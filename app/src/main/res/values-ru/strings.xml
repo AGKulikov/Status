@@ -1,0 +1,255 @@
+<!--
+  ~ Copyright © 2025-2026 Dezz (https://github.com/DezzK)
+  ~
+  ~ This program is free software: you can redistribute it and/or modify
+  ~ it under the terms of the GNU General Public License as published by
+  ~ the Free Software Foundation, either version 3 of the License, or
+  ~ (at your option) any later version.
+  ~
+  ~ This program is distributed in the hope that it will be useful,
+  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ~ GNU General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU General Public License
+  ~ along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  -->
+
+<resources>
+    <string name="app_name">Виджет информации</string>
+    <string name="accessibility_service_summary">Отслеживает активное приложение на каждом дисплее</string>
+    <string name="accessibility_service_description">Позволяет виджету определять, на каком физическом дисплее произошло переключение приложения. Нужно только для головных устройств с несколькими дисплеями: виджет будет скрываться/появляться только при переключении приложений на своём дисплее, не реагируя на другие.</string>
+
+    <string name="widget_title">Настройки виджета</string>
+    <string name="section_general">Виджет</string>
+    <string name="section_layout">Расположение</string>
+    <string name="section_appearance">Внешний вид</string>
+    <string name="enable_widget">Включить виджет</string>
+    <string name="widget_mode">Режим виджета</string>
+    <string-array name="widget_modes">
+        <item>Плавающий</item>
+        <item>Статусная строка</item>
+    </string-array>
+
+    <string name="widget_align_right">Привязать виджет к правому краю</string>
+    <string name="widget_align_right_hint">При изменении ширины содержимого правый край остаётся на месте, а левый сдвигается</string>
+    <string name="widget_position_x">Позиция виджета по X</string>
+    <string name="widget_position_y">Позиция виджета по Y</string>
+    <string name="widget_padding_left">Отступ слева</string>
+    <string name="widget_padding_right">Отступ справа</string>
+    <string name="widget_padding_top">Отступ сверху</string>
+    <string name="widget_padding_bottom">Отступ снизу</string>
+
+    <string name="icon_design">Дизайн иконок</string>
+    <string-array name="icon_designs">
+        <item>Классический</item>
+        <item>Силуэт</item>
+        <item>Полоски</item>
+    </string-array>
+
+    <string name="icon_style">Стиль иконок</string>
+    <string-array name="icon_styles">
+        <item>Монохромные</item>
+        <item>Цветные</item>
+    </string-array>
+
+    <string name="widget_theme">Тема виджета</string>
+    <string-array name="widget_themes">
+        <item>Системная</item>
+        <item>Светлая</item>
+        <item>Тёмная</item>
+        <item>Инверсная</item>
+    </string-array>
+
+    <string name="show_date">Показывать дату</string>
+    <string name="show_day_of_the_week">Показывать день недели</string>
+    <string name="one_line_layout">Однострочное расположение</string>
+    <string name="show_full_day_and_month">Не сокращать дни недели и месяцы</string>
+    <string name="date_before_day_of_week">Число перед днём недели</string>
+    <string name="brick_text_alignment">Выравнивание текста</string>
+    <string-array name="calendar_alignment_types">
+        <item>Влево</item>
+        <item>Центр</item>
+        <item>Вправо</item>
+    </string-array>
+    <string name="show_gnss_satellite_badge">Показывать спутники и режим</string>
+    <string name="show_gnss_satellite_badge_hint">Число спутников или маркер DR / анти-спуфинга. Требуется приложение GNSS Share.</string>
+    <string name="show_media_hint">Для отображения воспроизводимого медиа требуется доступ к уведомлениям.</string>
+    <string name="media_unknown_track">Идёт воспроизведение</string>
+    <string name="grant_notification_access">Открыть настройки доступа к уведомлениям</string>
+    <string name="notification_access_required">Предоставьте доступ к уведомлениям, чтобы виджет мог читать активную медиа-сессию</string>
+
+    <string name="add_element">Добавить элемент</string>
+    <string name="remove_element">Удалить элемент</string>
+    <string name="brick_reset_button">Сбросить настройки</string>
+    <string name="brick_reset_title">Сбросить настройки элемента?</string>
+    <string name="brick_reset_message">Все настройки этого элемента будут возвращены к значениям по умолчанию. Сам элемент останется в виджете.</string>
+    <string name="brick_drag_handle">Перетаскивание для изменения порядка</string>
+    <string name="brick_expand">Развернуть или свернуть настройки</string>
+    <string name="brick_title_time">Время</string>
+    <string name="brick_title_date">Дата и день недели</string>
+    <string name="brick_title_media">Воспроизведение</string>
+    <string name="brick_title_wifi">Wi-Fi</string>
+    <string name="brick_title_gps">GPS</string>
+    <string name="brick_title_bluetooth">Bluetooth</string>
+    <string name="brick_title_indoor_temp">Температура в салоне</string>
+    <string name="brick_title_outdoor_temp">Температура за бортом</string>
+    <string name="show_bluetooth_device_count_badge">Показывать число подключённых устройств</string>
+    <string name="brick_font_size">Размер шрифта</string>
+    <string name="brick_size">Размер</string>
+    <string name="brick_outline_alpha">Интенсивность обводки</string>
+    <string name="brick_outline_width">Толщина обводки</string>
+    <string name="brick_content_alpha">Непрозрачность</string>
+    <string name="brick_margin_start">Отступ слева</string>
+    <string name="brick_margin_end">Отступ справа</string>
+    <string name="brick_adjust_y">Сдвиг по вертикали</string>
+    <string name="brick_media_max_width">Максимальная ширина медиа</string>
+    <string name="brick_media_show_source">Показывать источник</string>
+    <string name="brick_media_title_first">Название перед исполнителем</string>
+    <string name="brick_media_marquee_enabled">Прокручивать длинное название</string>
+    <string name="brick_media_progress_bar_enabled">Показывать прогресс трека</string>
+    <string name="brick_media_duration_section">Длительность</string>
+    <string name="brick_media_show_duration">Показывать длительность</string>
+    <string name="brick_media_line_gap">Интервал между источником и названием</string>
+    <string name="brick_media_source_section">Источник</string>
+    <string name="brick_media_title_section">Композиция</string>
+    <string name="brick_font_family">Шрифт</string>
+    <string name="brick_font_bold">Жирный</string>
+    <string name="brick_font_italic">Курсив</string>
+    <string name="brick_font_bold_short">Ж</string>
+    <string name="brick_font_italic_short">К</string>
+    <string name="font_roboto_condensed">Roboto Condensed</string>
+    <string name="font_sans_serif">Без засечек</string>
+    <string name="font_sans_serif_condensed">Без засечек узкий</string>
+    <string name="font_sans_serif_light">Без засечек тонкий</string>
+    <string name="font_sans_serif_medium">Без засечек средний</string>
+    <string name="font_serif">С засечками</string>
+    <string name="font_monospace">Моноширинный</string>
+    <string name="brick_status_alignment">Выравнивание в статусной строке</string>
+    <string-array name="brick_status_alignments">
+        <item>Слева</item>
+        <item>Центр</item>
+        <item>Справа</item>
+    </string-array>
+    <string name="brick_hide_in_apps">Скрывать в приложениях…</string>
+    <string name="brick_hide_in_apps_count">Скрывать в приложениях… (%1$d)</string>
+    <string name="brick_hide_in_apps_title">Скрывать %1$s в:</string>
+    <string name="brick_hide_apply_to">Скрывать в тех же приложениях:</string>
+    <string name="brick_hide_inherited_hint">Скрывается в тех же приложениях, что и элемент «%1$s».</string>
+    <string name="brick_hide_use_own_list">Указать отдельный список приложений для скрытия элемента</string>
+    <string name="brick_hide_keeps_space">Сохранять место при скрытии</string>
+    <string name="value_edit_title">Введите значение</string>
+    <string name="presets_title">Пресеты</string>
+    <string name="presets_menu_entry">Пресеты…</string>
+    <string name="preset_save_current">Сохранить текущие</string>
+    <string name="preset_action_rename">Переименовать</string>
+    <string name="preset_rename_title">Переименование пресета</string>
+    <string name="preset_rename_confirm">Сохранить</string>
+    <string name="preset_rename_failed">Не удалось переименовать пресет</string>
+    <string name="preset_rename_collision">Пресет с таким именем уже существует</string>
+    <string name="preset_renamed_toast">Пресет переименован в «%1$s»</string>
+    <string name="preset_bundled_subtitle_prefix">Встроенный · %1$s</string>
+
+    <string name="background_transparency">Интенсивность фона</string>
+    <string name="background_corner_radius">Скругление углов фона</string>
+    <string name="size_value_format">%d пикс.</string>
+
+    <string name="permissions_required">Требуется предоставить разрешения</string>
+    <string name="overlay_permission_required">Требуется разрешение отображения поверх всех окон</string>
+    <string name="background_location_required">Требуется доступ к геолокации в фоне</string>
+    <string name="background_location_settings_hint">Выберите «Разрешить в любом режиме» для доступа к геолокации</string>
+    <string name="usage_access_required">Предоставьте доступ к данным об использовании, чтобы виджет видел текущее приложение</string>
+    <string name="system_settings_not_available">На этом устройстве нет нужного окна системных настроек</string>
+    <string name="privileged_grant_success">Разрешения получены автоматически: %1$s</string>
+    <string name="privileged_grant_failed">Не удалось получить разрешения: %1$s</string>
+    <string name="permission_label_overlay">поверх окон</string>
+    <string name="permission_label_foreground_location">геолокация</string>
+    <string name="permission_label_background_location">геолокация в фоне</string>
+    <string name="permission_label_usage_access">доступ к статистике</string>
+    <string name="permission_label_notification">доступ к уведомлениям</string>
+    <string name="permission_label_accessibility">специальные возможности</string>
+    <string name="hide_in_apps_button">Скрывать в приложениях…</string>
+    <string name="hide_in_apps_title">Скрывать в:</string>
+    <string name="app_selection_load_failed_title">Не удалось загрузить список приложений</string>
+    <string name="app_selection_load_failed_message">Произошла ошибка:\n\n%1$s</string>
+    <string name="menu_about">О приложении</string>
+    <string name="menu_import_preset">Импортировать пресет…</string>
+    <string name="menu_export_settings">Экспорт настроек…</string>
+    <string name="menu_import_settings">Импорт настроек…</string>
+    <string name="menu_reset_settings">Сбросить настройки…</string>
+    <string name="menu_settings">Настройки</string>
+
+    <string name="preset_apply_title">Применить пресет?</string>
+    <string name="preset_apply_message">Текущие настройки будут заменены пресетом «%1$s». Действие нельзя отменить.</string>
+    <string name="preset_apply_confirm">Применить</string>
+    <string name="preset_apply_failed">Не удалось применить пресет</string>
+    <string name="preset_applied_toast">Пресет «%1$s» применён</string>
+
+    <string name="preset_user_subtitle">Пользовательский</string>
+    <string name="preset_action_export">Экспортировать</string>
+    <string name="preset_action_delete">Удалить</string>
+
+    <string name="preset_name_hint">Название пресета</string>
+    <string name="preset_name_invalid">Название должно содержать хотя бы одну букву или цифру</string>
+
+    <string name="preset_save_title">Сохранить текущие настройки как пресет</string>
+    <string name="preset_save_confirm">Сохранить</string>
+    <string name="preset_save_failed">Не удалось сохранить пресет</string>
+    <string name="preset_saved_toast">Пресет «%1$s» сохранён</string>
+
+    <string name="preset_import_title">Импорт пресета</string>
+    <string name="preset_import_failed">Не удалось импортировать пресет</string>
+
+    <string name="preset_overwrite_title">Перезаписать пресет?</string>
+    <string name="preset_overwrite_message">Пресет «%1$s» уже существует. Перезаписать?</string>
+    <string name="preset_overwrite_confirm">Перезаписать</string>
+
+    <string name="preset_export_failed">Не удалось экспортировать пресет</string>
+    <string name="preset_exported_toast">Пресет «%1$s» экспортирован</string>
+
+    <string name="preset_delete_title">Удалить пресет?</string>
+    <string name="preset_delete_message">Пресет «%1$s» будет удалён без возможности восстановления.</string>
+    <string name="preset_delete_confirm">Удалить</string>
+    <string name="preset_delete_failed">Не удалось удалить пресет</string>
+    <string name="preset_deleted_toast">Пресет «%1$s» удалён</string>
+
+    <string name="preset_minimal_name">Минимум</string>
+    <string name="preset_minimal_desc">Только крупные плавающие часы, без фона и обводки</string>
+    <string name="preset_standard_name">Стандартный</string>
+    <string name="preset_standard_desc">Все элементы в плавающем режиме: время, дата, медиа, Wi-Fi, GPS</string>
+    <string name="preset_status_bar_name">Статусная строка</string>
+    <string name="preset_status_bar_desc">Компактная полоса во всю ширину сверху экрана</string>
+    <string name="preset_sunlight_name">Под солнцем</string>
+    <string name="preset_sunlight_desc">Высококонтрастная тёмная тема с толстой обводкой для яркого дня</string>
+    <string name="preset_retro_name">Ретро</string>
+    <string name="preset_retro_desc">Крупные моноширинные жирные цифры — классические электронные часы</string>
+
+    <string name="crash_report_title">Приложение упало в прошлый раз</string>
+    <string name="crash_report_copy">Копировать</string>
+    <string name="crash_report_share">Отправить</string>
+    <string name="crash_report_dismiss">Отклонить</string>
+    <string name="crash_report_copied">Скопировано в буфер обмена</string>
+    <string name="crash_report_chooser">Отправить отчёт о сбое</string>
+    <string name="reset_settings_title">Сбросить настройки?</string>
+    <string name="reset_settings_message">Все настройки будут возвращены к значениям по умолчанию, виджет остановится. Действие нельзя отменить.</string>
+    <string name="reset_settings_confirm">Сбросить</string>
+    <string name="export_chooser_title">Экспорт настроек</string>
+    <string name="export_failed_toast">Не удалось экспортировать настройки</string>
+    <string name="import_success_toast">Настройки импортированы</string>
+    <string name="import_failed_toast">Не удалось импортировать настройки</string>
+    <string name="import_invalid_file_toast">Этот файл не является экспортом настроек Виджета информации</string>
+    <string name="about_fallback"><![CDATA[
+        <p><b>Виджет информации</b><br>
+        Плавающий виджет статуса для автомобильных головных устройств на Android.</p>
+        <p><b>Авторы</b><br>
+        Dezz — Telegram <a href="https://t.me/DezzK">@DezzK</a><br>
+        S. Ramazanov — Telegram <a href="https://t.me/RamazanovS">@RamazanovS</a></p>
+        <p><b>Исходный код</b><br>
+        <a href="https://github.com/DezzK/status-widget">github.com/DezzK/status-widget</a></p>
+        <p><i>Полная страница «О приложении» доступна онлайн по адресу <a href="https://dezzk.github.io/status-widget/">dezzk.github.io/status-widget</a> при наличии подключения к интернету.</i></p>
+    ]]></string>
+    <string name="all_permissions_granted_toast">Все разрешения предоставлены!</string>
+    <string name="missing_permissions_toast">Некоторые разрешения не предоставлены. Приложение может работать некорректно.</string>
+    <string name="notification_channel_title">Служба виджета статуса</string>
+    <string name="notification_content">Служба виджета запущена</string>
+</resources>
