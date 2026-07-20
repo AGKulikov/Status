@@ -96,6 +96,7 @@ dependencies {
     implementation libs.core
     implementation libs.constraintlayout
     implementation libs.material
+    implementation libs.okhttp
     implementation libs.recyclerview
 
     // eCarX AdaptAPI (Geely flavor only) — class-jar converted from the vendor-distributed
@@ -103,4 +104,7 @@ dependencies {
     // must not import com.ecarx.* — only app/src/geely may.
     geelyImplementation files('libs/geely/ecarx-adaptapi.jar')
     testImplementation 'junit:junit:4.13.2'
+    // Android's local-unit-test stub throws from org.json methods. Protocol fixtures need the
+    // real implementation so auth/catalog/event compatibility is tested on every CI build.
+    testImplementation 'org.json:json:20240303'
 }

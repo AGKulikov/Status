@@ -7,10 +7,14 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import dezz.status.widget.automation.AutomationContract;
+import dezz.status.widget.integration.ActionBinding;
+import dezz.status.widget.integration.SourceBinding;
+import dezz.status.widget.scenario.RuleSet;
+import dezz.status.widget.scenario.ScenarioPresets;
 
 /** Independent configuration of one text/tile cell in the second floating overlay. */
 public final class PopupItemConfig {
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 4;
     public static final String TYPE_HA_DEVICE = "HA_DEVICE";
     public static final String TYPE_HA_TEXT = "HA_TEXT";
     public static final String TYPE_HA_BUTTON = "HA_BUTTON";
@@ -20,6 +24,12 @@ public final class PopupItemConfig {
     public String id;
     /** Runtime state id. Kept separate so a local editor identity never changes MQTT topics. */
     public String automationId;
+    /** Connector-neutral value source. Missing legacy data migrates from {@link #automationId}. */
+    public SourceBinding sourceBinding;
+    /** Connector-neutral press action. Missing legacy data migrates from actionId/payload. */
+    public ActionBinding actionBinding;
+    /** Local first-match presentation rules. Connectors publish raw values, never colors. */
+    public RuleSet displayRules;
     public String type;
     /** Stable builtin.* id used only by TYPE_BUILTIN. */
     public String builtinId;
@@ -85,6 +95,9 @@ public final class PopupItemConfig {
         PopupItemConfig c = new PopupItemConfig();
         c.id = AutomationContract.requireSafeId(id);
         c.automationId = c.id;
+        c.sourceBinding = SourceBinding.legacy(c.automationId);
+        c.actionBinding = ActionBinding.unbound();
+        c.displayRules = ScenarioPresets.raw();
         c.type = TYPE_HA_DEVICE;
         c.builtinId = "";
         c.name = id;
@@ -207,6 +220,14 @@ public final class PopupItemConfig {
         c.confirmationRequired = o.optBoolean("confirmationRequired", c.confirmationRequired);
         c.confirmationText = o.optString("confirmationText", c.confirmationText);
         c.autoHideAfterAction = o.optBoolean("autoHideAfterAction", c.autoHideAfterAction);
+        JSONObject source = o.optJSONObject("sourceBinding");
+        c.sourceBinding = source == null ? SourceBinding.legacy(c.automationId)
+                : SourceBinding.fromJson(source);
+        JSONObject action = o.optJSONObject("actionBinding");
+        c.actionBinding = action == null ? ActionBinding.legacy(c.actionId, c.actionPayload)
+                : ActionBinding.fromJson(action);
+        JSONObject rules = o.optJSONObject("displayRules");
+        c.displayRules = rules == null ? defaultRules(c.sourceBinding) : RuleSet.fromJson(rules);
         return c;
     }
 
@@ -217,6 +238,13 @@ public final class PopupItemConfig {
         o.put("id", id).put("automationId", automationId).put("type", type)
                 .put("builtinId", builtinId).put("name", name)
                 .put("enabled", enabled).put("order", order);
+        o.put("sourceBinding", sourceBinding == null
+                ? SourceBinding.legacy(automationId).toJson() : sourceBinding.toJson());
+        o.put("actionBinding", actionBinding == null
+                ? ActionBinding.legacy(actionId, actionPayload).toJson()
+                : actionBinding.toJson());
+        o.put("displayRules", (displayRules == null ? defaultRules(sourceBinding) : displayRules)
+                .toJson());
         o.put("row", row).put("column", column).put("rowSpan", rowSpan)
                 .put("columnSpan", columnSpan);
         o.put("icon", icon).put("iconSize", iconSize).put("iconColor", iconColor)
@@ -247,6 +275,20 @@ public final class PopupItemConfig {
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    @NonNull
+    private static RuleSet defaultRules(SourceBinding binding) {
+        String presentation = binding == null ? SourceBinding.PRESENTATION_RAW
+                : binding.presentation;
+        if (SourceBinding.PRESENTATION_COVER.equals(presentation)) return ScenarioPresets.cover();
+        if (SourceBinding.PRESENTATION_BOOLEAN.equals(presentation)) {
+            return ScenarioPresets.booleanState();
+        }
+        if (SourceBinding.PRESENTATION_TEMPERATURE.equals(presentation)) {
+            return ScenarioPresets.temperature();
+        }
+        return ScenarioPresets.raw();
     }
 
     private static String normalizeType(String value) {

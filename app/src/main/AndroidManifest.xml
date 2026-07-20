@@ -58,6 +58,7 @@
     <application
         android:name=".StatusWidgetApplication"
         android:allowBackup="true"
+        android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/Theme.StatusWidget">
@@ -86,6 +87,18 @@
 
         <activity
             android:name=".PopupSettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".SprutHubSettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".HomeAssistantSettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ScenarioSettingsActivity"
             android:exported="false" />
 
         <activity
