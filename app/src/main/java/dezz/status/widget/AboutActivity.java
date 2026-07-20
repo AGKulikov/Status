@@ -151,9 +151,9 @@ public class AboutActivity extends AppCompatActivity {
     private void renderCarDiagnostics() {
         if (binding == null) return;
         LinearLayout container = binding.carDiagnosticsContainer;
-        while (container.getChildCount() > 1) {
-            container.removeViewAt(container.getChildCount() - 1);
-        }
+        // The status is now a sibling above this dynamic list, so every child here belongs to
+        // the previous render. Clearing all of them prevents duplicate action rows on refresh.
+        container.removeAllViews();
 
         String connectorState = catalogIsFresh
                 ? "Sprut.hub ONLINE, используется актуальный каталог"
