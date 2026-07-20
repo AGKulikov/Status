@@ -36,11 +36,12 @@ import java.util.Set;
 
 public class Preferences {
     private static final String TAG = "Preferences";
-    /** Secrets never leave the device through settings exports or presets. Keep future connector
-     * credentials here as well so adding a transport cannot accidentally make them exportable. */
+    /** Secrets and installation identities never leave the device through settings exports or
+     * presets. Keep future connector credentials/identities here as well so adding a transport
+     * cannot accidentally make them exportable or clone one client identity to another device. */
     private static final Set<String> SECRET_PREFERENCE_KEYS = Collections.unmodifiableSet(
             new HashSet<>(java.util.Arrays.asList(
-                    "mqttPassword", "sprutPassword", "haAccessToken",
+                    "mqttPassword", "sprutPassword", "sprutClientId", "haAccessToken",
                     // Contains both the full bearer action and fixed-endpoint token. Layout
                     // presets are routinely shared, so rules must remain device-local too.
                     "intentActionRulesJson")));
@@ -458,6 +459,8 @@ public class Preferences {
             "ws://192.168.1.2/spruthub");
     public final Str sprutEmail = new Str(this, "sprutEmail", "");
     public final Secret sprutPassword = new Secret(this, "sprutPassword");
+    /** Stable cloud client identity, equivalent to the official web app's persisted cid. */
+    public final Str sprutClientId = new Str(this, "sprutClientId", "");
     /** Optional hub serial. Empty means select the only/first hub returned by hub.list. */
     public final Str sprutHubSerial = new Str(this, "sprutHubSerial", "");
     public final Bool sprutKeepAwake = new Bool(this, "sprutKeepAwake", true);

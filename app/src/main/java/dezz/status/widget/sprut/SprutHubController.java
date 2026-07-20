@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executors;
@@ -74,6 +75,7 @@ public final class SprutHubController {
     private final PopupItemConfigStore popupConfigs;
     private final SprutHubCatalogStore catalogStore;
     private final Listener listener;
+    private final String clientId;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
             runnable -> {
                 Thread thread = new Thread(runnable, "spruthub-controller");
@@ -109,6 +111,12 @@ public final class SprutHubController {
         this.states = states;
         this.values = values;
         this.listener = listener;
+        String savedClientId = prefs.sprutClientId.get().trim();
+        if (savedClientId.isEmpty()) {
+            savedClientId = UUID.randomUUID().toString();
+            prefs.sprutClientId.set(savedClientId);
+        }
+        clientId = savedClientId;
         mainConfigs = new HaBrickConfigStore(prefs);
         popupConfigs = new PopupItemConfigStore(prefs);
         catalogStore = new SprutHubCatalogStore(context);
@@ -333,7 +341,7 @@ public final class SprutHubController {
         final SprutHubRpcClient[] owner = new SprutHubRpcClient[1];
         final SprutHubRpcClient next;
         try {
-            next = new SprutHubRpcClient(prefs.sprutWebSocketUrl.get(),
+            next = new SprutHubRpcClient(prefs.sprutWebSocketUrl.get(), clientId,
                     new SprutHubRpcClient.Listener() {
                         @Override public void onOpen() {
                             SprutHubRpcClient source = owner[0];
@@ -393,7 +401,9 @@ public final class SprutHubController {
                         throw new CompletionException(new IOException("Superseded connection"));
                     }
                     current.setSession(token, null);
-                    return selectHub(current, token).thenApply(ignored -> token);
+                    return selectHub(current, token)
+                            .thenCompose(ignored -> current.registerClientInfo())
+                            .thenApply(ignored -> token);
                 })
                 .thenCompose(token -> syncSnapshot(current, expectedGeneration))
                 .whenComplete((result, failure) -> {
@@ -438,6 +448,9 @@ public final class SprutHubController {
         return current.call(hubList).handle((response, failure) -> {
             String configured = prefs.sprutHubSerial.get().trim();
             if (failure != null) {
+                // The official relay guarantees hub.list. Do not hide a cloud protocol error and
+                // then misleadingly report it as room.list/accessory.list during the snapshot.
+                if (current.isOfficialCloud()) throw new CompletionException(failure);
                 current.setSession(token, configured);
                 return (Void) null;
             }
@@ -450,16 +463,39 @@ public final class SprutHubController {
                     if (hub == null) continue;
                     String serial = firstNonBlank(hub.optString("serial", ""),
                             hub.optString("serialNumber", ""), hub.optString("id", ""));
-                    if (selected == null || (!configured.isEmpty() && configured.equals(serial))) {
+                    if (configured.isEmpty()) {
+                        // Prefer an online hub when an account contains old/offline entries.
+                        // Keep the first entry only as a diagnostic fallback when none is online.
+                        if (selected == null || (!selected.optBoolean("online", false)
+                                && hub.optBoolean("online", false))) {
+                            selected = hub;
+                        }
+                    } else if (!configured.isEmpty() && configured.equals(serial)) {
                         selected = hub;
+                        break;
                     }
-                    if (!configured.isEmpty() && configured.equals(serial)) break;
                 }
+            }
+            if (current.isOfficialCloud() && selected == null) {
+                throw new CompletionException(new IOException(configured.isEmpty()
+                        ? "hub.list: account has no hubs"
+                        : "hub.list: configured hub " + configured + " was not found"));
             }
             String selectedSerial = configured;
             if (selected != null) {
                 selectedSerial = firstNonBlank(configured, selected.optString("serial", ""),
                         selected.optString("serialNumber", ""), selected.optString("id", ""));
+                if (current.isOfficialCloud() && selected.has("online")
+                        && !selected.optBoolean("online", false)) {
+                    Object lastSeen = selected.opt("lastSeen");
+                    String hint = current.isBetaCloud()
+                            ? "; if the hub is on the release branch, use "
+                                    + "wss://web.spruthub.ru/spruthub"
+                            : "";
+                    throw new CompletionException(new IOException(
+                            "hub.list: hub " + selectedSerial + " is offline (lastSeen="
+                                    + (lastSeen == null ? "unknown" : lastSeen) + ")" + hint));
+                }
                 JSONObject version = selected.optJSONObject("version");
                 JSONObject currentVersion = version == null ? null : version.optJSONObject("current");
                 if (currentVersion != null && currentVersion.has("revision")) {
@@ -500,13 +536,16 @@ public final class SprutHubController {
 
             CompletableFuture<JSONObject> rooms = current.call(
                     SprutProtocolAdapter.buildRoomListParams(), 20_000L);
+            String primaryExpand = current.isOfficialCloud()
+                    ? SprutProtocolAdapter.EXPAND_COMMA : SprutProtocolAdapter.EXPAND_PLUS;
+            String fallbackExpand = current.isOfficialCloud()
+                    ? SprutProtocolAdapter.EXPAND_PLUS : SprutProtocolAdapter.EXPAND_COMMA;
             CompletableFuture<JSONObject> accessories = current.call(
-                            SprutProtocolAdapter.buildAccessoryListParams(
-                                    SprutProtocolAdapter.EXPAND_PLUS), 20_000L)
+                            SprutProtocolAdapter.buildAccessoryListParams(primaryExpand), 20_000L)
                     .handle((value, failure) -> failure == null
                             ? CompletableFuture.completedFuture(value)
                             : current.call(SprutProtocolAdapter.buildAccessoryListParams(
-                                    SprutProtocolAdapter.EXPAND_COMMA), 20_000L))
+                                    fallbackExpand), 20_000L))
                     .thenCompose(stage -> stage);
             CompletableFuture<JSONObject> serviceTypes = current.call(
                             object("service", object("types", new JSONObject())), 20_000L)
