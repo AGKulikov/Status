@@ -94,6 +94,15 @@ import java.util.Set;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.databinding.OverlayStatusWidgetBinding;
+import dezz.status.widget.automation.AutomationContract;
+import dezz.status.widget.automation.AutomationState;
+import dezz.status.widget.automation.AutomationStateStore;
+import dezz.status.widget.ha.HaBrickConfig;
+import dezz.status.widget.ha.HaBrickConfigStore;
+import dezz.status.widget.mqtt.MqttController;
+import dezz.status.widget.popup.PopupOverlayController;
+import dezz.status.widget.popup.PopupItemConfig;
+import dezz.status.widget.popup.PopupItemConfigStore;
 
 public class WidgetService extends Service {
     enum GnssState {
@@ -202,6 +211,10 @@ public class WidgetService extends Service {
     private static WidgetService instance;
 
     private Preferences prefs;
+    private AutomationStateStore automationStates;
+    private HaBrickConfigStore haConfigs;
+    private MqttController mqttController;
+    private PopupOverlayController popupOverlay;
 
     private WindowManager windowManager;
     private WindowManager.LayoutParams params;
@@ -219,6 +232,25 @@ public class WidgetService extends Service {
     private boolean btReceiverRegistered = false;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    /** Re-evaluates TTL/stale rules even when no new packet arrives. */
+    private final Runnable automationFreshnessTick = new Runnable() {
+        @Override public void run() {
+            if (binding != null) {
+                renderHomeAssistantBricks();
+                applyBrickVisibility(currentBrickSet());
+            }
+            if (popupOverlay != null) popupOverlay.applyPreferences();
+            mainHandler.postDelayed(this, 30_000L);
+        }
+    };
+    private final Runnable popupRefresh = () -> {
+        if (popupOverlay != null) popupOverlay.applyPreferences();
+    };
+
+    private void schedulePopupRefresh() {
+        mainHandler.removeCallbacks(popupRefresh);
+        mainHandler.post(popupRefresh);
+    }
     private LocationManager locationManager = null;
     private ConnectivityManager connectivityManager = null;
     private long lastLocationUpdateTime = 0;
@@ -492,6 +524,21 @@ public class WidgetService extends Service {
     @Override
     public void onCreate() {
         prefs = new Preferences(this);
+        automationStates = new AutomationStateStore(this);
+        haConfigs = new HaBrickConfigStore(prefs);
+        mqttController = new MqttController(this, prefs, automationStates,
+                new MqttController.StateListener() {
+                    @Override public void onStateChanged(String scope, String id) {
+                        onAutomationStateChanged(scope, id);
+                    }
+
+                    @Override public void onConnectionChanged(boolean connected, String detail) {
+                        Log.i(TAG, "MQTT " + (connected ? "connected" : "disconnected")
+                                + ": " + detail);
+                    }
+                });
+        popupOverlay = new PopupOverlayController(this, prefs, automationStates, mqttController,
+                this::popupBuiltinValue);
 
         createNotificationChannel();
         startForeground(NOTIFICATION_ID, createNotification());
@@ -520,6 +567,9 @@ public class WidgetService extends Service {
         });
 
         createOverlayView();
+        mqttController.reconfigure();
+        popupOverlay.applyPreferences();
+        mainHandler.postDelayed(automationFreshnessTick, 30_000L);
     }
 
     private void createOverlayView() {
@@ -680,6 +730,8 @@ public class WidgetService extends Service {
 
     @SuppressLint("MissingPermission")
     public void applyPreferences() {
+        if (mqttController != null) mqttController.reconfigure();
+        if (popupOverlay != null) popupOverlay.applyPreferences();
         hiddenInPackages = prefs.hideInPackages.get();
         rebuildEffectiveHideLists();
         updateForegroundAppTracking();
@@ -691,6 +743,8 @@ public class WidgetService extends Service {
         List<BrickType> bricks = BrickType.parseOrder(prefs.brickOrder.get());
         Set<BrickType> bricksSet = EnumSet.noneOf(BrickType.class);
         bricksSet.addAll(bricks);
+        Set<BrickType> trackingSet = EnumSet.copyOf(bricksSet);
+        trackingSet.addAll(popupBuiltinTypes());
 
         // The content-change LayoutTransition only makes sense in floating mode, where the
         // widget's own width animates as brick content grows/shrinks. In status-bar mode the
@@ -714,6 +768,7 @@ public class WidgetService extends Service {
         applyBluetoothBrickSettings();
         applyIndoorTempBrickSettings();
         applyOutdoorTempBrickSettings();
+        renderHomeAssistantBricks();
 
         applyBrickVisibility(bricksSet);
         applyOverlayPosition();
@@ -752,13 +807,13 @@ public class WidgetService extends Service {
                 computeMinWidgetHeight(bricksSet) + verticalPadding);
 
         mainHandler.removeCallbacks(updateDateTimeRunnable);
-        if (bricksSet.contains(BrickType.TIME) || bricksSet.contains(BrickType.DATE)) {
+        if (trackingSet.contains(BrickType.TIME) || trackingSet.contains(BrickType.DATE)) {
             long now = System.currentTimeMillis();
             long delay = DATETIME_UPDATE_INTERVAL_MS - (now % DATETIME_UPDATE_INTERVAL_MS);
             mainHandler.postDelayed(updateDateTimeRunnable, delay);
         }
 
-        if (bricksSet.contains(BrickType.WIFI)) {
+        if (trackingSet.contains(BrickType.WIFI)) {
             if (connectivityManager == null) {
                 connectivityManager = getSystemService(ConnectivityManager.class);
 
@@ -791,7 +846,7 @@ public class WidgetService extends Service {
             connectivityManager = null;
         }
 
-        if (bricksSet.contains(BrickType.GPS)) {
+        if (trackingSet.contains(BrickType.GPS)) {
             if (locationManager == null) {
                 locationManager = getSystemService(LocationManager.class);
 
@@ -813,7 +868,7 @@ public class WidgetService extends Service {
             locationManager = null;
         }
 
-        if (bricksSet.contains(BrickType.BLUETOOTH)) {
+        if (trackingSet.contains(BrickType.BLUETOOTH)) {
             registerBluetoothReceiver();
             refreshBtConnectedFromProxies();
         } else {
@@ -822,7 +877,7 @@ public class WidgetService extends Service {
         }
         updateBluetoothStatus();
 
-        if (bricksSet.contains(BrickType.MEDIA) && Permissions.isNotificationAccessGranted(this)) {
+        if (trackingSet.contains(BrickType.MEDIA) && Permissions.isNotificationAccessGranted(this)) {
             enableMediaTracking();
         } else {
             disableMediaTracking();
@@ -831,8 +886,24 @@ public class WidgetService extends Service {
 
         // Car temperature bricks — one subscription per brick through the flavor's
         // CarIntegration; the callback lands on the main thread per its contract.
-        updateCarTempSubscription(BrickType.INDOOR_TEMP, bricksSet, binding.indoorTempText);
-        updateCarTempSubscription(BrickType.OUTDOOR_TEMP, bricksSet, binding.outdoorTempText);
+        updateCarTempSubscription(BrickType.INDOOR_TEMP, trackingSet, binding.indoorTempText);
+        updateCarTempSubscription(BrickType.OUTDOOR_TEMP, trackingSet, binding.outdoorTempText);
+    }
+
+    private Set<BrickType> popupBuiltinTypes() {
+        Set<BrickType> result = EnumSet.noneOf(BrickType.class);
+        if (!prefs.popupEnabled.get()) return result;
+        for (PopupItemConfig item : new PopupItemConfigStore(prefs).load()) {
+            if (!item.enabled || !PopupItemConfig.TYPE_BUILTIN.equals(item.type)) continue;
+            for (BrickType type : BrickType.values()) {
+                if (type.automationId().equals(item.builtinId)) result.add(type);
+            }
+        }
+        return result;
+    }
+
+    private boolean isPopupBuiltinRequested(BrickType type) {
+        return popupBuiltinTypes().contains(type);
     }
 
     private void updateCarTempSubscription(BrickType type, Set<BrickType> bricksSet,
@@ -853,6 +924,7 @@ public class WidgetService extends Service {
             car.subscribe(type, (brickType, value) -> {
                 if (binding == null) return;
                 target.setText(formatTemperature(value));
+                schedulePopupRefresh();
             });
         } else {
             car.unsubscribe(type);
@@ -1011,6 +1083,8 @@ public class WidgetService extends Service {
                 return binding.indoorTempText;
             case OUTDOOR_TEMP:
                 return binding.outdoorTempText;
+            case HOME_ASSISTANT:
+                return binding.homeAssistantContainer;
             default:
                 return null;
         }
@@ -1026,6 +1100,78 @@ public class WidgetService extends Service {
 
     private void applyOutdoorTempBrickSettings() {
         applySingleLineTextBrick(binding.outdoorTempText, prefs.outdoorTemp);
+    }
+
+    /** Rebuilds the dynamic HA row from independent configs and persistent runtime state. */
+    private void renderHomeAssistantBricks() {
+        if (binding == null || automationStates == null || haConfigs == null) return;
+        LinearLayout container = binding.homeAssistantContainer;
+        container.removeAllViews();
+        long now = System.currentTimeMillis();
+        for (HaBrickConfig config : haConfigs.loadMain()) {
+            if (!config.enabled) continue;
+            AutomationState state = automationStates.get(AutomationContract.SCOPE_MAIN, config.id);
+            if (!state.visible) continue;
+
+            boolean hiddenByOwnAppList = lastForegroundPackage != null
+                    && config.hideInPackages.contains(lastForegroundPackage);
+            boolean hiddenByGroupList = config.inheritGroupHide
+                    && isBrickHiddenByApp(BrickType.HOME_ASSISTANT);
+            if ((hiddenByOwnAppList || hiddenByGroupList) && !config.hideKeepsSpace) continue;
+
+            boolean stale = state.present
+                    && state.isStale(now, config.staleAfterSeconds * 1000L);
+            String text;
+            String color;
+            if (!state.present) {
+                text = config.pendingText;
+                color = config.pendingColor;
+            } else if (stale) {
+                text = config.staleText;
+                color = config.staleColor;
+            } else if (state.text == null) {
+                text = config.defaultText;
+                color = config.defaultColor;
+            } else if (TextUtils.isEmpty(state.text)) {
+                text = config.emptyText;
+                color = TextUtils.isEmpty(state.color) ? config.emptyColor : state.color;
+            } else {
+                text = state.text;
+                color = TextUtils.isEmpty(state.color) ? config.defaultColor : state.color;
+            }
+            if (config.collapseWhenEmpty && TextUtils.isEmpty(text)) continue;
+
+            MarqueeOutlineTextView view = new MarqueeOutlineTextView(
+                    themedContext != null ? themedContext : this);
+            view.setTag(config.id);
+            view.setIncludeFontPadding(false);
+            view.setSingleLine(true);
+            view.setTextSize(TypedValue.COMPLEX_UNIT_PX, config.fontSize);
+            view.setTypeface(Fonts.resolve(this, config.fontFamily, config.bold, config.italic));
+            view.setTextColor(AutomationState.parseColor(color, 0xFFFFFFFF));
+            int outlineBase = AutomationState.parseColor(config.outlineColor, 0xFF000000);
+            view.setOutlineColor((outlineBase & 0x00FFFFFF) | (config.outlineAlpha << 24));
+            view.setOutlineWidth(config.outlineWidth);
+            view.setAlpha(config.contentAlpha / 255f);
+            if (hiddenByOwnAppList || hiddenByGroupList) view.setAlpha(0f);
+            view.setTranslationY(config.adjustY);
+            view.setPadding(config.paddingLeft, config.paddingTop,
+                    config.paddingRight, config.paddingBottom);
+            if (config.maxWidth > 0) view.setMaxWidth(config.maxWidth);
+            view.setMarqueeEnabled(config.marquee);
+            view.setMarqueeText(text);
+
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.gravity = Gravity.CENTER_VERTICAL;
+            lp.setMarginStart(config.marginStart);
+            lp.setMarginEnd(config.marginEnd);
+            container.addView(view, lp);
+        }
+        applyHorizontalMargins(container, prefs.homeAssistant.marginStart.get(),
+                prefs.homeAssistant.marginEnd.get());
+        container.setTranslationY(prefs.homeAssistant.adjustY.get());
+        container.setAlpha(prefs.homeAssistant.contentAlpha.get() / 255f);
     }
 
     private void applyDateBrickSettings() {
@@ -1269,6 +1415,11 @@ public class WidgetService extends Service {
         for (Set<String> s : effectiveHideLists.values()) {
             if (s != null && !s.isEmpty()) return true;
         }
+        if (haConfigs != null) {
+            for (HaBrickConfig config : haConfigs.loadMain()) {
+                if (!config.hideInPackages.isEmpty()) return true;
+            }
+        }
         return false;
     }
 
@@ -1284,6 +1435,8 @@ public class WidgetService extends Service {
                 && car.isBrickSupported(BrickType.INDOOR_TEMP);
         boolean outdoorTempActive = bricksSet.contains(BrickType.OUTDOOR_TEMP)
                 && car.isBrickSupported(BrickType.OUTDOOR_TEMP);
+        boolean homeAssistantActive = bricksSet.contains(BrickType.HOME_ASSISTANT)
+                && binding.homeAssistantContainer.getChildCount() > 0;
         BrickTarget[] targets = {
                 resolveTarget(BrickType.TIME, bricksSet.contains(BrickType.TIME),
                         binding.timeText, prefs.time.contentAlpha.get()),
@@ -1299,10 +1452,13 @@ public class WidgetService extends Service {
                         binding.indoorTempText, prefs.indoorTemp.contentAlpha.get()),
                 resolveTarget(BrickType.OUTDOOR_TEMP, outdoorTempActive,
                         binding.outdoorTempText, prefs.outdoorTemp.contentAlpha.get()),
+                resolveTarget(BrickType.HOME_ASSISTANT, homeAssistantActive,
+                        binding.homeAssistantContainer, prefs.homeAssistant.contentAlpha.get()),
         };
 
         // Media has the extra session gate, so we build its BrickTarget here.
-        boolean mediaShouldBeGone = !bricksSet.contains(BrickType.MEDIA);
+        boolean mediaShouldBeGone = !bricksSet.contains(BrickType.MEDIA)
+                || !isRemotelyVisible(BrickType.MEDIA);
         boolean mediaHiddenByApp = !mediaShouldBeGone && isBrickHiddenByApp(BrickType.MEDIA);
         BrickTarget mediaTarget;
         if (mediaShouldBeGone) {
@@ -1384,10 +1540,12 @@ public class WidgetService extends Service {
     private BrickTarget resolveTarget(BrickType type, boolean activeInLayout, View view,
                                       int contentAlphaPref) {
         float baseAlpha = contentAlphaPref / 255f;
-        if (!activeInLayout) {
+        if (!activeInLayout || !isRemotelyVisible(type)) {
             return new BrickTarget(view, View.GONE, baseAlpha);
         }
-        if (isBrickHiddenByApp(type)) {
+        // HA children independently choose whether to inherit the group's app list; their
+        // renderer has already removed or made transparent the matching children.
+        if (type != BrickType.HOME_ASSISTANT && isBrickHiddenByApp(type)) {
             if (prefs.hideKeepsSpaceFor(type).get()) {
                 // VISIBLE-with-alpha-0 replaces the old INVISIBLE constant — same effect on
                 // layout (space preserved) but animatable.
@@ -1396,6 +1554,72 @@ public class WidgetService extends Service {
             return new BrickTarget(view, View.GONE, baseAlpha);
         }
         return new BrickTarget(view, View.VISIBLE, baseAlpha);
+    }
+
+    private boolean isRemotelyVisible(BrickType type) {
+        return automationStates == null || automationStates
+                .get(AutomationContract.SCOPE_BUILTIN, type.automationId()).visible;
+    }
+
+    /** Called after either an exported Broadcast or MQTT packet has been persisted. */
+    public void onAutomationStateChanged(String scope, String id) {
+        mainHandler.post(() -> {
+            if (binding == null) return;
+            if (AutomationContract.SCOPE_MAIN.equals(scope)) renderHomeAssistantBricks();
+            if (popupOverlay != null) popupOverlay.onStateChanged(scope);
+            applyBrickVisibility(currentBrickSet());
+        });
+    }
+
+    /** Read-only snapshots let the second overlay reuse original brick data without duplicating
+     * notification, eCarX, GNSS or connectivity listeners. Called only on the main thread. */
+    @Nullable
+    private PopupOverlayController.BuiltinValue popupBuiltinValue(@NonNull String id) {
+        if (binding == null) return null;
+        switch (id) {
+            case "builtin.time":
+                return new PopupOverlayController.BuiltinValue(timeFormat.format(new Date()),
+                        "#FFFFFFFF", null, true);
+            case "builtin.date":
+                return new PopupOverlayController.BuiltinValue(String.valueOf(binding.dateText.getText()),
+                        "#FFFFFFFF", null, true);
+            case "builtin.media":
+                return new PopupOverlayController.BuiltinValue(lastMediaSubtitle,
+                        "#FFFFFFFF", null, !isEmpty(lastMediaSubtitle));
+            case "builtin.wifi":
+                return new PopupOverlayController.BuiltinValue("", "#FFFFFFFF", "wifi",
+                        true);
+            case "builtin.gps":
+                return new PopupOverlayController.BuiltinValue("", "#FFFFFFFF", "gps",
+                        true);
+            case "builtin.bluetooth":
+                return new PopupOverlayController.BuiltinValue("", "#FFFFFFFF", "bluetooth",
+                        true);
+            case "builtin.indoor_temp":
+                return popupTextValue(binding.indoorTempText, "temperature", true);
+            case "builtin.outdoor_temp":
+                return popupTextValue(binding.outdoorTempText, "temperature", true);
+            case "builtin.home_assistant":
+                StringBuilder text = new StringBuilder();
+                for (int i = 0; i < binding.homeAssistantContainer.getChildCount(); i++) {
+                    View child = binding.homeAssistantContainer.getChildAt(i);
+                    if (!(child instanceof android.widget.TextView)
+                            || child.getVisibility() != View.VISIBLE) continue;
+                    if (text.length() > 0) text.append(' ');
+                    text.append(((android.widget.TextView) child).getText());
+                }
+                return new PopupOverlayController.BuiltinValue(text.toString(), "#FFFFFFFF", null,
+                        binding.homeAssistantContainer.getVisibility() == View.VISIBLE);
+            default:
+                return null;
+        }
+    }
+
+    private static PopupOverlayController.BuiltinValue popupTextValue(
+            android.widget.TextView view, @Nullable String iconId, boolean visible) {
+        return new PopupOverlayController.BuiltinValue(String.valueOf(view.getText()),
+                String.format(Locale.ROOT, "#%08X", view.getCurrentTextColor()), iconId,
+                visible);
     }
 
     /**
@@ -1587,6 +1811,16 @@ public class WidgetService extends Service {
         if (bricks.contains(BrickType.OUTDOOR_TEMP) && car.isBrickSupported(BrickType.OUTDOOR_TEMP)) {
             h = Math.max(h, textLineHeight(binding.outdoorTempText, prefs.outdoorTemp.fontSize.get()));
         }
+        if (bricks.contains(BrickType.HOME_ASSISTANT)) {
+            for (int i = 0; i < binding.homeAssistantContainer.getChildCount(); i++) {
+                View child = binding.homeAssistantContainer.getChildAt(i);
+                if (child instanceof OutlineTextView) {
+                    OutlineTextView text = (OutlineTextView) child;
+                    h = Math.max(h, textLineHeight(text, Math.round(text.getTextSize()))
+                            + text.getPaddingTop() + text.getPaddingBottom());
+                }
+            }
+        }
         return h;
     }
 
@@ -1690,15 +1924,22 @@ public class WidgetService extends Service {
 
     private void updateMediaInfo() {
         if (binding == null) return;
-        if (!currentBrickSet().contains(BrickType.MEDIA) || isBrickHiddenByApp(BrickType.MEDIA)) {
+        boolean mainMediaVisible = currentBrickSet().contains(BrickType.MEDIA)
+                && !isBrickHiddenByApp(BrickType.MEDIA) && isRemotelyVisible(BrickType.MEDIA);
+        boolean popupMediaRequested = isPopupBuiltinRequested(BrickType.MEDIA);
+        if (!mainMediaVisible && !popupMediaRequested) {
             binding.mediaContainer.setVisibility(View.GONE);
             stopMediaProgressTicker();
+            lastMediaSubtitle = null;
+            schedulePopupRefresh();
             return;
         }
         MediaController playing = pickActiveMediaController();
         if (playing == null) {
             binding.mediaContainer.setVisibility(View.GONE);
             stopMediaProgressTicker();
+            lastMediaSubtitle = null;
+            schedulePopupRefresh();
             return;
         }
         MediaMetadata metadata = playing.getMetadata();
@@ -1782,9 +2023,10 @@ public class WidgetService extends Service {
             binding.mediaProgressBar.setVisibility(View.GONE);
         }
 
-        binding.mediaContainer.setVisibility(View.VISIBLE);
+        binding.mediaContainer.setVisibility(mainMediaVisible ? View.VISIBLE : View.GONE);
 
         updateMediaProgress(playing);
+        schedulePopupRefresh();
     }
 
     /**
@@ -2139,6 +2381,7 @@ public class WidgetService extends Service {
         if (binding != null) {
             updateIconStatus(ICON_TYPE_BT, binding.bluetoothStatusIcon, bluetoothState.ordinal());
         }
+        schedulePopupRefresh();
     }
 
     private void updateForegroundAppTracking() {
@@ -2219,6 +2462,7 @@ public class WidgetService extends Service {
         lastForegroundPackage = latestPackage;
         applyOverlayVisibility(hiddenInPackages.contains(latestPackage));
         if (changed && binding != null) {
+            renderHomeAssistantBricks();
             applyBrickVisibility(currentBrickSet());
         }
     }
@@ -2321,8 +2565,9 @@ public class WidgetService extends Service {
     private void updateDateTime() {
         Set<BrickType> bricks = EnumSet.noneOf(BrickType.class);
         bricks.addAll(BrickType.parseOrder(prefs.brickOrder.get()));
-        boolean showTime = bricks.contains(BrickType.TIME);
-        boolean dateBrickActive = bricks.contains(BrickType.DATE);
+        boolean showTime = bricks.contains(BrickType.TIME) || isPopupBuiltinRequested(BrickType.TIME);
+        boolean dateBrickActive = bricks.contains(BrickType.DATE)
+                || isPopupBuiltinRequested(BrickType.DATE);
         boolean showDate = dateBrickActive && prefs.date.showDate.get();
         boolean showDayOfTheWeek = dateBrickActive && prefs.date.showDayOfWeek.get();
 
@@ -2361,6 +2606,7 @@ public class WidgetService extends Service {
                 binding.dateText.setText(dateStr);
             }
         }
+        schedulePopupRefresh();
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -2450,6 +2696,7 @@ public class WidgetService extends Service {
 
     private void updateWifiStatus() {
         updateIconStatus(ICON_TYPE_WIFI, binding.wifiStatusIcon, wifiState.ordinal());
+        schedulePopupRefresh();
     }
 
     private void setGnssStatus(GnssState newState) {
@@ -2462,6 +2709,7 @@ public class WidgetService extends Service {
 
     private void updateGnssStatus() {
         updateIconStatus(ICON_TYPE_GNSS, binding.gnssStatusIcon, gnssState.ordinal());
+        schedulePopupRefresh();
     }
 
     private void updateIconStatus(int iconType, OutlineImageView icon, int state) {
@@ -2627,6 +2875,7 @@ public class WidgetService extends Service {
         mainHandler.removeCallbacks(foregroundAppCheckRunnable);
         mainHandler.removeCallbacks(reachabilityProbeRunnable);
         mainHandler.removeCallbacks(mediaProgressTick);
+        mainHandler.removeCallbacks(automationFreshnessTick);
 
         if (binding != null && windowManager != null) {
             windowManager.removeView(binding.getRoot());
@@ -2649,6 +2898,8 @@ public class WidgetService extends Service {
         unregisterSatelliteStatusReceiver();
         unregisterBluetoothReceiver();
         disableMediaTracking();
+        if (mqttController != null) mqttController.stop();
+        if (popupOverlay != null) popupOverlay.destroy();
         // Drop car sensor subscriptions but keep the process-wide integration alive — the
         // settings UI may still query isBrickSupported after the overlay service stops.
         CarIntegration car = CarIntegrations.get(this);

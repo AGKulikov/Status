@@ -20,6 +20,8 @@ package dezz.status.widget.car;
 import androidx.annotation.NonNull;
 
 import dezz.status.widget.BrickType;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Abstraction over a vendor car SDK feeding data to car-specific bricks.
@@ -46,6 +48,10 @@ public interface CarIntegration {
         void onValue(@NonNull BrickType type, float value);
     }
 
+    interface DiagnosticsListener {
+        void onDiagnostics(@NonNull List<CarDiagnosticValue> values);
+    }
+
     /** Whether this vehicle can feed the given brick right now. */
     boolean isBrickSupported(@NonNull BrickType type);
 
@@ -62,6 +68,11 @@ public interface CarIntegration {
 
     /** Stop delivering values for the brick. No-op when not subscribed. */
     void unsubscribe(@NonNull BrickType type);
+
+    /** Asynchronous, read-only diagnostic snapshot; callback is delivered on the main thread. */
+    default void requestDiagnostics(@NonNull DiagnosticsListener listener) {
+        listener.onDiagnostics(Collections.emptyList());
+    }
 
     /** Release all subscriptions and vendor resources. The instance is not reusable afterwards. */
     void shutdown();

@@ -42,6 +42,8 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import dezz.status.widget.databinding.ActivityAboutBinding;
+import dezz.status.widget.car.CarDiagnosticValue;
+import dezz.status.widget.car.CarIntegrations;
 
 public class AboutActivity extends AppCompatActivity {
     private ActivityAboutBinding binding;
@@ -62,6 +64,23 @@ public class AboutActivity extends AppCompatActivity {
         });
 
         binding.backButton.setOnClickListener(v -> finish());
+
+        CarIntegrations.get(this).requestDiagnostics(values -> {
+            if (binding == null || isFinishing() || isDestroyed()) return;
+            if (values.isEmpty()) {
+                binding.carDiagnostics.setText(R.string.car_diagnostics_empty);
+                return;
+            }
+            StringBuilder text = new StringBuilder("Диагностика данных автомобиля\n");
+            for (CarDiagnosticValue value : values) {
+                text.append('\n').append(value.label)
+                        .append("\n  ").append(value.id)
+                        .append("\n  support: ").append(value.supportStatus)
+                        .append("\n  raw: ").append(value.rawValue)
+                        .append("\n  ").append(value.unitNote).append('\n');
+            }
+            binding.carDiagnostics.setText(text);
+        });
 
         binding.aboutFallback.setMovementMethod(LinkMovementMethod.getInstance());
         binding.aboutFallback.setText(Html.fromHtml(
@@ -140,6 +159,7 @@ public class AboutActivity extends AppCompatActivity {
             binding.aboutWebView.setWebViewClient(new WebViewClient());
             binding.aboutWebView.loadUrl("about:blank");
         }
+        binding = null;
         super.onDestroy();
     }
 }

@@ -27,8 +27,12 @@ import androidx.annotation.Nullable;
 
 import com.ecarx.xui.adaptapi.FunctionStatus;
 import com.ecarx.xui.adaptapi.car.Car;
+import com.ecarx.xui.adaptapi.car.ICar;
+import com.ecarx.xui.adaptapi.car.base.ICarInfo;
 import com.ecarx.xui.adaptapi.car.sensor.ISensor;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -75,6 +79,8 @@ final class GeelyCarIntegration implements CarIntegration {
 
     @Nullable
     private ISensor sensors;
+    @Nullable
+    private ICar carApi;
     private boolean sensorsResolveAttempted = false;
 
     @Nullable
@@ -119,16 +125,103 @@ final class GeelyCarIntegration implements CarIntegration {
 
     /** Resolve the AdaptAPI sensor service once; on any failure stay null (unsupported). */
     @Nullable
-    private ISensor ensureSensors() {
+    private synchronized ISensor ensureSensors() {
         if (!sensorsResolveAttempted) {
             sensorsResolveAttempted = true;
             try {
-                sensors = Car.create(appContext).getSensorManager();
+                carApi = Car.create(appContext);
+                sensors = carApi.getSensorManager();
             } catch (Throwable t) {
                 Log.w(TAG, "eCarX sensor manager unavailable", t);
             }
         }
         return sensors;
+    }
+
+    @Override
+    public void requestDiagnostics(@NonNull DiagnosticsListener listener) {
+        // Binder reads may block while the vehicle service wakes, so never run them on the UI.
+        new Thread(() -> {
+            List<CarDiagnosticValue> values = new ArrayList<>();
+            ISensor s = ensureSensors();
+            if (s == null) {
+                values.add(new CarDiagnosticValue("ecarx.sensor_manager", "eCarX sensor manager",
+                        "unavailable", "—", "Vendor service did not connect"));
+                mainHandler.post(() -> listener.onDiagnostics(values));
+                return;
+            }
+
+            addSensor(values, s, "fuel_level", "Остаток топлива — raw",
+                    ISensor.SENSOR_TYPE_FUEL_LEVEL,
+                    "Единица AdaptAPI не указана: это ещё не подтверждённые литры");
+            addCarInfo(values, "fuel_capacity", "Объём бака — raw",
+                    ICarInfo.FLT_INFO_FUEL_CAPACITY,
+                    "Единица AdaptAPI не указана; нужна сверка на автомобиле");
+            addSensor(values, s, "range_fuel", "Запас хода на топливе — raw",
+                    ISensor.SENSOR_TYPE_ENDURANCE_MILEAGE_FUEL, "Единица SDK, вероятно расстояние");
+            addSensor(values, s, "range_total", "Общий запас хода — raw",
+                    ISensor.SENSOR_TYPE_ENDURANCE_MILEAGE, "Единица SDK, вероятно расстояние");
+            addSensor(values, s, "odometer", "Одометр — raw",
+                    ISensor.SENSOR_TYPE_ODOMETER, "Единица SDK не нормализуется");
+            addSensor(values, s, "speed", "Скорость — raw",
+                    ISensor.SENSOR_TYPE_CAR_SPEED, "Единица SDK не нормализуется");
+            addSensor(values, s, "rpm", "Обороты двигателя — raw",
+                    ISensor.SENSOR_TYPE_RPM, "raw");
+            addSensor(values, s, "coolant_temp", "Температура ОЖ — raw",
+                    ISensor.SENSOR_TYPE_ENGINE_COOLANT_TEMPERATURE, "raw");
+            addSensor(values, s, "coolant_level", "Уровень ОЖ — raw",
+                    ISensor.SENSOR_TYPE_ENGINE_COOLANT_LEVEL, "raw");
+            addSensor(values, s, "engine_oil_level", "Уровень масла — raw",
+                    ISensor.SENSOR_TYPE_ENGINE_OIL_LEVEL, "raw");
+            addSensor(values, s, "indoor_temp", "Температура салона",
+                    ISensor.SENSOR_TYPE_TEMPERATURE_INDOOR, "°C (источник штатного кирпичика)");
+            addSensor(values, s, "ambient_temp", "Наружная температура",
+                    ISensor.SENSOR_TYPE_TEMPERATURE_AMBIENT, "°C (источник штатного кирпичика)");
+            addSensor(values, s, "vehicle_weight", "Масса автомобиля — raw",
+                    ISensor.SENSOR_TYPE_VEHICLE_WEIGHT, "raw");
+            addSensor(values, s, "ev_battery_level", "Заряд тяговой батареи — raw",
+                    ISensor.SENSOR_TYPE_EV_BATTERY_LEVEL, "raw");
+            mainHandler.post(() -> listener.onDiagnostics(values));
+        }, "ecarx-diagnostics").start();
+    }
+
+    private void addSensor(List<CarDiagnosticValue> out, ISensor s, String id, String label,
+                           int sensorType, String unitNote) {
+        FunctionStatus status;
+        try {
+            status = s.isSensorSupported(sensorType);
+        } catch (Throwable t) {
+            out.add(new CarDiagnosticValue("ISensor." + id, label, "error",
+                    t.getClass().getSimpleName(), unitNote));
+            return;
+        }
+        String raw = "—";
+        if (status == FunctionStatus.active || status == FunctionStatus.notactive) {
+            try {
+                raw = Float.toString(s.getSensorLatestValue(sensorType));
+            } catch (Throwable t) {
+                raw = "error: " + t.getClass().getSimpleName();
+            }
+        }
+        out.add(new CarDiagnosticValue("ISensor." + id, label, String.valueOf(status), raw,
+                unitNote + "; signal=" + sensorType));
+    }
+
+    private void addCarInfo(List<CarDiagnosticValue> out, String id, String label,
+                            int infoType, String unitNote) {
+        ICarInfo info = null;
+        try {
+            if (carApi == null) carApi = Car.create(appContext);
+            info = carApi.getCarInfoManager();
+            FunctionStatus status = info.isCarInfoSupported(infoType);
+            String raw = (status == FunctionStatus.active || status == FunctionStatus.notactive)
+                    ? Float.toString(info.getCarInfoFloat(infoType)) : "—";
+            out.add(new CarDiagnosticValue("ICarInfo." + id, label, String.valueOf(status), raw,
+                    unitNote + "; info=" + infoType));
+        } catch (Throwable t) {
+            out.add(new CarDiagnosticValue("ICarInfo." + id, label, "error",
+                    t.getClass().getSimpleName(), unitNote));
+        }
     }
 
     @Nullable

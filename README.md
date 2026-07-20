@@ -1,4 +1,11 @@
-# Виджет информации (Status Widget)
+# Status Widget HA
+
+> Полноценный форк официального Status Widget 2.8.2. Он устанавливается рядом с оригиналом
+> (`applicationId: ru.natro.statuswidget`) и добавляет Home Assistant/MQTT, независимые
+> HA-кирпичики и второй управляющий оверлей. Полное ТЗ: [FORK_SPEC_RU.md](FORK_SPEC_RU.md).
+> Настройка Home Assistant: [HA_MQTT_SETUP_RU.md](HA_MQTT_SETUP_RU.md).
+
+## Исходное описание Status Widget
 
 Плавающий статус-виджет для **Android-головных устройств в автомобилях**.
 Показывает поверх любого приложения время, дату, текущий трек, состояние
