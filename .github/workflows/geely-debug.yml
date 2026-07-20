@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - 'rewrite/**'
+      - 'feature/**'
   pull_request:
 
 jobs:
