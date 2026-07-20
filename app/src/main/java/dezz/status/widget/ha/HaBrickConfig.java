@@ -9,14 +9,24 @@ import org.json.JSONObject;
 
 import dezz.status.widget.Fonts;
 import dezz.status.widget.automation.AutomationContract;
+import dezz.status.widget.integration.ActionBinding;
+import dezz.status.widget.integration.SourceBinding;
+import dezz.status.widget.scenario.RuleSet;
+import dezz.status.widget.scenario.ScenarioPresets;
 import java.util.HashSet;
 import java.util.Set;
 
 /** Complete, independent appearance and unavailable-state configuration for one HA brick. */
 public final class HaBrickConfig {
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 3;
 
     public String id;
+    /** Connector-neutral value source. Legacy configs bind this to {@link #id}. */
+    public SourceBinding sourceBinding;
+    /** Optional press action; main-row legacy bricks have no action. */
+    public ActionBinding actionBinding;
+    /** Local first-match presentation rules. Connectors publish raw values, never colors. */
+    public RuleSet displayRules;
     public String name;
     public boolean enabled;
     public int order;
@@ -55,6 +65,9 @@ public final class HaBrickConfig {
     public static HaBrickConfig create(String id, int order) {
         HaBrickConfig c = new HaBrickConfig();
         c.id = AutomationContract.requireSafeId(id);
+        c.sourceBinding = SourceBinding.legacy(c.id);
+        c.actionBinding = ActionBinding.unbound();
+        c.displayRules = ScenarioPresets.raw();
         c.name = id;
         c.enabled = true;
         c.order = Math.max(0, order);
@@ -138,6 +151,14 @@ public final class HaBrickConfig {
                 }
             }
         }
+        JSONObject source = o.optJSONObject("sourceBinding");
+        c.sourceBinding = source == null ? SourceBinding.legacy(c.id)
+                : SourceBinding.fromJson(source);
+        JSONObject action = o.optJSONObject("actionBinding");
+        c.actionBinding = action == null ? ActionBinding.unbound()
+                : ActionBinding.fromJson(action);
+        JSONObject rules = o.optJSONObject("displayRules");
+        c.displayRules = rules == null ? defaultRules(c.sourceBinding) : RuleSet.fromJson(rules);
         return c;
     }
 
@@ -146,6 +167,12 @@ public final class HaBrickConfig {
         JSONObject o = new JSONObject();
         o.put("schema", SCHEMA_VERSION);
         o.put("id", id);
+        o.put("sourceBinding", sourceBinding == null
+                ? SourceBinding.legacy(id).toJson() : sourceBinding.toJson());
+        o.put("actionBinding", actionBinding == null
+                ? ActionBinding.unbound().toJson() : actionBinding.toJson());
+        o.put("displayRules", (displayRules == null ? defaultRules(sourceBinding) : displayRules)
+                .toJson());
         o.put("name", name);
         o.put("enabled", enabled);
         o.put("order", order);
@@ -185,6 +212,20 @@ public final class HaBrickConfig {
     }
 
     private static int nonNegative(int value) { return Math.max(0, value); }
+
+    @NonNull
+    private static RuleSet defaultRules(SourceBinding binding) {
+        String presentation = binding == null ? SourceBinding.PRESENTATION_RAW
+                : binding.presentation;
+        if (SourceBinding.PRESENTATION_COVER.equals(presentation)) return ScenarioPresets.cover();
+        if (SourceBinding.PRESENTATION_BOOLEAN.equals(presentation)) {
+            return ScenarioPresets.booleanState();
+        }
+        if (SourceBinding.PRESENTATION_TEMPERATURE.equals(presentation)) {
+            return ScenarioPresets.temperature();
+        }
+        return ScenarioPresets.raw();
+    }
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
     }

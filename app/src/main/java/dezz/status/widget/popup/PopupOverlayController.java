@@ -27,8 +27,9 @@ import androidx.core.widget.ImageViewCompat;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.IOException;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 import dezz.status.widget.OutlineTextView;
@@ -36,7 +37,8 @@ import dezz.status.widget.Preferences;
 import dezz.status.widget.automation.AutomationContract;
 import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.automation.AutomationStateStore;
-import dezz.status.widget.mqtt.MqttController;
+import dezz.status.widget.integration.ActionBinding;
+import dezz.status.widget.integration.ActionDispatcher;
 
 /** Independent fixed-pixel, draggable, touchable popup grid controlled by retained HA state. */
 public final class PopupOverlayController {
@@ -64,12 +66,14 @@ public final class PopupOverlayController {
     private final Preferences prefs;
     private final AutomationStateStore states;
     private final PopupItemConfigStore configs;
-    private final MqttController mqtt;
+    private final ActionDispatcher actionDispatcher;
     private final BuiltinProvider builtinProvider;
     private final WindowManager windowManager;
     private final int touchSlop;
     private final Handler main = new Handler(Looper.getMainLooper());
+    private final Set<String> pendingActions = new HashSet<>();
     private long lastActionAt;
+    private boolean destroyed;
 
     private FrameLayout root;
     private WindowManager.LayoutParams params;
@@ -81,19 +85,20 @@ public final class PopupOverlayController {
     public PopupOverlayController(@NonNull android.content.Context context,
                                   @NonNull Preferences prefs,
                                   @NonNull AutomationStateStore states,
-                                  @NonNull MqttController mqtt,
+                                  @NonNull ActionDispatcher actionDispatcher,
                                   @NonNull BuiltinProvider builtinProvider) {
         this.context = context;
         this.prefs = prefs;
         this.states = states;
         this.configs = new PopupItemConfigStore(prefs);
-        this.mqtt = mqtt;
+        this.actionDispatcher = actionDispatcher;
         this.builtinProvider = builtinProvider;
         this.windowManager = context.getSystemService(WindowManager.class);
         this.touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
     }
 
     public void applyPreferences() {
+        if (destroyed) return;
         if (Looper.myLooper() != Looper.getMainLooper()) {
             main.post(this::applyPreferences);
             return;
@@ -114,6 +119,8 @@ public final class PopupOverlayController {
     }
 
     public void destroy() {
+        destroyed = true;
+        pendingActions.clear();
         main.removeCallbacksAndMessages(null);
         if (root != null) {
             try { windowManager.removeView(root); } catch (Exception ignored) {}
@@ -158,8 +165,13 @@ public final class PopupOverlayController {
         try { windowManager.updateViewLayout(root, params); } catch (Exception ignored) {}
 
         GradientDrawable bg = new GradientDrawable();
-        int base = AutomationState.parseColor(prefs.popupBackgroundColor.get(), 0xFF000000);
-        bg.setColor((base & 0x00FFFFFF) | (clamp(prefs.popupBackgroundAlpha.get(), 0, 255) << 24));
+        AutomationState overlayState = states.get(AutomationContract.SCOPE_OVERLAY, "popup");
+        String configuredBackground = overlayState.backgroundColor == null
+                ? prefs.popupBackgroundColor.get() : overlayState.backgroundColor;
+        int base = AutomationState.parseColor(configuredBackground, 0xFF000000);
+        int alpha = overlayState.backgroundColor == null
+                ? clamp(prefs.popupBackgroundAlpha.get(), 0, 255) : (base >>> 24);
+        bg.setColor((base & 0x00FFFFFF) | (alpha << 24));
         bg.setCornerRadius(prefs.popupCornerRadius.get());
         root.setBackground(bg);
     }
@@ -245,7 +257,9 @@ public final class PopupOverlayController {
         String bgValue = state.backgroundColor == null ? item.backgroundColor : state.backgroundColor;
         int bgBase = AutomationState.parseColor(bgValue, 0xFF28282C);
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor((bgBase & 0x00FFFFFF) | (clamp(item.backgroundAlpha, 0, 255) << 24));
+        int tileAlpha = state.backgroundColor == null
+                ? clamp(item.backgroundAlpha, 0, 255) : (bgBase >>> 24);
+        bg.setColor((bgBase & 0x00FFFFFF) | (tileAlpha << 24));
         bg.setCornerRadius(item.cornerRadius);
         int borderBase = AutomationState.parseColor(item.borderColor, 0x00FFFFFF);
         bg.setStroke(item.borderWidth,
@@ -324,9 +338,16 @@ public final class PopupOverlayController {
         textGroup.addView(value, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        boolean actionable = !item.actionId.isEmpty() && state.actionEnabled;
+        boolean hasBoundAction = item.actionBinding != null && item.actionBinding.isBound();
+        boolean hasAnyAction = hasBoundAction || !item.actionId.isEmpty();
+        // Never send a command from a cached or not-yet-confirmed device state. This also keeps
+        // actions fail-closed during boot and reconnect even if their last persisted patch said
+        // action_enabled=true.
+        boolean commandPending = pendingActions.contains(item.id);
+        boolean actionable = hasAnyAction && !pending && !stale && !commandPending
+                && state.actionEnabled;
         tile.setEnabled(actionable);
-        tile.setAlpha(actionable || item.actionId.isEmpty() ? 1f : 0.45f);
+        tile.setAlpha(actionable || !hasAnyAction ? 1f : 0.45f);
         attachTileTouch(tile, item, actionable);
         return tile;
     }
@@ -397,7 +418,9 @@ public final class PopupOverlayController {
     }
 
     private void sendAction(PopupItemConfig item) {
+        if (destroyed || !pendingActions.add(item.id)) return;
         lastActionAt = System.currentTimeMillis();
+        renderItems();
         try {
             JSONObject payload;
             try { payload = new JSONObject(item.actionPayload); }
@@ -413,17 +436,40 @@ public final class PopupOverlayController {
             String stateId = PopupItemConfig.TYPE_BUILTIN.equals(item.type)
                     && !item.builtinId.isEmpty() ? item.builtinId : item.automationId;
             payload.put("last_state", states.get(stateScope, stateId).toJson());
-            mqtt.publishAction(item.actionId, payload);
-            if (item.autoHideAfterAction) {
-                JSONObject hidden = new JSONObject();
-                hidden.put("visible", false);
-                states.apply(AutomationContract.SCOPE_POPUP, item.automationId, hidden);
-                renderItems();
-            }
-            Toast.makeText(context, "Команда отправлена: " + item.actionId,
-                    Toast.LENGTH_SHORT).show();
-        } catch (IOException | JSONException e) {
-            Toast.makeText(context, "MQTT-команда не отправлена: " + e.getMessage(),
+            ActionBinding binding = item.actionBinding != null
+                    ? item.actionBinding : ActionBinding.legacy(item.actionId, item.actionPayload);
+            actionDispatcher.dispatch(binding, payload).whenComplete((ignored, failure) ->
+                    main.post(() -> {
+                        pendingActions.remove(item.id);
+                        if (destroyed) return;
+                        if (failure != null) {
+                            Throwable cause = failure;
+                            while (cause.getCause() != null) cause = cause.getCause();
+                            Toast.makeText(context, "Команда не отправлена: "
+                                            + (cause.getMessage() == null
+                                            ? cause.getClass().getSimpleName() : cause.getMessage()),
+                                    Toast.LENGTH_LONG).show();
+                            renderItems();
+                            return;
+                        }
+                        if (item.autoHideAfterAction) {
+                            try {
+                                JSONObject hidden = new JSONObject();
+                                hidden.put("visible", false);
+                                states.apply(AutomationContract.SCOPE_POPUP,
+                                        item.automationId, hidden);
+                                renderItems();
+                            } catch (JSONException e) {
+                                android.util.Log.w("PopupOverlay", "Could not auto-hide tile", e);
+                            }
+                        }
+                        renderItems();
+                        Toast.makeText(context, "Команда отправлена", Toast.LENGTH_SHORT).show();
+                    }));
+        } catch (JSONException | RuntimeException e) {
+            pendingActions.remove(item.id);
+            if (!destroyed) renderItems();
+            Toast.makeText(context, "Команда не сформирована: " + e.getMessage(),
                     Toast.LENGTH_LONG).show();
         }
     }
@@ -487,6 +533,7 @@ public final class PopupOverlayController {
     }
 
     private static int withAlpha(int color, int alpha) {
-        return (color & 0x00FFFFFF) | (clamp(alpha, 0, 255) << 24);
+        int combined = ((color >>> 24) * clamp(alpha, 0, 255) + 127) / 255;
+        return (color & 0x00FFFFFF) | (combined << 24);
     }
 }

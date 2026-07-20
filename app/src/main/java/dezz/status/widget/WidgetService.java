@@ -90,19 +90,31 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
+import dezz.status.widget.car.CarTelemetryExporter;
 import dezz.status.widget.databinding.OverlayStatusWidgetBinding;
 import dezz.status.widget.automation.AutomationContract;
 import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.automation.AutomationStateStore;
+import dezz.status.widget.automation.ScenarioTriggerReceiver;
 import dezz.status.widget.ha.HaBrickConfig;
 import dezz.status.widget.ha.HaBrickConfigStore;
+import dezz.status.widget.integration.ConnectorActionDispatcher;
+import dezz.status.widget.integration.ConnectorValueRegistry;
+import dezz.status.widget.integration.IntentScenarioController;
+import dezz.status.widget.integration.LocalScenarioController;
+import dezz.status.widget.ha.api.HaApiController;
+import dezz.status.widget.ha.api.HaEntityCatalog;
+import dezz.status.widget.ha.api.HaWebSocketConnector;
 import dezz.status.widget.mqtt.MqttController;
 import dezz.status.widget.popup.PopupOverlayController;
 import dezz.status.widget.popup.PopupItemConfig;
 import dezz.status.widget.popup.PopupItemConfigStore;
+import dezz.status.widget.sprut.SprutCatalog;
+import dezz.status.widget.sprut.SprutHubController;
 
 public class WidgetService extends Service {
     enum GnssState {
@@ -212,9 +224,35 @@ public class WidgetService extends Service {
 
     private Preferences prefs;
     private AutomationStateStore automationStates;
+    private ConnectorValueRegistry connectorValues;
+    private LocalScenarioController scenarioController;
+    private IntentScenarioController intentScenarioController;
+    private ConnectorActionDispatcher actionDispatcher;
     private HaBrickConfigStore haConfigs;
+    private HaApiController haApiController;
     private MqttController mqttController;
+    private SprutHubController sprutController;
+    private CarTelemetryExporter carTelemetryExporter;
     private PopupOverlayController popupOverlay;
+    private volatile boolean destroyed;
+    private final AtomicBoolean crossSourceRuleRefreshScheduled = new AtomicBoolean();
+    private final ConnectorValueRegistry.Listener crossSourceRuleListener =
+            changedValues -> scheduleCrossSourceRuleRefresh();
+    private final Runnable crossSourceRuleRefresh = () -> {
+        crossSourceRuleRefreshScheduled.set(false);
+        if (destroyed) return;
+        // RuleSet.sourceReference is connector-neutral. Re-project only those explicit
+        // dependencies after any provider update, so an HA value can recolor/hide a Sprut tile
+        // without waiting for the Sprut characteristic itself to change (and vice versa).
+        if (mqttController != null) mqttController.reapplyCrossSourceBindings();
+        if (sprutController != null) sprutController.reapplyCrossSourceBindings();
+        if (haApiController != null) haApiController.reapplyCrossSourceBindings();
+    };
+
+    private void scheduleCrossSourceRuleRefresh() {
+        if (destroyed || !crossSourceRuleRefreshScheduled.compareAndSet(false, true)) return;
+        mainHandler.postDelayed(crossSourceRuleRefresh, 50L);
+    }
 
     private WindowManager windowManager;
     private WindowManager.LayoutParams params;
@@ -235,12 +273,13 @@ public class WidgetService extends Service {
     /** Re-evaluates TTL/stale rules even when no new packet arrives. */
     private final Runnable automationFreshnessTick = new Runnable() {
         @Override public void run() {
+            if (destroyed) return;
             if (binding != null) {
                 renderHomeAssistantBricks();
                 applyBrickVisibility(currentBrickSet());
             }
             if (popupOverlay != null) popupOverlay.applyPreferences();
-            mainHandler.postDelayed(this, 30_000L);
+            if (!destroyed) mainHandler.postDelayed(this, 30_000L);
         }
     };
     private final Runnable popupRefresh = () -> {
@@ -248,6 +287,7 @@ public class WidgetService extends Service {
     };
 
     private void schedulePopupRefresh() {
+        if (destroyed) return;
         mainHandler.removeCallbacks(popupRefresh);
         mainHandler.post(popupRefresh);
     }
@@ -523,10 +563,24 @@ public class WidgetService extends Service {
 
     @Override
     public void onCreate() {
+        super.onCreate();
+        destroyed = false;
+
+        // startForegroundService() gives us only a few seconds. Promote immediately, before
+        // preferences and connector constructors parse potentially large cached catalogs.
+        createNotificationChannel();
+        startForeground(NOTIFICATION_ID, createNotification());
+
         prefs = new Preferences(this);
         automationStates = new AutomationStateStore(this);
+        connectorValues = new ConnectorValueRegistry();
+        connectorValues.addListener(crossSourceRuleListener);
+        // A value persisted before ignition-off is useful context, but it is not authoritative
+        // after a new process starts. Each connector promotes only values returned by its fresh
+        // startup snapshot/retained replay, preventing a missed offline change from looking live.
+        automationStates.markAllStale();
         haConfigs = new HaBrickConfigStore(prefs);
-        mqttController = new MqttController(this, prefs, automationStates,
+        mqttController = new MqttController(this, prefs, automationStates, connectorValues,
                 new MqttController.StateListener() {
                     @Override public void onStateChanged(String scope, String id) {
                         onAutomationStateChanged(scope, id);
@@ -537,11 +591,68 @@ public class WidgetService extends Service {
                                 + ": " + detail);
                     }
                 });
-        popupOverlay = new PopupOverlayController(this, prefs, automationStates, mqttController,
-                this::popupBuiltinValue);
+        sprutController = new SprutHubController(this, prefs, automationStates, connectorValues,
+                new SprutHubController.Listener() {
+                    @Override public void onStateChanged(@NonNull String scope,
+                                                         @NonNull String id) {
+                        onAutomationStateChanged(scope, id);
+                    }
 
-        createNotificationChannel();
-        startForeground(NOTIFICATION_ID, createNotification());
+                    @Override public void onConnectionChanged(
+                            @NonNull SprutHubController.State state, @NonNull String detail) {
+                        Log.i(TAG, "Sprut.hub " + state + ": " + detail);
+                        if (carTelemetryExporter != null) {
+                            carTelemetryExporter.onSprutConnectionChanged(state);
+                        }
+                    }
+
+                    @Override public void onCatalogChanged(@NonNull SprutCatalog catalog) {
+                        Log.i(TAG, "Sprut.hub catalog: " + catalog.accessories().size()
+                                + " devices, " + catalog.characteristics().size()
+                                + " characteristics");
+                        if (carTelemetryExporter != null) {
+                            carTelemetryExporter.onSprutCatalogChanged();
+                        }
+                    }
+
+                    @Override public void onCharacteristicChanged(
+                            @NonNull dezz.status.widget.sprut.SprutPath path) {
+                        if (carTelemetryExporter != null) {
+                            carTelemetryExporter.onSprutCharacteristicChanged(path);
+                        }
+                    }
+                });
+        carTelemetryExporter = new CarTelemetryExporter(prefs, CarIntegrations.get(this),
+                sprutController, mainHandler);
+        haApiController = new HaApiController(this, prefs, automationStates, connectorValues,
+                new HaApiController.Listener() {
+                    @Override public void onStateChanged(@NonNull String scope,
+                                                         @NonNull String id) {
+                        onAutomationStateChanged(scope, id);
+                    }
+
+                    @Override public void onConnectionChanged(
+                            @NonNull HaWebSocketConnector.ConnectionState state,
+                            @NonNull String detail) {
+                        Log.i(TAG, "Home Assistant " + state + ": " + detail);
+                    }
+
+                    @Override public void onCatalogChanged(@NonNull HaEntityCatalog catalog) {
+                        Log.i(TAG, "Home Assistant catalog: " + catalog.size() + " entities");
+                    }
+                });
+        actionDispatcher = new ConnectorActionDispatcher(
+                mqttController, sprutController, haApiController);
+        scenarioController = new LocalScenarioController(prefs, automationStates, connectorValues,
+                targets -> mainHandler.post(() -> {
+                    if (destroyed) return;
+                    if (binding != null) renderHomeAssistantBricks();
+                    if (popupOverlay != null) popupOverlay.applyPreferences();
+                    if (binding != null) applyBrickVisibility(currentBrickSet());
+                }));
+        intentScenarioController = new IntentScenarioController(this, prefs, actionDispatcher);
+        popupOverlay = new PopupOverlayController(this, prefs, automationStates,
+                actionDispatcher, this::popupBuiltinValue);
 
         if (!Permissions.allPermissionsGranted(this)) {
             prefs.widgetEnabled.set(false);
@@ -568,8 +679,32 @@ public class WidgetService extends Service {
 
         createOverlayView();
         mqttController.reconfigure();
+        carTelemetryExporter.reconfigure();
+        sprutController.reconfigure();
+        haApiController.reconfigure();
+        scenarioController.reconfigure();
+        intentScenarioController.reconfigure();
         popupOverlay.applyPreferences();
         mainHandler.postDelayed(automationFreshnessTick, 30_000L);
+    }
+
+    @Override
+    public int onStartCommand(@Nullable Intent intent, int flags, int startId) {
+        if (!destroyed && intent != null
+                && ScenarioTriggerReceiver.ACTION_EXECUTE_RULE.equals(intent.getAction())
+                && intentScenarioController != null) {
+            // Reload before lookup so a broadcast accepted from the latest device-protected
+            // preferences cannot execute an older in-memory target after a settings edit.
+            intentScenarioController.reconfigure();
+            intentScenarioController.triggerRuleId(
+                    intent.getStringExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_ID),
+                    intent.getStringExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_TOKEN),
+                    intent.getStringExtra(ScenarioTriggerReceiver.EXTRA_RULE_FINGERPRINT),
+                    intent.getLongExtra(ScenarioTriggerReceiver.EXTRA_DEADLINE_ELAPSED, 0L));
+        }
+        // A sticky restart restores the long-lived widget/connectors but carries no old command.
+        // Re-delivering a TOGGLE after process death would be unsafe, so null intents do nothing.
+        return START_STICKY;
     }
 
     private void createOverlayView() {
@@ -730,7 +865,13 @@ public class WidgetService extends Service {
 
     @SuppressLint("MissingPermission")
     public void applyPreferences() {
+        if (destroyed || prefs == null || binding == null) return;
         if (mqttController != null) mqttController.reconfigure();
+        if (sprutController != null) sprutController.reconfigure();
+        if (carTelemetryExporter != null) carTelemetryExporter.reconfigure();
+        if (haApiController != null) haApiController.reconfigure();
+        if (scenarioController != null) scenarioController.reconfigure();
+        if (intentScenarioController != null) intentScenarioController.reconfigure();
         if (popupOverlay != null) popupOverlay.applyPreferences();
         hiddenInPackages = prefs.hideInPackages.get();
         rebuildEffectiveHideLists();
@@ -1563,8 +1704,9 @@ public class WidgetService extends Service {
 
     /** Called after either an exported Broadcast or MQTT packet has been persisted. */
     public void onAutomationStateChanged(String scope, String id) {
+        if (destroyed) return;
         mainHandler.post(() -> {
-            if (binding == null) return;
+            if (destroyed || binding == null) return;
             if (AutomationContract.SCOPE_MAIN.equals(scope)) renderHomeAssistantBricks();
             if (popupOverlay != null) popupOverlay.onStateChanged(scope);
             applyBrickVisibility(currentBrickSet());
@@ -2868,18 +3010,36 @@ public class WidgetService extends Service {
 
     @Override
     public void onDestroy() {
+        destroyed = true;
         instance = null;
 
-        mainHandler.removeCallbacks(updateGnssStatusRunnable);
-        mainHandler.removeCallbacks(updateDateTimeRunnable);
-        mainHandler.removeCallbacks(foregroundAppCheckRunnable);
-        mainHandler.removeCallbacks(reachabilityProbeRunnable);
-        mainHandler.removeCallbacks(mediaProgressTick);
-        mainHandler.removeCallbacks(automationFreshnessTick);
+        mainHandler.removeCallbacksAndMessages(null);
+
+        // Unregister derived listeners first. Connector shutdown emits synchronous stale events;
+        // with the guards above and no scenario/popup listeners left, none can recreate a window.
+        if (connectorValues != null) connectorValues.removeListener(crossSourceRuleListener);
+        crossSourceRuleRefreshScheduled.set(false);
+        if (intentScenarioController != null) intentScenarioController.destroy();
+        intentScenarioController = null;
+        if (scenarioController != null) scenarioController.destroy();
+        scenarioController = null;
+        if (popupOverlay != null) popupOverlay.destroy();
+        popupOverlay = null;
+        if (carTelemetryExporter != null) carTelemetryExporter.stop();
+        carTelemetryExporter = null;
+        if (mqttController != null) mqttController.stop();
+        mqttController = null;
+        if (sprutController != null) sprutController.stop();
+        sprutController = null;
+        if (haApiController != null) haApiController.stop();
+        haApiController = null;
+        actionDispatcher = null;
+        mainHandler.removeCallbacksAndMessages(null);
 
         if (binding != null && windowManager != null) {
             windowManager.removeView(binding.getRoot());
         }
+        binding = null;
 
         if (locationManager != null) {
             locationManager.unregisterGnssStatusCallback(gnssStatusCallback);
@@ -2898,14 +3058,13 @@ public class WidgetService extends Service {
         unregisterSatelliteStatusReceiver();
         unregisterBluetoothReceiver();
         disableMediaTracking();
-        if (mqttController != null) mqttController.stop();
-        if (popupOverlay != null) popupOverlay.destroy();
         // Drop car sensor subscriptions but keep the process-wide integration alive — the
         // settings UI may still query isBrickSupported after the overlay service stops.
         CarIntegration car = CarIntegrations.get(this);
         car.setAvailabilityChangedListener(null);
         car.unsubscribe(BrickType.INDOOR_TEMP);
         car.unsubscribe(BrickType.OUTDOOR_TEMP);
+        super.onDestroy();
     }
 
     @Nullable

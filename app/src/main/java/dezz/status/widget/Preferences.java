@@ -36,6 +36,14 @@ import java.util.Set;
 
 public class Preferences {
     private static final String TAG = "Preferences";
+    /** Secrets never leave the device through settings exports or presets. Keep future connector
+     * credentials here as well so adding a transport cannot accidentally make them exportable. */
+    private static final Set<String> SECRET_PREFERENCE_KEYS = Collections.unmodifiableSet(
+            new HashSet<>(java.util.Arrays.asList(
+                    "mqttPassword", "sprutPassword", "haAccessToken",
+                    // Contains both the full bearer action and fixed-endpoint token. Layout
+                    // presets are routinely shared, so rules must remain device-local too.
+                    "intentActionRulesJson")));
     public static abstract class Preference {
         final Preferences preferences;
         final String key;
@@ -408,6 +416,12 @@ public class Preferences {
     // classes and therefore automatically participate in the existing settings export/import.
     public final Str haMainBricksJson = new Str(this, "haMainBricksJson", "[]");
     public final Str popupItemsJson = new Str(this, "popupItemsJson", "[]");
+    /** Ordered connector-neutral local scenarios. Conditions and UI targets are independent. */
+    public final Str localScenariosJson = new Str(this, "localScenariosJson", "[]");
+    /** One-shot, exact Android Intent actions mapped to stored connector commands. */
+    public final Str intentActionRulesJson = new Str(this, "intentActionRulesJson", "[]");
+    /** Per-metric mappings from the vehicle SDK to writable Sprut.hub characteristics. */
+    public final Str carSprutBindingsJson = new Str(this, "carSprutBindingsJson", "[]");
     public final Bool popupEnabled = new Bool(this, "popupEnabled", true);
     public final Int popupWidth = new Int(this, "popupWidth", 500);
     public final Int popupHeight = new Int(this, "popupHeight", 500);
@@ -436,6 +450,24 @@ public class Preferences {
     public final Int mqttQos = new Int(this, "mqttQos", 1);
     public final Int mqttKeepAliveSeconds = new Int(this, "mqttKeepAliveSeconds", 30);
     public final Bool mqttKeepAwake = new Bool(this, "mqttKeepAwake", true);
+
+    // Direct Sprut.hub connector. The token is intentionally kept only in the live connector;
+    // reconnect performs a fresh challenge using the Keystore-protected password.
+    public final Bool sprutEnabled = new Bool(this, "sprutEnabled", false);
+    public final Str sprutWebSocketUrl = new Str(this, "sprutWebSocketUrl",
+            "ws://192.168.1.2/spruthub");
+    public final Str sprutEmail = new Str(this, "sprutEmail", "");
+    public final Secret sprutPassword = new Secret(this, "sprutPassword");
+    /** Optional hub serial. Empty means select the only/first hub returned by hub.list. */
+    public final Str sprutHubSerial = new Str(this, "sprutHubSerial", "");
+    public final Bool sprutKeepAwake = new Bool(this, "sprutKeepAwake", true);
+
+    // Direct Home Assistant API/WebSocket connector. Broadcast updates remain supported as a
+    // compatibility ingress, but this connector can obtain an authoritative startup snapshot.
+    public final Bool haApiEnabled = new Bool(this, "haApiEnabled", false);
+    public final Str haBaseUrl = new Str(this, "haBaseUrl", "http://homeassistant.local:8123");
+    public final Secret haAccessToken = new Secret(this, "haAccessToken");
+    public final Bool haKeepAwake = new Bool(this, "haKeepAwake", true);
 
     @Nullable
     public TextBrickPrefs textBrickPrefs(BrickType type) {
@@ -697,7 +729,7 @@ public class Preferences {
         JSONObject preferencesNode = new JSONObject();
         for (Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
             // Credentials are device-local and never leave the app in an export or preset.
-            if ("mqttPassword".equals(entry.getKey())) continue;
+            if (SECRET_PREFERENCE_KEYS.contains(entry.getKey())) continue;
             Object value = entry.getValue();
             if (value instanceof Set) {
                 JSONArray array = new JSONArray();
@@ -720,7 +752,13 @@ public class Preferences {
     }
 
     public void importFromJson(String json) throws JSONException, InvalidSettingsFileException {
-        String existingMqttPassword = mqttPassword.get();
+        // Preserve encrypted device-local connector credentials byte-for-byte. Decrypting and
+        // re-encrypting here can fail during Direct Boot before the Keystore is unlocked.
+        Map<String, String> existingSecrets = new java.util.HashMap<>();
+        for (String secretKey : SECRET_PREFERENCE_KEYS) {
+            String stored = prefs.getString(secretKey, null);
+            if (stored != null) existingSecrets.put(secretKey, stored);
+        }
         JSONObject root = new JSONObject(json);
         if (!EXPORT_FILE_TYPE.equals(root.optString(KEY_FILE_TYPE, null))) {
             throw new InvalidSettingsFileException("Not a Status Widget settings file");
@@ -738,7 +776,7 @@ public class Preferences {
         Iterator<String> keys = preferencesNode.keys();
         while (keys.hasNext()) {
             String key = keys.next();
-            if ("mqttPassword".equals(key)) continue;
+            if (SECRET_PREFERENCE_KEYS.contains(key)) continue;
             Object value = preferencesNode.get(key);
             if (value instanceof Boolean) {
                 editor.putBoolean(key, (Boolean) value);
@@ -764,8 +802,10 @@ public class Preferences {
                 editor.putString(key, (String) value);
             }
         }
+        for (Map.Entry<String, String> secret : existingSecrets.entrySet()) {
+            editor.putString(secret.getKey(), secret.getValue());
+        }
         editor.commit();
-        if (!existingMqttPassword.isEmpty()) mqttPassword.set(existingMqttPassword);
         // The file may be from the legacy (pre-brick) schema — re-run migration so it adapts.
         migrateLegacyPrefsIfNeeded();
     }

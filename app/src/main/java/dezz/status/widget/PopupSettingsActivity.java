@@ -8,10 +8,12 @@ import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -22,6 +24,7 @@ import androidx.core.widget.NestedScrollView;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -33,9 +36,24 @@ import java.util.Set;
 
 import dezz.status.widget.popup.PopupItemConfig;
 import dezz.status.widget.popup.PopupItemConfigStore;
+import dezz.status.widget.integration.ActionBinding;
+import dezz.status.widget.integration.ConnectorType;
+import dezz.status.widget.integration.SourceBinding;
+import dezz.status.widget.scenario.RuleSet;
 
 /** Full editor for fixed-pixel popup geometry, its grid and every independent tile. */
 public final class PopupSettingsActivity extends AppCompatActivity {
+    private static final String[] ACTION_CONNECTOR_TYPES = {
+            ConnectorType.MQTT.jsonName(),
+            ConnectorType.HOME_ASSISTANT.jsonName(),
+            ConnectorType.SPRUTHUB.jsonName()
+    };
+    private static final String[] ACTION_OPERATIONS = {
+            ActionBinding.OPERATION_PUBLISH,
+            ActionBinding.OPERATION_SET,
+            ActionBinding.OPERATION_TOGGLE
+    };
+
     private Preferences prefs;
     private PopupItemConfigStore store;
     private LinearLayout itemsHost;
@@ -188,6 +206,8 @@ public final class PopupSettingsActivity extends AppCompatActivity {
 
     private final class ItemEditor {
         final LinearLayout root = column();
+        final SourceBinding originalSourceBinding;
+        final boolean legacySourceBinding;
         final CheckBox enabled;
         final EditText id, automationId, type, builtinId, name, row, column, rowSpan, columnSpan;
         final EditText icon, iconSize, iconColor, iconAlpha, iconBackgroundColor;
@@ -195,15 +215,25 @@ public final class PopupSettingsActivity extends AppCompatActivity {
         final EditText iconAdjustX, iconAdjustY, iconRotation, orientation;
         final EditText title, titleSize, titleColor, titleAlpha;
         final EditText defaultText, textSize, defaultTextColor, textAlpha;
+        final EditText displayRulesJson;
         final EditText pendingText, pendingColor, staleText, staleColor, staleSeconds;
         final EditText backgroundColor, backgroundAlpha, borderColor, borderAlpha, borderWidth;
         final EditText cornerRadius, padding, adjustX, adjustY;
         final CheckBox showTitle, showStatus, titleBold, textBold;
-        final EditText actionId, actionPayload, confirmationText;
+        final CheckBox actionEnabled;
+        final Spinner actionConnectorType, actionOperation;
+        final EditText actionConnectorId, actionResourceId, actionBindingPayload;
+        final EditText confirmationText;
         final CheckBox confirmationRequired;
         final CheckBox autoHideAfterAction;
 
         ItemEditor(PopupItemConfig c) {
+            originalSourceBinding = c.sourceBinding;
+            legacySourceBinding = c.sourceBinding != null
+                    && c.sourceBinding.connectorType == ConnectorType.MQTT
+                    && c.automationId.equals(c.sourceBinding.resourceId);
+            ActionBinding initialAction = c.actionBinding == null
+                    ? ActionBinding.legacy(c.actionId, c.actionPayload) : c.actionBinding;
             root.setPadding(dp(14), dp(14), dp(14), dp(14));
             GradientDrawable bg = new GradientDrawable();
             bg.setColor(surfaceColor());
@@ -227,6 +257,10 @@ public final class PopupSettingsActivity extends AppCompatActivity {
             enabled = check("Включена", c.enabled); root.addView(enabled);
             id = field(root, "Локальный ID конфигурации", c.id, false);
             automationId = field(root, "Automation ID (MQTT/Broadcast)", c.automationId, false);
+            root.addView(label("Источник статуса: " + (c.sourceBinding == null
+                    ? "не назначен" : c.sourceBinding.toString())));
+            root.addView(label("Источник команды: " + (c.actionBinding == null
+                    || !c.actionBinding.isBound() ? "нет" : c.actionBinding.toString())));
             type = field(root, "Тип: HA_DEVICE / HA_TEXT / HA_BUTTON / STATIC_TEXT / BUILTIN",
                     c.type, false);
             builtinId = field(root, "ID штатного блока для BUILTIN (например builtin.time)",
@@ -263,6 +297,9 @@ public final class PopupSettingsActivity extends AppCompatActivity {
             defaultText = field(root, "Текст/статус по умолчанию", c.defaultText, false);
             textSize = field(root, "Размер статуса, px", c.textSize, true);
             defaultTextColor = field(root, "Цвет статуса по умолчанию", c.defaultTextColor, false);
+            displayRulesJson = multiline(root,
+                    "Локальные правила статуса (JSON, первое совпавшее правило)",
+                    pretty(c.displayRules));
             textAlpha = field(root, "Прозрачность статуса, 0–255", c.textAlpha, true);
             textBold = check("Жирный статус", c.textBold); root.addView(textBold);
             pendingText = field(root, "Текст до первого состояния", c.pendingText, false);
@@ -280,8 +317,30 @@ public final class PopupSettingsActivity extends AppCompatActivity {
             padding = field(root, "Внутренний отступ плитки, px", c.padding, true);
             adjustX = field(root, "Горизонтальное смещение плитки, px", c.adjustX, true);
             adjustY = field(root, "Вертикальное смещение, px", c.adjustY, true);
-            actionId = field(root, "ID MQTT-действия (пусто = без управления)", c.actionId, false);
-            actionPayload = field(root, "Дополнительный JSON команды", c.actionPayload, false);
+            root.addView(heading("Команда по нажатию", 17), topMargin(14));
+            root.addView(label("Действие не зависит от источника статуса плитки: например, "
+                    + "состояние можно читать из Home Assistant, а команду отправлять в Sprut.hub. "
+                    + "Снимите галочку, чтобы плитка ничего не отправляла."), topMargin(6));
+            actionEnabled = check("Включить управление по нажатию", initialAction.isBound());
+            root.addView(actionEnabled);
+            actionConnectorType = choice(root, "Коннектор действия",
+                    ACTION_CONNECTOR_TYPES, initialAction.connectorType.jsonName());
+            actionConnectorId = field(root, "Connector ID (обычно default)",
+                    initialAction.connectorId, false);
+            actionResourceId = field(root, "Resource ID: MQTT action ID, HA entity_id "
+                    + "или Sprut aId/sId/cId", initialAction.resourceId, false);
+            actionOperation = choice(root, "Операция действия", ACTION_OPERATIONS,
+                    initialAction.operation);
+            actionBindingPayload = multiline(root, "Payload команды в JSON", normalizedPayload(
+                    initialAction.payload));
+            root.addView(label("MQTT: только PUBLISH, payload передаётся без изменений. "
+                    + "Home Assistant: TOGGLE либо SET; "
+                    + "для явного сервиса укажите объект вроде "
+                    + "{\"service\":\"cover.open_cover\"}. Sprut.hub: TOGGLE либо SET; "
+                    + "для SET допустимы true, число или JSON-строка."), topMargin(6));
+            actionEnabled.setOnCheckedChangeListener((button, checked) ->
+                    setActionFieldsEnabled(checked));
+            setActionFieldsEnabled(actionEnabled.isChecked());
             confirmationRequired = check("Требовать диалог подтверждения", c.confirmationRequired);
             root.addView(confirmationRequired);
             confirmationText = field(root, "Текст подтверждения", c.confirmationText, false);
@@ -295,6 +354,13 @@ public final class PopupSettingsActivity extends AppCompatActivity {
                     .put("type", text(type)).put("builtinId", text(builtinId))
                     .put("name", text(name)).put("enabled", enabled.isChecked())
                     .put("order", orderValue);
+            SourceBinding source = legacySourceBinding
+                    ? SourceBinding.legacy(text(automationId)) : originalSourceBinding;
+            ActionBinding action = readActionBinding();
+            o.put("sourceBinding", (source == null
+                    ? SourceBinding.unbound() : source).toJson());
+            o.put("actionBinding", action.toJson());
+            o.put("displayRules", new JSONObject(text(displayRulesJson)));
             o.put("row", number(row, -1)).put("column", number(column, -1))
                     .put("rowSpan", number(rowSpan, 1)).put("columnSpan", number(columnSpan, 1));
             o.put("icon", text(icon)).put("iconSize", number(iconSize, 42))
@@ -325,13 +391,44 @@ public final class PopupSettingsActivity extends AppCompatActivity {
                     .put("cornerRadius", number(cornerRadius, 28))
                     .put("padding", number(padding, 12)).put("adjustX", number(adjustX, 0))
                     .put("adjustY", number(adjustY, 0));
-            o.put("actionId", text(actionId)).put("actionPayload", text(actionPayload))
+            // Keep schema-1 MQTT aliases synchronized for downgrade/import compatibility and
+            // for the MQTT context payload assembled by PopupOverlayController.
+            String legacyActionId = action.isBound()
+                    && action.connectorType == ConnectorType.MQTT ? action.resourceId : "";
+            String legacyActionPayload = legacyActionId.isEmpty() ? "{}" : action.payload;
+            o.put("actionId", legacyActionId).put("actionPayload", legacyActionPayload)
                     .put("confirmationRequired", confirmationRequired.isChecked())
                     .put("confirmationText", text(confirmationText))
                     .put("autoHideAfterAction", autoHideAfterAction.isChecked());
-            // Validate command JSON now so a typo cannot leave a button that silently drops data.
-            if (!text(actionPayload).isEmpty()) new JSONObject(text(actionPayload));
             return PopupItemConfig.fromJson(o, orderValue);
+        }
+
+        private ActionBinding readActionBinding() throws JSONException {
+            if (!actionEnabled.isChecked()) return ActionBinding.unbound();
+            ConnectorType connector = ConnectorType.fromJsonName(
+                    selected(actionConnectorType), ConnectorType.MQTT);
+            String connectorId = text(actionConnectorId);
+            if (connectorId.isEmpty()) connectorId = SourceBinding.DEFAULT_CONNECTOR_ID;
+            if (!SourceBinding.DEFAULT_CONNECTOR_ID.equals(connectorId)) {
+                throw new IllegalArgumentException(
+                        "В этой версии поддерживается только Connector ID default");
+            }
+            String resourceId = text(actionResourceId);
+            if (resourceId.isEmpty()) {
+                throw new IllegalArgumentException("Для управления укажите Resource ID");
+            }
+            String payload = normalizedPayload(text(actionBindingPayload));
+            String operation = selected(actionOperation);
+            validateActionPayload(connector, operation, payload);
+            return new ActionBinding(connector, connectorId, resourceId, operation, payload);
+        }
+
+        private void setActionFieldsEnabled(boolean enabled) {
+            actionConnectorType.setEnabled(enabled);
+            actionConnectorId.setEnabled(enabled);
+            actionResourceId.setEnabled(enabled);
+            actionOperation.setEnabled(enabled);
+            actionBindingPayload.setEnabled(enabled);
         }
     }
 
@@ -350,6 +447,76 @@ public final class PopupSettingsActivity extends AppCompatActivity {
         LinearLayout.LayoutParams lp = matchWrap(); lp.topMargin = dp(8);
         parent.addView(box, lp);
         return input;
+    }
+
+    private EditText multiline(LinearLayout parent, String hint, String value) {
+        TextInputLayout box = new TextInputLayout(this);
+        box.setHint(hint);
+        TextInputEditText input = new TextInputEditText(this);
+        input.setText(value);
+        input.setSingleLine(false);
+        input.setMinLines(5);
+        input.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        box.addView(input, matchWrap());
+        LinearLayout.LayoutParams lp = matchWrap();
+        lp.topMargin = dp(8);
+        parent.addView(box, lp);
+        return input;
+    }
+
+    private Spinner choice(LinearLayout parent, String title, String[] values, String selected) {
+        TextView label = label(title);
+        parent.addView(label, topMargin(8));
+        Spinner spinner = new Spinner(this);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, values);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        spinner.setMinimumHeight(dp(48));
+        for (int i = 0; i < values.length; i++) {
+            if (values[i].equalsIgnoreCase(selected == null ? "" : selected.trim())) {
+                spinner.setSelection(i);
+                break;
+            }
+        }
+        parent.addView(spinner, matchWrap());
+        return spinner;
+    }
+
+    private static String selected(Spinner spinner) {
+        Object item = spinner.getSelectedItem();
+        return item == null ? "" : item.toString();
+    }
+
+    private static String normalizedPayload(String value) {
+        String payload = value == null ? "" : value.trim();
+        return payload.isEmpty() ? "{}" : payload;
+    }
+
+    private static void validateActionPayload(ConnectorType connector, String operation,
+                                              String payload)
+            throws JSONException {
+        if (connector == ConnectorType.MQTT) {
+            if (!ActionBinding.OPERATION_PUBLISH.equals(operation)) {
+                throw new IllegalArgumentException("MQTT поддерживает только PUBLISH");
+            }
+            // The client publishes the exact text, including a non-JSON device command.
+            return;
+        }
+        if (!ActionBinding.OPERATION_SET.equals(operation)
+                && !ActionBinding.OPERATION_TOGGLE.equals(operation)) {
+            throw new IllegalArgumentException(
+                    "Home Assistant и Sprut.hub поддерживают только SET или TOGGLE");
+        }
+        // Wrapping lets org.json validate an object, array, string, number or boolean uniformly.
+        new JSONArray("[" + payload + "]").get(0);
+    }
+
+    private static String pretty(RuleSet rules) {
+        if (rules == null) return "{}";
+        try { return rules.toJson().toString(2); }
+        catch (JSONException ignored) { return "{}"; }
     }
 
     private CheckBox check(String value, boolean checked) {

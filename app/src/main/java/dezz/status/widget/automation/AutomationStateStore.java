@@ -11,6 +11,7 @@ import org.json.JSONObject;
 import org.json.JSONArray;
 
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -22,6 +23,8 @@ public final class AutomationStateStore {
     private static final String KEY_PREFIX = "state|";
 
     private final SharedPreferences prefs;
+    /** Derived local UI layer. Never persisted: it must be recomputed from fresh connector data. */
+    private final Map<String, JSONObject> scenarioOverrides = new LinkedHashMap<>();
 
     public AutomationStateStore(@NonNull Context context) {
         Context device = context.getApplicationContext().createDeviceProtectedStorageContext();
@@ -31,13 +34,18 @@ public final class AutomationStateStore {
 
     @NonNull
     public synchronized AutomationState get(String scope, String id) {
-        String raw = prefs.getString(key(scope, id), null);
-        if (raw == null) return AutomationState.missing();
-        try {
-            return AutomationState.fromJson(new JSONObject(raw));
-        } catch (JSONException ignored) {
-            return AutomationState.missing();
+        String storageKey = key(scope, id);
+        String raw = prefs.getString(storageKey, null);
+        AutomationState base;
+        if (raw == null) base = AutomationState.missing();
+        else {
+            try {
+                base = AutomationState.fromJson(new JSONObject(raw));
+            } catch (JSONException ignored) {
+                base = AutomationState.missing();
+            }
         }
+        return base.withLocalOverrides(scenarioOverrides.get(storageKey));
     }
 
     /** Partial-update merge. A payload with clear=true removes the retained local state. */
@@ -74,6 +82,9 @@ public final class AutomationStateStore {
             else if (patch.has("value")) merged.put("text", String.valueOf(patch.opt("value")));
         }
         if (!patch.has("updated_at")) merged.put("updated_at", System.currentTimeMillis());
+        // Every accepted connector update is a confirmation unless the caller explicitly marks
+        // it stale. Cached values are demoted with markStale() during disconnect/restart.
+        if (!patch.has("fresh")) merged.put("fresh", true);
         merged.put("visible", patch.has("visible")
                 ? AutomationContract.parseBoolean(patch.opt("visible"))
                 : merged.optBoolean("visible", true));
@@ -87,6 +98,77 @@ public final class AutomationStateStore {
 
     public synchronized void clearAll() {
         prefs.edit().clear().commit();
+        scenarioOverrides.clear();
+    }
+
+    /**
+     * Atomically replaces every derived scenario override. Keys are canonical
+     * {@code scope|id}; values may contain only the local presentation fields accepted below.
+     * The layer is deliberately memory-only and therefore empty after every process start.
+     */
+    public synchronized void replaceScenarioOverrides(@NonNull Map<String, JSONObject> overrides) {
+        LinkedHashMap<String, JSONObject> next = new LinkedHashMap<>();
+        for (Map.Entry<String, JSONObject> entry : overrides.entrySet()) {
+            String rawKey = entry.getKey() == null ? "" : entry.getKey().trim();
+            int separator = rawKey.indexOf('|');
+            if (separator <= 0 || separator == rawKey.length() - 1) {
+                throw new IllegalArgumentException("Invalid scenario target key");
+            }
+            String storageKey = key(rawKey.substring(0, separator),
+                    rawKey.substring(separator + 1));
+            JSONObject source = entry.getValue();
+            if (source == null) continue;
+            JSONObject filtered = new JSONObject();
+            try {
+                copyIfPresent(source, filtered, "text");
+                copyIfPresent(source, filtered, "color");
+                copyIfPresent(source, filtered, "icon");
+                copyIfPresent(source, filtered, "background_color");
+                copyIfPresent(source, filtered, "visible");
+                copyIfPresent(source, filtered, "action_enabled");
+            } catch (JSONException impossible) {
+                throw new IllegalArgumentException(impossible);
+            }
+            if (filtered.length() > 0) next.put(storageKey, filtered);
+        }
+        scenarioOverrides.clear();
+        scenarioOverrides.putAll(next);
+    }
+
+    public synchronized void clearScenarioOverrides() {
+        scenarioOverrides.clear();
+    }
+
+    /** Keeps the last value for display but forces the renderer to use its per-brick stale style. */
+    public synchronized void markStale(String scope, String id) {
+        String storageKey = key(scope, id);
+        String previous = prefs.getString(storageKey, null);
+        if (previous == null) return;
+        try {
+            JSONObject state = new JSONObject(previous);
+            state.put("fresh", false);
+            prefs.edit().putString(storageKey, state.toString()).commit();
+        } catch (JSONException ignored) {
+            prefs.edit().remove(storageKey).commit();
+        }
+    }
+
+    /** Boot/session barrier: no disk-cached network value is current until its connector syncs. */
+    public synchronized void markAllStale() {
+        SharedPreferences.Editor editor = prefs.edit();
+        for (Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
+            if (!entry.getKey().startsWith(KEY_PREFIX) || !(entry.getValue() instanceof String)) {
+                continue;
+            }
+            try {
+                JSONObject state = new JSONObject((String) entry.getValue());
+                state.put("fresh", false);
+                editor.putString(entry.getKey(), state.toString());
+            } catch (JSONException ignored) {
+                editor.remove(entry.getKey());
+            }
+        }
+        editor.commit();
     }
 
     /** Snapshot for an explicitly addressed local integration helper; never contains config. */
@@ -116,6 +198,7 @@ public final class AutomationStateStore {
                 || "value".equals(name) || "icon".equals(name) || "state".equals(name)
                 || "background_color".equals(name) || "action_enabled".equals(name)
                 || "enabled".equals(name)
+                || "fresh".equals(name) || "source".equals(name)
                 || "attributes".equals(name) || "request_id".equals(name);
     }
 
@@ -130,6 +213,7 @@ public final class AutomationStateStore {
         checkLength(patch, "background_color", 64);
         checkLength(patch, "icon", 64);
         checkLength(patch, "request_id", 128);
+        checkLength(patch, "source", 64);
     }
 
     private static void checkLength(JSONObject patch, String field, int max) {
@@ -142,5 +226,23 @@ public final class AutomationStateStore {
     private static String key(String scope, String id) {
         return KEY_PREFIX + AutomationContract.normalizeScope(scope) + "|"
                 + AutomationContract.requireSafeId(id);
+    }
+
+    private static void copyIfPresent(JSONObject source, JSONObject target, String field)
+            throws JSONException {
+        if (!source.has(field)) return;
+        Object value = source.get(field);
+        if (("visible".equals(field) || "action_enabled".equals(field))) {
+            target.put(field, AutomationContract.parseBoolean(value));
+            return;
+        }
+        if (value == JSONObject.NULL) target.put(field, JSONObject.NULL);
+        else {
+            String text = String.valueOf(value);
+            if (text.length() > 1024 || text.indexOf('\u0000') >= 0) {
+                throw new IllegalArgumentException("Scenario override is too long");
+            }
+            target.put(field, text);
+        }
     }
 }

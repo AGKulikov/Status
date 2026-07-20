@@ -49,19 +49,28 @@
     </LinearLayout>
 
     <ScrollView
+        android:id="@+id/carDiagnosticsScroll"
         android:layout_width="match_parent"
-        android:layout_height="260dp"
+        android:layout_height="360dp"
         android:fillViewport="true">
 
-        <TextView
-            android:id="@+id/carDiagnostics"
+        <LinearLayout
+            android:id="@+id/carDiagnosticsContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:orientation="vertical"
             android:paddingHorizontal="@dimen/sectionPadding"
-            android:paddingBottom="@dimen/optionsMarginSmall"
-            android:text="@string/car_diagnostics_loading"
-            android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:textIsSelectable="true" />
+            android:paddingBottom="@dimen/optionsMarginSmall">
+
+            <TextView
+                android:id="@+id/carDiagnosticsStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/car_diagnostics_loading"
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                android:textIsSelectable="true" />
+
+        </LinearLayout>
     </ScrollView>
 
     <FrameLayout

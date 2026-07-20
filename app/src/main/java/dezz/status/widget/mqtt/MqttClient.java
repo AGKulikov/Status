@@ -37,6 +37,8 @@ public final class MqttClient {
     private static final int MAX_PACKET_BYTES = 256 * 1024;
     private static final int MAX_PENDING_QOS1 = 128;
     private static final long QOS1_RETRY_MS = 5_000L;
+    private static final long MIN_RECONNECT_DELAY_MS = 1_000L;
+    private static final long MAX_RECONNECT_DELAY_MS = 60_000L;
 
     public interface Listener {
         void onMessage(@NonNull String topic, @NonNull byte[] payload, boolean retained);
@@ -77,27 +79,33 @@ public final class MqttClient {
     private final Object outputLock = new Object();
     private final ConcurrentHashMap<Integer, PendingPublish> pendingQos1 =
             new ConcurrentHashMap<>();
+    private final KeepAliveState keepAlive;
     private volatile boolean running;
     private volatile Socket socket;
     private volatile OutputStream output;
     private Thread worker;
-    private long lastTrafficAt;
+    /** Invalidates callbacks and sockets belonging to a stopped/restarted worker. */
+    private long lifecycleGeneration;
 
     public MqttClient(@NonNull Config config, @NonNull Listener listener) {
         this.config = config;
         this.listener = listener;
+        keepAlive = new KeepAliveState(config.keepAliveSeconds);
     }
 
     public synchronized void start() {
         if (running) return;
         running = true;
-        worker = new Thread(this::runLoop, "status-widget-mqtt");
-        worker.setDaemon(true);
-        worker.start();
+        final long generation = ++lifecycleGeneration;
+        Thread next = new Thread(() -> runLoop(generation), "status-widget-mqtt");
+        next.setDaemon(true);
+        worker = next;
+        next.start();
     }
 
     public synchronized void stop() {
         running = false;
+        lifecycleGeneration++;
         if (output != null) {
             try {
                 publish(config.availabilityTopic, "offline".getBytes(StandardCharsets.UTF_8),
@@ -106,8 +114,11 @@ public final class MqttClient {
             } catch (IOException ignored) {}
         }
         pendingQos1.clear();
-        closeSocket();
-        if (worker != null) worker.interrupt();
+        Socket activeSocket = socket;
+        socket = null;
+        output = null;
+        closeQuietly(activeSocket);
+        if (worker != null && worker != Thread.currentThread()) worker.interrupt();
         worker = null;
     }
 
@@ -118,71 +129,102 @@ public final class MqttClient {
         publish(topic, json.getBytes(StandardCharsets.UTF_8), retained, config.qos == 1);
     }
 
-    private void runLoop() {
-        long backoff = 1_000L;
-        while (running) {
-            try {
-                connectAndRead();
-                backoff = 1_000L;
-            } catch (Exception e) {
-                if (running) {
-                    Log.w(TAG, "MQTT connection lost: " + e.getMessage());
-                    listener.onConnectionChanged(false, e.getMessage() == null
-                            ? e.getClass().getSimpleName() : e.getMessage());
+    private void runLoop(long generation) {
+        ReconnectBackoff backoff = new ReconnectBackoff();
+        try {
+            while (isCurrent(generation)) {
+                ConnectionAttempt attempt = new ConnectionAttempt();
+                try {
+                    connectAndRead(generation, attempt);
+                } catch (Exception e) {
+                    if (isCurrent(generation)) {
+                        String detail = e.getMessage() == null
+                                ? e.getClass().getSimpleName() : e.getMessage();
+                        Log.w(TAG, "MQTT connection lost: " + detail);
+                        notifyConnectionChanged(generation, false, detail);
+                    }
                 }
-            } finally {
-                closeSocket();
+                // A confirmed CONNACK+SUBACK proves that the previous outage ended. The next
+                // independent drop therefore starts at one second instead of inheriting an old
+                // exponential delay that may already have reached a minute.
+                if (attempt.established) backoff.onConnectionEstablished();
+                if (!isCurrent(generation)) break;
+                try {
+                    Thread.sleep(backoff.takeDelay());
+                } catch (InterruptedException interrupted) {
+                    if (!isCurrent(generation)) break;
+                    // The worker has no other interrupt-based control path; a stray interrupt
+                    // merely shortens this one retry delay.
+                }
             }
-            if (!running) break;
-            SystemClock.sleep(backoff);
-            backoff = Math.min(60_000L, backoff * 2L);
+        } finally {
+            clearWorker(generation);
         }
     }
 
-    private void connectAndRead() throws IOException {
+    private void connectAndRead(long generation, ConnectionAttempt attempt) throws IOException {
         SocketFactory factory = config.tls ? SSLSocketFactory.getDefault() : SocketFactory.getDefault();
         Socket next = factory.createSocket();
-        next.connect(new InetSocketAddress(config.host, config.port), 15_000);
-        next.setKeepAlive(true);
-        next.setTcpNoDelay(true);
-        if (next instanceof SSLSocket) {
+        if (!claimSocket(generation, next)) {
+            closeQuietly(next);
+            return;
+        }
+        try {
+            ensureCurrent(generation);
+            next.connect(new InetSocketAddress(config.host, config.port), 15_000);
+            ensureCurrent(generation);
+            next.setKeepAlive(true);
+            next.setTcpNoDelay(true);
             next.setSoTimeout(15_000);
-            SSLParameters tlsParameters = ((SSLSocket) next).getSSLParameters();
-            tlsParameters.setEndpointIdentificationAlgorithm("HTTPS");
-            ((SSLSocket) next).setSSLParameters(tlsParameters);
-            ((SSLSocket) next).startHandshake();
-        }
-        next.setSoTimeout(1_000);
-        socket = next;
-        output = next.getOutputStream();
-        InputStream input = next.getInputStream();
+            if (next instanceof SSLSocket) {
+                SSLParameters tlsParameters = ((SSLSocket) next).getSSLParameters();
+                tlsParameters.setEndpointIdentificationAlgorithm("HTTPS");
+                ((SSLSocket) next).setSSLParameters(tlsParameters);
+                ((SSLSocket) next).startHandshake();
+                ensureCurrent(generation);
+            }
+            OutputStream nextOutput = next.getOutputStream();
+            InputStream input = next.getInputStream();
+            installOutput(generation, next, nextOutput);
+            keepAlive.reset(SystemClock.elapsedRealtime());
 
-        writePacket(0x10, connectBody());
-        Packet connAck = readPacket(input);
-        if (connAck.type() != 2 || connAck.body.length < 2 || connAck.body[1] != 0) {
-            int code = connAck.body.length >= 2 ? connAck.body[1] & 0xff : -1;
-            throw new IOException("Broker rejected CONNECT, code=" + code);
-        }
-        subscribe(config.subscription);
-        resendPendingAfterReconnect();
-        publish(config.availabilityTopic, "online".getBytes(StandardCharsets.UTF_8), true,
-                config.qos == 1);
-        listener.onConnectionChanged(true, "connected");
-        lastTrafficAt = SystemClock.elapsedRealtime();
+            writePacket(0x10, connectBody());
+            Packet connAck = readPacket(input);
+            keepAlive.onTraffic(SystemClock.elapsedRealtime());
+            if (connAck.header != 0x20 || connAck.body.length != 2 || connAck.body[1] != 0) {
+                int code = connAck.body.length >= 2 ? connAck.body[1] & 0xff : -1;
+                throw new IOException("Broker rejected CONNECT, code=" + code);
+            }
+            int subscriptionId = subscribe(config.subscription);
+            awaitSubAck(input, generation, subscriptionId);
+            // Do this immediately after a validated SUBACK: later availability/QoS writes may
+            // fail, but the broker session itself was nevertheless established successfully.
+            attempt.established = true;
+            next.setSoTimeout(1_000);
+            resendPendingAfterReconnect();
+            publish(config.availabilityTopic, "online".getBytes(StandardCharsets.UTF_8), true,
+                    config.qos == 1);
+            notifyConnectionChanged(generation, true, "connected");
 
-        while (running && !next.isClosed()) {
-            try {
-                Packet packet = readPacket(input);
-                lastTrafficAt = SystemClock.elapsedRealtime();
-                handlePacket(packet);
-            } catch (SocketTimeoutException ignored) {
-                retryPending();
-                long silence = SystemClock.elapsedRealtime() - lastTrafficAt;
-                if (silence >= config.keepAliveSeconds * 500L) {
-                    writePacket(0xC0, new byte[0]);
-                    lastTrafficAt = SystemClock.elapsedRealtime();
+            while (isCurrent(generation) && !next.isClosed()) {
+                try {
+                    Packet packet = readPacket(input);
+                    keepAlive.onTraffic(SystemClock.elapsedRealtime());
+                    handlePacket(packet, generation);
+                } catch (SocketTimeoutException ignored) {
+                    long now = SystemClock.elapsedRealtime();
+                    if (keepAlive.hasTimedOut(now)) {
+                        throw new IOException("MQTT PINGRESP timeout");
+                    }
+                    retryPending();
+                    if (keepAlive.shouldPing(now)) {
+                        writePacket(0xC0, new byte[0]);
+                        keepAlive.onPingSent(SystemClock.elapsedRealtime());
+                    }
                 }
             }
+        } finally {
+            closeSocket(next);
         }
     }
 
@@ -191,8 +233,10 @@ public final class MqttClient {
         DataOutputStream out = new DataOutputStream(bytes);
         writeUtf(out, "MQTT");
         out.writeByte(4); // protocol level 3.1.1
-        boolean hasUser = config.username != null && !config.username.isEmpty();
         boolean hasPassword = config.password != null && !config.password.isEmpty();
+        // MQTT 3.1.1 forbids Password Flag=1 with User Name Flag=0. An explicitly empty
+        // username is still a valid username field for brokers that authenticate by password.
+        boolean hasUser = (config.username != null && !config.username.isEmpty()) || hasPassword;
         int flags = 0x02 | 0x04 | 0x20 | (config.qos << 3); // clean + retained will
         if (hasUser) flags |= 0x80;
         if (hasPassword) flags |= 0x40;
@@ -201,21 +245,61 @@ public final class MqttClient {
         writeUtf(out, config.clientId);
         writeUtf(out, config.availabilityTopic);
         writeUtf(out, "offline");
-        if (hasUser) writeUtf(out, config.username);
+        if (hasUser) writeUtf(out, config.username == null ? "" : config.username);
         if (hasPassword) writeUtf(out, config.password);
         return bytes.toByteArray();
     }
 
-    private void subscribe(String filter) throws IOException {
+    private int subscribe(String filter) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytes);
-        out.writeShort(nextPacketId());
+        int packetId = nextPacketId();
+        out.writeShort(packetId);
         writeUtf(out, filter);
         out.writeByte(config.qos);
         writePacket(0x82, bytes.toByteArray());
+        return packetId;
     }
 
-    private void handlePacket(Packet packet) throws IOException {
+    private void awaitSubAck(InputStream input, long generation, int expectedPacketId)
+            throws IOException {
+        while (isCurrent(generation)) {
+            Packet packet = readPacket(input);
+            keepAlive.onTraffic(SystemClock.elapsedRealtime());
+            if (packet.type() == 9) {
+                validateSubAck(expectedPacketId, config.qos, packet.header, packet.body);
+                return;
+            }
+            // A retained PUBLISH or a PUBACK may legally be interleaved before SUBACK.
+            handlePacket(packet, generation);
+        }
+        throw new IOException("MQTT stopped before SUBACK");
+    }
+
+    static void validateSubAck(int expectedPacketId, int requestedQos, int header, byte[] body)
+            throws IOException {
+        if (header != 0x90 || body == null || body.length != 3) {
+            throw new IOException("Invalid MQTT SUBACK");
+        }
+        int packetId = ((body[0] & 0xff) << 8) | (body[1] & 0xff);
+        if (packetId != expectedPacketId) {
+            throw new IOException("MQTT SUBACK packet id mismatch");
+        }
+        int grantedQos = body[2] & 0xff;
+        if (grantedQos == 0x80) throw new IOException("Broker rejected MQTT subscription");
+        if (grantedQos > 1 || grantedQos > (requestedQos <= 0 ? 0 : 1)) {
+            throw new IOException("Invalid MQTT SUBACK QoS=" + grantedQos);
+        }
+    }
+
+    private void handlePacket(Packet packet, long generation) throws IOException {
+        if (packet.type() == 13) {
+            if (packet.header != 0xD0 || packet.body.length != 0) {
+                throw new IOException("Invalid MQTT PINGRESP");
+            }
+            keepAlive.onPingResponse(SystemClock.elapsedRealtime());
+            return;
+        }
         if (packet.type() == 4 && packet.body.length >= 2) {
             int packetId = ((packet.body[0] & 0xff) << 8) | (packet.body[1] & 0xff);
             pendingQos1.remove(packetId);
@@ -228,7 +312,7 @@ public final class MqttClient {
         int packetId = qos > 0 ? in.readUnsignedShort() : 0;
         byte[] payload = new byte[in.available()];
         in.readFully(payload);
-        listener.onMessage(topic, payload, (packet.header & 0x01) != 0);
+        notifyMessage(generation, topic, payload, (packet.header & 0x01) != 0);
         if (qos == 1) {
             writePacket(0x40, new byte[] {(byte) (packetId >> 8), (byte) packetId});
         }
@@ -236,6 +320,7 @@ public final class MqttClient {
 
     private void publish(String topic, byte[] payload, boolean retained, boolean qosOne)
             throws IOException {
+        validateTopicName(topic);
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytes);
         writeUtf(out, topic);
@@ -287,7 +372,7 @@ public final class MqttClient {
             writeRemainingLength(out, body.length);
             out.write(body);
             out.flush();
-            lastTrafficAt = SystemClock.elapsedRealtime();
+            keepAlive.onTraffic(SystemClock.elapsedRealtime());
         }
     }
 
@@ -304,11 +389,60 @@ public final class MqttClient {
         return packetIds.getAndUpdate(v -> v >= 0xffff ? 1 : v + 1);
     }
 
-    private void closeSocket() {
-        output = null;
-        Socket old = socket;
-        socket = null;
-        if (old != null) try { old.close(); } catch (IOException ignored) {}
+    private synchronized boolean claimSocket(long generation, Socket next) {
+        if (!isCurrentLocked(generation)) return false;
+        socket = next;
+        return true;
+    }
+
+    private synchronized void installOutput(long generation, Socket expected,
+                                            OutputStream nextOutput) throws IOException {
+        if (!isCurrentLocked(generation) || socket != expected) {
+            throw new IOException("MQTT stopped while connecting");
+        }
+        output = nextOutput;
+    }
+
+    private synchronized boolean isCurrent(long generation) {
+        return isCurrentLocked(generation);
+    }
+
+    private boolean isCurrentLocked(long generation) {
+        return running && lifecycleGeneration == generation;
+    }
+
+    private synchronized void ensureCurrent(long generation) throws IOException {
+        if (!isCurrentLocked(generation)) throw new IOException("MQTT stopped");
+    }
+
+    private synchronized void notifyMessage(long generation, String topic, byte[] payload,
+                                            boolean retained) throws IOException {
+        if (!isCurrentLocked(generation)) throw new IOException("MQTT stopped");
+        listener.onMessage(topic, payload, retained);
+    }
+
+    private synchronized void notifyConnectionChanged(long generation, boolean connected,
+                                                       String detail) {
+        if (!isCurrentLocked(generation)) return;
+        listener.onConnectionChanged(connected, detail);
+    }
+
+    private synchronized void clearWorker(long generation) {
+        if (lifecycleGeneration == generation && worker == Thread.currentThread()) worker = null;
+    }
+
+    private void closeSocket(Socket expected) {
+        synchronized (this) {
+            if (socket == expected) {
+                output = null;
+                socket = null;
+            }
+        }
+        closeQuietly(expected);
+    }
+
+    private static void closeQuietly(Socket target) {
+        if (target != null) try { target.close(); } catch (IOException ignored) {}
     }
 
     private static void writeUtf(DataOutputStream out, String value) throws IOException {
@@ -316,6 +450,15 @@ public final class MqttClient {
         if (bytes.length > 0xffff) throw new IOException("MQTT UTF value is too long");
         out.writeShort(bytes.length);
         out.write(bytes);
+    }
+
+    private static void validateTopicName(String topic) throws IOException {
+        String value = topic == null ? "" : topic;
+        byte[] encoded = value.getBytes(StandardCharsets.UTF_8);
+        if (encoded.length == 0 || encoded.length > 0xffff || value.indexOf('\u0000') >= 0
+                || value.indexOf('#') >= 0 || value.indexOf('+') >= 0) {
+            throw new IOException("Invalid MQTT topic name");
+        }
     }
 
     private static String readUtf(DataInputStream in) throws IOException {
@@ -375,6 +518,70 @@ public final class MqttClient {
         PendingPublish(int header, byte[] body) {
             this.header = header;
             this.body = body;
+        }
+    }
+
+    private static final class ConnectionAttempt {
+        boolean established;
+    }
+
+    /** Pure reconnect policy kept package-visible for local JVM tests. */
+    static final class ReconnectBackoff {
+        private long nextDelay = MIN_RECONNECT_DELAY_MS;
+
+        void onConnectionEstablished() {
+            nextDelay = MIN_RECONNECT_DELAY_MS;
+        }
+
+        long takeDelay() {
+            long result = nextDelay;
+            nextDelay = Math.min(MAX_RECONNECT_DELAY_MS, nextDelay * 2L);
+            return result;
+        }
+    }
+
+    /** Tracks a concrete outstanding PINGREQ; unrelated traffic cannot acknowledge it. */
+    static final class KeepAliveState {
+        private final long pingAfterMs;
+        private final long pingTimeoutMs;
+        private long lastTrafficAt;
+        private long pingSentAt = -1L;
+
+        KeepAliveState(int keepAliveSeconds) {
+            int seconds = Math.max(1, keepAliveSeconds);
+            pingAfterMs = seconds * 500L;
+            pingTimeoutMs = seconds * 1_000L;
+        }
+
+        synchronized void reset(long now) {
+            lastTrafficAt = now;
+            pingSentAt = -1L;
+        }
+
+        synchronized void onTraffic(long now) {
+            lastTrafficAt = now;
+        }
+
+        synchronized boolean shouldPing(long now) {
+            return pingSentAt < 0L && now - lastTrafficAt >= pingAfterMs;
+        }
+
+        synchronized void onPingSent(long now) {
+            lastTrafficAt = now;
+            pingSentAt = now;
+        }
+
+        synchronized boolean hasTimedOut(long now) {
+            return pingSentAt >= 0L && now - pingSentAt >= pingTimeoutMs;
+        }
+
+        synchronized void onPingResponse(long now) {
+            lastTrafficAt = now;
+            pingSentAt = -1L;
+        }
+
+        synchronized boolean isPingOutstanding() {
+            return pingSentAt >= 0L;
         }
     }
 }

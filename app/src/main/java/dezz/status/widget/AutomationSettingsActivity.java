@@ -33,6 +33,10 @@ import java.util.List;
 import dezz.status.widget.ha.HaBrickConfig;
 import dezz.status.widget.ha.HaBrickConfigStore;
 import dezz.status.widget.mqtt.MqttController;
+import dezz.status.widget.integration.ActionBinding;
+import dezz.status.widget.integration.ConnectorType;
+import dezz.status.widget.integration.SourceBinding;
+import dezz.status.widget.scenario.RuleSet;
 
 /**
  * Source-native editor for the automation layer. Kept independent from the upstream brick card
@@ -94,6 +98,24 @@ public final class AutomationSettingsActivity extends AppCompatActivity {
         popupSettings.setOnClickListener(v ->
                 startActivity(new Intent(this, PopupSettingsActivity.class)));
         page.addView(popupSettings, topMargin(12));
+
+        Button haSettings = new Button(this);
+        haSettings.setText("Home Assistant: подключение и выбор сущностей");
+        haSettings.setOnClickListener(v ->
+                startActivity(new Intent(this, HomeAssistantSettingsActivity.class)));
+        page.addView(haSettings, topMargin(8));
+
+        Button sprutSettings = new Button(this);
+        sprutSettings.setText("Sprut.hub: подключение и выбор устройств");
+        sprutSettings.setOnClickListener(v ->
+                startActivity(new Intent(this, SprutHubSettingsActivity.class)));
+        page.addView(sprutSettings, topMargin(8));
+
+        Button scenarioSettings = new Button(this);
+        scenarioSettings.setText("Сценарии: условия и видимость между коннекторами");
+        scenarioSettings.setOnClickListener(v ->
+                startActivity(new Intent(this, ScenarioSettingsActivity.class)));
+        page.addView(scenarioSettings, topMargin(8));
 
         page.addView(heading(getString(R.string.mqtt_section_title), 20), topMargin(18));
         TextView topicHint = label("Retained topics: statuswidget/v1/{device}/state/{main|builtin|popup}/{id}");
@@ -245,11 +267,15 @@ public final class AutomationSettingsActivity extends AppCompatActivity {
 
     private final class BrickEditor {
         final LinearLayout root = column();
+        final SourceBinding originalSourceBinding;
+        final ActionBinding originalActionBinding;
+        final boolean legacySourceBinding;
         final EditText id;
         final EditText name;
         final CheckBox enabled;
         final EditText defaultText;
         final EditText defaultColor;
+        final EditText displayRulesJson;
         final EditText pendingText;
         final EditText pendingColor;
         final EditText staleText;
@@ -280,6 +306,11 @@ public final class AutomationSettingsActivity extends AppCompatActivity {
         final CheckBox hideKeepsSpace;
 
         BrickEditor(HaBrickConfig c) {
+            originalSourceBinding = c.sourceBinding;
+            originalActionBinding = c.actionBinding;
+            legacySourceBinding = c.sourceBinding != null
+                    && c.sourceBinding.connectorType == ConnectorType.MQTT
+                    && c.id.equals(c.sourceBinding.resourceId);
             root.setPadding(dp(14), dp(14), dp(14), dp(14));
             GradientDrawable background = new GradientDrawable();
             background.setColor(resolveSurfaceColor());
@@ -308,8 +339,13 @@ public final class AutomationSettingsActivity extends AppCompatActivity {
             root.addView(enabled);
             id = field(root, "Уникальный ID / brick_id", c.id, false);
             name = field(root, "Название в настройках", c.name, false);
+            root.addView(label("Источник: " + (c.sourceBinding == null
+                    ? "не назначен" : c.sourceBinding.toString())));
             defaultText = field(root, "Собственный текст по умолчанию", c.defaultText, false);
             defaultColor = field(root, "Цвет обычного статуса (#AARRGGBB)", c.defaultColor, false);
+            displayRulesJson = multiline(root,
+                    "Локальные правила статуса (JSON, первое совпавшее правило)",
+                    pretty(c.displayRules));
             pendingText = field(root, "Текст до первого актуального статуса", c.pendingText, false);
             pendingColor = field(root, "Цвет до первого актуального статуса", c.pendingColor, false);
             staleText = field(root, "Текст устаревшего статуса", c.staleText, false);
@@ -352,6 +388,13 @@ public final class AutomationSettingsActivity extends AppCompatActivity {
         HaBrickConfig read(int order) throws JSONException {
             JSONObject o = new JSONObject();
             o.put("id", text(id));
+            SourceBinding source = legacySourceBinding
+                    ? SourceBinding.legacy(text(id)) : originalSourceBinding;
+            o.put("sourceBinding", (source == null
+                    ? SourceBinding.unbound() : source).toJson());
+            o.put("actionBinding", (originalActionBinding == null
+                    ? ActionBinding.unbound() : originalActionBinding).toJson());
+            o.put("displayRules", new JSONObject(text(displayRulesJson)));
             o.put("name", text(name));
             o.put("enabled", enabled.isChecked());
             o.put("order", order);
@@ -406,6 +449,28 @@ public final class AutomationSettingsActivity extends AppCompatActivity {
         lp.topMargin = dp(8);
         parent.addView(layout, lp);
         return input;
+    }
+
+    private EditText multiline(LinearLayout parent, String hint, String value) {
+        TextInputLayout layout = new TextInputLayout(this);
+        layout.setHint(hint);
+        TextInputEditText input = new TextInputEditText(this);
+        input.setText(value);
+        input.setSingleLine(false);
+        input.setMinLines(5);
+        input.setGravity(Gravity.TOP | Gravity.START);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        layout.addView(input, matchWrap());
+        LinearLayout.LayoutParams lp = matchWrap();
+        lp.topMargin = dp(8);
+        parent.addView(layout, lp);
+        return input;
+    }
+
+    private static String pretty(RuleSet rules) {
+        if (rules == null) return "{}";
+        try { return rules.toJson().toString(2); }
+        catch (JSONException ignored) { return "{}"; }
     }
 
     private CheckBox addCheck(LinearLayout parent, CheckBox check) {

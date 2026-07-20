@@ -39,12 +39,17 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Build geelyDebug
+      - name: Test and build geelyDebug
         env:
           VERSION_NAME: v2.8.2-ha${{ github.run_number }}
         run: |
           export VERSION_CODE=$((208020000 + GITHUB_RUN_NUMBER))
-          ./gradlew --no-daemon clean testGeelyDebugUnitTest assembleGeelyDebug
+          # Keep unit tests and APK assembly in separate Gradle invocations.
+          # Running both task graphs together can make D8 see duplicate
+          # non-namespaced AndroidX R classes in this legacy project.
+          ./gradlew --no-daemon clean
+          ./gradlew --no-daemon testGeelyDebugUnitTest
+          ./gradlew --no-daemon assembleGeelyDebug
 
       - name: Verify APK identity, alignment and signature
         shell: bash
