@@ -45,6 +45,7 @@ public final class SprutCatalogIndexTest {
         assertEquals(1, result.totalMatches());
         assertEquals(target, result.entries().get(0).accessory());
         assertEquals("Техническая комната", result.entries().get(0).roomName());
+        assertEquals(1, result.entries().get(0).characteristicCount());
     }
 
     @Test public void breadcrumbQueryUsesSamePredicateForDiscoveryAndExpansion() {

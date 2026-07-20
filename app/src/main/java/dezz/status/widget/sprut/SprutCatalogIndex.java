@@ -33,7 +33,13 @@ public final class SprutCatalogIndex {
             if ((position++ & 63) == 0) checkInterrupted();
             String room = catalog.roomNameFor(accessory);
             String sortKey = normalize(room + " " + accessory.name() + " " + accessory.id());
-            values.add(new Entry(accessory, room, sortKey));
+            int characteristicCount = 0;
+            int servicePosition = 0;
+            for (SprutCatalog.Service service : accessory.services()) {
+                if ((servicePosition++ & 63) == 0) checkInterrupted();
+                characteristicCount += service.characteristics().size();
+            }
+            values.add(new Entry(accessory, room, sortKey, characteristicCount));
         }
         values.sort(Comparator.comparing(Entry::sortKey));
         checkInterrupted();
@@ -98,11 +104,14 @@ public final class SprutCatalogIndex {
         private final SprutCatalog.Accessory accessory;
         private final String roomName;
         private final String sortKey;
+        private final int characteristicCount;
 
-        private Entry(SprutCatalog.Accessory accessory, String roomName, String sortKey) {
+        private Entry(SprutCatalog.Accessory accessory, String roomName, String sortKey,
+                      int characteristicCount) {
             this.accessory = accessory;
             this.roomName = roomName;
             this.sortKey = sortKey;
+            this.characteristicCount = characteristicCount;
         }
 
         private boolean matches(Query query) {
@@ -116,6 +125,9 @@ public final class SprutCatalogIndex {
         public SprutCatalog.Accessory accessory() { return accessory; }
 
         public String roomName() { return roomName; }
+
+        /** Precomputed off the UI thread while building the catalog index. */
+        public int characteristicCount() { return characteristicCount; }
 
         private String sortKey() { return sortKey; }
     }
