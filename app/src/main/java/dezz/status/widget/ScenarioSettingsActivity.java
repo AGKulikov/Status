@@ -31,12 +31,15 @@ import org.json.JSONObject;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 import dezz.status.widget.ha.HaBrickConfig;
 import dezz.status.widget.ha.HaBrickConfigStore;
+import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.popup.PopupItemConfig;
 import dezz.status.widget.popup.PopupItemConfigStore;
+import dezz.status.widget.popup.PopupIconCatalog;
 import dezz.status.widget.scenario.Condition;
 import dezz.status.widget.scenario.ConditionMode;
 import dezz.status.widget.scenario.Input;
@@ -59,6 +62,29 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
     private static final String DEFAULT_CONNECTOR_ID = "default";
     private static final String[] CONNECTORS = {
             "HOME_ASSISTANT", "MQTT", "SPRUTHUB"
+    };
+    private static final String[] OPERATOR_VALUES = {
+            "EQUALS", "NOT_EQUALS", "TRUE", "FALSE", "GREATER", "GREATER_OR_EQUAL",
+            "LESS", "LESS_OR_EQUAL", "BETWEEN", "CONTAINS", "EMPTY", "NOT_EMPTY",
+            "AVAILABLE", "UNAVAILABLE", "FRESH", "STALE", "ALWAYS"
+    };
+    private static final String[] OPERATOR_LABELS = {
+            "равно", "не равно", "включено / да", "выключено / нет", "больше",
+            "больше или равно", "меньше", "меньше или равно", "в диапазоне",
+            "содержит текст", "пустое", "не пустое", "доступно", "недоступно",
+            "актуально", "устарело", "всегда"
+    };
+    private static final String[] TARGET_VALUES = {"MAIN", "POPUP", "BUILTIN", "OVERLAY"};
+    private static final String[] TARGET_LABELS = {
+            "Элемент основной строки", "Плитка плавающего оверлея",
+            "Штатный элемент", "Весь плавающий оверлей"
+    };
+    private static final String[] FIELD_VALUES = {
+            "VISIBLE", "TEXT_COLOR", "BACKGROUND_COLOR", "ICON", "ACTION_ENABLED"
+    };
+    private static final String[] FIELD_LABELS = {
+            "Показать или скрыть", "Изменить цвет текста", "Изменить цвет фона",
+            "Изменить иконку", "Разрешить или запретить нажатие"
     };
 
     private Preferences prefs;
@@ -91,17 +117,10 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         header.addView(heading("Локальные сценарии", 24), weighted());
         page.addView(header, matchWrap());
 
-        TextView explanation = label("Сценарий читает значение из Home Assistant, MQTT или "
-                + "Sprut.hub и меняет отдельную локальную цель. Источник и цель независимы: "
-                + "например, условие HOME_ASSISTANT может показать POPUP-элемент Sprut.hub. "
-                + "Сейчас редактор поддерживает "
-                + "режим ALL, одно условие и одно действие. Более сложные записи сохраняются без "
-                + "изменений. VISIBLE/ACTION_ENABLED=true работает как безопасный шлюз: цель до "
-                + "совпадения выключена. Значение false действует только при совпадении и подходит "
-                + "для условного скрытия/запрета. Обычное "
-                + "сравнение на stale/unavailable не срабатывает. "
-                + "Для MQTT ресурс "
-                + "задаётся как main/id, popup/id, builtin/id или overlay/popup.");
+        TextView explanation = label("Соберите правило из трёх шагов: выберите устройство, "
+                + "задайте понятное условие и выберите, что изменить. Источник и цель могут быть "
+                + "из разных систем — например, датчик Home Assistant может показать плитку "
+                + "Sprut.hub.");
         page.addView(explanation, topMargin(10));
 
         Button intentCommands = new Button(this);
@@ -118,10 +137,6 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         addButton.setEnabled(loadError == null);
         addButton.setOnClickListener(view -> showEditor(-1));
         listHeader.addView(addButton);
-        Button advanced = new Button(this);
-        advanced.setText("JSON");
-        advanced.setOnClickListener(view -> showRawEditor());
-        listHeader.addView(advanced);
         page.addView(listHeader, topMargin(20));
 
         if (loadError != null) {
@@ -495,6 +510,9 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         final Spinner localField;
         final Switch booleanValue;
         final EditText stringValue;
+        final TextView sourceSummary;
+        final TextView targetSummary;
+        final Button chooseStyleValue;
         final String conditionId;
 
         EditorViews(@Nullable Scenario source) {
@@ -507,50 +525,71 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             root.addView(enabled, matchWrap());
             scenarioId = field(root, "Уникальный ID сценария",
                     source == null ? nextScenarioId() : source.id);
+            hideControlAndLabel(root, scenarioId);
 
-            root.addView(section("Источник"), topMargin(16));
+            root.addView(section("1. Когда изменится устройство"), topMargin(16));
             connector = spinner(root, "Коннектор",
                     CONNECTORS, condition == null ? CONNECTORS[0]
                             : condition.reference.connectorType);
+            hideControlAndLabel(root, connector);
             connectorId = field(root, "ID подключения",
                     condition == null ? DEFAULT_CONNECTOR_ID : condition.reference.connectorId);
             connectorId.setText(DEFAULT_CONNECTOR_ID);
             connectorId.setEnabled(false);
-            root.addView(label("В текущей версии у каждого коннектора один профиль: default."));
+            hideControlAndLabel(root, connectorId);
             resourceId = field(root, "ID ресурса / entity / topic",
                     condition == null ? "" : condition.reference.resourceId);
+            hideControlAndLabel(root, resourceId);
             valuePath = field(root, "Путь к значению (необязательно)",
                     condition == null || condition.reference.valuePath == null
                             ? "" : condition.reference.valuePath);
+            hideControlAndLabel(root, valuePath);
+            sourceSummary = label(condition == null ? "Устройство ещё не выбрано"
+                    : sourceLabel(condition.reference));
+            root.addView(sourceSummary, topMargin(6));
+            Button chooseSource = new Button(ScenarioSettingsActivity.this);
+            chooseSource.setText("Выбрать устройство");
+            chooseSource.setOnClickListener(view -> showSourcePicker());
+            root.addView(chooseSource, topMargin(6));
 
-            root.addView(section("Условие · ALL · одно"), topMargin(16));
-            String[] operators = enumNames(Operator.values());
-            operator = spinner(root, "Оператор", operators,
-                    condition == null ? Operator.ALWAYS.jsonName()
+            root.addView(section("2. При каком условии"), topMargin(16));
+            operator = mappedSpinner(root, "Сравнение", OPERATOR_LABELS, OPERATOR_VALUES,
+                    condition == null ? Operator.EQUALS.jsonName()
                             : condition.operator.jsonName());
-            operand = field(root, "Operand",
+            operand = field(root, "Значение для сравнения",
                     condition == null ? "" : condition.operand);
-            secondOperand = field(root, "Second operand (для BETWEEN)",
+            secondOperand = field(root, "Верхняя граница диапазона",
                     condition == null ? "" : condition.secondOperand);
 
-            root.addView(section("Локальное действие"), topMargin(16));
-            target = spinner(root, "Цель", enumNames(TargetScope.values()),
+            root.addView(section("3. Что сделать"), topMargin(16));
+            target = mappedSpinner(root, "Где находится изменяемый элемент",
+                    TARGET_LABELS, TARGET_VALUES,
                     action == null ? TargetScope.MAIN.jsonName()
                             : action.targetScope.jsonName());
             targetId = field(root, "ID кирпичика / элемента (например sprut_gate, builtin.time, popup)",
                     action == null ? "" : action.targetId);
+            hideControlAndLabel(root, targetId);
+            targetSummary = label(action == null ? "Элемент ещё не выбран"
+                    : targetLabel(action.targetScope, action.targetId));
+            root.addView(targetSummary, topMargin(6));
             Button chooseTarget = new Button(ScenarioSettingsActivity.this);
-            chooseTarget.setText("Выбрать существующую цель");
+            chooseTarget.setText("Выбрать элемент");
             chooseTarget.setOnClickListener(view -> showTargetPicker());
             root.addView(chooseTarget, topMargin(6));
-            localField = spinner(root, "Поле", enumNames(LocalField.values()),
+            localField = mappedSpinner(root, "Действие", FIELD_LABELS, FIELD_VALUES,
                     action == null ? LocalField.VISIBLE.jsonName() : action.field.jsonName());
             boolean initialBoolean = action == null || action.booleanValue() == null
                     || action.booleanValue();
-            booleanValue = switchView("Логическое значение", initialBoolean);
+            booleanValue = switchView("Показывать / разрешить", initialBoolean);
             root.addView(booleanValue, topMargin(8));
             stringValue = field(root, "Строковое значение стиля",
                     action == null || action.stringValue() == null ? "" : action.stringValue());
+            hideControlAndLabel(root, stringValue);
+            chooseStyleValue = new Button(ScenarioSettingsActivity.this);
+            chooseStyleValue.setText(action == null || action.stringValue() == null
+                    ? "Выбрать значение" : "Выбрано: " + action.stringValue());
+            chooseStyleValue.setOnClickListener(view -> chooseActionValue());
+            root.addView(chooseStyleValue, topMargin(6));
             localField.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override public void onItemSelected(AdapterView<?> parent, View view,
                                                      int position, long id) {
@@ -571,7 +610,8 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             if (resource.isEmpty()) {
                 throw new IllegalArgumentException("Укажите ID ресурса");
             }
-            Operator selectedOperator = Operator.fromJsonName(selected(operator));
+            Operator selectedOperator = Operator.fromJsonName(
+                    mappedValue(operator, OPERATOR_VALUES));
             String first = rawText(operand);
             String second = rawText(secondOperand);
             validateOperands(selectedOperator, first, second);
@@ -580,13 +620,13 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                     resource, optional(text(valuePath)));
             Condition condition = new Condition(conditionId, reference, Input.FIELD_VALUE,
                     selectedOperator, first, second);
-            LocalField field = LocalField.fromJsonName(selected(localField));
+            LocalField field = LocalField.fromJsonName(mappedValue(localField, FIELD_VALUES));
             Object value = isBooleanField(field)
                     ? booleanValue.isChecked() : text(stringValue);
             if (!isBooleanField(field) && ((String) value).isEmpty()) {
                 throw new IllegalArgumentException("Укажите строковое значение стиля");
             }
-            TargetScope targetScope = TargetScope.fromJsonName(selected(target));
+            TargetScope targetScope = TargetScope.fromJsonName(mappedValue(target, TARGET_VALUES));
             String selectedTargetId = text(targetId);
             validateTarget(targetScope, selectedTargetId);
             LocalAction action = new LocalAction(targetScope, selectedTargetId, field, value);
@@ -597,19 +637,69 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         private void updateValueControl() {
             LocalField field;
             try {
-                field = LocalField.fromJsonName(selected(localField));
+                field = LocalField.fromJsonName(mappedValue(localField, FIELD_VALUES));
             } catch (RuntimeException ignored) {
                 field = LocalField.VISIBLE;
             }
             boolean bool = isBooleanField(field);
             booleanValue.setVisibility(bool ? View.VISIBLE : View.GONE);
-            stringValue.setVisibility(bool ? View.GONE : View.VISIBLE);
+            stringValue.setVisibility(View.GONE);
+            chooseStyleValue.setVisibility(bool ? View.GONE : View.VISIBLE);
+        }
+
+        private void showSourcePicker() {
+            List<SourceOption> options = sourceOptions();
+            if (options.isEmpty()) {
+                new AlertDialog.Builder(ScenarioSettingsActivity.this)
+                        .setTitle("Нет доступных устройств")
+                        .setMessage("Сначала добавьте нужное устройство в основную строку или "
+                                + "плавающий оверлей. После этого оно появится здесь как источник.")
+                        .setPositiveButton("Основная строка", (d, w) -> startActivity(
+                                new Intent(ScenarioSettingsActivity.this,
+                                        AutomationSettingsActivity.class)))
+                        .setNegativeButton("Закрыть", null).show();
+                return;
+            }
+            String[] labels = new String[options.size()];
+            for (int index = 0; index < options.size(); index++) labels[index] = options.get(index).label;
+            new AlertDialog.Builder(ScenarioSettingsActivity.this)
+                    .setTitle("Устройство-источник").setItems(labels, (dialog, which) -> {
+                        SourceBinding value = options.get(which).binding;
+                        selectSpinnerValue(connector, CONNECTORS, value.connectorType.jsonName());
+                        resourceId.setText(value.resourceId);
+                        valuePath.setText(value.valuePath);
+                        sourceSummary.setText(options.get(which).label);
+                    }).setNegativeButton("Отмена", null).show();
+        }
+
+        private void chooseActionValue() {
+            LocalField field = LocalField.fromJsonName(mappedValue(localField, FIELD_VALUES));
+            if (field == LocalField.ICON) {
+                String[] labels = {"Ворота", "Гараж", "Свет", "Замок", "Питание",
+                        "Температура", "Вода", "Дверь", "Wi-Fi", "GPS", "Bluetooth"};
+                new AlertDialog.Builder(ScenarioSettingsActivity.this).setTitle("Иконка")
+                        .setItems(labels, (d, which) -> {
+                            String value = PopupIconCatalog.IDS.get(which);
+                            stringValue.setText(value);
+                            chooseStyleValue.setText("Выбрано: " + labels[which]);
+                        }).setNegativeButton("Отмена", null).show();
+                return;
+            }
+            String[] labels = {"Белый", "Зелёный", "Оранжевый", "Красный", "Голубой",
+                    "Серый", "Чёрный", "Прозрачный"};
+            String[] colors = {"#FFFFFFFF", "#FF4CAF50", "#FFFF9800", "#FFF44336",
+                    "#FF03A9F4", "#FF9E9E9E", "#FF000000", "transparent"};
+            new AlertDialog.Builder(ScenarioSettingsActivity.this).setTitle("Цвет")
+                    .setItems(labels, (d, which) -> {
+                        stringValue.setText(colors[which]);
+                        chooseStyleValue.setText("Выбрано: " + labels[which]);
+                    }).setNegativeButton("Отмена", null).show();
         }
 
         private void showTargetPicker() {
             final TargetScope scope;
             try {
-                scope = TargetScope.fromJsonName(selected(target));
+                scope = TargetScope.fromJsonName(mappedValue(target, TARGET_VALUES));
             } catch (RuntimeException error) {
                 showValidationError(error);
                 return;
@@ -626,7 +716,10 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             }
             new AlertDialog.Builder(ScenarioSettingsActivity.this)
                     .setTitle("Цель сценария")
-                    .setItems(labels, (dialog, which) -> targetId.setText(options.get(which).id))
+                    .setItems(labels, (dialog, which) -> {
+                        targetId.setText(options.get(which).id);
+                        targetSummary.setText(options.get(which).label);
+                    })
                     .setNegativeButton("Отмена", null)
                     .show();
         }
@@ -664,6 +757,41 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 break;
         }
         return result;
+    }
+
+    private List<SourceOption> sourceOptions() {
+        LinkedHashMap<String, SourceOption> values = new LinkedHashMap<>();
+        for (HaBrickConfig item : new HaBrickConfigStore(prefs).loadMain()) {
+            addSourceOption(values, item.sourceBinding, item.name + " · основная строка");
+        }
+        for (PopupItemConfig item : new PopupItemConfigStore(prefs).load()) {
+            addSourceOption(values, item.sourceBinding, item.name + " · плавающий оверлей");
+        }
+        return new ArrayList<>(values.values());
+    }
+
+    private static void addSourceOption(LinkedHashMap<String, SourceOption> values,
+                                        SourceBinding binding, String name) {
+        if (binding == null || !binding.isBound()) return;
+        String key = binding.connectorType.jsonName() + '|' + binding.connectorId + '|'
+                + binding.resourceId + '|' + binding.valuePath;
+        String connector = binding.connectorType == dezz.status.widget.integration.ConnectorType.HOME_ASSISTANT
+                ? "Home Assistant" : binding.connectorType
+                == dezz.status.widget.integration.ConnectorType.SPRUTHUB ? "Sprut.hub" : "MQTT";
+        values.putIfAbsent(key, new SourceOption(binding, name + "\n" + connector + " · "
+                + binding.resourceId + (binding.valuePath.isEmpty() ? "" : " · " + binding.valuePath)));
+    }
+
+    private static String sourceLabel(ValueReference reference) {
+        String connector = "HOME_ASSISTANT".equals(reference.connectorType) ? "Home Assistant"
+                : "SPRUTHUB".equals(reference.connectorType) ? "Sprut.hub" : "MQTT";
+        return connector + " · " + reference.resourceId
+                + (reference.valuePath == null ? "" : " · " + reference.valuePath);
+    }
+
+    private String targetLabel(TargetScope scope, String id) {
+        for (TargetOption option : targetOptions(scope)) if (option.id.equals(id)) return option.label;
+        return id;
     }
 
     private void validateTarget(TargetScope scope, String id) {
@@ -761,30 +889,21 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
     }
 
     private static String entryTitle(Entry entry, int index) {
-        if (entry.scenario != null) return entry.scenario.id;
-        if (entry.raw instanceof JSONObject) {
-            String id = ((JSONObject) entry.raw).optString("id", "").trim();
-            if (!id.isEmpty()) return id;
-        }
-        return "Запись " + (index + 1);
+        return "Сценарий " + (index + 1);
     }
 
     private static String entrySummary(Entry entry) {
         if (entry.scenario == null) return "Формат не поддерживается этой версией редактора";
         Scenario scenario = entry.scenario;
         StringBuilder text = new StringBuilder();
-        text.append("Режим: ").append(scenario.mode.jsonName())
-                .append(" · условий: ").append(scenario.conditions.size())
-                .append(" · действий: ").append(scenario.actions.size());
+        text.append(scenario.enabled ? "Работает" : "Выключен");
         if (!scenario.conditions.isEmpty()) {
             Condition condition = scenario.conditions.get(0);
-            text.append("\nИсточник: ").append(condition.reference.connectorType)
-                    .append('/').append(condition.reference.connectorId)
-                    .append(" · ").append(condition.reference.resourceId);
+            text.append("\nКогда: ").append(sourceLabel(condition.reference));
             if (condition.reference.valuePath != null) {
-                text.append(" · path ").append(condition.reference.valuePath);
+                text.append(" · ").append(condition.reference.valuePath);
             }
-            text.append("\nУсловие: ").append(condition.operator.jsonName());
+            text.append("\nУсловие: ").append(friendlyOperator(condition.operator));
             if (!condition.operand.isEmpty()) text.append(' ').append(condition.operand);
             if (!condition.secondOperand.isEmpty()) {
                 text.append(" … ").append(condition.secondOperand);
@@ -792,11 +911,24 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         }
         if (!scenario.actions.isEmpty()) {
             LocalAction action = scenario.actions.get(0);
-            text.append("\nДействие: ").append(action.targetScope.jsonName())
-                    .append('/').append(action.targetId).append(" · ")
-                    .append(action.field.jsonName()).append(" = ").append(action.value);
+            text.append("\nРезультат: ").append(friendlyField(action.field))
+                    .append(" → ").append(action.targetId).append(" = ").append(action.value);
         }
         return text.toString();
+    }
+
+    private static String friendlyOperator(Operator operator) {
+        for (int i = 0; i < OPERATOR_VALUES.length; i++) {
+            if (OPERATOR_VALUES[i].equals(operator.jsonName())) return OPERATOR_LABELS[i];
+        }
+        return operator.jsonName();
+    }
+
+    private static String friendlyField(LocalField field) {
+        for (int i = 0; i < FIELD_VALUES.length; i++) {
+            if (FIELD_VALUES[i].equals(field.jsonName())) return FIELD_LABELS[i];
+        }
+        return field.jsonName();
     }
 
     private void showValidationError(Exception error) {
@@ -851,6 +983,30 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         return spinner;
     }
 
+    private Spinner mappedSpinner(LinearLayout parent, String title, String[] labels,
+                                  String[] values, String selectedValue) {
+        int index = 0;
+        for (int i = 0; i < values.length; i++) if (values[i].equalsIgnoreCase(selectedValue)) {
+            index = i;
+            break;
+        }
+        Spinner result = spinner(parent, title, labels, labels[index]);
+        result.setSelection(index);
+        return result;
+    }
+
+    private static String mappedValue(Spinner spinner, String[] values) {
+        int index = spinner.getSelectedItemPosition();
+        return index < 0 || index >= values.length ? values[0] : values[index];
+    }
+
+    private static void selectSpinnerValue(Spinner spinner, String[] values, String target) {
+        for (int i = 0; i < values.length; i++) if (values[i].equalsIgnoreCase(target)) {
+            spinner.setSelection(i);
+            return;
+        }
+    }
+
     private EditText field(LinearLayout parent, String title, String value) {
         parent.addView(label(title), topMargin(8));
         EditText edit = new EditText(this);
@@ -860,6 +1016,12 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         parent.addView(edit, matchWrap());
         return edit;
+    }
+
+    private static void hideControlAndLabel(LinearLayout parent, View control) {
+        int index = parent.indexOfChild(control);
+        control.setVisibility(View.GONE);
+        if (index > 0) parent.getChildAt(index - 1).setVisibility(View.GONE);
     }
 
     private Switch switchView(String title, boolean checked) {
@@ -965,6 +1127,16 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
 
         TargetOption(String id, String label) {
             this.id = id;
+            this.label = label;
+        }
+    }
+
+    private static final class SourceOption {
+        final SourceBinding binding;
+        final String label;
+
+        SourceOption(SourceBinding binding, String label) {
+            this.binding = binding;
             this.label = label;
         }
     }

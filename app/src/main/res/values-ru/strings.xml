@@ -18,8 +18,8 @@
 <resources>
     <string name="app_name">Status Widget HA</string>
     <string name="brick_title_home_assistant">Home Assistant</string>
-    <string name="automation_settings_button">Home Assistant, MQTT и всплывающий оверлей</string>
-    <string name="automation_settings_title">Home Assistant и MQTT</string>
+    <string name="automation_settings_button">Элементы умного дома</string>
+    <string name="automation_settings_title">Элементы основной строки</string>
     <string name="mqtt_section_title">Подключение MQTT</string>
     <string name="ha_bricks_section_title">HA-кирпичики в основной строке</string>
     <string name="ha_add_brick">Добавить HA-кирпичик</string>
@@ -255,16 +255,6 @@
     <string name="import_success_toast">Настройки импортированы</string>
     <string name="import_failed_toast">Не удалось импортировать настройки</string>
     <string name="import_invalid_file_toast">Этот файл не является экспортом настроек Виджета информации</string>
-    <string name="about_fallback"><![CDATA[
-        <p><b>Виджет информации</b><br>
-        Плавающий виджет статуса для автомобильных головных устройств на Android.</p>
-        <p><b>Авторы</b><br>
-        Dezz — Telegram <a href="https://t.me/DezzK">@DezzK</a><br>
-        S. Ramazanov — Telegram <a href="https://t.me/RamazanovS">@RamazanovS</a></p>
-        <p><b>Исходный код</b><br>
-        <a href="https://github.com/DezzK/status-widget">github.com/DezzK/status-widget</a></p>
-        <p><i>Полная страница «О приложении» доступна онлайн по адресу <a href="https://dezzk.github.io/status-widget/">dezzk.github.io/status-widget</a> при наличии подключения к интернету.</i></p>
-    ]]></string>
     <string name="all_permissions_granted_toast">Все разрешения предоставлены!</string>
     <string name="missing_permissions_toast">Некоторые разрешения не предоставлены. Приложение может работать некорректно.</string>
     <string name="notification_channel_title">Служба виджета статуса</string>

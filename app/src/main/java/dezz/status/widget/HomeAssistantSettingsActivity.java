@@ -326,6 +326,8 @@ public final class HomeAssistantSettingsActivity extends AppCompatActivity {
             applyLiveSettings();
             Toast.makeText(this, "Добавлено в основную строку: " + config.name,
                     Toast.LENGTH_LONG).show();
+            startActivity(VisualBrickEditorActivity.intent(this,
+                    VisualBrickEditorActivity.SURFACE_MAIN, config.id));
         } catch (Exception error) {
             Toast.makeText(this, "Не удалось добавить: " + safeMessage(error),
                     Toast.LENGTH_LONG).show();
@@ -356,6 +358,8 @@ public final class HomeAssistantSettingsActivity extends AppCompatActivity {
             applyLiveSettings();
             Toast.makeText(this, "Добавлена всплывающая плитка: " + config.name,
                     Toast.LENGTH_LONG).show();
+            startActivity(VisualBrickEditorActivity.intent(this,
+                    VisualBrickEditorActivity.SURFACE_POPUP, config.id));
         } catch (Exception error) {
             Toast.makeText(this, "Не удалось добавить: " + safeMessage(error),
                     Toast.LENGTH_LONG).show();

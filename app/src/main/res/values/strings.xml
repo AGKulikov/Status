@@ -18,8 +18,8 @@
 <resources>
     <string name="app_name">Status Widget HA</string>
     <string name="brick_title_home_assistant">Home Assistant</string>
-    <string name="automation_settings_button">Home Assistant, MQTT and popup overlay</string>
-    <string name="automation_settings_title">Home Assistant and MQTT</string>
+    <string name="automation_settings_button">Smart-home elements</string>
+    <string name="automation_settings_title">Main-row elements</string>
     <string name="mqtt_section_title">MQTT connection</string>
     <string name="ha_bricks_section_title">Main-row HA bricks</string>
     <string name="ha_add_brick">Add HA brick</string>
@@ -260,17 +260,6 @@
     <string name="import_success_toast">Settings imported</string>
     <string name="import_failed_toast">Failed to import settings</string>
     <string name="import_invalid_file_toast">This file is not a Status Widget settings export</string>
-    <string name="about_url" translatable="false">https://dezzk.github.io/status-widget/</string>
-    <string name="about_fallback"><![CDATA[
-        <p><b>Information Widget</b><br>
-        Floating status widget for Android car head units.</p>
-        <p><b>Authors</b><br>
-        Dezz — Telegram <a href="https://t.me/DezzK">@DezzK</a><br>
-        S. Ramazanov — Telegram <a href="https://t.me/RamazanovS">@RamazanovS</a></p>
-        <p><b>Source code</b><br>
-        <a href="https://github.com/DezzK/status-widget">github.com/DezzK/status-widget</a></p>
-        <p><i>The full About page is available online at <a href="https://dezzk.github.io/status-widget/">dezzk.github.io/status-widget</a> when an internet connection is available.</i></p>
-    ]]></string>
     <string name="all_permissions_granted_toast">All permissions granted!</string>
     <string name="missing_permissions_toast">Some permissions were denied. The app may not work properly.</string>
     <string name="notification_channel_title">Status Widget Overlay Service</string>

@@ -17,28 +17,15 @@
 
 package dezz.status.widget;
 
-import android.annotation.SuppressLint;
-import android.content.Context;
 import android.content.Intent;
-import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
-import android.net.ConnectivityManager;
-import android.net.Network;
-import android.net.NetworkCapabilities;
-import android.net.Uri;
 import android.os.Bundle;
-import android.text.Html;
 import android.text.InputType;
-import android.text.method.LinkMovementMethod;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.webkit.WebResourceError;
-import android.webkit.WebResourceRequest;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -48,7 +35,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -73,6 +59,8 @@ import dezz.status.widget.sprut.SprutCatalog;
 import dezz.status.widget.sprut.SprutHubCatalogStore;
 import dezz.status.widget.sprut.SprutHubController;
 import dezz.status.widget.sprut.SprutProtocolAdapter;
+import dezz.status.widget.ha.api.HaApiController;
+import dezz.status.widget.mqtt.MqttController;
 
 public class AboutActivity extends AppCompatActivity {
     private ActivityAboutBinding binding;
@@ -84,7 +72,6 @@ public class AboutActivity extends AppCompatActivity {
     private boolean catalogIsFresh;
     private int diagnosticsRequestGeneration;
 
-    @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         EdgeToEdge.enable(this);
@@ -105,57 +92,25 @@ public class AboutActivity extends AppCompatActivity {
 
         binding.backButton.setOnClickListener(v -> finish());
 
+        binding.appVersionText.setText("Status Widget · версия "
+                + VersionGetter.getAppVersionName(this) + "\n" + getPackageName());
+        binding.haSettingsButton.setOnClickListener(v -> startActivity(
+                new Intent(this, HomeAssistantSettingsActivity.class)));
+        binding.mqttSettingsButton.setOnClickListener(v -> startActivity(
+                new Intent(this, MqttSettingsActivity.class)));
+        binding.sprutSettingsButton.setOnClickListener(v -> startActivity(
+                new Intent(this, SprutHubSettingsActivity.class)));
+        binding.mainBricksButton.setOnClickListener(v -> startActivity(
+                new Intent(this, AutomationSettingsActivity.class)));
+        binding.popupSettingsButton.setOnClickListener(v -> startActivity(
+                new Intent(this, PopupSettingsActivity.class)));
+        binding.scenarioSettingsButton.setOnClickListener(v -> startActivity(
+                new Intent(this, ScenarioSettingsActivity.class)));
+        binding.intentSettingsButton.setOnClickListener(v -> startActivity(
+                new Intent(this, IntentScenarioSettingsActivity.class)));
+
         requestCarDiagnostics();
-
-        binding.aboutFallback.setMovementMethod(LinkMovementMethod.getInstance());
-        binding.aboutFallback.setText(Html.fromHtml(
-                getString(R.string.about_fallback), Html.FROM_HTML_MODE_COMPACT));
-
-        WebView web = binding.aboutWebView;
-        web.getSettings().setJavaScriptEnabled(false);
-        web.getSettings().setDomStorageEnabled(false);
-        web.setBackgroundColor(0x00000000);
-        web.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onPageStarted(WebView view, String url, Bitmap favicon) {
-                binding.aboutProgress.setVisibility(View.VISIBLE);
-            }
-
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                binding.aboutProgress.setVisibility(View.GONE);
-            }
-
-            @Override
-            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                if (request.isForMainFrame()) {
-                    showFallback();
-                }
-            }
-
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, @NonNull WebResourceRequest request) {
-                // Open external links in the browser, keep the about page itself in the WebView.
-                String host = request.getUrl().getHost();
-                if (host != null && host.equalsIgnoreCase("dezzk.github.io")) {
-                    return false;
-                }
-                Intent intent = new Intent(Intent.ACTION_VIEW, request.getUrl());
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                try {
-                    startActivity(intent);
-                } catch (Exception ignored) {
-                    return false;
-                }
-                return true;
-            }
-        });
-
-        if (isOnline()) {
-            web.loadUrl(getString(R.string.about_url));
-        } else {
-            showFallback();
-        }
+        refreshConnectionStatuses();
     }
 
     @Override
@@ -164,7 +119,21 @@ public class AboutActivity extends AppCompatActivity {
         if (prefs == null) return;
         carBindings = carBindingStore.load();
         reloadSprutCatalog();
+        refreshConnectionStatuses();
         if (binding != null) renderCarDiagnostics();
+    }
+
+    private void refreshConnectionStatuses() {
+        if (binding == null) return;
+        binding.haStatusText.setText(prefs.haApiEnabled.get()
+                ? "Включено · " + HaApiController.connectionDetail()
+                : "Выключено");
+        binding.mqttStatusText.setText(prefs.mqttEnabled.get()
+                ? (MqttController.isConnected() ? "Подключено" : "Включено · "
+                + MqttController.connectionDetail()) : "Выключено");
+        binding.sprutStatusText.setText(prefs.sprutEnabled.get()
+                ? (SprutHubController.isSynced() ? "Подключено, каталог актуален" : "Включено · "
+                + SprutHubController.connectionDetail()) : "Выключено");
     }
 
     private void requestCarDiagnostics() {
@@ -727,32 +696,8 @@ public class AboutActivity extends AppCompatActivity {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
-    private boolean isOnline() {
-        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        if (cm == null) {
-            return false;
-        }
-        Network active = cm.getActiveNetwork();
-        if (active == null) {
-            return false;
-        }
-        NetworkCapabilities caps = cm.getNetworkCapabilities(active);
-        return caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
-    }
-
-    private void showFallback() {
-        binding.aboutProgress.setVisibility(View.GONE);
-        binding.aboutWebView.setVisibility(View.GONE);
-        binding.aboutFallbackContainer.setVisibility(View.VISIBLE);
-    }
-
     @Override
     protected void onDestroy() {
-        if (binding != null) {
-            binding.aboutWebView.stopLoading();
-            binding.aboutWebView.setWebViewClient(new WebViewClient());
-            binding.aboutWebView.loadUrl("about:blank");
-        }
         binding = null;
         super.onDestroy();
     }

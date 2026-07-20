@@ -86,6 +86,14 @@
             android:exported="false" />
 
         <activity
+            android:name=".MqttSettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".VisualBrickEditorActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".PopupSettingsActivity"
             android:exported="false" />
 

@@ -680,6 +680,8 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
             applyLiveSettings();
             Toast.makeText(this, "Добавлено в основную строку: " + config.name,
                     Toast.LENGTH_LONG).show();
+            startActivity(VisualBrickEditorActivity.intent(this,
+                    VisualBrickEditorActivity.SURFACE_MAIN, config.id));
         } catch (Exception e) {
             Toast.makeText(this, "Не удалось добавить: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
@@ -712,6 +714,8 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
             applyLiveSettings();
             Toast.makeText(this, "Добавлена всплывающая плитка: " + config.name,
                     Toast.LENGTH_LONG).show();
+            startActivity(VisualBrickEditorActivity.intent(this,
+                    VisualBrickEditorActivity.SURFACE_POPUP, config.id));
         } catch (Exception e) {
             Toast.makeText(this, "Не удалось добавить: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
@@ -763,6 +767,8 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
             applyLiveSettings();
             Toast.makeText(this, "Создан пресет плитки: " + config.title,
                     Toast.LENGTH_LONG).show();
+            startActivity(VisualBrickEditorActivity.intent(this,
+                    VisualBrickEditorActivity.SURFACE_POPUP, config.id));
         } catch (Exception e) {
             Toast.makeText(this, "Не удалось создать пресет: " + e.getMessage(),
                     Toast.LENGTH_LONG).show();
