@@ -32,9 +32,14 @@ import org.json.JSONObject;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 
 import dezz.status.widget.ha.HaBrickConfig;
 import dezz.status.widget.ha.HaBrickConfigStore;
@@ -44,6 +49,7 @@ import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.popup.PopupItemConfig;
 import dezz.status.widget.popup.PopupItemConfigStore;
 import dezz.status.widget.sprut.SprutCatalog;
+import dezz.status.widget.sprut.SprutCatalogIndex;
 import dezz.status.widget.sprut.SprutHubCatalogStore;
 import dezz.status.widget.sprut.SprutHubController;
 import dezz.status.widget.sprut.SprutPath;
@@ -57,13 +63,30 @@ import dezz.status.widget.scenario.ScenarioPresets;
 
 /** Connection setup and catalog-first brick wizard for the direct Sprut.hub connector. */
 public final class SprutHubSettingsActivity extends AppCompatActivity {
+    private static final int CATALOG_PAGE_SIZE = 24;
+    private static final int MAX_RENDERED_SERVICES = 40;
+    private static final int MAX_RENDERED_CHARACTERISTICS = 80;
+    private static final long SEARCH_DEBOUNCE_MS = 275L;
+
     private final android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final ExecutorService catalogWorker = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "spruthub-catalog-browser");
+        thread.setDaemon(true);
+        return thread;
+    });
     private final Runnable statusTick = new Runnable() {
         @Override public void run() {
             refreshStatus();
             main.postDelayed(this, 1_000L);
         }
     };
+    private final Runnable searchRender = () -> {
+        catalogPage = 0;
+        expandedAccessoryId = -1L;
+        expandedServiceId = -1L;
+        renderCatalog();
+    };
+    private final Runnable delayedReload = this::reloadCatalog;
 
     private Preferences prefs;
     private HaBrickConfigStore mainStore;
@@ -79,7 +102,16 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
     private TextView status;
     private LinearLayout catalogContainer;
     private SprutCatalog shownCatalog = SprutCatalog.empty();
-    private long shownCatalogFingerprint = Long.MIN_VALUE;
+    @Nullable private SprutCatalogIndex catalogIndex;
+    @Nullable private SprutCatalog indexingCatalog;
+    @Nullable private Future<?> indexingTask;
+    private final Map<SprutPath, TextView> visibleCharacteristicViews = new LinkedHashMap<>();
+    private int catalogPage;
+    private long expandedAccessoryId = -1L;
+    private long expandedServiceId = -1L;
+    private int catalogGeneration;
+    private int renderGeneration;
+    private int lifecycleGeneration;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -88,11 +120,11 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
         mainStore = new HaBrickConfigStore(prefs);
         popupStore = new PopupItemConfigStore(prefs);
         setContentView(buildScreen());
-        reloadCatalog();
     }
 
     @Override protected void onResume() {
         super.onResume();
+        lifecycleGeneration++;
         main.removeCallbacks(statusTick);
         main.post(statusTick);
         reloadCatalog();
@@ -100,7 +132,20 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
 
     @Override protected void onPause() {
         main.removeCallbacks(statusTick);
+        main.removeCallbacks(searchRender);
+        main.removeCallbacks(delayedReload);
+        lifecycleGeneration++;
         super.onPause();
+    }
+
+    @Override protected void onDestroy() {
+        catalogGeneration++;
+        renderGeneration++;
+        lifecycleGeneration++;
+        Future<?> activeIndex = indexingTask;
+        if (activeIndex != null) activeIndex.cancel(true);
+        catalogWorker.shutdownNow();
+        super.onDestroy();
     }
 
     private View buildScreen() {
@@ -157,7 +202,11 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                renderCatalog();
+                // Invalidate a worker result for the previous text immediately; the replacement
+                // search itself remains debounced to avoid work for every keyboard event.
+                renderGeneration++;
+                main.removeCallbacks(searchRender);
+                main.postDelayed(searchRender, SEARCH_DEBOUNCE_MS);
             }
             @Override public void afterTextChanged(Editable s) {}
         });
@@ -196,7 +245,8 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
                 startForegroundService(new Intent(this, WidgetService.class));
             }
             Toast.makeText(this, "Настройки Sprut.hub сохранены", Toast.LENGTH_SHORT).show();
-            main.postDelayed(this::reloadCatalog, 1_500L);
+            main.removeCallbacks(delayedReload);
+            main.postDelayed(delayedReload, 1_500L);
         } catch (Exception e) {
             Toast.makeText(this, "Sprut.hub: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
@@ -209,14 +259,8 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
         SprutHubController current = SprutHubController.active();
         if (current != null) {
             SprutCatalog latest = current.catalog();
-            long latestFingerprint = catalogFingerprint(latest);
-            if (latest != shownCatalog || latestFingerprint != shownCatalogFingerprint) {
-                shownCatalog = latest;
-                if (latestFingerprint != shownCatalogFingerprint) {
-                    shownCatalogFingerprint = latestFingerprint;
-                    renderCatalog();
-                }
-            }
+            if (latest != shownCatalog) installCatalog(latest);
+            else refreshVisibleCharacteristicValues();
         }
     }
 
@@ -228,15 +272,17 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
                     Toast.LENGTH_LONG).show();
             return;
         }
+        final int expectedLifecycle = lifecycleGeneration;
         current.refreshCatalog().whenComplete((catalog, failure) -> main.post(() -> {
+            if (expectedLifecycle != lifecycleGeneration || isFinishing() || isDestroyed()) {
+                return;
+            }
             if (failure != null) {
                 Throwable cause = rootCause(failure);
                 Toast.makeText(this, "Не удалось обновить: " + cause.getMessage(),
                         Toast.LENGTH_LONG).show();
             } else {
-                shownCatalog = catalog;
-                shownCatalogFingerprint = catalogFingerprint(catalog);
-                renderCatalog();
+                installCatalog(catalog);
                 Toast.makeText(this, "Устройства обновлены", Toast.LENGTH_SHORT).show();
             }
         }));
@@ -246,18 +292,99 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
         SprutHubController current = SprutHubController.active();
         if (current != null && (SprutHubController.isSynced()
                 || !current.catalog().accessories().isEmpty())) {
-            shownCatalog = current.catalog();
-        } else {
+            installCatalog(current.catalog());
+            return;
+        }
+        final int generation = ++catalogGeneration;
+        showCatalogMessage("Загрузка сохранённого каталога…");
+        submitCatalogWork(() -> {
+            SprutCatalog loaded = SprutCatalog.empty();
             JSONObject cached = new SprutHubCatalogStore(this).load();
             JSONObject rooms = cached == null ? null : cached.optJSONObject("rooms");
             JSONObject accessories = cached == null ? null : cached.optJSONObject("accessories");
             if (rooms != null && accessories != null) {
-                try { shownCatalog = SprutProtocolAdapter.parseCatalog(rooms, accessories); }
-                catch (RuntimeException ignored) { shownCatalog = SprutCatalog.empty(); }
+                try {
+                    loaded = SprutProtocolAdapter.parseCatalog(rooms, accessories);
+                } catch (RuntimeException ignored) {
+                    loaded = SprutCatalog.empty();
+                }
             }
+            SprutCatalog result = loaded;
+            main.post(() -> {
+                if (generation == catalogGeneration && !isFinishing() && !isDestroyed()) {
+                    installCatalog(result);
+                }
+            });
+        });
+    }
+
+    /** Builds the expensive full-text index away from the Android UI thread. */
+    private void installCatalog(SprutCatalog catalog) {
+        if (catalog == shownCatalog) {
+            if (catalogIndex != null) renderCatalog();
+            // A pause/resume or delayed connector callback must not queue a second complete build
+            // behind the one already indexing the same immutable snapshot.
+            if (catalogIndex != null || indexingCatalog == catalog) return;
         }
-        shownCatalogFingerprint = catalogFingerprint(shownCatalog);
-        renderCatalog();
+        Future<?> previousIndex = indexingTask;
+        if (previousIndex != null) previousIndex.cancel(true);
+        shownCatalog = catalog == null ? SprutCatalog.empty() : catalog;
+        catalogIndex = null;
+        indexingCatalog = null;
+        indexingTask = null;
+        catalogPage = 0;
+        expandedAccessoryId = -1L;
+        expandedServiceId = -1L;
+        visibleCharacteristicViews.clear();
+        final int generation = ++catalogGeneration;
+        renderGeneration++;
+        if (shownCatalog.accessories().isEmpty()) {
+            showCatalogMessage("Каталог пока пуст. Сохраните подключение, дождитесь ONLINE "
+                    + "и нажмите «Обновить устройства».");
+            return;
+        }
+        showCatalogMessage("Подготовка поиска: " + shownCatalog.accessories().size()
+                + " устройств…");
+        SprutCatalog source = shownCatalog;
+        indexingCatalog = source;
+        indexingTask = submitCatalogTask(() -> {
+            SprutCatalogIndex built = SprutCatalogIndex.build(source);
+            if (Thread.currentThread().isInterrupted()) return;
+            main.post(() -> {
+                if (generation != catalogGeneration || source != shownCatalog || isFinishing()
+                        || isDestroyed()) {
+                    return;
+                }
+                indexingCatalog = null;
+                indexingTask = null;
+                catalogIndex = built;
+                renderCatalog();
+            });
+        });
+        if (indexingTask == null) indexingCatalog = null;
+    }
+
+    private void submitCatalogWork(Runnable work) {
+        try {
+            catalogWorker.execute(work);
+        } catch (RejectedExecutionException ignored) {
+            // Normal when an asynchronous result races Activity destruction.
+        }
+    }
+
+    @Nullable
+    private Future<?> submitCatalogTask(Runnable work) {
+        try {
+            return catalogWorker.submit(work);
+        } catch (RejectedExecutionException ignored) {
+            return null;
+        }
+    }
+
+    private void showCatalogMessage(String message) {
+        if (catalogContainer == null) return;
+        catalogContainer.removeAllViews();
+        catalogContainer.addView(label(message), topMargin(12));
     }
 
     private static void validateWebSocketUrl(String endpoint) {
@@ -279,104 +406,160 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
         }
     }
 
-    /** Includes mutable characteristic values because Sprut events update the catalog in place. */
-    private static long catalogFingerprint(SprutCatalog catalog) {
-        long hash = 1_125_899_906_842_597L;
-        for (SprutCatalog.Accessory accessory : catalog.accessories()) {
-            hash = mix(hash, accessory.id());
-            hash = mix(hash, accessory.name());
-            hash = mix(hash, accessory.model());
-            hash = mix(hash, accessory.online());
-            for (SprutCatalog.Service service : accessory.services()) {
-                hash = mix(hash, service.id());
-                hash = mix(hash, service.name());
-                hash = mix(hash, service.type());
-                for (SprutCatalog.Characteristic characteristic : service.characteristics()) {
-                    hash = mix(hash, characteristic.path());
-                    hash = mix(hash, characteristic.name());
-                    hash = mix(hash, characteristic.type());
-                    hash = mix(hash, characteristic.unit());
-                    hash = mix(hash, characteristic.readable());
-                    hash = mix(hash, characteristic.writable());
-                    hash = mix(hash, characteristic.valueType());
-                    hash = mix(hash, characteristic.currentValue());
-                }
-            }
-        }
-        return hash;
-    }
-
-    private static long mix(long hash, Object value) {
-        return hash * 31L + (value == null ? 0 : value.hashCode());
-    }
-
     private void renderCatalog() {
         if (catalogContainer == null) return;
+        SprutCatalogIndex index = catalogIndex;
+        if (index == null) return;
+        SprutCatalogIndex.Query query = SprutCatalogIndex.Query.parse(
+                search == null ? "" : text(search));
+        int requestedPage = catalogPage;
+        int generation = ++renderGeneration;
+        submitCatalogWork(() -> {
+            SprutCatalogIndex.Page result = index.search(query, requestedPage, CATALOG_PAGE_SIZE);
+            main.post(() -> {
+                if (generation != renderGeneration || index != catalogIndex || isFinishing()
+                        || isDestroyed()) {
+                    return;
+                }
+                applyCatalogPage(result, query);
+            });
+        });
+    }
+
+    private void applyCatalogPage(SprutCatalogIndex.Page page, SprutCatalogIndex.Query query) {
+        catalogPage = page.pageIndex();
         catalogContainer.removeAllViews();
-        String query = search == null ? "" : text(search).toLowerCase(Locale.ROOT);
-        if (shownCatalog.accessories().isEmpty()) {
-            catalogContainer.addView(label("Каталог пока пуст. Сохраните подключение, дождитесь "
-                    + "ONLINE и нажмите «Обновить устройства»."), topMargin(12));
+        visibleCharacteristicViews.clear();
+        if (page.totalMatches() == 0) {
+            catalogContainer.addView(label("Ничего не найдено"), topMargin(12));
             return;
         }
-        List<SprutCatalog.Accessory> accessories = new ArrayList<>(shownCatalog.accessories());
-        accessories.sort(Comparator.comparing(a -> (shownCatalog.roomNameFor(a) + " " + a.name())
-                .toLowerCase(Locale.ROOT)));
-        for (SprutCatalog.Accessory accessory : accessories) {
-            String searchable = accessory.name() + " " + accessory.model() + " "
-                    + shownCatalog.roomNameFor(accessory);
-            boolean accessoryMatches = query.isEmpty()
-                    || searchable.toLowerCase(Locale.ROOT).contains(query);
-            LinearLayout accessoryCard = buildAccessoryCard(accessory, query, accessoryMatches);
-            if (accessoryCard.getChildCount() > 1) {
-                catalogContainer.addView(accessoryCard, cardParams());
-            }
+
+        String range = (page.fromIndex() + 1) + "–" + page.toIndex();
+        catalogContainer.addView(label("Показаны устройства " + range + " из "
+                + page.totalMatches() + ". Поиск выполняется по всему каталогу; "
+                + "одновременно раскрывается одно устройство и один сервис."), topMargin(12));
+        if (page.pageCount() > 1) {
+            catalogContainer.addView(buildPageNavigation(page), topMargin(8));
         }
-        if (catalogContainer.getChildCount() == 0) {
-            catalogContainer.addView(label("Ничего не найдено"), topMargin(12));
+        for (SprutCatalogIndex.Entry entry : page.entries()) {
+            SprutCatalog.Accessory accessory = entry.accessory();
+            boolean accessoryMatches = query.matchesAccessoryHeader(accessory, entry.roomName());
+            catalogContainer.addView(buildAccessoryCard(accessory, entry.roomName(), query,
+                    accessoryMatches), cardParams());
+        }
+
+        if (page.pageCount() > 1) {
+            catalogContainer.addView(buildPageNavigation(page), topMargin(12));
         }
     }
 
-    private LinearLayout buildAccessoryCard(SprutCatalog.Accessory accessory, String query,
+    private LinearLayout buildPageNavigation(SprutCatalogIndex.Page page) {
+        LinearLayout navigation = row();
+        Button previous = smallButton("‹ Назад");
+        previous.setEnabled(page.pageIndex() > 0);
+        previous.setOnClickListener(v -> showCatalogPage(page.pageIndex() - 1));
+        navigation.addView(previous, weighted());
+        TextView pageLabel = label("Страница " + (page.pageIndex() + 1) + " из "
+                + page.pageCount());
+        pageLabel.setGravity(Gravity.CENTER);
+        navigation.addView(pageLabel, weighted());
+        Button next = smallButton("Далее ›");
+        next.setEnabled(page.pageIndex() + 1 < page.pageCount());
+        next.setOnClickListener(v -> showCatalogPage(page.pageIndex() + 1));
+        navigation.addView(next, weighted());
+        return navigation;
+    }
+
+    private void showCatalogPage(int page) {
+        catalogPage = Math.max(0, page);
+        expandedAccessoryId = -1L;
+        expandedServiceId = -1L;
+        renderCatalog();
+    }
+
+    private LinearLayout buildAccessoryCard(SprutCatalog.Accessory accessory, String room,
+                                            SprutCatalogIndex.Query query,
                                             boolean accessoryMatches) {
         LinearLayout card = card();
-        String room = shownCatalog.roomNameFor(accessory);
-        String title = (room.isEmpty() ? "" : room + " · ") + accessory.name();
+        String name = firstNonBlank(accessory.name(), accessory.model(),
+                "Устройство " + accessory.id());
+        String title = (room.isEmpty() ? "" : room + " · ") + name;
         card.addView(heading(title, 19));
+        int characteristicCount = 0;
+        for (SprutCatalog.Service service : accessory.services()) {
+            characteristicCount += service.characteristics().size();
+        }
         card.addView(label("ID " + accessory.id() + " · "
                 + (accessory.online() ? "online" : "offline")
-                + (accessory.model().isEmpty() ? "" : " · " + accessory.model())));
+                + (accessory.model().isEmpty() ? "" : " · " + accessory.model())
+                + " · сервисов " + accessory.services().size()
+                + " · значений " + characteristicCount));
 
-        int serviceCount = 0;
-        for (SprutCatalog.Service service : accessory.services()) {
-            String serviceSearch = service.name() + " " + service.type();
-            boolean serviceMatches = accessoryMatches || query.isEmpty()
-                    || serviceSearch.toLowerCase(Locale.ROOT).contains(query);
-            LinearLayout serviceView = buildService(accessory, service, query, serviceMatches);
-            if (serviceView.getChildCount() > 0) {
-                card.addView(serviceView, topMargin(12));
-                serviceCount++;
+        boolean expanded = expandedAccessoryId == accessory.id();
+        Button expand = smallButton(expanded ? "Свернуть устройство" : "Выбрать устройство");
+        expand.setOnClickListener(v -> {
+            expandedAccessoryId = expanded ? -1L : accessory.id();
+            expandedServiceId = -1L;
+            renderCatalog();
+        });
+        card.addView(expand, topMargin(6));
+        if (!expanded) return card;
+
+        int matchingServices = 0;
+        int renderedServices = 0;
+        if (accessoryMatches) {
+            for (SprutCatalog.Service service : accessory.services()) {
+                if (service.characteristics().isEmpty()) continue;
+                matchingServices++;
+                if (renderedServices >= MAX_RENDERED_SERVICES) continue;
+                card.addView(buildService(accessory, room, service, query, true), topMargin(12));
+                renderedServices++;
+            }
+        } else {
+            for (SprutCatalog.Service service : accessory.services()) {
+                boolean serviceOwnMatch = query.matchesServiceHeader(accessory, room, service);
+                if (!serviceOwnMatch && !query.matchesService(accessory, room, service)) continue;
+                matchingServices++;
+                if (renderedServices >= MAX_RENDERED_SERVICES) continue;
+                card.addView(buildService(accessory, room, service, query, serviceOwnMatch),
+                        topMargin(12));
+                renderedServices++;
             }
         }
-        if (serviceCount == 0) {
-            // Remove header-only cards from filtered results; caller checks child count.
-            card.removeAllViews();
+        if (matchingServices == 0) {
+            card.addView(label("В выбранном устройстве нет характеристик, подходящих под поиск."),
+                    topMargin(8));
+        } else if (matchingServices > renderedServices) {
+            card.addView(label("Показаны первые " + renderedServices + " из " + matchingServices
+                    + " сервисов. Уточните поиск по названию сервиса или характеристики."),
+                    topMargin(8));
         }
         return card;
     }
 
-    private LinearLayout buildService(SprutCatalog.Accessory accessory,
-                                      SprutCatalog.Service service, String query,
+    private LinearLayout buildService(SprutCatalog.Accessory accessory, String room,
+                                      SprutCatalog.Service service,
+                                      SprutCatalogIndex.Query query,
                                       boolean serviceMatches) {
         LinearLayout group = column();
-        List<SprutCatalog.Characteristic> visible = new ArrayList<>();
-        for (SprutCatalog.Characteristic characteristic : service.characteristics()) {
-            String value = characteristic.name() + " " + characteristic.type() + " "
-                    + characteristic.path().characteristicId();
-            if (serviceMatches || query.isEmpty()
-                    || value.toLowerCase(Locale.ROOT).contains(query)) visible.add(characteristic);
+        int visibleCount;
+        if (serviceMatches) {
+            visibleCount = service.characteristics().size();
+        } else {
+            visibleCount = 0;
+            for (SprutCatalog.Characteristic characteristic : service.characteristics()) {
+                if (query.matchesCharacteristic(accessory, room, service, characteristic)) {
+                    visibleCount++;
+                }
+            }
         }
-        if (visible.isEmpty()) return group;
+        if (visibleCount == 0) {
+            group.addView(heading(firstNonBlank(service.name(), service.type(), "Сервис"), 16));
+            group.addView(label(service.type() + " · aId/sId " + accessory.id() + "/"
+                    + service.id() + " · нет характеристик"));
+            return group;
+        }
 
         LinearLayout serviceHeader = row();
         serviceHeader.setGravity(Gravity.CENTER_VERTICAL);
@@ -385,21 +568,30 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
         Button preset = smallButton("Готовая плитка");
         preset.setOnClickListener(v -> addServicePreset(accessory, service));
         serviceHeader.addView(preset);
+        boolean expanded = expandedServiceId == service.id();
+        Button expand = smallButton(expanded ? "Свернуть" : "Значения");
+        expand.setOnClickListener(v -> {
+            expandedServiceId = expanded ? -1L : service.id();
+            renderCatalog();
+        });
+        serviceHeader.addView(expand);
         group.addView(serviceHeader, matchWrap());
-        group.addView(label(service.type() + " · aId/sId " + accessory.id() + "/" + service.id()));
+        group.addView(label(service.type() + " · aId/sId " + accessory.id() + "/" + service.id()
+                + " · значений " + visibleCount));
+        if (!expanded) return group;
 
-        for (SprutCatalog.Characteristic characteristic : visible) {
+        int rendered = 0;
+        for (SprutCatalog.Characteristic characteristic : service.characteristics()) {
+            if (!serviceMatches
+                    && !query.matchesCharacteristic(accessory, room, service, characteristic)) {
+                continue;
+            }
+            if (rendered >= MAX_RENDERED_CHARACTERISTICS) break;
             LinearLayout characteristicRow = column();
-            SprutValueMapper.DisplayValue display =
-                    SprutValueMapper.toDisplayPayload(characteristic);
             TextView value = new TextView(this);
-            value.setText(firstNonBlank(characteristic.name(), characteristic.type(), "Характеристика")
-                    + "  [cId " + characteristic.path().characteristicId() + "]\n"
-                    + "Сейчас: " + display.text() + " · "
-                    + (characteristic.readable() ? "read" : "")
-                    + (characteristic.writable() ? "/write" : "")
-                    + (characteristic.unit().isEmpty() ? "" : " · " + characteristic.unit()));
+            value.setText(characteristicText(characteristic));
             value.setTextSize(14);
+            visibleCharacteristicViews.put(characteristic.path(), value);
             characteristicRow.addView(value, matchWrap());
             if (characteristic.readable()) {
                 LinearLayout actions = row();
@@ -416,8 +608,34 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
             characteristicRow.setBackground(divider);
             characteristicRow.setPadding(dp(8), dp(8), dp(8), dp(8));
             group.addView(characteristicRow, topMargin(6));
+            rendered++;
+        }
+        if (visibleCount > rendered) {
+            group.addView(label("Показаны первые " + rendered + " из " + visibleCount
+                    + " значений. Уточните поиск по названию характеристики."), topMargin(8));
         }
         return group;
+    }
+
+    private void refreshVisibleCharacteristicValues() {
+        if (visibleCharacteristicViews.isEmpty()) return;
+        for (Map.Entry<SprutPath, TextView> entry : visibleCharacteristicViews.entrySet()) {
+            SprutCatalog.Characteristic latest = shownCatalog.find(entry.getKey());
+            if (latest == null) continue;
+            String text = characteristicText(latest);
+            CharSequence previous = entry.getValue().getText();
+            if (previous == null || !text.contentEquals(previous)) entry.getValue().setText(text);
+        }
+    }
+
+    private String characteristicText(SprutCatalog.Characteristic characteristic) {
+        SprutValueMapper.DisplayValue display = SprutValueMapper.toDisplayPayload(characteristic);
+        return firstNonBlank(characteristic.name(), characteristic.type(), "Характеристика")
+                + "  [cId " + characteristic.path().characteristicId() + "]\n"
+                + "Сейчас: " + display.text() + " · "
+                + (characteristic.readable() ? "read" : "")
+                + (characteristic.writable() ? "/write" : "")
+                + (characteristic.unit().isEmpty() ? "" : " · " + characteristic.unit());
     }
 
     private void addMain(SprutCatalog.Accessory accessory, SprutCatalog.Service service,

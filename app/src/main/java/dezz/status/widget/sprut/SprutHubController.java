@@ -456,26 +456,9 @@ public final class SprutHubController {
             }
             JSONObject body = commandBody(response, "hub", "list");
             JSONArray hubs = body == null ? null : body.optJSONArray("hubs");
-            JSONObject selected = null;
-            if (hubs != null) {
-                for (int i = 0; i < hubs.length(); i++) {
-                    JSONObject hub = hubs.optJSONObject(i);
-                    if (hub == null) continue;
-                    String serial = firstNonBlank(hub.optString("serial", ""),
-                            hub.optString("serialNumber", ""), hub.optString("id", ""));
-                    if (configured.isEmpty()) {
-                        // Prefer an online hub when an account contains old/offline entries.
-                        // Keep the first entry only as a diagnostic fallback when none is online.
-                        if (selected == null || (!selected.optBoolean("online", false)
-                                && hub.optBoolean("online", false))) {
-                            selected = hub;
-                        }
-                    } else if (!configured.isEmpty() && configured.equals(serial)) {
-                        selected = hub;
-                        break;
-                    }
-                }
-            }
+            // The cloud relay may retain an old offline row and a current online row for the
+            // same physical serial. Scan duplicate rows instead of stopping at the first match.
+            JSONObject selected = SprutHubSelection.select(hubs, configured);
             if (current.isOfficialCloud() && selected == null) {
                 throw new CompletionException(new IOException(configured.isEmpty()
                         ? "hub.list: account has no hubs"
@@ -483,18 +466,16 @@ public final class SprutHubController {
             }
             String selectedSerial = configured;
             if (selected != null) {
-                selectedSerial = firstNonBlank(configured, selected.optString("serial", ""),
-                        selected.optString("serialNumber", ""), selected.optString("id", ""));
-                if (current.isOfficialCloud() && selected.has("online")
-                        && !selected.optBoolean("online", false)) {
-                    Object lastSeen = selected.opt("lastSeen");
-                    String hint = current.isBetaCloud()
-                            ? "; if the hub is on the release branch, use "
-                                    + "wss://web.spruthub.ru/spruthub"
-                            : "";
-                    throw new CompletionException(new IOException(
-                            "hub.list: hub " + selectedSerial + " is offline (lastSeen="
-                                    + (lastSeen == null ? "unknown" : lastSeen) + ")" + hint));
+                selectedSerial = firstNonBlank(SprutHubSelection.serialOf(selected), configured);
+                if (SprutHubSelection.presenceOf(selected)
+                        == SprutHubSelection.Presence.OFFLINE) {
+                    // Presence is relay metadata, not command authorization. Probe the actual
+                    // hub-routed RPC; it gives an authoritative error and also tolerates stale
+                    // duplicate rows returned by hub.list.
+                    Log.w(TAG, "Selected hub row is marked offline; probing route anyway: serial="
+                            + selectedSerial + ", lastSeen=" + selected.opt("lastSeen"));
+                    updateState(State.AUTHENTICATING,
+                            "hub metadata says offline; probing current route");
                 }
                 JSONObject version = selected.optJSONObject("version");
                 JSONObject currentVersion = version == null ? null : version.optJSONObject("current");
