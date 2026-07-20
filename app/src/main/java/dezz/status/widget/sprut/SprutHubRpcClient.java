@@ -9,7 +9,10 @@ import org.json.JSONObject;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -28,11 +31,15 @@ import okhttp3.WebSocketListener;
 /**
  * Small JSON-RPC 2.0 transport for Sprut.hub's internal {@code /spruthub} WebSocket endpoint.
  *
- * <p>The protocol operation lives inside {@code params}; the JSON-RPC {@code method} is an empty
- * string. Authentication and reconnect policy deliberately live in {@link SprutHubController} so
- * this class remains a replaceable transport if Sprut changes its private API.</p>
+ * <p>The protocol operation lives inside {@code params}. Local and custom {@code /spruthub}
+ * endpoints use an empty JSON-RPC {@code method}, while Sprut's official cloud relay rejects that
+ * field and expects it to be absent. Authentication and reconnect policy deliberately live in
+ * {@link SprutHubController} so this class remains a replaceable transport if Sprut changes its
+ * private API.</p>
  */
 public final class SprutHubRpcClient implements Closeable {
+    enum EnvelopeMode { OFFICIAL_CLOUD, LOCAL_OR_CUSTOM }
+
     public interface Listener {
         void onOpen();
         void onEvent(@NonNull JSONObject event);
@@ -63,6 +70,7 @@ public final class SprutHubRpcClient implements Closeable {
     private final Map<Long, Pending> pending = new ConcurrentHashMap<>();
     private final Listener listener;
     private final String url;
+    private final EnvelopeMode envelopeMode;
     private final Object lock = new Object();
 
     @Nullable private volatile WebSocket socket;
@@ -73,6 +81,7 @@ public final class SprutHubRpcClient implements Closeable {
 
     public SprutHubRpcClient(@NonNull String url, @NonNull Listener listener) {
         this.url = normalizeUrl(url);
+        envelopeMode = envelopeModeForUrl(this.url);
         this.listener = listener;
         // Validate the complete authority/path before a controller acquires long-lived wake locks.
         new Request.Builder().url(this.url).build();
@@ -115,16 +124,9 @@ public final class SprutHubRpcClient implements Closeable {
     public CompletableFuture<JSONObject> call(@NonNull JSONObject params, long timeoutMs) {
         CompletableFuture<JSONObject> result = new CompletableFuture<>();
         long id = nextId.getAndIncrement();
-        JSONObject request = new JSONObject();
+        final JSONObject request;
         try {
-            request.put("jsonrpc", "2.0");
-            request.put("method", "");
-            request.put("params", params);
-            request.put("id", id);
-            String currentToken = token;
-            String currentSerial = serial;
-            if (currentToken != null) request.put("token", currentToken);
-            if (currentSerial != null) request.put("serial", currentSerial);
+            request = buildRequestEnvelope(envelopeMode, params, id, token, serial);
         } catch (JSONException e) {
             result.completeExceptionally(e);
             return result;
@@ -236,7 +238,7 @@ public final class SprutHubRpcClient implements Closeable {
     }
 
     @NonNull
-    private static String normalizeUrl(@NonNull String raw) {
+    static String normalizeUrl(@NonNull String raw) {
         String value = raw.trim();
         if (!(value.startsWith("ws://") || value.startsWith("wss://"))) {
             throw new IllegalArgumentException("Sprut.hub URL must start with ws:// or wss://");
@@ -244,6 +246,44 @@ public final class SprutHubRpcClient implements Closeable {
         int schemeEnd = value.indexOf("://") + 3;
         if (value.indexOf('/', schemeEnd) < 0) value += "/spruthub";
         return value;
+    }
+
+    @NonNull
+    static EnvelopeMode envelopeModeForUrl(@NonNull String normalizedUrl) {
+        final String host;
+        try {
+            host = new URI(normalizedUrl).getHost();
+        } catch (URISyntaxException ignored) {
+            // Request.Builder performs the authoritative validation in the constructor. If a
+            // future custom URL is accepted by OkHttp but not java.net.URI, retain local/custom
+            // compatibility instead of silently switching wire protocols.
+            return EnvelopeMode.LOCAL_OR_CUSTOM;
+        }
+        if (host != null && ("beta.spruthub.ru".equalsIgnoreCase(host)
+                || "web.spruthub.ru".equalsIgnoreCase(host))) {
+            return EnvelopeMode.OFFICIAL_CLOUD;
+        }
+        return EnvelopeMode.LOCAL_OR_CUSTOM;
+    }
+
+    @NonNull
+    static JSONObject buildRequestEnvelope(@NonNull EnvelopeMode mode,
+                                           @NonNull JSONObject params,
+                                           long id,
+                                           @Nullable String token,
+                                           @Nullable String serial) throws JSONException {
+        Objects.requireNonNull(mode, "mode");
+        Objects.requireNonNull(params, "params");
+        JSONObject request = new JSONObject();
+        request.put("jsonrpc", "2.0");
+        if (mode == EnvelopeMode.LOCAL_OR_CUSTOM) request.put("method", "");
+        request.put("params", params);
+        request.put("id", id);
+        String normalizedToken = blankToNull(token);
+        String normalizedSerial = blankToNull(serial);
+        if (normalizedToken != null) request.put("token", normalizedToken);
+        if (normalizedSerial != null) request.put("serial", normalizedSerial);
+        return request;
     }
 
     @Nullable
