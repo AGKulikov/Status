@@ -31,7 +31,11 @@ jobs:
       - name: Install Android SDK 36
         shell: bash
         run: |
+          # sdkmanager closes stdin after accepting all licenses, which gives `yes` SIGPIPE.
+          # Temporarily disable pipefail so the step follows sdkmanager's exit code instead.
+          set +o pipefail
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
+          set -o pipefail
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;android-36" "build-tools;36.0.0"
 
