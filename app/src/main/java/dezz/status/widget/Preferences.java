@@ -19,6 +19,7 @@ package dezz.status.widget;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -34,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 
 public class Preferences {
+    private static final String TAG = "Preferences";
     public static abstract class Preference {
         final Preferences preferences;
         final String key;
@@ -112,6 +114,35 @@ public class Preferences {
 
         public void set(String value) {
             preferences.prefs.edit().putString(key, value).apply();
+        }
+    }
+
+    /** A string encrypted with an app-private Android Keystore key. */
+    public static final class Secret extends Preference {
+        public Secret(Preferences preferences, String key) { super(preferences, key); }
+
+        public String get() {
+            String stored = preferences.prefs.getString(key, "");
+            try {
+                String plain = SecretStore.decrypt(preferences.appContext, stored);
+                // Migrate an old plaintext value immediately after a successful read.
+                if (!stored.isEmpty() && !stored.startsWith("v1:")) set(plain);
+                return plain;
+            } catch (Exception e) {
+                Log.w(TAG, "Secret is unavailable until Android Keystore unlocks", e);
+                return "";
+            }
+        }
+
+        public void set(String value) {
+            try {
+                preferences.prefs.edit().putString(key,
+                        SecretStore.encrypt(preferences.appContext, value == null ? "" : value))
+                        .apply();
+            } catch (Exception e) {
+                Log.e(TAG, "Could not encrypt secret", e);
+                throw new IllegalStateException("Android Keystore is unavailable", e);
+            }
         }
     }
 
@@ -329,6 +360,7 @@ public class Preferences {
     }
 
     private final SharedPreferences prefs;
+    private final Context appContext;
 
     // Global widget settings.
     public final Bool widgetEnabled = new Bool(this, "enabled", false);
@@ -369,6 +401,41 @@ public class Preferences {
     // Car-specific temperature bricks (fed by the flavor's CarIntegration).
     public final TextBrickPrefs indoorTemp = new TextBrickPrefs(this, "indoorTemp", 40);
     public final TextBrickPrefs outdoorTemp = new TextBrickPrefs(this, "outdoorTemp", 40);
+    /** Layout-level settings for the dynamic HA row. Child text styles live in haMainBricksJson. */
+    public final TextBrickPrefs homeAssistant = new TextBrickPrefs(this, "homeAssistant", 40);
+
+    // Home Assistant / automation configuration. JSON arrays are versioned by their model
+    // classes and therefore automatically participate in the existing settings export/import.
+    public final Str haMainBricksJson = new Str(this, "haMainBricksJson", "[]");
+    public final Str popupItemsJson = new Str(this, "popupItemsJson", "[]");
+    public final Bool popupEnabled = new Bool(this, "popupEnabled", true);
+    public final Int popupWidth = new Int(this, "popupWidth", 500);
+    public final Int popupHeight = new Int(this, "popupHeight", 500);
+    public final Int popupRows = new Int(this, "popupRows", 2);
+    public final Int popupColumns = new Int(this, "popupColumns", 2);
+    public final Int popupX = new Int(this, "popupX", 200);
+    public final Int popupY = new Int(this, "popupY", 300);
+    public final Int popupPaddingLeft = new Int(this, "popupPaddingLeft", 12);
+    public final Int popupPaddingTop = new Int(this, "popupPaddingTop", 12);
+    public final Int popupPaddingRight = new Int(this, "popupPaddingRight", 12);
+    public final Int popupPaddingBottom = new Int(this, "popupPaddingBottom", 12);
+    public final Int popupCellGap = new Int(this, "popupCellGap", 8);
+    public final Str popupBackgroundColor = new Str(this, "popupBackgroundColor", "#FF000000");
+    public final Int popupBackgroundAlpha = new Int(this, "popupBackgroundAlpha", 0xCC);
+    public final Int popupCornerRadius = new Int(this, "popupCornerRadius", 28);
+
+    public final Bool mqttEnabled = new Bool(this, "mqttEnabled", false);
+    public final Str mqttHost = new Str(this, "mqttHost", "");
+    public final Int mqttPort = new Int(this, "mqttPort", 1883);
+    public final Bool mqttTls = new Bool(this, "mqttTls", false);
+    public final Str mqttUsername = new Str(this, "mqttUsername", "");
+    public final Secret mqttPassword = new Secret(this, "mqttPassword");
+    public final Str mqttClientId = new Str(this, "mqttClientId", "");
+    public final Str mqttDeviceId = new Str(this, "mqttDeviceId", "geely");
+    public final Str mqttBaseTopic = new Str(this, "mqttBaseTopic", "statuswidget/v1");
+    public final Int mqttQos = new Int(this, "mqttQos", 1);
+    public final Int mqttKeepAliveSeconds = new Int(this, "mqttKeepAliveSeconds", 30);
+    public final Bool mqttKeepAwake = new Bool(this, "mqttKeepAwake", true);
 
     @Nullable
     public TextBrickPrefs textBrickPrefs(BrickType type) {
@@ -383,6 +450,8 @@ public class Preferences {
                 return indoorTemp;
             case OUTDOOR_TEMP:
                 return outdoorTemp;
+            case HOME_ASSISTANT:
+                return homeAssistant;
             default:
                 return null;
         }
@@ -457,6 +526,7 @@ public class Preferences {
     }
 
     public Preferences(Context context) {
+        appContext = context.getApplicationContext();
         final Context deviceContext = context.getApplicationContext().createDeviceProtectedStorageContext();
         prefs = deviceContext.getSharedPreferences(context.getPackageName() + "_preferences", Context.MODE_PRIVATE);
         migrateLegacyPrefsIfNeeded();
@@ -470,6 +540,12 @@ public class Preferences {
      */
     public void resetAll() {
         prefs.edit().clear().commit();
+    }
+
+    /** Popup drag can be followed immediately by ignition power-off; persist both coordinates
+     * atomically and synchronously so a half-updated or lost position cannot occur. */
+    public void savePopupPosition(int x, int y) {
+        prefs.edit().putInt(popupX.key, x).putInt(popupY.key, y).commit();
     }
 
     /**
@@ -501,6 +577,7 @@ public class Preferences {
             case BLUETOOTH: return "bluetooth";
             case INDOOR_TEMP: return "indoorTemp";
             case OUTDOOR_TEMP: return "outdoorTemp";
+            case HOME_ASSISTANT: return "homeAssistant";
             default: return null;
         }
     }
@@ -619,6 +696,8 @@ public class Preferences {
     public String exportToJson(@Nullable String presetName) throws JSONException {
         JSONObject preferencesNode = new JSONObject();
         for (Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
+            // Credentials are device-local and never leave the app in an export or preset.
+            if ("mqttPassword".equals(entry.getKey())) continue;
             Object value = entry.getValue();
             if (value instanceof Set) {
                 JSONArray array = new JSONArray();
@@ -641,6 +720,7 @@ public class Preferences {
     }
 
     public void importFromJson(String json) throws JSONException, InvalidSettingsFileException {
+        String existingMqttPassword = mqttPassword.get();
         JSONObject root = new JSONObject(json);
         if (!EXPORT_FILE_TYPE.equals(root.optString(KEY_FILE_TYPE, null))) {
             throw new InvalidSettingsFileException("Not a Status Widget settings file");
@@ -658,6 +738,7 @@ public class Preferences {
         Iterator<String> keys = preferencesNode.keys();
         while (keys.hasNext()) {
             String key = keys.next();
+            if ("mqttPassword".equals(key)) continue;
             Object value = preferencesNode.get(key);
             if (value instanceof Boolean) {
                 editor.putBoolean(key, (Boolean) value);
@@ -683,7 +764,8 @@ public class Preferences {
                 editor.putString(key, (String) value);
             }
         }
-        editor.apply();
+        editor.commit();
+        if (!existingMqttPassword.isEmpty()) mqttPassword.set(existingMqttPassword);
         // The file may be from the legacy (pre-brick) schema — re-run migration so it adapts.
         migrateLegacyPrefsIfNeeded();
     }

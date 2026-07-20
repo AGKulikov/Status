@@ -35,6 +35,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
@@ -77,6 +78,14 @@
 
         <activity
             android:name=".AboutActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".AutomationSettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".PopupSettingsActivity"
             android:exported="false" />
 
         <activity
@@ -137,6 +146,27 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.USER_UNLOCKED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Explicit broadcasts sent by Home Assistant Companion. MQTT is the primary transport,
+             but this stable action remains supported for compatibility and manual testing. -->
+        <receiver
+            android:name=".automation.HaUpdateReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="ru.natro.statuswidget.HA_UPDATE" />
+                <action android:name="ru.natro.statuswidget.HA_CLEAR" />
+                <action android:name="ru.natro.statuswidget.HA_VISIBILITY" />
+                <action android:name="ru.natro.statuswidget.HA_BUILTIN_VISIBILITY" />
+                <action android:name="ru.natro.statuswidget.HA_POPUP_UPDATE" />
+                <action android:name="ru.natro.statuswidget.HA_POPUP_CLEAR" />
+                <action android:name="ru.natro.statuswidget.HA_POPUP_VISIBILITY" />
+                <action android:name="ru.natro.statuswidget.HA_SYNC_REQUEST" />
+                <action android:name="ru.natro.statuswidget.HA_REFRESH" />
             </intent-filter>
         </receiver>
     </application>

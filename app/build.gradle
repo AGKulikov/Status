@@ -21,8 +21,12 @@ android {
     namespace "dezz.status.widget"
 
     compileSdkVersion 36
+    buildToolsVersion "36.0.0"
 
     defaultConfig {
+        // Deliberately different from the upstream package so the fork can be installed next
+        // to Status Widget 2.8.2 and keeps an entirely independent preference/database space.
+        applicationId "ru.natro.statuswidget"
         minSdk 28
         //noinspection ExpiredTargetSdkVersion
         targetSdkVersion 28
@@ -30,7 +34,7 @@ android {
         versionName rootProject.ext.appVersionName
 
         // Set the output APK name
-        setProperty("archivesBaseName", "status-widget-${versionName}")
+        setProperty("archivesBaseName", "status-widget-ha-${versionName}")
     }
 
     // Car-specific builds: each flavor wires in one vendor SDK via <flavor>Implementation and
@@ -52,7 +56,7 @@ android {
     applicationVariants.configureEach { variant ->
         variant.outputs.configureEach {
             def flavorTag = variant.flavorName == "geely" ? "" : "-${variant.flavorName}"
-            outputFileName = "status-widget-${variant.versionName}${flavorTag}-${variant.buildType.name}.apk"
+            outputFileName = "status-widget-ha-${variant.versionName}${flavorTag}-${variant.buildType.name}.apk"
         }
     }
 
@@ -98,4 +102,5 @@ dependencies {
     // dex jar; bundled into the APK the same way the infoDash fork ships it. Main source set
     // must not import com.ecarx.* — only app/src/geely may.
     geelyImplementation files('libs/geely/ecarx-adaptapi.jar')
+    testImplementation 'junit:junit:4.13.2'
 }

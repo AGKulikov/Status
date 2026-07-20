@@ -16,7 +16,24 @@
   -->
 
 <resources>
-    <string name="app_name">Виджет информации</string>
+    <string name="app_name">Status Widget HA</string>
+    <string name="brick_title_home_assistant">Home Assistant</string>
+    <string name="automation_settings_button">Home Assistant, MQTT и всплывающий оверлей</string>
+    <string name="automation_settings_title">Home Assistant и MQTT</string>
+    <string name="mqtt_section_title">Подключение MQTT</string>
+    <string name="ha_bricks_section_title">HA-кирпичики в основной строке</string>
+    <string name="ha_add_brick">Добавить HA-кирпичик</string>
+    <string name="save">Сохранить</string>
+    <string name="move_up">Выше</string>
+    <string name="move_down">Ниже</string>
+    <string name="delete">Удалить</string>
+    <string name="settings_saved">Настройки сохранены</string>
+    <string name="invalid_settings">Ошибка в настройках: %1$s</string>
+    <string name="popup_settings_button">Настроить всплывающий оверлей и плитки</string>
+    <string name="popup_settings_title">Всплывающий оверлей</string>
+    <string name="popup_add_item">Добавить плитку</string>
+    <string name="car_diagnostics_loading">Диагностика данных автомобиля: загрузка…</string>
+    <string name="car_diagnostics_empty">Диагностика данных автомобиля: интеграция недоступна</string>
     <string name="accessibility_service_summary">Отслеживает активное приложение на каждом дисплее</string>
     <string name="accessibility_service_description">Позволяет виджету определять, на каком физическом дисплее произошло переключение приложения. Нужно только для головных устройств с несколькими дисплеями: виджет будет скрываться/появляться только при переключении приложений на своём дисплее, не реагируя на другие.</string>
 
