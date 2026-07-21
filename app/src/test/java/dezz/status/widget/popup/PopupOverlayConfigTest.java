@@ -8,6 +8,8 @@ import static org.junit.Assert.assertTrue;
 import org.json.JSONObject;
 import org.junit.Test;
 
+import java.util.Collections;
+
 public final class PopupOverlayConfigTest {
     @Test
     public void roundTripKeepsIndependentGeometry() throws Exception {
@@ -43,5 +45,25 @@ public final class PopupOverlayConfigTest {
                 new JSONObject().put("id", "gate").put("automationId", "gate"), 0);
 
         assertEquals(PopupItemConfig.DEFAULT_OVERLAY_ID, item.overlayId);
+    }
+
+    @Test
+    public void settingsChangePreservesPositionSavedByDragController() {
+        PopupOverlayConfig staleEditor = PopupOverlayConfig.create("gate", "Ворота", 0);
+        staleEditor.x = 100;
+        staleEditor.y = 200;
+        staleEditor.positionLocked = true;
+
+        PopupOverlayConfig dragged = PopupOverlayConfig.create("gate", "Ворота", 0);
+        dragged.x = 731;
+        dragged.y = 419;
+        dragged.positionLocked = false;
+
+        PopupOverlayConfigStore.preserveStoredPositions(
+                Collections.singletonList(staleEditor), Collections.singletonList(dragged));
+
+        assertEquals(731, staleEditor.x);
+        assertEquals(419, staleEditor.y);
+        assertTrue(staleEditor.positionLocked);
     }
 }

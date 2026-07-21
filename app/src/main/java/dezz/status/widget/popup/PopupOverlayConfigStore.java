@@ -73,7 +73,25 @@ public final class PopupOverlayConfigStore {
 
     public synchronized void save(@NonNull List<PopupOverlayConfig> configs) throws JSONException {
         synchronized (LOCK) {
+            // The settings screen can stay open while the WindowManager controller writes a new
+            // drag position. Its in-memory config then contains stale x/y; never let a checkbox,
+            // slider, rename or reorder operation move the window back to those old coordinates.
+            preserveStoredPositions(configs, loadLocked());
             saveLocked(configs);
+        }
+    }
+
+    /** Package-private for the regression test; position changes must go through savePosition. */
+    static void preserveStoredPositions(@NonNull List<PopupOverlayConfig> pending,
+                                        @NonNull List<PopupOverlayConfig> stored) {
+        for (PopupOverlayConfig target : pending) {
+            if (target == null) continue;
+            for (PopupOverlayConfig current : stored) {
+                if (current == null || !target.id.equals(current.id)) continue;
+                target.x = current.x;
+                target.y = current.y;
+                break;
+            }
         }
     }
 
