@@ -140,6 +140,16 @@ public final class PopupSettingsActivity extends AppCompatActivity {
         });
         toggles.addView(defaultVisible, weighted());
         page.addView(toggles, topMargin(8));
+        CheckBox positionLocked = check(
+                "Заблокировать перемещение оверлея", overlay.positionLocked);
+        positionLocked.setOnCheckedChangeListener((v, value) -> {
+            overlay.positionLocked = value;
+            persistOverlay();
+        });
+        page.addView(positionLocked, topMargin(8));
+        page.addView(label("Сначала переместите окно в нужное место, затем включите блокировку. "
+                + "Плитки продолжат нажиматься по всей площади, но окно больше не сдвинется."),
+                topMargin(3));
         page.addView(label("Если «Показывать без сценария» выключено, окно останется скрытым, "
                 + "пока автоматизация явно его не покажет. Потеря связи не меняет последнее "
                 + "определённое состояние."), topMargin(4));
@@ -218,7 +228,8 @@ public final class PopupSettingsActivity extends AppCompatActivity {
             text.addView(heading(overlay.name, 18));
             int tileCount = itemStore.load(overlay.id).size();
             text.addView(label(overlay.width + "×" + overlay.height + " px · сетка "
-                    + overlay.columns + "×" + overlay.rows + " · плиток: " + tileCount));
+                    + overlay.columns + "×" + overlay.rows + " · плиток: " + tileCount
+                    + (overlay.positionLocked ? " · положение закреплено" : "")));
             title.addView(text, weighted());
             CheckBox enabled = check("Вкл.", overlay.enabled);
             enabled.setOnCheckedChangeListener((v, value) -> {

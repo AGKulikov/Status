@@ -5,6 +5,7 @@ import android.content.res.ColorStateList;
 import android.graphics.PixelFormat;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.TypedValue;
@@ -27,8 +28,10 @@ import androidx.core.widget.ImageViewCompat;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.List;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -70,11 +73,15 @@ public final class PopupOverlayController {
     private final ActionDispatcher actionDispatcher;
     private final BuiltinProvider builtinProvider;
     private final WindowManager windowManager;
-    private final int touchSlop;
+    /** A car display is noisy: the platform slop alone turns ordinary taps into drags. */
+    private final int dragThreshold;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Set<String> pendingActions = new HashSet<>();
-    private long lastActionAt;
+    private final Map<String, Long> lastActionAtByItem = new HashMap<>();
     private boolean destroyed;
+    /** Prevent connector updates from replacing the touched View between DOWN and UP. */
+    private boolean touchInProgress;
+    private boolean refreshDeferred;
 
     private FrameLayout root;
     private WindowManager.LayoutParams params;
@@ -82,6 +89,7 @@ public final class PopupOverlayController {
     private float touchY;
     private int startX;
     private int startY;
+    private boolean rootDragging;
     @Nullable private PopupOverlayConfig currentConfig;
 
     public PopupOverlayController(@NonNull android.content.Context context,
@@ -108,13 +116,19 @@ public final class PopupOverlayController {
         this.actionDispatcher = actionDispatcher;
         this.builtinProvider = builtinProvider;
         this.windowManager = context.getSystemService(WindowManager.class);
-        this.touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
+        int platformSlop = ViewConfiguration.get(context).getScaledTouchSlop();
+        int twentyFourDp = Math.round(24f * context.getResources().getDisplayMetrics().density);
+        this.dragThreshold = Math.max(platformSlop * 3, twentyFourDp);
     }
 
     public void applyPreferences() {
         if (destroyed) return;
         if (Looper.myLooper() != Looper.getMainLooper()) {
             main.post(this::applyPreferences);
+            return;
+        }
+        if (touchInProgress) {
+            refreshDeferred = true;
             return;
         }
         currentConfig = overlayConfigs.find(overlayId);
@@ -136,6 +150,9 @@ public final class PopupOverlayController {
     public void destroy() {
         destroyed = true;
         pendingActions.clear();
+        lastActionAtByItem.clear();
+        touchInProgress = false;
+        refreshDeferred = false;
         main.removeCallbacksAndMessages(null);
         if (root != null) {
             try { windowManager.removeView(root); } catch (Exception ignored) {}
@@ -197,6 +214,10 @@ public final class PopupOverlayController {
 
     private void renderItems() {
         if (root == null || params == null) return;
+        if (touchInProgress) {
+            refreshDeferred = true;
+            return;
+        }
         root.removeAllViews();
         PopupOverlayConfig config = currentConfig;
         if (config == null || !states.effectiveVisibility(AutomationContract.SCOPE_OVERLAY,
@@ -289,7 +310,11 @@ public final class PopupOverlayController {
         int borderBase = AutomationState.parseColor(item.borderColor, 0x00FFFFFF);
         bg.setStroke(item.borderWidth,
                 (borderBase & 0x00FFFFFF) | (clamp(item.borderAlpha, 0, 255) << 24));
-        tile.setBackground(bg);
+        GradientDrawable rippleMask = new GradientDrawable();
+        rippleMask.setColor(0xFFFFFFFF);
+        rippleMask.setCornerRadius(item.cornerRadius);
+        tile.setBackground(new RippleDrawable(ColorStateList.valueOf(0x55FFFFFF),
+                bg, rippleMask));
 
         String iconId = item.icon;
         if (builtin != null && PopupIconCatalog.resolve(builtin.iconId) != 0) iconId = builtin.iconId;
@@ -362,6 +387,13 @@ public final class PopupOverlayController {
         boolean actionable = hasAnyAction && !presentation.pending && !presentation.stale
                 && !commandPending
                 && state.actionEnabled;
+        String unavailableReason = null;
+        if (hasAnyAction && !actionable) {
+            if (commandPending) unavailableReason = "Команда уже отправляется";
+            else if (presentation.pending) unavailableReason = "Статус устройства ещё не получен";
+            else if (presentation.stale) unavailableReason = "Статус устройства устарел";
+            else if (!state.actionEnabled) unavailableReason = "Управление сейчас недоступно";
+        }
         // Keep the cell itself enabled even while its command is unavailable: every pixel of the
         // allocated grid cell remains a drag surface.  Command availability is handled by the
         // click callback and visual alpha, not by disabling the parent View (which makes touch
@@ -371,7 +403,7 @@ public final class PopupOverlayController {
         tile.setFocusable(actionable);
         tile.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
         tile.setAlpha(actionable || !hasAnyAction ? 1f : 0.45f);
-        attachTileTouch(tile, item, actionable);
+        attachTileTouch(tile, item, actionable, unavailableReason);
         return tile;
     }
 
@@ -413,51 +445,90 @@ public final class PopupOverlayController {
         }
     }
 
-    /** Every tile doubles as a drag surface; a short release remains the configured action. */
-    private void attachTileTouch(View tile, PopupItemConfig item, boolean actionable) {
+    /**
+     * The complete tile is one touch target. Small pointer noise remains a click; an unlocked
+     * overlay starts moving only after a deliberately large drag. Connector refreshes are held
+     * until UP/CANCEL so they cannot replace the View halfway through the gesture.
+     */
+    private void attachTileTouch(View tile, PopupItemConfig item, boolean actionable,
+                                 @Nullable String unavailableReason) {
         final float[] down = new float[2];
         final int[] origin = new int[2];
         final boolean[] dragging = new boolean[1];
+        final boolean[] clickCancelled = new boolean[1];
+        final boolean[] tracking = new boolean[1];
         tile.setOnClickListener(view -> {
             if (actionable) activate(item, null);
+            else if (unavailableReason != null) {
+                Toast.makeText(context, unavailableReason, Toast.LENGTH_SHORT).show();
+            }
         });
         tile.setOnTouchListener((view, event) -> {
             if (params == null) return false;
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
+                    if (!beginTouch()) return false;
+                    tracking[0] = true;
                     down[0] = event.getRawX();
                     down[1] = event.getRawY();
                     origin[0] = params.x;
                     origin[1] = params.y;
                     dragging[0] = false;
+                    clickCancelled[0] = false;
+                    view.setPressed(true);
                     return true;
                 case MotionEvent.ACTION_MOVE:
+                    if (!tracking[0]) return false;
                     float dx = event.getRawX() - down[0];
                     float dy = event.getRawY() - down[1];
-                    if (Math.abs(dx) > touchSlop || Math.abs(dy) > touchSlop) dragging[0] = true;
+                    if (!isPositionLocked()
+                            && (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold)) {
+                        dragging[0] = true;
+                    } else if (isPositionLocked()
+                            && (Math.abs(dx) > dragThreshold * 2
+                            || Math.abs(dy) > dragThreshold * 2)) {
+                        // A long swipe on a fixed overlay is not a deliberate device command.
+                        clickCancelled[0] = true;
+                    }
                     if (dragging[0]) {
+                        view.setPressed(false);
                         params.x = origin[0] + Math.round(dx);
                         params.y = origin[1] + Math.round(dy);
                         try { windowManager.updateViewLayout(root, params); }
                         catch (Exception ignored) {}
+                    } else {
+                        view.setPressed(!clickCancelled[0]);
                     }
                     return true;
                 case MotionEvent.ACTION_UP:
-                    if (dragging[0]) overlayConfigs.savePosition(overlayId, params.x, params.y);
-                    else view.performClick();
+                    if (!tracking[0]) return false;
+                    view.setPressed(false);
+                    if (dragging[0]) saveCurrentPosition();
+                    else if (!clickCancelled[0]) view.performClick();
+                    tracking[0] = false;
+                    finishTouch();
                     return true;
                 case MotionEvent.ACTION_CANCEL:
-                    if (dragging[0]) overlayConfigs.savePosition(overlayId, params.x, params.y);
+                    if (!tracking[0]) return false;
+                    view.setPressed(false);
+                    if (dragging[0]) saveCurrentPosition();
+                    tracking[0] = false;
+                    finishTouch();
                     return true;
                 default:
-                    return false;
+                    return tracking[0];
             }
         });
     }
 
     private void activate(PopupItemConfig item, @Nullable TextView feedback) {
         long now = System.currentTimeMillis();
-        if (now - lastActionAt < ACTION_DEBOUNCE_MS) return;
+        Long lastActionAt = lastActionAtByItem.get(item.id);
+        if (lastActionAt != null && now - lastActionAt < ACTION_DEBOUNCE_MS) {
+            Toast.makeText(context, "Подождите перед повторной командой", Toast.LENGTH_SHORT)
+                    .show();
+            return;
+        }
         if (item.confirmationRequired) {
             try {
                 android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(context,
@@ -482,7 +553,7 @@ public final class PopupOverlayController {
 
     private void sendAction(PopupItemConfig item) {
         if (destroyed || !pendingActions.add(item.id)) return;
-        lastActionAt = System.currentTimeMillis();
+        lastActionAtByItem.put(item.id, System.currentTimeMillis());
         renderItems();
         try {
             JSONObject payload;
@@ -542,23 +613,66 @@ public final class PopupOverlayController {
         if (params == null) return false;
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                if (!beginTouch()) return false;
                 startX = params.x;
                 startY = params.y;
                 touchX = event.getRawX();
                 touchY = event.getRawY();
+                rootDragging = false;
                 return true;
             case MotionEvent.ACTION_MOVE:
-                params.x = startX + Math.round(event.getRawX() - touchX);
-                params.y = startY + Math.round(event.getRawY() - touchY);
-                try { windowManager.updateViewLayout(root, params); } catch (Exception ignored) {}
+                float dx = event.getRawX() - touchX;
+                float dy = event.getRawY() - touchY;
+                if (!isPositionLocked()
+                        && (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold)) {
+                    rootDragging = true;
+                }
+                if (rootDragging) {
+                    params.x = startX + Math.round(dx);
+                    params.y = startY + Math.round(dy);
+                    try { windowManager.updateViewLayout(root, params); }
+                    catch (Exception ignored) {}
+                }
                 return true;
             case MotionEvent.ACTION_UP:
+                if (rootDragging) saveCurrentPosition();
+                rootDragging = false;
+                finishTouch();
+                return true;
             case MotionEvent.ACTION_CANCEL:
-                overlayConfigs.savePosition(overlayId, params.x, params.y);
+                if (rootDragging) saveCurrentPosition();
+                rootDragging = false;
+                finishTouch();
                 return true;
             default:
-                return false;
+                return touchInProgress;
         }
+    }
+
+    private boolean beginTouch() {
+        if (destroyed || touchInProgress) return false;
+        touchInProgress = true;
+        return true;
+    }
+
+    private void finishTouch() {
+        touchInProgress = false;
+        if (!refreshDeferred || destroyed) return;
+        refreshDeferred = false;
+        applyPreferences();
+    }
+
+    private boolean isPositionLocked() {
+        return currentConfig != null && currentConfig.positionLocked;
+    }
+
+    private void saveCurrentPosition() {
+        if (params == null) return;
+        if (currentConfig != null) {
+            currentConfig.x = params.x;
+            currentConfig.y = params.y;
+        }
+        overlayConfigs.savePosition(overlayId, params.x, params.y);
     }
 
     private static int[] findPosition(boolean[][] used, int requestedRow, int requestedColumn,

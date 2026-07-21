@@ -3,6 +3,7 @@ package dezz.status.widget.popup;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import org.json.JSONObject;
 import org.junit.Test;
@@ -18,6 +19,7 @@ public final class PopupOverlayConfigTest {
         source.columns = 3;
         source.x = -42;
         source.y = 515;
+        source.positionLocked = true;
         source.backgroundColor = "transparent";
 
         PopupOverlayConfig restored = PopupOverlayConfig.fromJson(source.toJson(), 0);
@@ -31,6 +33,7 @@ public final class PopupOverlayConfigTest {
         assertEquals(3, restored.columns);
         assertEquals(-42, restored.x);
         assertEquals(515, restored.y);
+        assertTrue(restored.positionLocked);
         assertEquals("transparent", restored.backgroundColor);
     }
 

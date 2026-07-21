@@ -25,6 +25,8 @@ public final class PopupOverlayConfig {
     public int columns;
     public int x;
     public int y;
+    /** When true, touches can activate tiles but can never move this overlay window. */
+    public boolean positionLocked;
     public int paddingLeft;
     public int paddingTop;
     public int paddingRight;
@@ -48,6 +50,7 @@ public final class PopupOverlayConfig {
         config.columns = 2;
         config.x = 200 + order * 24;
         config.y = 300 + order * 24;
+        config.positionLocked = false;
         config.paddingLeft = 12;
         config.paddingTop = 12;
         config.paddingRight = 12;
@@ -99,6 +102,7 @@ public final class PopupOverlayConfig {
         config.columns = clamp(object.optInt("columns", config.columns), 1, 50);
         config.x = clamp(object.optInt("x", config.x), -10000, 10000);
         config.y = clamp(object.optInt("y", config.y), -10000, 10000);
+        config.positionLocked = object.optBoolean("positionLocked", config.positionLocked);
         config.paddingLeft = clamp(object.optInt("paddingLeft", config.paddingLeft), 0, 1000);
         config.paddingTop = clamp(object.optInt("paddingTop", config.paddingTop), 0, 1000);
         config.paddingRight = clamp(object.optInt("paddingRight", config.paddingRight), 0, 1000);
@@ -130,6 +134,7 @@ public final class PopupOverlayConfig {
                 .put("columns", columns)
                 .put("x", x)
                 .put("y", y)
+                .put("positionLocked", positionLocked)
                 .put("paddingLeft", paddingLeft)
                 .put("paddingTop", paddingTop)
                 .put("paddingRight", paddingRight)
