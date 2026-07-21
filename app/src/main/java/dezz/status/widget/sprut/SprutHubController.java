@@ -145,6 +145,25 @@ public final class SprutHubController {
         }
     }
 
+    /** Re-renders popup presentation from the already loaded catalog without reconnecting or
+     * requesting a 500+ accessory snapshot. Used by the live visual editor. */
+    public void reapplyPopupBindings() {
+        SprutCatalog current = catalog;
+        boolean fresh = sessionSynced;
+        for (PopupItemConfig item : popupConfigs.load()) {
+            applyPopupBinding(item, current, fresh, null);
+        }
+    }
+
+    /** Main-row counterpart of {@link #reapplyPopupBindings()}. */
+    public void reapplyMainBindings() {
+        SprutCatalog current = catalog;
+        boolean fresh = sessionSynced;
+        for (HaBrickConfig item : mainConfigs.loadMain()) {
+            applyMainBinding(item, current, fresh, null);
+        }
+    }
+
     /** Applies changed settings without disturbing MQTT or Home Assistant connections. */
     public void reconfigure() {
         String next = settingsSignature();
@@ -232,23 +251,20 @@ public final class SprutHubController {
             failed.completeExceptionally(new IOException("Sprut.hub has no current snapshot"));
             return failed;
         }
-        final SprutPath path;
+        final SprutActionTargetResolver.Resolved resolvedAction;
         try {
-            path = SprutPath.parse(binding.resourceId);
+            resolvedAction = SprutActionTargetResolver.resolve(catalog, binding);
         } catch (IllegalArgumentException e) {
             CompletableFuture<JSONObject> failed = new CompletableFuture<>();
             failed.completeExceptionally(e);
             return failed;
         }
-        SprutCatalog.Characteristic characteristic = catalog.find(path);
-        if (characteristic == null || !characteristic.writable()) {
-            CompletableFuture<JSONObject> failed = new CompletableFuture<>();
-            failed.completeExceptionally(new IOException("Characteristic is not writable: " + path));
-            return failed;
-        }
+        ActionBinding effectiveBinding = resolvedAction.binding();
+        SprutCatalog.Characteristic characteristic = resolvedAction.characteristic();
+        SprutPath path = characteristic.path();
         final Object value;
         try {
-            value = SprutActionValue.resolve(binding, characteristic);
+            value = SprutActionValue.resolve(effectiveBinding, characteristic);
         } catch (IllegalArgumentException e) {
             CompletableFuture<JSONObject> failed = new CompletableFuture<>();
             failed.completeExceptionally(e);

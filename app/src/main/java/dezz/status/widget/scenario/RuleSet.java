@@ -14,7 +14,9 @@ import java.util.regex.Pattern;
 /** Ordered first-match display rules with an optional cross-connector value source. */
 public final class RuleSet {
     public static final int SCHEMA_VERSION = 1;
-    public static final int MAX_RULES = 128;
+    /** Human-facing editors do not impose a small rule limit. This high safety ceiling only
+     * protects imports from accidentally trying to allocate an unbounded JSON collection. */
+    public static final int MAX_RULES = 4_096;
     private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,127}");
 
     public final String id;

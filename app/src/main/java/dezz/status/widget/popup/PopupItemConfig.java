@@ -14,7 +14,9 @@ import dezz.status.widget.scenario.ScenarioPresets;
 
 /** Independent configuration of one text/tile cell in the second floating overlay. */
 public final class PopupItemConfig {
-    public static final int SCHEMA_VERSION = 4;
+    public static final int SCHEMA_VERSION = 5;
+    /** Legacy single-overlay id. Existing configurations migrate here automatically. */
+    public static final String DEFAULT_OVERLAY_ID = "popup";
     public static final String TYPE_HA_DEVICE = "HA_DEVICE";
     public static final String TYPE_HA_TEXT = "HA_TEXT";
     public static final String TYPE_HA_BUTTON = "HA_BUTTON";
@@ -22,6 +24,8 @@ public final class PopupItemConfig {
     public static final String TYPE_BUILTIN = "BUILTIN";
 
     public String id;
+    /** Floating overlay that owns this tile. Tile ids remain globally unique for connectors. */
+    public String overlayId;
     /** Runtime state id. Kept separate so a local editor identity never changes MQTT topics. */
     public String automationId;
     /** Connector-neutral value source. Missing legacy data migrates from {@link #automationId}. */
@@ -94,6 +98,7 @@ public final class PopupItemConfig {
     public static PopupItemConfig create(String id, int order) {
         PopupItemConfig c = new PopupItemConfig();
         c.id = AutomationContract.requireSafeId(id);
+        c.overlayId = DEFAULT_OVERLAY_ID;
         c.automationId = c.id;
         c.sourceBinding = SourceBinding.legacy(c.automationId);
         c.actionBinding = ActionBinding.unbound();
@@ -157,6 +162,8 @@ public final class PopupItemConfig {
     @NonNull
     public static PopupItemConfig fromJson(@NonNull JSONObject o, int fallbackOrder) {
         PopupItemConfig c = create(o.optString("id", "popup_" + fallbackOrder), fallbackOrder);
+        c.overlayId = AutomationContract.requireSafeId(
+                o.optString("overlayId", DEFAULT_OVERLAY_ID));
         c.automationId = AutomationContract.requireSafeId(
                 o.optString("automationId", c.automationId));
         c.type = normalizeType(o.optString("type", c.type));
@@ -235,7 +242,8 @@ public final class PopupItemConfig {
     public JSONObject toJson() throws JSONException {
         JSONObject o = new JSONObject();
         o.put("schema", SCHEMA_VERSION);
-        o.put("id", id).put("automationId", automationId).put("type", type)
+        o.put("id", id).put("overlayId", overlayId)
+                .put("automationId", automationId).put("type", type)
                 .put("builtinId", builtinId).put("name", name)
                 .put("enabled", enabled).put("order", order);
         o.put("sourceBinding", sourceBinding == null

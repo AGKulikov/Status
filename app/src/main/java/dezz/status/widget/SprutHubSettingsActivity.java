@@ -94,6 +94,7 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
     private Preferences prefs;
     private HaBrickConfigStore mainStore;
     private PopupItemConfigStore popupStore;
+    private String targetPopupOverlayId = PopupItemConfig.DEFAULT_OVERLAY_ID;
     private final SprutPopupPresetEngine presetEngine = new SprutPopupPresetEngine();
     private CheckBox enabled;
     private CheckBox keepAwake;
@@ -122,6 +123,11 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = new Preferences(this);
+        String requestedOverlay = getIntent().getStringExtra(PopupSettingsActivity.EXTRA_OVERLAY_ID);
+        if (requestedOverlay != null && !requestedOverlay.trim().isEmpty()) {
+            targetPopupOverlayId = dezz.status.widget.automation.AutomationContract
+                    .requireSafeId(requestedOverlay);
+        }
         mainStore = new HaBrickConfigStore(prefs);
         popupStore = new PopupItemConfigStore(prefs);
         setContentView(buildScreen());
@@ -694,6 +700,7 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
             String id = uniquePopupId("sprut_" + characteristic.path().stableId().replace('/', '_'),
                     items);
             PopupItemConfig config = PopupItemConfig.create(id, items.size());
+            config.overlayId = targetPopupOverlayId;
             config.automationId = id;
             config.name = accessory.name() + " · "
                     + firstNonBlank(characteristic.name(), service.name(), characteristic.type());
@@ -702,7 +709,15 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
             config.displayRules = rulesFor(accessory, service, characteristic,
                     config.sourceBinding);
             config.icon = firstNonBlank(SprutValueMapper.iconFor(characteristic), "power");
-            if (characteristic.writable()
+            // A cover tile displays CurrentDoorState/CurrentPosition (read-only) but commands
+            // TargetDoorState/TargetPosition.  Always derive the press action from the whole
+            // typed service rather than assuming that the displayed characteristic is writable.
+            // The preset engine fails closed if no semantically matching writable target exists.
+            SprutPopupPreset preset = presetEngine.recommend(accessory, service);
+            boolean appliedPresetAction = preset.primaryCharacteristicPath().isPresent()
+                    && preset.primaryCharacteristicPath().get().equals(characteristic.path())
+                    && applyPresetAction(config, preset);
+            if (!appliedPresetAction && characteristic.writable()
                     && (characteristic.valueType() == SprutCatalog.ValueType.BOOLEAN
                     || characteristic.currentValue() instanceof Boolean)) {
                 config.actionBinding = new ActionBinding(ConnectorType.SPRUTHUB, "default",
@@ -733,6 +748,7 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
             SprutCatalog.Characteristic primary = shownCatalog.find(primaryPath);
             String id = uniquePopupId("sprut_" + primaryPath.stableId().replace('/', '_'), items);
             PopupItemConfig config = PopupItemConfig.create(id, items.size());
+            config.overlayId = targetPopupOverlayId;
             config.automationId = id;
             config.name = preset.title();
             config.title = preset.title();
@@ -746,22 +762,7 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
                 SprutValueMapper.DisplayValue display = SprutValueMapper.toDisplayPayload(primary);
                 config.defaultText = display.text();
             }
-            if (preset.actionCharacteristicPath().isPresent()
-                    && preset.actionOperation().isPresent()) {
-                String operation = preset.actionOperation().get()
-                        == SprutPopupPreset.ActionOperation.TOGGLE
-                        ? ActionBinding.OPERATION_TOGGLE : ActionBinding.OPERATION_SET;
-                String payload = preset.defaultActionPayload().isPresent()
-                        ? primitiveJson(preset.defaultActionPayload().get()) : "{}";
-                // SET without a chosen value would be unsafe; leave it display-only until the
-                // user selects the desired value in the tile editor.
-                if (ActionBinding.OPERATION_TOGGLE.equals(operation)
-                        || preset.defaultActionPayload().isPresent()) {
-                    config.actionBinding = new ActionBinding(ConnectorType.SPRUTHUB, "default",
-                            preset.actionCharacteristicPath().get().stableId(), operation, payload);
-                    config.actionId = id + "_action";
-                }
-            }
+            applyPresetAction(config, preset);
             items.add(config);
             popupStore.save(items);
             applyLiveSettings();
@@ -773,6 +774,28 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
             Toast.makeText(this, "Не удалось создать пресет: " + e.getMessage(),
                     Toast.LENGTH_LONG).show();
         }
+    }
+
+    /** Applies only an action that still resolves to a writable value in the current snapshot. */
+    private boolean applyPresetAction(PopupItemConfig config, SprutPopupPreset preset) {
+        if (!preset.actionCharacteristicPath().isPresent()
+                || !preset.actionOperation().isPresent()) return false;
+        SprutCatalog.Characteristic target = shownCatalog.find(
+                preset.actionCharacteristicPath().get());
+        if (target == null || !target.writable()) return false;
+        String operation = preset.actionOperation().get()
+                == SprutPopupPreset.ActionOperation.TOGGLE
+                ? ActionBinding.OPERATION_TOGGLE : ActionBinding.OPERATION_SET;
+        String payload = preset.defaultActionPayload().isPresent()
+                ? primitiveJson(preset.defaultActionPayload().get()) : "{}";
+        // SET without a chosen value would be unsafe; leave it display-only until the user
+        // selects a target. Cover/gate presets always provide their typed open endpoint.
+        if (!ActionBinding.OPERATION_TOGGLE.equals(operation)
+                && !preset.defaultActionPayload().isPresent()) return false;
+        config.actionBinding = new ActionBinding(ConnectorType.SPRUTHUB, "default",
+                target.path().stableId(), operation, payload);
+        config.actionId = config.id + "_action";
+        return true;
     }
 
     private SourceBinding sourceBinding(SprutCatalog.Characteristic characteristic) {

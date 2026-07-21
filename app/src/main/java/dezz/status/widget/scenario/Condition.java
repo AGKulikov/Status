@@ -19,12 +19,14 @@ public final class Condition {
                      String operand, String secondOperand) {
         // Reuse display-rule validation so both engine surfaces have identical limits/coercion.
         Rule validated = new Rule(id, field, operator, operand, secondOperand, Output.none());
+        String[] normalizedOperands = normalizeOperands(validated.operator, validated.operand,
+                validated.secondOperand);
         this.id = validated.id;
         this.reference = Objects.requireNonNull(reference, "reference");
         this.field = validated.field;
         this.operator = validated.operator;
-        this.operand = validated.operand;
-        this.secondOperand = validated.secondOperand;
+        this.operand = normalizedOperands[0];
+        this.secondOperand = normalizedOperands[1];
     }
 
     public boolean matches(ValueResolverRegistry registry) {
@@ -33,6 +35,11 @@ public final class Condition {
     }
 
     public boolean matches(ValueResolver resolver) {
+        return matches(resolve(resolver));
+    }
+
+    /** Resolves once so Scenario can distinguish false from unknown/stale. */
+    public Input resolve(ValueResolver resolver) {
         Objects.requireNonNull(resolver, "resolver");
         Input input;
         try {
@@ -40,7 +47,15 @@ public final class Condition {
         } catch (RuntimeException ignored) {
             input = Input.unavailable();
         }
-        return matches(input == null ? Input.unavailable() : input);
+        return input == null ? Input.unavailable() : input;
+    }
+
+    /** These operators intentionally describe connection/freshness and remain determinate even
+     * when an ordinary value comparison would be unsafe. */
+    public boolean explicitlyHandlesAvailability() {
+        return operator == Operator.ALWAYS || operator == Operator.FRESH
+                || operator == Operator.STALE || operator == Operator.AVAILABLE
+                || operator == Operator.UNAVAILABLE;
     }
 
     public boolean matches(Input input) {
@@ -87,5 +102,37 @@ public final class Condition {
     @Override
     public int hashCode() {
         return Objects.hash(id, reference, field, operator, operand, secondOperand);
+    }
+
+    /**
+     * Removes operands that are not consumed by the selected operator. Numeric operands are
+     * trimmed so switching operators in the visual editor cannot leave a hidden stale value in
+     * the stored scenario. Text operands intentionally keep their whitespace because it may be
+     * part of an exact comparison.
+     */
+    static String[] normalizeOperands(Operator operator, String operand, String secondOperand) {
+        String first = operand == null ? "" : operand;
+        String second = secondOperand == null ? "" : secondOperand;
+        switch (Objects.requireNonNull(operator, "operator")) {
+            case EQUALS:
+            case NOT_EQUALS:
+            case EQUALS_IGNORE_CASE:
+            case NOT_EQUALS_IGNORE_CASE:
+            case CONTAINS:
+            case CONTAINS_IGNORE_CASE:
+            case STARTS_WITH:
+            case ENDS_WITH:
+                return new String[]{first, ""};
+            case GREATER:
+            case GREATER_OR_EQUAL:
+            case LESS:
+            case LESS_OR_EQUAL:
+                return new String[]{first.trim(), ""};
+            case BETWEEN:
+            case BETWEEN_EXCLUSIVE:
+                return new String[]{first.trim(), second.trim()};
+            default:
+                return new String[]{"", ""};
+        }
     }
 }

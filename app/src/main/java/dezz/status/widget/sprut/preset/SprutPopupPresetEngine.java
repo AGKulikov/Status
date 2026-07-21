@@ -118,6 +118,13 @@ public final class SprutPopupPresetEngine {
         if (has(serviceKey, "switch", "relay")) return Kind.SWITCH;
 
         // Fall back to the characteristic family for vendor-specific C_* service types.
+        if (has(all, "currentdoorstate", "текущийрежимдвери", "текущеесостояниедвери")
+                && has(all, "targetdoorstate", "целевойрежимдвери",
+                "целевоесостояниедвери")) return Kind.GARAGE;
+        if (has(all, "currentposition", "текущаяпозиция", "текущееположение")
+                && has(all, "targetposition", "целеваяпозиция", "целевоеположение")) {
+            return Kind.COVER;
+        }
         if (has(all, "contactsensorstate", "contactsensor")) return Kind.CONTACT;
         if (has(all, "temperaturesensor", "currenttemperature", "temperature")) {
             return Kind.TEMPERATURE;
@@ -177,9 +184,11 @@ public final class SprutPopupPresetEngine {
                 return readable(service, "on", "outletinuse", "active", "statusactive");
             case GARAGE:
                 return readable(service, "currentdoorstate", "currentposition", "positionstate",
+                        "текущийрежимдвери", "текущеесостояниедвери", "текущаяпозиция",
                         "targetdoorstate", "targetposition", "obstructiondetected");
             case COVER:
                 return readable(service, "currentposition", "positionstate", "currentdoorstate",
+                        "текущаяпозиция", "текущееположение", "текущийрежимдвери",
                         "targetposition", "targetdoorstate", "obstructiondetected");
             case LOCK:
                 return readable(service, "lockcurrentstate", "currentlockstate", "locktargetstate",
@@ -232,10 +241,14 @@ public final class SprutPopupPresetEngine {
                 preferred = writable(service, "on", "active", "brightness");
                 break;
             case GARAGE:
-                preferred = writable(service, "targetdoorstate", "targetposition", "holdposition");
+                preferred = writable(service, "targetdoorstate", "targetposition",
+                        "целевойрежимдвери", "целевоесостояниедвери", "целеваяпозиция",
+                        "целевоеположение", "holdposition");
                 break;
             case COVER:
-                preferred = writable(service, "targetposition", "targetdoorstate", "holdposition");
+                preferred = writable(service, "targetposition", "targetdoorstate",
+                        "целеваяпозиция", "целевоеположение", "целевойрежимдвери",
+                        "целевоесостояниедвери", "holdposition");
                 break;
             case LOCK:
                 preferred = writable(service, "locktargetstate", "targetlockstate");
@@ -273,7 +286,15 @@ public final class SprutPopupPresetEngine {
                 break;
         }
         if (preferred != null) return preferred;
-        if (primary != null && primary.writable()) return primary;
+        // Only families whose displayed state is also conventionally their control may fall
+        // back to the primary value. Covers, locks and climate services have separate current
+        // and target characteristics; treating an arbitrary writable primary as their command
+        // would recreate the CurrentDoorState bug (or worse, select a vendor setting).
+        if (primary != null && primary.writable()
+                && (kind == Kind.LIGHT || kind == Kind.SWITCH || kind == Kind.OUTLET
+                || kind == Kind.FAN || kind == Kind.VALVE || kind == Kind.GENERIC)) {
+            return primary;
+        }
         return null;
     }
 
@@ -341,7 +362,7 @@ public final class SprutPopupPresetEngine {
         switch (kind) {
             case GARAGE:
             case COVER:
-                if (has(type, "targetposition")) {
+                if (has(type, "targetposition", "целеваяпозиция", "целевоеположение")) {
                     return action.maxValue() == null ? 100 : action.maxValue();
                 }
                 Object open = validValue(action, ValueIntent.OPEN,
@@ -370,13 +391,13 @@ public final class SprutPopupPresetEngine {
         switch (kind) {
             case GARAGE:
             case COVER:
-                if (has(type, "doorstate")) {
+                if (has(type, "doorstate", "режимдвери", "состояниедвери")) {
                     exact(rules, 0, "Открыто", GREEN);
                     exact(rules, 1, "Закрыто", WHITE);
                     exact(rules, 2, "Открывается", ORANGE);
                     exact(rules, 3, "Закрывается", RED);
                     exact(rules, 4, "Остановлено", YELLOW);
-                } else if (has(type, "position")) {
+                } else if (has(type, "position", "позиция", "положение")) {
                     exact(rules, 0, "Закрыто", WHITE);
                     exact(rules, 100, "Открыто", GREEN);
                     rules.add(SprutPopupPreset.StatusRule.range(0d, 100d,
@@ -505,6 +526,13 @@ public final class SprutPopupPresetEngine {
             SprutCatalog.Characteristic characteristic = characteristics.get(index);
             if (writable ? !characteristic.writable() : !characteristic.readable()) continue;
             int score = preferenceScore(characteristic, preferredTypes);
+            // A command target must be both writable and semantically related to the requested
+            // operation.  Previously any writable sibling won when none of the preferred target
+            // types existed.  A read-only CurrentDoorState could therefore be paired with an
+            // unrelated writable vendor setting and the resulting gate tile looked actionable
+            // while writing the wrong characteristic.  Readable display selection deliberately
+            // keeps its generic fallback; command selection must fail closed.
+            if (writable && preferredTypes.length > 0 && score == 0) continue;
             // A hidden/internal diagnostic must not beat a visible value merely because its
             // technical type has a preferred name such as "State".
             if (characteristic.hidden()) score -= 2000;

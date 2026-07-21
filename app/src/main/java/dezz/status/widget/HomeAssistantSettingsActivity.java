@@ -60,6 +60,7 @@ public final class HomeAssistantSettingsActivity extends AppCompatActivity {
     private Preferences prefs;
     private HaBrickConfigStore mainStore;
     private PopupItemConfigStore popupStore;
+    private String targetPopupOverlayId = PopupItemConfig.DEFAULT_OVERLAY_ID;
     private CheckBox enabled;
     private CheckBox keepAwake;
     private EditText baseUrl;
@@ -73,6 +74,11 @@ public final class HomeAssistantSettingsActivity extends AppCompatActivity {
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = new Preferences(this);
+        String requestedOverlay = getIntent().getStringExtra(PopupSettingsActivity.EXTRA_OVERLAY_ID);
+        if (requestedOverlay != null && !requestedOverlay.trim().isEmpty()) {
+            targetPopupOverlayId = dezz.status.widget.automation.AutomationContract
+                    .requireSafeId(requestedOverlay);
+        }
         mainStore = new HaBrickConfigStore(prefs);
         popupStore = new PopupItemConfigStore(prefs);
         setContentView(buildScreen());
@@ -339,6 +345,7 @@ public final class HomeAssistantSettingsActivity extends AppCompatActivity {
             List<PopupItemConfig> items = new ArrayList<>(popupStore.load());
             String id = uniquePopupId(bindingId(entity, choice), items);
             PopupItemConfig config = PopupItemConfig.create(id, items.size());
+            config.overlayId = targetPopupOverlayId;
             config.automationId = id;
             config.name = friendlyName(entity) + " · " + choice.shortLabel();
             config.title = config.name;

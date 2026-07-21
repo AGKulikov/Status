@@ -151,6 +151,16 @@ public final class MqttController implements MqttClient.Listener {
         }
     }
 
+    /** Re-renders popup presentation from retained values already held in memory. */
+    public synchronized void reapplyPopupBindings() {
+        for (PopupItemConfig item : popupConfigs.load()) reapplyPopup(item);
+    }
+
+    /** Main-row counterpart of {@link #reapplyPopupBindings()}. */
+    public synchronized void reapplyMainBindings() {
+        for (HaBrickConfig item : mainConfigs.loadMain()) reapplyMain(item);
+    }
+
     /** Publishes the binding's exact payload to an explicit topic or legacy command id. */
     public synchronized void publishAction(@NonNull ActionBinding binding)
             throws java.io.IOException {

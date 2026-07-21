@@ -42,6 +42,40 @@ public final class SprutPopupPresetEngineTest {
         assertEquals(1, preset.rowSpan());
     }
 
+    @Test public void garagePresetDoesNotUseUnrelatedWritableSiblingAsCommand() {
+        SprutCatalog.Characteristic current = characteristic(12, "CurrentDoorState",
+                SprutCatalog.ValueType.INTEGER, 1, true, false, "uint8", "", 0, 4,
+                Collections.emptyList());
+        SprutCatalog.Characteristic vendorSetting = characteristic(99, "CalibrationMode",
+                SprutCatalog.ValueType.BOOLEAN, false, true, true, "bool", "", 0, 1,
+                Collections.emptyList());
+        SprutCatalog.Service service = service("GarageDoorOpener", "Ворота", current,
+                vendorSetting);
+
+        SprutPopupPreset preset = engine.recommend(accessory("Въезд", service), service);
+
+        assertEquals("42/7/12", preset.primaryCharacteristicPath().get().stableId());
+        assertFalse(preset.actionCharacteristicPath().isPresent());
+        assertFalse(preset.actionOperation().isPresent());
+    }
+
+    @Test public void vendorServiceWithDoorStatePairStillGetsSafeGarageTarget() {
+        SprutCatalog.Characteristic current = characteristic(15, "CurrentDoorState",
+                SprutCatalog.ValueType.INTEGER, 1, true, false, "uint8", "", 0, 4,
+                Collections.emptyList());
+        SprutCatalog.Characteristic target = characteristic(16, "TargetDoorState",
+                SprutCatalog.ValueType.INTEGER, 1, true, true, "uint8", "", 0, 1,
+                Arrays.asList(valid(0, "open", "Open"), valid(1, "closed", "Closed")));
+        SprutCatalog.Service service = service("C_1275_13", "Въезд", current, target);
+
+        SprutPopupPreset preset = engine.recommend(accessory("Ворота", service), service);
+
+        assertEquals(SprutPopupPreset.Presentation.COVER, preset.presentation());
+        assertEquals("42/7/15", preset.primaryCharacteristicPath().get().stableId());
+        assertEquals("42/7/16", preset.actionCharacteristicPath().get().stableId());
+        assertTrue(target.writable());
+    }
+
     @Test public void lightPresetTogglesSameBooleanCharacteristic() {
         SprutCatalog.Characteristic on = characteristic(20, "On",
                 SprutCatalog.ValueType.BOOLEAN, false, true, true, "bool", "", 0, 1,

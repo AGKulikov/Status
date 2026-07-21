@@ -115,6 +115,25 @@ public final class HaApiController implements HaWebSocketConnector.Listener {
         }
     }
 
+    /** Re-renders popup presentation from the current authoritative HA catalog. No transport
+     * restart or network request is performed. */
+    public void reapplyPopupBindings() {
+        HaEntityCatalog current = connector.catalog();
+        boolean fresh = connector.isOnline();
+        for (PopupItemConfig item : popupConfigs.load()) {
+            applyPopup(item, current, fresh, null);
+        }
+    }
+
+    /** Main-row counterpart of {@link #reapplyPopupBindings()}. */
+    public void reapplyMainBindings() {
+        HaEntityCatalog current = connector.catalog();
+        boolean fresh = connector.isOnline();
+        for (HaBrickConfig item : mainConfigs.loadMain()) {
+            applyMain(item, current, fresh, null);
+        }
+    }
+
     public synchronized void reconfigure() {
         String next = settingsSignature();
         if (Objects.equals(signature, next) && started) {

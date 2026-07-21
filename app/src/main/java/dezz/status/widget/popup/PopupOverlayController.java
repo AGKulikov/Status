@@ -63,9 +63,10 @@ public final class PopupOverlayController {
     }
 
     private final android.content.Context context;
-    private final Preferences prefs;
     private final AutomationStateStore states;
     private final PopupItemConfigStore configs;
+    private final PopupOverlayConfigStore overlayConfigs;
+    private final String overlayId;
     private final ActionDispatcher actionDispatcher;
     private final BuiltinProvider builtinProvider;
     private final WindowManager windowManager;
@@ -81,16 +82,29 @@ public final class PopupOverlayController {
     private float touchY;
     private int startX;
     private int startY;
+    @Nullable private PopupOverlayConfig currentConfig;
 
     public PopupOverlayController(@NonNull android.content.Context context,
                                   @NonNull Preferences prefs,
                                   @NonNull AutomationStateStore states,
                                   @NonNull ActionDispatcher actionDispatcher,
                                   @NonNull BuiltinProvider builtinProvider) {
+        this(context, prefs, states, actionDispatcher, builtinProvider,
+                PopupItemConfig.DEFAULT_OVERLAY_ID, new PopupOverlayConfigStore(prefs));
+    }
+
+    public PopupOverlayController(@NonNull android.content.Context context,
+                                  @NonNull Preferences prefs,
+                                  @NonNull AutomationStateStore states,
+                                  @NonNull ActionDispatcher actionDispatcher,
+                                  @NonNull BuiltinProvider builtinProvider,
+                                  @NonNull String overlayId,
+                                  @NonNull PopupOverlayConfigStore overlayConfigs) {
         this.context = context;
-        this.prefs = prefs;
         this.states = states;
         this.configs = new PopupItemConfigStore(prefs);
+        this.overlayConfigs = overlayConfigs;
+        this.overlayId = AutomationContract.requireSafeId(overlayId);
         this.actionDispatcher = actionDispatcher;
         this.builtinProvider = builtinProvider;
         this.windowManager = context.getSystemService(WindowManager.class);
@@ -103,7 +117,8 @@ public final class PopupOverlayController {
             main.post(this::applyPreferences);
             return;
         }
-        if (!prefs.popupEnabled.get()) {
+        currentConfig = overlayConfigs.find(overlayId);
+        if (currentConfig == null || !currentConfig.enabled) {
             setOverlayVisible(false);
             return;
         }
@@ -135,16 +150,18 @@ public final class PopupOverlayController {
         root.setClipChildren(false);
         root.setClipToPadding(false);
         root.setOnTouchListener(this::dragOverlay);
+        PopupOverlayConfig config = currentConfig;
+        if (config == null) return;
         params = new WindowManager.LayoutParams(
-                prefs.popupWidth.get(), prefs.popupHeight.get(),
+                config.width, config.height,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.TOP | Gravity.LEFT;
-        params.x = prefs.popupX.get();
-        params.y = prefs.popupY.get();
+        params.x = config.x;
+        params.y = config.y;
         params.windowAnimations = 0;
         try {
             windowManager.addView(root, params);
@@ -158,40 +175,43 @@ public final class PopupOverlayController {
 
     private void updateWindowGeometry() {
         if (root == null || params == null) return;
-        params.width = clamp(prefs.popupWidth.get(), 100, 4000);
-        params.height = clamp(prefs.popupHeight.get(), 100, 4000);
-        params.x = prefs.popupX.get();
-        params.y = prefs.popupY.get();
+        PopupOverlayConfig config = currentConfig;
+        if (config == null) return;
+        params.width = clamp(config.width, 100, 4000);
+        params.height = clamp(config.height, 100, 4000);
+        params.x = config.x;
+        params.y = config.y;
         try { windowManager.updateViewLayout(root, params); } catch (Exception ignored) {}
 
         GradientDrawable bg = new GradientDrawable();
-        AutomationState overlayState = states.get(AutomationContract.SCOPE_OVERLAY, "popup");
+        AutomationState overlayState = states.get(AutomationContract.SCOPE_OVERLAY, overlayId);
         String configuredBackground = overlayState.backgroundColor == null
-                ? prefs.popupBackgroundColor.get() : overlayState.backgroundColor;
+                ? config.backgroundColor : overlayState.backgroundColor;
         int base = AutomationState.parseColor(configuredBackground, 0xFF000000);
         int alpha = overlayState.backgroundColor == null
-                ? clamp(prefs.popupBackgroundAlpha.get(), 0, 255) : (base >>> 24);
+                ? clamp(config.backgroundAlpha, 0, 255) : (base >>> 24);
         bg.setColor((base & 0x00FFFFFF) | (alpha << 24));
-        bg.setCornerRadius(prefs.popupCornerRadius.get());
+        bg.setCornerRadius(config.cornerRadius);
         root.setBackground(bg);
     }
 
     private void renderItems() {
         if (root == null || params == null) return;
         root.removeAllViews();
-        AutomationState overlayState = states.get(AutomationContract.SCOPE_OVERLAY, "popup");
-        if (!overlayState.visible) {
+        PopupOverlayConfig config = currentConfig;
+        if (config == null || !states.effectiveVisibility(AutomationContract.SCOPE_OVERLAY,
+                overlayId, config.defaultVisible)) {
             setOverlayVisible(false);
             return;
         }
 
-        int rows = clamp(prefs.popupRows.get(), 1, 50);
-        int columns = clamp(prefs.popupColumns.get(), 1, 50);
-        int gap = clamp(prefs.popupCellGap.get(), 0, 500);
-        int left = clamp(prefs.popupPaddingLeft.get(), 0, params.width / 2);
-        int right = clamp(prefs.popupPaddingRight.get(), 0, params.width / 2);
-        int top = clamp(prefs.popupPaddingTop.get(), 0, params.height / 2);
-        int bottom = clamp(prefs.popupPaddingBottom.get(), 0, params.height / 2);
+        int rows = clamp(config.rows, 1, 50);
+        int columns = clamp(config.columns, 1, 50);
+        int gap = clamp(config.cellGap, 0, 500);
+        int left = clamp(config.paddingLeft, 0, params.width / 2);
+        int right = clamp(config.paddingRight, 0, params.width / 2);
+        int top = clamp(config.paddingTop, 0, params.height / 2);
+        int bottom = clamp(config.paddingBottom, 0, params.height / 2);
         int usableWidth = Math.max(columns, params.width - left - right - gap * (columns - 1));
         int usableHeight = Math.max(rows, params.height - top - bottom - gap * (rows - 1));
         int cellWidth = Math.max(1, usableWidth / columns);
@@ -200,7 +220,7 @@ public final class PopupOverlayController {
         int visibleCount = 0;
         long now = System.currentTimeMillis();
 
-        List<PopupItemConfig> items = configs.load();
+        List<PopupItemConfig> items = configs.load(overlayId);
         for (PopupItemConfig item : items) {
             if (!item.enabled) continue;
             String stateScope = PopupItemConfig.TYPE_BUILTIN.equals(item.type)
@@ -346,7 +366,14 @@ public final class PopupOverlayController {
         boolean commandPending = pendingActions.contains(item.id);
         boolean actionable = hasAnyAction && !pending && !stale && !commandPending
                 && state.actionEnabled;
-        tile.setEnabled(actionable);
+        // Keep the cell itself enabled even while its command is unavailable: every pixel of the
+        // allocated grid cell remains a drag surface.  Command availability is handled by the
+        // click callback and visual alpha, not by disabling the parent View (which makes touch
+        // dispatch OEM-dependent when tapping padding/background instead of a TextView).
+        tile.setEnabled(true);
+        tile.setClickable(true);
+        tile.setFocusable(actionable);
+        tile.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
         tile.setAlpha(actionable || !hasAnyAction ? 1f : 0.45f);
         attachTileTouch(tile, item, actionable);
         return tile;
@@ -357,6 +384,9 @@ public final class PopupOverlayController {
         final float[] down = new float[2];
         final int[] origin = new int[2];
         final boolean[] dragging = new boolean[1];
+        tile.setOnClickListener(view -> {
+            if (actionable) activate(item, null);
+        });
         tile.setOnTouchListener((view, event) -> {
             if (params == null) return false;
             switch (event.getActionMasked()) {
@@ -379,12 +409,11 @@ public final class PopupOverlayController {
                     }
                     return true;
                 case MotionEvent.ACTION_UP:
-                    if (dragging[0]) prefs.savePopupPosition(params.x, params.y);
-                    else if (actionable) activate(item, null);
-                    view.performClick();
+                    if (dragging[0]) overlayConfigs.savePosition(overlayId, params.x, params.y);
+                    else view.performClick();
                     return true;
                 case MotionEvent.ACTION_CANCEL:
-                    if (dragging[0]) prefs.savePopupPosition(params.x, params.y);
+                    if (dragging[0]) overlayConfigs.savePosition(overlayId, params.x, params.y);
                     return true;
                 default:
                     return false;
@@ -428,6 +457,7 @@ public final class PopupOverlayController {
             payload.put("schema", AutomationContract.SCHEMA_VERSION);
             payload.put("request_id", UUID.randomUUID().toString());
             payload.put("item_id", item.id);
+            payload.put("overlay_id", overlayId);
             payload.put("automation_id", item.automationId);
             payload.put("action_id", item.actionId);
             payload.put("sent_at", System.currentTimeMillis());
@@ -456,8 +486,8 @@ public final class PopupOverlayController {
                             try {
                                 JSONObject hidden = new JSONObject();
                                 hidden.put("visible", false);
-                                states.apply(AutomationContract.SCOPE_POPUP,
-                                        item.automationId, hidden);
+                                states.apply(AutomationContract.SCOPE_OVERLAY,
+                                        overlayId, hidden);
                                 renderItems();
                             } catch (JSONException e) {
                                 android.util.Log.w("PopupOverlay", "Could not auto-hide tile", e);
@@ -490,7 +520,7 @@ public final class PopupOverlayController {
                 return true;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
-                prefs.savePopupPosition(params.x, params.y);
+                overlayConfigs.savePosition(overlayId, params.x, params.y);
                 return true;
             default:
                 return false;

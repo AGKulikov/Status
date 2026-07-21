@@ -40,6 +40,8 @@ import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.popup.PopupItemConfig;
 import dezz.status.widget.popup.PopupItemConfigStore;
 import dezz.status.widget.popup.PopupIconCatalog;
+import dezz.status.widget.popup.PopupOverlayConfig;
+import dezz.status.widget.popup.PopupOverlayConfigStore;
 import dezz.status.widget.scenario.Condition;
 import dezz.status.widget.scenario.ConditionMode;
 import dezz.status.widget.scenario.Input;
@@ -64,14 +66,18 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             "HOME_ASSISTANT", "MQTT", "SPRUTHUB"
     };
     private static final String[] OPERATOR_VALUES = {
-            "EQUALS", "NOT_EQUALS", "TRUE", "FALSE", "GREATER", "GREATER_OR_EQUAL",
-            "LESS", "LESS_OR_EQUAL", "BETWEEN", "CONTAINS", "EMPTY", "NOT_EMPTY",
+            "EQUALS", "NOT_EQUALS", "EQUALS_IGNORE_CASE", "NOT_EQUALS_IGNORE_CASE",
+            "TRUE", "FALSE", "GREATER", "GREATER_OR_EQUAL",
+            "LESS", "LESS_OR_EQUAL", "BETWEEN", "BETWEEN_EXCLUSIVE", "CONTAINS",
+            "CONTAINS_IGNORE_CASE", "STARTS_WITH", "ENDS_WITH", "EMPTY", "NOT_EMPTY",
             "AVAILABLE", "UNAVAILABLE", "FRESH", "STALE", "ALWAYS"
     };
     private static final String[] OPERATOR_LABELS = {
-            "равно", "не равно", "включено / да", "выключено / нет", "больше",
-            "больше или равно", "меньше", "меньше или равно", "в диапазоне",
-            "содержит текст", "пустое", "не пустое", "доступно", "недоступно",
+            "равно", "не равно", "равно без учёта регистра",
+            "не равно без учёта регистра", "включено / да", "выключено / нет", "больше",
+            "больше или равно", "меньше", "меньше или равно", "в диапазоне включительно",
+            "в диапазоне без границ", "содержит текст", "содержит без учёта регистра",
+            "начинается с", "заканчивается на", "пустое", "не пустое", "доступно", "недоступно",
             "актуально", "устарело", "всегда"
     };
     private static final String[] TARGET_VALUES = {"MAIN", "POPUP", "BUILTIN", "OVERLAY"};
@@ -85,6 +91,10 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
     private static final String[] FIELD_LABELS = {
             "Показать или скрыть", "Изменить цвет текста", "Изменить цвет фона",
             "Изменить иконку", "Разрешить или запретить нажатие"
+    };
+    private static final String[] BOOLEAN_BRANCH_LABELS = {
+            "Не переопределять (обычное состояние)",
+            "Показать / разрешить", "Скрыть / запретить"
     };
 
     private Preferences prefs;
@@ -446,15 +456,24 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         condition.put("reference", reference);
         merged.put("conditions", new JSONArray().put(condition));
 
-        JSONObject originalAction = firstObject(original.optJSONArray("actions"));
-        JSONObject canonicalAction = canonical.getJSONArray("actions").getJSONObject(0);
-        JSONObject action = originalAction == null ? new JSONObject() : copyObject(originalAction);
-        action.put("targetScope", canonicalAction.getString("targetScope"));
-        action.put("targetId", canonicalAction.getString("targetId"));
-        action.put("field", canonicalAction.getString("field"));
-        action.put("value", canonicalAction.get("value"));
-        merged.put("actions", new JSONArray().put(action));
+        merged.put("actions", mergeActionArray(original.optJSONArray("actions"),
+                canonical.getJSONArray("actions")));
+        merged.put("elseActions", mergeActionArray(original.optJSONArray("elseActions"),
+                canonical.getJSONArray("elseActions")));
         return merged;
+    }
+
+    private static JSONArray mergeActionArray(@Nullable JSONArray original,
+                                               JSONArray canonical) throws JSONException {
+        if (canonical.length() == 0) return new JSONArray();
+        JSONObject source = firstObject(original);
+        JSONObject target = canonical.getJSONObject(0);
+        JSONObject action = source == null ? new JSONObject() : copyObject(source);
+        action.put("targetScope", target.getString("targetScope"));
+        action.put("targetId", target.getString("targetId"));
+        action.put("field", target.getString("field"));
+        action.put("value", target.get("value"));
+        return new JSONArray().put(action);
     }
 
     private boolean persist(boolean showSuccess) {
@@ -508,17 +527,29 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         final Spinner target;
         final EditText targetId;
         final Spinner localField;
-        final Switch booleanValue;
+        final Spinner trueBooleanChoice;
+        final Spinner falseBooleanChoice;
+        final Switch trueStyleEnabled;
+        final Switch falseStyleEnabled;
         final EditText stringValue;
+        final EditText falseStringValue;
         final TextView sourceSummary;
         final TextView targetSummary;
         final Button chooseStyleValue;
+        final Button chooseFalseStyleValue;
         final String conditionId;
 
         EditorViews(@Nullable Scenario source) {
             root.setPadding(dp(10), dp(6), dp(10), dp(20));
             Condition condition = source == null ? null : source.conditions.get(0);
-            LocalAction action = source == null ? null : source.actions.get(0);
+            LocalAction action = source == null || source.actions.isEmpty()
+                    ? null : source.actions.get(0);
+            LocalAction elseAction = source == null || source.elseActions.isEmpty()
+                    ? null : source.elseActions.get(0);
+            if (elseAction == null && source != null && source.legacyFailClosed) {
+                elseAction = legacyImplicitElse(action);
+            }
+            LocalAction baseAction = action == null ? elseAction : action;
             conditionId = condition == null ? "condition_0" : condition.id;
 
             enabled = switchView("Сценарий включён", source == null || source.enabled);
@@ -564,43 +595,74 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             root.addView(section("3. Что сделать"), topMargin(16));
             target = mappedSpinner(root, "Где находится изменяемый элемент",
                     TARGET_LABELS, TARGET_VALUES,
-                    action == null ? TargetScope.MAIN.jsonName()
-                            : action.targetScope.jsonName());
+                    baseAction == null ? TargetScope.OVERLAY.jsonName()
+                            : baseAction.targetScope.jsonName());
             targetId = field(root, "ID кирпичика / элемента (например sprut_gate, builtin.time, popup)",
-                    action == null ? "" : action.targetId);
+                    baseAction == null ? "" : baseAction.targetId);
             hideControlAndLabel(root, targetId);
-            targetSummary = label(action == null ? "Элемент ещё не выбран"
-                    : targetLabel(action.targetScope, action.targetId));
+            targetSummary = label(baseAction == null ? "Элемент ещё не выбран"
+                    : targetLabel(baseAction.targetScope, baseAction.targetId));
             root.addView(targetSummary, topMargin(6));
             Button chooseTarget = new Button(ScenarioSettingsActivity.this);
             chooseTarget.setText("Выбрать элемент");
             chooseTarget.setOnClickListener(view -> showTargetPicker());
             root.addView(chooseTarget, topMargin(6));
             localField = mappedSpinner(root, "Действие", FIELD_LABELS, FIELD_VALUES,
-                    action == null ? LocalField.VISIBLE.jsonName() : action.field.jsonName());
-            boolean initialBoolean = action == null || action.booleanValue() == null
-                    || action.booleanValue();
-            booleanValue = switchView("Показывать / разрешить", initialBoolean);
-            root.addView(booleanValue, topMargin(8));
+                    baseAction == null ? LocalField.VISIBLE.jsonName()
+                            : baseAction.field.jsonName());
+            root.addView(label("Если условие выполняется"), topMargin(10));
+            trueBooleanChoice = simpleSpinner(BOOLEAN_BRANCH_LABELS,
+                    booleanBranchIndex(action));
+            root.addView(trueBooleanChoice, matchWrap());
+            root.addView(label("Если условие НЕ выполняется"), topMargin(10));
+            falseBooleanChoice = simpleSpinner(BOOLEAN_BRANCH_LABELS,
+                    booleanBranchIndex(elseAction));
+            root.addView(falseBooleanChoice, matchWrap());
+            trueStyleEnabled = switchView("Если условие выполняется — изменить оформление",
+                    action != null);
+            root.addView(trueStyleEnabled, topMargin(8));
+            falseStyleEnabled = switchView("Если условие НЕ выполняется — изменить оформление",
+                    elseAction != null);
+            root.addView(falseStyleEnabled, topMargin(8));
             stringValue = field(root, "Строковое значение стиля",
                     action == null || action.stringValue() == null ? "" : action.stringValue());
             hideControlAndLabel(root, stringValue);
+            falseStringValue = field(root, "Строковое значение для ложной ветки",
+                    elseAction == null || elseAction.stringValue() == null
+                            ? "" : elseAction.stringValue());
+            hideControlAndLabel(root, falseStringValue);
             chooseStyleValue = new Button(ScenarioSettingsActivity.this);
             chooseStyleValue.setText(action == null || action.stringValue() == null
-                    ? "Выбрать значение" : "Выбрано: " + action.stringValue());
-            chooseStyleValue.setOnClickListener(view -> chooseActionValue());
+                    ? "Значение для выполненного условия" : "Выбрано: " + action.stringValue());
+            chooseStyleValue.setOnClickListener(view -> chooseActionValue(false));
             root.addView(chooseStyleValue, topMargin(6));
+            chooseFalseStyleValue = new Button(ScenarioSettingsActivity.this);
+            chooseFalseStyleValue.setText(elseAction == null || elseAction.stringValue() == null
+                    ? "Значение для невыполненного условия"
+                    : "Выбрано: " + elseAction.stringValue());
+            chooseFalseStyleValue.setOnClickListener(view -> chooseActionValue(true));
+            root.addView(chooseFalseStyleValue, topMargin(6));
             localField.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override public void onItemSelected(AdapterView<?> parent, View view,
                                                      int position, long id) {
                     updateValueControl();
+                    keepTileVisibilityOutOfPopupScope();
                 }
 
                 @Override public void onNothingSelected(AdapterView<?> parent) {
                     updateValueControl();
                 }
             });
+            target.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @Override public void onItemSelected(AdapterView<?> parent, View view,
+                                                     int position, long id) {
+                    keepTileVisibilityOutOfPopupScope();
+                }
+
+                @Override public void onNothingSelected(AdapterView<?> parent) {}
+            });
             updateValueControl();
+            keepTileVisibilityOutOfPopupScope();
         }
 
         Scenario read() {
@@ -621,17 +683,43 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             Condition condition = new Condition(conditionId, reference, Input.FIELD_VALUE,
                     selectedOperator, first, second);
             LocalField field = LocalField.fromJsonName(mappedValue(localField, FIELD_VALUES));
-            Object value = isBooleanField(field)
-                    ? booleanValue.isChecked() : text(stringValue);
-            if (!isBooleanField(field) && ((String) value).isEmpty()) {
-                throw new IllegalArgumentException("Укажите строковое значение стиля");
-            }
             TargetScope targetScope = TargetScope.fromJsonName(mappedValue(target, TARGET_VALUES));
             String selectedTargetId = text(targetId);
             validateTarget(targetScope, selectedTargetId);
-            LocalAction action = new LocalAction(targetScope, selectedTargetId, field, value);
+            if (field == LocalField.VISIBLE && targetScope == TargetScope.POPUP) {
+                throw new IllegalArgumentException("Видимость настраивается для всего "
+                        + "плавающего оверлея. Выберите «Весь плавающий оверлей»");
+            }
+            List<LocalAction> trueActions = branchActions(false, targetScope,
+                    selectedTargetId, field);
+            List<LocalAction> falseActions = branchActions(true, targetScope,
+                    selectedTargetId, field);
+            if (trueActions.isEmpty() && falseActions.isEmpty()) {
+                throw new IllegalArgumentException("Выберите действие хотя бы для одного случая");
+            }
             return new Scenario(id, enabled.isChecked(), ConditionMode.ALL,
-                    Collections.singletonList(condition), Collections.singletonList(action));
+                    Collections.singletonList(condition), trueActions, falseActions);
+        }
+
+        private List<LocalAction> branchActions(boolean falseBranch, TargetScope targetScope,
+                                                String selectedTargetId, LocalField field) {
+            if (isBooleanField(field)) {
+                int choice = (falseBranch ? falseBooleanChoice : trueBooleanChoice)
+                        .getSelectedItemPosition();
+                if (choice <= 0) return Collections.emptyList();
+                return Collections.singletonList(new LocalAction(targetScope, selectedTargetId,
+                        field, choice == 1));
+            }
+            Switch enabledControl = falseBranch ? falseStyleEnabled : trueStyleEnabled;
+            if (!enabledControl.isChecked()) return Collections.emptyList();
+            String value = text(falseBranch ? falseStringValue : stringValue);
+            if (value.isEmpty()) {
+                throw new IllegalArgumentException(falseBranch
+                        ? "Выберите оформление для невыполненного условия"
+                        : "Выберите оформление для выполненного условия");
+            }
+            return Collections.singletonList(new LocalAction(targetScope, selectedTargetId,
+                    field, value));
         }
 
         private void updateValueControl() {
@@ -642,9 +730,33 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 field = LocalField.VISIBLE;
             }
             boolean bool = isBooleanField(field);
-            booleanValue.setVisibility(bool ? View.VISIBLE : View.GONE);
+            trueBooleanChoice.setVisibility(bool ? View.VISIBLE : View.GONE);
+            falseBooleanChoice.setVisibility(bool ? View.VISIBLE : View.GONE);
+            trueStyleEnabled.setVisibility(bool ? View.GONE : View.VISIBLE);
+            falseStyleEnabled.setVisibility(bool ? View.GONE : View.VISIBLE);
             stringValue.setVisibility(View.GONE);
+            falseStringValue.setVisibility(View.GONE);
             chooseStyleValue.setVisibility(bool ? View.GONE : View.VISIBLE);
+            chooseFalseStyleValue.setVisibility(bool ? View.GONE : View.VISIBLE);
+        }
+
+        /** Visibility of popup UI belongs to the independent window, not to a child tile.
+         * Legacy POPUP/VISIBLE JSON remains valid in the runtime controller, but the visual
+         * editor always redirects that combination to an OVERLAY target. */
+        private void keepTileVisibilityOutOfPopupScope() {
+            LocalField field;
+            try {
+                field = LocalField.fromJsonName(mappedValue(localField, FIELD_VALUES));
+            } catch (RuntimeException ignored) {
+                return;
+            }
+            if (field != LocalField.VISIBLE
+                    || !TargetScope.POPUP.jsonName().equals(mappedValue(target, TARGET_VALUES))) {
+                return;
+            }
+            selectSpinnerValue(target, TARGET_VALUES, TargetScope.OVERLAY.jsonName());
+            targetId.setText("");
+            targetSummary.setText("Выберите плавающий оверлей целиком");
         }
 
         private void showSourcePicker() {
@@ -672,28 +784,57 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                     }).setNegativeButton("Отмена", null).show();
         }
 
-        private void chooseActionValue() {
+        private void chooseActionValue(boolean falseBranch) {
             LocalField field = LocalField.fromJsonName(mappedValue(localField, FIELD_VALUES));
+            EditText destination = falseBranch ? falseStringValue : stringValue;
+            Button destinationButton = falseBranch ? chooseFalseStyleValue : chooseStyleValue;
             if (field == LocalField.ICON) {
                 String[] labels = {"Ворота", "Гараж", "Свет", "Замок", "Питание",
                         "Температура", "Вода", "Дверь", "Wi-Fi", "GPS", "Bluetooth"};
                 new AlertDialog.Builder(ScenarioSettingsActivity.this).setTitle("Иконка")
                         .setItems(labels, (d, which) -> {
                             String value = PopupIconCatalog.IDS.get(which);
-                            stringValue.setText(value);
-                            chooseStyleValue.setText("Выбрано: " + labels[which]);
+                            destination.setText(value);
+                            destinationButton.setText("Выбрано: " + labels[which]);
                         }).setNegativeButton("Отмена", null).show();
                 return;
             }
             String[] labels = {"Белый", "Зелёный", "Оранжевый", "Красный", "Голубой",
-                    "Серый", "Чёрный", "Прозрачный"};
+                    "Серый", "Чёрный", "Прозрачный", "Свой цвет…"};
             String[] colors = {"#FFFFFFFF", "#FF4CAF50", "#FFFF9800", "#FFF44336",
                     "#FF03A9F4", "#FF9E9E9E", "#FF000000", "transparent"};
             new AlertDialog.Builder(ScenarioSettingsActivity.this).setTitle("Цвет")
                     .setItems(labels, (d, which) -> {
-                        stringValue.setText(colors[which]);
-                        chooseStyleValue.setText("Выбрано: " + labels[which]);
+                        if (which < colors.length) {
+                            destination.setText(colors[which]);
+                            destinationButton.setText("Выбрано: " + labels[which]);
+                        } else {
+                            chooseCustomActionColor(destination, destinationButton);
+                        }
                     }).setNegativeButton("Отмена", null).show();
+        }
+
+        private void chooseCustomActionColor(EditText destination, Button destinationButton) {
+            EditText value = new EditText(ScenarioSettingsActivity.this);
+            value.setSingleLine(true);
+            value.setText(text(destination).isEmpty() ? "#FFFFFFFF" : text(destination));
+            new AlertDialog.Builder(ScenarioSettingsActivity.this)
+                    .setTitle("Цвет #AARRGGBB")
+                    .setView(value)
+                    .setNegativeButton("Отмена", null)
+                    .setPositiveButton("Применить", (dialog, which) -> {
+                        String selected = text(value);
+                        try {
+                            if (!"transparent".equalsIgnoreCase(selected)) {
+                                android.graphics.Color.parseColor(selected);
+                            }
+                            destination.setText(selected);
+                            destinationButton.setText("Выбрано: " + selected);
+                        } catch (IllegalArgumentException invalid) {
+                            Toast.makeText(ScenarioSettingsActivity.this,
+                                    "Неверный формат цвета", Toast.LENGTH_LONG).show();
+                        }
+                    }).show();
         }
 
         private void showTargetPicker() {
@@ -751,7 +892,10 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 }
                 break;
             case OVERLAY:
-                result.add(new TargetOption("popup", "popup — весь всплывающий оверлей"));
+                for (PopupOverlayConfig overlay : new PopupOverlayConfigStore(prefs).load()) {
+                    result.add(new TargetOption(overlay.id,
+                            overlay.name + " — весь оверлей [" + overlay.id + "]"));
+                }
                 break;
             default:
                 break;
@@ -825,7 +969,12 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         switch (operator) {
             case EQUALS:
             case NOT_EQUALS:
+            case EQUALS_IGNORE_CASE:
+            case NOT_EQUALS_IGNORE_CASE:
             case CONTAINS:
+            case CONTAINS_IGNORE_CASE:
+            case STARTS_WITH:
+            case ENDS_WITH:
                 if (first.isEmpty()) {
                     throw new IllegalArgumentException("Для выбранного оператора нужен operand");
                 }
@@ -837,10 +986,14 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 requireNumber(first, "Operand должен быть числом");
                 break;
             case BETWEEN:
+            case BETWEEN_EXCLUSIVE:
                 BigDecimal lower = requireNumber(first, "Первый operand должен быть числом");
                 BigDecimal upper = requireNumber(second, "Second operand должен быть числом");
-                if (lower.compareTo(upper) > 0) {
-                    throw new IllegalArgumentException("Нижняя граница BETWEEN больше верхней");
+                int order = lower.compareTo(upper);
+                if (order > 0 || (operator == Operator.BETWEEN_EXCLUSIVE && order == 0)) {
+                    throw new IllegalArgumentException(operator == Operator.BETWEEN_EXCLUSIVE
+                            ? "Для строгого диапазона нижняя граница должна быть меньше верхней"
+                            : "Нижняя граница больше верхней");
                 }
                 break;
             default:
@@ -851,8 +1004,10 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
 
     private static BigDecimal requireNumber(String value, String error) {
         try {
-            if (value.trim().isEmpty()) throw new NumberFormatException();
-            return new BigDecimal(value.trim());
+            String normalized = value == null ? "" : value.trim();
+            if (normalized.isEmpty() || (normalized.indexOf(',') >= 0
+                    && normalized.indexOf('.') >= 0)) throw new NumberFormatException();
+            return new BigDecimal(normalized.replace(',', '.'));
         } catch (NumberFormatException invalid) {
             throw new IllegalArgumentException(error);
         }
@@ -860,9 +1015,17 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
 
     private static boolean isEditorSupported(@Nullable Scenario scenario) {
         if (scenario == null || scenario.mode != ConditionMode.ALL
-                || scenario.conditions.size() != 1 || scenario.actions.size() != 1) return false;
+                || scenario.conditions.size() != 1 || scenario.actions.size() > 1
+                || scenario.elseActions.size() > 1) return false;
         Condition condition = scenario.conditions.get(0);
         if (!Input.FIELD_VALUE.equals(condition.field)) return false;
+        if (!scenario.actions.isEmpty() && !scenario.elseActions.isEmpty()) {
+            LocalAction whenTrue = scenario.actions.get(0);
+            LocalAction whenFalse = scenario.elseActions.get(0);
+            if (whenTrue.targetScope != whenFalse.targetScope
+                    || !whenTrue.targetId.equals(whenFalse.targetId)
+                    || whenTrue.field != whenFalse.field) return false;
+        }
         boolean connectorSupported = false;
         for (String connector : CONNECTORS) {
             if (connector.equals(condition.reference.connectorType)) {
@@ -911,10 +1074,37 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         }
         if (!scenario.actions.isEmpty()) {
             LocalAction action = scenario.actions.get(0);
-            text.append("\nРезультат: ").append(friendlyField(action.field))
+            text.append("\nЕсли да: ").append(friendlyField(action.field))
                     .append(" → ").append(action.targetId).append(" = ").append(action.value);
+        } else {
+            text.append("\nЕсли да: обычное состояние");
+        }
+        if (!scenario.elseActions.isEmpty()) {
+            LocalAction action = scenario.elseActions.get(0);
+            text.append("\nЕсли нет: ").append(friendlyField(action.field))
+                    .append(" → ").append(action.targetId).append(" = ").append(action.value);
+        } else if (scenario.legacyFailClosed) {
+            LocalAction implicit = scenario.actions.isEmpty()
+                    ? null : legacyImplicitElse(scenario.actions.get(0));
+            if (implicit != null) {
+                text.append("\nЕсли нет: ").append(friendlyField(implicit.field))
+                        .append(" → ").append(implicit.targetId).append(" = false")
+                        .append(" (старый режим)");
+            } else {
+                text.append("\nЕсли нет: обычное состояние (старый режим)");
+            }
+        } else {
+            text.append("\nЕсли нет: обычное состояние");
         }
         return text.toString();
+    }
+
+    @Nullable
+    private static LocalAction legacyImplicitElse(@Nullable LocalAction action) {
+        if (action == null || (action.field != LocalField.VISIBLE
+                && action.field != LocalField.ACTION_ENABLED)
+                || !Boolean.TRUE.equals(action.booleanValue())) return null;
+        return new LocalAction(action.targetScope, action.targetId, action.field, false);
     }
 
     private static String friendlyOperator(Operator operator) {
@@ -993,6 +1183,21 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         Spinner result = spinner(parent, title, labels, labels[index]);
         result.setSelection(index);
         return result;
+    }
+
+    private Spinner simpleSpinner(String[] labels, int selection) {
+        Spinner spinner = new Spinner(this);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, labels);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        spinner.setSelection(Math.max(0, Math.min(labels.length - 1, selection)));
+        return spinner;
+    }
+
+    private static int booleanBranchIndex(@Nullable LocalAction action) {
+        if (action == null || action.booleanValue() == null) return 0;
+        return action.booleanValue() ? 1 : 2;
     }
 
     private static String mappedValue(Spinner spinner, String[] values) {

@@ -5,6 +5,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.math.BigDecimal;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
@@ -59,6 +60,10 @@ public final class Rule {
                 return RuleValues.equal(actual, operand);
             case NOT_EQUALS:
                 return !RuleValues.equal(actual, operand);
+            case EQUALS_IGNORE_CASE:
+                return !RuleValues.isNull(actual) && text(actual).equalsIgnoreCase(operand);
+            case NOT_EQUALS_IGNORE_CASE:
+                return RuleValues.isNull(actual) || !text(actual).equalsIgnoreCase(operand);
             case GREATER:
                 return compare(actual, operand, comparison -> comparison > 0);
             case GREATER_OR_EQUAL:
@@ -73,9 +78,23 @@ public final class Rule {
                 BigDecimal upper = RuleValues.number(secondOperand);
                 return value != null && lower != null && upper != null
                         && value.compareTo(lower) >= 0 && value.compareTo(upper) <= 0;
+            case BETWEEN_EXCLUSIVE:
+                BigDecimal exclusiveValue = RuleValues.number(actual);
+                BigDecimal exclusiveLower = RuleValues.number(operand);
+                BigDecimal exclusiveUpper = RuleValues.number(secondOperand);
+                return exclusiveValue != null && exclusiveLower != null && exclusiveUpper != null
+                        && exclusiveValue.compareTo(exclusiveLower) > 0
+                        && exclusiveValue.compareTo(exclusiveUpper) < 0;
             case CONTAINS:
                 return !RuleValues.isNull(actual)
                         && String.valueOf(actual).contains(operand);
+            case CONTAINS_IGNORE_CASE:
+                return !RuleValues.isNull(actual) && text(actual).toLowerCase(Locale.ROOT)
+                        .contains(operand.toLowerCase(Locale.ROOT));
+            case STARTS_WITH:
+                return !RuleValues.isNull(actual) && text(actual).startsWith(operand);
+            case ENDS_WITH:
+                return !RuleValues.isNull(actual) && text(actual).endsWith(operand);
             case EMPTY:
                 return RuleValues.isEmpty(actual);
             case NOT_EMPTY:
@@ -137,6 +156,10 @@ public final class Rule {
         BigDecimal left = RuleValues.number(actual);
         BigDecimal right = RuleValues.number(expected);
         return left != null && right != null && predicate.test(left.compareTo(right));
+    }
+
+    private static String text(Object actual) {
+        return RuleValues.isNull(actual) ? "" : String.valueOf(actual);
     }
 
     private static String safeId(String raw) {

@@ -111,6 +111,9 @@ import dezz.status.widget.ha.api.HaEntityCatalog;
 import dezz.status.widget.ha.api.HaWebSocketConnector;
 import dezz.status.widget.mqtt.MqttController;
 import dezz.status.widget.popup.PopupOverlayController;
+import dezz.status.widget.popup.PopupOverlayManager;
+import dezz.status.widget.popup.PopupOverlayConfig;
+import dezz.status.widget.popup.PopupOverlayConfigStore;
 import dezz.status.widget.popup.PopupItemConfig;
 import dezz.status.widget.popup.PopupItemConfigStore;
 import dezz.status.widget.sprut.SprutCatalog;
@@ -233,7 +236,7 @@ public class WidgetService extends Service {
     private MqttController mqttController;
     private SprutHubController sprutController;
     private CarTelemetryExporter carTelemetryExporter;
-    private PopupOverlayController popupOverlay;
+    private PopupOverlayManager popupOverlay;
     private volatile boolean destroyed;
     private final AtomicBoolean crossSourceRuleRefreshScheduled = new AtomicBoolean();
     private final ConnectorValueRegistry.Listener crossSourceRuleListener =
@@ -651,7 +654,7 @@ public class WidgetService extends Service {
                     if (binding != null) applyBrickVisibility(currentBrickSet());
                 }));
         intentScenarioController = new IntentScenarioController(this, prefs, actionDispatcher);
-        popupOverlay = new PopupOverlayController(this, prefs, automationStates,
+        popupOverlay = new PopupOverlayManager(this, prefs, automationStates,
                 actionDispatcher, this::popupBuiltinValue);
 
         if (!Permissions.allPermissionsGranted(this)) {
@@ -865,13 +868,20 @@ public class WidgetService extends Service {
 
     @SuppressLint("MissingPermission")
     public void applyPreferences() {
+        applyPreferences(true);
+    }
+
+    @SuppressLint("MissingPermission")
+    private void applyPreferences(boolean reconfigureIntegrations) {
         if (destroyed || prefs == null || binding == null) return;
-        if (mqttController != null) mqttController.reconfigure();
-        if (sprutController != null) sprutController.reconfigure();
-        if (carTelemetryExporter != null) carTelemetryExporter.reconfigure();
-        if (haApiController != null) haApiController.reconfigure();
-        if (scenarioController != null) scenarioController.reconfigure();
-        if (intentScenarioController != null) intentScenarioController.reconfigure();
+        if (reconfigureIntegrations) {
+            if (mqttController != null) mqttController.reconfigure();
+            if (sprutController != null) sprutController.reconfigure();
+            if (carTelemetryExporter != null) carTelemetryExporter.reconfigure();
+            if (haApiController != null) haApiController.reconfigure();
+            if (scenarioController != null) scenarioController.reconfigure();
+            if (intentScenarioController != null) intentScenarioController.reconfigure();
+        }
         if (popupOverlay != null) popupOverlay.applyPreferences();
         hiddenInPackages = prefs.hideInPackages.get();
         rebuildEffectiveHideLists();
@@ -1031,11 +1041,43 @@ public class WidgetService extends Service {
         updateCarTempSubscription(BrickType.OUTDOOR_TEMP, trackingSet, binding.outdoorTempText);
     }
 
+    /** Applies only floating-window geometry/visibility. Used by live popup sliders so changing
+     * a pixel value does not re-scan every connector binding on every touch sample. */
+    public void applyPopupPreferences() {
+        if (destroyed || popupOverlay == null) return;
+        popupOverlay.applyPreferences();
+    }
+
+    /** Applies a popup tile's rules/action/style live from in-memory connector snapshots. This
+     * deliberately does not call connector reconfigure(), so an offline connector is not
+     * restarted and a large Sprut catalog is not fetched while the user drags a slider. */
+    public void applyPopupItemPreferences() {
+        if (destroyed || popupOverlay == null) return;
+        if (mqttController != null) mqttController.reapplyPopupBindings();
+        if (sprutController != null) sprutController.reapplyPopupBindings();
+        if (haApiController != null) haApiController.reapplyPopupBindings();
+        popupOverlay.applyPreferences();
+    }
+
+    /** Live main-row appearance/rule update without restarting an offline connector. */
+    public void applyMainItemPreferences() {
+        if (destroyed || binding == null) return;
+        if (mqttController != null) mqttController.reapplyMainBindings();
+        if (sprutController != null) sprutController.reapplyMainBindings();
+        if (haApiController != null) haApiController.reapplyMainBindings();
+        applyPreferences(false);
+    }
+
     private Set<BrickType> popupBuiltinTypes() {
         Set<BrickType> result = EnumSet.noneOf(BrickType.class);
-        if (!prefs.popupEnabled.get()) return result;
+        Set<String> enabledOverlays = new HashSet<>();
+        for (PopupOverlayConfig overlay : new PopupOverlayConfigStore(prefs).load()) {
+            if (overlay.enabled) enabledOverlays.add(overlay.id);
+        }
+        if (enabledOverlays.isEmpty()) return result;
         for (PopupItemConfig item : new PopupItemConfigStore(prefs).load()) {
-            if (!item.enabled || !PopupItemConfig.TYPE_BUILTIN.equals(item.type)) continue;
+            if (!item.enabled || !enabledOverlays.contains(item.overlayId)
+                    || !PopupItemConfig.TYPE_BUILTIN.equals(item.type)) continue;
             for (BrickType type : BrickType.values()) {
                 if (type.automationId().equals(item.builtinId)) result.add(type);
             }
@@ -1708,7 +1750,7 @@ public class WidgetService extends Service {
         mainHandler.post(() -> {
             if (destroyed || binding == null) return;
             if (AutomationContract.SCOPE_MAIN.equals(scope)) renderHomeAssistantBricks();
-            if (popupOverlay != null) popupOverlay.onStateChanged(scope);
+            if (popupOverlay != null) popupOverlay.onStateChanged(scope, id);
             applyBrickVisibility(currentBrickSet());
         });
     }

@@ -41,6 +41,19 @@ public final class PopupItemConfigStore {
         return result;
     }
 
+    /** Tiles owned by one overlay. Connector subscriptions may still use {@link #load()} to
+     * flatten the catalog because automation ids remain globally unique. */
+    @NonNull
+    public List<PopupItemConfig> load(@NonNull String overlayId) {
+        String safeOverlayId = dezz.status.widget.automation.AutomationContract
+                .requireSafeId(overlayId);
+        ArrayList<PopupItemConfig> result = new ArrayList<>();
+        for (PopupItemConfig config : load()) {
+            if (safeOverlayId.equals(config.overlayId)) result.add(config);
+        }
+        return result;
+    }
+
     public void save(@NonNull List<PopupItemConfig> configs) throws JSONException {
         JSONArray array = new JSONArray();
         Set<String> ids = new HashSet<>();
@@ -55,5 +68,26 @@ public final class PopupItemConfigStore {
             array.put(config.toJson());
         }
         prefs.popupItemsJson.set(array.toString());
+    }
+
+    /** Replaces only one overlay's tile list without disturbing tiles in other windows. */
+    public void save(@NonNull String overlayId, @NonNull List<PopupItemConfig> configs)
+            throws JSONException {
+        String safeOverlayId = dezz.status.widget.automation.AutomationContract
+                .requireSafeId(overlayId);
+        ArrayList<PopupItemConfig> merged = new ArrayList<>();
+        for (PopupItemConfig existing : load()) {
+            if (!safeOverlayId.equals(existing.overlayId)) merged.add(existing);
+        }
+        for (PopupItemConfig config : configs) {
+            if (config == null) continue;
+            config.overlayId = safeOverlayId;
+            merged.add(config);
+        }
+        save(merged);
+    }
+
+    public void deleteOverlay(@NonNull String overlayId) throws JSONException {
+        save(overlayId, java.util.Collections.emptyList());
     }
 }

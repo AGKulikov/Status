@@ -417,6 +417,9 @@ public class Preferences {
     // classes and therefore automatically participate in the existing settings export/import.
     public final Str haMainBricksJson = new Str(this, "haMainBricksJson", "[]");
     public final Str popupItemsJson = new Str(this, "popupItemsJson", "[]");
+    /** Independent floating overlay windows. Empty means the legacy popup settings still need
+     * to be projected into the default `popup` overlay by PopupOverlayConfigStore. */
+    public final Str popupOverlaysJson = new Str(this, "popupOverlaysJson", "");
     /** Ordered connector-neutral local scenarios. Conditions and UI targets are independent. */
     public final Str localScenariosJson = new Str(this, "localScenariosJson", "[]");
     /** One-shot, exact Android Intent actions mapped to stored connector commands. */
@@ -581,6 +584,11 @@ public class Preferences {
      * atomically and synchronously so a half-updated or lost position cannot occur. */
     public void savePopupPosition(int x, int y) {
         prefs.edit().putInt(popupX.key, x).putInt(popupY.key, y).commit();
+    }
+
+    /** Multi-overlay geometry may be followed immediately by ignition power-off. */
+    public void savePopupOverlaysJson(@NonNull String json) {
+        prefs.edit().putString(popupOverlaysJson.key, json).commit();
     }
 
     /**

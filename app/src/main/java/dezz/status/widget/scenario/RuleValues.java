@@ -37,6 +37,13 @@ final class RuleValues {
         if (value instanceof Number || value instanceof CharSequence) {
             String text = String.valueOf(value).trim();
             if (text.isEmpty()) return null;
+            // Connectors and the human preview may provide a localized decimal string (40,5).
+            // Accept one decimal convention at a time; a mixed "1,234.5" remains ambiguous
+            // and is deliberately rejected instead of being guessed as a thousands separator.
+            if (text.indexOf(',') >= 0) {
+                if (text.indexOf('.') >= 0) return null;
+                text = text.replace(',', '.');
+            }
             try {
                 return new BigDecimal(text);
             } catch (NumberFormatException ignored) {

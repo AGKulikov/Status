@@ -3,6 +3,7 @@ package dezz.status.widget.scenario;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -46,6 +47,12 @@ public final class RuleSetTest {
     @Test public void coercionIsNumericBooleanAndLiteralOnly() {
         assertTrue(new Rule("numeric", Input.FIELD_VALUE, Operator.EQUALS, "1.00", "",
                 Output.none()).matches(Input.value(1, true, true)));
+        assertTrue(new Rule("decimal_comma", Input.FIELD_VALUE, Operator.GREATER, "40", "",
+                Output.none()).matches(Input.value("40,5", true, true)));
+        assertTrue(new Rule("comma_operand", Input.FIELD_VALUE, Operator.EQUALS, "40,5", "",
+                Output.none()).matches(Input.value("40.5", true, true)));
+        assertFalse(new Rule("ambiguous_number", Input.FIELD_VALUE, Operator.EQUALS,
+                "1,234.5", "", Output.none()).matches(Input.value(1234.5, true, true)));
         assertTrue(new Rule("boolean", Input.FIELD_VALUE, Operator.TRUE, "", "",
                 Output.none()).matches(Input.value("on", true, true)));
         assertFalse(new Rule("literal", Input.FIELD_VALUE, Operator.CONTAINS, ".*", "",
@@ -64,6 +71,13 @@ public final class RuleSetTest {
         assertTrue(rule("lt", Operator.LESS, "11", "").matches(input));
         assertTrue(rule("lte", Operator.LESS_OR_EQUAL, "10", "").matches(input));
         assertTrue(rule("between", Operator.BETWEEN, "10", "20").matches(input));
+        assertTrue(rule("inclusive_single_value", Operator.BETWEEN, "10", "10")
+                .matches(input));
+        assertTrue(rule("exclusive", Operator.BETWEEN_EXCLUSIVE, "9", "11").matches(input));
+        assertFalse(rule("exclusive_edge", Operator.BETWEEN_EXCLUSIVE, "10", "11")
+                .matches(input));
+        assertFalse(rule("exclusive_empty_range", Operator.BETWEEN_EXCLUSIVE, "10", "10")
+                .matches(input));
         assertTrue(new Rule("contains", "attributes.label", Operator.CONTAINS, "door", "",
                 Output.none()).matches(input));
         assertTrue(new Rule("unit", Input.FIELD_UNIT, Operator.NOT_EMPTY, "", "",
@@ -73,6 +87,33 @@ public final class RuleSetTest {
         assertTrue(rule("always", Operator.ALWAYS, "", "").matches(input));
         assertTrue(rule("fresh", Operator.FRESH, "", "").matches(input));
         assertTrue(rule("available", Operator.AVAILABLE, "", "").matches(input));
+    }
+
+    @Test public void supportsHumanFriendlyStringComparisons() {
+        Input input = Input.value("Opening Gate", true, true);
+
+        assertTrue(rule("eq_i", Operator.EQUALS_IGNORE_CASE, "opening gate", "")
+                .matches(input));
+        assertTrue(rule("neq_i", Operator.NOT_EQUALS_IGNORE_CASE, "closed", "")
+                .matches(input));
+        assertTrue(rule("contains_i", Operator.CONTAINS_IGNORE_CASE, "GATE", "")
+                .matches(input));
+        assertTrue(rule("starts", Operator.STARTS_WITH, "Opening", "").matches(input));
+        assertTrue(rule("ends", Operator.ENDS_WITH, "Gate", "").matches(input));
+    }
+
+    @Test public void missingTextOverrideKeepsOriginalAndTransparentColorIsFirstMatch() {
+        Rule hiddenClosed = new Rule("closed", Input.FIELD_VALUE, Operator.EQUALS,
+                "closed", "", new Output(null, "transparent", null, null, null, null));
+        Rule fallback = new Rule("fallback", Input.FIELD_VALUE, Operator.ALWAYS, "", "",
+                new Output("{value}", "#FFFFFFFF", null, null, null, null));
+
+        Result result = new RuleSet("cover", Arrays.asList(hiddenClosed, fallback))
+                .evaluate(Input.value("closed", true, true));
+
+        assertNull(result.renderedText);
+        assertEquals("transparent", result.output.textColor);
+        assertEquals(0, result.matchedRuleIndex);
     }
 
     @Test public void explicitSourceIsResolvedInsteadOfOwnInput() {
@@ -93,8 +134,17 @@ public final class RuleSetTest {
         assertEquals(Boolean.FALSE, result.output.actionEnabled);
     }
 
+    @Test public void acceptsMoreThanLegacy128Rules() {
+        ArrayList<Rule> rules = new ArrayList<>();
+        for (int index = 0; index < 256; index++) {
+            rules.add(new Rule("r" + index, Input.FIELD_VALUE, Operator.ALWAYS, "", "",
+                    Output.none()));
+        }
+        assertEquals(256, new RuleSet("many", rules).rules.size());
+    }
+
     @Test(expected = IllegalArgumentException.class)
-    public void rejectsMoreThan128Rules() {
+    public void retainsHighImportSafetyCeiling() {
         ArrayList<Rule> rules = new ArrayList<>();
         for (int index = 0; index <= RuleSet.MAX_RULES; index++) {
             rules.add(new Rule("r" + index, Input.FIELD_VALUE, Operator.ALWAYS, "", "",

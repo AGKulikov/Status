@@ -48,6 +48,26 @@ public final class AutomationStateStore {
         return base.withLocalOverrides(scenarioOverrides.get(storageKey));
     }
 
+    /** Visibility with a caller-defined default. Scenario overrides have priority over retained
+     * connector state; a missing state no longer forces every automation-only overlay visible. */
+    public synchronized boolean effectiveVisibility(String scope, String id,
+                                                    boolean defaultValue) {
+        String storageKey = key(scope, id);
+        JSONObject override = scenarioOverrides.get(storageKey);
+        if (override != null && override.has("visible")) {
+            return AutomationContract.parseBoolean(override.opt("visible"));
+        }
+        String raw = prefs.getString(storageKey, null);
+        if (raw == null) return defaultValue;
+        try {
+            JSONObject state = new JSONObject(raw);
+            return state.has("visible")
+                    ? AutomationContract.parseBoolean(state.opt("visible")) : defaultValue;
+        } catch (JSONException ignored) {
+            return defaultValue;
+        }
+    }
+
     /** Partial-update merge. A payload with clear=true removes the retained local state. */
     @NonNull
     public synchronized AutomationState apply(String scope, String id, @NonNull JSONObject patch)

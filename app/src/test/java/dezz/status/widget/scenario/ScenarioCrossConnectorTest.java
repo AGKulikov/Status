@@ -44,9 +44,70 @@ public final class ScenarioCrossConnectorTest {
 
         ScenarioResult notParked = scenario.evaluate(
                 ignored -> Input.value("off", true, true));
+        assertTrue(notParked.determinate);
         assertFalse(notParked.matched);
         assertEquals("car_parked", notParked.failedConditionId);
         assertTrue(notParked.actions.isEmpty());
+    }
+
+    @Test public void explicitFalseBranchRunsOnlyForADeterminateFalseCondition() {
+        ValueReference reference = new ValueReference("HOME_ASSISTANT", "default",
+                "input_boolean.near_home", null);
+        Condition condition = new Condition("near_home", reference, Input.FIELD_VALUE,
+                Operator.TRUE, "", "");
+        LocalAction show = new LocalAction(TargetScope.OVERLAY, "home",
+                LocalField.VISIBLE, true);
+        LocalAction hide = new LocalAction(TargetScope.OVERLAY, "home",
+                LocalField.VISIBLE, false);
+        Scenario scenario = new Scenario("home_overlay", true, ConditionMode.ALL,
+                Collections.singletonList(condition), Collections.singletonList(show),
+                Collections.singletonList(hide));
+
+        ScenarioResult falseResult = scenario.evaluate(
+                ignored -> Input.value("off", true, true));
+        assertTrue(falseResult.determinate);
+        assertFalse(falseResult.matched);
+        assertEquals(Collections.singletonList(hide), falseResult.actions);
+
+        ScenarioResult unknownResult = scenario.evaluate(ignored -> Input.unavailable());
+        assertFalse(unknownResult.determinate);
+        assertFalse(unknownResult.matched);
+        assertTrue(unknownResult.actions.isEmpty());
+    }
+
+    @Test public void allFalseAndAnyTrueRemainDecisiveBesideUnknownConditions() {
+        ValueReference unavailable = new ValueReference("MQTT", "default", "missing", null);
+        ValueReference current = new ValueReference("MQTT", "default", "current", null);
+        Condition unknown = new Condition("unknown", unavailable, Input.FIELD_VALUE,
+                Operator.TRUE, "", "");
+        Condition falseCondition = new Condition("false", current, Input.FIELD_VALUE,
+                Operator.TRUE, "", "");
+        Condition trueCondition = new Condition("true", current, Input.FIELD_VALUE,
+                Operator.TRUE, "", "");
+        LocalAction trueAction = new LocalAction(TargetScope.OVERLAY, "test",
+                LocalField.VISIBLE, true);
+        LocalAction falseAction = new LocalAction(TargetScope.OVERLAY, "test",
+                LocalField.VISIBLE, false);
+        ValueResolver resolver = reference -> "missing".equals(reference.resourceId)
+                ? Input.unavailable() : Input.value("off", true, true);
+        Scenario all = new Scenario("all", true, ConditionMode.ALL,
+                java.util.Arrays.asList(unknown, falseCondition),
+                Collections.singletonList(trueAction), Collections.singletonList(falseAction));
+
+        ScenarioResult allResult = all.evaluate(resolver);
+        assertTrue(allResult.determinate);
+        assertFalse(allResult.matched);
+        assertEquals(Collections.singletonList(falseAction), allResult.actions);
+
+        ValueResolver anyResolver = reference -> "missing".equals(reference.resourceId)
+                ? Input.unavailable() : Input.value("on", true, true);
+        Scenario any = new Scenario("any", true, ConditionMode.ANY,
+                java.util.Arrays.asList(unknown, trueCondition),
+                Collections.singletonList(trueAction), Collections.singletonList(falseAction));
+        ScenarioResult anyResult = any.evaluate(anyResolver);
+        assertTrue(anyResult.determinate);
+        assertTrue(anyResult.matched);
+        assertEquals(Collections.singletonList(trueAction), anyResult.actions);
     }
 
     @Test public void ordinaryConditionCannotMatchExpiredReferencedValue() {

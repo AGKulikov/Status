@@ -71,7 +71,11 @@ public final class LocalScenarioControllerTest {
 
     @Test public void positiveVisibilityIsFailClosedUntilConditionMatches() {
         ConnectorValueRegistry registry = new ConnectorValueRegistry();
-        Scenario gate = scenario("gate", "input_boolean.near_home", "sprut_gate", true);
+        Scenario gate = legacyScenario("gate", "input_boolean.near_home", "sprut_gate", true);
+
+        JSONObject unavailable = LocalScenarioController.buildOverrides(
+                Collections.singletonList(gate), registry).get("popup|sprut_gate");
+        assertFalse(unavailable.optBoolean("visible", true));
 
         registry.upsert(value("input_boolean.near_home", false));
         JSONObject unmatched = LocalScenarioController.buildOverrides(
@@ -86,7 +90,7 @@ public final class LocalScenarioControllerTest {
 
     @Test public void falseVisibilityOnlyBlocksWhenConditionMatches() {
         ConnectorValueRegistry registry = new ConnectorValueRegistry();
-        Scenario blocker = scenario("blocker", "input_boolean.away", "sprut_gate", false);
+        Scenario blocker = legacyScenario("blocker", "input_boolean.away", "sprut_gate", false);
 
         registry.upsert(value("input_boolean.away", false));
         assertNull(LocalScenarioController.buildOverrides(Collections.singletonList(blocker),
@@ -96,6 +100,43 @@ public final class LocalScenarioControllerTest {
         JSONObject matched = LocalScenarioController.buildOverrides(
                 Collections.singletonList(blocker), registry).get("popup|sprut_gate");
         assertFalse(matched.optBoolean("visible", true));
+    }
+
+    @Test public void schemaTwoCanChooseIndependentTrueAndFalseActions() {
+        ConnectorValueRegistry registry = new ConnectorValueRegistry();
+        Scenario inverse = scenarioWithElse("inverse", "input_boolean.away", "home_overlay",
+                false, true);
+
+        registry.upsert(value("input_boolean.away", false));
+        JSONObject whenFalse = LocalScenarioController.buildOverrides(
+                Collections.singletonList(inverse), registry).get("overlay|home_overlay");
+        assertTrue(whenFalse.optBoolean("visible", false));
+
+        registry.upsert(value("input_boolean.away", true));
+        JSONObject whenTrue = LocalScenarioController.buildOverrides(
+                Collections.singletonList(inverse), registry).get("overlay|home_overlay");
+        assertFalse(whenTrue.optBoolean("visible", true));
+    }
+
+    @Test public void schemaTwoEmptyFalseBranchDoesNotSynthesizeAnInverse() {
+        ConnectorValueRegistry registry = new ConnectorValueRegistry();
+        Scenario showOnly = scenario("show_only", "input_boolean.near_home",
+                "home_overlay", true);
+
+        registry.upsert(value("input_boolean.near_home", false));
+
+        assertNull(LocalScenarioController.buildOverrides(Collections.singletonList(showOnly),
+                registry).get("popup|home_overlay"));
+    }
+
+    @Test public void ordinaryUnknownValueRunsNeitherExplicitBranch() {
+        Scenario inverse = scenarioWithElse("inverse", "input_boolean.away", "home_overlay",
+                false, true);
+
+        Map<String, JSONObject> overrides = LocalScenarioController.buildOverrides(
+                Collections.singletonList(inverse), ignored -> Input.unavailable());
+
+        assertTrue(overrides.isEmpty());
     }
 
     private static Scenario scenario(String id, String resourceId, String targetId) {
@@ -112,6 +153,33 @@ public final class LocalScenarioControllerTest {
                 visible);
         return new Scenario(id, Collections.singletonList(condition),
                 Collections.singletonList(action));
+    }
+
+    private static Scenario scenarioWithElse(String id, String resourceId, String targetId,
+                                             boolean whenTrue, boolean whenFalse) {
+        ValueReference reference = new ValueReference("HOME_ASSISTANT", "default", resourceId,
+                null);
+        Condition condition = new Condition("condition", reference, Input.FIELD_VALUE,
+                Operator.TRUE, "", "");
+        LocalAction trueAction = new LocalAction(TargetScope.OVERLAY, targetId,
+                LocalField.VISIBLE, whenTrue);
+        LocalAction falseAction = new LocalAction(TargetScope.OVERLAY, targetId,
+                LocalField.VISIBLE, whenFalse);
+        return new Scenario(id, true, dezz.status.widget.scenario.ConditionMode.ALL,
+                Collections.singletonList(condition), Collections.singletonList(trueAction),
+                Collections.singletonList(falseAction));
+    }
+
+    private static Scenario legacyScenario(String id, String resourceId, String targetId,
+                                           boolean visible) {
+        try {
+            JSONObject json = scenario(id, resourceId, targetId, visible).toJson();
+            json.put("schemaVersion", 1);
+            json.remove("elseActions");
+            return Scenario.fromJson(json);
+        } catch (Exception impossible) {
+            throw new AssertionError(impossible);
+        }
     }
 
     private static ConnectorValue value(String resourceId, boolean raw) {

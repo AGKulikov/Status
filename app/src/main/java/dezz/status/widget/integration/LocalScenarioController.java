@@ -111,12 +111,13 @@ public final class LocalScenarioController implements ConnectorValueRegistry.Lis
                                                              ValueResolver resolver) {
         LinkedHashMap<String, JSONObject> overrides = new LinkedHashMap<>();
 
-        // Positive boolean actions are fail-closed gates: visibility/interaction stays false
-        // until a fresh condition explicitly enables it. A false action is instead a conditional
-        // blocker and must not become an unconditional false override when its condition misses.
-        // We never synthesize true, so a disconnected source cannot re-enable an action.
+        // Schema-v1 had an implicit fail-closed gate for positive visibility/interaction actions.
+        // Preserve that behaviour only for untouched legacy imports. Schema-v2 makes both the
+        // true and false branches explicit; an empty branch deliberately means "do not change".
         for (Scenario scenario : source) {
-            if (!scenario.enabled || scenario.conditions.isEmpty()) continue;
+            if (!scenario.legacyFailClosed || !scenario.enabled || scenario.conditions.isEmpty()) {
+                continue;
+            }
             for (LocalAction action : scenario.actions) {
                 if (action.field != LocalField.VISIBLE
                         && action.field != LocalField.ACTION_ENABLED) continue;
@@ -130,7 +131,6 @@ public final class LocalScenarioController implements ConnectorValueRegistry.Lis
             // Resolve directly against the neutral registry. The condition connector/profile is
             // independent from the local target, e.g. HA/default -> popup/sprut_gate.
             ScenarioResult result = scenario.evaluate(resolver);
-            if (!result.matched) continue;
             for (LocalAction action : result.actions) put(overrides, action, action.value);
         }
         return overrides;
