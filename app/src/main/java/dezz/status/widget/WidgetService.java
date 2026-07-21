@@ -103,6 +103,7 @@ import dezz.status.widget.automation.ScenarioTriggerReceiver;
 import dezz.status.widget.ha.HaBrickConfig;
 import dezz.status.widget.ha.HaBrickConfigStore;
 import dezz.status.widget.integration.ConnectorActionDispatcher;
+import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.IntentScenarioController;
 import dezz.status.widget.integration.LocalScenarioController;
@@ -3125,6 +3126,13 @@ public class WidgetService extends Service {
 
     public static boolean isRunning() {
         return instance != null;
+    }
+
+    /** Immutable read-only connector snapshot for settings/catalog pickers. */
+    @NonNull
+    public List<ConnectorValue> connectorValueSnapshot() {
+        ConnectorValueRegistry current = connectorValues;
+        return current == null ? java.util.Collections.emptyList() : current.snapshot();
     }
 
     private static Rect getBounds(View view) {

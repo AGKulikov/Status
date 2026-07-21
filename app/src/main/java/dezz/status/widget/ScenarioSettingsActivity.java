@@ -4,7 +4,9 @@ package dezz.status.widget;
 import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,6 +15,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.Switch;
@@ -31,11 +34,20 @@ import org.json.JSONObject;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
+import dezz.status.widget.automation.AutomationContract;
 import dezz.status.widget.ha.HaBrickConfig;
 import dezz.status.widget.ha.HaBrickConfigStore;
+import dezz.status.widget.ha.api.HaApiController;
+import dezz.status.widget.ha.api.HaEntity;
+import dezz.status.widget.integration.ConnectorType;
+import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.popup.PopupItemConfig;
 import dezz.status.widget.popup.PopupItemConfigStore;
@@ -51,6 +63,10 @@ import dezz.status.widget.scenario.Operator;
 import dezz.status.widget.scenario.Scenario;
 import dezz.status.widget.scenario.TargetScope;
 import dezz.status.widget.scenario.ValueReference;
+import dezz.status.widget.sprut.SprutCatalog;
+import dezz.status.widget.sprut.SprutHubCatalogStore;
+import dezz.status.widget.sprut.SprutHubController;
+import dezz.status.widget.sprut.SprutProtocolAdapter;
 
 /**
  * Small, deliberately constrained editor for connector-neutral local scenarios.
@@ -65,6 +81,11 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
     private static final String[] CONNECTORS = {
             "HOME_ASSISTANT", "MQTT", "SPRUTHUB"
     };
+    private static final String[] CONNECTOR_LABELS = {
+            "Home Assistant", "MQTT", "Sprut.hub"
+    };
+    /** Views remain bounded even when a connector exposes hundreds of devices. */
+    private static final int MAX_SOURCE_RESULTS = 100;
     private static final String[] OPERATOR_VALUES = {
             "EQUALS", "NOT_EQUALS", "EQUALS_IGNORE_CASE", "NOT_EQUALS_IGNORE_CASE",
             "TRUE", "FALSE", "GREATER", "GREATER_OR_EQUAL",
@@ -579,7 +600,7 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                     : sourceLabel(condition.reference));
             root.addView(sourceSummary, topMargin(6));
             Button chooseSource = new Button(ScenarioSettingsActivity.this);
-            chooseSource.setText("Выбрать устройство");
+            chooseSource.setText("Выбрать коннектор и устройство");
             chooseSource.setOnClickListener(view -> showSourcePicker());
             root.addView(chooseSource, topMargin(6));
 
@@ -760,28 +781,334 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         }
 
         private void showSourcePicker() {
-            List<SourceOption> options = sourceOptions();
-            if (options.isEmpty()) {
+            int current = 0;
+            String selectedConnector = selected(connector);
+            for (int index = 0; index < CONNECTORS.length; index++) {
+                if (CONNECTORS[index].equals(selectedConnector)) {
+                    current = index;
+                    break;
+                }
+            }
+            new AlertDialog.Builder(ScenarioSettingsActivity.this)
+                    .setTitle("1. Выберите коннектор")
+                    .setSingleChoiceItems(CONNECTOR_LABELS, current, (dialog, which) -> {
+                        dialog.dismiss();
+                        switch (CONNECTORS[which]) {
+                            case "HOME_ASSISTANT":
+                                showHomeAssistantSourcePicker();
+                                break;
+                            case "SPRUTHUB":
+                                showSprutSourcePicker();
+                                break;
+                            case "MQTT":
+                            default:
+                                showMqttSourcePicker();
+                                break;
+                        }
+                    })
+                    .setNegativeButton("Отмена", null)
+                    .show();
+        }
+
+        private void showHomeAssistantSourcePicker() {
+            HaApiController active = HaApiController.active();
+            if (active == null || active.catalog().isEmpty()) {
                 new AlertDialog.Builder(ScenarioSettingsActivity.this)
-                        .setTitle("Нет доступных устройств")
-                        .setMessage("Сначала добавьте нужное устройство в основную строку или "
-                                + "плавающий оверлей. После этого оно появится здесь как источник.")
-                        .setPositiveButton("Основная строка", (d, w) -> startActivity(
+                        .setTitle("Каталог Home Assistant пуст")
+                        .setMessage("Подключите Home Assistant и дождитесь загрузки полного "
+                                + "списка сущностей.")
+                        .setPositiveButton("Настроить", (dialog, which) -> startActivity(
                                 new Intent(ScenarioSettingsActivity.this,
-                                        AutomationSettingsActivity.class)))
-                        .setNegativeButton("Закрыть", null).show();
+                                        HomeAssistantSettingsActivity.class)))
+                        .setNegativeButton("Назад", (dialog, which) -> showSourcePicker())
+                        .show();
                 return;
             }
-            String[] labels = new String[options.size()];
-            for (int index = 0; index < options.size(); index++) labels[index] = options.get(index).label;
+            List<HaEntity> entities = new ArrayList<>(active.catalog().values());
+            entities.sort(Comparator.comparing(entity ->
+                    (haFriendlyName(entity) + " " + entity.entityId())
+                            .toLowerCase(Locale.ROOT)));
+            List<SearchChoice<HaEntity>> choices = new ArrayList<>(entities.size());
+            for (HaEntity entity : entities) {
+                String name = haFriendlyName(entity);
+                choices.add(new SearchChoice<>(entity,
+                        name + "\n" + entity.entityId() + "  •  state: "
+                                + displayCatalogValue(entity.state()),
+                        name + " " + entity.entityId() + " " + entity.domain() + " "
+                                + entity.state()));
+            }
+            showSearchPicker("2. Устройство Home Assistant",
+                    "Поиск по названию, entity_id или состоянию", choices,
+                    "В каталоге Home Assistant нет сущностей.", this::showSourcePicker,
+                    null, null, choice -> showHomeAssistantValuePicker(choice.value));
+        }
+
+        private void showHomeAssistantValuePicker(HaEntity entity) {
+            List<SearchChoice<SourceBinding>> choices = new ArrayList<>();
+            SourceBinding state = sourceBinding(ConnectorType.HOME_ASSISTANT,
+                    entity.entityId(), "state");
+            choices.add(new SearchChoice<>(state,
+                    "Состояние (state)\nсейчас: " + displayCatalogValue(entity.state()),
+                    "state состояние " + entity.state()));
+            List<Map.Entry<String, Object>> attributes =
+                    new ArrayList<>(entity.attributes().entrySet());
+            attributes.sort(Map.Entry.comparingByKey(String.CASE_INSENSITIVE_ORDER));
+            for (Map.Entry<String, Object> attribute : attributes) {
+                appendAttributeChoices(choices, ConnectorType.HOME_ASSISTANT,
+                        entity.entityId(), attribute.getKey(), attribute.getValue(), 0);
+            }
+            String name = haFriendlyName(entity);
+            showSearchPicker(name + " — значение", "Поиск по атрибутам", choices,
+                    "У сущности нет доступных значений.", this::showHomeAssistantSourcePicker,
+                    null, null, choice -> applySource(choice.value,
+                            "Home Assistant · " + name + "\n" + entity.entityId() + " · "
+                                    + choice.value.valuePath));
+        }
+
+        private void showSprutSourcePicker() {
+            SprutHubController active = SprutHubController.active();
+            if (active != null && !active.catalog().accessories().isEmpty()) {
+                showSprutAccessoryPicker(active.catalog());
+                return;
+            }
+            AlertDialog loading = new AlertDialog.Builder(ScenarioSettingsActivity.this)
+                    .setTitle("Sprut.hub")
+                    .setMessage("Загружаем сохранённый каталог…")
+                    .setNegativeButton("Отмена", null)
+                    .create();
+            loading.show();
+            CompletableFuture.supplyAsync(
+                    ScenarioSettingsActivity.this::loadCachedSprutCatalog)
+                    .whenComplete((catalog, failure) -> runOnUiThread(() -> {
+                        if (!loading.isShowing() || isFinishing() || isDestroyed()) return;
+                        loading.dismiss();
+                        if (failure != null || catalog == null
+                                || catalog.accessories().isEmpty()) {
+                            showMissingSprutCatalog();
+                        } else {
+                            showSprutAccessoryPicker(catalog);
+                        }
+                    }));
+        }
+
+        private void showMissingSprutCatalog() {
             new AlertDialog.Builder(ScenarioSettingsActivity.this)
-                    .setTitle("Устройство-источник").setItems(labels, (dialog, which) -> {
-                        SourceBinding value = options.get(which).binding;
-                        selectSpinnerValue(connector, CONNECTORS, value.connectorType.jsonName());
-                        resourceId.setText(value.resourceId);
-                        valuePath.setText(value.valuePath);
-                        sourceSummary.setText(options.get(which).label);
-                    }).setNegativeButton("Отмена", null).show();
+                    .setTitle("Каталог Sprut.hub пуст")
+                    .setMessage("Подключите Sprut.hub и обновите каталог устройств.")
+                    .setPositiveButton("Настроить", (dialog, which) -> startActivity(
+                            new Intent(ScenarioSettingsActivity.this,
+                                    SprutHubSettingsActivity.class)))
+                    .setNegativeButton("Назад", (dialog, which) -> showSourcePicker())
+                    .show();
+        }
+
+        private void showSprutAccessoryPicker(SprutCatalog catalog) {
+            List<SprutCatalog.Accessory> accessories = new ArrayList<>();
+            for (SprutCatalog.Accessory accessory : catalog.accessories()) {
+                if (hasReadableCharacteristic(accessory)) accessories.add(accessory);
+            }
+            accessories.sort(Comparator
+                    .comparing((SprutCatalog.Accessory value) -> catalog.roomNameFor(value),
+                            String.CASE_INSENSITIVE_ORDER)
+                    .thenComparing(ScenarioSettingsActivity::sprutAccessoryName,
+                            String.CASE_INSENSITIVE_ORDER));
+            List<SearchChoice<SprutCatalog.Accessory>> choices =
+                    new ArrayList<>(accessories.size());
+            for (SprutCatalog.Accessory accessory : accessories) {
+                String room = catalog.roomNameFor(accessory);
+                String name = sprutAccessoryName(accessory);
+                String label = (room.isEmpty() ? "" : room + " → ") + name
+                        + (accessory.online() ? "" : "  [offline]")
+                        + (accessory.model().isEmpty() ? "" : "\n" + accessory.model());
+                choices.add(new SearchChoice<>(accessory, label,
+                        room + " " + name + " " + accessory.model() + " "
+                                + accessory.manufacturer() + " " + accessory.serial()));
+            }
+            showSearchPicker("2. Устройство Sprut.hub",
+                    "Поиск по комнате, названию, модели или серийному номеру", choices,
+                    "В каталоге нет устройств с читаемыми характеристиками.",
+                    this::showSourcePicker, null, null,
+                    choice -> showSprutServicePicker(catalog, choice.value));
+        }
+
+        private void showSprutServicePicker(SprutCatalog catalog,
+                                            SprutCatalog.Accessory accessory) {
+            List<SprutCatalog.Service> services = new ArrayList<>();
+            for (SprutCatalog.Service service : accessory.services()) {
+                if (hasReadableCharacteristic(service)) services.add(service);
+            }
+            services.sort(Comparator.comparing(ScenarioSettingsActivity::sprutServiceName,
+                    String.CASE_INSENSITIVE_ORDER));
+            List<SearchChoice<SprutCatalog.Service>> choices = new ArrayList<>(services.size());
+            for (SprutCatalog.Service service : services) {
+                String name = sprutServiceName(service);
+                choices.add(new SearchChoice<>(service,
+                        name + "\nтип: " + dash(service.type()) + "  •  sId=" + service.id(),
+                        name + " " + service.type() + " " + service.id()));
+            }
+            showSearchPicker(sprutAccessoryName(accessory) + " — сервис",
+                    "Поиск по названию или типу сервиса", choices,
+                    "У устройства нет читаемых сервисов.",
+                    () -> showSprutAccessoryPicker(catalog), null, null,
+                    choice -> showSprutCharacteristicPicker(catalog, accessory, choice.value));
+        }
+
+        private void showSprutCharacteristicPicker(SprutCatalog catalog,
+                SprutCatalog.Accessory accessory, SprutCatalog.Service service) {
+            List<SprutCatalog.Characteristic> characteristics = new ArrayList<>();
+            for (SprutCatalog.Characteristic characteristic : service.characteristics()) {
+                if (characteristic.readable()) characteristics.add(characteristic);
+            }
+            characteristics.sort(Comparator.comparing(
+                    ScenarioSettingsActivity::sprutCharacteristicName,
+                    String.CASE_INSENSITIVE_ORDER));
+            List<SearchChoice<SprutCatalog.Characteristic>> choices =
+                    new ArrayList<>(characteristics.size());
+            for (SprutCatalog.Characteristic characteristic : characteristics) {
+                String name = sprutCharacteristicName(characteristic);
+                String path = characteristic.path().stableId();
+                choices.add(new SearchChoice<>(characteristic,
+                        name + "\nсейчас: " + displayCatalogValue(characteristic.currentValue())
+                                + "  •  " + path,
+                        name + " " + characteristic.type() + " "
+                                + characteristic.format() + " " + characteristic.unit()
+                                + " " + characteristic.currentValue() + " " + path));
+            }
+            showSearchPicker(sprutServiceName(service) + " — значение",
+                    "Поиск по названию, типу или path", choices,
+                    "У сервиса нет читаемых характеристик.",
+                    () -> showSprutServicePicker(catalog, accessory), null, null, choice -> {
+                        SprutCatalog.Characteristic value = choice.value;
+                        String room = catalog.roomNameFor(accessory);
+                        String prefix = room.isEmpty() ? "" : room + " → ";
+                        SourceBinding binding = sourceBinding(ConnectorType.SPRUTHUB,
+                                value.path().stableId(), "");
+                        applySource(binding, "Sprut.hub · " + prefix
+                                + sprutAccessoryName(accessory) + " → "
+                                + sprutServiceName(service) + " → "
+                                + sprutCharacteristicName(value) + "\n"
+                                + value.path().stableId());
+                    });
+        }
+
+        private void showMqttSourcePicker() {
+            WidgetService running = WidgetService.getInstance();
+            List<ConnectorValue> snapshot = running == null
+                    ? Collections.emptyList() : running.connectorValueSnapshot();
+            LinkedHashMap<String, ConnectorValue> observed = new LinkedHashMap<>();
+            for (ConnectorValue value : snapshot) {
+                if (value.connectorType == ConnectorType.MQTT
+                        && DEFAULT_CONNECTOR_ID.equals(value.connectorId)
+                        && isCanonicalMqttResource(value.resourceId)) {
+                    observed.put(value.resourceId, value);
+                }
+            }
+            List<ConnectorValue> values = new ArrayList<>(observed.values());
+            values.sort(Comparator.comparing(value -> value.resourceId,
+                    String.CASE_INSENSITIVE_ORDER));
+            List<SearchChoice<ConnectorValue>> choices = new ArrayList<>(values.size());
+            for (ConnectorValue value : values) {
+                choices.add(new SearchChoice<>(value,
+                        value.resourceId + "\nсейчас: "
+                                + displayCatalogValue(value.rawValue)
+                                + (value.fresh ? "" : "  [stale]"),
+                        value.resourceId + " " + value.rawValue + " " + value.valueType
+                                + " " + value.unit + " " + value.attributes));
+            }
+            showSearchPicker("2. Наблюдаемые значения MQTT",
+                    "Поиск по scope/id, значению или атрибутам", choices,
+                    "Retained/live значения ещё не получены. Можно указать topic вручную.",
+                    this::showSourcePicker, "Ввести topic", this::showManualMqttSourcePicker,
+                    choice -> showMqttValuePicker(choice.value));
+        }
+
+        private void showMqttValuePicker(ConnectorValue value) {
+            List<SearchChoice<SourceBinding>> choices = new ArrayList<>();
+            SourceBinding primary = sourceBinding(ConnectorType.MQTT, value.resourceId, "");
+            choices.add(new SearchChoice<>(primary,
+                    "Основное значение\nсейчас: " + displayCatalogValue(value.rawValue),
+                    "value state основное " + value.rawValue));
+            List<Map.Entry<String, Object>> attributes =
+                    new ArrayList<>(value.attributes.entrySet());
+            attributes.sort(Map.Entry.comparingByKey(String.CASE_INSENSITIVE_ORDER));
+            for (Map.Entry<String, Object> attribute : attributes) {
+                appendAttributeChoices(choices, ConnectorType.MQTT, value.resourceId,
+                        attribute.getKey(), attribute.getValue(), 0);
+            }
+            showSearchPicker(value.resourceId + " — значение", "Поиск по атрибутам", choices,
+                    "Нет доступных значений.", this::showMqttSourcePicker,
+                    "Ввести topic", this::showManualMqttSourcePicker,
+                    choice -> applySource(choice.value, "MQTT · " + value.resourceId
+                            + (choice.value.valuePath.isEmpty() ? ""
+                            : " · " + choice.value.valuePath)));
+        }
+
+        private void showManualMqttSourcePicker() {
+            LinearLayout form = column();
+            form.setPadding(dp(16), dp(4), dp(16), dp(4));
+            String currentResource = "MQTT".equals(selected(connector))
+                    ? text(resourceId) : "";
+            EditText topic = field(form, "Полный MQTT topic или scope/id", currentResource);
+            EditText path = field(form, "Путь к атрибуту (необязательно)",
+                    "MQTT".equals(selected(connector)) ? text(valuePath) : "");
+            AlertDialog dialog = new AlertDialog.Builder(ScenarioSettingsActivity.this)
+                    .setTitle("MQTT — ручной источник")
+                    .setMessage("Для наблюдаемых сообщений предпочтителен scope/id. Полный topic "
+                            + "также поддерживается.")
+                    .setView(form)
+                    .setNegativeButton("Отмена", null)
+                    .setPositiveButton("Применить", null)
+                    .create();
+            dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                    .setOnClickListener(view -> {
+                        try {
+                            String selectedTopic = text(topic);
+                            if (selectedTopic.isEmpty()) {
+                                throw new IllegalArgumentException("Укажите MQTT topic");
+                            }
+                            SourceBinding binding = sourceBinding(ConnectorType.MQTT,
+                                    selectedTopic, text(path));
+                            applySource(binding, "MQTT · " + binding.resourceId
+                                    + (binding.valuePath.isEmpty() ? ""
+                                    : " · " + binding.valuePath));
+                            dialog.dismiss();
+                        } catch (RuntimeException error) {
+                            showValidationError(error);
+                        }
+                    }));
+            dialog.show();
+        }
+
+        private void appendAttributeChoices(List<SearchChoice<SourceBinding>> choices,
+                ConnectorType type, String resource, String path, Object value, int depth) {
+            if (depth < 6 && value instanceof Map<?, ?> && !((Map<?, ?>) value).isEmpty()) {
+                List<Map.Entry<?, ?>> nested = new ArrayList<>(((Map<?, ?>) value).entrySet());
+                nested.sort(Comparator.comparing(item -> String.valueOf(item.getKey()),
+                        String.CASE_INSENSITIVE_ORDER));
+                for (Map.Entry<?, ?> item : nested) {
+                    appendAttributeChoices(choices, type, resource,
+                            path + "." + item.getKey(), item.getValue(), depth + 1);
+                }
+                return;
+            }
+            String valuePath = "attributes." + path;
+            SourceBinding binding = sourceBinding(type, resource, valuePath);
+            choices.add(new SearchChoice<>(binding,
+                    "Атрибут: " + path + "\nсейчас: " + displayCatalogValue(value),
+                    path + " " + valuePath + " " + value));
+        }
+
+        private SourceBinding sourceBinding(ConnectorType type, String resource, String path) {
+            return new SourceBinding(type, SourceBinding.DEFAULT_CONNECTOR_ID,
+                    resource, path, SourceBinding.PRESENTATION_AUTO, "");
+        }
+
+        private void applySource(SourceBinding value, String label) {
+            selectSpinnerValue(connector, CONNECTORS, value.connectorType.jsonName());
+            connectorId.setText(value.connectorId);
+            resourceId.setText(value.resourceId);
+            valuePath.setText(value.valuePath);
+            sourceSummary.setText(label);
         }
 
         private void chooseActionValue(boolean falseBranch) {
@@ -903,27 +1230,173 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         return result;
     }
 
-    private List<SourceOption> sourceOptions() {
-        LinkedHashMap<String, SourceOption> values = new LinkedHashMap<>();
-        for (HaBrickConfig item : new HaBrickConfigStore(prefs).loadMain()) {
-            addSourceOption(values, item.sourceBinding, item.name + " · основная строка");
-        }
-        for (PopupItemConfig item : new PopupItemConfigStore(prefs).load()) {
-            addSourceOption(values, item.sourceBinding, item.name + " · плавающий оверлей");
-        }
-        return new ArrayList<>(values.values());
+    private SprutCatalog loadCachedSprutCatalog() {
+        JSONObject cached = new SprutHubCatalogStore(this).load();
+        JSONObject rooms = cached == null ? null : cached.optJSONObject("rooms");
+        JSONObject accessories = cached == null ? null : cached.optJSONObject("accessories");
+        return rooms == null || accessories == null
+                ? SprutCatalog.empty() : SprutProtocolAdapter.parseCatalog(rooms, accessories);
     }
 
-    private static void addSourceOption(LinkedHashMap<String, SourceOption> values,
-                                        SourceBinding binding, String name) {
-        if (binding == null || !binding.isBound()) return;
-        String key = binding.connectorType.jsonName() + '|' + binding.connectorId + '|'
-                + binding.resourceId + '|' + binding.valuePath;
-        String connector = binding.connectorType == dezz.status.widget.integration.ConnectorType.HOME_ASSISTANT
-                ? "Home Assistant" : binding.connectorType
-                == dezz.status.widget.integration.ConnectorType.SPRUTHUB ? "Sprut.hub" : "MQTT";
-        values.putIfAbsent(key, new SourceOption(binding, name + "\n" + connector + " · "
-                + binding.resourceId + (binding.valuePath.isEmpty() ? "" : " · " + binding.valuePath)));
+    /** Search is performed against the complete lightweight choice list, while the ListView is
+     * capped. This avoids creating hundreds of Android Views for large connector catalogs. */
+    private <T> void showSearchPicker(String title, String hint,
+                                      List<SearchChoice<T>> choices, String emptyMessage,
+                                      @Nullable Runnable back,
+                                      @Nullable String extraActionLabel,
+                                      @Nullable Runnable extraAction,
+                                      ChoiceHandler<T> onSelected) {
+        LinearLayout content = column();
+        content.setPadding(dp(16), dp(4), dp(16), 0);
+        EditText search = new EditText(this);
+        search.setHint(hint);
+        search.setSingleLine(true);
+        search.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        content.addView(search, matchWrap());
+        TextView status = label("");
+        content.addView(status, topMargin(4));
+        ListView results = new ListView(this);
+        content.addView(results, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(380)));
+
+        List<SearchChoice<T>> visible = new ArrayList<>();
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_list_item_1, new ArrayList<>()) {
+            @Override public View getView(int position, @Nullable View convertView,
+                                          ViewGroup parent) {
+                TextView view = (TextView) super.getView(position, convertView, parent);
+                view.setSingleLine(false);
+                view.setMaxLines(4);
+                view.setPadding(dp(8), dp(7), dp(8), dp(7));
+                return view;
+            }
+        };
+        results.setAdapter(adapter);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setView(content);
+        if (back == null) {
+            builder.setNegativeButton("Отмена", null);
+        } else {
+            builder.setNegativeButton("Назад", (dialog, which) -> back.run());
+        }
+        if (extraActionLabel != null && extraAction != null) {
+            builder.setNeutralButton(extraActionLabel, (dialog, which) -> extraAction.run());
+        }
+        AlertDialog dialog = builder.create();
+        results.setOnItemClickListener((parent, view, position, id) -> {
+            if (position < 0 || position >= visible.size()) return;
+            SearchChoice<T> selectedChoice = visible.get(position);
+            dialog.dismiss();
+            onSelected.onSelected(selectedChoice);
+        });
+
+        Runnable filter = () -> {
+            String query = rawText(search).trim().toLowerCase(Locale.ROOT);
+            visible.clear();
+            int matches = 0;
+            for (SearchChoice<T> choice : choices) {
+                if (!query.isEmpty() && !choice.searchText.contains(query)) continue;
+                matches++;
+                if (visible.size() < MAX_SOURCE_RESULTS) visible.add(choice);
+            }
+            adapter.setNotifyOnChange(false);
+            adapter.clear();
+            for (SearchChoice<T> choice : visible) adapter.add(choice.label);
+            adapter.notifyDataSetChanged();
+            if (choices.isEmpty()) {
+                status.setText(emptyMessage);
+            } else if (matches == 0) {
+                status.setText("Ничего не найдено");
+            } else if (matches > visible.size()) {
+                status.setText("Показаны первые " + visible.size() + " из " + matches
+                        + ". Уточните поиск.");
+            } else {
+                status.setText("Найдено: " + matches);
+            }
+        };
+        search.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence value, int start, int count,
+                                                    int after) {}
+            @Override public void onTextChanged(CharSequence value, int start, int before,
+                                                int count) {
+                filter.run();
+            }
+            @Override public void afterTextChanged(Editable value) {}
+        });
+        filter.run();
+        dialog.show();
+    }
+
+    private static boolean hasReadableCharacteristic(SprutCatalog.Accessory accessory) {
+        for (SprutCatalog.Service service : accessory.services()) {
+            if (hasReadableCharacteristic(service)) return true;
+        }
+        return false;
+    }
+
+    private static boolean hasReadableCharacteristic(SprutCatalog.Service service) {
+        for (SprutCatalog.Characteristic characteristic : service.characteristics()) {
+            if (characteristic.readable()) return true;
+        }
+        return false;
+    }
+
+    private static String haFriendlyName(HaEntity entity) {
+        Object value = entity.attribute("friendly_name");
+        String name = value == null ? "" : String.valueOf(value).trim();
+        return name.isEmpty() ? entity.entityId() : name;
+    }
+
+    private static String sprutAccessoryName(SprutCatalog.Accessory value) {
+        return firstNonBlank(value.name(), value.model(), "Устройство " + value.id());
+    }
+
+    private static String sprutServiceName(SprutCatalog.Service value) {
+        String name = firstNonBlank(value.name(), value.type(), "Service " + value.id());
+        return value.type().isEmpty() || value.type().equals(name)
+                ? name : name + " [" + value.type() + "]";
+    }
+
+    private static String sprutCharacteristicName(SprutCatalog.Characteristic value) {
+        String name = firstNonBlank(value.name(), value.type(), "Characteristic");
+        return value.type().isEmpty() || value.type().equals(name)
+                ? name : name + " [" + value.type() + "]";
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.trim().isEmpty()) return value.trim();
+        }
+        return "";
+    }
+
+    private static String dash(String value) {
+        return value == null || value.trim().isEmpty() ? "—" : value.trim();
+    }
+
+    private static String displayCatalogValue(@Nullable Object value) {
+        if (value == null || value == JSONObject.NULL) return "—";
+        if (value instanceof Boolean) return (Boolean) value ? "1" : "0";
+        String text = String.valueOf(value);
+        return text.length() <= 160 ? text : text.substring(0, 160) + "…";
+    }
+
+    private static boolean isCanonicalMqttResource(String resource) {
+        if (resource == null) return false;
+        int slash = resource.indexOf('/');
+        if (slash <= 0 || slash != resource.lastIndexOf('/')
+                || slash == resource.length() - 1) return false;
+        try {
+            String scope = resource.substring(0, slash);
+            String id = resource.substring(slash + 1);
+            return scope.equals(AutomationContract.normalizeScope(scope))
+                    && id.equals(AutomationContract.requireSafeId(id));
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
     }
 
     private static String sourceLabel(ValueReference reference) {
@@ -1336,13 +1809,20 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         }
     }
 
-    private static final class SourceOption {
-        final SourceBinding binding;
-        final String label;
+    private interface ChoiceHandler<T> {
+        void onSelected(SearchChoice<T> choice);
+    }
 
-        SourceOption(SourceBinding binding, String label) {
-            this.binding = binding;
-            this.label = label;
+    private static final class SearchChoice<T> {
+        final T value;
+        final String label;
+        final String searchText;
+
+        SearchChoice(T value, String label, String searchText) {
+            this.value = value;
+            this.label = label == null ? "" : label;
+            this.searchText = (this.label + " " + (searchText == null ? "" : searchText))
+                    .toLowerCase(Locale.ROOT);
         }
     }
 }
