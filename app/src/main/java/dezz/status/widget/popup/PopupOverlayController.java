@@ -233,13 +233,17 @@ public final class PopupOverlayController {
                     ? builtinProvider.getBuiltinValue(item.builtinId) : null;
             if (PopupItemConfig.TYPE_BUILTIN.equals(item.type) && builtin == null) continue;
             if (builtin != null && !builtin.visible) continue;
+            TilePresentation presentation = resolvePresentation(item, state, builtin, now);
+            // Transparent is a value-rule shorthand for hiding the complete device. Filter it
+            // before grid placement so the cell is released and another tile can occupy it.
+            if (AutomationState.isFullyTransparentColor(presentation.color)) continue;
             int spanX = clamp(item.columnSpan, 1, columns);
             int spanY = clamp(item.rowSpan, 1, rows);
             int[] position = findPosition(used, item.row, item.column, spanY, spanX);
             if (position == null) continue;
             mark(used, position[0], position[1], spanY, spanX);
 
-            View tile = buildTile(item, state, builtin, now);
+            View tile = buildTile(item, state, builtin, presentation);
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                     spanX * cellWidth + (spanX - 1) * gap,
                     spanY * cellHeight + (spanY - 1) * gap);
@@ -268,7 +272,8 @@ public final class PopupOverlayController {
     }
 
     private View buildTile(PopupItemConfig item, AutomationState state,
-                           @Nullable BuiltinValue builtin, long now) {
+                           @Nullable BuiltinValue builtin,
+                           @NonNull TilePresentation presentation) {
         LinearLayout tile = new LinearLayout(context);
         tile.setOrientation(item.orientation == 1 ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
         tile.setGravity(Gravity.CENTER);
@@ -336,22 +341,12 @@ public final class PopupOverlayController {
         textGroup.addView(title, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        boolean reactive = !PopupItemConfig.TYPE_STATIC_TEXT.equals(item.type)
-                && !PopupItemConfig.TYPE_BUILTIN.equals(item.type);
-        boolean pending = reactive && !state.present;
-        boolean stale = reactive && state.present
-                && state.isStale(now, item.staleAfterSeconds * 1000L);
-        String effectiveText = builtin == null ? item.defaultText : builtin.text;
-        String effectiveColor = builtin == null ? item.defaultTextColor : builtin.color;
-        if (!pending && !stale && state.text != null) effectiveText = state.text;
-        if (!pending && !stale && state.color != null) effectiveColor = state.color;
         OutlineTextView value = new OutlineTextView(context);
         value.setGravity(Gravity.CENTER);
         value.setIncludeFontPadding(false);
-        value.setText(pending ? item.pendingText : stale ? item.staleText : effectiveText);
+        value.setText(presentation.text);
         value.setTextSize(TypedValue.COMPLEX_UNIT_PX, item.textSize);
-        String valueColor = pending ? item.pendingColor : stale ? item.staleColor : effectiveColor;
-        value.setTextColor(withAlpha(AutomationState.parseColor(valueColor, 0xFFFFFFFF),
+        value.setTextColor(withAlpha(AutomationState.parseColor(presentation.color, 0xFFFFFFFF),
                 item.textAlpha));
         value.setTypeface(value.getTypeface(), item.textBold ? Typeface.BOLD : Typeface.NORMAL);
         value.setVisibility(item.showStatus ? View.VISIBLE : View.GONE);
@@ -364,7 +359,8 @@ public final class PopupOverlayController {
         // actions fail-closed during boot and reconnect even if their last persisted patch said
         // action_enabled=true.
         boolean commandPending = pendingActions.contains(item.id);
-        boolean actionable = hasAnyAction && !pending && !stale && !commandPending
+        boolean actionable = hasAnyAction && !presentation.pending && !presentation.stale
+                && !commandPending
                 && state.actionEnabled;
         // Keep the cell itself enabled even while its command is unavailable: every pixel of the
         // allocated grid cell remains a drag surface.  Command availability is handled by the
@@ -377,6 +373,44 @@ public final class PopupOverlayController {
         tile.setAlpha(actionable || !hasAnyAction ? 1f : 0.45f);
         attachTileTouch(tile, item, actionable);
         return tile;
+    }
+
+    @NonNull
+    private static TilePresentation resolvePresentation(@NonNull PopupItemConfig item,
+                                                        @NonNull AutomationState state,
+                                                        @Nullable BuiltinValue builtin,
+                                                        long now) {
+        boolean reactive = !PopupItemConfig.TYPE_STATIC_TEXT.equals(item.type)
+                && !PopupItemConfig.TYPE_BUILTIN.equals(item.type);
+        boolean pending = reactive && !state.present;
+        boolean stale = reactive && state.present
+                && state.isStale(now, item.staleAfterSeconds * 1000L);
+        String text = builtin == null ? item.defaultText : builtin.text;
+        String color = builtin == null ? item.defaultTextColor : builtin.color;
+        if (!pending && !stale && state.text != null) text = state.text;
+        if (!pending && !stale && state.color != null) color = state.color;
+        if (pending) {
+            text = item.pendingText;
+            color = item.pendingColor;
+        } else if (stale) {
+            text = item.staleText;
+            color = item.staleColor;
+        }
+        return new TilePresentation(text, color, pending, stale);
+    }
+
+    private static final class TilePresentation {
+        final String text;
+        final String color;
+        final boolean pending;
+        final boolean stale;
+
+        TilePresentation(String text, String color, boolean pending, boolean stale) {
+            this.text = text;
+            this.color = color;
+            this.pending = pending;
+            this.stale = stale;
+        }
     }
 
     /** Every tile doubles as a drag surface; a short release remains the configured action. */

@@ -38,6 +38,7 @@ import java.util.function.IntConsumer;
 
 import dezz.status.widget.ha.HaBrickConfig;
 import dezz.status.widget.ha.HaBrickConfigStore;
+import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.integration.ActionBinding;
 import dezz.status.widget.integration.ConnectorType;
@@ -973,8 +974,12 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
             ruleTestStatus.setText(tested == null
                     ? "Введите пример — результат появится в макете выше"
                     : tested.ruleIndex < 0 ? "Ни одно правило не совпало"
-                    : "Сработало правило №" + (tested.ruleIndex + 1));
+                    : "Сработало правило №" + (tested.ruleIndex + 1)
+                    + (tested.hidden ? " — устройство скрыто полностью" : ""));
         }
+        boolean hiddenByRule = tested != null && tested.hidden;
+        preview.setVisibility(hiddenByRule ? View.GONE : View.VISIBLE);
+        if (hiddenByRule) return;
         if (main != null) {
             previewIcon.setVisibility(View.GONE);
             previewTitle.setVisibility(View.GONE);
@@ -1040,7 +1045,9 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         String text = result.renderedText == null ? raw : result.renderedText;
         String fallback = main != null ? main.defaultColor : popup.defaultTextColor;
         String color = result.output.textColor == null ? fallback : result.output.textColor;
-        return new PreviewPresentation(text, color, result.matchedRuleIndex);
+        boolean hidden = Boolean.FALSE.equals(result.output.visible)
+                || AutomationState.isFullyTransparentColor(color);
+        return new PreviewPresentation(text, color, result.matchedRuleIndex, hidden);
     }
 
     private void onConfigChanged() {
@@ -1217,10 +1224,12 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         final String text;
         final String color;
         final int ruleIndex;
-        PreviewPresentation(String text, String color, int ruleIndex) {
+        final boolean hidden;
+        PreviewPresentation(String text, String color, int ruleIndex, boolean hidden) {
             this.text = text;
             this.color = color;
             this.ruleIndex = ruleIndex;
+            this.hidden = hidden;
         }
     }
 }

@@ -1323,6 +1323,10 @@ public class WidgetService extends Service {
                 color = TextUtils.isEmpty(state.color) ? config.defaultColor : state.color;
             }
             if (config.collapseWhenEmpty && TextUtils.isEmpty(text)) continue;
+            // A transparent value selected by a value rule means "hide this brick", not
+            // "reserve its margins for invisible text". Keep this renderer-side guard for
+            // retained states written by older builds before connectors recompute visibility.
+            if (AutomationState.isFullyTransparentColor(color)) continue;
 
             MarqueeOutlineTextView view = new MarqueeOutlineTextView(
                     themedContext != null ? themedContext : this);

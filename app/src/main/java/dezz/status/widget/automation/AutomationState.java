@@ -134,6 +134,26 @@ public final class AutomationState {
         }
     }
 
+    /**
+     * Returns whether a configured presentation color is explicitly fully transparent.
+     *
+     * <p>The visual rule editor stores transparency either as the human-readable
+     * {@code transparent} token or as an Android {@code #AARRGGBB}/{@code #ARGB} value. Invalid
+     * and missing colors deliberately return {@code false}: they fall back to the brick's normal
+     * color and must not make it disappear.</p>
+     */
+    public static boolean isFullyTransparentColor(@Nullable String value) {
+        if (value == null) return false;
+        String color = value.trim();
+        if (color.isEmpty()) return false;
+        if ("transparent".equalsIgnoreCase(color)) return true;
+        if (color.charAt(0) != '#') return false;
+        if (color.length() == 9) {
+            return color.regionMatches(true, 1, "00", 0, 2);
+        }
+        return color.length() == 5 && color.charAt(1) == '0';
+    }
+
     @Nullable
     private static String optionalOverride(@NonNull JSONObject object, String key,
                                            @Nullable String fallback) {
