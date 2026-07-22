@@ -73,6 +73,8 @@ import dezz.status.widget.launcher.media.MediaPanelView;
 import dezz.status.widget.launcher.panels.PanelElementConfigStore;
 import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
 import dezz.status.widget.launcher.routes.FavoriteRoutesPanelView;
+import dezz.status.widget.launcher.vehicle.VehicleInfoPanelConfigStore;
+import dezz.status.widget.launcher.vehicle.VehicleInfoPanelView;
 import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarControlState;
 import dezz.status.widget.car.CarIntegration;
@@ -102,6 +104,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private PanelElementConfigStore panelElementStore;
     private FavoriteAppsConfigStore favoriteAppsConfigStore;
     private FavoriteRoutesConfigStore favoriteRoutesConfigStore;
+    private VehicleInfoPanelConfigStore vehicleInfoConfigStore;
     private FrameLayout workspace;
     private LauncherGridView editorGrid;
     private MaterialButton doneButton;
@@ -112,6 +115,9 @@ public final class LauncherActivity extends AppCompatActivity {
     private TextView navigationArrival;
     private TextView navigationDuration;
     private TextView navigationDistance;
+    private TextView navigationManeuver;
+    private TextView navigationSpeedLimit;
+    private TextView navigationTrafficLight;
     private TextView navigationInactive;
     /** Opens the same Yandex product that supplied the current route; Navigator is the default. */
     private YandexWindowLauncher.Product navigationLaunchProduct =
@@ -128,6 +134,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private boolean activityStarted;
     private ClimatePanelView climatePanel;
     private FavoriteRoutesPanelView favoriteRoutesPanel;
+    private VehicleInfoPanelView vehicleInfoPanel;
     @Nullable private String appliedPanelElementsJson;
     private int appliedAppsColumns = -1;
     private int appliedActionsColumns = -1;
@@ -152,6 +159,7 @@ public final class LauncherActivity extends AppCompatActivity {
         panelElementStore = new PanelElementConfigStore(preferences);
         favoriteAppsConfigStore = new FavoriteAppsConfigStore(preferences);
         favoriteRoutesConfigStore = new FavoriteRoutesConfigStore(preferences);
+        vehicleInfoConfigStore = new VehicleInfoPanelConfigStore(preferences);
         configureWindow();
         setContentView(buildRoot());
         workspace.post(this::initializePanels);
@@ -181,6 +189,9 @@ public final class LauncherActivity extends AppCompatActivity {
                 && hasClimatePanelContent()) {
             climatePanel.start();
         }
+        if (vehicleInfoPanel != null && preferences.launcherVehicleInfoVisible.get()) {
+            vehicleInfoPanel.start();
+        }
     }
 
     @Override
@@ -188,6 +199,7 @@ public final class LauncherActivity extends AppCompatActivity {
         activityStarted = false;
         navigationUiHandler.removeCallbacks(navigationUiRefresh);
         if (climatePanel != null) climatePanel.stop();
+        if (vehicleInfoPanel != null) vehicleInfoPanel.stop();
         if (carIntegration != null) carIntegration.unsubscribeControlStates(carStateListener);
         if (mediaController != null) mediaController.stop();
         try { unregisterReceiver(navigationReceiver); } catch (IllegalArgumentException ignored) {}
@@ -245,6 +257,13 @@ public final class LauncherActivity extends AppCompatActivity {
             else climatePanel.stop();
         }
         if (mediaPanel != null) mediaPanel.reloadConfig();
+        boolean vehicleInfoVisible = preferences.launcherVehicleInfoVisible.get();
+        setPanelVisibility(LauncherLayoutStore.VEHICLE_INFO, vehicleInfoVisible);
+        if (vehicleInfoPanel != null) {
+            vehicleInfoPanel.reloadConfig();
+            if (activityStarted && vehicleInfoVisible) vehicleInfoPanel.start();
+            else vehicleInfoPanel.stop();
+        }
 
         layoutStore.load(workspace.getWidth(), workspace.getHeight());
         for (Map.Entry<String, LauncherElementFrame> entry : panels.entrySet()) {
@@ -412,6 +431,15 @@ public final class LauncherActivity extends AppCompatActivity {
             climateFrame.setCardBackgroundColor(Color.TRANSPARENT);
             climateFrame.setCardElevation(0);
         }
+        addPanel(LauncherLayoutStore.VEHICLE_INFO, "Данные автомобиля",
+                buildVehicleInfoPanel(), preferences.launcherVehicleInfoVisible.get());
+        LauncherElementFrame vehicleFrame = panels.get(LauncherLayoutStore.VEHICLE_INFO);
+        if (vehicleFrame != null) {
+            vehicleFrame.setCardBackgroundColor(Color.TRANSPARENT);
+            vehicleFrame.setCardElevation(0);
+            vehicleFrame.setVisibility(preferences.launcherVehicleInfoVisible.get()
+                    && vehicleInfoPanel.hasDisplayableSample() ? View.VISIBLE : View.GONE);
+        }
 
         mediaController = new LauncherMediaController(this, this::updateMedia);
         // initializePanels() is posted from onCreate. If the activity was stopped before that
@@ -422,6 +450,9 @@ public final class LauncherActivity extends AppCompatActivity {
         updateNavigation();
         if (activityStarted && preferences.launcherClimateVisible.get()
                 && hasClimatePanelContent()) climatePanel.start();
+        if (activityStarted && preferences.launcherVehicleInfoVisible.get()) {
+            vehicleInfoPanel.start();
+        }
         appliedPanelElementsJson = preferences.launcherPanelElementsJson.get();
         appliedAppsColumns = preferences.launcherAppsColumns.get();
         appliedActionsColumns = preferences.launcherActionsColumns.get();
@@ -433,6 +464,17 @@ public final class LauncherActivity extends AppCompatActivity {
         favoriteRoutesPanel = new FavoriteRoutesPanelView(this, favoriteRoutesConfigStore,
                 Math.max(1, Math.min(6, preferences.launcherFavoriteRoutesColumns.get())));
         return favoriteRoutesPanel;
+    }
+
+    @NonNull
+    private View buildVehicleInfoPanel() {
+        vehicleInfoPanel = new VehicleInfoPanelView(this, carIntegration,
+                vehicleInfoConfigStore);
+        vehicleInfoPanel.setContentVisibilityListener(contentVisible ->
+                setPanelVisibility(LauncherLayoutStore.VEHICLE_INFO,
+                        preferences.launcherVehicleInfoVisible.get()
+                                && (editMode || contentVisible)));
+        return vehicleInfoPanel;
     }
 
     private void addPanel(@NonNull String id, @NonNull String label, @NonNull View content,
@@ -538,6 +580,9 @@ public final class LauncherActivity extends AppCompatActivity {
         navigationArrival = null;
         navigationDuration = null;
         navigationDistance = null;
+        navigationManeuver = null;
+        navigationSpeedLimit = null;
+        navigationTrafficLight = null;
         navigationInactive = null;
         for (PanelElementConfigStore.Element element : config.enabled()) {
             TextView value;
@@ -550,6 +595,15 @@ public final class LauncherActivity extends AppCompatActivity {
             } else if (PanelElementConfigStore.NAV_DISTANCE.equals(element.id)) {
                 navigationDistance = value = text(18f * element.scalePercent / 100f,
                         Color.LTGRAY, false);
+            } else if (PanelElementConfigStore.NAV_MANEUVER.equals(element.id)) {
+                navigationManeuver = value = text(17f * element.scalePercent / 100f,
+                        Color.WHITE, false);
+            } else if (PanelElementConfigStore.NAV_SPEED_LIMIT.equals(element.id)) {
+                navigationSpeedLimit = value = text(18f * element.scalePercent / 100f,
+                        Color.rgb(255, 210, 90), true);
+            } else if (PanelElementConfigStore.NAV_TRAFFIC_LIGHT.equals(element.id)) {
+                navigationTrafficLight = value = text(18f * element.scalePercent / 100f,
+                        Color.WHITE, true);
             } else if (PanelElementConfigStore.NAV_INACTIVE.equals(element.id)) {
                 navigationInactive = value = text(16f * element.scalePercent / 100f,
                         Color.GRAY, false);
@@ -876,6 +930,10 @@ public final class LauncherActivity extends AppCompatActivity {
                 ? View.VISIBLE : View.GONE);
         doneButton.setVisibility(enabled ? View.VISIBLE : View.GONE);
         for (LauncherElementFrame frame : panels.values()) frame.setEditMode(enabled, snap);
+        if (vehicleInfoPanel != null && preferences.launcherVehicleInfoVisible.get()) {
+            setPanelVisibility(LauncherLayoutStore.VEHICLE_INFO,
+                    enabled || vehicleInfoPanel.hasDisplayableSample());
+        }
         Toast.makeText(this, enabled
                 ? "Тащите панель; маркер внизу справа изменяет размер"
                 : "Компоновка сохранена", Toast.LENGTH_SHORT).show();
@@ -887,13 +945,18 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private void updateNavigation() {
         if (navigationArrival == null && navigationDuration == null
-                && navigationDistance == null && navigationInactive == null) return;
+                && navigationDistance == null && navigationManeuver == null
+                && navigationSpeedLimit == null && navigationTrafficLight == null
+                && navigationInactive == null) return;
         NavigationDataRepository.Snapshot state = NavigationDataRepository.read(this);
-        if (!state.available) {
+        if (!state.available && !state.trafficAvailable) {
             navigationLaunchProduct = YandexWindowLauncher.Product.NAVIGATOR;
             if (navigationArrival != null) navigationArrival.setVisibility(View.GONE);
             if (navigationDuration != null) navigationDuration.setVisibility(View.GONE);
             if (navigationDistance != null) navigationDistance.setVisibility(View.GONE);
+            if (navigationManeuver != null) navigationManeuver.setVisibility(View.GONE);
+            if (navigationSpeedLimit != null) navigationSpeedLimit.setVisibility(View.GONE);
+            if (navigationTrafficLight != null) navigationTrafficLight.setVisibility(View.GONE);
             if (navigationInactive != null) {
                 navigationInactive.setVisibility(View.VISIBLE);
                 navigationInactive.setText("Маршрут не запущен\nНажмите, чтобы открыть Яндекс Навигатор");
@@ -903,19 +966,56 @@ public final class LauncherActivity extends AppCompatActivity {
         navigationLaunchProduct = NavigationDataRepository.PRODUCT_MAPS.equals(state.sourceProduct)
                 ? YandexWindowLauncher.Product.MAPS
                 : YandexWindowLauncher.Product.NAVIGATOR;
-        if (navigationInactive != null) navigationInactive.setVisibility(View.GONE);
+        if (navigationInactive != null) {
+            navigationInactive.setVisibility(state.available ? View.GONE : View.VISIBLE);
+            if (!state.available) navigationInactive.setText("Маршрут не запущен");
+        }
         if (navigationArrival != null) {
-            navigationArrival.setVisibility(View.VISIBLE);
+            navigationArrival.setVisibility(state.available ? View.VISIBLE : View.GONE);
             navigationArrival.setText(state.arrival.isEmpty() ? "Маршрут активен"
                     : "Время прибытия: " + state.arrival);
         }
         if (navigationDuration != null) {
-            navigationDuration.setVisibility(state.duration.isEmpty() ? View.GONE : View.VISIBLE);
+            navigationDuration.setVisibility(state.available && !state.duration.isEmpty()
+                    ? View.VISIBLE : View.GONE);
             navigationDuration.setText(state.duration.isEmpty() ? "" : "Осталось: " + state.duration);
         }
         if (navigationDistance != null) {
-            navigationDistance.setVisibility(state.distance.isEmpty() ? View.GONE : View.VISIBLE);
+            navigationDistance.setVisibility(state.available && !state.distance.isEmpty()
+                    ? View.VISIBLE : View.GONE);
             navigationDistance.setText(state.distance);
+        }
+        if (navigationManeuver != null) {
+            String maneuver = state.maneuverText.isEmpty()
+                    ? state.maneuverTitle : state.maneuverText;
+            navigationManeuver.setVisibility(state.available && !maneuver.isEmpty()
+                    ? View.VISIBLE : View.GONE);
+            navigationManeuver.setText(maneuver);
+        }
+        if (navigationSpeedLimit != null) {
+            navigationSpeedLimit.setVisibility(state.available && !state.speedLimit.isEmpty()
+                    ? View.VISIBLE : View.GONE);
+            navigationSpeedLimit.setText(state.speedLimit.isEmpty()
+                    ? "" : "Ограничение: " + state.speedLimit);
+        }
+        if (navigationTrafficLight != null) {
+            navigationTrafficLight.setVisibility(state.trafficAvailable
+                    ? View.VISIBLE : View.GONE);
+            if (state.trafficAvailable) {
+                String color;
+                int tint;
+                switch (state.trafficColor) {
+                    case "GREEN": color = "Зелёный"; tint = Color.rgb(80, 220, 120); break;
+                    case "YELLOW": color = "Жёлтый"; tint = Color.rgb(255, 210, 60); break;
+                    case "RED":
+                    default: color = "Красный"; tint = Color.rgb(255, 90, 90); break;
+                }
+                navigationTrafficLight.setTextColor(tint);
+                String suffix = state.trafficCountdown.isEmpty()
+                        ? "" : " · " + state.trafficCountdown + " с";
+                if (!state.trafficArrow.isEmpty()) suffix += " · " + state.trafficArrow;
+                navigationTrafficLight.setText("Светофор: " + color + suffix);
+            }
         }
     }
 

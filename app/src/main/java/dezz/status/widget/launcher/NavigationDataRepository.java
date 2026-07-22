@@ -49,6 +49,13 @@ public final class NavigationDataRepository {
     public static final String EXTRA_BROADCAST_ARRIVAL = "Arrival_text";
     public static final String EXTRA_BROADCAST_TIME = "Time_text";
     public static final String EXTRA_BROADCAST_DISTANCE = "Distance_text";
+    // Rich navigation contract consumed by mHUD-compatible MConfig/Plus Monjaro publishers.
+    public static final String ACTION_MONJARO_NAVIGATION_UPDATE =
+            "plus.monjaro.NAVIGATION_UPDATE";
+    public static final String ACTION_MONJARO_NAVIGATION_ENDED =
+            "plus.monjaro.NAVIGATION_ENDED";
+    public static final String ACTION_MONJARO_TRAFFIC_LIGHT_UPDATE =
+            "plus.monjaro.TRAFFIC_LIGHT_UPDATE";
 
     public static final String PRODUCT_NAVIGATOR = "navigator";
     public static final String PRODUCT_MAPS = "maps";
@@ -63,7 +70,15 @@ public final class NavigationDataRepository {
     private static final String PREF_UPDATED_AT = "updatedAt";
     private static final String PREF_SOURCE_PACKAGE = "sourcePackage";
     private static final String PREF_SOURCE_KEY = "sourceKey";
+    private static final String PREF_MANEUVER_TITLE = "maneuverTitle";
+    private static final String PREF_MANEUVER_TEXT = "maneuverText";
+    private static final String PREF_SPEED_LIMIT = "speedLimit";
+    private static final String PREF_TRAFFIC_COLOR = "trafficColor";
+    private static final String PREF_TRAFFIC_COUNTDOWN = "trafficCountdown";
+    private static final String PREF_TRAFFIC_ARROW = "trafficArrow";
+    private static final String PREF_TRAFFIC_UPDATED_AT = "trafficUpdatedAt";
     private static final long STALE_MS = 30L * 60L * 1000L;
+    private static final long TRAFFIC_STALE_MS = 120_000L;
     private static final long TIMESTAMP_WRITE_INTERVAL_MS = 60_000L;
     private static final int MAX_REMOTE_VIEW_NODES = 1_000;
 
@@ -75,15 +90,31 @@ public final class NavigationDataRepository {
         @NonNull public final String sourcePackage;
         /** Stable product id: navigator, maps, yango, google_maps or unknown. */
         @NonNull public final String sourceProduct;
+        @NonNull public final String maneuverTitle;
+        @NonNull public final String maneuverText;
+        @NonNull public final String speedLimit;
+        @NonNull public final String trafficColor;
+        @NonNull public final String trafficCountdown;
+        @NonNull public final String trafficArrow;
+        public final boolean trafficAvailable;
         public final boolean available;
 
         Snapshot(String arrival, String duration, String distance, String sourcePackage,
-                boolean available) {
+                boolean available, String maneuverTitle, String maneuverText, String speedLimit,
+                String trafficColor, String trafficCountdown, String trafficArrow,
+                boolean trafficAvailable) {
             this.arrival = arrival;
             this.duration = duration;
             this.distance = distance;
             this.sourcePackage = sourcePackage;
             this.sourceProduct = productForPackage(sourcePackage);
+            this.maneuverTitle = maneuverTitle;
+            this.maneuverText = maneuverText;
+            this.speedLimit = speedLimit;
+            this.trafficColor = trafficColor;
+            this.trafficCountdown = trafficCountdown;
+            this.trafficArrow = trafficArrow;
+            this.trafficAvailable = trafficAvailable;
             this.available = available;
         }
     }
@@ -248,10 +279,20 @@ public final class NavigationDataRepository {
         return true;
     }
 
-    /** Consumes com.yandex.ARRIVAL/TIME/DISTANCE broadcasts used by supported Yandex builds. */
+    /** Consumes scalar Yandex broadcasts and the richer mHUD-compatible Plus Monjaro contract. */
     public static boolean updateFromYandexBroadcast(@NonNull Context context,
             @NonNull Intent intent) {
         String action = intent.getAction();
+        if (ACTION_MONJARO_NAVIGATION_ENDED.equals(action)) {
+            clear(context);
+            return true;
+        }
+        if (ACTION_MONJARO_TRAFFIC_LIGHT_UPDATE.equals(action)) {
+            return updateTrafficLight(context, intent);
+        }
+        if (ACTION_MONJARO_NAVIGATION_UPDATE.equals(action)) {
+            return updateFromMonjaroNavigation(context, intent);
+        }
         if (!ACTION_YANDEX_ARRIVAL.equals(action) && !ACTION_YANDEX_TIME.equals(action)
                 && !ACTION_YANDEX_DISTANCE.equals(action)) return false;
 
@@ -323,10 +364,17 @@ public final class NavigationDataRepository {
             boolean hadData = prefs.getLong(PREF_UPDATED_AT, 0L) > 0
                     || !prefs.getString(PREF_ARRIVAL, "").isEmpty()
                     || !prefs.getString(PREF_DURATION, "").isEmpty()
-                    || !prefs.getString(PREF_DISTANCE, "").isEmpty();
+                    || !prefs.getString(PREF_DISTANCE, "").isEmpty()
+                    || !prefs.getString(PREF_MANEUVER_TITLE, "").isEmpty()
+                    || !prefs.getString(PREF_MANEUVER_TEXT, "").isEmpty()
+                    || !prefs.getString(PREF_SPEED_LIMIT, "").isEmpty()
+                    || prefs.getLong(PREF_TRAFFIC_UPDATED_AT, 0L) > 0;
             prefs.edit().remove(PREF_ARRIVAL).remove(PREF_DURATION).remove(PREF_DISTANCE)
                     .remove(PREF_UPDATED_AT).remove(PREF_SOURCE_PACKAGE)
-                    .remove(PREF_SOURCE_KEY).apply();
+                    .remove(PREF_SOURCE_KEY).remove(PREF_MANEUVER_TITLE)
+                    .remove(PREF_MANEUVER_TEXT).remove(PREF_SPEED_LIMIT)
+                    .remove(PREF_TRAFFIC_COLOR).remove(PREF_TRAFFIC_COUNTDOWN)
+                    .remove(PREF_TRAFFIC_ARROW).remove(PREF_TRAFFIC_UPDATED_AT).apply();
             if (hadData) notifyChanged(context);
         }
     }
@@ -336,9 +384,87 @@ public final class NavigationDataRepository {
         SharedPreferences prefs = preferences(context);
         long updatedAt = prefs.getLong(PREF_UPDATED_AT, 0L);
         boolean available = updatedAt > 0 && System.currentTimeMillis() - updatedAt <= STALE_MS;
+        long trafficUpdatedAt = prefs.getLong(PREF_TRAFFIC_UPDATED_AT, 0L);
+        boolean trafficAvailable = trafficUpdatedAt > 0
+                && System.currentTimeMillis() - trafficUpdatedAt <= TRAFFIC_STALE_MS;
         return new Snapshot(prefs.getString(PREF_ARRIVAL, ""),
                 prefs.getString(PREF_DURATION, ""), prefs.getString(PREF_DISTANCE, ""),
-                prefs.getString(PREF_SOURCE_PACKAGE, ""), available);
+                prefs.getString(PREF_SOURCE_PACKAGE, ""), available,
+                prefs.getString(PREF_MANEUVER_TITLE, ""),
+                prefs.getString(PREF_MANEUVER_TEXT, ""),
+                prefs.getString(PREF_SPEED_LIMIT, ""),
+                prefs.getString(PREF_TRAFFIC_COLOR, ""),
+                prefs.getString(PREF_TRAFFIC_COUNTDOWN, ""),
+                prefs.getString(PREF_TRAFFIC_ARROW, ""), trafficAvailable);
+    }
+
+    private static boolean updateFromMonjaroNavigation(@NonNull Context context,
+            @NonNull Intent intent) {
+        if (!intent.getBooleanExtra("route_active", true)) {
+            clear(context);
+            return true;
+        }
+        Bundle extras = intent.getExtras();
+        String title = text(value(extras, "title"));
+        String maneuver = text(value(extras, "text"));
+        String subtext = text(value(extras, "subtext"));
+        String speedLimit = text(value(extras, "speedlimit"));
+        List<String> values = new ArrayList<>();
+        if (!subtext.isEmpty()) values.add(subtext);
+        NavigationDataParser.Parsed parsed = NavigationDataParser.parse(values);
+        String sourcePackage = sourcePackageFromHint(text(value(extras, "source")));
+        if (parsed.hasData()) {
+            persist(context, parsed, sourcePackage, "broadcast:plus.monjaro", true);
+        }
+        if (!parsed.hasData() && title.isEmpty() && maneuver.isEmpty() && speedLimit.isEmpty()) {
+            return false;
+        }
+        SharedPreferences prefs = preferences(context);
+        long now = System.currentTimeMillis();
+        boolean changed = !title.equals(prefs.getString(PREF_MANEUVER_TITLE, ""))
+                || !maneuver.equals(prefs.getString(PREF_MANEUVER_TEXT, ""))
+                || !speedLimit.equals(prefs.getString(PREF_SPEED_LIMIT, ""));
+        prefs.edit().putString(PREF_MANEUVER_TITLE, title)
+                .putString(PREF_MANEUVER_TEXT, maneuver)
+                .putString(PREF_SPEED_LIMIT, speedLimit)
+                .putString(PREF_SOURCE_PACKAGE, sourcePackage)
+                .putString(PREF_SOURCE_KEY, "broadcast:plus.monjaro")
+                .putLong(PREF_UPDATED_AT, now).apply();
+        if (changed || !parsed.hasData()) notifyChanged(context);
+        return true;
+    }
+
+    private static boolean updateTrafficLight(@NonNull Context context,
+            @NonNull Intent intent) {
+        Bundle extras = intent.getExtras();
+        String color = text(value(extras, "tl_color")).toUpperCase(java.util.Locale.ROOT);
+        String countdown = text(value(extras, "tl_countdown"));
+        String arrow = text(value(extras, "tl_arrow"));
+        if (!"RED".equals(color) && !"YELLOW".equals(color) && !"GREEN".equals(color)) {
+            return false;
+        }
+        SharedPreferences prefs = preferences(context);
+        boolean changed = !color.equals(prefs.getString(PREF_TRAFFIC_COLOR, ""))
+                || !countdown.equals(prefs.getString(PREF_TRAFFIC_COUNTDOWN, ""))
+                || !arrow.equals(prefs.getString(PREF_TRAFFIC_ARROW, ""));
+        prefs.edit().putString(PREF_TRAFFIC_COLOR, color)
+                .putString(PREF_TRAFFIC_COUNTDOWN, countdown)
+                .putString(PREF_TRAFFIC_ARROW, arrow)
+                .putLong(PREF_TRAFFIC_UPDATED_AT, System.currentTimeMillis()).apply();
+        if (changed) notifyChanged(context);
+        return true;
+    }
+
+    @NonNull
+    private static String sourcePackageFromHint(@NonNull String source) {
+        String lower = source.toLowerCase(java.util.Locale.ROOT);
+        return lower.contains("maps") || lower.contains("карты")
+                ? PACKAGE_YANDEX_MAPS : PACKAGE_YANDEX_NAVIGATOR;
+    }
+
+    @NonNull
+    private static String text(@Nullable Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
     }
 
     private static void persist(Context context, NavigationDataParser.Parsed parsed,

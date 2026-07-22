@@ -472,6 +472,12 @@ public class Preferences {
             "launcherFavoriteRoutesColumns", 2);
     // Opt-in on upgrades so a new large panel never covers an existing hand-tuned HOME layout.
     public final Bool launcherClimateVisible = new Bool(this, "launcherClimateVisible", false);
+    // Independent HOME surface for live eCarX/HUD telemetry.  Content and appearance live in a
+    // versioned JSON document so new metrics can be added without invalidating existing layouts.
+    public final Bool launcherVehicleInfoVisible = new Bool(this,
+            "launcherVehicleInfoVisible", true);
+    public final Str launcherVehicleInfoConfigJson = new Str(this,
+            "launcherVehicleInfoConfigJson", "");
     // Per-panel inner element visibility/order/scale. Kept separate from outer pixel geometry so
     // older HOME layouts migrate without moving any panel on upgrade.
     public final Str launcherPanelElementsJson = new Str(this, "launcherPanelElementsJson", "");

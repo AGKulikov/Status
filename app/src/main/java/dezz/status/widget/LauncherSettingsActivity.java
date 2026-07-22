@@ -83,6 +83,7 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         addSwitch("Избранные маршруты", preferences.launcherFavoriteRoutesVisible);
         addSwitch("Быстрые действия", preferences.launcherActionsVisible);
         addSwitch("Отдельная климатическая панель", preferences.launcherClimateVisible);
+        addSwitch("Данные автомобиля / HUD", preferences.launcherVehicleInfoVisible);
         addButton("Состав, порядок и размеры элементов панелей…", v ->
                 startActivity(new Intent(this, PanelElementSettingsActivity.class)));
         addButton("Настроить избранные приложения…", v ->
@@ -93,6 +94,8 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
                 startActivity(new Intent(this, FavoriteRoutesSettingsActivity.class)));
         addButton("Настроить климатическую панель…", v ->
                 startActivity(new Intent(this, ClimatePanelSettingsActivity.class)));
+        addButton("Настроить данные автомобиля…", v ->
+                startActivity(new Intent(this, VehicleInfoPanelSettingsActivity.class)));
         addButton("Иконки, функции и приложения…", v ->
                 startActivity(new Intent(this, LauncherShortcutSettingsActivity.class)));
         addActionsColumnsControl();

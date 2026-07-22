@@ -32,8 +32,11 @@ import com.ecarx.xui.adaptapi.car.base.ICarFunction;
 import com.ecarx.xui.adaptapi.car.base.ICarInfo;
 import com.ecarx.xui.adaptapi.car.hvac.IHvac;
 import com.ecarx.xui.adaptapi.car.sensor.ISensor;
+import com.ecarx.xui.adaptapi.car.vehicle.IBcm;
 import com.ecarx.xui.adaptapi.car.vehicle.IDriveMode;
 import com.ecarx.xui.adaptapi.car.vehicle.IVehicle;
+import com.ecarx.xui.adaptapi.tpms.ITireState;
+import com.ecarx.xui.adaptapi.tpms.TPMS;
 import com.ecarx.xui.adaptapi.vehicle.VehicleSeat;
 
 import java.util.ArrayList;
@@ -93,6 +96,14 @@ final class GeelyCarIntegration implements CarIntegration {
     private static final int CONTROL_WRITE_ATTEMPTS = 6;
     private static final int NO_ZONE = Integer.MIN_VALUE;
 
+    /** Geely extension signals used by the instrument cluster but absent from this SDK's stubs. */
+    private static final int SENSOR_TYPE_AVERAGE_CONSUMPTION = 4_194_560;
+    private static final int SENSOR_TYPE_INSTANT_CONSUMPTION = 4_194_816;
+    private static final int SENSOR_TYPE_AVERAGE_CONSUMPTION_ONE_IGNITION = 4_195_072;
+    private static final long BCM_STATE_POLL_INTERVAL_MS = 300L;
+    /** Longer than a normal indicator's dark half-cycle, but still quick when it is cancelled. */
+    private static final long TURN_SIGNAL_OFF_HOLD_MS = 1_000L;
+
     private final Context appContext;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Map<BrickType, Subscription> subscriptions = new EnumMap<>(BrickType.class);
@@ -101,6 +112,8 @@ final class GeelyCarIntegration implements CarIntegration {
     private final Object telemetryLock = new Object();
     private final Map<TelemetryListener, TelemetrySubscription> telemetrySubscriptions =
             new IdentityHashMap<>();
+    /** Worker-thread-only debounce state shared by all subscribers of the same physical lamp. */
+    private final Map<String, Long> bcmLastOnMillis = new HashMap<>();
     private final Object controlsLock = new Object();
     private final Map<ControlStateListener, ControlSubscription> controlSubscriptions =
             new IdentityHashMap<>();
@@ -129,6 +142,24 @@ final class GeelyCarIntegration implements CarIntegration {
     private final Runnable controlRefreshTask = () -> {
         controlRefreshScheduled = false;
         executeTelemetryTask(this::refreshControlRegistrationAndStates);
+    };
+    /** Main-thread scheduler; the next tick is queued only after the previous Binder read ends. */
+    private boolean bcmPollScheduled;
+    private boolean bcmPollInFlight;
+    private final Runnable bcmPollTask = () -> {
+        bcmPollScheduled = false;
+        if (!hasBcmTelemetryDemand()) return;
+        bcmPollInFlight = true;
+        executeTelemetryTask(() -> {
+            try {
+                pollBcmTelemetryOnce();
+            } finally {
+                mainHandler.post(() -> {
+                    bcmPollInFlight = false;
+                    scheduleNextBcmPoll();
+                });
+            }
+        });
     };
 
     @Nullable
@@ -173,17 +204,32 @@ final class GeelyCarIntegration implements CarIntegration {
         final String unitNote;
         final String telemetryUnit;
         final boolean boundedTemperature;
+        final boolean eventOnly;
+        final boolean probeWithoutSupport;
+        final long staleAfterMillis;
 
         TelemetrySignal(String id, String label, int sensorType, String unitNote,
                         boolean boundedTemperature) {
+            this(id, label, sensorType, unitNote, boundedTemperature ? "°C" : "raw",
+                    boundedTemperature, false, false, 120_000L);
+        }
+
+        TelemetrySignal(String id, String label, int sensorType, String unitNote,
+                        String telemetryUnit, boolean boundedTemperature, boolean eventOnly,
+                        boolean probeWithoutSupport, long staleAfterMillis) {
             this.id = "ISensor." + id;
             this.label = label;
             this.sensorType = sensorType;
             this.unitNote = unitNote;
             this.boundedTemperature = boundedTemperature;
-            // Streaming consumers need a compact machine-facing unit. Detailed uncertainty and
-            // provenance remain in the diagnostics-only unitNote above.
-            this.telemetryUnit = boundedTemperature ? "°C" : "raw";
+            this.telemetryUnit = telemetryUnit;
+            this.eventOnly = eventOnly;
+            this.probeWithoutSupport = probeWithoutSupport;
+            this.staleAfterMillis = staleAfterMillis;
+        }
+
+        CarTelemetryDescriptor descriptor() {
+            return new CarTelemetryDescriptor(id, label, telemetryUnit, true, staleAfterMillis);
         }
     }
 
@@ -218,7 +264,26 @@ final class GeelyCarIntegration implements CarIntegration {
             new TelemetrySignal("vehicle_weight", "Масса автомобиля — raw",
                     ISensor.SENSOR_TYPE_VEHICLE_WEIGHT, "raw", false),
             new TelemetrySignal("ev_battery_level", "Заряд тяговой батареи — raw",
-                    ISensor.SENSOR_TYPE_EV_BATTERY_LEVEL, "raw", false)
+                    ISensor.SENSOR_TYPE_EV_BATTERY_LEVEL, "raw", false),
+            new TelemetrySignal("avg_fuel_consumption", "Средний расход",
+                    SENSOR_TYPE_AVERAGE_CONSUMPTION,
+                    "Расширенный сигнал Geely; литры на 100 км", "L/100 km",
+                    false, false, true, 120_000L),
+            new TelemetrySignal("instant_fuel_consumption", "Мгновенный расход",
+                    SENSOR_TYPE_INSTANT_CONSUMPTION,
+                    "Расширенный сигнал Geely; литры на 100 км", "L/100 km",
+                    false, false, true, 30_000L),
+            new TelemetrySignal("avg_fuel_consumption_ignition",
+                    "Средний расход за текущую поездку",
+                    SENSOR_TYPE_AVERAGE_CONSUMPTION_ONE_IGNITION,
+                    "Расширенный сигнал Geely с момента включения зажигания; литры на 100 км",
+                    "L/100 km", false, false, true, 120_000L),
+            new TelemetrySignal("gear", "Передача", ISensor.SENSOR_TYPE_GEAR,
+                    "Код ISensorEvent.GEAR_*", "", false, true, true, 0L),
+            new TelemetrySignal("ignition_state", "Состояние зажигания",
+                    ISensor.SENSOR_TYPE_IGNITION_STATE,
+                    "Код ISensorEvent.IGNITION_STATE_*", "",
+                    false, true, false, 0L)
     };
 
     private static final String FUEL_CAPACITY_ID = "ICarInfo.fuel_capacity";
@@ -227,12 +292,77 @@ final class GeelyCarIntegration implements CarIntegration {
             "Единица AdaptAPI не указана; нужна сверка на автомобиле";
     private static final String FUEL_CAPACITY_TELEMETRY_UNIT = "raw";
 
+    private static final class TireMetric {
+        final String id;
+        final String label;
+        final int tireId;
+        final boolean pressure;
+
+        TireMetric(String positionId, String positionLabel, int tireId, boolean pressure) {
+            this.id = "TPMS." + (pressure ? "pressure." : "temperature.") + positionId;
+            this.label = (pressure ? "Давление" : "Температура") + " — " + positionLabel;
+            this.tireId = tireId;
+            this.pressure = pressure;
+        }
+
+        String unit() { return pressure ? "bar" : "°C"; }
+
+        CarTelemetryDescriptor descriptor() {
+            return new CarTelemetryDescriptor(id, label, unit(), true, 600_000L);
+        }
+    }
+
+    private static final TireMetric[] TIRE_METRICS = {
+            new TireMetric("front_left", "переднее левое", TPMS.TIRE_ID_LEFT_FRONT, true),
+            new TireMetric("front_left", "переднее левое", TPMS.TIRE_ID_LEFT_FRONT, false),
+            new TireMetric("front_right", "переднее правое", TPMS.TIRE_ID_RIGHT_FRONT, true),
+            new TireMetric("front_right", "переднее правое", TPMS.TIRE_ID_RIGHT_FRONT, false),
+            new TireMetric("rear_left", "заднее левое", TPMS.TIRE_ID_LEFT_REAR, true),
+            new TireMetric("rear_left", "заднее левое", TPMS.TIRE_ID_LEFT_REAR, false),
+            new TireMetric("rear_right", "заднее правое", TPMS.TIRE_ID_RIGHT_REAR, true),
+            new TireMetric("rear_right", "заднее правое", TPMS.TIRE_ID_RIGHT_REAR, false)
+    };
+
+    private static final class BcmMetric {
+        final String id;
+        final String label;
+        final int functionId;
+        final boolean turnSignal;
+
+        BcmMetric(String id, String label, int functionId, boolean turnSignal) {
+            this.id = "IBcm." + id;
+            this.label = label;
+            this.functionId = functionId;
+            this.turnSignal = turnSignal;
+        }
+
+        CarTelemetryDescriptor descriptor() {
+            return new CarTelemetryDescriptor(id, label, "", true, 1_500L);
+        }
+    }
+
+    private static final BcmMetric[] BCM_METRICS = {
+            new BcmMetric("high_beam", "Дальний свет",
+                    IBcm.BCM_FUNC_LIGHT_MAIN_BEAM, false),
+            new BcmMetric("turn_signal_left", "Левый указатель поворота",
+                    IBcm.BCM_FUNC_LIGHT_LEFT_TRUN_SIGNAL, true),
+            new BcmMetric("turn_signal_right", "Правый указатель поворота",
+                    IBcm.BCM_FUNC_LIGHT_RIGHT_TRUN_SIGNAL, true)
+    };
+
+    private static final List<CarTelemetryDescriptor> TELEMETRY_CATALOG =
+            buildTelemetryCatalog();
+
     private static final class TelemetrySubscription {
         final TelemetryListener listener;
         final Set<String> metricIds;
         final AtomicBoolean cancelled = new AtomicBoolean(false);
         /** Accessed only by telemetryWorker. */
         final List<VendorRegistration> vendorListeners = new ArrayList<>();
+        /** Worker-thread-only per-listener dedupe; new listeners still receive an initial state. */
+        final Map<String, Integer> lastBcmValues = new HashMap<>();
+        @Nullable TPMS tpmsSource;
+        @Nullable TPMS.ITireStateMonitor tireStateMonitor;
 
         TelemetrySubscription(TelemetryListener listener, Set<String> metricIds) {
             this.listener = listener;
@@ -446,8 +576,20 @@ final class GeelyCarIntegration implements CarIntegration {
 
     /** Integer-valued event channels use both extrema as their documented/observed no-data form. */
     static boolean isValidTelemetryEventValue(int value, boolean boundedTemperature) {
-        return value != Integer.MIN_VALUE && value != Integer.MAX_VALUE
+        return value != -1 && value != Integer.MIN_VALUE && value != Integer.MAX_VALUE
                 && isValidTelemetryValue(value, boundedTemperature);
+    }
+
+    /** TPMS implementations observed in the field return either bar or hundredths of a bar. */
+    static float normalizeTirePressureBar(float rawPressure) {
+        if (!Float.isFinite(rawPressure) || rawPressure <= 0f) return Float.NaN;
+        float bar = rawPressure >= 40f ? rawPressure / 100f : rawPressure;
+        return bar >= 0.1f && bar <= 10f ? bar : Float.NaN;
+    }
+
+    static boolean isValidTireTemperature(float celsius) {
+        return Float.isFinite(celsius) && !isObviousFloatSentinel(celsius)
+                && celsius >= -40f && celsius <= 150f;
     }
 
     private static boolean isObviousFloatSentinel(float value) {
@@ -465,7 +607,28 @@ final class GeelyCarIntegration implements CarIntegration {
             if (requested.contains(signal.id)) selected.add(signal.id);
         }
         if (requested.contains(FUEL_CAPACITY_ID)) selected.add(FUEL_CAPACITY_ID);
+        for (TireMetric metric : TIRE_METRICS) {
+            if (requested.contains(metric.id)) selected.add(metric.id);
+        }
+        for (BcmMetric metric : BCM_METRICS) {
+            if (requested.contains(metric.id)) selected.add(metric.id);
+        }
         return Collections.unmodifiableSet(selected);
+    }
+
+    private static List<CarTelemetryDescriptor> buildTelemetryCatalog() {
+        List<CarTelemetryDescriptor> catalog = new ArrayList<>();
+        for (TelemetrySignal signal : TELEMETRY_SIGNALS) catalog.add(signal.descriptor());
+        catalog.add(new CarTelemetryDescriptor(FUEL_CAPACITY_ID, FUEL_CAPACITY_LABEL,
+                FUEL_CAPACITY_TELEMETRY_UNIT, false, 0L));
+        for (TireMetric metric : TIRE_METRICS) catalog.add(metric.descriptor());
+        for (BcmMetric metric : BCM_METRICS) catalog.add(metric.descriptor());
+        return Collections.unmodifiableList(catalog);
+    }
+
+    @Override
+    public void requestTelemetryCatalog(@NonNull TelemetryCatalogListener listener) {
+        mainHandler.post(() -> listener.onCatalog(TELEMETRY_CATALOG));
     }
 
     /** Resolve the AdaptAPI root service; an early null/exception is deliberately retryable. */
@@ -578,6 +741,7 @@ final class GeelyCarIntegration implements CarIntegration {
                 if (s == null) addUnavailableSensor(values, TELEMETRY_SIGNALS[index]);
                 else addSensor(values, s, TELEMETRY_SIGNALS[index]);
             }
+            addTireDiagnostics(values);
             mainHandler.post(() -> listener.onDiagnostics(values));
         }, "ecarx-diagnostics").start();
     }
@@ -601,11 +765,19 @@ final class GeelyCarIntegration implements CarIntegration {
         }
         String raw = "—";
         Float numeric = null;
-        if (status == FunctionStatus.active || status == FunctionStatus.notactive) {
+        if (isSupported(status) || signal.probeWithoutSupport) {
             try {
-                float latest = s.getSensorLatestValue(signal.sensorType);
-                raw = Float.toString(latest);
-                if (isValidTelemetryValue(latest, signal.boundedTemperature)) numeric = latest;
+                if (signal.eventOnly) {
+                    int latest = s.getSensorEvent(signal.sensorType);
+                    raw = Integer.toString(latest);
+                    if (isValidTelemetryEventValue(latest, signal.boundedTemperature)) {
+                        numeric = (float) latest;
+                    }
+                } else {
+                    float latest = s.getSensorLatestValue(signal.sensorType);
+                    raw = Float.toString(latest);
+                    if (isValidTelemetryValue(latest, signal.boundedTemperature)) numeric = latest;
+                }
             } catch (Throwable t) {
                 invalidateSensorProxy(s);
                 raw = "error: " + t.getClass().getSimpleName();
@@ -613,6 +785,41 @@ final class GeelyCarIntegration implements CarIntegration {
         }
         out.add(new CarDiagnosticValue(signal.id, signal.label, String.valueOf(status), raw,
                 signal.unitNote + "; signal=" + signal.sensorType, numeric));
+    }
+
+    private void addTireDiagnostics(List<CarDiagnosticValue> out) {
+        TPMS tpms;
+        try {
+            tpms = TPMS.create(appContext);
+            if (tpms == null) throw new IllegalStateException("TPMS.create returned null");
+        } catch (Throwable t) {
+            for (TireMetric metric : TIRE_METRICS) {
+                out.add(new CarDiagnosticValue(metric.id, metric.label, "error",
+                        t.getClass().getSimpleName(), metric.unit()));
+            }
+            return;
+        }
+        for (TireMetric metric : TIRE_METRICS) {
+            String raw = "—";
+            Float numeric = null;
+            try {
+                ITireState state = tpms.getTireState(metric.tireId);
+                if (state != null) {
+                    float value = metric.pressure ? state.getPressure() : state.getTemperature();
+                    raw = Float.toString(value);
+                    if (metric.pressure) {
+                        float bar = normalizeTirePressureBar(value);
+                        if (Float.isFinite(bar)) numeric = bar;
+                    } else if (isValidTireTemperature(value)) {
+                        numeric = value;
+                    }
+                }
+            } catch (Throwable t) {
+                raw = "error: " + t.getClass().getSimpleName();
+            }
+            out.add(new CarDiagnosticValue(metric.id, metric.label, "unknown", raw,
+                    metric.unit() + "; tire=" + metric.tireId, numeric));
+        }
     }
 
     private void addCarInfo(List<CarDiagnosticValue> out, String id, String label,
@@ -994,6 +1201,7 @@ final class GeelyCarIntegration implements CarIntegration {
             if (previous != null) unregisterTelemetryVendorListeners(previous);
             activateTelemetrySubscription(next);
         });
+        mainHandler.post(this::reconcileBcmPolling);
     }
 
     @Override
@@ -1006,14 +1214,22 @@ final class GeelyCarIntegration implements CarIntegration {
         removed.cancelled.set(true);
         executeTelemetryTask(() -> unregisterTelemetryVendorListeners(removed));
         mainHandler.post(this::pruneRecoveryRequests);
+        mainHandler.post(this::reconcileBcmPolling);
     }
 
     private void activateTelemetrySubscription(TelemetrySubscription subscription) {
         if (subscription.cancelled.get()) return;
         boolean needsSensors = false;
+        boolean needsTires = false;
         for (TelemetrySignal signal : TELEMETRY_SIGNALS) {
             if (subscription.metricIds.contains(signal.id)) {
                 needsSensors = true;
+                break;
+            }
+        }
+        for (TireMetric metric : TIRE_METRICS) {
+            if (subscription.metricIds.contains(metric.id)) {
+                needsTires = true;
                 break;
             }
         }
@@ -1035,20 +1251,132 @@ final class GeelyCarIntegration implements CarIntegration {
         if (subscription.metricIds.contains(FUEL_CAPACITY_ID)) {
             emitInitialFuelCapacity(subscription);
         }
+        if (needsTires && !subscription.cancelled.get()) {
+            registerTireTelemetry(subscription);
+        }
+    }
+
+    private boolean hasBcmTelemetryDemand() {
+        synchronized (telemetryLock) {
+            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
+                if (subscription.cancelled.get()) continue;
+                for (BcmMetric metric : BCM_METRICS) {
+                    if (subscription.metricIds.contains(metric.id)) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Main-thread only: start immediately on first demand and fully stop after the last one. */
+    private void reconcileBcmPolling() {
+        if (!hasBcmTelemetryDemand()) {
+            mainHandler.removeCallbacks(bcmPollTask);
+            bcmPollScheduled = false;
+            executeTelemetryTask(bcmLastOnMillis::clear);
+            return;
+        }
+        if (!bcmPollScheduled && !bcmPollInFlight) {
+            bcmPollScheduled = true;
+            mainHandler.post(bcmPollTask);
+        }
+    }
+
+    private void scheduleNextBcmPoll() {
+        if (!hasBcmTelemetryDemand()) {
+            reconcileBcmPolling();
+            return;
+        }
+        if (!bcmPollScheduled && !bcmPollInFlight) {
+            bcmPollScheduled = true;
+            mainHandler.postDelayed(bcmPollTask, BCM_STATE_POLL_INTERVAL_MS);
+        }
+    }
+
+    private void pollBcmTelemetryOnce() {
+        List<TelemetrySubscription> subscribers = new ArrayList<>();
+        LinkedHashSet<String> demandedIds = new LinkedHashSet<>();
+        synchronized (telemetryLock) {
+            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
+                if (subscription.cancelled.get()) continue;
+                boolean demanded = false;
+                for (BcmMetric metric : BCM_METRICS) {
+                    if (subscription.metricIds.contains(metric.id)) {
+                        demandedIds.add(metric.id);
+                        demanded = true;
+                    }
+                }
+                if (demanded) subscribers.add(subscription);
+            }
+        }
+        bcmLastOnMillis.keySet().retainAll(demandedIds);
+        if (demandedIds.isEmpty()) return;
+
+        ICarFunction source = ensureCarFunctions();
+        if (source == null) return;
+        long nowMillis = System.nanoTime() / 1_000_000L;
+        for (BcmMetric metric : BCM_METRICS) {
+            if (!demandedIds.contains(metric.id)) continue;
+            final int raw;
+            try {
+                raw = source.getFunctionValue(metric.functionId);
+            } catch (UnsupportedOperationException ignored) {
+                continue;
+            } catch (Throwable t) {
+                invalidateFunctionProxy(source);
+                Log.w(TAG, "BCM telemetry read failed for " + metric.id, t);
+                return;
+            }
+            int binary = normalizeBcmBinaryValue(raw);
+            if (binary < 0) continue;
+            int stable = binary;
+            if (metric.turnSignal) {
+                Long lastOn = bcmLastOnMillis.get(metric.id);
+                if (binary == 1) {
+                    bcmLastOnMillis.put(metric.id, nowMillis);
+                } else {
+                    stable = stabilizeTurnSignalValue(binary,
+                            lastOn == null ? -1L : lastOn, nowMillis);
+                }
+            }
+            for (TelemetrySubscription subscription : subscribers) {
+                if (subscription.cancelled.get()
+                        || !subscription.metricIds.contains(metric.id)) continue;
+                Integer previous = subscription.lastBcmValues.put(metric.id, stable);
+                if (previous != null && previous == stable) continue;
+                deliverTelemetry(subscription, metric.id, metric.label, "", stable);
+            }
+        }
+    }
+
+    /** Only real off/on values are exposed; SDK unknown/error/default codes are ignored. */
+    static int normalizeBcmBinaryValue(int raw) {
+        if (raw == ICarFunction.COMMON_VALUE_OFF) return 0;
+        if (raw == ICarFunction.COMMON_VALUE_ON) return 1;
+        return -1;
+    }
+
+    /** Keep an active indicator lit across the lamp's normal dark half-cycle. */
+    static int stabilizeTurnSignalValue(int binary, long lastOnMillis, long nowMillis) {
+        if (binary == 1) return 1;
+        if (binary != 0) return -1;
+        return lastOnMillis >= 0L && nowMillis >= lastOnMillis
+                && nowMillis - lastOnMillis <= TURN_SIGNAL_OFF_HOLD_MS ? 1 : 0;
     }
 
     private void registerTelemetrySignal(ISensor source, TelemetrySignal signal,
                                          TelemetrySubscription subscription) {
         FunctionStatus initialStatus = sensorSupportStatus(source, signal.sensorType);
         AtomicBoolean supported = new AtomicBoolean(isSupported(initialStatus));
-        if (!supported.get() && (initialStatus == null || initialStatus == FunctionStatus.error)) {
+        if (!signal.probeWithoutSupport && !supported.get()
+                && (initialStatus == null || initialStatus == FunctionStatus.error)) {
             requestSensorRecovery(signal.sensorType);
         }
         ISensor.ISensorListener vendorListener = new ISensor.ISensorListener() {
             @Override public void onSensorEventChanged(int changedType, int value) {
                 if (subscription.cancelled.get() || changedType != signal.sensorType
-                        || !isValidTelemetryEventValue(value, signal.boundedTemperature)
-                        || !supported.get()) return;
+                        || !isValidTelemetryEventValue(value, signal.boundedTemperature)) return;
+                supported.set(true);
                 // Several nominally numeric AdaptAPI signals (notably fluid/oil levels) are
                 // exposed through the integer event callback on some firmware revisions.
                 deliverTelemetry(subscription, signal.id, signal.label,
@@ -1059,7 +1387,8 @@ final class GeelyCarIntegration implements CarIntegration {
                 if (changedType != signal.sensorType || subscription.cancelled.get()) return;
                 supported.set(isSupported(status));
                 if (!isSupported(status)) {
-                    if (status == null || status == FunctionStatus.error) {
+                    if (!signal.probeWithoutSupport
+                            && (status == null || status == FunctionStatus.error)) {
                         requestSensorRecovery(signal.sensorType);
                     }
                     return;
@@ -1073,8 +1402,9 @@ final class GeelyCarIntegration implements CarIntegration {
 
             @Override public void onSensorValueChanged(int changedType, float value) {
                 if (subscription.cancelled.get() || changedType != signal.sensorType
-                        || !isValidTelemetryValue(value, signal.boundedTemperature)
-                        || !supported.get()) return;
+                        || signal.eventOnly
+                        || !isValidTelemetryValue(value, signal.boundedTemperature)) return;
+                supported.set(true);
                 deliverTelemetry(subscription, signal.id, signal.label,
                         signal.telemetryUnit, value);
             }
@@ -1101,24 +1431,97 @@ final class GeelyCarIntegration implements CarIntegration {
         if (subscription.cancelled.get()) return;
         FunctionStatus status = sensorSupportStatus(source, signal.sensorType);
         supported.set(isSupported(status));
-        if (!isSupported(status)) {
+        if (!isSupported(status) && !signal.probeWithoutSupport) {
             if (status == null || status == FunctionStatus.error) {
                 requestSensorRecovery(signal.sensorType);
             }
             return;
         }
         try {
-            float latest = source.getSensorLatestValue(signal.sensorType);
-            if (isValidTelemetryValue(latest, signal.boundedTemperature)) {
-                deliverTelemetry(subscription, signal.id, signal.label,
-                        signal.telemetryUnit, latest);
-            } else if (isObviousFloatSentinel(latest)) {
-                requestSensorRecovery(signal.sensorType);
+            if (signal.eventOnly) {
+                int latest = source.getSensorEvent(signal.sensorType);
+                if (isValidTelemetryEventValue(latest, signal.boundedTemperature)) {
+                    supported.set(true);
+                    deliverTelemetry(subscription, signal.id, signal.label,
+                            signal.telemetryUnit, latest);
+                } else if (!signal.probeWithoutSupport) {
+                    requestSensorRecovery(signal.sensorType);
+                }
+            } else {
+                float latest = source.getSensorLatestValue(signal.sensorType);
+                if (isValidTelemetryValue(latest, signal.boundedTemperature)) {
+                    supported.set(true);
+                    deliverTelemetry(subscription, signal.id, signal.label,
+                            signal.telemetryUnit, latest);
+                } else if (isObviousFloatSentinel(latest) && !signal.probeWithoutSupport) {
+                    requestSensorRecovery(signal.sensorType);
+                }
             }
         } catch (Throwable t) {
             invalidateSensorProxy(source);
             Log.w(TAG, "telemetry initial read failed for " + signal.id, t);
-            requestSensorRecovery(signal.sensorType);
+            if (!signal.probeWithoutSupport) requestSensorRecovery(signal.sensorType);
+        }
+    }
+
+    private void registerTireTelemetry(TelemetrySubscription subscription) {
+        TPMS tpms;
+        try {
+            tpms = TPMS.create(appContext);
+            if (tpms == null) throw new IllegalStateException("TPMS.create returned null");
+        } catch (Throwable t) {
+            Log.w(TAG, "TPMS service unavailable", t);
+            return;
+        }
+        TPMS.ITireStateMonitor monitor = (tireId, state) -> {
+            if (subscription.cancelled.get() || state == null) return;
+            emitTireState(subscription, tireId, state);
+        };
+        try {
+            if (tpms.registerTireStateMonitor(monitor)) {
+                subscription.tpmsSource = tpms;
+                subscription.tireStateMonitor = monitor;
+            } else {
+                Log.w(TAG, "TPMS monitor registration was rejected");
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "TPMS subscription failed", t);
+            try {
+                tpms.unregisterTireStateMonitor(monitor);
+            } catch (Throwable ignored) {
+            }
+        }
+        // Some firmware exposes snapshots but rejects the monitor API. Initial values remain
+        // useful in that case and will be refreshed by the next launcher subscription.
+        for (int tireId : new int[] { TPMS.TIRE_ID_LEFT_FRONT, TPMS.TIRE_ID_RIGHT_FRONT,
+                TPMS.TIRE_ID_LEFT_REAR, TPMS.TIRE_ID_RIGHT_REAR }) {
+            if (subscription.cancelled.get()) break;
+            try {
+                ITireState state = tpms.getTireState(tireId);
+                if (state != null) emitTireState(subscription, tireId, state);
+            } catch (Throwable t) {
+                Log.w(TAG, "Initial TPMS read failed for tire " + tireId, t);
+            }
+        }
+    }
+
+    private void emitTireState(TelemetrySubscription subscription, int tireId,
+                               @NonNull ITireState state) {
+        for (TireMetric metric : TIRE_METRICS) {
+            if (metric.tireId != tireId || !subscription.metricIds.contains(metric.id)) continue;
+            try {
+                float value;
+                if (metric.pressure) {
+                    value = normalizeTirePressureBar(state.getPressure());
+                    if (!Float.isFinite(value)) continue;
+                } else {
+                    value = state.getTemperature();
+                    if (!isValidTireTemperature(value)) continue;
+                }
+                deliverTelemetry(subscription, metric.id, metric.label, metric.unit(), value);
+            } catch (Throwable t) {
+                Log.w(TAG, "TPMS value read failed for " + metric.id, t);
+            }
         }
     }
 
@@ -1185,6 +1588,17 @@ final class GeelyCarIntegration implements CarIntegration {
             }
         }
         subscription.vendorListeners.clear();
+        TPMS tpms = subscription.tpmsSource;
+        TPMS.ITireStateMonitor monitor = subscription.tireStateMonitor;
+        subscription.tpmsSource = null;
+        subscription.tireStateMonitor = null;
+        if (tpms != null && monitor != null) {
+            try {
+                tpms.unregisterTireStateMonitor(monitor);
+            } catch (Throwable t) {
+                Log.w(TAG, "TPMS monitor unregister failed", t);
+            }
+        }
     }
 
     private void executeTelemetryTask(Runnable task) {
@@ -1815,10 +2229,13 @@ final class GeelyCarIntegration implements CarIntegration {
         }
         for (ControlSubscription subscription : controls) subscription.cancelled.set(true);
         mainHandler.removeCallbacks(controlRefreshTask);
+        mainHandler.removeCallbacks(bcmPollTask);
+        bcmPollScheduled = false;
         executeTelemetryTask(() -> {
             for (TelemetrySubscription subscription : telemetry) {
                 unregisterTelemetryVendorListeners(subscription);
             }
+            bcmLastOnMillis.clear();
             detachControlWatcher();
         });
         telemetryWorker.shutdown();

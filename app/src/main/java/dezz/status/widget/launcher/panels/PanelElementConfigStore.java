@@ -38,6 +38,9 @@ public final class PanelElementConfigStore {
     public static final String NAV_ARRIVAL = "arrival";
     public static final String NAV_DURATION = "duration";
     public static final String NAV_DISTANCE = "distance";
+    public static final String NAV_MANEUVER = "maneuver";
+    public static final String NAV_SPEED_LIMIT = "speed_limit";
+    public static final String NAV_TRAFFIC_LIGHT = "traffic_light";
     public static final String NAV_INACTIVE = "inactive";
     public static final String ACTION_TILES = "tiles";
     public static final String ACTION_ADD = "add";
@@ -266,6 +269,9 @@ public final class PanelElementConfigStore {
                 new Definition(NAV_ARRIVAL, "Время прибытия"),
                 new Definition(NAV_DURATION, "Оставшееся время"),
                 new Definition(NAV_DISTANCE, "Оставшееся расстояние"),
+                new Definition(NAV_MANEUVER, "Следующий манёвр"),
+                new Definition(NAV_SPEED_LIMIT, "Ограничение скорости"),
+                new Definition(NAV_TRAFFIC_LIGHT, "Светофор и обратный отсчёт"),
                 new Definition(NAV_INACTIVE, "Сообщение, когда маршрут не запущен")));
         result.put(LauncherLayoutStore.ACTIONS, list(
                 new Definition(ACTION_TILES, "Пользовательские плитки"),

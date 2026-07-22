@@ -112,6 +112,11 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".VehicleInfoPanelSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".MediaPanelSettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />
@@ -278,6 +283,9 @@
                 <action android:name="com.yandex.ARRIVAL" />
                 <action android:name="com.yandex.TIME" />
                 <action android:name="com.yandex.DISTANCE" />
+                <action android:name="plus.monjaro.NAVIGATION_UPDATE" />
+                <action android:name="plus.monjaro.NAVIGATION_ENDED" />
+                <action android:name="plus.monjaro.TRAFFIC_LIGHT_UPDATE" />
             </intent-filter>
         </receiver>
     </application>

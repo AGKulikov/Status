@@ -40,18 +40,57 @@ public final class GeelyCarTelemetryValidationTest {
 
     @Test public void integerEventSentinelsAreRejectedBeforeFloatConversion() {
         assertTrue(GeelyCarIntegration.isValidTelemetryEventValue(0, false));
+        assertFalse(GeelyCarIntegration.isValidTelemetryEventValue(-1, false));
         assertFalse(GeelyCarIntegration.isValidTelemetryEventValue(Integer.MIN_VALUE, false));
         assertFalse(GeelyCarIntegration.isValidTelemetryEventValue(Integer.MAX_VALUE, false));
+    }
+
+    @Test public void tirePressureAcceptsBarAndHundredthsOfBar() {
+        assertEquals(2.4f, GeelyCarIntegration.normalizeTirePressureBar(2.4f), 0.0001f);
+        assertEquals(2.4f, GeelyCarIntegration.normalizeTirePressureBar(240f), 0.0001f);
+        assertTrue(Float.isNaN(GeelyCarIntegration.normalizeTirePressureBar(0f)));
+        assertTrue(Float.isNaN(GeelyCarIntegration.normalizeTirePressureBar(Float.MAX_VALUE)));
+    }
+
+    @Test public void tireTemperatureUsesASeparateHigherSafetyBound() {
+        assertTrue(GeelyCarIntegration.isValidTireTemperature(-40f));
+        assertTrue(GeelyCarIntegration.isValidTireTemperature(150f));
+        assertFalse(GeelyCarIntegration.isValidTireTemperature(150.1f));
+        assertFalse(GeelyCarIntegration.isValidTireTemperature(Float.NaN));
+    }
+
+    @Test public void bcmStateExposesOnlyBinaryOffAndOn() {
+        assertEquals(0, GeelyCarIntegration.normalizeBcmBinaryValue(0));
+        assertEquals(1, GeelyCarIntegration.normalizeBcmBinaryValue(1));
+        assertEquals(-1, GeelyCarIntegration.normalizeBcmBinaryValue(2));
+        assertEquals(-1, GeelyCarIntegration.normalizeBcmBinaryValue(253));
+        assertEquals(-1, GeelyCarIntegration.normalizeBcmBinaryValue(255));
+    }
+
+    @Test public void turnSignalDarkPhaseIsHeldButRealOffEventuallyWins() {
+        assertEquals(1, GeelyCarIntegration.stabilizeTurnSignalValue(1, -1L, 5_000L));
+        assertEquals(1, GeelyCarIntegration.stabilizeTurnSignalValue(0, 5_000L, 5_900L));
+        assertEquals(0, GeelyCarIntegration.stabilizeTurnSignalValue(0, 5_000L, 6_001L));
+        assertEquals(0, GeelyCarIntegration.stabilizeTurnSignalValue(0, -1L, 5_000L));
+        assertEquals(-1, GeelyCarIntegration.stabilizeTurnSignalValue(2, 5_000L, 5_100L));
     }
 
     @Test public void requestedMetricsAreFilteredWithoutImplicitSubscriptions() {
         Set<String> requested = new LinkedHashSet<>(Arrays.asList(
                 "unknown.metric",
                 "ICarInfo.fuel_capacity",
-                "ISensor.fuel_level"));
+                "ISensor.fuel_level",
+                "ISensor.avg_fuel_consumption",
+                "ISensor.gear",
+                "TPMS.pressure.front_left",
+                "IBcm.high_beam",
+                "IBcm.turn_signal_right"));
 
         assertEquals(new LinkedHashSet<>(Arrays.asList(
-                        "ISensor.fuel_level", "ICarInfo.fuel_capacity")),
+                        "ISensor.fuel_level", "ISensor.avg_fuel_consumption",
+                        "ISensor.gear", "ICarInfo.fuel_capacity",
+                        "TPMS.pressure.front_left", "IBcm.high_beam",
+                        "IBcm.turn_signal_right")),
                 GeelyCarIntegration.selectKnownTelemetryMetricIds(requested));
         assertTrue(GeelyCarIntegration.selectKnownTelemetryMetricIds(
                 new LinkedHashSet<>()).isEmpty());

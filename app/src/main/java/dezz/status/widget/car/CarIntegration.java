@@ -87,6 +87,11 @@ public interface CarIntegration {
         void onTelemetry(@NonNull TelemetryValue value);
     }
 
+    /** Receives all telemetry metrics exposed by this vehicle connector on the main thread. */
+    interface TelemetryCatalogListener {
+        void onCatalog(@NonNull List<CarTelemetryDescriptor> values);
+    }
+
     /** Receives the vehicle's visual control catalog on the main thread. */
     interface ControlCatalogListener {
         void onCatalog(@NonNull List<CarControlDescriptor> controls);
@@ -131,6 +136,14 @@ public interface CarIntegration {
 
     /** Stop a telemetry subscription without disturbing the widget's brick subscriptions. */
     void unsubscribeTelemetry(@NonNull TelemetryListener listener);
+
+    /**
+     * Return the stable, connector-neutral metric catalog. Implementations do not need a live
+     * vehicle connection to describe the values they know how to read.
+     */
+    default void requestTelemetryCatalog(@NonNull TelemetryCatalogListener listener) {
+        listener.onCatalog(Collections.emptyList());
+    }
 
     /** Asynchronous, read-only diagnostic snapshot; callback is delivered on the main thread. */
     default void requestDiagnostics(@NonNull DiagnosticsListener listener) {
