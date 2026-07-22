@@ -5,13 +5,9 @@
 
 package dezz.status.widget.launcher.routes;
 
-import android.app.ActivityOptions;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Build;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.Toast;
@@ -19,10 +15,11 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-/** Opens a saved destination in Yandex Maps/Navigator, including ECARX freeform display 2. */
+import dezz.status.widget.launcher.YandexWindowLauncher;
+
+/** Opens a saved destination through the same ECARX window entry point as the HOME shortcut. */
 public final class YandexRouteLauncher {
-    private static final int ECARX_NAVIGATION_DISPLAY = 2;
-    private static final long ROUTE_AFTER_WINDOW_DELAY_MS = 420L;
+    private static final long ROUTE_AFTER_WINDOW_DELAY_MS = 650L;
 
     private YandexRouteLauncher() {}
 
@@ -39,20 +36,23 @@ public final class YandexRouteLauncher {
             return false;
         }
 
-        if (!route.floating) return startDeepLink(context, route.product, deepLink, null);
+        if (!route.floating) return startDeepLink(context, route.product, deepLink);
 
-        Bundle freeform = freeformOptions();
-        boolean opened = startFreeformWindow(context, route.product, freeform);
+        // Do not create a second approximation of the vendor floating window here. The HOME
+        // "Navigator" shortcut already uses Yandex' ECARX-specific TransparentSplashActivity
+        // (`ddnavwin`). Opening that exact entry point first also keeps route buttons compatible
+        // with head units where ActivityOptions/windowingMode 5 opens on the wrong display.
+        boolean opened = YandexWindowLauncher.launch(
+                context, windowProduct(route.product), false);
         if (!opened) {
-            // Some Yandex builds accept ActivityOptions directly on ACTION_VIEW even when their
-            // explicit MAIN entry point changed in an update.
-            return startDeepLink(context, route.product, deepLink, freeform)
-                    || startDeepLink(context, route.product, deepLink, null);
+            return startDeepLink(context, route.product, deepLink);
         }
 
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            if (!startDeepLink(context, route.product, deepLink, freeform)
-                    && !startDeepLink(context, route.product, deepLink, null)) {
+            // The Yandex task is now the same floating task created by the normal Navigator
+            // button. ACTION_VIEW is delivered afterwards, so only its destination changes and
+            // Android reuses that already-windowed task instead of constructing another window.
+            if (!startDeepLink(context, route.product, deepLink)) {
                 Toast.makeText(context, "Не удалось передать маршрут в Яндекс",
                         Toast.LENGTH_LONG).show();
             }
@@ -79,38 +79,25 @@ public final class YandexRouteLauncher {
                 + Uri.encode("Маршрут до " + addressValue + " едем"));
     }
 
-    private static boolean startFreeformWindow(@NonNull Context context,
-                                               @NonNull FavoriteRouteConfig.Product product,
-                                               @Nullable Bundle options) {
-        String packageName = packageName(product);
-        String className = product == FavoriteRouteConfig.Product.MAPS
-                ? "ru.yandex.yandexmaps.SplashScreen"
-                : "ru.yandex.yandexnavi.core.NavigatorActivity";
-        Intent intent = new Intent(Intent.ACTION_MAIN)
-                .addCategory(Intent.CATEGORY_LAUNCHER)
-                .setComponent(new ComponentName(packageName, className))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        return start(context, intent, options);
-    }
-
     private static boolean startDeepLink(@NonNull Context context,
                                          @NonNull FavoriteRouteConfig.Product product,
-                                         @NonNull Uri deepLink, @Nullable Bundle options) {
+                                         @NonNull Uri deepLink) {
         Intent intent = new Intent(Intent.ACTION_VIEW, deepLink)
                 .setPackage(packageName(product))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        if (start(context, intent, options)) return true;
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra("ddnavwin", true);
+        if (start(context, intent)) return true;
         // Keep the proprietary URI as an implicit fallback for regional/Yandex builds whose
         // package differs but still register the same scheme.
         intent.setPackage(null);
-        return start(context, intent, options);
+        return start(context, intent);
     }
 
-    private static boolean start(@NonNull Context context, @NonNull Intent intent,
-                                 @Nullable Bundle options) {
+    private static boolean start(@NonNull Context context, @NonNull Intent intent) {
         try {
-            if (options == null) context.startActivity(intent);
-            else context.startActivity(intent, options);
+            context.startActivity(intent);
             return true;
         } catch (RuntimeException ignored) {
             return false;
@@ -122,18 +109,11 @@ public final class YandexRouteLauncher {
                 ? "ru.yandex.yandexmaps" : "ru.yandex.yandexnavi";
     }
 
-    @Nullable
-    private static Bundle freeformOptions() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null;
-        try {
-            ActivityOptions options = ActivityOptions.makeBasic();
-            options.setLaunchDisplayId(ECARX_NAVIGATION_DISPLAY);
-            Bundle bundle = options.toBundle();
-            bundle.putInt("android.activity.SplitScreenShownPosition", 0);
-            bundle.putInt("android.activity.windowingMode", 5);
-            return bundle;
-        } catch (RuntimeException ignored) {
-            return null;
-        }
+    @NonNull
+    private static YandexWindowLauncher.Product windowProduct(
+            @NonNull FavoriteRouteConfig.Product product) {
+        return product == FavoriteRouteConfig.Product.MAPS
+                ? YandexWindowLauncher.Product.MAPS
+                : YandexWindowLauncher.Product.NAVIGATOR;
     }
 }
