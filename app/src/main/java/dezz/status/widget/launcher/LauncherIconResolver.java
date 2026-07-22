@@ -34,6 +34,8 @@ public final class LauncherIconResolver {
             new Preset("app", "Иконка приложения"),
             new Preset("apps", "Приложения"),
             new Preset("navigation", "Навигация"),
+            new Preset("home", "Домой"),
+            new Preset("work", "Работа"),
             new Preset("media", "Медиа"),
             new Preset("media_previous", "Предыдущий трек"),
             new Preset("media_next", "Следующий трек"),
@@ -99,9 +101,25 @@ public final class LauncherIconResolver {
         return source;
     }
 
+    /** Resolves a built-in icon without manufacturing a launcher shortcut. */
+    @Nullable
+    public static Drawable resolvePreset(@NonNull Context context, @NonNull String iconKey,
+                                         @Nullable String colorOverride) {
+        Drawable source = ContextCompat.getDrawable(context, drawable(iconKey));
+        if (source == null) return null;
+        source = DrawableCompat.wrap(source).mutate();
+        if (colorOverride != null && !"none".equalsIgnoreCase(colorOverride)) {
+            try { DrawableCompat.setTint(source, Color.parseColor(colorOverride)); }
+            catch (IllegalArgumentException ignored) { DrawableCompat.setTint(source, Color.WHITE); }
+        }
+        return source;
+    }
+
     private static int drawable(String key) {
         switch (key) {
             case "navigation": return android.R.drawable.ic_menu_mylocation;
+            case "home": return android.R.drawable.ic_menu_myplaces;
+            case "work": return android.R.drawable.ic_menu_agenda;
             case "media": return android.R.drawable.ic_media_play;
             case "media_previous": return android.R.drawable.ic_media_previous;
             case "media_next": return android.R.drawable.ic_media_next;

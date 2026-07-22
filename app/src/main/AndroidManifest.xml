@@ -117,6 +117,11 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".FavoriteRoutesSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".PanelElementSettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />
