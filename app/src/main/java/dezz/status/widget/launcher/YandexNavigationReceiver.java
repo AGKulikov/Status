@@ -9,6 +9,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Process;
+import android.util.Log;
 
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -17,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 /** Compatibility endpoint for navigation data broadcasts used by Yandex/MConfig builds. */
 public final class YandexNavigationReceiver extends BroadcastReceiver {
+    private static final String TAG = "YandexNavReceiver";
     /**
      * Bitmap decode/down-sampling and crash-safe PNG writes must never run on the receiver's main
      * thread. A single worker deliberately preserves update/clear order across all navigation
@@ -36,15 +38,17 @@ public final class YandexNavigationReceiver extends BroadcastReceiver {
         try {
             snapshot = snapshotForWorker(intent);
             pendingResult = goAsync();
-        } catch (RuntimeException ignored) {
+        } catch (Throwable failure) {
+            reportNonFatal("Could not snapshot navigation broadcast", failure);
             return;
         }
         NavigationTask task = new NavigationTask(targetContext, snapshot, pendingResult);
         try {
             WORKER.execute(task);
-        } catch (RuntimeException error) {
+        } catch (Throwable failure) {
             // The process may be shutting down and reject new tasks. Never leak a PendingResult.
             task.finish();
+            reportNonFatal("Could not enqueue navigation broadcast", failure);
         }
     }
 
@@ -69,8 +73,18 @@ public final class YandexNavigationReceiver extends BroadcastReceiver {
                 new ArrayBlockingQueue<>(MAX_PENDING_BROADCASTS), runnable -> {
                     Thread thread = new Thread(() -> {
                         try { Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND); }
-                        catch (RuntimeException ignored) { }
-                        runnable.run();
+                        catch (Throwable failure) {
+                            reportNonFatal("Could not lower navigation worker priority", failure);
+                        }
+                        try {
+                            runnable.run();
+                        } catch (Throwable failure) {
+                            // Last-resort boundary around ThreadPoolExecutor.Worker itself. The
+                            // task-level guard below normally handles payload failures without
+                            // replacing this thread, while this guard also protects against an
+                            // unexpected non-fatal Error raised by executor bookkeeping.
+                            reportNonFatal("Navigation worker failed", failure);
+                        }
                     }, "navigation-broadcast-worker");
                     thread.setDaemon(true);
                     return thread;
@@ -125,9 +139,11 @@ public final class YandexNavigationReceiver extends BroadcastReceiver {
         @Override public void run() {
             try {
                 NavigationDataRepository.updateFromYandexBroadcast(context, intent);
-            } catch (RuntimeException ignored) {
+            } catch (Throwable failure) {
                 // This receiver is exported for mHUD/MConfig. A malformed Parcelable/extra from
-                // another process is invalid input, not a reason to terminate our app process.
+                // another process (including a Parcelable class-initialization/linkage failure)
+                // is invalid input, not a reason to terminate our app process.
+                reportNonFatal("Rejected malformed navigation broadcast", failure);
             } finally {
                 finish();
             }
@@ -222,8 +238,15 @@ public final class YandexNavigationReceiver extends BroadcastReceiver {
             pendingResult = null;
             if (value != null) {
                 try { value.finish(); }
-                catch (RuntimeException ignored) { }
+                catch (Throwable failure) {
+                    reportNonFatal("Could not finish navigation broadcast", failure);
+                }
             }
         }
+    }
+
+    private static void reportNonFatal(String message, Throwable failure) {
+        NavigationWorkerFailurePolicy.rethrowIfFatal(failure);
+        Log.w(TAG, message, failure);
     }
 }
