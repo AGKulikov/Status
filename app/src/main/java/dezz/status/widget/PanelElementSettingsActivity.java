@@ -31,6 +31,7 @@ import java.util.List;
 
 import dezz.status.widget.launcher.LauncherLayoutStore;
 import dezz.status.widget.launcher.panels.PanelElementConfigStore;
+import dezz.status.widget.launcher.panels.PanelEditScheduler;
 
 /** Visual, code-free editor for the functional elements placed inside HOME panels. */
 public final class PanelElementSettingsActivity extends AppCompatActivity {
@@ -42,12 +43,17 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
     private FrameLayout previewHost;
     @NonNull private String selectedPanel = LauncherLayoutStore.APPS;
     @Nullable private PanelElementConfigStore.Panel current;
+    @Nullable private PanelEditScheduler editScheduler;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         preferences = new Preferences(this);
         store = new PanelElementConfigStore(preferences);
+        editScheduler = PanelEditScheduler.onMainThread(this::renderPreview, () -> {
+            PanelElementConfigStore.Panel panel = current;
+            if (panel != null) store.save(panel);
+        });
         String requestedPanel = getIntent().getStringExtra(EXTRA_PANEL_ID);
         if (requestedPanel != null
                 && !PanelElementConfigStore.definitions(requestedPanel).isEmpty()) {
@@ -56,6 +62,18 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         setTitle("Элементы панелей HOME");
         setContentView(buildContent());
         showPanel(selectedPanel);
+    }
+
+    @Override
+    protected void onStop() {
+        if (editScheduler != null) editScheduler.flush();
+        super.onStop();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (editScheduler != null) editScheduler.cancel();
+        super.onDestroy();
     }
 
     @NonNull
@@ -145,6 +163,7 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
     }
 
     private void showPanel(@NonNull String panelId) {
+        if (editScheduler != null) editScheduler.flush();
         selectedPanel = panelId;
         current = store.load(panelId);
         renderEditor();
@@ -263,8 +282,7 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
                 scaleValue.setText(selected + "%");
                 if (user) {
                     panel.setScale(element.id, selected);
-                    store.save(panel);
-                    renderPreview();
+                    if (editScheduler != null) editScheduler.request();
                 }
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}

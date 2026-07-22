@@ -5,6 +5,7 @@
 
 package dezz.status.widget.launcher.climate;
 
+import android.content.ClipData;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
@@ -12,6 +13,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.view.Gravity;
+import android.view.DragEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -45,6 +47,11 @@ import dezz.status.widget.car.CarIntegration;
  * disabled until the vehicle service confirms them.
  */
 public final class ClimatePanelView extends FrameLayout {
+    /** Receives drag-and-drop changes made directly on the live editor preview. */
+    public interface EditorLayoutListener {
+        void onMoveElement(@NonNull String sourceId, @NonNull String targetId);
+    }
+
     /** Geely integration verifies controls every 30 s; older cache is presentation-only. */
     private static final long STATE_FRESH_MS = 75_000L;
     private final CarIntegration integration;
@@ -56,6 +63,7 @@ public final class ClimatePanelView extends FrameLayout {
     private ClimatePanelConfig config;
     private TextView connectionLabel;
     private boolean editorPreviewMode;
+    @Nullable private EditorLayoutListener editorLayoutListener;
     private boolean started;
     private int catalogGeneration;
     private boolean catalogRefreshPending;
@@ -104,6 +112,12 @@ public final class ClimatePanelView extends FrameLayout {
         editorPreviewMode = enabled;
         if (catalog.isEmpty() && !enabled) renderLoading();
         else rebuildControls();
+    }
+
+    public void setEditorLayoutListener(@Nullable EditorLayoutListener listener) {
+        if (editorLayoutListener == listener) return;
+        editorLayoutListener = listener;
+        if (editorPreviewMode && listener != null) rebuildControls();
     }
 
     /** Used by the editor's live preview; the caller persists the same value separately. */
@@ -232,7 +246,10 @@ public final class ClimatePanelView extends FrameLayout {
                 ViewGroup.LayoutParams.MATCH_PARENT, scaledDp(50)));
 
         ClimateFlowLayout controls = new ClimateFlowLayout(getContext());
-        controls.setGaps(scaledDp(6), scaledDp(6));
+        // One source of spacing: no child margins are added in flowLp(), so the slider's pixel
+        // value is the actual edge-to-edge distance between adjacent tiles.
+        int gap = config.tileSpacingPx;
+        controls.setGaps(gap, gap);
         for (ClimatePanelConfig.Element element : config.orderedElements()) {
             addConfiguredElement(controls, element.id);
         }
@@ -313,10 +330,10 @@ public final class ClimatePanelView extends FrameLayout {
         card.addView(content, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         card.setOnClickListener(v -> execute(id, operation, 0));
-        ControlBinding binding = new ControlBinding(descriptor, card, icon, value,
+        ControlBinding binding = new ControlBinding(descriptor, card, icon, title, value,
                 Collections.emptyList());
         bindings.put(id, binding);
-        flow.addView(card, flowLp(id, 126, 76));
+        flow.addView(card, flowLp(id, 126, 88));
     }
 
     private void addStepperIfVisible(@NonNull ClimateFlowLayout flow, @NonNull String id,
@@ -329,15 +346,15 @@ public final class ClimatePanelView extends FrameLayout {
         content.setGravity(Gravity.CENTER);
         content.setPadding(elementScaledDp(id, 3), elementScaledDp(id, 4),
                 elementScaledDp(id, 3), elementScaledDp(id, 4));
-        TextView minus = stepButton(id, "−");
-        TextView plus = stepButton(id, "+");
+        TextView minus = stepButton(id, "‹");
+        TextView plus = stepButton(id, "›");
         LinearLayout center = new LinearLayout(getContext());
         center.setOrientation(LinearLayout.VERTICAL);
         center.setGravity(Gravity.CENTER);
         ImageView icon = tileIcon(id);
         TextView title = label(shortLabel, elementScaledSp(id, 11), true);
         title.setGravity(Gravity.CENTER);
-        TextView value = label("…", elementScaledSp(id, 17), true);
+        TextView value = label("…", elementScaledSp(id, 22), true);
         value.setGravity(Gravity.CENTER);
         center.addView(icon, new LinearLayout.LayoutParams(
                 elementScaledDp(id, 23), elementScaledDp(id, 23)));
@@ -356,8 +373,8 @@ public final class ClimatePanelView extends FrameLayout {
         List<View> interactive = new ArrayList<>();
         interactive.add(minus);
         interactive.add(plus);
-        bindings.put(id, new ControlBinding(descriptor, card, icon, value, interactive));
-        flow.addView(card, flowLp(id, 238, 88));
+        bindings.put(id, new ControlBinding(descriptor, card, icon, title, value, interactive));
+        flow.addView(card, flowLp(id, 238, 96));
     }
 
     private void addCycleIfVisible(@NonNull ClimateFlowLayout flow, @NonNull String id,
@@ -382,9 +399,9 @@ public final class ClimatePanelView extends FrameLayout {
         CarControlCommand.Operation operation = descriptor.kind == CarControlDescriptor.Kind.ACTION
                 ? CarControlCommand.Operation.ACTIVATE : CarControlCommand.Operation.CYCLE;
         card.setOnClickListener(v -> execute(id, operation, 0));
-        bindings.put(id, new ControlBinding(descriptor, card, icon, value,
+        bindings.put(id, new ControlBinding(descriptor, card, icon, title, value,
                 Collections.emptyList()));
-        flow.addView(card, flowLp(id, 108, 90));
+        flow.addView(card, flowLp(id, 116, 96));
     }
 
     @Nullable
@@ -467,6 +484,9 @@ public final class ClimatePanelView extends FrameLayout {
         ControlBinding binding = bindings.get(id);
         CarControlState state = states.get(id);
         if (binding == null || pending.containsKey(id)) return;
+        // The editor is a layout surface, never a second climate remote. It uses representative
+        // values so active/inactive styling is visible without touching the vehicle.
+        if (isEditorPlaceholder(id)) return;
         boolean available = !isEditorPlaceholder(id) && isFresh(state) && state.available;
         if (!available) {
             Toast.makeText(getContext(), "Функция пока недоступна", Toast.LENGTH_SHORT).show();
@@ -492,26 +512,39 @@ public final class ClimatePanelView extends FrameLayout {
         ControlBinding binding = bindings.get(id);
         if (binding == null) return;
         CarControlState state = states.get(id);
-        boolean available = !isEditorPlaceholder(id) && isFresh(state) && state.available;
-        boolean known = available && state.known;
-        boolean active = known && state.active;
+        boolean previewSample = isEditorPlaceholder(id);
+        boolean available = previewSample || (isFresh(state) && state.available);
+        boolean known = previewSample || (available && state.known);
+        boolean active = previewSample ? isPreviewActive(id) : known && state.active;
         int accent = color(config.accentColor, Color.CYAN);
-        if (active && config.useVehicleStateColors && state.suggestedColor != null) {
+        if (active && state != null && config.useVehicleStateColors
+                && state.suggestedColor != null) {
             accent = color(state.suggestedColor, accent);
         }
         int inactive = color(config.inactiveColor, Color.LTGRAY);
         int tint = active ? accent : inactive;
         binding.icon.setColorFilter(tint);
-        binding.value.setText(pending.containsKey(id) || isEditorPlaceholder(id)
-                || !isFresh(state) ? "…" : state.valueLabel);
+        binding.value.setText(pending.containsKey(id) ? "…" : previewSample
+                ? previewValue(id) : !isFresh(state) ? "…" : state.valueLabel);
         binding.value.setTextColor(tint);
-        binding.card.setCardBackgroundColor(active
-                ? withAlpha(accent, 72) : Color.argb(92, 255, 255, 255));
-        binding.card.setStrokeColor(active ? accent : Color.argb(52, 255, 255, 255));
-        binding.card.setStrokeWidth(active ? elementScaledDp(id, 2) : elementScaledDp(id, 1));
+        // New CarPlay uses a calm translucent glass row and turns the selected action into a
+        // bright, soft tile. A real blur would be too expensive (and unavailable) on Android 9,
+        // so the two layered gradients retain the same visual hierarchy at negligible GPU cost.
+        int activeFill = withAlpha(blend(Color.WHITE, accent, .08f), config.activeTileAlpha);
+        int inactiveFill = Color.argb(config.inactiveTileAlpha, 255, 255, 255);
+        binding.card.setCardBackgroundColors(active
+                ? activeFill : inactiveFill,
+                active ? withAlpha(Color.WHITE, Math.min(255, config.activeTileAlpha + 18))
+                        : Color.argb(Math.min(150, config.inactiveTileAlpha + 30), 255, 255, 255));
+        binding.card.setStrokeColor(active ? withAlpha(accent, 216)
+                : Color.argb(Math.min(130, config.inactiveTileAlpha + 24), 255, 255, 255));
+        binding.card.setStrokeWidth(active ? scaledPx(2) : scaledPx(1));
+        binding.title.setTextColor(active
+                ? blend(Color.rgb(18, 20, 27), accent, .12f)
+                : color(config.textColor, Color.WHITE));
         float alpha = pending.containsKey(id) ? .60f : available ? 1f : .42f;
         binding.card.setAlpha(alpha);
-        binding.card.setEnabled(available && !pending.containsKey(id));
+        binding.card.setEnabled(editorPreviewMode || (available && !pending.containsKey(id)));
         boolean optionsReady = binding.descriptor.options.isEmpty()
                 || binding.descriptor.availability == CarControlDescriptor.Availability.SUPPORTED;
         for (View interactive : binding.interactive) {
@@ -519,7 +552,8 @@ public final class ClimatePanelView extends FrameLayout {
             interactive.setAlpha(known && optionsReady ? 1f : .38f);
         }
         binding.card.setContentDescription(binding.descriptor.label + ", "
-                + (state == null ? "состояние неизвестно" : state.valueLabel));
+                + (previewSample ? previewValue(id)
+                        : state == null ? "состояние неизвестно" : state.valueLabel));
     }
 
     private void updateConnectionLabel() {
@@ -539,24 +573,62 @@ public final class ClimatePanelView extends FrameLayout {
     private void applySurface() {
         int base = color(config.backgroundColor, Color.rgb(20, 26, 36));
         GradientDrawable surface = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{withAlpha(base, config.backgroundAlpha),
-                        withAlpha(blend(base, color(config.accentColor, Color.CYAN), .13f),
+                new int[]{withAlpha(blend(base, Color.WHITE, .10f), config.backgroundAlpha),
+                        withAlpha(base, config.backgroundAlpha),
+                        withAlpha(blend(base, color(config.accentColor, Color.CYAN), .12f),
                                 config.backgroundAlpha)});
         surface.setCornerRadius(config.cornerRadiusPx);
-        surface.setStroke(scaledDp(1), Color.argb(Math.min(150, config.backgroundAlpha),
+        surface.setStroke(1, Color.argb(Math.min(138, config.backgroundAlpha),
                 255, 255, 255));
         setBackground(surface);
+        setElevation(scaledPx(3));
     }
 
     @NonNull
     private ClimateTileView tileCard(@NonNull String id) {
         ClimateTileView card = new ClimateTileView(getContext());
-        card.setRadius(elementScaledDp(id, 15));
-        card.setCardElevation(0);
+        card.setRadius(config.tileCornerRadiusPx);
+        card.setCardElevation(scaledPx(1));
         card.setClickable(true);
         card.setFocusable(true);
         card.setRippleColor(ColorStateList.valueOf(Color.argb(80, 255, 255, 255)));
+        installEditorDrag(card, id);
         return card;
+    }
+
+    private void installEditorDrag(@NonNull ClimateTileView card, @NonNull String id) {
+        if (!editorPreviewMode || editorLayoutListener == null) return;
+        card.setLongClickable(true);
+        card.setOnLongClickListener(view -> {
+            ClipData data = ClipData.newPlainText("climate-element", id);
+            return view.startDragAndDrop(data, new View.DragShadowBuilder(view), id, 0);
+        });
+        card.setOnDragListener((view, event) -> {
+            Object local = event.getLocalState();
+            if (!(local instanceof String)) return false;
+            String sourceId = (String) local;
+            switch (event.getAction()) {
+                case DragEvent.ACTION_DRAG_STARTED:
+                    return !id.equals(sourceId);
+                case DragEvent.ACTION_DRAG_ENTERED:
+                    view.animate().scaleX(1.045f).scaleY(1.045f).setDuration(80L).start();
+                    return true;
+                case DragEvent.ACTION_DRAG_EXITED:
+                    view.animate().scaleX(1f).scaleY(1f).setDuration(80L).start();
+                    return true;
+                case DragEvent.ACTION_DROP:
+                    view.setScaleX(1f);
+                    view.setScaleY(1f);
+                    editorLayoutListener.onMoveElement(sourceId, id);
+                    return true;
+                case DragEvent.ACTION_DRAG_ENDED:
+                    view.setScaleX(1f);
+                    view.setScaleY(1f);
+                    return true;
+                default:
+                    return true;
+            }
+        });
     }
 
     @NonNull
@@ -588,7 +660,8 @@ public final class ClimatePanelView extends FrameLayout {
         button.setBackground(background);
         button.setClickable(true);
         button.setFocusable(true);
-        button.setContentDescription(symbol.equals("+") ? "Увеличить" : "Уменьшить");
+        button.setContentDescription(symbol.equals("+") || symbol.equals("›")
+                ? "Увеличить" : "Уменьшить");
         button.setPadding(elementScaledDp(id, 6), 0, elementScaledDp(id, 6), 0);
         return button;
     }
@@ -606,9 +679,9 @@ public final class ClimatePanelView extends FrameLayout {
 
     private ViewGroup.MarginLayoutParams flowLp(@NonNull String id, int width, int height) {
         ViewGroup.MarginLayoutParams lp = new ViewGroup.MarginLayoutParams(
-                elementScaledDp(id, width), elementScaledDp(id, height));
-        int margin = scaledDp(2);
-        lp.setMargins(margin, margin, margin, margin);
+                elementSizedDp(id, width, config.elementWidthPercent(id)),
+                elementSizedDp(id, height, config.elementHeightPercent(id)));
+        lp.setMargins(0, 0, 0, 0);
         return lp;
     }
 
@@ -620,6 +693,16 @@ public final class ClimatePanelView extends FrameLayout {
     private int scaledDp(int value) {
         float density = getResources().getDisplayMetrics().density;
         return Math.max(1, Math.round(value * density * config.scalePercent / 100f));
+    }
+
+    /** Configuration dimensions are literal screen pixels, then follow the global scale. */
+    private int scaledPx(int value) {
+        if (value == 0) return 0;
+        return Math.max(1, Math.round(value * config.scalePercent / 100f));
+    }
+
+    private int elementSizedDp(@NonNull String id, int value, int percent) {
+        return Math.max(1, Math.round(scaledDp(value) * percent / 100f));
     }
 
     private float scaledSp(int value) {
@@ -655,6 +738,24 @@ public final class ClimatePanelView extends FrameLayout {
         return editorPreviewMode && catalog.isEmpty() && !catalog.containsKey(id);
     }
 
+    private static boolean isPreviewActive(@NonNull String id) {
+        return id.equals(ClimatePanelConfig.POWER)
+                || id.equals(ClimatePanelConfig.AC)
+                || id.equals(ClimatePanelConfig.SEAT_HEAT_DRIVER)
+                || id.equals(ClimatePanelConfig.WHEEL_HEAT);
+    }
+
+    @NonNull
+    private static String previewValue(@NonNull String id) {
+        if (id.equals(ClimatePanelConfig.TEMP_DRIVER)) return "22°";
+        if (id.equals(ClimatePanelConfig.TEMP_PASSENGER)) return "21°";
+        if (id.equals(ClimatePanelConfig.FAN)) return "3";
+        if (id.contains("seat_heat") || id.contains("seat_vent")) return "2";
+        if (id.equals(ClimatePanelConfig.POWER) || id.equals(ClimatePanelConfig.AC)) return "ВКЛ";
+        if (id.equals(ClimatePanelConfig.AUTO)) return "AUTO";
+        return "ВЫКЛ";
+    }
+
     @NonNull
     private static CarControlDescriptor previewDescriptor(@NonNull String id) {
         CarControlDescriptor.Kind kind = id.equals(ClimatePanelConfig.TEMP_DRIVER)
@@ -663,7 +764,7 @@ public final class ClimatePanelView extends FrameLayout {
                 ? CarControlDescriptor.Kind.RANGE : CarControlDescriptor.Kind.TOGGLE;
         return new CarControlDescriptor(id, shortLabel(id), "Климат", "climate", kind,
                 CarControlDescriptor.Availability.UNKNOWN, Collections.emptyList(),
-                0, 30, 1, "", "#35B7FF");
+                0, 30, 1, "", "#59A9FF");
     }
 
     private boolean isFresh(@Nullable CarControlState state) {
@@ -705,15 +806,18 @@ public final class ClimatePanelView extends FrameLayout {
         @NonNull final CarControlDescriptor descriptor;
         @NonNull final ClimateTileView card;
         @NonNull final ImageView icon;
+        @NonNull final TextView title;
         @NonNull final TextView value;
         @NonNull final List<View> interactive;
 
         ControlBinding(@NonNull CarControlDescriptor descriptor,
                        @NonNull ClimateTileView card, @NonNull ImageView icon,
-                       @NonNull TextView value, @NonNull List<View> interactive) {
+                       @NonNull TextView title, @NonNull TextView value,
+                       @NonNull List<View> interactive) {
             this.descriptor = descriptor;
             this.card = card;
             this.icon = icon;
+            this.title = title;
             this.value = value;
             this.interactive = interactive;
         }
@@ -763,6 +867,11 @@ public final class ClimatePanelView extends FrameLayout {
 
         void setCardBackgroundColor(int color) {
             shape.setColor(color);
+        }
+
+        void setCardBackgroundColors(int startColor, int endColor) {
+            shape.setOrientation(GradientDrawable.Orientation.TL_BR);
+            shape.setColors(new int[]{startColor, endColor});
         }
 
         void setStrokeColor(int color) {

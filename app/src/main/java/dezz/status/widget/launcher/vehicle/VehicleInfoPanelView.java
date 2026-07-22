@@ -488,10 +488,10 @@ public final class VehicleInfoPanelView extends FrameLayout {
             renderMissing(views, metric);
             return;
         }
-        NavigationDataRepository.Snapshot navigation =
-                NavigationDataRepository.read(getContext());
+        NavigationDataRepository.RouteStatus navigation =
+                NavigationDataRepository.readRouteStatus(getContext());
         renderSpeedLimitWarning(views, metric, speed.value, navigation.speedLimit,
-                navigation.available);
+                navigation.routeActive);
         if (isStale(SPEED_ID, speed)) views.value.setAlpha(.48f);
     }
 

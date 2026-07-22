@@ -275,6 +275,23 @@ public final class NavigationDataRepository {
         }
     }
 
+    /**
+     * Tiny navigation state used by consumers that do not render route graphics.
+     *
+     * <p>{@link #read(Context)} may decode four persisted PNG files and parse traffic/lane JSON.
+     * Vehicle telemetry needs only the active-route bit and speed limit, so making its one-second
+     * stale/blink tick use the full snapshot would put avoidable bitmap I/O on the main thread.</p>
+     */
+    public static final class RouteStatus {
+        public final boolean routeActive;
+        @NonNull public final String speedLimit;
+
+        RouteStatus(boolean routeActive, @Nullable String speedLimit) {
+            this.routeActive = routeActive;
+            this.speedLimit = speedLimit == null ? "" : speedLimit;
+        }
+    }
+
     /** Parsed notification candidate used to choose one route without persisting intermediates. */
     public static final class NotificationCandidate {
         @NonNull public final String packageName;
@@ -645,6 +662,17 @@ public final class NavigationDataRepository {
                 prefs.getString(PREF_LANE_RAW_DISTANCES, ""),
                 prefs.getString(PREF_LANE_RAW_ALONG_ROUTE, ""), laneAvailable, routeActive,
                 maneuverImage, lanesImage, jamImage, rainbowImage);
+    }
+
+    /** Reads only scalar route state; never parses lane/traffic JSON or loads route bitmaps. */
+    @NonNull
+    public static RouteStatus readRouteStatus(@NonNull Context context) {
+        SharedPreferences prefs = preferences(context);
+        long updatedAt = prefs.getLong(PREF_UPDATED_AT, 0L);
+        boolean routeActive = NavigationRouteStatePolicy.isRouteActive(
+                prefs.contains(PREF_ROUTE_ACTIVE), prefs.getBoolean(PREF_ROUTE_ACTIVE, false),
+                hasMainRouteEvidence(prefs), updatedAt, System.currentTimeMillis(), true);
+        return new RouteStatus(routeActive, prefs.getString(PREF_SPEED_LIMIT, ""));
     }
 
     /** Main-route evidence used only to migrate snapshots written before routeActive existed. */

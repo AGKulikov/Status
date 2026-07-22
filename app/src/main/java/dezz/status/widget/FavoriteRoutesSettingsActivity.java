@@ -37,6 +37,7 @@ import java.util.Collections;
 import java.util.List;
 
 import dezz.status.widget.launcher.LauncherIconResolver;
+import dezz.status.widget.launcher.panels.PanelEditScheduler;
 import dezz.status.widget.launcher.routes.FavoriteRouteConfig;
 import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
 import dezz.status.widget.launcher.routes.FavoriteRoutesPanelView;
@@ -56,6 +57,7 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
     private MaterialSwitch panelVisibleSwitch;
     @Nullable private FavoriteRouteConfig selected;
     @Nullable private FavoriteRoutesPanelView preview;
+    @Nullable private PanelEditScheduler editScheduler;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -63,12 +65,29 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
         preferences = new Preferences(this);
         store = new FavoriteRoutesConfigStore(preferences);
         routes.addAll(store.load());
+        editScheduler = PanelEditScheduler.onMainThread(this::applyPreviewState, () -> {
+            store.save(routes);
+            markSaved();
+            rebuildList();
+        });
         setTitle("Маршрут и избранное HOME");
         setContentView(buildScreen());
         rebuildList();
         if (!routes.isEmpty()) select(routes.get(0));
         else showEmptyEditor();
         rebuildPreview();
+    }
+
+    @Override
+    protected void onStop() {
+        if (editScheduler != null) editScheduler.flush();
+        super.onStop();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (editScheduler != null) editScheduler.cancel();
+        super.onDestroy();
     }
 
     @NonNull
@@ -358,18 +377,27 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
     }
 
     private void persistWithoutList() {
-        store.save(routes);
-        if (preview != null) preview.reloadConfig();
-        markSaved();
+        if (editScheduler != null) editScheduler.request();
     }
 
     private void rebuildPreview() {
         if (previewHost == null) return;
-        previewHost.removeAllViews();
-        preview = new FavoriteRoutesPanelView(this, store,
-                Math.max(1, Math.min(6, preferences.launcherFavoriteRoutesColumns.get())));
-        preview.setPreviewMode(true);
-        previewHost.addView(preview, new FrameLayout.LayoutParams(match(), match()));
+        if (preview == null) {
+            previewHost.removeAllViews();
+            preview = new FavoriteRoutesPanelView(this, store,
+                    Math.max(1, Math.min(6,
+                            preferences.launcherFavoriteRoutesColumns.get())));
+            preview.setPreviewMode(true);
+            previewHost.addView(preview, new FrameLayout.LayoutParams(match(), match()));
+        }
+        applyPreviewState();
+    }
+
+    private void applyPreviewState() {
+        if (preview == null) return;
+        preview.setColumns(Math.max(1, Math.min(6,
+                preferences.launcherFavoriteRoutesColumns.get())));
+        preview.setPreviewRoutes(routes);
     }
 
     private void markSaved() {

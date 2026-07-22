@@ -51,13 +51,21 @@ public final class ClimatePanelConfigTest {
         ClimatePanelConfig config = new ClimatePanelConfig();
         config.backgroundAlpha = 900;
         config.cornerRadiusPx = -3;
+        config.tileCornerRadiusPx = 900;
+        config.tileSpacingPx = -4;
+        config.activeTileAlpha = 999;
+        config.inactiveTileAlpha = -2;
         config.scalePercent = 20;
         config.accentColor = "wrong";
         config.normalize();
         assertEquals(255, config.backgroundAlpha);
         assertEquals(0, config.cornerRadiusPx);
+        assertEquals(64, config.tileCornerRadiusPx);
+        assertEquals(0, config.tileSpacingPx);
+        assertEquals(255, config.activeTileAlpha);
+        assertEquals(0, config.inactiveTileAlpha);
         assertEquals(60, config.scalePercent);
-        assertEquals("#35B7FF", config.accentColor);
+        assertEquals("#59A9FF", config.accentColor);
     }
 
     @Test
@@ -74,6 +82,20 @@ public final class ClimatePanelConfigTest {
         copy.setElementScalePercent(ClimatePanelConfig.AC, 70);
         assertEquals(180, config.elementScalePercent(ClimatePanelConfig.AC));
         assertEquals(70, copy.elementScalePercent(ClimatePanelConfig.AC));
+    }
+
+    @Test
+    public void dragOrderAndPhysicalDimensionsAreIndependent() {
+        ClimatePanelConfig config = new ClimatePanelConfig();
+        int target = config.elementOrder().indexOf(ClimatePanelConfig.WHEEL_HEAT);
+        assertTrue(config.moveElementTo(ClimatePanelConfig.POWER, target));
+        config.setElementWidthPercent(ClimatePanelConfig.POWER, 999);
+        config.setElementHeightPercent(ClimatePanelConfig.POWER, 1);
+        assertEquals(ClimatePanelConfig.WHEEL_HEAT,
+                config.elementOrder().get(target - 1));
+        assertEquals(ClimatePanelConfig.POWER, config.elementOrder().get(target));
+        assertEquals(240, config.elementWidthPercent(ClimatePanelConfig.POWER));
+        assertEquals(65, config.elementHeightPercent(ClimatePanelConfig.POWER));
     }
 
     @Test
@@ -151,5 +173,37 @@ public final class ClimatePanelConfigTest {
         assertEquals(145, restored.elementScalePercent(ClimatePanelConfig.WHEEL_HEAT));
         assertFalse(restored.isElementEnabled(ClimatePanelConfig.FAN));
         assertEquals(ClimatePanelConfig.ELEMENTS.size(), restored.elementOrder().size());
+    }
+
+    @Test
+    public void versionTwoSingleSizeMigratesToPhysicalWidthAndHeight() throws Exception {
+        JSONObject legacy = new JSONObject()
+                .put("version", 2)
+                .put("elementScales", new JSONObject()
+                        .put(ClimatePanelConfig.AC, 145));
+        ClimatePanelConfig restored = ClimatePanelConfigStore.decode(legacy.toString());
+        assertEquals(145, restored.elementScalePercent(ClimatePanelConfig.AC));
+        assertEquals(145, restored.elementWidthPercent(ClimatePanelConfig.AC));
+        assertEquals(145, restored.elementHeightPercent(ClimatePanelConfig.AC));
+    }
+
+    @Test
+    public void versionThreeRoundTripKeepsCarPlayGlassAndTileDimensions() throws Exception {
+        ClimatePanelConfig source = new ClimatePanelConfig();
+        source.tileCornerRadiusPx = 41;
+        source.tileSpacingPx = 17;
+        source.activeTileAlpha = 207;
+        source.inactiveTileAlpha = 51;
+        source.setElementWidthPercent(ClimatePanelConfig.TEMP_DRIVER, 175);
+        source.setElementHeightPercent(ClimatePanelConfig.TEMP_DRIVER, 125);
+
+        ClimatePanelConfig restored = ClimatePanelConfigStore.decode(
+                ClimatePanelConfigStore.encode(source).toString());
+        assertEquals(41, restored.tileCornerRadiusPx);
+        assertEquals(17, restored.tileSpacingPx);
+        assertEquals(207, restored.activeTileAlpha);
+        assertEquals(51, restored.inactiveTileAlpha);
+        assertEquals(175, restored.elementWidthPercent(ClimatePanelConfig.TEMP_DRIVER));
+        assertEquals(125, restored.elementHeightPercent(ClimatePanelConfig.TEMP_DRIVER));
     }
 }

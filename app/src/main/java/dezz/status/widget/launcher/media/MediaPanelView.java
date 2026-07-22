@@ -11,10 +11,13 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
+import android.os.Build;
 import android.text.TextUtils;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -40,11 +43,19 @@ public final class MediaPanelView extends FrameLayout {
         void next();
     }
 
+    /** Direct manipulation callback used only by the settings preview. */
+    public interface LayoutEditor {
+        void onLayoutChanged(@NonNull MediaPanelConfig value, @NonNull String movedId,
+                             boolean finished);
+    }
+
     private final MediaPanelConfigStore store;
     @Nullable private final Controls controls;
     private final Map<String, View> elementViews = new LinkedHashMap<>();
+    private final int[] dragGridLocation = new int[2];
     private MediaPanelConfig config;
-    private MediaElementFlowLayout flow;
+    private MediaElementGridLayout grid;
+    @Nullable private LayoutEditor layoutEditor;
     private ImageView artwork;
     private TextView title;
     private TextView artist;
@@ -84,6 +95,12 @@ public final class MediaPanelView extends FrameLayout {
     public void setConfig(@NonNull MediaPanelConfig value) {
         config = value.copy();
         config.normalize();
+        rebuild();
+    }
+
+    /** Enables drag-to-place, slot highlighting and disables media actions in the preview. */
+    public void setLayoutEditor(@Nullable LayoutEditor editor) {
+        layoutEditor = editor;
         rebuild();
     }
 
@@ -136,9 +153,10 @@ public final class MediaPanelView extends FrameLayout {
         playPause = null;
         applySurface();
 
-        flow = new MediaElementFlowLayout(getContext());
-        flow.setSpacing(config.spacingPx);
-        flow.setPadding(config.contentPaddingPx, config.contentPaddingPx,
+        grid = new MediaElementGridLayout(getContext());
+        grid.setSpacing(config.spacingPx);
+        grid.setGridVisible(layoutEditor != null);
+        grid.setPadding(config.contentPaddingPx, config.contentPaddingPx,
                 config.contentPaddingPx, config.contentPaddingPx);
         for (MediaPanelConfig.Element element : config.orderedElements()) {
             if (!element.enabled) continue;
@@ -146,9 +164,10 @@ public final class MediaPanelView extends FrameLayout {
             if (spec == null) continue;
             View view = buildElement(element, spec);
             elementViews.put(element.id, view);
-            flow.addView(view, elementLayout(spec, element.scalePercent));
+            if (layoutEditor != null) attachEditorDrag(view, element.id);
+            grid.addView(view, elementLayout(element));
         }
-        addView(flow, new FrameLayout.LayoutParams(
+        addView(grid, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         applySnapshot();
     }
@@ -161,6 +180,11 @@ public final class MediaPanelView extends FrameLayout {
                 artwork = new ImageView(getContext());
                 artwork.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 artwork.setContentDescription("Обложка");
+                artwork.setBackground(glassBackground(false, config.cornerRadiusPx / 2));
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    artwork.setClipToOutline(true);
+                    artwork.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
+                }
                 return artwork;
             case MediaPanelConfig.TITLE:
                 title = text(scaleSp(23, element.scalePercent), color(config.titleColor,
@@ -208,6 +232,8 @@ public final class MediaPanelView extends FrameLayout {
         LinearLayout root = new LinearLayout(getContext());
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER_VERTICAL);
+        root.setPadding(dp(10), dp(4), dp(10), dp(7));
+        root.setBackground(glassBackground(false, Math.max(dp(10), config.cornerRadiusPx / 2)));
         timeline = text(scaleSp(13, scalePercent), color(config.secondaryColor, Color.LTGRAY),
                 false);
         timeline.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.CENTER_VERTICAL);
@@ -230,6 +256,8 @@ public final class MediaPanelView extends FrameLayout {
         LinearLayout root = new LinearLayout(getContext());
         root.setGravity(Gravity.CENTER_VERTICAL);
         root.setContentDescription("Громкость музыки");
+        root.setPadding(dp(8), 0, dp(8), 0);
+        root.setBackground(glassBackground(false, Math.max(dp(10), config.cornerRadiusPx / 2)));
         ImageView icon = new ImageView(getContext());
         icon.setImageResource(android.R.drawable.ic_lock_silent_mode_off);
         icon.setColorFilter(color(config.controlColor, Color.WHITE));
@@ -273,10 +301,10 @@ public final class MediaPanelView extends FrameLayout {
     }
 
     @NonNull
-    private LayoutParams elementLayout(@NonNull MediaPanelConfig.Spec spec, int scalePercent) {
-        int width = Math.max(dp(28), Math.round(dp(spec.baseWidthDp) * scalePercent / 100f));
-        int height = Math.max(dp(28), Math.round(dp(spec.baseHeightDp) * scalePercent / 100f));
-        return new LayoutParams(width, height);
+    private MediaElementGridLayout.ElementLayoutParams elementLayout(
+            @NonNull MediaPanelConfig.Element element) {
+        return new MediaElementGridLayout.ElementLayoutParams(element.column, element.row,
+                element.columnSpan, element.rowSpan);
     }
 
     @NonNull
@@ -297,10 +325,13 @@ public final class MediaPanelView extends FrameLayout {
                                @Nullable OnClickListener listener, int scalePercent) {
         ImageButton value = new ImageButton(getContext());
         value.setImageResource(icon);
+        value.setScaleType(ImageView.ScaleType.FIT_CENTER);
         value.setColorFilter(color(config.controlColor, Color.WHITE));
-        value.setBackgroundColor(Color.TRANSPARENT);
+        value.setBackground(glassBackground(false, Math.max(dp(12), config.cornerRadiusPx / 2)));
         value.setContentDescription(description);
-        int padding = Math.max(dp(4), Math.round(dp(13) * scalePercent / 100f));
+        // A larger content scale must make the glyph larger, not add more padding around it.
+        int padding = Math.max(dp(3),
+                Math.round(dp(16) * 100f / Math.max(45, scalePercent)));
         value.setPadding(padding, padding, padding, padding);
         value.setOnClickListener(listener);
         value.setClickable(listener != null);
@@ -334,6 +365,8 @@ public final class MediaPanelView extends FrameLayout {
         if (playPause != null) {
             playPause.setImageResource(playing
                     ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
+            playPause.setBackground(glassBackground(playing,
+                    Math.max(dp(12), config.cornerRadiusPx / 2)));
         }
         if (timeline != null) {
             timeline.setText(MediaTimeline.format(positionMs) + " / "
@@ -355,7 +388,92 @@ public final class MediaPanelView extends FrameLayout {
         background.setColor(Color.argb(config.backgroundAlpha, Color.red(base),
                 Color.green(base), Color.blue(base)));
         background.setCornerRadius(config.cornerRadiusPx);
+        int outline = color(config.outlineColor, Color.WHITE);
+        background.setStroke(config.outlineWidthPx, Color.argb(config.outlineAlpha,
+                Color.red(outline), Color.green(outline), Color.blue(outline)));
         setBackground(background);
+    }
+
+    @NonNull
+    private GradientDrawable glassBackground(boolean active, int radius) {
+        int source = color(active ? config.accentColor : config.glassColor,
+                active ? Color.rgb(134, 183, 255) : Color.WHITE);
+        GradientDrawable value = new GradientDrawable();
+        int alpha = active ? Math.max(92, config.glassAlpha * 3) : config.glassAlpha;
+        value.setColor(Color.argb(Math.min(220, alpha), Color.red(source), Color.green(source),
+                Color.blue(source)));
+        int outline = color(config.outlineColor, Color.WHITE);
+        value.setStroke(config.outlineWidthPx, Color.argb(config.outlineAlpha,
+                Color.red(outline), Color.green(outline), Color.blue(outline)));
+        value.setCornerRadius(Math.max(0, radius));
+        return value;
+    }
+
+    private void attachEditorDrag(@NonNull View child, @NonNull String id) {
+        child.setClickable(true);
+        child.setOnTouchListener(new OnTouchListener() {
+            private float touchOffsetX;
+            private float touchOffsetY;
+
+            @Override public boolean onTouch(View view, MotionEvent event) {
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        touchOffsetX = event.getX();
+                        touchOffsetY = event.getY();
+                        if (view.getParent() != null) {
+                            view.getParent().requestDisallowInterceptTouchEvent(true);
+                        }
+                        view.bringToFront();
+                        view.setScaleX(1.035f);
+                        view.setScaleY(1.035f);
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            view.setElevation(dp(10));
+                        }
+                        return true;
+                    case MotionEvent.ACTION_MOVE:
+                        grid.getLocationOnScreen(dragGridLocation);
+                        int left = Math.round(event.getRawX() - dragGridLocation[0] - touchOffsetX);
+                        int top = Math.round(event.getRawY() - dragGridLocation[1] - touchOffsetY);
+                        if (grid.moveToPixel(view, left, top)) {
+                            MediaElementGridLayout.ElementLayoutParams lp =
+                                    (MediaElementGridLayout.ElementLayoutParams) view.getLayoutParams();
+                            config.setPosition(id, lp.column, lp.row);
+                            syncGridPlacements();
+                            LayoutEditor editor = layoutEditor;
+                            if (editor != null) editor.onLayoutChanged(config.copy(), id, false);
+                        }
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        view.setScaleX(1f);
+                        view.setScaleY(1f);
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            view.setElevation(0f);
+                        }
+                        LayoutEditor editor = layoutEditor;
+                        if (editor != null) editor.onLayoutChanged(config.copy(), id, true);
+                        view.performClick();
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+        });
+    }
+
+    private void syncGridPlacements() {
+        for (Map.Entry<String, View> entry : elementViews.entrySet()) {
+            MediaPanelConfig.Element element = config.element(entry.getKey());
+            View view = entry.getValue();
+            MediaElementGridLayout.ElementLayoutParams lp =
+                    (MediaElementGridLayout.ElementLayoutParams) view.getLayoutParams();
+            lp.column = element.column;
+            lp.row = element.row;
+            lp.columnSpan = element.columnSpan;
+            lp.rowSpan = element.rowSpan;
+            view.setLayoutParams(lp);
+        }
+        grid.requestLayout();
     }
 
     private static int color(String value, int fallback) {

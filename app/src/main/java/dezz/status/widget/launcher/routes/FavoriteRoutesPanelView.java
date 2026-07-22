@@ -25,6 +25,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -68,6 +69,19 @@ public final class FavoriteRoutesPanelView extends FrameLayout {
     public void reloadConfig() {
         List<FavoriteRouteConfig> loaded = store.load();
         routes = loaded == null ? Collections.emptyList() : loaded;
+        rebuild();
+    }
+
+    /**
+     * Applies an in-memory editor snapshot without forcing a JSON write/read round-trip.
+     * Production HOME continues to use {@link #reloadConfig()} as its durable source of truth.
+     */
+    public void setPreviewRoutes(@NonNull List<FavoriteRouteConfig> source) {
+        ArrayList<FavoriteRouteConfig> snapshot = new ArrayList<>();
+        for (FavoriteRouteConfig value : source) {
+            if (value != null) snapshot.add(value.copy());
+        }
+        routes = Collections.unmodifiableList(snapshot);
         rebuild();
     }
 

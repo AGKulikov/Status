@@ -18,7 +18,8 @@ import dezz.status.widget.Preferences;
 
 /** Versioned persistence for the visual media-panel editor. */
 public final class MediaPanelConfigStore {
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
+    private static final int LEGACY_FLOW_SCHEMA_VERSION = 1;
     private final Preferences preferences;
 
     public MediaPanelConfigStore(@NonNull Preferences preferences) {
@@ -32,7 +33,8 @@ public final class MediaPanelConfigStore {
         if (raw == null || raw.trim().isEmpty()) return value;
         try {
             JSONObject root = new JSONObject(raw);
-            if (root.optInt("version", 0) != SCHEMA_VERSION) return value;
+            int version = root.optInt("version", 0);
+            if (version != SCHEMA_VERSION && version != LEGACY_FLOW_SCHEMA_VERSION) return value;
             value.backgroundColor = root.optString("backgroundColor", value.backgroundColor);
             value.backgroundAlpha = root.optInt("backgroundAlpha", value.backgroundAlpha);
             value.cornerRadiusPx = root.optInt("cornerRadiusPx", value.cornerRadiusPx);
@@ -41,6 +43,12 @@ public final class MediaPanelConfigStore {
             value.titleColor = root.optString("titleColor", value.titleColor);
             value.secondaryColor = root.optString("secondaryColor", value.secondaryColor);
             value.controlColor = root.optString("controlColor", value.controlColor);
+            value.glassColor = root.optString("glassColor", value.glassColor);
+            value.glassAlpha = root.optInt("glassAlpha", value.glassAlpha);
+            value.accentColor = root.optString("accentColor", value.accentColor);
+            value.outlineColor = root.optString("outlineColor", value.outlineColor);
+            value.outlineAlpha = root.optInt("outlineAlpha", value.outlineAlpha);
+            value.outlineWidthPx = root.optInt("outlineWidthPx", value.outlineWidthPx);
             JSONArray elements = root.optJSONArray("elements");
             if (elements != null) {
                 Set<String> restored = new HashSet<>();
@@ -57,6 +65,16 @@ public final class MediaPanelConfigStore {
                     // Applying moves in array order also makes hand-edited/imported JSON robust
                     // against duplicate or sparse order numbers.
                     value.element(id).order = item.optInt("order", index);
+                    // Version 1 stored only flow order and content scale. The stable default
+                    // slots retain every old setting without guessing pixel coordinates from a
+                    // panel size that may have changed since the previous launch.
+                    if (version >= SCHEMA_VERSION) {
+                        MediaPanelConfig.Element element = value.element(id);
+                        element.column = item.optInt("column", element.column);
+                        element.row = item.optInt("row", element.row);
+                        element.columnSpan = item.optInt("columnSpan", element.columnSpan);
+                        element.rowSpan = item.optInt("rowSpan", element.rowSpan);
+                    }
                     maximumOrder = Math.max(maximumOrder, value.element(id).order);
                 }
                 // New built-ins are appended to an existing user's layout instead of being
@@ -84,6 +102,12 @@ public final class MediaPanelConfigStore {
             root.put("titleColor", value.titleColor);
             root.put("secondaryColor", value.secondaryColor);
             root.put("controlColor", value.controlColor);
+            root.put("glassColor", value.glassColor);
+            root.put("glassAlpha", value.glassAlpha);
+            root.put("accentColor", value.accentColor);
+            root.put("outlineColor", value.outlineColor);
+            root.put("outlineAlpha", value.outlineAlpha);
+            root.put("outlineWidthPx", value.outlineWidthPx);
             JSONArray elements = new JSONArray();
             for (MediaPanelConfig.Element element : value.orderedElements()) {
                 JSONObject item = new JSONObject();
@@ -91,6 +115,10 @@ public final class MediaPanelConfigStore {
                 item.put("enabled", element.enabled);
                 item.put("order", element.order);
                 item.put("scalePercent", element.scalePercent);
+                item.put("column", element.column);
+                item.put("row", element.row);
+                item.put("columnSpan", element.columnSpan);
+                item.put("rowSpan", element.rowSpan);
                 elements.put(item);
             }
             root.put("elements", elements);

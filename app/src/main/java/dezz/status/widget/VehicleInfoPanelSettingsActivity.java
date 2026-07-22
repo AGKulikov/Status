@@ -42,6 +42,7 @@ import dezz.status.widget.launcher.vehicle.VehicleInfoPanelConfig;
 import dezz.status.widget.launcher.vehicle.VehicleInfoPanelConfigStore;
 import dezz.status.widget.launcher.vehicle.VehicleInfoPanelView;
 import dezz.status.widget.launcher.vehicle.VehicleDerivedMetrics;
+import dezz.status.widget.launcher.panels.PanelEditScheduler;
 
 /** Human-friendly, immediate visual editor for the HOME vehicle-information panel. */
 public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
@@ -66,6 +67,7 @@ public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
     private VehicleInfoPanelView preview;
     private LinearLayout metricList;
     private TextView catalogStatus;
+    private PanelEditScheduler editScheduler;
     private boolean destroyed;
 
     @Override
@@ -75,6 +77,11 @@ public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
         store = new VehicleInfoPanelConfigStore(preferences);
         config = store.load();
         integration = CarIntegrations.get(this);
+        editScheduler = PanelEditScheduler.onMainThread(
+                () -> {
+                    if (preview != null) preview.setConfig(config);
+                },
+                () -> store.save(config));
         setTitle("Данные автомобиля");
         setContentView(buildContent());
     }
@@ -88,6 +95,7 @@ public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
 
     @Override
     protected void onStop() {
+        if (editScheduler != null) editScheduler.flush();
         if (preview != null) preview.stop();
         super.onStop();
     }
@@ -95,6 +103,7 @@ public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         destroyed = true;
+        if (editScheduler != null) editScheduler.cancel();
         super.onDestroy();
     }
 
@@ -430,8 +439,7 @@ public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
     }
 
     private void persistAndPreview() {
-        store.save(config);
-        if (preview != null) preview.setConfig(config);
+        editScheduler.request();
     }
 
     @NonNull
