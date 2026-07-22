@@ -226,8 +226,10 @@ public final class ClimatePanelOverlayController {
         requestedEdge = clamp(preferences.climatePanelEdge.get(), 0, 3);
         Point display = displaySize();
         int maximum = isHorizontalEdge(requestedEdge) ? display.y : display.x;
-        requestedExtent = clamp(preferences.climatePanelExtent.get(), dp(64),
-                Math.max(dp(64), maximum));
+        // WindowManager geometry and wm overscan both use physical pixels. Keep the editor's
+        // "px" value exact instead of silently scaling its minimum through screen density.
+        requestedExtent = clamp(preferences.climatePanelExtent.get(), 80,
+                Math.max(80, maximum));
         reservationGeneration++;
 
         if (reservedActive
@@ -354,8 +356,8 @@ public final class ClimatePanelOverlayController {
 
     private boolean ensureButtonWindow() {
         if (!canDrawOverlays() || windowManager == null || windowContext == null) return false;
-        int size = clamp(preferences.climateButtonSize.get(), dp(40),
-                Math.max(dp(40), Math.min(displaySize().x, displaySize().y)));
+        int size = clamp(preferences.climateButtonSize.get(), 48,
+                Math.max(48, Math.min(displaySize().x, displaySize().y)));
         if (buttonRoot == null) buttonRoot = buildButton();
         refreshButtonAppearance();
         if (buttonParams == null) {
@@ -524,8 +526,8 @@ public final class ClimatePanelOverlayController {
     @NonNull
     private WindowManager.LayoutParams compactPanelParams() {
         Point display = displaySize();
-        int width = clamp(preferences.climateOverlayWidth.get(), dp(240), display.x);
-        int height = clamp(preferences.climateOverlayHeight.get(), dp(140), display.y);
+        int width = clamp(preferences.climateOverlayWidth.get(), 320, display.x);
+        int height = clamp(preferences.climateOverlayHeight.get(), 160, display.y);
         WindowManager.LayoutParams result = overlayParams(width, height, false);
         int size = buttonParams == null ? preferences.climateButtonSize.get() : buttonParams.width;
         int bx = buttonParams == null ? preferences.climateButtonX.get() : buttonParams.x;
@@ -541,7 +543,7 @@ public final class ClimatePanelOverlayController {
     @NonNull
     private WindowManager.LayoutParams reservedPanelParams() {
         Point display = displaySize();
-        int extent = clamp(appliedExtent > 0 ? appliedExtent : requestedExtent, dp(64),
+        int extent = clamp(appliedExtent > 0 ? appliedExtent : requestedExtent, 80,
                 isHorizontalEdge(requestedEdge) ? display.y : display.x);
         int edge = appliedEdge >= 0 ? appliedEdge : requestedEdge;
         int width = isHorizontalEdge(edge) ? display.x : extent;
@@ -580,8 +582,8 @@ public final class ClimatePanelOverlayController {
 
     private void updateButtonGeometry() {
         if (buttonParams == null || buttonRoot == null) return;
-        int size = clamp(preferences.climateButtonSize.get(), dp(40),
-                Math.max(dp(40), Math.min(displaySize().x, displaySize().y)));
+        int size = clamp(preferences.climateButtonSize.get(), 48,
+                Math.max(48, Math.min(displaySize().x, displaySize().y)));
         buttonParams.width = size;
         buttonParams.height = size;
         // Preferences are authoritative unless the user is in the middle of a drag.

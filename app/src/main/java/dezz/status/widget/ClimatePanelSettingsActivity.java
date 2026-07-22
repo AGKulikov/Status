@@ -42,6 +42,7 @@ import dezz.status.widget.launcher.climate.ClimatePanelConfig;
 import dezz.status.widget.launcher.climate.ClimatePanelConfigStore;
 import dezz.status.widget.launcher.climate.ClimatePanelView;
 import dezz.status.widget.climate.ClimatePanelService;
+import dezz.status.widget.climate.ScreenReservationStateStore;
 import dezz.status.widget.shell.PrivilegedShell;
 
 /** Code-free, immediate editor for the HOME and always-on climate surfaces. */
@@ -107,11 +108,14 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        // ACTION_MANAGE_OVERLAY_PERMISSION does not return a result on every Android 9 vendor
+        // build. Re-entering this screen is therefore our reliable completion signal, whether
+        // the user granted the permission or pressed Back.
+        overlayPermissionRequestInFlight = false;
         // The compact button can be dragged while this screen is not in the foreground. Always
         // show the persisted coordinates rather than the values captured during onCreate().
         updateCompactPositionInfo();
         if (preferences.climatePanelEnabled.get() && Settings.canDrawOverlays(this)) {
-            overlayPermissionRequestInFlight = false;
             applyClimatePanel();
         }
         if (runtimeStatusInfo != null) {
@@ -340,7 +344,17 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
     }
 
     private void applyClimatePanel() {
-        ClimatePanelService.apply(this);
+        if (preferences.climatePanelEnabled.get()) {
+            ClimatePanelService.apply(this);
+            return;
+        }
+        // Do not flash a foreground-service notification while the user merely edits the HOME
+        // preview with the permanent panel disabled. A running compact panel or a crash journal
+        // still has to be stopped/restored immediately.
+        if (!"stopped".equals(ClimatePanelService.getRuntimeStatus())
+                || new ScreenReservationStateStore(this).hasManagedReservation()) {
+            ClimatePanelService.stopAndRestore(this);
+        }
     }
 
     private void requestOverlayPermission() {
