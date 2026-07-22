@@ -59,6 +59,7 @@ jobs:
       - name: Test and build geelyDebug
         env:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           # CI revisions live above the earlier hand-built HA14..HA24 line, so every artifact is
           # accepted by Android as an upgrade. Four digits are reserved by build.gradle.

@@ -47,8 +47,13 @@ jobs:
     - name: Set up Android SDK
       uses: android-actions/setup-android@v2
 
-    - name: Decode Keystore
-      run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+    - name: Decode stable update keystore
+      env:
+        KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      shell: bash
+      run: |
+        test -n "$KEYSTORE_BASE64" || { echo "KEYSTORE_BASE64 is required" >&2; exit 1; }
+        echo "$KEYSTORE_BASE64" | base64 -d > keystore.jks
 
     - name: Make gradlew executable
       run: chmod +x gradlew
@@ -57,9 +62,14 @@ jobs:
       env:
         VERSION_NAME: ${{ steps.version.outputs.version }}
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
       run: |
+        test -n "$KEY_PASSWORD" || { echo "KEY_PASSWORD is required" >&2; exit 1; }
         ./gradlew assembleGeelyRelease
-        mv app/build/outputs/apk/geely/release/status-widget-${VERSION_NAME}-release.apk app/build/outputs/apk/geely/release/status-widget-${VERSION_NAME}.apk
+        APK="app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}-release.apk"
+        "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/apk-certs.txt
+        grep -qi "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75" /tmp/apk-certs.txt
+        mv "$APK" "app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}.apk"
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
@@ -68,4 +78,4 @@ jobs:
         name: Release ${{ steps.version.outputs.version }}
         draft: false
         prerelease: false
-        files: app/build/outputs/apk/geely/release/status-widget-${{ steps.version.outputs.version }}.apk
+        files: app/build/outputs/apk/geely/release/status-widget-ha-${{ steps.version.outputs.version }}.apk

@@ -69,7 +69,9 @@ android {
         release {
             storeFile file('../keystore.jks')
             storePassword System.getenv("KEY_PASSWORD")
-            keyAlias "key0"
+            // The stable HA14+ update container uses this alias. Keep it overridable for
+            // downstream forks, but never silently fall back to Android's debug key in CI.
+            keyAlias System.getenv("KEY_ALIAS") ?: "status-widget-ha"
             keyPassword System.getenv("KEY_PASSWORD")
         }
     }
