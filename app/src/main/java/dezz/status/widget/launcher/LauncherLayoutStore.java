@@ -28,6 +28,7 @@ public final class LauncherLayoutStore {
     public static final String NAVIGATION = "navigation";
     public static final String ACTIONS = "actions";
     public static final String CLIMATE = "climate";
+    public static final String FAVORITE_ROUTES = "favorite_routes";
 
     public static final class Geometry {
         public int x;
@@ -168,6 +169,13 @@ public final class LauncherLayoutStore {
         int climateH = Math.min(370, Math.max(290, height / 2));
         result.put(CLIMATE, new Geometry(Math.max(0, (width - climateW) / 2),
                 Math.min(32, Math.max(0, height - climateH)), climateW, climateH));
+
+        int routesW = Math.min(520, Math.max(320, width / 4));
+        int routesH = Math.min(230, Math.max(150, height / 4));
+        result.put(FAVORITE_ROUTES, new Geometry(
+                Math.max(0, width - routesW - clockW - 52),
+                Math.min(36, Math.max(0, height - routesH)),
+                routesW, routesH));
         return result;
     }
 }

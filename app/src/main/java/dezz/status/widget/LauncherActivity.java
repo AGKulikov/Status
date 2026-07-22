@@ -71,6 +71,8 @@ import dezz.status.widget.launcher.media.MediaPanelConfig;
 import dezz.status.widget.launcher.media.MediaPanelConfigStore;
 import dezz.status.widget.launcher.media.MediaPanelView;
 import dezz.status.widget.launcher.panels.PanelElementConfigStore;
+import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
+import dezz.status.widget.launcher.routes.FavoriteRoutesPanelView;
 import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarControlState;
 import dezz.status.widget.car.CarIntegration;
@@ -99,6 +101,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private LauncherLayoutStore layoutStore;
     private PanelElementConfigStore panelElementStore;
     private FavoriteAppsConfigStore favoriteAppsConfigStore;
+    private FavoriteRoutesConfigStore favoriteRoutesConfigStore;
     private FrameLayout workspace;
     private LauncherGridView editorGrid;
     private MaterialButton doneButton;
@@ -124,6 +127,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private final Set<String> pendingCarControls = new LinkedHashSet<>();
     private boolean activityStarted;
     private ClimatePanelView climatePanel;
+    private FavoriteRoutesPanelView favoriteRoutesPanel;
     @Nullable private String appliedPanelElementsJson;
     private int appliedAppsColumns = -1;
     private int appliedActionsColumns = -1;
@@ -147,6 +151,7 @@ public final class LauncherActivity extends AppCompatActivity {
         layoutStore = new LauncherLayoutStore(preferences);
         panelElementStore = new PanelElementConfigStore(preferences);
         favoriteAppsConfigStore = new FavoriteAppsConfigStore(preferences);
+        favoriteRoutesConfigStore = new FavoriteRoutesConfigStore(preferences);
         configureWindow();
         setContentView(buildRoot());
         workspace.post(this::initializePanels);
@@ -221,6 +226,14 @@ public final class LauncherActivity extends AppCompatActivity {
         setPanelVisibility(LauncherLayoutStore.NAVIGATION,
                 preferences.launcherNavigationVisible.get()
                         && hasSimplePanelContent(LauncherLayoutStore.NAVIGATION));
+        boolean favoriteRoutesVisible = preferences.launcherFavoriteRoutesVisible.get()
+                && favoriteRoutesConfigStore.hasEnabled();
+        setPanelVisibility(LauncherLayoutStore.FAVORITE_ROUTES, favoriteRoutesVisible);
+        if (favoriteRoutesPanel != null) {
+            favoriteRoutesPanel.setColumns(Math.max(1, Math.min(6,
+                    preferences.launcherFavoriteRoutesColumns.get())));
+            favoriteRoutesPanel.reloadConfig();
+        }
         setPanelVisibility(LauncherLayoutStore.ACTIONS, preferences.launcherActionsVisible.get()
                 && hasSimplePanelContent(LauncherLayoutStore.ACTIONS));
         boolean climateVisible = preferences.launcherClimateVisible.get()
@@ -386,6 +399,9 @@ public final class LauncherActivity extends AppCompatActivity {
         addPanel(LauncherLayoutStore.NAVIGATION, "Маршрут", buildNavigationPanel(),
                 preferences.launcherNavigationVisible.get()
                         && hasSimplePanelContent(LauncherLayoutStore.NAVIGATION));
+        addPanel(LauncherLayoutStore.FAVORITE_ROUTES, "Избранные маршруты",
+                buildFavoriteRoutesPanel(), preferences.launcherFavoriteRoutesVisible.get()
+                        && favoriteRoutesConfigStore.hasEnabled());
         addPanel(LauncherLayoutStore.ACTIONS, "Действия", buildActionsPanel(),
                 preferences.launcherActionsVisible.get()
                         && hasSimplePanelContent(LauncherLayoutStore.ACTIONS));
@@ -410,6 +426,13 @@ public final class LauncherActivity extends AppCompatActivity {
         appliedAppsColumns = preferences.launcherAppsColumns.get();
         appliedActionsColumns = preferences.launcherActionsColumns.get();
         if (getIntent().getBooleanExtra(EXTRA_EDIT_MODE, false)) setEditMode(true);
+    }
+
+    @NonNull
+    private View buildFavoriteRoutesPanel() {
+        favoriteRoutesPanel = new FavoriteRoutesPanelView(this, favoriteRoutesConfigStore,
+                Math.max(1, Math.min(6, preferences.launcherFavoriteRoutesColumns.get())));
+        return favoriteRoutesPanel;
     }
 
     private void addPanel(@NonNull String id, @NonNull String label, @NonNull View content,

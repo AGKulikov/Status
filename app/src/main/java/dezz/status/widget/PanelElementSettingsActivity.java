@@ -67,6 +67,8 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         addExternalButton(navigation, "Медиа", MediaPanelSettingsActivity.class);
         addPanelButton(navigation, "Часы", LauncherLayoutStore.CLOCK);
         addPanelButton(navigation, "Маршрут", LauncherLayoutStore.NAVIGATION);
+        addExternalButton(navigation, "Избранные маршруты",
+                FavoriteRoutesSettingsActivity.class);
         addPanelButton(navigation, "Иконки и действия", LauncherLayoutStore.ACTIONS);
         addExternalButton(navigation, "Климат", ClimatePanelSettingsActivity.class);
         TextView hint = new TextView(this);

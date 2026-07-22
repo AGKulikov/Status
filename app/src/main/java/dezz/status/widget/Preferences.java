@@ -462,6 +462,14 @@ public class Preferences {
     public final Bool launcherNavigationVisible = new Bool(this, "launcherNavigationVisible", true);
     public final Bool launcherActionsVisible = new Bool(this, "launcherActionsVisible", true);
     public final Str launcherMediaConfigJson = new Str(this, "launcherMediaConfigJson", "");
+    // User-defined one-tap destinations (Home, Work, etc.). Kept as its own visual panel so it
+    // can be positioned and resized independently from current-route information.
+    public final Str launcherFavoriteRoutesJson = new Str(this,
+            "launcherFavoriteRoutesJson", "");
+    public final Bool launcherFavoriteRoutesVisible = new Bool(this,
+            "launcherFavoriteRoutesVisible", false);
+    public final Int launcherFavoriteRoutesColumns = new Int(this,
+            "launcherFavoriteRoutesColumns", 2);
     // Opt-in on upgrades so a new large panel never covers an existing hand-tuned HOME layout.
     public final Bool launcherClimateVisible = new Bool(this, "launcherClimateVisible", false);
     // Per-panel inner element visibility/order/scale. Kept separate from outer pixel geometry so
