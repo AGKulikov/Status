@@ -19,19 +19,30 @@ package dezz.status.widget;
 
 import android.accessibilityservice.AccessibilityService;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
 
 import androidx.annotation.Nullable;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
+import dezz.status.widget.launcher.NavigationDataRepository;
 
 /**
- * Accessibility service whose sole purpose is to report, for each physical display, which
- * app package is currently in the foreground there. Needed because Geely Monjaro head units
+ * Accessibility service that reports the foreground package on every physical display and reads
+ * route summaries from Yandex Maps/Navigator when a build exposes them only in its view tree.
+ * Foreground tracking is needed because Geely Monjaro head units
  * run 4 displays in parallel: a user-app switch on display 2 must not change overlay
  * visibility on display 1 (and vice versa), but {@link android.app.usage.UsageStatsManager}
  * doesn't expose display IDs — its events are global. {@link AccessibilityWindowInfo} does.
@@ -43,12 +54,54 @@ import java.util.Map;
  */
 public class WidgetAccessibilityService extends AccessibilityService {
     private static final String TAG = "WidgetA11yService";
+    private static final long NAVIGATION_SCAN_DELAY_MS = 120L;
+    private static final long NAVIGATION_REFRESH_MS = 1_500L;
+    private static final long NAVIGATION_MISSING_GRACE_MS = 800L;
+    private static final int MAX_NAVIGATION_NODES = 1_500;
+    private static final int MAX_NAVIGATION_DEPTH = 45;
 
     @Nullable
     private static volatile WidgetAccessibilityService instance;
 
     /** displayId → current foreground package. Updated on every window change event. */
     private final Map<Integer, String> foregroundByDisplay = new HashMap<>();
+    private int consecutiveMissingNavigationScans;
+    private static final class NavigationWindowScan {
+        final Set<String> visiblePackages;
+        final Set<String> routePackages;
+
+        NavigationWindowScan(Set<String> visiblePackages, Set<String> routePackages) {
+            this.visiblePackages = visiblePackages;
+            this.routePackages = routePackages;
+        }
+    }
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable navigationScan = new Runnable() {
+        @Override
+        public void run() {
+            NavigationWindowScan scan = scanNavigationWindows();
+            boolean accessibilitySourceMissing =
+                    NavigationDataRepository.isAccessibilitySourceMissing(
+                            WidgetAccessibilityService.this, scan.routePackages);
+            if (accessibilitySourceMissing) {
+                consecutiveMissingNavigationScans++;
+                if (consecutiveMissingNavigationScans >= 2) {
+                    NavigationDataRepository.clearIfAccessibilitySourceMissing(
+                            WidgetAccessibilityService.this, scan.routePackages);
+                    consecutiveMissingNavigationScans = 0;
+                }
+            } else {
+                consecutiveMissingNavigationScans = 0;
+            }
+            if (!scan.visiblePackages.isEmpty()) {
+                handler.postDelayed(this, NAVIGATION_REFRESH_MS);
+            } else if (accessibilitySourceMissing) {
+                // Require two empty scans so a transient window recreation does not flash the
+                // route panel off while Navigator rotates or replaces its map surface.
+                handler.postDelayed(this, NAVIGATION_MISSING_GRACE_MS);
+            }
+        }
+    };
 
     @Nullable
     public static WidgetAccessibilityService getInstance() {
@@ -75,6 +128,9 @@ public class WidgetAccessibilityService extends AccessibilityService {
 
     @Override
     public void onDestroy() {
+        handler.removeCallbacks(navigationScan);
+        NavigationDataRepository.clearIfAccessibilitySourceMissing(this,
+                Collections.emptySet());
         instance = null;
         synchronized (foregroundByDisplay) {
             foregroundByDisplay.clear();
@@ -95,6 +151,7 @@ public class WidgetAccessibilityService extends AccessibilityService {
         // remember the per-display foreground packages. Otherwise the first event-driven
         // update would have to wait for a real window change.
         seedFromCurrentWindows();
+        scheduleNavigationScan(0L);
         Log.i(TAG, "Connected. Seeded " + foregroundByDisplay.size() + " display(s).");
         WidgetService widget = WidgetService.getInstance();
         if (widget != null) {
@@ -106,18 +163,23 @@ public class WidgetAccessibilityService extends AccessibilityService {
     public void onAccessibilityEvent(AccessibilityEvent event) {
         if (event == null) return;
         int type = event.getEventType();
-        if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-                && type != AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
-            return;
+        boolean windowChanged = type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                || type == AccessibilityEvent.TYPE_WINDOWS_CHANGED;
+        if (windowChanged) {
+            // The event itself carries one package, but we want a coherent snapshot of every
+            // display, not only the one which changed.
+            seedFromCurrentWindows();
+            WidgetService widget = WidgetService.getInstance();
+            if (widget != null) widget.onForegroundDisplayMapUpdated();
         }
-        // After any window state change, re-scan: the event itself carries one package, but
-        // we want a coherent snapshot of every display, not just the one that changed. Cheap
-        // — there are typically only a handful of accessibility windows in total.
-        seedFromCurrentWindows();
 
-        WidgetService widget = WidgetService.getInstance();
-        if (widget != null) {
-            widget.onForegroundDisplayMapUpdated();
+        CharSequence packageName = event.getPackageName();
+        if (windowChanged || NavigationDataRepository.isYandexPackage(
+                packageName == null ? null : packageName.toString())) {
+            // Debouncing coalesces the many TYPE_WINDOW_CONTENT_CHANGED events emitted while
+            // Navigator updates distance/ETA. The actual read uses the complete tree, so a
+            // maneuver distance such as "500 м" cannot overwrite the full remaining route.
+            scheduleNavigationScan(NAVIGATION_SCAN_DELAY_MS);
         }
     }
 
@@ -153,6 +215,115 @@ public class WidgetAccessibilityService extends AccessibilityService {
             foregroundByDisplay.clear();
             foregroundByDisplay.putAll(next);
         }
+    }
+
+    private void scheduleNavigationScan(long delayMs) {
+        handler.removeCallbacks(navigationScan);
+        handler.postDelayed(navigationScan, Math.max(0L, delayMs));
+    }
+
+    /**
+     * Reads text and content descriptions from every visible Yandex window. Selecting the largest
+     * duration/distance in {@link dezz.status.widget.launcher.NavigationDataParser} filters out
+     * the shorter next-maneuver values commonly present in the same tree.
+     */
+    private NavigationWindowScan scanNavigationWindows() {
+        Map<String, Set<String>> valuesByPackage = new HashMap<>();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            android.util.SparseArray<List<AccessibilityWindowInfo>> all = getWindowsOnAllDisplays();
+            if (all != null) {
+                for (int i = 0; i < all.size(); i++) {
+                    collectNavigationWindows(all.valueAt(i), valuesByPackage);
+                }
+            }
+        } else {
+            collectNavigationWindows(getWindows(), valuesByPackage);
+        }
+
+        // Some firmware returns an empty getWindows() list until touch exploration is active,
+        // while getRootInActiveWindow() still works. Use it as a final fallback.
+        AccessibilityNodeInfo activeRoot = getRootInActiveWindow();
+        if (activeRoot != null) {
+            try {
+                collectNavigationRoot(activeRoot, valuesByPackage);
+            } finally {
+                activeRoot.recycle();
+            }
+        }
+
+        Set<String> routePackages = new HashSet<>();
+        for (Map.Entry<String, Set<String>> entry : valuesByPackage.entrySet()) {
+            if (NavigationDataRepository.updateFromText(this, entry.getKey(),
+                    new ArrayList<>(entry.getValue()))) {
+                routePackages.add(entry.getKey());
+            }
+        }
+        return new NavigationWindowScan(new HashSet<>(valuesByPackage.keySet()), routePackages);
+    }
+
+    private static boolean collectNavigationWindows(@Nullable List<AccessibilityWindowInfo> windows,
+            Map<String, Set<String>> valuesByPackage) {
+        if (windows == null) return false;
+        boolean found = false;
+        for (AccessibilityWindowInfo window : windows) {
+            if (window == null) continue;
+            AccessibilityNodeInfo root;
+            try {
+                root = window.getRoot();
+            } catch (RuntimeException ignored) {
+                continue;
+            }
+            if (root == null) continue;
+            try {
+                found |= collectNavigationRoot(root, valuesByPackage);
+            } finally {
+                root.recycle();
+            }
+        }
+        return found;
+    }
+
+    private static boolean collectNavigationRoot(AccessibilityNodeInfo root,
+            Map<String, Set<String>> valuesByPackage) {
+        CharSequence packageName = root.getPackageName();
+        String pkg = packageName == null ? "" : packageName.toString();
+        if (!NavigationDataRepository.isYandexPackage(pkg)) return false;
+        Set<String> values = valuesByPackage.get(pkg);
+        if (values == null) {
+            values = new LinkedHashSet<>();
+            valuesByPackage.put(pkg, values);
+        }
+        collectNavigationNode(root, values, 0, new int[] {0});
+        return true;
+    }
+
+    private static void collectNavigationNode(AccessibilityNodeInfo node, Set<String> values,
+            int depth, int[] visited) {
+        if (node == null || depth > MAX_NAVIGATION_DEPTH
+                || visited[0]++ >= MAX_NAVIGATION_NODES) return;
+        addNavigationText(values, node.getText());
+        addNavigationText(values, node.getContentDescription());
+        int childCount = Math.min(node.getChildCount(), MAX_NAVIGATION_NODES - visited[0]);
+        for (int i = 0; i < childCount; i++) {
+            AccessibilityNodeInfo child;
+            try {
+                child = node.getChild(i);
+            } catch (RuntimeException ignored) {
+                continue;
+            }
+            if (child == null) continue;
+            try {
+                collectNavigationNode(child, values, depth + 1, visited);
+            } finally {
+                child.recycle();
+            }
+        }
+    }
+
+    private static void addNavigationText(Set<String> values, @Nullable CharSequence value) {
+        if (value == null) return;
+        String text = value.toString().replace('\n', ' ').trim();
+        if (!text.isEmpty()) values.add(text);
     }
 
     /**

@@ -21,8 +21,12 @@ android {
     namespace "dezz.status.widget"
 
     compileSdkVersion 36
+    buildToolsVersion "36.0.0"
 
     defaultConfig {
+        // Deliberately different from the upstream package so the fork can be installed next
+        // to Status Widget 2.8.2 and keeps an entirely independent preference/database space.
+        applicationId "ru.natro.statuswidget"
         minSdk 28
         //noinspection ExpiredTargetSdkVersion
         targetSdkVersion 28
@@ -30,7 +34,7 @@ android {
         versionName rootProject.ext.appVersionName
 
         // Set the output APK name
-        setProperty("archivesBaseName", "status-widget-${versionName}")
+        setProperty("archivesBaseName", "status-widget-ha-${versionName}")
     }
 
     // Car-specific builds: each flavor wires in one vendor SDK via <flavor>Implementation and
@@ -52,7 +56,7 @@ android {
     applicationVariants.configureEach { variant ->
         variant.outputs.configureEach {
             def flavorTag = variant.flavorName == "geely" ? "" : "-${variant.flavorName}"
-            outputFileName = "status-widget-${variant.versionName}${flavorTag}-${variant.buildType.name}.apk"
+            outputFileName = "status-widget-ha-${variant.versionName}${flavorTag}-${variant.buildType.name}.apk"
         }
     }
 
@@ -65,7 +69,9 @@ android {
         release {
             storeFile file('../keystore.jks')
             storePassword System.getenv("KEY_PASSWORD")
-            keyAlias "key0"
+            // The stable HA14+ update container uses this alias. Keep it overridable for
+            // downstream forks, but never silently fall back to Android's debug key in CI.
+            keyAlias System.getenv("KEY_ALIAS") ?: "status-widget-ha"
             keyPassword System.getenv("KEY_PASSWORD")
         }
     }
@@ -77,6 +83,11 @@ android {
         }
         debug {
             debuggable true
+            // CI (and an authorised local build) supplies the stable update key. Without it,
+            // retain Android's normal debug signing so contributors can still compile forks.
+            if (file('../keystore.jks').exists() && System.getenv("KEY_PASSWORD")) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 
@@ -92,10 +103,15 @@ dependencies {
     implementation libs.core
     implementation libs.constraintlayout
     implementation libs.material
+    implementation libs.okhttp
     implementation libs.recyclerview
 
     // eCarX AdaptAPI (Geely flavor only) — class-jar converted from the vendor-distributed
     // dex jar; bundled into the APK the same way the infoDash fork ships it. Main source set
     // must not import com.ecarx.* — only app/src/geely may.
     geelyImplementation files('libs/geely/ecarx-adaptapi.jar')
+    testImplementation 'junit:junit:4.13.2'
+    // Android's local-unit-test stub throws from org.json methods. Protocol fixtures need the
+    // real implementation so auth/catalog/event compatibility is tested on every CI build.
+    testImplementation 'org.json:json:20240303'
 }

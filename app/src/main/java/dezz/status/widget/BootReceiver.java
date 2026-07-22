@@ -29,6 +29,12 @@ public class BootReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        if (Intent.ACTION_USER_UNLOCKED.equals(intent.getAction())) {
+            // Keystore-backed MQTT credentials can become readable only after unlock on some
+            // OEM ROMs. Re-reading preferences restarts MQTT without touching either overlay.
+            if (WidgetService.isRunning()) WidgetService.getInstance().applyPreferences();
+            return;
+        }
         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())
                 || Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(intent.getAction())
                 || ACTION_QUICKBOOT_POWERON.equals(intent.getAction())) {

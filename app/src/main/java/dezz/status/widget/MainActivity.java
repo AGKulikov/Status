@@ -67,6 +67,7 @@ import java.util.List;
 
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
+import dezz.status.widget.automation.AutomationStateStore;
 import dezz.status.widget.databinding.ActivityMainBinding;
 import dezz.status.widget.shell.PrivilegedShell;
 
@@ -127,6 +128,10 @@ public class MainActivity extends AppCompatActivity {
 
         binding.sectionGeneral.aboutButton.setOnClickListener(v ->
                 startActivity(new Intent(this, AboutActivity.class)));
+        binding.sectionGeneral.automationSettingsButton.setOnClickListener(v ->
+                startActivity(new Intent(this, AutomationSettingsActivity.class)));
+        binding.sectionGeneral.launcherSettingsButton.setOnClickListener(v ->
+                startActivity(new Intent(this, LauncherSettingsActivity.class)));
         binding.sectionGeneral.settingsButton.setOnClickListener(this::showSettingsMenu);
 
         final String appVersion = VersionGetter.getAppVersionName(this);
@@ -541,6 +546,8 @@ public class MainActivity extends AppCompatActivity {
                 return getString(R.string.brick_title_indoor_temp);
             case OUTDOOR_TEMP:
                 return getString(R.string.brick_title_outdoor_temp);
+            case HOME_ASSISTANT:
+                return getString(R.string.brick_title_home_assistant);
             default:
                 return "";
         }
@@ -718,6 +725,7 @@ public class MainActivity extends AppCompatActivity {
             stopService(new Intent(this, WidgetService.class));
         }
         prefs.resetAll();
+        new AutomationStateStore(this).clearAll();
         // Start a fresh MainActivity instead of recreate(): recreate() restores the View
         // hierarchy state after our initializeViews(), and the CompoundButton listeners we
         // attached then fire on setChecked(...) from restoreInstanceState — writing the

@@ -35,6 +35,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
@@ -44,6 +45,9 @@
          apps for the "Hide widget in apps" picker. Without these, the picker would show only
          our own app. -->
     <queries>
+        <package android:name="ru.yandex.yandexmaps" />
+        <package android:name="ru.yandex.yandexnavi" />
+        <package android:name="com.yandex.yango" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
@@ -57,6 +61,7 @@
     <application
         android:name=".StatusWidgetApplication"
         android:allowBackup="true"
+        android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/Theme.StatusWidget">
@@ -72,11 +77,88 @@
         </activity>
 
         <activity
+            android:name=".LauncherActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:resizeableActivity="false"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.StatusWidget.Launcher">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".LauncherSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".LauncherShortcutSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".FavoriteAppsSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".ClimatePanelSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".MediaPanelSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".PanelElementSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".AppSelectionActivity"
             android:exported="false" />
 
         <activity
             android:name=".AboutActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".AutomationSettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".MqttSettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".VisualBrickEditorActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".PopupSettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".SprutHubSettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".HomeAssistantSettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ScenarioSettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".IntentScenarioSettingsActivity"
             android:exported="false" />
 
         <activity
@@ -137,6 +219,53 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.USER_UNLOCKED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Explicit broadcasts sent by Home Assistant Companion. MQTT is the primary transport,
+             but this stable action remains supported for compatibility and manual testing. -->
+        <receiver
+            android:name=".automation.HaUpdateReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="ru.natro.statuswidget.HA_UPDATE" />
+                <action android:name="ru.natro.statuswidget.HA_CLEAR" />
+                <action android:name="ru.natro.statuswidget.HA_VISIBILITY" />
+                <action android:name="ru.natro.statuswidget.HA_BUILTIN_VISIBILITY" />
+                <action android:name="ru.natro.statuswidget.HA_POPUP_UPDATE" />
+                <action android:name="ru.natro.statuswidget.HA_POPUP_CLEAR" />
+                <action android:name="ru.natro.statuswidget.HA_POPUP_VISIBILITY" />
+                <action android:name="ru.natro.statuswidget.HA_SYNC_REQUEST" />
+                <action android:name="ru.natro.statuswidget.HA_REFRESH" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Cold-start endpoint for one-shot scenario commands. The fixed action accepts only a
+             saved rule id plus its random token. A sender that needs a configured action while
+             the process is stopped must explicitly address this receiver class and know the
+             random action suffix. Both paths use the saved allowlist before starting the service. -->
+        <receiver
+            android:name=".automation.ScenarioTriggerReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="ru.natro.statuswidget.SCENARIO_TRIGGER" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Route values published by supported Yandex Navigator/Maps builds and MConfig. -->
+        <receiver
+            android:name=".launcher.YandexNavigationReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.yandex.ARRIVAL" />
+                <action android:name="com.yandex.TIME" />
+                <action android:name="com.yandex.DISTANCE" />
             </intent-filter>
         </receiver>
     </application>
