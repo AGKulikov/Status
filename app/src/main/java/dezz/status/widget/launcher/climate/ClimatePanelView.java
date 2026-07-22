@@ -10,6 +10,7 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -22,8 +23,6 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-
-import com.google.android.material.card.MaterialCardView;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -300,7 +299,7 @@ public final class ClimatePanelView extends FrameLayout {
                                     @NonNull String shortLabel) {
         CarControlDescriptor descriptor = visibleDescriptor(id);
         if (descriptor == null) return;
-        MaterialCardView card = tileCard(id);
+        ClimateTileView card = tileCard(id);
         LinearLayout content = tileContent(id);
         ImageView icon = tileIcon(id);
         TextView title = label(shortLabel, elementScaledSp(id, 12), true);
@@ -311,7 +310,7 @@ public final class ClimatePanelView extends FrameLayout {
                 elementScaledDp(id, 25), elementScaledDp(id, 25)));
         content.addView(title);
         content.addView(value);
-        card.addView(content, new MaterialCardView.LayoutParams(
+        card.addView(content, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         card.setOnClickListener(v -> execute(id, operation, 0));
         ControlBinding binding = new ControlBinding(descriptor, card, icon, value,
@@ -324,7 +323,7 @@ public final class ClimatePanelView extends FrameLayout {
                                      @NonNull String shortLabel) {
         CarControlDescriptor descriptor = visibleDescriptor(id);
         if (descriptor == null) return;
-        MaterialCardView card = tileCard(id);
+        ClimateTileView card = tileCard(id);
         LinearLayout content = new LinearLayout(getContext());
         content.setOrientation(LinearLayout.HORIZONTAL);
         content.setGravity(Gravity.CENTER);
@@ -350,7 +349,7 @@ public final class ClimatePanelView extends FrameLayout {
                 ViewGroup.LayoutParams.MATCH_PARENT, 1f));
         content.addView(plus, new LinearLayout.LayoutParams(elementScaledDp(id, 40),
                 ViewGroup.LayoutParams.MATCH_PARENT));
-        card.addView(content, new MaterialCardView.LayoutParams(
+        card.addView(content, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         minus.setOnClickListener(v -> adjust(id, -1));
         plus.setOnClickListener(v -> adjust(id, 1));
@@ -365,7 +364,7 @@ public final class ClimatePanelView extends FrameLayout {
                                    @NonNull String shortLabel) {
         CarControlDescriptor descriptor = visibleDescriptor(id);
         if (descriptor == null) return;
-        MaterialCardView card = tileCard(id);
+        ClimateTileView card = tileCard(id);
         LinearLayout content = tileContent(id);
         ImageView icon = tileIcon(id);
         TextView title = label(shortLabel, elementScaledSp(id, 10), true);
@@ -378,7 +377,7 @@ public final class ClimatePanelView extends FrameLayout {
                 elementScaledDp(id, 29), elementScaledDp(id, 29)));
         content.addView(title);
         content.addView(value);
-        card.addView(content, new MaterialCardView.LayoutParams(
+        card.addView(content, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         CarControlCommand.Operation operation = descriptor.kind == CarControlDescriptor.Kind.ACTION
                 ? CarControlCommand.Operation.ACTIVATE : CarControlCommand.Operation.CYCLE;
@@ -550,8 +549,8 @@ public final class ClimatePanelView extends FrameLayout {
     }
 
     @NonNull
-    private MaterialCardView tileCard(@NonNull String id) {
-        MaterialCardView card = new MaterialCardView(getContext());
+    private ClimateTileView tileCard(@NonNull String id) {
+        ClimateTileView card = new ClimateTileView(getContext());
         card.setRadius(elementScaledDp(id, 15));
         card.setCardElevation(0);
         card.setClickable(true);
@@ -704,19 +703,76 @@ public final class ClimatePanelView extends FrameLayout {
 
     private static final class ControlBinding {
         @NonNull final CarControlDescriptor descriptor;
-        @NonNull final MaterialCardView card;
+        @NonNull final ClimateTileView card;
         @NonNull final ImageView icon;
         @NonNull final TextView value;
         @NonNull final List<View> interactive;
 
         ControlBinding(@NonNull CarControlDescriptor descriptor,
-                       @NonNull MaterialCardView card, @NonNull ImageView icon,
+                       @NonNull ClimateTileView card, @NonNull ImageView icon,
                        @NonNull TextView value, @NonNull List<View> interactive) {
             this.descriptor = descriptor;
             this.card = card;
             this.icon = icon;
             this.value = value;
             this.interactive = interactive;
+        }
+    }
+
+    /**
+     * Theme-independent replacement for MaterialCardView used by the overlay climate panel.
+     *
+     * <p>The overlay can be created from {@code Context#createDisplayContext()}, which deliberately
+     * has no Activity theme. MaterialCardView rejects that perfectly valid window context at
+     * construction time. This lightweight view keeps the same rounded fill, border, elevation and
+     * ripple behaviour without consulting theme attributes, so it is safe in HOME, the editor and
+     * every display/overlay window.</p>
+     */
+    private static final class ClimateTileView extends FrameLayout {
+        private final GradientDrawable shape = new GradientDrawable();
+        private final GradientDrawable rippleMask = new GradientDrawable();
+        private final RippleDrawable ripple;
+        private int strokeColor = Color.TRANSPARENT;
+        private int strokeWidth;
+
+        ClimateTileView(@NonNull Context context) {
+            super(context);
+            shape.setShape(GradientDrawable.RECTANGLE);
+            shape.setColor(Color.TRANSPARENT);
+            rippleMask.setShape(GradientDrawable.RECTANGLE);
+            rippleMask.setColor(Color.WHITE);
+            ripple = new RippleDrawable(ColorStateList.valueOf(
+                    Color.argb(80, 255, 255, 255)), shape, rippleMask);
+            setBackground(ripple);
+            setClipToOutline(true);
+        }
+
+        void setRadius(float radius) {
+            float safeRadius = Math.max(0f, radius);
+            shape.setCornerRadius(safeRadius);
+            rippleMask.setCornerRadius(safeRadius);
+        }
+
+        void setCardElevation(float elevation) {
+            setElevation(Math.max(0f, elevation));
+        }
+
+        void setRippleColor(@NonNull ColorStateList color) {
+            ripple.setColor(color);
+        }
+
+        void setCardBackgroundColor(int color) {
+            shape.setColor(color);
+        }
+
+        void setStrokeColor(int color) {
+            strokeColor = color;
+            shape.setStroke(strokeWidth, strokeColor);
+        }
+
+        void setStrokeWidth(int width) {
+            strokeWidth = Math.max(0, width);
+            shape.setStroke(strokeWidth, strokeColor);
         }
     }
 }
