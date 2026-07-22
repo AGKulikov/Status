@@ -260,7 +260,7 @@ public class WidgetService extends Service {
             pendingAutomationUi.clear();
             automationUiRefreshScheduled = false;
         }
-        if (destroyed || changed.isEmpty()) return;
+        if (WidgetService.this.destroyed || changed.isEmpty()) return;
         boolean affectsStatusRow = changed.containsKey(AutomationContract.SCOPE_MAIN)
                 || changed.containsKey(AutomationContract.SCOPE_BUILTIN);
         if (popupOverlay != null) {
@@ -272,7 +272,7 @@ public class WidgetService extends Service {
         }
         // Popup windows have an independent WindowManager lifecycle. A failed/retrying status-row
         // attachment must not discard their connector updates.
-        if (binding == null) return;
+        if (WidgetService.this.binding == null) return;
         if (changed.containsKey(AutomationContract.SCOPE_MAIN)) renderHomeAssistantBricks();
         // A popup-only temperature/sensor stream must not remeasure and animate the independent
         // status row. HA1048 did that for every packet even when no status brick had changed.

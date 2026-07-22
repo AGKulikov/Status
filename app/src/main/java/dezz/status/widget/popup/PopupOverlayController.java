@@ -86,7 +86,8 @@ public final class PopupOverlayController {
     private boolean refreshDeferred;
     private List<PopupItemConfig> currentItems = Collections.emptyList();
     private final Runnable stateRefresh = () -> {
-        if (destroyed || currentConfig == null || !currentConfig.enabled) return;
+        PopupOverlayConfig config = PopupOverlayController.this.currentConfig;
+        if (destroyed || config == null || !config.enabled) return;
         if (touchInProgress) {
             refreshDeferred = true;
             return;
