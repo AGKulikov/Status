@@ -11,6 +11,9 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import dezz.status.widget.Preferences;
 
 /** Versioned persistence for the visual media-panel editor. */
@@ -40,18 +43,25 @@ public final class MediaPanelConfigStore {
             value.controlColor = root.optString("controlColor", value.controlColor);
             JSONArray elements = root.optJSONArray("elements");
             if (elements != null) {
+                Set<String> restored = new HashSet<>();
+                int maximumOrder = -1;
                 for (int index = 0; index < elements.length(); index++) {
                     JSONObject item = elements.optJSONObject(index);
                     if (item == null) continue;
                     String id = item.optString("id", "");
                     if (MediaPanelConfig.spec(id) == null) continue;
+                    restored.add(id);
                     value.setEnabled(id, item.optBoolean("enabled", value.element(id).enabled));
                     value.setScale(id, item.optInt("scalePercent",
                             value.element(id).scalePercent));
                     // Applying moves in array order also makes hand-edited/imported JSON robust
                     // against duplicate or sparse order numbers.
                     value.element(id).order = item.optInt("order", index);
+                    maximumOrder = Math.max(maximumOrder, value.element(id).order);
                 }
+                // New built-ins are appended to an existing user's layout instead of being
+                // inserted between carefully ordered controls after an application update.
+                value.appendMissingDisabled(restored, maximumOrder);
             }
         } catch (JSONException ignored) {
             // Keep safe defaults after an interrupted write or incompatible import.

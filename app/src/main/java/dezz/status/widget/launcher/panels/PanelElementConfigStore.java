@@ -15,9 +15,11 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import dezz.status.widget.Preferences;
 import dezz.status.widget.launcher.LauncherLayoutStore;
@@ -38,9 +40,17 @@ public final class PanelElementConfigStore {
     public static final String NAV_ARRIVAL = "arrival";
     public static final String NAV_DURATION = "duration";
     public static final String NAV_DISTANCE = "distance";
+    public static final String NAV_MANEUVER_IMAGE = "maneuver_image";
+    public static final String NAV_MANEUVER_DISTANCE = "maneuver_distance";
     public static final String NAV_MANEUVER = "maneuver";
+    public static final String NAV_TRIP_INFO = "trip_info";
+    public static final String NAV_COMBINED = "navigation_combined";
     public static final String NAV_SPEED_LIMIT = "speed_limit";
     public static final String NAV_TRAFFIC_LIGHT = "traffic_light";
+    public static final String NAV_LANES_IMAGE = "lanes_image";
+    public static final String NAV_LANE_INFO = "lane_info";
+    public static final String NAV_JAM_PROGRESS = "jam_progress";
+    public static final String NAV_RAINBOW_IMAGE = "rainbow_image";
     public static final String NAV_INACTIVE = "inactive";
     public static final String ACTION_TILES = "tiles";
     public static final String ACTION_ADD = "add";
@@ -48,10 +58,16 @@ public final class PanelElementConfigStore {
     public static final class Definition {
         @NonNull public final String id;
         @NonNull public final String label;
+        public final boolean enabledByDefault;
 
         Definition(@NonNull String id, @NonNull String label) {
+            this(id, label, true);
+        }
+
+        Definition(@NonNull String id, @NonNull String label, boolean enabledByDefault) {
             this.id = id;
             this.label = label;
+            this.enabledByDefault = enabledByDefault;
         }
     }
 
@@ -185,15 +201,18 @@ public final class PanelElementConfigStore {
             JSONObject panel = panels == null ? null : panels.optJSONObject(panelId);
             JSONArray elements = panel == null ? null : panel.optJSONArray("elements");
             if (elements == null) return result;
+            Set<String> restored = new HashSet<>();
             for (int index = 0; index < elements.length(); index++) {
                 JSONObject value = elements.optJSONObject(index);
                 if (value == null) continue;
                 Element target = result.find(value.optString("id", ""));
                 if (target == null) continue;
+                restored.add(target.id);
                 target.enabled = value.optBoolean("enabled", target.enabled);
                 target.order = value.optInt("order", target.order);
                 target.scalePercent = value.optInt("scale", target.scalePercent);
             }
+            disableMissingSavedDefinitions(result, panelId, restored);
             result.normalize();
         } catch (JSONException ignored) {
             // Keep usable defaults when imported JSON is incomplete or belongs to a newer build.
@@ -244,11 +263,24 @@ public final class PanelElementConfigStore {
         return null;
     }
 
-    @NonNull private static Panel defaults(@NonNull String panelId) {
+    /**
+     * A saved navigation panel represents a hand-tuned, size-constrained layout. New rows are
+     * appended disabled so an update cannot silently overflow its old pixel rectangle. A fresh
+     * install still receives the product defaults above.
+     */
+    static void disableMissingSavedDefinitions(@NonNull Panel panel,
+            @NonNull String panelId, @NonNull Set<String> restoredIds) {
+        if (!LauncherLayoutStore.NAVIGATION.equals(panelId)) return;
+        for (Definition definition : definitions(panelId)) {
+            if (!restoredIds.contains(definition.id)) panel.setEnabled(definition.id, false);
+        }
+    }
+
+    @NonNull static Panel defaults(@NonNull String panelId) {
         List<Element> elements = new ArrayList<>();
         int order = 0;
         for (Definition definition : definitions(panelId)) {
-            elements.add(new Element(definition.id, true, order++, 100));
+            elements.add(new Element(definition.id, definition.enabledByDefault, order++, 100));
         }
         return new Panel(panelId, elements);
     }
@@ -269,9 +301,17 @@ public final class PanelElementConfigStore {
                 new Definition(NAV_ARRIVAL, "Время прибытия"),
                 new Definition(NAV_DURATION, "Оставшееся время"),
                 new Definition(NAV_DISTANCE, "Оставшееся расстояние"),
-                new Definition(NAV_MANEUVER, "Следующий манёвр"),
+                new Definition(NAV_MANEUVER_IMAGE, "Стрелка следующего манёвра", false),
+                new Definition(NAV_MANEUVER_DISTANCE, "Расстояние до манёвра", false),
+                new Definition(NAV_MANEUVER, "Информация о манёвре"),
+                new Definition(NAV_TRIP_INFO, "Сводка поездки", false),
+                new Definition(NAV_COMBINED, "Манёвр: стрелка + расстояние + текст", false),
                 new Definition(NAV_SPEED_LIMIT, "Ограничение скорости"),
                 new Definition(NAV_TRAFFIC_LIGHT, "Светофор и обратный отсчёт"),
+                new Definition(NAV_LANES_IMAGE, "Графика полос движения", false),
+                new Definition(NAV_LANE_INFO, "Полосы / съезд и расстояние", false),
+                new Definition(NAV_JAM_PROGRESS, "Графика прогресса / пробок", false),
+                new Definition(NAV_RAINBOW_IMAGE, "Графика Rainbow", false),
                 new Definition(NAV_INACTIVE, "Сообщение, когда маршрут не запущен")));
         result.put(LauncherLayoutStore.ACTIONS, list(
                 new Definition(ACTION_TILES, "Пользовательские плитки"),

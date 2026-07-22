@@ -13,6 +13,7 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Color;
+import android.graphics.Bitmap;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -87,16 +88,20 @@ import dezz.status.widget.scenario.IntentActionRuleStore;
 public final class LauncherActivity extends AppCompatActivity {
     public static final String EXTRA_EDIT_MODE = "dezz.status.widget.extra.EDIT_HOME";
     private static final long NAVIGATION_UI_REFRESH_MS = 30_000L;
+    private static final long NAVIGATION_DYNAMIC_REFRESH_MS = 1_000L;
     private final Map<String, LauncherElementFrame> panels = new HashMap<>();
     private final Handler navigationUiHandler = new Handler(Looper.getMainLooper());
     private final Runnable navigationUiRefresh = new Runnable() {
         @Override public void run() {
             updateNavigation();
-            navigationUiHandler.postDelayed(this, NAVIGATION_UI_REFRESH_MS);
+            scheduleNavigationRefresh();
         }
     };
     private final BroadcastReceiver navigationReceiver = new BroadcastReceiver() {
-        @Override public void onReceive(Context context, Intent intent) { updateNavigation(); }
+        @Override public void onReceive(Context context, Intent intent) {
+            updateNavigation();
+            scheduleNavigationRefresh();
+        }
     };
 
     private Preferences preferences;
@@ -110,14 +115,27 @@ public final class LauncherActivity extends AppCompatActivity {
     private MaterialButton doneButton;
     private boolean editMode;
     private boolean panelsInitialized;
+    private boolean navigationDynamicRefresh;
     private LauncherMediaController mediaController;
     private MediaPanelView mediaPanel;
     private TextView navigationArrival;
     private TextView navigationDuration;
     private TextView navigationDistance;
+    private ImageView navigationManeuverImage;
+    private TextView navigationManeuverDistance;
     private TextView navigationManeuver;
+    private TextView navigationTripInfo;
+    private LinearLayout navigationCombined;
+    private ImageView navigationCombinedImage;
+    private TextView navigationCombinedDistance;
+    private TextView navigationCombinedManeuver;
     private TextView navigationSpeedLimit;
-    private TextView navigationTrafficLight;
+    private LinearLayout navigationTrafficLights;
+    private int navigationTrafficScalePercent = 100;
+    private ImageView navigationLanesImage;
+    private TextView navigationLaneInfo;
+    private ImageView navigationJamImage;
+    private ImageView navigationRainbowImage;
     private TextView navigationInactive;
     /** Opens the same Yandex product that supplied the current route; Navigator is the default. */
     private YandexWindowLauncher.Product navigationLaunchProduct =
@@ -182,8 +200,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 new IntentFilter(NavigationDataRepository.ACTION_UPDATED));
         if (mediaController != null) mediaController.start();
         updateNavigation();
-        navigationUiHandler.removeCallbacks(navigationUiRefresh);
-        navigationUiHandler.postDelayed(navigationUiRefresh, NAVIGATION_UI_REFRESH_MS);
+        scheduleNavigationRefresh();
         resubscribeCarControls();
         if (climatePanel != null && preferences.launcherClimateVisible.get()
                 && hasClimatePanelContent()) {
@@ -295,6 +312,7 @@ public final class LauncherActivity extends AppCompatActivity {
         replacePanelContent(LauncherLayoutStore.ACTIONS, buildActionsPanel());
         refreshFavorites();
         updateNavigation();
+        scheduleNavigationRefresh();
         refreshShortcutGrid();
     }
 
@@ -448,6 +466,7 @@ public final class LauncherActivity extends AppCompatActivity {
         if (activityStarted && !isFinishing()) mediaController.start();
         refreshFavorites();
         updateNavigation();
+        scheduleNavigationRefresh();
         if (activityStarted && preferences.launcherClimateVisible.get()
                 && hasClimatePanelContent()) climatePanel.start();
         if (activityStarted && preferences.launcherVehicleInfoVisible.get()) {
@@ -580,12 +599,23 @@ public final class LauncherActivity extends AppCompatActivity {
         navigationArrival = null;
         navigationDuration = null;
         navigationDistance = null;
+        navigationManeuverImage = null;
+        navigationManeuverDistance = null;
         navigationManeuver = null;
+        navigationTripInfo = null;
+        navigationCombined = null;
+        navigationCombinedImage = null;
+        navigationCombinedDistance = null;
+        navigationCombinedManeuver = null;
         navigationSpeedLimit = null;
-        navigationTrafficLight = null;
+        navigationTrafficLights = null;
+        navigationLanesImage = null;
+        navigationLaneInfo = null;
+        navigationJamImage = null;
+        navigationRainbowImage = null;
         navigationInactive = null;
         for (PanelElementConfigStore.Element element : config.enabled()) {
-            TextView value;
+            TextView value = null;
             if (PanelElementConfigStore.NAV_ARRIVAL.equals(element.id)) {
                 navigationArrival = value = text(24f * element.scalePercent / 100f,
                         Color.WHITE, true);
@@ -595,25 +625,85 @@ public final class LauncherActivity extends AppCompatActivity {
             } else if (PanelElementConfigStore.NAV_DISTANCE.equals(element.id)) {
                 navigationDistance = value = text(18f * element.scalePercent / 100f,
                         Color.LTGRAY, false);
+            } else if (PanelElementConfigStore.NAV_MANEUVER_IMAGE.equals(element.id)) {
+                navigationManeuverImage = navigationImage(element.scalePercent, 76);
+                root.addView(navigationManeuverImage);
+            } else if (PanelElementConfigStore.NAV_MANEUVER_DISTANCE.equals(element.id)) {
+                navigationManeuverDistance = value = text(25f * element.scalePercent / 100f,
+                        Color.WHITE, true);
             } else if (PanelElementConfigStore.NAV_MANEUVER.equals(element.id)) {
                 navigationManeuver = value = text(17f * element.scalePercent / 100f,
                         Color.WHITE, false);
+            } else if (PanelElementConfigStore.NAV_TRIP_INFO.equals(element.id)) {
+                navigationTripInfo = value = text(16f * element.scalePercent / 100f,
+                        Color.LTGRAY, false);
+            } else if (PanelElementConfigStore.NAV_COMBINED.equals(element.id)) {
+                navigationCombined = buildNavigationCombined(element.scalePercent);
+                root.addView(navigationCombined);
             } else if (PanelElementConfigStore.NAV_SPEED_LIMIT.equals(element.id)) {
                 navigationSpeedLimit = value = text(18f * element.scalePercent / 100f,
                         Color.rgb(255, 210, 90), true);
             } else if (PanelElementConfigStore.NAV_TRAFFIC_LIGHT.equals(element.id)) {
-                navigationTrafficLight = value = text(18f * element.scalePercent / 100f,
-                        Color.WHITE, true);
+                navigationTrafficScalePercent = element.scalePercent;
+                navigationTrafficLights = new LinearLayout(this);
+                navigationTrafficLights.setOrientation(LinearLayout.VERTICAL);
+                root.addView(navigationTrafficLights, new LinearLayout.LayoutParams(
+                        matchWidth(), wrapContent()));
+            } else if (PanelElementConfigStore.NAV_LANES_IMAGE.equals(element.id)) {
+                navigationLanesImage = navigationImage(element.scalePercent, 82);
+                root.addView(navigationLanesImage);
+            } else if (PanelElementConfigStore.NAV_LANE_INFO.equals(element.id)) {
+                navigationLaneInfo = value = text(16f * element.scalePercent / 100f,
+                        Color.WHITE, false);
+            } else if (PanelElementConfigStore.NAV_JAM_PROGRESS.equals(element.id)) {
+                navigationJamImage = navigationImage(element.scalePercent, 58);
+                root.addView(navigationJamImage);
+            } else if (PanelElementConfigStore.NAV_RAINBOW_IMAGE.equals(element.id)) {
+                navigationRainbowImage = navigationImage(element.scalePercent, 58);
+                root.addView(navigationRainbowImage);
             } else if (PanelElementConfigStore.NAV_INACTIVE.equals(element.id)) {
                 navigationInactive = value = text(16f * element.scalePercent / 100f,
                         Color.GRAY, false);
             } else {
                 continue;
             }
-            root.addView(value);
+            if (value != null) root.addView(value);
         }
         root.setOnClickListener(v -> launchYandex(navigationLaunchProduct, false));
         return root;
+    }
+
+    @NonNull
+    private ImageView navigationImage(int scalePercent, int baseHeightDp) {
+        ImageView value = new ImageView(this);
+        value.setAdjustViewBounds(true);
+        value.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        value.setVisibility(View.GONE);
+        int height = dp(Math.max(28, baseHeightDp * scalePercent / 100));
+        value.setLayoutParams(new LinearLayout.LayoutParams(matchWidth(), height));
+        return value;
+    }
+
+    @NonNull
+    private LinearLayout buildNavigationCombined(int scalePercent) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setVisibility(View.GONE);
+        navigationCombinedImage = new ImageView(this);
+        navigationCombinedImage.setAdjustViewBounds(true);
+        navigationCombinedImage.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        int imageSize = dp(Math.max(42, 68 * scalePercent / 100));
+        card.addView(navigationCombinedImage, new LinearLayout.LayoutParams(imageSize, imageSize));
+        LinearLayout labels = new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        labels.setPadding(dp(8), 0, 0, 0);
+        navigationCombinedDistance = text(24f * scalePercent / 100f, Color.WHITE, true);
+        navigationCombinedManeuver = text(16f * scalePercent / 100f, Color.LTGRAY, false);
+        labels.addView(navigationCombinedDistance);
+        labels.addView(navigationCombinedManeuver);
+        card.addView(labels, new LinearLayout.LayoutParams(0, wrapContent(), 1f));
+        return card;
     }
 
     @NonNull
@@ -944,19 +1034,50 @@ public final class LauncherActivity extends AppCompatActivity {
     }
 
     private void updateNavigation() {
+        navigationDynamicRefresh = false;
         if (navigationArrival == null && navigationDuration == null
-                && navigationDistance == null && navigationManeuver == null
-                && navigationSpeedLimit == null && navigationTrafficLight == null
+                && navigationDistance == null && navigationManeuverImage == null
+                && navigationManeuverDistance == null && navigationManeuver == null
+                && navigationTripInfo == null && navigationCombined == null
+                && navigationSpeedLimit == null
+                && navigationTrafficLights == null && navigationLanesImage == null
+                && navigationLaneInfo == null && navigationJamImage == null
+                && navigationRainbowImage == null
                 && navigationInactive == null) return;
         NavigationDataRepository.Snapshot state = NavigationDataRepository.read(this);
-        if (!state.available && !state.trafficAvailable) {
+        boolean laneTextAvailable = state.laneAvailable && (!state.lanes.isEmpty()
+                || !state.laneDistance.isEmpty() || Double.isFinite(state.laneDistanceMeters));
+        navigationDynamicRefresh = state.trafficAvailable || state.jamImage != null
+                || state.lanesImage != null || state.rainbowImage != null || laneTextAvailable;
+        boolean visualAvailable = state.maneuverImage != null || state.lanesImage != null
+                || state.jamImage != null || state.rainbowImage != null || laneTextAvailable;
+        boolean anyAvailable = state.available || state.trafficAvailable || visualAvailable;
+        if (!anyAvailable) {
             navigationLaunchProduct = YandexWindowLauncher.Product.NAVIGATOR;
             if (navigationArrival != null) navigationArrival.setVisibility(View.GONE);
             if (navigationDuration != null) navigationDuration.setVisibility(View.GONE);
             if (navigationDistance != null) navigationDistance.setVisibility(View.GONE);
+            hideNavigationImage(navigationManeuverImage);
+            if (navigationManeuverDistance != null) {
+                navigationManeuverDistance.setVisibility(View.GONE);
+            }
             if (navigationManeuver != null) navigationManeuver.setVisibility(View.GONE);
+            if (navigationTripInfo != null) navigationTripInfo.setVisibility(View.GONE);
+            if (navigationCombined != null) {
+                navigationCombined.setVisibility(View.GONE);
+                if (navigationCombinedImage != null) {
+                    navigationCombinedImage.setImageDrawable(null);
+                }
+            }
             if (navigationSpeedLimit != null) navigationSpeedLimit.setVisibility(View.GONE);
-            if (navigationTrafficLight != null) navigationTrafficLight.setVisibility(View.GONE);
+            if (navigationTrafficLights != null) {
+                navigationTrafficLights.removeAllViews();
+                navigationTrafficLights.setVisibility(View.GONE);
+            }
+            hideNavigationImage(navigationLanesImage);
+            if (navigationLaneInfo != null) navigationLaneInfo.setVisibility(View.GONE);
+            hideNavigationImage(navigationJamImage);
+            hideNavigationImage(navigationRainbowImage);
             if (navigationInactive != null) {
                 navigationInactive.setVisibility(View.VISIBLE);
                 navigationInactive.setText("Маршрут не запущен\nНажмите, чтобы открыть Яндекс Навигатор");
@@ -967,8 +1088,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 ? YandexWindowLauncher.Product.MAPS
                 : YandexWindowLauncher.Product.NAVIGATOR;
         if (navigationInactive != null) {
-            navigationInactive.setVisibility(state.available ? View.GONE : View.VISIBLE);
-            if (!state.available) navigationInactive.setText("Маршрут не запущен");
+            navigationInactive.setVisibility(anyAvailable ? View.GONE : View.VISIBLE);
         }
         if (navigationArrival != null) {
             navigationArrival.setVisibility(state.available ? View.VISIBLE : View.GONE);
@@ -985,6 +1105,12 @@ public final class LauncherActivity extends AppCompatActivity {
                     ? View.VISIBLE : View.GONE);
             navigationDistance.setText(state.distance);
         }
+        showNavigationImage(navigationManeuverImage, state.maneuverImage);
+        if (navigationManeuverDistance != null) {
+            navigationManeuverDistance.setVisibility(state.available
+                    && !state.maneuverTitle.isEmpty() ? View.VISIBLE : View.GONE);
+            navigationManeuverDistance.setText(state.maneuverTitle);
+        }
         if (navigationManeuver != null) {
             String maneuver = state.maneuverText.isEmpty()
                     ? state.maneuverTitle : state.maneuverText;
@@ -992,31 +1118,121 @@ public final class LauncherActivity extends AppCompatActivity {
                     ? View.VISIBLE : View.GONE);
             navigationManeuver.setText(maneuver);
         }
+        if (navigationTripInfo != null) {
+            navigationTripInfo.setVisibility(state.available && !state.maneuverSubtext.isEmpty()
+                    ? View.VISIBLE : View.GONE);
+            navigationTripInfo.setText(state.maneuverSubtext);
+        }
+        if (navigationCombined != null) {
+            String combinedTitle = state.available ? state.maneuverTitle : "";
+            String combinedManeuver = state.available
+                    ? (state.maneuverText.isEmpty()
+                    ? state.maneuverSubtext : state.maneuverText) : "";
+            boolean combinedVisible = state.maneuverImage != null
+                    || (state.available && (!combinedTitle.isEmpty()
+                    || !combinedManeuver.isEmpty()));
+            navigationCombined.setVisibility(combinedVisible ? View.VISIBLE : View.GONE);
+            if (navigationCombinedImage != null) {
+                navigationCombinedImage.setImageBitmap(state.maneuverImage);
+                navigationCombinedImage.setVisibility(state.maneuverImage == null
+                        ? View.GONE : View.VISIBLE);
+            }
+            if (navigationCombinedDistance != null) {
+                navigationCombinedDistance.setText(combinedTitle);
+                navigationCombinedDistance.setVisibility(combinedTitle.isEmpty()
+                        ? View.GONE : View.VISIBLE);
+            }
+            if (navigationCombinedManeuver != null) {
+                navigationCombinedManeuver.setText(combinedManeuver);
+                navigationCombinedManeuver.setVisibility(combinedManeuver.isEmpty()
+                        ? View.GONE : View.VISIBLE);
+            }
+        }
         if (navigationSpeedLimit != null) {
             navigationSpeedLimit.setVisibility(state.available && !state.speedLimit.isEmpty()
                     ? View.VISIBLE : View.GONE);
             navigationSpeedLimit.setText(state.speedLimit.isEmpty()
                     ? "" : "Ограничение: " + state.speedLimit);
         }
-        if (navigationTrafficLight != null) {
-            navigationTrafficLight.setVisibility(state.trafficAvailable
-                    ? View.VISIBLE : View.GONE);
+        if (navigationTrafficLights != null) {
+            navigationTrafficLights.removeAllViews();
             if (state.trafficAvailable) {
-                String color;
-                int tint;
-                switch (state.trafficColor) {
-                    case "GREEN": color = "Зелёный"; tint = Color.rgb(80, 220, 120); break;
-                    case "YELLOW": color = "Жёлтый"; tint = Color.rgb(255, 210, 60); break;
-                    case "RED":
-                    default: color = "Красный"; tint = Color.rgb(255, 90, 90); break;
+                if (state.trafficLights.isEmpty()) {
+                    addTrafficLightRow(state.trafficColor, state.trafficCountdown,
+                            state.trafficArrow, -1);
+                } else {
+                    for (NavigationDataRepository.TrafficLight light : state.trafficLights) {
+                        addTrafficLightRow(light.color, light.countdown, light.arrow,
+                                light.position);
+                    }
                 }
-                navigationTrafficLight.setTextColor(tint);
-                String suffix = state.trafficCountdown.isEmpty()
-                        ? "" : " · " + state.trafficCountdown + " с";
-                if (!state.trafficArrow.isEmpty()) suffix += " · " + state.trafficArrow;
-                navigationTrafficLight.setText("Светофор: " + color + suffix);
             }
+            navigationTrafficLights.setVisibility(state.trafficAvailable
+                    && navigationTrafficLights.getChildCount() > 0 ? View.VISIBLE : View.GONE);
         }
+        showNavigationImage(navigationLanesImage, state.lanesImage);
+        if (navigationLaneInfo != null) {
+            StringBuilder value = new StringBuilder();
+            if (!state.lanes.isEmpty()) value.append(state.lanes.replace(";", " · "));
+            if (!state.laneDistance.isEmpty()) {
+                if (value.length() > 0) value.append("  ·  ");
+                value.append(state.laneDistance);
+            } else if (Double.isFinite(state.laneDistanceMeters)) {
+                if (value.length() > 0) value.append("  ·  ");
+                value.append(formatLaneMeters(state.laneDistanceMeters));
+            }
+            navigationLaneInfo.setText(value.toString());
+            navigationLaneInfo.setVisibility(state.laneAvailable && value.length() > 0
+                    ? View.VISIBLE : View.GONE);
+        }
+        showNavigationImage(navigationJamImage, state.jamImage);
+        showNavigationImage(navigationRainbowImage, state.rainbowImage);
+    }
+
+    private void scheduleNavigationRefresh() {
+        navigationUiHandler.removeCallbacks(navigationUiRefresh);
+        if (!activityStarted) return;
+        navigationUiHandler.postDelayed(navigationUiRefresh, navigationDynamicRefresh
+                ? NAVIGATION_DYNAMIC_REFRESH_MS : NAVIGATION_UI_REFRESH_MS);
+    }
+
+    private void showNavigationImage(@Nullable ImageView view, @Nullable Bitmap bitmap) {
+        if (view == null) return;
+        view.setImageBitmap(bitmap);
+        view.setVisibility(bitmap == null ? View.GONE : View.VISIBLE);
+    }
+
+    private void hideNavigationImage(@Nullable ImageView view) {
+        if (view == null) return;
+        view.setImageDrawable(null);
+        view.setVisibility(View.GONE);
+    }
+
+    private void addTrafficLightRow(String color, String countdown, String arrow, int position) {
+        if (navigationTrafficLights == null || color == null || color.isEmpty()) return;
+        int tint;
+        String label;
+        switch (color.toUpperCase(Locale.ROOT)) {
+            case "GREEN": label = "Зелёный"; tint = Color.rgb(80, 220, 120); break;
+            case "YELLOW": label = "Жёлтый"; tint = Color.rgb(255, 210, 60); break;
+            case "RED": label = "Красный"; tint = Color.rgb(255, 90, 90); break;
+            default: label = color; tint = Color.WHITE; break;
+        }
+        TextView row = text(18f * navigationTrafficScalePercent / 100f, tint, true);
+        String prefix = position >= 0 ? "Светофор " + (position + 1) + ": " : "Светофор: ";
+        String suffix = countdown == null || countdown.isEmpty()
+                ? "" : " · " + countdown + " с";
+        if (arrow != null && !arrow.isEmpty()) suffix += " · " + arrow;
+        row.setText(prefix + label + suffix);
+        navigationTrafficLights.addView(row);
+    }
+
+    private static String formatLaneMeters(double meters) {
+        if (meters >= 1_000d) {
+            return String.format(Locale.getDefault(), meters >= 10_000d ? "%.0f км" : "%.1f км",
+                    meters / 1_000d);
+        }
+        return String.format(Locale.getDefault(), "%.0f м", meters);
     }
 
     private void launchYandex(YandexWindowLauncher.Product product, boolean full) {

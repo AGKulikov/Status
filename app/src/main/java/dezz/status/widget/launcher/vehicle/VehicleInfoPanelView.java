@@ -5,10 +5,14 @@
 
 package dezz.status.widget.launcher.vehicle;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -34,6 +38,8 @@ import java.util.Set;
 
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarTelemetryDescriptor;
+import dezz.status.widget.car.EcarxSignalDecoder;
+import dezz.status.widget.launcher.NavigationDataRepository;
 
 /**
  * Configurable HOME panel showing live connector-neutral vehicle telemetry.
@@ -49,6 +55,12 @@ public final class VehicleInfoPanelView extends FrameLayout {
 
     private static final long STALE_TICK_MS = 1_000L;
     private static final long UNKNOWN_STREAM_STALE_MS = 15_000L;
+    private static final String FUEL_ID = "ISensor.fuel_level";
+    private static final String FUEL_CAPACITY_ID = "ICarInfo.fuel_capacity";
+    private static final String GEAR_ID = "ISensor.gear";
+    private static final String SPEED_ID = "ISensor.speed";
+    private static final String TURN_LEFT_ID = "IBcm.turn_signal_left";
+    private static final String TURN_RIGHT_ID = "IBcm.turn_signal_right";
 
     private final CarIntegration integration;
     private final VehicleInfoPanelConfigStore configStore;
@@ -60,9 +72,19 @@ public final class VehicleInfoPanelView extends FrameLayout {
     private boolean catalogReady;
     private boolean previewMode;
     private boolean firstSessionSample;
+    private boolean navigationReceiverRegistered;
     private int catalogGeneration;
     @Nullable private ContentVisibilityListener contentVisibilityListener;
     @Nullable private Boolean lastReportedContentVisibility;
+
+    private final BroadcastReceiver navigationReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (NavigationDataRepository.ACTION_UPDATED.equals(intent.getAction())) {
+                updateMetric(VehicleDerivedMetrics.SPEED_LIMIT_WARNING_ID);
+                updatePanelVisibility();
+            }
+        }
+    };
 
     private final CarIntegration.TelemetryListener telemetryListener = sample -> {
         if (Looper.myLooper() != Looper.getMainLooper()) {
@@ -104,6 +126,7 @@ public final class VehicleInfoPanelView extends FrameLayout {
         // Re-emit now that start() guarantees the frame is present.
         lastReportedContentVisibility = null;
         updatePanelVisibility();
+        registerNavigationReceiver();
         subscribeEnabledMetrics();
         requestCatalog();
         removeCallbacks(staleTick);
@@ -116,6 +139,7 @@ public final class VehicleInfoPanelView extends FrameLayout {
         started = false;
         catalogGeneration++;
         integration.unsubscribeTelemetry(telemetryListener);
+        unregisterNavigationReceiver();
         removeCallbacks(staleTick);
     }
 
@@ -125,14 +149,14 @@ public final class VehicleInfoPanelView extends FrameLayout {
 
     /** Applies editor sliders immediately; persistence remains the editor/store's responsibility. */
     public void setConfig(@NonNull VehicleInfoPanelConfig value) {
-        Set<String> before = enabledMetricIds();
+        Set<String> before = subscriptionMetricIds();
         config = value.copy();
         config.normalize();
         // LauncherActivity applies its coarse preference visibility before reloadConfig().
         // Re-report the content gate so a waiting-for-data panel cannot leave an empty frame.
         lastReportedContentVisibility = null;
         rebuild();
-        if (started && !before.equals(enabledMetricIds())) subscribeEnabledMetrics();
+        if (started && !before.equals(subscriptionMetricIds())) subscribeEnabledMetrics();
     }
 
     @NonNull
@@ -177,12 +201,14 @@ public final class VehicleInfoPanelView extends FrameLayout {
         final int generation = ++catalogGeneration;
         integration.requestTelemetryCatalog(values -> {
             if (generation != catalogGeneration) return;
+            ArrayList<CarTelemetryDescriptor> complete = new ArrayList<>(values);
+            complete.addAll(derivedCatalog());
             catalogReady = true;
             catalog.clear();
-            for (CarTelemetryDescriptor descriptor : values) {
+            for (CarTelemetryDescriptor descriptor : complete) {
                 catalog.put(descriptor.id, descriptor);
             }
-            boolean added = config.mergeCatalog(values);
+            boolean added = config.mergeCatalog(complete);
             if (added) configStore.save(config);
             rebuild();
             if (started) subscribeEnabledMetrics();
@@ -191,8 +217,29 @@ public final class VehicleInfoPanelView extends FrameLayout {
 
     private void subscribeEnabledMetrics() {
         integration.unsubscribeTelemetry(telemetryListener);
-        Set<String> ids = enabledMetricIds();
+        Set<String> ids = subscriptionMetricIds();
         if (started && !ids.isEmpty()) integration.subscribeTelemetry(ids, telemetryListener);
+    }
+
+    @NonNull
+    private Set<String> subscriptionMetricIds() {
+        LinkedHashSet<String> result = new LinkedHashSet<>();
+        for (VehicleInfoPanelConfig.Metric metric : config.orderedMetrics()) {
+            if (!metric.enabled) continue;
+            if (VehicleDerivedMetrics.REFILL_FUEL_ID.equals(metric.id)) {
+                result.add(FUEL_ID);
+                if (metric.refillAutomaticCapacity) result.add(FUEL_CAPACITY_ID);
+                if (metric.refillOnlyInPark) result.add(GEAR_ID);
+            } else if (VehicleDerivedMetrics.TURN_SIGNALS_ID.equals(metric.id)) {
+                result.add(TURN_LEFT_ID);
+                result.add(TURN_RIGHT_ID);
+            } else if (VehicleDerivedMetrics.SPEED_LIMIT_WARNING_ID.equals(metric.id)) {
+                result.add(SPEED_ID);
+            } else {
+                result.add(metric.id);
+            }
+        }
+        return result;
     }
 
     @NonNull
@@ -216,9 +263,40 @@ public final class VehicleInfoPanelView extends FrameLayout {
             configStore.save(config);
             rebuild();
         } else {
-            updateMetric(sample.id);
+            updateAllValues();
             updatePanelVisibility();
         }
+    }
+
+    @NonNull
+    private static List<CarTelemetryDescriptor> derivedCatalog() {
+        ArrayList<CarTelemetryDescriptor> result = new ArrayList<>();
+        result.add(new CarTelemetryDescriptor(VehicleDerivedMetrics.REFILL_FUEL_ID,
+                "Долить топлива", "л", true, 120_000L));
+        result.add(new CarTelemetryDescriptor(VehicleDerivedMetrics.TURN_SIGNALS_ID,
+                "Поворотники / аварийка", "", true, 1_500L));
+        result.add(new CarTelemetryDescriptor(VehicleDerivedMetrics.SPEED_LIMIT_WARNING_ID,
+                "Превышение скорости", "км/ч", true, 30_000L));
+        return result;
+    }
+
+    private void registerNavigationReceiver() {
+        if (navigationReceiverRegistered) return;
+        IntentFilter filter = new IntentFilter(NavigationDataRepository.ACTION_UPDATED);
+        if (Build.VERSION.SDK_INT >= 33) {
+            getContext().registerReceiver(navigationReceiver, filter,
+                    Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            getContext().registerReceiver(navigationReceiver, filter);
+        }
+        navigationReceiverRegistered = true;
+    }
+
+    private void unregisterNavigationReceiver() {
+        if (!navigationReceiverRegistered) return;
+        try { getContext().unregisterReceiver(navigationReceiver); }
+        catch (IllegalArgumentException ignored) {}
+        navigationReceiverRegistered = false;
     }
 
     private void rebuild() {
@@ -308,7 +386,7 @@ public final class VehicleInfoPanelView extends FrameLayout {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         tile.addView(value, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        metricViews.put(metric.id, new MetricViews(label, value));
+        metricViews.put(metric.id, new MetricViews(tile, label, value, background));
         return tile;
     }
 
@@ -322,23 +400,152 @@ public final class VehicleInfoPanelView extends FrameLayout {
         VehicleInfoPanelConfig.Metric metric = config.metric(id);
         if (views == null || metric == null) return;
         views.label.setText(resolveLabel(metric));
+        resetMetricAppearance(views, metric);
 
         if (previewMode) {
-            views.value.setText(formatValue(metric, demoValue(metric.id), resolvedUnit(metric)));
-            views.value.setAlpha(1f);
-            views.value.setContentDescription(resolveLabel(metric) + ": " + views.value.getText());
+            if (VehicleDerivedMetrics.TURN_SIGNALS_ID.equals(id)) {
+                renderValue(views, metric,
+                        VehicleDerivedMetrics.turnText(VehicleDerivedMetrics.TURN_HAZARD), false);
+            } else if (VehicleDerivedMetrics.SPEED_LIMIT_WARNING_ID.equals(id)) {
+                renderSpeedLimitWarning(views, metric, 19.4d, "60", true);
+            } else {
+                renderValue(views, metric,
+                        formatValue(metric, demoValue(metric.id), resolvedUnit(metric)), false);
+            }
+            return;
+        }
+
+        if (VehicleDerivedMetrics.REFILL_FUEL_ID.equals(id)) {
+            updateRefillMetric(views, metric);
+            return;
+        }
+        if (VehicleDerivedMetrics.TURN_SIGNALS_ID.equals(id)) {
+            updateTurnMetric(views, metric);
+            return;
+        }
+        if (VehicleDerivedMetrics.SPEED_LIMIT_WARNING_ID.equals(id)) {
+            updateSpeedLimitWarning(views, metric);
             return;
         }
 
         CarIntegration.TelemetryValue sample = latest.get(id);
         if (sample == null) {
-            views.value.setText("…");
-            views.value.setAlpha(.55f);
-            views.value.setContentDescription(resolveLabel(metric) + ": нет данных");
+            renderMissing(views, metric);
             return;
         }
         boolean stale = isStale(id, sample);
         String formatted = formatValue(metric, sample.value, resolvedUnit(metric));
+        renderValue(views, metric, formatted, stale);
+    }
+
+    private void updateRefillMetric(@NonNull MetricViews views,
+                                    @NonNull VehicleInfoPanelConfig.Metric metric) {
+        if (metric.refillOnlyInPark) {
+            CarIntegration.TelemetryValue gear = latest.get(GEAR_ID);
+            if (gear == null || !VehicleDerivedMetrics.isPark(gear.value)) {
+                views.tile.setVisibility(View.GONE);
+                views.value.setContentDescription(resolveLabel(metric)
+                        + ": доступно только на передаче P");
+                return;
+            }
+        }
+        CarIntegration.TelemetryValue fuel = latest.get(FUEL_ID);
+        CarIntegration.TelemetryValue capacity = metric.refillAutomaticCapacity
+                ? latest.get(FUEL_CAPACITY_ID) : null;
+        if (fuel == null) {
+            renderMissing(views, metric);
+            return;
+        }
+        double capacityLitres = metric.refillAutomaticCapacity
+                ? VehicleDerivedMetrics.capacityLitresOrDefault(
+                        capacity == null ? null : capacity.value,
+                        VehicleDerivedMetrics.DEFAULT_FUEL_CAPACITY_LITRES)
+                : metric.refillManualCapacityLitres;
+        double refill = VehicleDerivedMetrics.refillLitres(fuel.value, capacityLitres);
+        boolean stale = isStale(FUEL_ID, fuel)
+                || (capacity != null && isStale(FUEL_CAPACITY_ID, capacity));
+        renderValue(views, metric,
+                formatValue(metric, refill, resolvedUnit(metric)), stale);
+    }
+
+    private void updateTurnMetric(@NonNull MetricViews views,
+                                  @NonNull VehicleInfoPanelConfig.Metric metric) {
+        CarIntegration.TelemetryValue left = latest.get(TURN_LEFT_ID);
+        CarIntegration.TelemetryValue right = latest.get(TURN_RIGHT_ID);
+        if (left == null || right == null) {
+            renderMissing(views, metric);
+            return;
+        }
+        int state = VehicleDerivedMetrics.turnState(left.value, right.value);
+        renderValue(views, metric, VehicleDerivedMetrics.turnText(state),
+                isStale(TURN_LEFT_ID, left) || isStale(TURN_RIGHT_ID, right));
+    }
+
+    private void updateSpeedLimitWarning(@NonNull MetricViews views,
+                                         @NonNull VehicleInfoPanelConfig.Metric metric) {
+        CarIntegration.TelemetryValue speed = latest.get(SPEED_ID);
+        if (speed == null) {
+            renderMissing(views, metric);
+            return;
+        }
+        NavigationDataRepository.Snapshot navigation =
+                NavigationDataRepository.read(getContext());
+        renderSpeedLimitWarning(views, metric, speed.value, navigation.speedLimit,
+                navigation.available);
+        if (isStale(SPEED_ID, speed)) views.value.setAlpha(.48f);
+    }
+
+    private void renderSpeedLimitWarning(@NonNull MetricViews views,
+                                         @NonNull VehicleInfoPanelConfig.Metric metric,
+                                         double rawSpeed, @NonNull String limitText,
+                                         boolean activeRoute) {
+        if (metric.speedLimitOnlyActiveRoute && !activeRoute) {
+            renderValue(views, metric, "Нет маршрута", false);
+            return;
+        }
+        double limit = VehicleDerivedMetrics.parseSpeedLimit(limitText);
+        if (!Double.isFinite(limit)) {
+            renderValue(views, metric, "Нет лимита", false);
+            return;
+        }
+        double current = VehicleDerivedMetrics.speedKmh(rawSpeed);
+        double excess = VehicleDerivedMetrics.speedExcess(rawSpeed, limit,
+                metric.speedLimitThresholdKmh);
+        boolean exceeded = Double.isFinite(excess) && excess > 0d;
+        String value = String.format(Locale.getDefault(), "%.0f / %.0f км/ч", current, limit);
+        renderValue(views, metric, value, false);
+        if (!exceeded) return;
+        views.value.setTextColor(color(metric.warningColor, Color.RED));
+        if (metric.speedLimitWhiteBackground) {
+            views.background.setColor(Color.argb(238, 255, 255, 255));
+            views.label.setTextColor(Color.rgb(35, 35, 35));
+        }
+        if (metric.speedLimitBlink
+                && ((System.currentTimeMillis() / STALE_TICK_MS) & 1L) != 0L) {
+            views.value.setAlpha(.22f);
+        }
+        views.value.setContentDescription(resolveLabel(metric) + ": превышение, " + value);
+    }
+
+    private void resetMetricAppearance(@NonNull MetricViews views,
+                                       @NonNull VehicleInfoPanelConfig.Metric metric) {
+        views.tile.setVisibility(View.VISIBLE);
+        views.value.setTextColor(color(metric.valueColor, Color.WHITE));
+        views.label.setTextColor(color(metric.labelColor, Color.LTGRAY));
+        views.value.setAlpha(1f);
+        views.background.setColor(Color.argb(66, 255, 255, 255));
+    }
+
+    private void renderMissing(@NonNull MetricViews views,
+                               @NonNull VehicleInfoPanelConfig.Metric metric) {
+        views.value.setText("…");
+        views.value.setAlpha(.55f);
+        views.value.setContentDescription(resolveLabel(metric) + ": нет данных");
+    }
+
+    private void renderValue(@NonNull MetricViews views,
+                             @NonNull VehicleInfoPanelConfig.Metric metric,
+                             @NonNull String formatted, boolean stale) {
         views.value.setText(stale ? formatted + "  · устарело" : formatted);
         views.value.setAlpha(stale ? .48f : 1f);
         views.value.setContentDescription(resolveLabel(metric) + ": " + formatted
@@ -407,17 +614,14 @@ public final class VehicleInfoPanelView extends FrameLayout {
 
     private static boolean isBooleanIndicator(@NonNull String id) {
         return id.equals("IBcm.high_beam") || id.equals("IBcm.turn_signal_left")
-                || id.equals("IBcm.turn_signal_right");
+                || id.equals("IBcm.turn_signal_right")
+                || id.equals("ECarx.gear_manual_mode")
+                || id.equals(VehicleDerivedMetrics.AUTO_HOLD_ID);
     }
 
     @Nullable
     private static String gearName(long raw) {
-        if (raw == 2097680L) return "N";
-        if (raw == 2097696L) return "D";
-        if (raw == 2097712L) return "P";
-        if (raw == 2097728L) return "R";
-        if (raw >= 2097665L && raw <= 2097674L) return String.valueOf(raw - 2097664L);
-        return null;
+        return EcarxSignalDecoder.gearDisplayName(raw);
     }
 
     @Nullable
@@ -437,6 +641,8 @@ public final class VehicleInfoPanelView extends FrameLayout {
         if (id.equals("ISensor.speed")) return 16.13d;
         if (id.equals("ISensor.rpm")) return 1_820d;
         if (id.equals("ISensor.gear")) return 2_097_696d;
+        if (VehicleDerivedMetrics.REFILL_FUEL_ID.equals(id)) return 20.5d;
+        if (VehicleDerivedMetrics.AUTO_HOLD_ID.equals(id)) return 1d;
         if (id.contains("temperature") || id.contains("_temp")) return 24.6d;
         if (id.startsWith("TPMS.pressure.")) return 238d;
         if (id.contains("range")) return 436d;
@@ -446,7 +652,17 @@ public final class VehicleInfoPanelView extends FrameLayout {
     }
 
     private void updatePanelVisibility() {
-        boolean hide = config.hideUntilFirstSample && !previewMode && !firstSessionSample;
+        boolean allTilesHidden = !previewMode && !metricViews.isEmpty();
+        if (allTilesHidden) {
+            for (MetricViews views : metricViews.values()) {
+                if (views.tile.getVisibility() == View.VISIBLE) {
+                    allTilesHidden = false;
+                    break;
+                }
+            }
+        }
+        boolean hide = (config.hideUntilFirstSample && !previewMode && !firstSessionSample)
+                || allTilesHidden;
         setVisibility(hide ? View.GONE : View.VISIBLE);
         boolean visible = !hide;
         if (contentVisibilityListener != null
@@ -492,12 +708,16 @@ public final class VehicleInfoPanelView extends FrameLayout {
     }
 
     private static final class MetricViews {
+        final View tile;
         final TextView label;
         final TextView value;
+        final GradientDrawable background;
 
-        MetricViews(TextView label, TextView value) {
+        MetricViews(View tile, TextView label, TextView value, GradientDrawable background) {
+            this.tile = tile;
             this.label = label;
             this.value = value;
+            this.background = background;
         }
     }
 }

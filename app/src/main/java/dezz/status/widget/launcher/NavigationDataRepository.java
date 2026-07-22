@@ -9,7 +9,10 @@ import android.app.Notification;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
 import android.os.Bundle;
+import android.os.SystemClock;
+import android.provider.Settings;
 import android.service.notification.StatusBarNotification;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,10 +23,19 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 /** Extracts and persists navigation summary data published by Maps/Navigator applications. */
@@ -56,6 +68,27 @@ public final class NavigationDataRepository {
             "plus.monjaro.NAVIGATION_ENDED";
     public static final String ACTION_MONJARO_TRAFFIC_LIGHT_UPDATE =
             "plus.monjaro.TRAFFIC_LIGHT_UPDATE";
+    public static final String ACTION_MONJARO_LANE_SIGN_DISTANCE =
+            "plus.monjaro.LANE_SIGN_DIST";
+    public static final String ACTION_YANDEX_LANE_SIGN = "com.yandex.LANE_SIGN";
+    public static final String ACTION_YANDEX_LANE_DISTANCE = "com.yandex.LANE_DIST";
+    public static final String ACTION_YANDEX_LANES_BITMAP = "com.yandex.LANES_BITMAP";
+    public static final String ACTION_YANDEX_LANES_BITMAP_CLEAR =
+            "com.yandex.LANES_BITMAP_CLEAR";
+    public static final String ACTION_YANDEX_JAM_IMAGE = "com.yandex.JAM_IMAGE";
+    public static final String ACTION_YANDEX_JAM_IMAGE_CLEAR = "com.yandex.JAM_IMAGE_CLEAR";
+    public static final String ACTION_MONJARO_RAINBOW_IMAGE = "plus.monjaro.RAINBOW_IMAGE";
+    public static final String ACTION_MONJARO_RAINBOW_IMAGE_CLEAR =
+            "plus.monjaro.RAINBOW_IMAGE_CLEAR";
+    public static final String ACTION_DEBUG_NAVIGATION_UPDATE =
+            "debug.monjaro.NAVIGATION_UPDATE";
+    public static final String ACTION_DEBUG_NAVIGATION_ENDED =
+            "debug.monjaro.NAVIGATION_ENDED";
+    public static final String ACTION_DEBUG_TRAFFIC_LIGHT_UPDATE =
+            "debug.monjaro.TRAFFIC_LIGHT_UPDATE";
+    public static final String ACTION_DEBUG_RAINBOW_IMAGE = "debug.monjaro.RAINBOW_IMAGE";
+    public static final String ACTION_DEBUG_RAINBOW_IMAGE_CLEAR =
+            "debug.monjaro.RAINBOW_IMAGE_CLEAR";
 
     public static final String PRODUCT_NAVIGATOR = "navigator";
     public static final String PRODUCT_MAPS = "maps";
@@ -72,15 +105,88 @@ public final class NavigationDataRepository {
     private static final String PREF_SOURCE_KEY = "sourceKey";
     private static final String PREF_MANEUVER_TITLE = "maneuverTitle";
     private static final String PREF_MANEUVER_TEXT = "maneuverText";
+    private static final String PREF_MANEUVER_SUBTEXT = "maneuverSubtext";
     private static final String PREF_SPEED_LIMIT = "speedLimit";
+    private static final String PREF_MANEUVER_IMAGE_UPDATED_AT = "maneuverImageUpdatedAt";
+    private static final String PREF_LANES = "lanes";
+    private static final String PREF_LANE_DISTANCE = "laneDistance";
+    private static final String PREF_LANE_DISTANCE_METERS = "laneDistanceMeters";
+    private static final String PREF_LANE_LATITUDE = "laneLatitude";
+    private static final String PREF_LANE_LONGITUDE = "laneLongitude";
+    private static final String PREF_LANE_ALONG_ROUTE = "laneAlongRoute";
+    private static final String PREF_LANE_RECORDS_JSON = "laneRecordsJson";
+    private static final String PREF_LANE_RAW_LANES = "laneRawLanes";
+    private static final String PREF_LANE_RAW_LATITUDES = "laneRawLatitudes";
+    private static final String PREF_LANE_RAW_LONGITUDES = "laneRawLongitudes";
+    private static final String PREF_LANE_RAW_DISTANCES = "laneRawDistances";
+    private static final String PREF_LANE_RAW_ALONG_ROUTE = "laneRawAlongRoute";
+    private static final String PREF_LANE_UPDATED_AT = "laneUpdatedAt";
+    private static final String PREF_LANES_IMAGE_UPDATED_AT = "lanesImageUpdatedAt";
+    private static final String PREF_JAM_IMAGE_UPDATED_AT = "jamImageUpdatedAt";
+    private static final String PREF_RAINBOW_IMAGE_UPDATED_AT = "rainbowImageUpdatedAt";
+    private static final String PREF_TRAFFIC_LIGHTS_JSON = "trafficLightsJson";
     private static final String PREF_TRAFFIC_COLOR = "trafficColor";
     private static final String PREF_TRAFFIC_COUNTDOWN = "trafficCountdown";
     private static final String PREF_TRAFFIC_ARROW = "trafficArrow";
     private static final String PREF_TRAFFIC_UPDATED_AT = "trafficUpdatedAt";
+    private static final String PREF_BOOT_COUNT = "bootCount";
+    private static final String PREF_BOOT_EPOCH = "bootEpoch";
     private static final long STALE_MS = 30L * 60L * 1000L;
     private static final long TRAFFIC_STALE_MS = 120_000L;
+    private static final long LANE_STALE_MS = 120_000L;
+    private static final long MANEUVER_IMAGE_STALE_MS = STALE_MS;
+    private static final long LANES_IMAGE_STALE_MS = 120_000L;
+    private static final long JAM_IMAGE_STALE_MS = 5_000L;
+    private static final long RAINBOW_IMAGE_STALE_MS = 120_000L;
     private static final long TIMESTAMP_WRITE_INTERVAL_MS = 60_000L;
     private static final int MAX_REMOTE_VIEW_NODES = 1_000;
+    private static final int MAX_TRAFFIC_LIGHTS = 8;
+    private static final int UNKNOWN_BOOT_COUNT = -1;
+    private static final long BOOT_EPOCH_TOLERANCE_MS = 5L * 60L * 1000L;
+
+    /** One independently addressed traffic light supplied by the mHUD-compatible contract. */
+    public static final class TrafficLight {
+        @NonNull public final String id;
+        @NonNull public final String source;
+        @NonNull public final String color;
+        @NonNull public final String countdown;
+        @NonNull public final String arrow;
+        public final int position;
+        public final long updatedAt;
+        @NonNull final String phaseOrigin;
+
+        TrafficLight(String id, String source, String color, String countdown, String arrow,
+                int position, long updatedAt, String phaseOrigin) {
+            this.id = id;
+            this.source = source;
+            this.color = color;
+            this.countdown = countdown;
+            this.arrow = arrow;
+            this.position = position;
+            this.updatedAt = updatedAt;
+            this.phaseOrigin = phaseOrigin;
+        }
+    }
+
+    /** One raw semicolon-list lane junction retained alongside the selected visible record. */
+    public static final class LaneRecord {
+        public final int rawIndex;
+        @NonNull public final String lanes;
+        public final double latitude;
+        public final double longitude;
+        public final double distanceMeters;
+        public final boolean alongRoute;
+
+        LaneRecord(int rawIndex, String lanes, double latitude, double longitude,
+                double distanceMeters, boolean alongRoute) {
+            this.rawIndex = rawIndex;
+            this.lanes = lanes;
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.distanceMeters = distanceMeters;
+            this.alongRoute = alongRoute;
+        }
+    }
 
     public static final class Snapshot {
         @NonNull public final String arrival;
@@ -92,17 +198,43 @@ public final class NavigationDataRepository {
         @NonNull public final String sourceProduct;
         @NonNull public final String maneuverTitle;
         @NonNull public final String maneuverText;
+        @NonNull public final String maneuverSubtext;
         @NonNull public final String speedLimit;
         @NonNull public final String trafficColor;
         @NonNull public final String trafficCountdown;
         @NonNull public final String trafficArrow;
+        @NonNull public final List<TrafficLight> trafficLights;
+        @NonNull public final String lanes;
+        @NonNull public final String laneDistance;
+        public final double laneDistanceMeters;
+        public final double laneLatitude;
+        public final double laneLongitude;
+        public final boolean laneAlongRoute;
+        @NonNull public final List<LaneRecord> laneRecords;
+        @NonNull public final String laneRawLanes;
+        @NonNull public final String laneRawLatitudes;
+        @NonNull public final String laneRawLongitudes;
+        @NonNull public final String laneRawDistances;
+        @NonNull public final String laneRawAlongRoute;
+        @Nullable public final Bitmap maneuverImage;
+        @Nullable public final Bitmap lanesImage;
+        @Nullable public final Bitmap jamImage;
+        @Nullable public final Bitmap rainbowImage;
+        public final boolean laneAvailable;
         public final boolean trafficAvailable;
         public final boolean available;
 
         Snapshot(String arrival, String duration, String distance, String sourcePackage,
                 boolean available, String maneuverTitle, String maneuverText, String speedLimit,
                 String trafficColor, String trafficCountdown, String trafficArrow,
-                boolean trafficAvailable) {
+                boolean trafficAvailable, String maneuverSubtext,
+                List<TrafficLight> trafficLights, String lanes, String laneDistance,
+                double laneDistanceMeters, double laneLatitude, double laneLongitude,
+                boolean laneAlongRoute, List<LaneRecord> laneRecords, String laneRawLanes,
+                String laneRawLatitudes, String laneRawLongitudes, String laneRawDistances,
+                String laneRawAlongRoute, boolean laneAvailable,
+                Bitmap maneuverImage,
+                Bitmap lanesImage, Bitmap jamImage, Bitmap rainbowImage) {
             this.arrival = arrival;
             this.duration = duration;
             this.distance = distance;
@@ -110,10 +242,29 @@ public final class NavigationDataRepository {
             this.sourceProduct = productForPackage(sourcePackage);
             this.maneuverTitle = maneuverTitle;
             this.maneuverText = maneuverText;
+            this.maneuverSubtext = maneuverSubtext;
             this.speedLimit = speedLimit;
             this.trafficColor = trafficColor;
             this.trafficCountdown = trafficCountdown;
             this.trafficArrow = trafficArrow;
+            this.trafficLights = Collections.unmodifiableList(new ArrayList<>(trafficLights));
+            this.lanes = lanes;
+            this.laneDistance = laneDistance;
+            this.laneDistanceMeters = laneDistanceMeters;
+            this.laneLatitude = laneLatitude;
+            this.laneLongitude = laneLongitude;
+            this.laneAlongRoute = laneAlongRoute;
+            this.laneRecords = Collections.unmodifiableList(new ArrayList<>(laneRecords));
+            this.laneRawLanes = laneRawLanes;
+            this.laneRawLatitudes = laneRawLatitudes;
+            this.laneRawLongitudes = laneRawLongitudes;
+            this.laneRawDistances = laneRawDistances;
+            this.laneRawAlongRoute = laneRawAlongRoute;
+            this.laneAvailable = laneAvailable;
+            this.maneuverImage = maneuverImage;
+            this.lanesImage = lanesImage;
+            this.jamImage = jamImage;
+            this.rainbowImage = rainbowImage;
             this.trafficAvailable = trafficAvailable;
             this.available = available;
         }
@@ -283,15 +434,49 @@ public final class NavigationDataRepository {
     public static boolean updateFromYandexBroadcast(@NonNull Context context,
             @NonNull Intent intent) {
         String action = intent.getAction();
-        if (ACTION_MONJARO_NAVIGATION_ENDED.equals(action)) {
+        if (ACTION_MONJARO_NAVIGATION_ENDED.equals(action)
+                || ACTION_DEBUG_NAVIGATION_ENDED.equals(action)) {
             clear(context);
             return true;
         }
-        if (ACTION_MONJARO_TRAFFIC_LIGHT_UPDATE.equals(action)) {
+        if (ACTION_MONJARO_TRAFFIC_LIGHT_UPDATE.equals(action)
+                || ACTION_DEBUG_TRAFFIC_LIGHT_UPDATE.equals(action)) {
             return updateTrafficLight(context, intent);
         }
-        if (ACTION_MONJARO_NAVIGATION_UPDATE.equals(action)) {
+        if (ACTION_MONJARO_NAVIGATION_UPDATE.equals(action)
+                || ACTION_DEBUG_NAVIGATION_UPDATE.equals(action)) {
             return updateFromMonjaroNavigation(context, intent);
+        }
+        if (ACTION_MONJARO_LANE_SIGN_DISTANCE.equals(action)
+                || ACTION_YANDEX_LANE_SIGN.equals(action)
+                || ACTION_YANDEX_LANE_DISTANCE.equals(action)) {
+            return updateLaneData(context, intent);
+        }
+        if (ACTION_YANDEX_LANES_BITMAP.equals(action)) {
+            return updateGraphic(context, NavigationGraphicStore.LANES, intent,
+                    PREF_LANES_IMAGE_UPDATED_AT, "lanes_bitmap", "image_bytes");
+        }
+        if (ACTION_YANDEX_LANES_BITMAP_CLEAR.equals(action)) {
+            return clearGraphic(context, NavigationGraphicStore.LANES,
+                    PREF_LANES_IMAGE_UPDATED_AT);
+        }
+        if (ACTION_YANDEX_JAM_IMAGE.equals(action)) {
+            return updateGraphic(context, NavigationGraphicStore.JAM, intent,
+                    PREF_JAM_IMAGE_UPDATED_AT, "jam_bitmap", "image_bytes");
+        }
+        if (ACTION_YANDEX_JAM_IMAGE_CLEAR.equals(action)) {
+            return clearGraphic(context, NavigationGraphicStore.JAM,
+                    PREF_JAM_IMAGE_UPDATED_AT);
+        }
+        if (ACTION_MONJARO_RAINBOW_IMAGE.equals(action)
+                || ACTION_DEBUG_RAINBOW_IMAGE.equals(action)) {
+            return updateGraphic(context, NavigationGraphicStore.RAINBOW, intent,
+                    PREF_RAINBOW_IMAGE_UPDATED_AT, "rainbow_bitmap", "image_bytes");
+        }
+        if (ACTION_MONJARO_RAINBOW_IMAGE_CLEAR.equals(action)
+                || ACTION_DEBUG_RAINBOW_IMAGE_CLEAR.equals(action)) {
+            return clearGraphic(context, NavigationGraphicStore.RAINBOW,
+                    PREF_RAINBOW_IMAGE_UPDATED_AT);
         }
         if (!ACTION_YANDEX_ARRIVAL.equals(action) && !ACTION_YANDEX_TIME.equals(action)
                 && !ACTION_YANDEX_DISTANCE.equals(action)) return false;
@@ -368,13 +553,32 @@ public final class NavigationDataRepository {
                     || !prefs.getString(PREF_MANEUVER_TITLE, "").isEmpty()
                     || !prefs.getString(PREF_MANEUVER_TEXT, "").isEmpty()
                     || !prefs.getString(PREF_SPEED_LIMIT, "").isEmpty()
-                    || prefs.getLong(PREF_TRAFFIC_UPDATED_AT, 0L) > 0;
+                    || prefs.getLong(PREF_TRAFFIC_UPDATED_AT, 0L) > 0
+                    || prefs.getLong(PREF_LANE_UPDATED_AT, 0L) > 0
+                    || prefs.getLong(PREF_MANEUVER_IMAGE_UPDATED_AT, 0L) > 0
+                    || prefs.getLong(PREF_LANES_IMAGE_UPDATED_AT, 0L) > 0
+                    || prefs.getLong(PREF_JAM_IMAGE_UPDATED_AT, 0L) > 0
+                    || prefs.getLong(PREF_RAINBOW_IMAGE_UPDATED_AT, 0L) > 0;
             prefs.edit().remove(PREF_ARRIVAL).remove(PREF_DURATION).remove(PREF_DISTANCE)
                     .remove(PREF_UPDATED_AT).remove(PREF_SOURCE_PACKAGE)
                     .remove(PREF_SOURCE_KEY).remove(PREF_MANEUVER_TITLE)
-                    .remove(PREF_MANEUVER_TEXT).remove(PREF_SPEED_LIMIT)
+                    .remove(PREF_MANEUVER_TEXT).remove(PREF_MANEUVER_SUBTEXT)
+                    .remove(PREF_SPEED_LIMIT).remove(PREF_MANEUVER_IMAGE_UPDATED_AT)
+                    .remove(PREF_LANES).remove(PREF_LANE_DISTANCE)
+                    .remove(PREF_LANE_DISTANCE_METERS).remove(PREF_LANE_LATITUDE)
+                    .remove(PREF_LANE_LONGITUDE).remove(PREF_LANE_ALONG_ROUTE)
+                    .remove(PREF_LANE_RECORDS_JSON).remove(PREF_LANE_RAW_LANES)
+                    .remove(PREF_LANE_RAW_LATITUDES).remove(PREF_LANE_RAW_LONGITUDES)
+                    .remove(PREF_LANE_RAW_DISTANCES).remove(PREF_LANE_RAW_ALONG_ROUTE)
+                    .remove(PREF_LANE_UPDATED_AT).remove(PREF_LANES_IMAGE_UPDATED_AT)
+                    .remove(PREF_JAM_IMAGE_UPDATED_AT).remove(PREF_RAINBOW_IMAGE_UPDATED_AT)
+                    .remove(PREF_TRAFFIC_LIGHTS_JSON)
                     .remove(PREF_TRAFFIC_COLOR).remove(PREF_TRAFFIC_COUNTDOWN)
                     .remove(PREF_TRAFFIC_ARROW).remove(PREF_TRAFFIC_UPDATED_AT).apply();
+            NavigationGraphicStore.clear(context, NavigationGraphicStore.MANEUVER);
+            NavigationGraphicStore.clear(context, NavigationGraphicStore.LANES);
+            NavigationGraphicStore.clear(context, NavigationGraphicStore.JAM);
+            NavigationGraphicStore.clear(context, NavigationGraphicStore.RAINBOW);
             if (hadData) notifyChanged(context);
         }
     }
@@ -383,19 +587,50 @@ public final class NavigationDataRepository {
     public static Snapshot read(@NonNull Context context) {
         SharedPreferences prefs = preferences(context);
         long updatedAt = prefs.getLong(PREF_UPDATED_AT, 0L);
-        boolean available = updatedAt > 0 && System.currentTimeMillis() - updatedAt <= STALE_MS;
+        long now = System.currentTimeMillis();
+        boolean available = isFresh(updatedAt, STALE_MS, now);
+        List<TrafficLight> trafficLights = readTrafficLights(prefs, now);
         long trafficUpdatedAt = prefs.getLong(PREF_TRAFFIC_UPDATED_AT, 0L);
-        boolean trafficAvailable = trafficUpdatedAt > 0
-                && System.currentTimeMillis() - trafficUpdatedAt <= TRAFFIC_STALE_MS;
+        boolean legacyTrafficAvailable = !prefs.contains(PREF_TRAFFIC_LIGHTS_JSON)
+                && isFresh(trafficUpdatedAt, TRAFFIC_STALE_MS, now);
+        boolean trafficAvailable = !trafficLights.isEmpty() || legacyTrafficAvailable;
+        TrafficLight primary = trafficLights.isEmpty() ? null : trafficLights.get(0);
+        String trafficColor = primary == null ? prefs.getString(PREF_TRAFFIC_COLOR, "")
+                : primary.color;
+        String trafficCountdown = primary == null
+                ? prefs.getString(PREF_TRAFFIC_COUNTDOWN, "") : primary.countdown;
+        String trafficArrow = primary == null ? prefs.getString(PREF_TRAFFIC_ARROW, "")
+                : primary.arrow;
+        long laneUpdatedAt = prefs.getLong(PREF_LANE_UPDATED_AT, 0L);
+        boolean laneAvailable = isFresh(laneUpdatedAt, LANE_STALE_MS, now);
+        Bitmap maneuverImage = loadFreshGraphic(context, prefs,
+                PREF_MANEUVER_IMAGE_UPDATED_AT, MANEUVER_IMAGE_STALE_MS,
+                NavigationGraphicStore.MANEUVER, now);
+        Bitmap lanesImage = loadFreshGraphic(context, prefs, PREF_LANES_IMAGE_UPDATED_AT,
+                LANES_IMAGE_STALE_MS, NavigationGraphicStore.LANES, now);
+        Bitmap jamImage = loadFreshGraphic(context, prefs, PREF_JAM_IMAGE_UPDATED_AT,
+                JAM_IMAGE_STALE_MS, NavigationGraphicStore.JAM, now);
+        Bitmap rainbowImage = loadFreshGraphic(context, prefs, PREF_RAINBOW_IMAGE_UPDATED_AT,
+                RAINBOW_IMAGE_STALE_MS, NavigationGraphicStore.RAINBOW, now);
         return new Snapshot(prefs.getString(PREF_ARRIVAL, ""),
                 prefs.getString(PREF_DURATION, ""), prefs.getString(PREF_DISTANCE, ""),
                 prefs.getString(PREF_SOURCE_PACKAGE, ""), available,
                 prefs.getString(PREF_MANEUVER_TITLE, ""),
                 prefs.getString(PREF_MANEUVER_TEXT, ""),
                 prefs.getString(PREF_SPEED_LIMIT, ""),
-                prefs.getString(PREF_TRAFFIC_COLOR, ""),
-                prefs.getString(PREF_TRAFFIC_COUNTDOWN, ""),
-                prefs.getString(PREF_TRAFFIC_ARROW, ""), trafficAvailable);
+                trafficColor, trafficCountdown, trafficArrow, trafficAvailable,
+                prefs.getString(PREF_MANEUVER_SUBTEXT, ""), trafficLights,
+                prefs.getString(PREF_LANES, ""), prefs.getString(PREF_LANE_DISTANCE, ""),
+                doublePreference(prefs, PREF_LANE_DISTANCE_METERS, Double.NaN),
+                doublePreference(prefs, PREF_LANE_LATITUDE, Double.NaN),
+                doublePreference(prefs, PREF_LANE_LONGITUDE, Double.NaN),
+                prefs.getBoolean(PREF_LANE_ALONG_ROUTE, false), readLaneRecords(prefs),
+                prefs.getString(PREF_LANE_RAW_LANES, ""),
+                prefs.getString(PREF_LANE_RAW_LATITUDES, ""),
+                prefs.getString(PREF_LANE_RAW_LONGITUDES, ""),
+                prefs.getString(PREF_LANE_RAW_DISTANCES, ""),
+                prefs.getString(PREF_LANE_RAW_ALONG_ROUTE, ""), laneAvailable,
+                maneuverImage, lanesImage, jamImage, rainbowImage);
     }
 
     private static boolean updateFromMonjaroNavigation(@NonNull Context context,
@@ -416,43 +651,508 @@ public final class NavigationDataRepository {
         if (parsed.hasData()) {
             persist(context, parsed, sourcePackage, "broadcast:plus.monjaro", true);
         }
-        if (!parsed.hasData() && title.isEmpty() && maneuver.isEmpty() && speedLimit.isEmpty()) {
-            return false;
+        boolean imageChanged = false;
+        boolean imageStored = false;
+        boolean hasImageFlag = intent.hasExtra("has_image");
+        boolean hasImage = intent.getBooleanExtra("has_image", false);
+        if (hasImage || intent.hasExtra("image_bytes")) {
+            imageChanged = NavigationGraphicStore.saveFromIntent(context,
+                    NavigationGraphicStore.MANEUVER, intent, "image_bytes", "maneuver_bitmap",
+                    "image");
+            imageStored = imageChanged;
+        } else if (hasImageFlag) {
+            imageChanged = clearGraphicWithoutNotify(context, NavigationGraphicStore.MANEUVER,
+                    PREF_MANEUVER_IMAGE_UPDATED_AT);
+        }
+        if (!parsed.hasData() && title.isEmpty() && maneuver.isEmpty() && subtext.isEmpty()
+                && speedLimit.isEmpty()) {
+            if (imageStored) {
+                preferences(context).edit().putLong(PREF_MANEUVER_IMAGE_UPDATED_AT,
+                        System.currentTimeMillis()).apply();
+            }
+            if (imageChanged) notifyChanged(context);
+            return imageChanged;
         }
         SharedPreferences prefs = preferences(context);
         long now = System.currentTimeMillis();
         boolean changed = !title.equals(prefs.getString(PREF_MANEUVER_TITLE, ""))
                 || !maneuver.equals(prefs.getString(PREF_MANEUVER_TEXT, ""))
+                || !subtext.equals(prefs.getString(PREF_MANEUVER_SUBTEXT, ""))
                 || !speedLimit.equals(prefs.getString(PREF_SPEED_LIMIT, ""));
-        prefs.edit().putString(PREF_MANEUVER_TITLE, title)
+        SharedPreferences.Editor editor = prefs.edit().putString(PREF_MANEUVER_TITLE, title)
                 .putString(PREF_MANEUVER_TEXT, maneuver)
+                .putString(PREF_MANEUVER_SUBTEXT, subtext)
                 .putString(PREF_SPEED_LIMIT, speedLimit)
                 .putString(PREF_SOURCE_PACKAGE, sourcePackage)
                 .putString(PREF_SOURCE_KEY, "broadcast:plus.monjaro")
-                .putLong(PREF_UPDATED_AT, now).apply();
-        if (changed || !parsed.hasData()) notifyChanged(context);
+                .putLong(PREF_UPDATED_AT, now);
+        if (imageStored) editor.putLong(PREF_MANEUVER_IMAGE_UPDATED_AT, now);
+        editor.apply();
+        if (changed || imageChanged || !parsed.hasData()) notifyChanged(context);
         return true;
     }
 
     private static boolean updateTrafficLight(@NonNull Context context,
             @NonNull Intent intent) {
         Bundle extras = intent.getExtras();
-        String color = text(value(extras, "tl_color")).toUpperCase(java.util.Locale.ROOT);
+        String color = text(value(extras, "tl_color")).toUpperCase(Locale.ROOT);
         String countdown = text(value(extras, "tl_countdown"));
         String arrow = text(value(extras, "tl_arrow"));
-        if (!"RED".equals(color) && !"YELLOW".equals(color) && !"GREEN".equals(color)) {
-            return false;
-        }
+        String id = text(value(extras, "tl_id"));
+        String source = text(first(value(extras, "tl_source"), value(extras, "source")));
+        int position = integer(value(extras, "tl_position"), -1);
+        String key = !id.isEmpty() ? "id:" + id
+                : position >= 0 ? "pos:" + position + "|src:" + source : "single";
         SharedPreferences prefs = preferences(context);
-        boolean changed = !color.equals(prefs.getString(PREF_TRAFFIC_COLOR, ""))
-                || !countdown.equals(prefs.getString(PREF_TRAFFIC_COUNTDOWN, ""))
-                || !arrow.equals(prefs.getString(PREF_TRAFFIC_ARROW, ""));
-        prefs.edit().putString(PREF_TRAFFIC_COLOR, color)
-                .putString(PREF_TRAFFIC_COUNTDOWN, countdown)
-                .putString(PREF_TRAFFIC_ARROW, arrow)
-                .putLong(PREF_TRAFFIC_UPDATED_AT, System.currentTimeMillis()).apply();
+        LinkedHashMap<String, TrafficLight> values = trafficLightsMap(prefs);
+        String before = encodeTrafficLights(values);
+        long now = System.currentTimeMillis();
+        if (color.isEmpty()) {
+            if (id.isEmpty() && position < 0) {
+                removeTrafficOwnedBy(values, source, now);
+            } else {
+                TrafficLight incumbent = freshTrafficForSlot(values.values(), id, position, now);
+                if (incumbent == null
+                        || NavigationSignalPolicy.sourceMayReplace(incumbent.source, source)) {
+                    removeTrafficSlot(values, id, position, null);
+                }
+            }
+        } else {
+            if (!NavigationSignalPolicy.validTrafficColor(color)) return false;
+            boolean routeActive = isFresh(prefs.getLong(PREF_UPDATED_AT, 0L), STALE_MS, now);
+            if (NavigationSignalPolicy.isUiSource(source)) {
+                // mHUD treats UI recognition as fallback only: it is not allowed to invent a
+                // light outside navigation. A standalone UI publisher remains valid when there
+                // is no stronger source for the same slot.
+                if (!routeActive) return true;
+            }
+
+            TrafficLight incumbent = freshTrafficForSlot(values.values(), id, position, now);
+            if (incumbent != null) {
+                if (!NavigationSignalPolicy.sourceMayReplace(incumbent.source, source)) {
+                    return true;
+                }
+                if (NavigationSignalPolicy.sourceRequiresTransitionValidation(
+                        incumbent.source, source)
+                        && !NavigationSignalPolicy.acceptsTransition(incumbent.color,
+                        incumbent.countdown, incumbent.phaseOrigin, incumbent.updatedAt,
+                        color, countdown, now)) return true;
+            }
+
+            String phaseOrigin = NavigationSignalPolicy.phaseOriginAfter(
+                    incumbent == null ? "" : incumbent.color,
+                    incumbent == null ? "" : incumbent.phaseOrigin, color);
+            // A higher-provenance source owns the logical slot; remove a UI fallback so sorting
+            // cannot make the visible primary light oscillate between duplicate records.
+            if (incumbent != null) {
+                removeTrafficSlot(values, id, position, null);
+            }
+            values.put(key, new TrafficLight(id, source, color, countdown, arrow, position,
+                    now, phaseOrigin));
+        }
+        trimTrafficLights(values);
+        boolean changed = !before.equals(encodeTrafficLights(values));
+        List<TrafficLight> sorted = sortedTrafficLights(values.values());
+        TrafficLight primary = sorted.isEmpty() ? null : sorted.get(0);
+        SharedPreferences.Editor editor = prefs.edit()
+                .putString(PREF_TRAFFIC_LIGHTS_JSON, encodeTrafficLights(values));
+        if (primary == null) {
+            editor.remove(PREF_TRAFFIC_COLOR).remove(PREF_TRAFFIC_COUNTDOWN)
+                    .remove(PREF_TRAFFIC_ARROW).remove(PREF_TRAFFIC_UPDATED_AT);
+        } else {
+            editor.putString(PREF_TRAFFIC_COLOR, primary.color)
+                    .putString(PREF_TRAFFIC_COUNTDOWN, primary.countdown)
+                    .putString(PREF_TRAFFIC_ARROW, primary.arrow)
+                    .putLong(PREF_TRAFFIC_UPDATED_AT, primary.updatedAt);
+        }
+        editor.apply();
         if (changed) notifyChanged(context);
         return true;
+    }
+
+    private static boolean updateLaneData(@NonNull Context context, @NonNull Intent intent) {
+        String action = intent.getAction();
+        Bundle extras = intent.getExtras();
+        SharedPreferences prefs = preferences(context);
+        long now = System.currentTimeMillis();
+        boolean wasStale = !isFresh(prefs.getLong(PREF_LANE_UPDATED_AT, 0L),
+                LANE_STALE_MS, now);
+        String oldLanes = prefs.getString(PREF_LANES, "");
+        String oldDistance = prefs.getString(PREF_LANE_DISTANCE, "");
+        double oldMeters = doublePreference(prefs, PREF_LANE_DISTANCE_METERS, Double.NaN);
+        double oldLatitude = doublePreference(prefs, PREF_LANE_LATITUDE, Double.NaN);
+        double oldLongitude = doublePreference(prefs, PREF_LANE_LONGITUDE, Double.NaN);
+        boolean oldAlongRoute = prefs.getBoolean(PREF_LANE_ALONG_ROUTE, false);
+        String oldRecordsJson = prefs.getString(PREF_LANE_RECORDS_JSON, "");
+        String oldRawLanes = prefs.getString(PREF_LANE_RAW_LANES, oldLanes);
+        String oldRawLatitudes = prefs.getString(PREF_LANE_RAW_LATITUDES, "");
+        String oldRawLongitudes = prefs.getString(PREF_LANE_RAW_LONGITUDES, "");
+        String oldRawDistances = prefs.getString(PREF_LANE_RAW_DISTANCES, "");
+        String oldRawAlongRoute = prefs.getString(PREF_LANE_RAW_ALONG_ROUTE, "");
+
+        String lanes = oldLanes;
+        String distance = oldDistance;
+        double meters = oldMeters;
+        double latitude = oldLatitude;
+        double longitude = oldLongitude;
+        boolean alongRoute = oldAlongRoute;
+        String rawLanes = oldRawLanes;
+        String rawLatitudes = oldRawLatitudes;
+        String rawLongitudes = oldRawLongitudes;
+        String rawDistances = oldRawDistances;
+        String rawAlongRoute = oldRawAlongRoute;
+        boolean supplied = false;
+
+        if (ACTION_MONJARO_LANE_SIGN_DISTANCE.equals(action)) {
+            String value = text(value(extras, "lanes"));
+            if (!value.isEmpty()) { rawLanes = value; supplied = true; }
+            String distanceText = text(value(extras, "dist_text"));
+            if (!distanceText.isEmpty()) { distance = distanceText; supplied = true; }
+            if (intent.hasExtra("dist_m")) {
+                rawDistances = text(value(extras, "dist_m"));
+                meters = number(value(extras, "dist_m"), Double.NaN); supplied = true;
+            }
+            if (intent.hasExtra("lat")) {
+                rawLatitudes = text(value(extras, "lat")); supplied = true;
+            }
+            if (intent.hasExtra("lon")) {
+                rawLongitudes = text(value(extras, "lon")); supplied = true;
+            }
+            if (intent.hasExtra("along_route")) {
+                rawAlongRoute = text(value(extras, "along_route")); supplied = true;
+            }
+        } else if (ACTION_YANDEX_LANE_SIGN.equals(action)) {
+            String value = text(value(extras, "lanes"));
+            if (!value.isEmpty()) { rawLanes = value; supplied = true; }
+            if (intent.hasExtra("lat")) {
+                rawLatitudes = text(value(extras, "lat")); supplied = true;
+            }
+            if (intent.hasExtra("lon")) {
+                rawLongitudes = text(value(extras, "lon")); supplied = true;
+            }
+            if (intent.hasExtra("dist_m")) {
+                rawDistances = text(value(extras, "dist_m"));
+                meters = number(value(extras, "dist_m"), Double.NaN); supplied = true;
+            }
+        } else if (ACTION_YANDEX_LANE_DISTANCE.equals(action)) {
+            String rawDistance = text(value(extras, "dist"));
+            String metrics = text(value(extras, "metrics"));
+            String value = (rawDistance + metrics).trim();
+            if (!value.isEmpty()) { distance = value; supplied = true; }
+            if (intent.hasExtra("dist_m")) {
+                rawDistances = text(value(extras, "dist_m"));
+                meters = number(value(extras, "dist_m"), Double.NaN); supplied = true;
+            }
+        }
+        if (!supplied) return false;
+
+        NavigationSignalPolicy.LaneSelection selection =
+                NavigationSignalPolicy.selectLanes(rawLanes, rawLatitudes, rawLongitudes,
+                        rawDistances, rawAlongRoute, oldLanes, oldLatitude, oldLongitude, meters);
+        if (selection.selected != null) {
+            NavigationSignalPolicy.LaneRecord selected = selection.selected;
+            lanes = selected.lanes;
+            latitude = selected.latitude;
+            longitude = selected.longitude;
+            alongRoute = selected.alongRoute;
+            if (Double.isFinite(selected.distanceMeters) && selected.distanceMeters >= 0.0d) {
+                meters = selected.distanceMeters;
+            }
+        }
+        String recordsJson = encodeLaneRecords(selection.records);
+
+        boolean changed = wasStale || !lanes.equals(oldLanes) || !distance.equals(oldDistance)
+                || !sameNumber(meters, oldMeters) || !sameNumber(latitude, oldLatitude)
+                || !sameNumber(longitude, oldLongitude) || alongRoute != oldAlongRoute
+                || !recordsJson.equals(oldRecordsJson)
+                || !rawLanes.equals(oldRawLanes) || !rawLatitudes.equals(oldRawLatitudes)
+                || !rawLongitudes.equals(oldRawLongitudes)
+                || !rawDistances.equals(oldRawDistances)
+                || !rawAlongRoute.equals(oldRawAlongRoute);
+        SharedPreferences.Editor editor = prefs.edit().putString(PREF_LANES, lanes)
+                .putString(PREF_LANE_DISTANCE, distance)
+                .putBoolean(PREF_LANE_ALONG_ROUTE, alongRoute)
+                .putString(PREF_LANE_RECORDS_JSON, recordsJson)
+                .putString(PREF_LANE_RAW_LANES, rawLanes)
+                .putString(PREF_LANE_RAW_LATITUDES, rawLatitudes)
+                .putString(PREF_LANE_RAW_LONGITUDES, rawLongitudes)
+                .putString(PREF_LANE_RAW_DISTANCES, rawDistances)
+                .putString(PREF_LANE_RAW_ALONG_ROUTE, rawAlongRoute)
+                .putLong(PREF_LANE_UPDATED_AT, now);
+        putDouble(editor, PREF_LANE_DISTANCE_METERS, meters);
+        putDouble(editor, PREF_LANE_LATITUDE, latitude);
+        putDouble(editor, PREF_LANE_LONGITUDE, longitude);
+        editor.apply();
+        if (changed) notifyChanged(context);
+        return true;
+    }
+
+    private static boolean updateGraphic(Context context, String slot, Intent intent,
+            String timestampPreference, String... keys) {
+        boolean changed = NavigationGraphicStore.saveFromIntent(context, slot, intent, keys);
+        if (!changed) return false;
+        preferences(context).edit().putLong(timestampPreference,
+                System.currentTimeMillis()).apply();
+        notifyChanged(context);
+        return true;
+    }
+
+    private static boolean clearGraphic(Context context, String slot,
+            String timestampPreference) {
+        boolean changed = clearGraphicWithoutNotify(context, slot, timestampPreference);
+        if (changed) notifyChanged(context);
+        return true;
+    }
+
+    private static boolean clearGraphicWithoutNotify(Context context, String slot,
+            String timestampPreference) {
+        SharedPreferences prefs = preferences(context);
+        boolean changed = prefs.getLong(timestampPreference, 0L) > 0
+                || NavigationGraphicStore.exists(context, slot);
+        NavigationGraphicStore.clear(context, slot);
+        prefs.edit().remove(timestampPreference).apply();
+        return changed;
+    }
+
+    @Nullable
+    private static Bitmap loadFreshGraphic(Context context, SharedPreferences prefs,
+            String timestampPreference, long ttl, String slot, long now) {
+        long updatedAt = prefs.getLong(timestampPreference, 0L);
+        if (isFresh(updatedAt, ttl, now)) return NavigationGraphicStore.load(context, slot);
+        // Expired transient graphics must release their cached ARGB bitmap. The bounded file is
+        // retained only as the previous atomic-replace target and can never load without a fresh
+        // timestamp; it is deleted by CLEAR/route end/next boot.
+        NavigationGraphicStore.evict(context, slot);
+        if (updatedAt > 0L) prefs.edit().remove(timestampPreference).apply();
+        return null;
+    }
+
+    private static LinkedHashMap<String, TrafficLight> trafficLightsMap(
+            SharedPreferences prefs) {
+        LinkedHashMap<String, TrafficLight> result = new LinkedHashMap<>();
+        String raw = prefs.getString(PREF_TRAFFIC_LIGHTS_JSON, "");
+        if (raw == null || raw.trim().isEmpty()) return result;
+        try {
+            JSONArray array = new JSONArray(raw);
+            int count = Math.min(array.length(), MAX_TRAFFIC_LIGHTS * 2);
+            for (int index = 0; index < count; index++) {
+                JSONObject item = array.optJSONObject(index);
+                if (item == null) continue;
+                String key = item.optString("key", "");
+                String color = item.optString("color", "");
+                if (key.isEmpty() || color.isEmpty()) continue;
+                result.put(key, new TrafficLight(item.optString("id", ""),
+                        item.optString("source", ""), color,
+                        item.optString("countdown", ""), item.optString("arrow", ""),
+                        item.optInt("position", -1), item.optLong("updatedAt", 0L),
+                        item.optString("phaseOrigin", "")));
+            }
+        } catch (JSONException ignored) {
+            // A partially written/imported value must not break the HOME screen.
+        }
+        return result;
+    }
+
+    private static String encodeTrafficLights(Map<String, TrafficLight> values) {
+        JSONArray array = new JSONArray();
+        for (Map.Entry<String, TrafficLight> entry : values.entrySet()) {
+            TrafficLight value = entry.getValue();
+            try {
+                JSONObject item = new JSONObject();
+                item.put("key", entry.getKey());
+                item.put("id", value.id);
+                item.put("source", value.source);
+                item.put("color", value.color);
+                item.put("countdown", value.countdown);
+                item.put("arrow", value.arrow);
+                item.put("position", value.position);
+                item.put("updatedAt", value.updatedAt);
+                item.put("phaseOrigin", value.phaseOrigin);
+                array.put(item);
+            } catch (JSONException ignored) {
+            }
+        }
+        return array.toString();
+    }
+
+    private static void removeTrafficSlot(LinkedHashMap<String, TrafficLight> values,
+            String id, int position, @Nullable String source) {
+        List<String> remove = new ArrayList<>();
+        for (Map.Entry<String, TrafficLight> entry : values.entrySet()) {
+            TrafficLight value = entry.getValue();
+            if (!NavigationSignalPolicy.sameSlot(value.id, value.position, id, position)) {
+                continue;
+            }
+            if (id.isEmpty() && source != null && !source.equalsIgnoreCase(value.source)) {
+                continue;
+            }
+            remove.add(entry.getKey());
+        }
+        for (String key : remove) values.remove(key);
+    }
+
+    private static void removeTrafficOwnedBy(LinkedHashMap<String, TrafficLight> values,
+            String source, long now) {
+        List<String> remove = new ArrayList<>();
+        for (Map.Entry<String, TrafficLight> entry : values.entrySet()) {
+            TrafficLight value = entry.getValue();
+            if (!NavigationSignalPolicy.fresh(value.updatedAt, value.countdown, now)
+                    || NavigationSignalPolicy.sourceMayReplace(value.source, source)) {
+                remove.add(entry.getKey());
+            }
+        }
+        for (String key : remove) values.remove(key);
+    }
+
+    @Nullable
+    private static TrafficLight freshTrafficForSlot(Collection<TrafficLight> values,
+            String id, int position, long now) {
+        TrafficLight result = null;
+        for (TrafficLight value : values) {
+            if (!NavigationSignalPolicy.sameSlot(value.id, value.position, id, position)
+                    || !NavigationSignalPolicy.fresh(value.updatedAt, value.countdown, now)) {
+                continue;
+            }
+            if (result == null
+                    || NavigationSignalPolicy.sourceRank(value.source)
+                    > NavigationSignalPolicy.sourceRank(result.source)
+                    || (NavigationSignalPolicy.sourceRank(value.source)
+                    == NavigationSignalPolicy.sourceRank(result.source)
+                    && value.updatedAt > result.updatedAt)) {
+                result = value;
+            }
+        }
+        return result;
+    }
+
+    private static String encodeLaneRecords(List<NavigationSignalPolicy.LaneRecord> values) {
+        JSONArray array = new JSONArray();
+        for (NavigationSignalPolicy.LaneRecord value : values) {
+            try {
+                JSONObject item = new JSONObject();
+                item.put("rawIndex", value.rawIndex);
+                item.put("lanes", value.lanes);
+                if (Double.isFinite(value.latitude)) item.put("latitude", value.latitude);
+                if (Double.isFinite(value.longitude)) item.put("longitude", value.longitude);
+                if (Double.isFinite(value.distanceMeters)) {
+                    item.put("distanceMeters", value.distanceMeters);
+                }
+                item.put("alongRoute", value.alongRoute);
+                array.put(item);
+            } catch (JSONException ignored) {
+            }
+        }
+        return array.toString();
+    }
+
+    private static List<LaneRecord> readLaneRecords(SharedPreferences prefs) {
+        List<LaneRecord> result = new ArrayList<>();
+        String raw = prefs.getString(PREF_LANE_RECORDS_JSON, "");
+        if (raw == null || raw.trim().isEmpty()) {
+            // Migration path for a lane snapshot persisted by the first rich-navigation build.
+            String lanes = prefs.getString(PREF_LANES, "");
+            if (!lanes.isEmpty()) {
+                result.add(new LaneRecord(0, lanes,
+                        doublePreference(prefs, PREF_LANE_LATITUDE, Double.NaN),
+                        doublePreference(prefs, PREF_LANE_LONGITUDE, Double.NaN),
+                        doublePreference(prefs, PREF_LANE_DISTANCE_METERS, Double.NaN),
+                        prefs.getBoolean(PREF_LANE_ALONG_ROUTE, false)));
+            }
+            return result;
+        }
+        try {
+            JSONArray array = new JSONArray(raw);
+            int count = Math.min(array.length(), 64);
+            for (int index = 0; index < count; index++) {
+                JSONObject item = array.optJSONObject(index);
+                if (item == null) continue;
+                String lanes = item.optString("lanes", "");
+                if (lanes.isEmpty()) continue;
+                result.add(new LaneRecord(item.optInt("rawIndex", index), lanes,
+                        item.has("latitude") ? item.optDouble("latitude", Double.NaN)
+                                : Double.NaN,
+                        item.has("longitude") ? item.optDouble("longitude", Double.NaN)
+                                : Double.NaN,
+                        item.has("distanceMeters")
+                                ? item.optDouble("distanceMeters", Double.NaN) : Double.NaN,
+                        item.optBoolean("alongRoute", false)));
+            }
+        } catch (JSONException ignored) {
+            // Raw parallel strings remain available even if imported JSON was malformed.
+        }
+        return result;
+    }
+
+    private static List<TrafficLight> readTrafficLights(SharedPreferences prefs, long now) {
+        List<TrafficLight> values = new ArrayList<>();
+        for (TrafficLight value : trafficLightsMap(prefs).values()) {
+            if (NavigationSignalPolicy.fresh(value.updatedAt, value.countdown, now)) {
+                values.add(value);
+            }
+        }
+        values = sortedTrafficLights(values);
+        if (values.size() > MAX_TRAFFIC_LIGHTS) {
+            return new ArrayList<>(values.subList(0, MAX_TRAFFIC_LIGHTS));
+        }
+        return values;
+    }
+
+    private static List<TrafficLight> sortedTrafficLights(Collection<TrafficLight> values) {
+        List<TrafficLight> result = new ArrayList<>(values);
+        result.sort(Comparator
+                .comparingInt((TrafficLight value) -> value.position < 0
+                        ? Integer.MAX_VALUE : value.position)
+                .thenComparing(value -> value.id)
+                .thenComparing(value -> value.source));
+        return result;
+    }
+
+    private static void trimTrafficLights(LinkedHashMap<String, TrafficLight> values) {
+        while (values.size() > MAX_TRAFFIC_LIGHTS) {
+            String oldestKey = null;
+            long oldest = Long.MAX_VALUE;
+            for (Map.Entry<String, TrafficLight> entry : values.entrySet()) {
+                if (entry.getValue().updatedAt < oldest) {
+                    oldest = entry.getValue().updatedAt;
+                    oldestKey = entry.getKey();
+                }
+            }
+            if (oldestKey == null) break;
+            values.remove(oldestKey);
+        }
+    }
+
+    private static boolean isFresh(long timestamp, long ttl, long now) {
+        return timestamp > 0L && now >= timestamp && now - timestamp <= ttl;
+    }
+
+    private static boolean sameNumber(double first, double second) {
+        return (Double.isNaN(first) && Double.isNaN(second))
+                || Double.compare(first, second) == 0;
+    }
+
+    private static void putDouble(SharedPreferences.Editor editor, String key, double value) {
+        if (Double.isFinite(value)) editor.putLong(key, Double.doubleToRawLongBits(value));
+        else editor.remove(key);
+    }
+
+    private static double doublePreference(SharedPreferences prefs, String key,
+            double fallback) {
+        return prefs.contains(key) ? Double.longBitsToDouble(prefs.getLong(key, 0L)) : fallback;
+    }
+
+    private static double number(Object value, double fallback) {
+        if (value instanceof Number) return ((Number) value).doubleValue();
+        if (value == null) return fallback;
+        try { return Double.parseDouble(String.valueOf(value).trim().replace(',', '.')); }
+        catch (NumberFormatException ignored) { return fallback; }
+    }
+
+    private static int integer(Object value, int fallback) {
+        if (value instanceof Number) return ((Number) value).intValue();
+        if (value == null) return fallback;
+        try { return Integer.parseInt(String.valueOf(value).trim()); }
+        catch (NumberFormatException ignored) { return fallback; }
     }
 
     @NonNull
@@ -524,7 +1224,53 @@ public final class NavigationDataRepository {
     @NonNull
     private static SharedPreferences preferences(@NonNull Context context) {
         Context storage = context.createDeviceProtectedStorageContext();
-        return storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        SharedPreferences prefs = storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        ensureCurrentBootSession(context, prefs);
+        return prefs;
+    }
+
+    /**
+     * Route broadcasts are live telemetry, not durable user settings. Scope them to one Android
+     * boot so a route/image cached shortly before power-off cannot appear after the next start.
+     */
+    private static void ensureCurrentBootSession(Context context, SharedPreferences prefs) {
+        synchronized (NavigationDataRepository.class) {
+            int currentBootCount = bootCount(context);
+            long currentBootEpoch = System.currentTimeMillis() - SystemClock.elapsedRealtime();
+            int storedBootCount = prefs.getInt(PREF_BOOT_COUNT, UNKNOWN_BOOT_COUNT);
+            long storedBootEpoch = prefs.getLong(PREF_BOOT_EPOCH, Long.MIN_VALUE);
+            if (sameBootSession(storedBootCount, storedBootEpoch,
+                    currentBootCount, currentBootEpoch)) return;
+
+            // Missing markers are also stale. This safely migrates builds which persisted route
+            // data without a boot identity, before a partial new update gets a chance to merge it.
+            prefs.edit().clear()
+                    .putInt(PREF_BOOT_COUNT, currentBootCount)
+                    .putLong(PREF_BOOT_EPOCH, currentBootEpoch)
+                    .apply();
+            NavigationGraphicStore.clear(context, NavigationGraphicStore.MANEUVER);
+            NavigationGraphicStore.clear(context, NavigationGraphicStore.LANES);
+            NavigationGraphicStore.clear(context, NavigationGraphicStore.JAM);
+            NavigationGraphicStore.clear(context, NavigationGraphicStore.RAINBOW);
+        }
+    }
+
+    private static int bootCount(Context context) {
+        try {
+            return Settings.Global.getInt(context.getContentResolver(),
+                    Settings.Global.BOOT_COUNT, UNKNOWN_BOOT_COUNT);
+        } catch (RuntimeException ignored) {
+            return UNKNOWN_BOOT_COUNT;
+        }
+    }
+
+    /** Pure helper kept package-visible so boot-scope behavior can be unit-tested on the JVM. */
+    static boolean sameBootSession(int storedCount, long storedEpoch,
+            int currentCount, long currentEpoch) {
+        if (storedCount >= 0 && currentCount >= 0) return storedCount == currentCount;
+        if (storedEpoch == Long.MIN_VALUE || currentEpoch == Long.MIN_VALUE) return false;
+        return storedEpoch >= currentEpoch - BOOT_EPOCH_TOLERANCE_MS
+                && storedEpoch <= currentEpoch + BOOT_EPOCH_TOLERANCE_MS;
     }
 
     private static void notifyChanged(Context context) {

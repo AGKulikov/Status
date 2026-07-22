@@ -14,16 +14,20 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** Persisted, connector-independent composition of the HOME media panel. */
 public final class MediaPanelConfig {
     public static final String ARTWORK = "media.artwork";
     public static final String TITLE = "media.title";
     public static final String ARTIST = "media.artist";
+    public static final String ALBUM = "media.album";
     public static final String APPLICATION = "media.application";
+    public static final String PROGRESS = "media.progress";
     public static final String PREVIOUS = "media.previous";
     public static final String PLAY_PAUSE = "media.play_pause";
     public static final String NEXT = "media.next";
+    public static final String VOLUME = "media.volume";
 
     public static final class Spec {
         @NonNull public final String id;
@@ -61,10 +65,13 @@ public final class MediaPanelConfig {
             new Spec(ARTWORK, "Обложка", 112, 112),
             new Spec(TITLE, "Название", 230, 58),
             new Spec(ARTIST, "Исполнитель", 190, 48),
+            new Spec(ALBUM, "Альбом", 180, 42),
             new Spec(APPLICATION, "Приложение", 150, 40),
+            new Spec(PROGRESS, "Позиция и длительность", 240, 58),
             new Spec(PREVIOUS, "Предыдущий трек", 64, 64),
             new Spec(PLAY_PAUSE, "Играть / пауза", 72, 72),
-            new Spec(NEXT, "Следующий трек", 64, 64)));
+            new Spec(NEXT, "Следующий трек", 64, 64),
+            new Spec(VOLUME, "Громкость", 220, 58)));
 
     @NonNull public String backgroundColor = "#121923";
     public int backgroundAlpha = 150;
@@ -108,6 +115,18 @@ public final class MediaPanelConfig {
     public void setScale(@NonNull String id, int scalePercent) {
         Element value = elements.get(id);
         if (value != null) value.scalePercent = scalePercent;
+    }
+
+    /** Appends built-ins introduced after a saved layout without unexpectedly enabling them. */
+    void appendMissingDisabled(@NonNull Set<String> restoredIds, int maximumOrder) {
+        int order = maximumOrder;
+        for (Spec spec : SPECS) {
+            if (restoredIds.contains(spec.id)) continue;
+            Element element = elements.get(spec.id);
+            if (element == null) continue;
+            element.order = ++order;
+            element.enabled = false;
+        }
     }
 
     /** Moves an element one visual slot and keeps a dense, deterministic order. */

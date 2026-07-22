@@ -36,6 +36,8 @@ import java.util.Set;
 
 public class Preferences {
     private static final String TAG = "Preferences";
+    /** New large HOME surfaces must remain opt-in when an existing layout is upgraded. */
+    static final boolean DEFAULT_LAUNCHER_VEHICLE_INFO_VISIBLE = false;
     /** Secrets and installation identities never leave the device through settings exports or
      * presets. Keep future connector credentials/identities here as well so adding a transport
      * cannot accidentally make them exportable or clone one client identity to another device. */
@@ -475,7 +477,7 @@ public class Preferences {
     // Independent HOME surface for live eCarX/HUD telemetry.  Content and appearance live in a
     // versioned JSON document so new metrics can be added without invalidating existing layouts.
     public final Bool launcherVehicleInfoVisible = new Bool(this,
-            "launcherVehicleInfoVisible", true);
+            "launcherVehicleInfoVisible", DEFAULT_LAUNCHER_VEHICLE_INFO_VISIBLE);
     public final Str launcherVehicleInfoConfigJson = new Str(this,
             "launcherVehicleInfoConfigJson", "");
     // Per-panel inner element visibility/order/scale. Kept separate from outer pixel geometry so

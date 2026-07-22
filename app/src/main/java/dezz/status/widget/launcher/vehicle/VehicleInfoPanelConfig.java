@@ -54,6 +54,17 @@ public final class VehicleInfoPanelConfig {
         public int decimals;
         @NonNull public String valueColor;
         @NonNull public String labelColor;
+        /** Derived refill option: suppress the value until the confirmed gear is P. */
+        public boolean refillOnlyInPark;
+        /** Prefer the static AdaptAPI tank capacity; otherwise use the editable value below. */
+        public boolean refillAutomaticCapacity;
+        public double refillManualCapacityLitres;
+        /** Allowed speed above the navigation limit before the warning becomes active. */
+        public int speedLimitThresholdKmh;
+        public boolean speedLimitBlink;
+        public boolean speedLimitWhiteBackground;
+        public boolean speedLimitOnlyActiveRoute;
+        @NonNull public String warningColor;
 
         private Metric(@NonNull String id, @NonNull String fallbackLabel,
                        @NonNull String fallbackUnit, boolean enabled, int decimals) {
@@ -69,6 +80,14 @@ public final class VehicleInfoPanelConfig {
             this.decimals = decimals;
             this.valueColor = "#FFFFFF";
             this.labelColor = "#AEB9C8";
+            this.refillOnlyInPark = false;
+            this.refillAutomaticCapacity = true;
+            this.refillManualCapacityLitres = 64d;
+            this.speedLimitThresholdKmh = 0;
+            this.speedLimitBlink = true;
+            this.speedLimitWhiteBackground = false;
+            this.speedLimitOnlyActiveRoute = true;
+            this.warningColor = "#FF3B30";
         }
 
         @NonNull
@@ -81,6 +100,14 @@ public final class VehicleInfoPanelConfig {
             value.offset = offset;
             value.valueColor = valueColor;
             value.labelColor = labelColor;
+            value.refillOnlyInPark = refillOnlyInPark;
+            value.refillAutomaticCapacity = refillAutomaticCapacity;
+            value.refillManualCapacityLitres = refillManualCapacityLitres;
+            value.speedLimitThresholdKmh = speedLimitThresholdKmh;
+            value.speedLimitBlink = speedLimitBlink;
+            value.speedLimitWhiteBackground = speedLimitWhiteBackground;
+            value.speedLimitOnlyActiveRoute = speedLimitOnlyActiveRoute;
+            value.warningColor = warningColor;
             return value;
         }
 
@@ -95,6 +122,13 @@ public final class VehicleInfoPanelConfig {
             if (!Double.isFinite(offset)) offset = 0d;
             if (!isColor(valueColor)) valueColor = "#FFFFFF";
             if (!isColor(labelColor)) labelColor = "#AEB9C8";
+            if (!Double.isFinite(refillManualCapacityLitres)
+                    || refillManualCapacityLitres < 1d
+                    || refillManualCapacityLitres > 250d) {
+                refillManualCapacityLitres = 64d;
+            }
+            speedLimitThresholdKmh = clamp(speedLimitThresholdKmh, 0, 20);
+            if (!isColor(warningColor)) warningColor = "#FF3B30";
         }
     }
 
@@ -135,10 +169,16 @@ public final class VehicleInfoPanelConfig {
             new BuiltIn("ISensor.avg_fuel_consumption_ignition",
                     "Средний расход за поездку", "л/100 км", 1),
             new BuiltIn("ISensor.gear", "Передача", "", 0),
+            new BuiltIn("ECarx.gear_actual", "Фактическая передача", "", 0),
+            new BuiltIn("ECarx.gear_manual_mode", "Ручной режим коробки", "", 0),
             new BuiltIn("ISensor.ignition_state", "Зажигание", "", 0),
             new BuiltIn("IBcm.high_beam", "Дальний свет", "", 0),
             new BuiltIn("IBcm.turn_signal_left", "Левый указатель поворота", "", 0),
             new BuiltIn("IBcm.turn_signal_right", "Правый указатель поворота", "", 0),
+            new BuiltIn("External.auto_hold", "Auto Hold", "", 0),
+            new BuiltIn("Derived.turn_signals", "Поворотники / аварийка", "", 0),
+            new BuiltIn("Derived.refill_fuel", "Долить топлива", "л", 1),
+            new BuiltIn("Derived.speed_limit_warning", "Превышение скорости", "км/ч", 0),
             new BuiltIn("TPMS.pressure.front_left", "Давление: переднее левое", "бар", 1),
             new BuiltIn("TPMS.pressure.front_right", "Давление: переднее правое", "бар", 1),
             new BuiltIn("TPMS.pressure.rear_left", "Давление: заднее левое", "бар", 1),

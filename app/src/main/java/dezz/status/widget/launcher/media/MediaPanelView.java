@@ -6,9 +6,11 @@
 package dezz.status.widget.launcher.media;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.media.AudioManager;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
@@ -16,6 +18,9 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.SeekBar;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -25,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import dezz.status.widget.launcher.LauncherMediaController;
+import dezz.status.widget.launcher.MediaTimeline;
 
 /** Responsive HOME media surface whose contents are fully driven by {@link MediaPanelConfig}. */
 public final class MediaPanelView extends FrameLayout {
@@ -42,12 +48,21 @@ public final class MediaPanelView extends FrameLayout {
     private ImageView artwork;
     private TextView title;
     private TextView artist;
+    private TextView album;
     private TextView application;
+    private ProgressBar progress;
+    private TextView timeline;
+    private SeekBar volume;
+    private TextView volumeLabel;
     private ImageButton playPause;
     @Nullable private android.graphics.Bitmap artworkBitmap;
     @NonNull private String titleValue = "Музыка не воспроизводится";
     @NonNull private String artistValue = "";
+    @NonNull private String albumValue = "";
     @NonNull private String applicationValue = "";
+    private long durationMs;
+    private long positionMs;
+    private int volumePercent;
     private boolean playing;
 
     public MediaPanelView(@NonNull Context context, @NonNull MediaPanelConfigStore store,
@@ -81,8 +96,12 @@ public final class MediaPanelView extends FrameLayout {
     public void setSnapshot(@NonNull LauncherMediaController.Snapshot state) {
         titleValue = state.title;
         artistValue = state.artist;
+        albumValue = state.album;
         applicationValue = state.application;
         artworkBitmap = state.artwork;
+        durationMs = state.durationMs;
+        positionMs = state.positionMs;
+        volumePercent = state.volumePercent;
         playing = state.playing;
         applySnapshot();
     }
@@ -92,8 +111,12 @@ public final class MediaPanelView extends FrameLayout {
                                   @NonNull String application, boolean playing) {
         titleValue = title;
         artistValue = artist;
+        albumValue = "Альбом";
         applicationValue = application;
         artworkBitmap = null;
+        durationMs = 4L * 60L * 1_000L + 12_000L;
+        positionMs = 1L * 60L * 1_000L + 24_000L;
+        volumePercent = 42;
         this.playing = playing;
         applySnapshot();
     }
@@ -104,7 +127,12 @@ public final class MediaPanelView extends FrameLayout {
         artwork = null;
         title = null;
         artist = null;
+        album = null;
         application = null;
+        progress = null;
+        timeline = null;
+        volume = null;
+        volumeLabel = null;
         playPause = null;
         applySurface();
 
@@ -144,11 +172,18 @@ public final class MediaPanelView extends FrameLayout {
                         Color.LTGRAY), false);
                 artist.setContentDescription("Исполнитель");
                 return artist;
+            case MediaPanelConfig.ALBUM:
+                album = text(scaleSp(15, element.scalePercent),
+                        withAlpha(color(config.secondaryColor, Color.LTGRAY), 210), false);
+                album.setContentDescription("Альбом");
+                return album;
             case MediaPanelConfig.APPLICATION:
                 application = text(scaleSp(13, element.scalePercent),
                         withAlpha(color(config.secondaryColor, Color.LTGRAY), 190), false);
                 application.setContentDescription("Музыкальное приложение");
                 return application;
+            case MediaPanelConfig.PROGRESS:
+                return progressElement(element.scalePercent);
             case MediaPanelConfig.PREVIOUS:
                 return button(android.R.drawable.ic_media_previous, "Предыдущий трек",
                         controls == null ? null : v -> controls.previous(), element.scalePercent);
@@ -159,11 +194,82 @@ public final class MediaPanelView extends FrameLayout {
             case MediaPanelConfig.NEXT:
                 return button(android.R.drawable.ic_media_next, "Следующий трек",
                         controls == null ? null : v -> controls.next(), element.scalePercent);
+            case MediaPanelConfig.VOLUME:
+                return volumeElement(element.scalePercent);
             default:
                 TextView fallback = text(14, Color.WHITE, false);
                 fallback.setText(spec.label);
                 return fallback;
         }
+    }
+
+    @NonNull
+    private View progressElement(int scalePercent) {
+        LinearLayout root = new LinearLayout(getContext());
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER_VERTICAL);
+        timeline = text(scaleSp(13, scalePercent), color(config.secondaryColor, Color.LTGRAY),
+                false);
+        timeline.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.CENTER_VERTICAL);
+        timeline.setContentDescription("Позиция и длительность трека");
+        root.addView(timeline, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        progress = new ProgressBar(getContext(), null, android.R.attr.progressBarStyleHorizontal);
+        progress.setMax(1_000);
+        progress.setProgressTintList(ColorStateList.valueOf(
+                color(config.controlColor, Color.WHITE)));
+        progress.setProgressBackgroundTintList(ColorStateList.valueOf(
+                withAlpha(color(config.secondaryColor, Color.LTGRAY), 95)));
+        root.addView(progress, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Math.max(dp(5), dp(7) * scalePercent / 100)));
+        return root;
+    }
+
+    @NonNull
+    private View volumeElement(int scalePercent) {
+        LinearLayout root = new LinearLayout(getContext());
+        root.setGravity(Gravity.CENTER_VERTICAL);
+        root.setContentDescription("Громкость музыки");
+        ImageView icon = new ImageView(getContext());
+        icon.setImageResource(android.R.drawable.ic_lock_silent_mode_off);
+        icon.setColorFilter(color(config.controlColor, Color.WHITE));
+        int iconSize = Math.max(dp(22), dp(30) * scalePercent / 100);
+        root.addView(icon, new LinearLayout.LayoutParams(iconSize, iconSize));
+        volume = new SeekBar(getContext());
+        volume.setMax(100);
+        volume.setEnabled(controls != null);
+        volume.setProgressTintList(ColorStateList.valueOf(color(config.controlColor, Color.WHITE)));
+        volume.setThumbTintList(ColorStateList.valueOf(color(config.controlColor, Color.WHITE)));
+        volume.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
+                if (volumeLabel != null) volumeLabel.setText(value + "%");
+                if (fromUser && controls != null) setSystemVolume(value);
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        LinearLayout.LayoutParams seekLp = new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+        seekLp.leftMargin = dp(4);
+        root.addView(volume, seekLp);
+        volumeLabel = text(scaleSp(13, scalePercent),
+                color(config.secondaryColor, Color.LTGRAY), false);
+        volumeLabel.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        root.addView(volumeLabel, new LinearLayout.LayoutParams(
+                Math.max(dp(46), dp(58) * scalePercent / 100),
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        return root;
+    }
+
+    private void setSystemVolume(int percent) {
+        AudioManager manager = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+        if (manager == null) return;
+        try {
+            int maximum = manager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+            int selected = Math.round(Math.max(0, Math.min(100, percent)) * maximum / 100f);
+            manager.setStreamVolume(AudioManager.STREAM_MUSIC, selected, 0);
+            volumePercent = percent;
+        } catch (RuntimeException ignored) {}
     }
 
     @NonNull
@@ -208,6 +314,10 @@ public final class MediaPanelView extends FrameLayout {
             artist.setText(artistValue);
             artist.setVisibility(artistValue.isEmpty() ? View.GONE : View.VISIBLE);
         }
+        if (album != null) {
+            album.setText(albumValue);
+            album.setVisibility(albumValue.isEmpty() ? View.GONE : View.VISIBLE);
+        }
         if (application != null) {
             application.setText(applicationValue);
             application.setVisibility(applicationValue.isEmpty() ? View.GONE : View.VISIBLE);
@@ -225,6 +335,18 @@ public final class MediaPanelView extends FrameLayout {
             playPause.setImageResource(playing
                     ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
         }
+        if (timeline != null) {
+            timeline.setText(MediaTimeline.format(positionMs) + " / "
+                    + MediaTimeline.format(durationMs));
+        }
+        if (progress != null) {
+            progress.setProgress(MediaTimeline.progress(positionMs, durationMs, 1_000));
+            View progressRoot = elementViews.get(MediaPanelConfig.PROGRESS);
+            if (progressRoot != null) progressRoot.setVisibility(
+                    durationMs > 0L ? View.VISIBLE : View.GONE);
+        }
+        if (volume != null && !volume.isPressed()) volume.setProgress(volumePercent);
+        if (volumeLabel != null) volumeLabel.setText(volumePercent + "%");
     }
 
     private void applySurface() {

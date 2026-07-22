@@ -41,6 +41,7 @@ import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.launcher.vehicle.VehicleInfoPanelConfig;
 import dezz.status.widget.launcher.vehicle.VehicleInfoPanelConfigStore;
 import dezz.status.widget.launcher.vehicle.VehicleInfoPanelView;
+import dezz.status.widget.launcher.vehicle.VehicleDerivedMetrics;
 
 /** Human-friendly, immediate visual editor for the HOME vehicle-information panel. */
 public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
@@ -335,6 +336,60 @@ public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
         addColor(body, "Название", () -> metric.labelColor,
                 value -> metric.labelColor = value);
 
+        if (VehicleDerivedMetrics.REFILL_FUEL_ID.equals(metric.id)) {
+            addSection(body, "Расчёт дозаправки");
+            addHint(body, "Остаток приходит из автомобиля. В автоматическом режиме объём бака "
+                    + "берётся из AdaptAPI, а если прошивка его не сообщает — используется "
+                    + "резервное значение 64 л.");
+            addSwitch(body, "Показывать только на передаче P", metric.refillOnlyInPark,
+                    checked -> {
+                        metric.refillOnlyInPark = checked;
+                        persistAndPreview();
+                    });
+            addSwitch(body, "Получать объём бака из автомобиля (резерв 64 л)",
+                    metric.refillAutomaticCapacity, checked -> {
+                        metric.refillAutomaticCapacity = checked;
+                        persistAndPreview();
+                    });
+            EditText tank = addInput(body, "Ручной объём бака, л",
+                    plainNumber(metric.refillManualCapacityLitres),
+                    InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+            watchNumber(tank, value -> {
+                if (value >= 1d && value <= 250d) metric.refillManualCapacityLitres = value;
+            });
+        } else if (VehicleDerivedMetrics.SPEED_LIMIT_WARNING_ID.equals(metric.id)) {
+            addSection(body, "Предупреждение о скорости");
+            addHint(body, "Текущая скорость приходит из ECARX, лимит — из активной "
+                    + "навигации. Порог добавляется к лимиту, например 60 + 10 км/ч.");
+            addSlider(body, "Допуск сверх лимита", metric.speedLimitThresholdKmh, 0, 20,
+                    value -> metric.speedLimitThresholdKmh = value,
+                    value -> "+" + value + " км/ч");
+            addSwitch(body, "Только при активном маршруте",
+                    metric.speedLimitOnlyActiveRoute, checked -> {
+                        metric.speedLimitOnlyActiveRoute = checked;
+                        persistAndPreview();
+                    });
+            addSwitch(body, "Мигать при превышении", metric.speedLimitBlink, checked -> {
+                metric.speedLimitBlink = checked;
+                persistAndPreview();
+            });
+            addSwitch(body, "Белый фон при превышении",
+                    metric.speedLimitWhiteBackground, checked -> {
+                        metric.speedLimitWhiteBackground = checked;
+                        persistAndPreview();
+                    });
+            addColor(body, "Цвет превышения", () -> metric.warningColor,
+                    value -> metric.warningColor = value);
+        } else if (VehicleDerivedMetrics.TURN_SIGNALS_ID.equals(metric.id)) {
+            addSection(body, "Комбинированный индикатор");
+            addHint(body, "← левый · → правый · ↔ аварийная сигнализация. Тёмная фаза "
+                    + "мигания автоматически сглаживается.");
+        } else if (VehicleDerivedMetrics.AUTO_HOLD_ID.equals(metric.id)) {
+            addSection(body, "Источник Auto Hold");
+            addHint(body, "Принимается совместимый broadcast plus.monjaro.AUTOHOLD. "
+                    + "Состояние сохраняется только для текущей загрузки магнитолы.");
+        }
+
         addSection(body, "Дополнительно");
         addHint(body, "Формула отображения: значение × множитель + смещение. "
                 + "Обычно эти поля менять не нужно.");
@@ -364,6 +419,7 @@ public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
                     metric.decimals = suggestedDecimals(metric.fallbackUnit);
                     metric.valueColor = "#FFFFFF";
                     metric.labelColor = "#AEB9C8";
+                    metric.warningColor = "#FF3B30";
                     persistAndPreview();
                     dialog.dismiss();
                     rebuildMetricControls();
@@ -608,6 +664,22 @@ public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
 
     @NonNull
     private static String metricSummary(@NonNull VehicleInfoPanelConfig.Metric metric) {
+        if (VehicleDerivedMetrics.REFILL_FUEL_ID.equals(metric.id)) {
+            String capacity = metric.refillAutomaticCapacity
+                    ? "объём бака из авто, резерв 64 л"
+                    : "бак " + plainNumber(metric.refillManualCapacityLitres) + " л";
+            return capacity + (metric.refillOnlyInPark ? " · только P" : "");
+        }
+        if (VehicleDerivedMetrics.SPEED_LIMIT_WARNING_ID.equals(metric.id)) {
+            return "Допуск: +" + metric.speedLimitThresholdKmh + " км/ч"
+                    + (metric.speedLimitBlink ? " · мигание" : "");
+        }
+        if (VehicleDerivedMetrics.TURN_SIGNALS_ID.equals(metric.id)) {
+            return "Левый · правый · аварийная сигнализация";
+        }
+        if (VehicleDerivedMetrics.AUTO_HOLD_ID.equals(metric.id)) {
+            return "Broadcast plus.monjaro.AUTOHOLD";
+        }
         String unit = metric.unitOverride.trim().isEmpty()
                 ? metric.fallbackUnit : metric.unitOverride.trim();
         return unit.isEmpty() ? "Без единицы измерения" : "Единица: " + unit;

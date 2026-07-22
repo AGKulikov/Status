@@ -17,9 +17,14 @@
 
 package dezz.status.widget.car;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -56,6 +61,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import dezz.status.widget.BrickType;
+import dezz.status.widget.launcher.vehicle.VehicleDerivedMetrics;
 
 /**
  * eCarX AdaptAPI backend for car-specific bricks: cabin ("indoor") and ambient ("outdoor")
@@ -101,8 +107,14 @@ final class GeelyCarIntegration implements CarIntegration {
     private static final int SENSOR_TYPE_INSTANT_CONSUMPTION = 4_194_816;
     private static final int SENSOR_TYPE_AVERAGE_CONSUMPTION_ONE_IGNITION = 4_195_072;
     private static final long BCM_STATE_POLL_INTERVAL_MS = 300L;
+    /** A dead/silent reflective callback must never suppress the supported AdaptAPI path forever. */
+    private static final long LOW_LEVEL_PRIORITY_TTL_MS = 15_000L;
     /** Longer than a normal indicator's dark half-cycle, but still quick when it is cancelled. */
     private static final long TURN_SIGNAL_OFF_HOLD_MS = 1_000L;
+    private static final String GEAR_ID = "ISensor.gear";
+    private static final String LOW_LEVEL_GEAR_ACTUAL_ID = "ECarx.gear_actual";
+    private static final String LOW_LEVEL_GEAR_MANUAL_ID = "ECarx.gear_manual_mode";
+    private static final String HIGH_BEAM_ID = "IBcm.high_beam";
 
     private final Context appContext;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -132,6 +144,12 @@ final class GeelyCarIntegration implements CarIntegration {
     private volatile ICar carApi;
     @Nullable
     private volatile ICarFunction carFunctions;
+    private final EcarxSignalFallback signalFallback;
+    /** Prefer the richer callback once it has produced a value; AdaptAPI remains the cold fallback. */
+    private volatile boolean lowLevelGearKnown;
+    private volatile boolean lowLevelHighBeamKnown;
+    private volatile long lowLevelGearObservedMonoMillis;
+    private volatile long lowLevelHighBeamObservedMonoMillis;
 
     /** Accessed only by telemetryWorker, except vendor callbacks which merely post deliveries. */
     @Nullable private ICarFunction controlWatcherSource;
@@ -161,6 +179,15 @@ final class GeelyCarIntegration implements CarIntegration {
             }
         });
     };
+    /** Internal wake-up after the exported manifest receiver persisted a current-boot state. */
+    private final BroadcastReceiver autoHoldChangedReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (AutoHoldStateRepository.ACTION_CHANGED.equals(intent.getAction())) {
+                deliverCurrentAutoHoldState();
+            }
+        }
+    };
+    private boolean autoHoldReceiverRegistered;
 
     @Nullable
     private Runnable availabilityChangedListener;
@@ -337,7 +364,8 @@ final class GeelyCarIntegration implements CarIntegration {
         }
 
         CarTelemetryDescriptor descriptor() {
-            return new CarTelemetryDescriptor(id, label, "", true, 1_500L);
+            return new CarTelemetryDescriptor(id, label, "", true,
+                    id.equals(HIGH_BEAM_ID) ? 5_000L : 1_500L);
         }
     }
 
@@ -547,6 +575,28 @@ final class GeelyCarIntegration implements CarIntegration {
 
     GeelyCarIntegration(@NonNull Context appContext) {
         this.appContext = appContext;
+        signalFallback = new EcarxSignalFallback(appContext,
+                new EcarxSignalFallback.Listener() {
+                    @Override public void onGear(int adaptGear, int actualGear,
+                                                 boolean manualMode) {
+                        lowLevelGearKnown = true;
+                        lowLevelGearObservedMonoMillis = monotonicMillis();
+                        deliverLowLevelGear(adaptGear, actualGear, manualMode);
+                    }
+
+                    @Override public void onHighBeam(int enabled) {
+                        lowLevelHighBeamKnown = true;
+                        lowLevelHighBeamObservedMonoMillis = monotonicMillis();
+                        deliverLowLevelHighBeam(enabled);
+                    }
+
+                    @Override public void onChannelLost() {
+                        lowLevelGearKnown = false;
+                        lowLevelHighBeamKnown = false;
+                        lowLevelGearObservedMonoMillis = 0L;
+                        lowLevelHighBeamObservedMonoMillis = 0L;
+                    }
+                });
     }
 
     private static int sensorTypeFor(@NonNull BrickType type) {
@@ -613,6 +663,15 @@ final class GeelyCarIntegration implements CarIntegration {
         for (BcmMetric metric : BCM_METRICS) {
             if (requested.contains(metric.id)) selected.add(metric.id);
         }
+        if (requested.contains(LOW_LEVEL_GEAR_ACTUAL_ID)) {
+            selected.add(LOW_LEVEL_GEAR_ACTUAL_ID);
+        }
+        if (requested.contains(LOW_LEVEL_GEAR_MANUAL_ID)) {
+            selected.add(LOW_LEVEL_GEAR_MANUAL_ID);
+        }
+        if (requested.contains(VehicleDerivedMetrics.AUTO_HOLD_ID)) {
+            selected.add(VehicleDerivedMetrics.AUTO_HOLD_ID);
+        }
         return Collections.unmodifiableSet(selected);
     }
 
@@ -623,6 +682,12 @@ final class GeelyCarIntegration implements CarIntegration {
                 FUEL_CAPACITY_TELEMETRY_UNIT, false, 0L));
         for (TireMetric metric : TIRE_METRICS) catalog.add(metric.descriptor());
         for (BcmMetric metric : BCM_METRICS) catalog.add(metric.descriptor());
+        catalog.add(new CarTelemetryDescriptor(LOW_LEVEL_GEAR_ACTUAL_ID,
+                "Фактическая передача", "", true, LOW_LEVEL_PRIORITY_TTL_MS));
+        catalog.add(new CarTelemetryDescriptor(LOW_LEVEL_GEAR_MANUAL_ID,
+                "Ручной режим коробки", "", true, LOW_LEVEL_PRIORITY_TTL_MS));
+        catalog.add(new CarTelemetryDescriptor(VehicleDerivedMetrics.AUTO_HOLD_ID,
+                "Auto Hold", "", true, 5L * 60L * 1_000L));
         return Collections.unmodifiableList(catalog);
     }
 
@@ -1202,6 +1267,8 @@ final class GeelyCarIntegration implements CarIntegration {
             activateTelemetrySubscription(next);
         });
         mainHandler.post(this::reconcileBcmPolling);
+        mainHandler.post(this::reconcileSignalFallback);
+        mainHandler.post(this::reconcileAutoHoldReceiver);
     }
 
     @Override
@@ -1215,6 +1282,8 @@ final class GeelyCarIntegration implements CarIntegration {
         executeTelemetryTask(() -> unregisterTelemetryVendorListeners(removed));
         mainHandler.post(this::pruneRecoveryRequests);
         mainHandler.post(this::reconcileBcmPolling);
+        mainHandler.post(this::reconcileSignalFallback);
+        mainHandler.post(this::reconcileAutoHoldReceiver);
     }
 
     private void activateTelemetrySubscription(TelemetrySubscription subscription) {
@@ -1268,6 +1337,126 @@ final class GeelyCarIntegration implements CarIntegration {
         return false;
     }
 
+    private boolean hasAutoHoldTelemetryDemand() {
+        synchronized (telemetryLock) {
+            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
+                if (!subscription.cancelled.get()
+                        && subscription.metricIds.contains(VehicleDerivedMetrics.AUTO_HOLD_ID)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void reconcileSignalFallback() {
+        boolean needsGear = false;
+        boolean needsHighBeam = false;
+        synchronized (telemetryLock) {
+            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
+                if (subscription.cancelled.get()) continue;
+                if (subscription.metricIds.contains(GEAR_ID)
+                        || subscription.metricIds.contains(LOW_LEVEL_GEAR_ACTUAL_ID)
+                        || subscription.metricIds.contains(LOW_LEVEL_GEAR_MANUAL_ID)) {
+                    needsGear = true;
+                }
+                if (subscription.metricIds.contains(HIGH_BEAM_ID)) needsHighBeam = true;
+            }
+        }
+        if (!needsGear) {
+            lowLevelGearKnown = false;
+            lowLevelGearObservedMonoMillis = 0L;
+        }
+        if (!needsHighBeam) {
+            lowLevelHighBeamKnown = false;
+            lowLevelHighBeamObservedMonoMillis = 0L;
+        }
+        signalFallback.updateDemand(needsGear, needsHighBeam);
+    }
+
+    private void deliverLowLevelGear(int adaptGear, int actualGear, boolean manualMode) {
+        List<TelemetrySubscription> subscribers = currentTelemetrySubscribers();
+        for (TelemetrySubscription subscription : subscribers) {
+            if (subscription.metricIds.contains(GEAR_ID)) {
+                deliverTelemetry(subscription, GEAR_ID, "Передача", "", adaptGear);
+            }
+            if (actualGear > 0
+                    && subscription.metricIds.contains(LOW_LEVEL_GEAR_ACTUAL_ID)) {
+                deliverTelemetry(subscription, LOW_LEVEL_GEAR_ACTUAL_ID,
+                        "Фактическая передача", "", actualGear);
+            }
+            if (subscription.metricIds.contains(LOW_LEVEL_GEAR_MANUAL_ID)) {
+                deliverTelemetry(subscription, LOW_LEVEL_GEAR_MANUAL_ID,
+                        "Ручной режим коробки", "", manualMode ? 1 : 0);
+            }
+        }
+    }
+
+    private void deliverLowLevelHighBeam(int enabled) {
+        for (TelemetrySubscription subscription : currentTelemetrySubscribers()) {
+            if (subscription.metricIds.contains(HIGH_BEAM_ID)) {
+                deliverTelemetry(subscription, HIGH_BEAM_ID, "Дальний свет", "", enabled);
+            }
+        }
+    }
+
+    private List<TelemetrySubscription> currentTelemetrySubscribers() {
+        List<TelemetrySubscription> subscribers = new ArrayList<>();
+        synchronized (telemetryLock) {
+            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
+                if (!subscription.cancelled.get()) subscribers.add(subscription);
+            }
+        }
+        return subscribers;
+    }
+
+    /** Main-thread demand registration; the external broadcast itself is manifest-received. */
+    private void reconcileAutoHoldReceiver() {
+        if (!hasAutoHoldTelemetryDemand()) {
+            if (autoHoldReceiverRegistered) {
+                try { appContext.unregisterReceiver(autoHoldChangedReceiver); }
+                catch (IllegalArgumentException ignored) {}
+                autoHoldReceiverRegistered = false;
+            }
+            return;
+        }
+        if (!autoHoldReceiverRegistered) {
+            IntentFilter filter = new IntentFilter(AutoHoldStateRepository.ACTION_CHANGED);
+            try {
+                if (Build.VERSION.SDK_INT >= 33) {
+                    appContext.registerReceiver(autoHoldChangedReceiver, filter,
+                            Context.RECEIVER_NOT_EXPORTED);
+                } else {
+                    appContext.registerReceiver(autoHoldChangedReceiver, filter);
+                }
+                autoHoldReceiverRegistered = true;
+            } catch (RuntimeException error) {
+                Log.w(TAG, "Auto Hold state receiver registration failed", error);
+            }
+        }
+        // The manifest receiver may have run while the launcher/process was not visible.
+        deliverCurrentAutoHoldState();
+    }
+
+    private void deliverCurrentAutoHoldState() {
+        AutoHoldStateRepository.Snapshot current = AutoHoldStateRepository.read(appContext);
+        if (!current.available) return;
+        List<TelemetrySubscription> subscribers = new ArrayList<>();
+        synchronized (telemetryLock) {
+            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
+                if (!subscription.cancelled.get()
+                        && subscription.metricIds.contains(VehicleDerivedMetrics.AUTO_HOLD_ID)) {
+                    subscribers.add(subscription);
+                }
+            }
+        }
+        TelemetryValue sample = new TelemetryValue(VehicleDerivedMetrics.AUTO_HOLD_ID,
+                "Auto Hold", current.value ? 1d : 0d, "", current.observedAtMillis);
+        for (TelemetrySubscription subscription : subscribers) {
+            deliverTelemetry(subscription, sample);
+        }
+    }
+
     /** Main-thread only: start immediately on first demand and fully stop after the last one. */
     private void reconcileBcmPolling() {
         if (!hasBcmTelemetryDemand()) {
@@ -1317,6 +1506,10 @@ final class GeelyCarIntegration implements CarIntegration {
         long nowMillis = System.nanoTime() / 1_000_000L;
         for (BcmMetric metric : BCM_METRICS) {
             if (!demandedIds.contains(metric.id)) continue;
+            // On firmware where IBcm reports a constant/default value, mHUD obtains the real
+            // steady high-beam state from CarSignalManager. Once that path is known-good, do not
+            // let the lower-fidelity poll overwrite it.
+            if (metric.id.equals(HIGH_BEAM_ID) && isLowLevelHighBeamFresh()) continue;
             final int raw;
             try {
                 raw = source.getFunctionValue(metric.functionId);
@@ -1375,7 +1568,8 @@ final class GeelyCarIntegration implements CarIntegration {
         ISensor.ISensorListener vendorListener = new ISensor.ISensorListener() {
             @Override public void onSensorEventChanged(int changedType, int value) {
                 if (subscription.cancelled.get() || changedType != signal.sensorType
-                        || !isValidTelemetryEventValue(value, signal.boundedTemperature)) return;
+                        || !isValidTelemetryEventValue(value, signal.boundedTemperature)
+                        || isLowLevelGearPreferred(signal)) return;
                 supported.set(true);
                 // Several nominally numeric AdaptAPI signals (notably fluid/oil levels) are
                 // exposed through the integer event callback on some firmware revisions.
@@ -1403,7 +1597,8 @@ final class GeelyCarIntegration implements CarIntegration {
             @Override public void onSensorValueChanged(int changedType, float value) {
                 if (subscription.cancelled.get() || changedType != signal.sensorType
                         || signal.eventOnly
-                        || !isValidTelemetryValue(value, signal.boundedTemperature)) return;
+                        || !isValidTelemetryValue(value, signal.boundedTemperature)
+                        || isLowLevelGearPreferred(signal)) return;
                 supported.set(true);
                 deliverTelemetry(subscription, signal.id, signal.label,
                         signal.telemetryUnit, value);
@@ -1428,7 +1623,7 @@ final class GeelyCarIntegration implements CarIntegration {
     private void emitInitialSensorValue(ISensor source, TelemetrySignal signal,
                                         TelemetrySubscription subscription,
                                         AtomicBoolean supported) {
-        if (subscription.cancelled.get()) return;
+        if (subscription.cancelled.get() || isLowLevelGearPreferred(signal)) return;
         FunctionStatus status = sensorSupportStatus(source, signal.sensorType);
         supported.set(isSupported(status));
         if (!isSupported(status) && !signal.probeWithoutSupport) {
@@ -1462,6 +1657,29 @@ final class GeelyCarIntegration implements CarIntegration {
             Log.w(TAG, "telemetry initial read failed for " + signal.id, t);
             if (!signal.probeWithoutSupport) requestSensorRecovery(signal.sensorType);
         }
+    }
+
+    private boolean isLowLevelGearPreferred(TelemetrySignal signal) {
+        return signal.id.equals(GEAR_ID) && isLowLevelGearFresh();
+    }
+
+    private boolean isLowLevelGearFresh() {
+        return lowLevelGearKnown
+                && isFreshLowLevelSample(lowLevelGearObservedMonoMillis, monotonicMillis());
+    }
+
+    private boolean isLowLevelHighBeamFresh() {
+        return lowLevelHighBeamKnown
+                && isFreshLowLevelSample(lowLevelHighBeamObservedMonoMillis, monotonicMillis());
+    }
+
+    static boolean isFreshLowLevelSample(long observedMonoMillis, long nowMonoMillis) {
+        return observedMonoMillis > 0L && nowMonoMillis >= observedMonoMillis
+                && nowMonoMillis - observedMonoMillis <= LOW_LEVEL_PRIORITY_TTL_MS;
+    }
+
+    private static long monotonicMillis() {
+        return SystemClock.elapsedRealtime();
     }
 
     private void registerTireTelemetry(TelemetrySubscription subscription) {
@@ -2231,6 +2449,11 @@ final class GeelyCarIntegration implements CarIntegration {
         mainHandler.removeCallbacks(controlRefreshTask);
         mainHandler.removeCallbacks(bcmPollTask);
         bcmPollScheduled = false;
+        if (autoHoldReceiverRegistered) {
+            try { appContext.unregisterReceiver(autoHoldChangedReceiver); }
+            catch (IllegalArgumentException ignored) {}
+            autoHoldReceiverRegistered = false;
+        }
         executeTelemetryTask(() -> {
             for (TelemetrySubscription subscription : telemetry) {
                 unregisterTelemetryVendorListeners(subscription);
@@ -2238,6 +2461,7 @@ final class GeelyCarIntegration implements CarIntegration {
             bcmLastOnMillis.clear();
             detachControlWatcher();
         });
+        signalFallback.shutdown();
         telemetryWorker.shutdown();
         availabilityChangedListener = null;
     }

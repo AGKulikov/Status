@@ -75,6 +75,14 @@ public final class GeelyCarTelemetryValidationTest {
         assertEquals(-1, GeelyCarIntegration.stabilizeTurnSignalValue(2, 5_000L, 5_100L));
     }
 
+    @Test public void lowLevelSignalPriorityExpiresAfterCallbackSilence() {
+        assertTrue(GeelyCarIntegration.isFreshLowLevelSample(10_000L, 10_000L));
+        assertTrue(GeelyCarIntegration.isFreshLowLevelSample(10_000L, 25_000L));
+        assertFalse(GeelyCarIntegration.isFreshLowLevelSample(10_000L, 25_001L));
+        assertFalse(GeelyCarIntegration.isFreshLowLevelSample(0L, 10_000L));
+        assertFalse(GeelyCarIntegration.isFreshLowLevelSample(10_001L, 10_000L));
+    }
+
     @Test public void requestedMetricsAreFilteredWithoutImplicitSubscriptions() {
         Set<String> requested = new LinkedHashSet<>(Arrays.asList(
                 "unknown.metric",
@@ -84,13 +92,14 @@ public final class GeelyCarTelemetryValidationTest {
                 "ISensor.gear",
                 "TPMS.pressure.front_left",
                 "IBcm.high_beam",
-                "IBcm.turn_signal_right"));
+                "IBcm.turn_signal_right",
+                "External.auto_hold"));
 
         assertEquals(new LinkedHashSet<>(Arrays.asList(
                         "ISensor.fuel_level", "ISensor.avg_fuel_consumption",
                         "ISensor.gear", "ICarInfo.fuel_capacity",
                         "TPMS.pressure.front_left", "IBcm.high_beam",
-                        "IBcm.turn_signal_right")),
+                        "IBcm.turn_signal_right", "External.auto_hold")),
                 GeelyCarIntegration.selectKnownTelemetryMetricIds(requested));
         assertTrue(GeelyCarIntegration.selectKnownTelemetryMetricIds(
                 new LinkedHashSet<>()).isEmpty());

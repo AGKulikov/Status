@@ -383,6 +383,8 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
     private static boolean isPrimary(@NonNull String id) {
         return PanelElementConfigStore.CLOCK_TIME.equals(id)
                 || PanelElementConfigStore.NAV_ARRIVAL.equals(id)
+                || PanelElementConfigStore.NAV_MANEUVER_DISTANCE.equals(id)
+                || PanelElementConfigStore.NAV_SPEED_LIMIT.equals(id)
                 || PanelElementConfigStore.APPS_HEADING.equals(id);
     }
 
@@ -402,9 +404,31 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         if (PanelElementConfigStore.NAV_ARRIVAL.equals(elementId)) return "Время прибытия: 15:28";
         if (PanelElementConfigStore.NAV_DURATION.equals(elementId)) return "Осталось: 24 мин";
         if (PanelElementConfigStore.NAV_DISTANCE.equals(elementId)) return "18 км";
+        if (PanelElementConfigStore.NAV_MANEUVER_IMAGE.equals(elementId)) return "↰";
+        if (PanelElementConfigStore.NAV_MANEUVER_DISTANCE.equals(elementId)) return "500 м";
+        if (PanelElementConfigStore.NAV_MANEUVER.equals(elementId)) {
+            return "Новочерёмушкинская улица";
+        }
+        if (PanelElementConfigStore.NAV_TRIP_INFO.equals(elementId)) {
+            return "1200 км • 10 ч 23 мин • 23:45";
+        }
+        if (PanelElementConfigStore.NAV_COMBINED.equals(elementId)) {
+            return "↰   500 м\nНовочерёмушкинская улица";
+        }
+        if (PanelElementConfigStore.NAV_SPEED_LIMIT.equals(elementId)) return "Ограничение: 60";
+        if (PanelElementConfigStore.NAV_TRAFFIC_LIGHT.equals(elementId)) {
+            return "● Зелёный · 12 с  ● Красный · 8 с";
+        }
+        if (PanelElementConfigStore.NAV_LANES_IMAGE.equals(elementId)) return "↑   ↑   ↗";
+        if (PanelElementConfigStore.NAV_LANE_INFO.equals(elementId)) return "↑ · ↑ · ↗  ·  350 м";
+        if (PanelElementConfigStore.NAV_JAM_PROGRESS.equals(elementId)) return "▰▰▰▱▱  Пробки";
+        if (PanelElementConfigStore.NAV_RAINBOW_IMAGE.equals(elementId)) {
+            return "Навигационная графика Rainbow";
+        }
         if (PanelElementConfigStore.NAV_INACTIVE.equals(elementId)) return "Маршрут не запущен";
         if (PanelElementConfigStore.ACTION_ADD.equals(elementId)) return "＋ Добавить";
-        return "▣   ▣   ▣\nПользовательские действия";
+        return LauncherLayoutStore.ACTIONS.equals(panelId)
+                ? "▣   ▣   ▣\nПользовательские действия" : elementId;
     }
 
     private static float basePreviewSp(@NonNull String panelId, @NonNull String elementId) {
@@ -412,6 +436,11 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         if (PanelElementConfigStore.NAV_ARRIVAL.equals(elementId)) return 23f;
         if (PanelElementConfigStore.NAV_DURATION.equals(elementId)) return 17f;
         if (PanelElementConfigStore.NAV_DISTANCE.equals(elementId)) return 17f;
+        if (PanelElementConfigStore.NAV_MANEUVER_IMAGE.equals(elementId)) return 38f;
+        if (PanelElementConfigStore.NAV_MANEUVER_DISTANCE.equals(elementId)) return 24f;
+        if (PanelElementConfigStore.NAV_TRIP_INFO.equals(elementId)) return 15f;
+        if (PanelElementConfigStore.NAV_COMBINED.equals(elementId)) return 20f;
+        if (PanelElementConfigStore.NAV_LANES_IMAGE.equals(elementId)) return 32f;
         if (PanelElementConfigStore.NAV_INACTIVE.equals(elementId)) return 16f;
         if (PanelElementConfigStore.CLOCK_DATE.equals(elementId)) return 17f;
         return 18f;

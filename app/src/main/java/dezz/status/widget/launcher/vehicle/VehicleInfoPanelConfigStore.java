@@ -19,7 +19,7 @@ import dezz.status.widget.Preferences;
 
 /** Versioned JSON persistence that tolerates interrupted writes and future telemetry IDs. */
 public final class VehicleInfoPanelConfigStore {
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
     private final Preferences preferences;
 
     public VehicleInfoPanelConfigStore(@NonNull Preferences preferences) {
@@ -86,6 +86,22 @@ public final class VehicleInfoPanelConfigStore {
                     metric.decimals = encoded.optInt("decimals", metric.decimals);
                     metric.valueColor = encoded.optString("valueColor", metric.valueColor);
                     metric.labelColor = encoded.optString("labelColor", metric.labelColor);
+                    metric.refillOnlyInPark = encoded.optBoolean("refillOnlyInPark",
+                            metric.refillOnlyInPark);
+                    metric.refillAutomaticCapacity = encoded.optBoolean(
+                            "refillAutomaticCapacity", metric.refillAutomaticCapacity);
+                    metric.refillManualCapacityLitres = finiteOr(encoded.optDouble(
+                            "refillManualCapacityLitres", metric.refillManualCapacityLitres),
+                            metric.refillManualCapacityLitres);
+                    metric.speedLimitThresholdKmh = encoded.optInt("speedLimitThresholdKmh",
+                            metric.speedLimitThresholdKmh);
+                    metric.speedLimitBlink = encoded.optBoolean("speedLimitBlink",
+                            metric.speedLimitBlink);
+                    metric.speedLimitWhiteBackground = encoded.optBoolean(
+                            "speedLimitWhiteBackground", metric.speedLimitWhiteBackground);
+                    metric.speedLimitOnlyActiveRoute = encoded.optBoolean(
+                            "speedLimitOnlyActiveRoute", metric.speedLimitOnlyActiveRoute);
+                    metric.warningColor = encoded.optString("warningColor", metric.warningColor);
                     order.add(id);
                 }
             }
@@ -135,6 +151,14 @@ public final class VehicleInfoPanelConfigStore {
             encoded.put("decimals", metric.decimals);
             encoded.put("valueColor", metric.valueColor);
             encoded.put("labelColor", metric.labelColor);
+            encoded.put("refillOnlyInPark", metric.refillOnlyInPark);
+            encoded.put("refillAutomaticCapacity", metric.refillAutomaticCapacity);
+            encoded.put("refillManualCapacityLitres", metric.refillManualCapacityLitres);
+            encoded.put("speedLimitThresholdKmh", metric.speedLimitThresholdKmh);
+            encoded.put("speedLimitBlink", metric.speedLimitBlink);
+            encoded.put("speedLimitWhiteBackground", metric.speedLimitWhiteBackground);
+            encoded.put("speedLimitOnlyActiveRoute", metric.speedLimitOnlyActiveRoute);
+            encoded.put("warningColor", metric.warningColor);
             metrics.put(encoded);
             order.put(metric.id);
         }

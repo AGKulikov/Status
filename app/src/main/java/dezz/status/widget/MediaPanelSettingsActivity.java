@@ -113,7 +113,8 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
                 value -> config.backgroundColor = value);
         addColor(settings, "Название", () -> config.titleColor,
                 value -> config.titleColor = value);
-        addColor(settings, "Исполнитель и приложение", () -> config.secondaryColor,
+        addColor(settings, "Исполнитель, альбом, время и приложение",
+                () -> config.secondaryColor,
                 value -> config.secondaryColor = value);
         addColor(settings, "Кнопки", () -> config.controlColor,
                 value -> config.controlColor = value);
