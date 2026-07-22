@@ -36,11 +36,16 @@ final class NavigationGraphicStore {
     static final String RAINBOW = "rainbow";
 
     private static final int MAX_ENCODED_BYTES = 2 * 1024 * 1024;
-    private static final int MAX_DIMENSION = 1_280;
-    private static final long MAX_PIXELS = 1_600_000L;
+    // These graphics are rendered inside a launcher tile, not full-screen. Four 1280px ARGB
+    // entries consumed about 25.6 MB and could kill the shared HOME/status process on the head
+    // unit. 640px still exceeds the physical maneuver/lane view while bounding the set to ~6 MB.
+    private static final int MAX_DIMENSION = 640;
+    private static final long MAX_PIXELS = 409_600L;
     private static final long MAX_FILE_BYTES = 5L * 1024L * 1024L;
     private static final String DIRECTORY = "navigation_graphics";
     private static final Map<String, Cached> CACHE = new HashMap<>();
+    /** Invalidates decoded results that finish after a trim, clear, or atomic file replacement. */
+    private static final NavigationCacheEpoch CACHE_EPOCH = new NavigationCacheEpoch();
 
     private NavigationGraphicStore() {}
 
@@ -70,7 +75,9 @@ final class NavigationGraphicStore {
         if (!file.isFile() || file.length() <= 0 || file.length() > MAX_FILE_BYTES) return null;
         String key = file.getAbsolutePath();
         long modified = file.lastModified();
+        long generation;
         synchronized (CACHE) {
+            generation = CACHE_EPOCH.capture();
             Cached cached = CACHE.get(key);
             if (cached != null && cached.modified == modified && !cached.bitmap.isRecycled()) {
                 return cached.bitmap;
@@ -78,7 +85,15 @@ final class NavigationGraphicStore {
         }
         Bitmap value = decodeFileBounded(file);
         if (value != null) {
-            synchronized (CACHE) { CACHE.put(key, new Cached(modified, value)); }
+            synchronized (CACHE) {
+                // A parallel evictAll()/save()/clear() deliberately wins over this old decode.
+                // The caller may still render its immutable snapshot, but it must not resurrect a
+                // cache entry after HOME released graphics or after a newer file was installed.
+                if (CACHE_EPOCH.isCurrent(generation) && file.isFile()
+                        && file.lastModified() == modified) {
+                    CACHE.put(key, new Cached(modified, value));
+                }
+            }
         }
         return value;
     }
@@ -92,7 +107,18 @@ final class NavigationGraphicStore {
     /** Drops the decoded ARGB copy while retaining the bounded on-disk file for atomic replace. */
     static void evict(@NonNull Context context, @NonNull String slot) {
         File file = file(context, slot);
-        synchronized (CACHE) { CACHE.remove(file.getAbsolutePath()); }
+        synchronized (CACHE) {
+            CACHE_EPOCH.invalidate();
+            CACHE.remove(file.getAbsolutePath());
+        }
+    }
+
+    /** Drops only decoded copies; bounded on-disk graphics remain available for the next HOME. */
+    static void evictAll() {
+        synchronized (CACHE) {
+            CACHE_EPOCH.invalidate();
+            CACHE.clear();
+        }
     }
 
     static void clear(@NonNull Context context, @NonNull String slot) {
@@ -152,7 +178,10 @@ final class NavigationGraphicStore {
         }
         //noinspection ResultOfMethodCallIgnored
         backup.delete();
-        synchronized (CACHE) { CACHE.remove(target.getAbsolutePath()); }
+        synchronized (CACHE) {
+            CACHE_EPOCH.invalidate();
+            CACHE.remove(target.getAbsolutePath());
+        }
         return true;
     }
 

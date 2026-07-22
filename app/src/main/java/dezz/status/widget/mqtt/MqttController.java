@@ -60,6 +60,8 @@ public final class MqttController implements MqttClient.Listener {
     private final HaBrickConfigStore mainConfigs;
     private final PopupItemConfigStore popupConfigs;
     private final StateListener listener;
+    private volatile List<HaBrickConfig> configuredMain = Collections.emptyList();
+    private volatile List<PopupItemConfig> configuredPopup = Collections.emptyList();
     @Nullable private MqttClient client;
     @Nullable private PowerManager.WakeLock wakeLock;
     @Nullable private WifiManager.WifiLock wifiLock;
@@ -84,6 +86,8 @@ public final class MqttController implements MqttClient.Listener {
 
     /** Idempotently applies the latest settings; changed credentials restart only MQTT. */
     public synchronized void reconfigure() {
+        configuredMain = mainConfigs.loadMain();
+        configuredPopup = popupConfigs.load();
         String nextSignature = settingsSignature();
         if (Objects.equals(signature, nextSignature) && client != null) {
             // Brick configuration is intentionally not part of the transport signature. Re-map
@@ -123,7 +127,10 @@ public final class MqttController implements MqttClient.Listener {
             if (prefs.mqttKeepAwake.get()) acquireLocks();
             client.start();
         } catch (RuntimeException e) {
+            MqttClient failed = client;
             client = null;
+            if (failed != null) failed.stop();
+            releaseLocks();
             lastConnected = false;
             lastConnectionDetail = "configuration error: " + e.getMessage();
             listener.onConnectionChanged(false, lastConnectionDetail);
@@ -141,11 +148,11 @@ public final class MqttController implements MqttClient.Listener {
 
     /** Re-evaluates only display rule sets that explicitly read another connector. */
     public synchronized void reapplyCrossSourceBindings() {
-        for (HaBrickConfig item : mainConfigs.loadMain()) {
+        for (HaBrickConfig item : configuredMain) {
             if (item.displayRules == null || item.displayRules.usesOwnSource()) continue;
             reapplyMain(item);
         }
-        for (PopupItemConfig item : popupConfigs.load()) {
+        for (PopupItemConfig item : configuredPopup) {
             if (item.displayRules == null || item.displayRules.usesOwnSource()) continue;
             reapplyPopup(item);
         }
@@ -153,12 +160,14 @@ public final class MqttController implements MqttClient.Listener {
 
     /** Re-renders popup presentation from retained values already held in memory. */
     public synchronized void reapplyPopupBindings() {
-        for (PopupItemConfig item : popupConfigs.load()) reapplyPopup(item);
+        configuredPopup = popupConfigs.load();
+        for (PopupItemConfig item : configuredPopup) reapplyPopup(item);
     }
 
     /** Main-row counterpart of {@link #reapplyPopupBindings()}. */
     public synchronized void reapplyMainBindings() {
-        for (HaBrickConfig item : mainConfigs.loadMain()) reapplyMain(item);
+        configuredMain = mainConfigs.loadMain();
+        for (HaBrickConfig item : configuredMain) reapplyMain(item);
     }
 
     /** Publishes the binding's exact payload to an explicit topic or legacy command id. */
@@ -256,6 +265,7 @@ public final class MqttController implements MqttClient.Listener {
         lastConnectionDetail = prefs.mqttEnabled.get() ? "disconnected" : "disabled";
         values.markConnectorStale(ConnectorType.MQTT, SourceBinding.DEFAULT_CONNECTOR_ID);
         markObservedStatesStale();
+        observedStateKeys.clear();
         releaseLocks();
     }
 
@@ -340,12 +350,12 @@ public final class MqttController implements MqttClient.Listener {
     }
 
     private void applyBindingsForResource(String topic, String scope, String id) {
-        for (HaBrickConfig item : mainConfigs.loadMain()) {
+        for (HaBrickConfig item : configuredMain) {
             if (!matches(item.sourceBinding, topic, scope, id)) continue;
             applyMapped(AutomationContract.SCOPE_MAIN, item.id, item.sourceBinding,
                     item.displayRules, item.actionBinding != null && item.actionBinding.isBound());
         }
-        for (PopupItemConfig item : popupConfigs.load()) {
+        for (PopupItemConfig item : configuredPopup) {
             if (!matches(item.sourceBinding, topic, scope, id)) continue;
             applyMapped(AutomationContract.SCOPE_POPUP, item.automationId, item.sourceBinding,
                     item.displayRules, item.actionBinding != null && item.actionBinding.isBound());
@@ -354,10 +364,10 @@ public final class MqttController implements MqttClient.Listener {
 
     /** Reprojects every configured MQTT target from the in-process retained-value registry. */
     private void applyAllBindingsFromRegistry() {
-        for (HaBrickConfig item : mainConfigs.loadMain()) {
+        for (HaBrickConfig item : configuredMain) {
             reapplyMain(item);
         }
-        for (PopupItemConfig item : popupConfigs.load()) {
+        for (PopupItemConfig item : configuredPopup) {
             reapplyPopup(item);
         }
     }
@@ -387,12 +397,12 @@ public final class MqttController implements MqttClient.Listener {
     private void clearBoundTargets(String topic, String scope, String id, JSONObject clear)
             throws JSONException {
         LinkedHashSet<String> targets = new LinkedHashSet<>();
-        for (HaBrickConfig item : mainConfigs.loadMain()) {
+        for (HaBrickConfig item : configuredMain) {
             if (matches(item.sourceBinding, topic, scope, id)) {
                 targets.add(AutomationContract.SCOPE_MAIN + "|" + item.id);
             }
         }
-        for (PopupItemConfig item : popupConfigs.load()) {
+        for (PopupItemConfig item : configuredPopup) {
             if (matches(item.sourceBinding, topic, scope, id)) {
                 targets.add(AutomationContract.SCOPE_POPUP + "|" + item.automationId);
             }

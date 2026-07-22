@@ -8,6 +8,7 @@ package dezz.status.widget.launcher;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Process;
 
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -66,8 +67,11 @@ public final class YandexNavigationReceiver extends BroadcastReceiver {
     private static ThreadPoolExecutor createWorker() {
         ThreadPoolExecutor result = new ThreadPoolExecutor(1, 1, 30L, TimeUnit.SECONDS,
                 new ArrayBlockingQueue<>(MAX_PENDING_BROADCASTS), runnable -> {
-                    Thread thread = new Thread(runnable, "navigation-broadcast-worker");
-                    thread.setPriority(Thread.NORM_PRIORITY - 1);
+                    Thread thread = new Thread(() -> {
+                        try { Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND); }
+                        catch (RuntimeException ignored) { }
+                        runnable.run();
+                    }, "navigation-broadcast-worker");
                     thread.setDaemon(true);
                     return thread;
                 });

@@ -46,6 +46,12 @@ public final class PopupOverlayManager {
     public synchronized void applyPreferences() {
         if (destroyed) return;
         List<PopupOverlayConfig> configs = overlayConfigs.load();
+        List<PopupItemConfig> allItems = itemConfigs.load();
+        Map<String, List<PopupItemConfig>> itemsByOverlay = new LinkedHashMap<>();
+        for (PopupItemConfig item : allItems) {
+            itemsByOverlay.computeIfAbsent(item.overlayId,
+                    ignored -> new java.util.ArrayList<>()).add(item);
+        }
         Set<String> configuredIds = new LinkedHashSet<>();
         for (PopupOverlayConfig config : configs) {
             configuredIds.add(config.id);
@@ -55,9 +61,11 @@ public final class PopupOverlayManager {
                         builtinProvider, config.id, overlayConfigs);
                 controllers.put(config.id, controller);
             }
-            controller.applyPreferences();
+            List<PopupItemConfig> items = itemsByOverlay.get(config.id);
+            controller.applyPreferences(config, items == null
+                    ? java.util.Collections.emptyList() : items);
         }
-        rebuildStateOwners(configuredIds);
+        rebuildStateOwners(configuredIds, allItems);
         Iterator<Map.Entry<String, PopupOverlayController>> iterator =
                 controllers.entrySet().iterator();
         while (iterator.hasNext()) {
@@ -83,9 +91,9 @@ public final class PopupOverlayManager {
         }
     }
 
-    private void rebuildStateOwners(Set<String> configuredIds) {
+    private void rebuildStateOwners(Set<String> configuredIds, List<PopupItemConfig> items) {
         stateOwners.clear();
-        for (PopupItemConfig item : itemConfigs.load()) {
+        for (PopupItemConfig item : items) {
             if (!configuredIds.contains(item.overlayId)) continue;
             String scope = PopupItemConfig.TYPE_BUILTIN.equals(item.type)
                     ? AutomationContract.SCOPE_BUILTIN : AutomationContract.SCOPE_POPUP;

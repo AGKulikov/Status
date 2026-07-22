@@ -297,6 +297,11 @@ public final class NavigationDataRepository {
 
     private NavigationDataRepository() {}
 
+    /** Releases decoded route graphics while retaining the latest crash-safe disk snapshot. */
+    public static void trimGraphicMemoryCache() {
+        NavigationGraphicStore.evictAll();
+    }
+
     public static boolean isSupportedPackage(@Nullable String packageName) {
         return PACKAGE_YANDEX_MAPS.equals(packageName)
                 || PACKAGE_YANDEX_NAVIGATOR.equals(packageName)

@@ -30,6 +30,7 @@ import org.json.JSONObject;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -46,6 +47,7 @@ import dezz.status.widget.integration.ActionDispatcher;
 /** Independent fixed-pixel, draggable, touchable popup grid controlled by retained HA state. */
 public final class PopupOverlayController {
     private static final long ACTION_DEBOUNCE_MS = 750L;
+    private static final long STATE_REFRESH_DEBOUNCE_MS = 50L;
 
     public interface BuiltinProvider {
         @Nullable BuiltinValue getBuiltinValue(@NonNull String automationId);
@@ -82,6 +84,17 @@ public final class PopupOverlayController {
     /** Prevent connector updates from replacing the touched View between DOWN and UP. */
     private boolean touchInProgress;
     private boolean refreshDeferred;
+    private List<PopupItemConfig> currentItems = Collections.emptyList();
+    private final Runnable stateRefresh = () -> {
+        if (destroyed || currentConfig == null || !currentConfig.enabled) return;
+        if (touchInProgress) {
+            refreshDeferred = true;
+            return;
+        }
+        ensureView();
+        updateWindowGeometry();
+        renderItems();
+    };
 
     private FrameLayout root;
     private WindowManager.LayoutParams params;
@@ -131,8 +144,35 @@ public final class PopupOverlayController {
             refreshDeferred = true;
             return;
         }
+        main.removeCallbacks(stateRefresh);
         currentConfig = overlayConfigs.find(overlayId);
         if (currentConfig == null || !currentConfig.enabled) {
+            currentItems = Collections.emptyList();
+            setOverlayVisible(false);
+            return;
+        }
+        currentItems = configs.load(overlayId);
+        ensureView();
+        updateWindowGeometry();
+        renderItems();
+    }
+
+    /** Applies a manager-owned snapshot so N overlays require only one JSON parse per refresh. */
+    public void applyPreferences(@NonNull PopupOverlayConfig config,
+                                 @NonNull List<PopupItemConfig> items) {
+        if (destroyed) return;
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            main.post(() -> applyPreferences(config, items));
+            return;
+        }
+        main.removeCallbacks(stateRefresh);
+        currentConfig = config;
+        currentItems = new java.util.ArrayList<>(items);
+        if (touchInProgress) {
+            refreshDeferred = true;
+            return;
+        }
+        if (!config.enabled) {
             setOverlayVisible(false);
             return;
         }
@@ -144,7 +184,12 @@ public final class PopupOverlayController {
     public void onStateChanged(String scope) {
         if (AutomationContract.SCOPE_POPUP.equals(scope)
                 || AutomationContract.SCOPE_OVERLAY.equals(scope)
-                || AutomationContract.SCOPE_BUILTIN.equals(scope)) applyPreferences();
+                || AutomationContract.SCOPE_BUILTIN.equals(scope)) {
+            // Initial connector snapshots can update dozens of tiles in one burst. Rebuild this
+            // overlay once after the burst and reuse its already-parsed item configuration.
+            main.removeCallbacks(stateRefresh);
+            main.postDelayed(stateRefresh, STATE_REFRESH_DEBOUNCE_MS);
+        }
     }
 
     public void destroy() {
@@ -153,6 +198,7 @@ public final class PopupOverlayController {
         lastActionAtByItem.clear();
         touchInProgress = false;
         refreshDeferred = false;
+        currentItems = Collections.emptyList();
         main.removeCallbacksAndMessages(null);
         if (root != null) {
             try { windowManager.removeView(root); } catch (Exception ignored) {}
@@ -241,8 +287,7 @@ public final class PopupOverlayController {
         int visibleCount = 0;
         long now = System.currentTimeMillis();
 
-        List<PopupItemConfig> items = configs.load(overlayId);
-        for (PopupItemConfig item : items) {
+        for (PopupItemConfig item : currentItems) {
             if (!item.enabled) continue;
             String stateScope = PopupItemConfig.TYPE_BUILTIN.equals(item.type)
                     ? AutomationContract.SCOPE_BUILTIN : AutomationContract.SCOPE_POPUP;

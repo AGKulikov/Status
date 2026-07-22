@@ -75,7 +75,7 @@ public final class AutomationStateStore {
         validatePatch(patch);
         String storageKey = key(scope, id);
         if (patch.optBoolean("clear", false)) {
-            prefs.edit().remove(storageKey).commit();
+            prefs.edit().remove(storageKey).apply();
             return AutomationState.missing();
         }
 
@@ -110,9 +110,11 @@ public final class AutomationStateStore {
                 : merged.optBoolean("visible", true));
         merged.put("schema", AutomationContract.SCHEMA_VERSION);
 
-        // Synchronous persistence is intentional: a car head unit can cut power immediately after
-        // receiving an update and the next boot still needs the last effective state.
-        prefs.edit().putString(storageKey, merged.toString()).commit();
+        // SharedPreferences updates memory synchronously; disk persistence is queued. Blocking a
+        // connector callback on a whole-file fsync for every temperature/progress packet caused
+        // backlogs on low-end head units. HA/MQTT/Sprut restore an authoritative snapshot after
+        // restart, so the tiny last-write power-loss window is preferable to runtime stalls.
+        prefs.edit().putString(storageKey, merged.toString()).apply();
         return AutomationState.fromJson(merged);
     }
 
@@ -167,9 +169,9 @@ public final class AutomationStateStore {
         try {
             JSONObject state = new JSONObject(previous);
             state.put("fresh", false);
-            prefs.edit().putString(storageKey, state.toString()).commit();
+            prefs.edit().putString(storageKey, state.toString()).apply();
         } catch (JSONException ignored) {
-            prefs.edit().remove(storageKey).commit();
+            prefs.edit().remove(storageKey).apply();
         }
     }
 
@@ -188,7 +190,10 @@ public final class AutomationStateStore {
                 editor.remove(entry.getKey());
             }
         }
-        editor.commit();
+        // The in-memory SharedPreferences snapshot changes immediately with apply(). Persisting a
+        // boot-session freshness barrier does not need to block the UI thread on an fsync; every
+        // new process establishes the same barrier again before accepting connector snapshots.
+        editor.apply();
     }
 
     /** Snapshot for an explicitly addressed local integration helper; never contains config. */

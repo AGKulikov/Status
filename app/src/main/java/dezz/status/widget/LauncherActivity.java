@@ -6,6 +6,7 @@
 package dezz.status.widget;
 
 import android.content.BroadcastReceiver;
+import android.content.ComponentCallbacks2;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -21,6 +22,9 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Process;
+import android.os.SystemClock;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -41,6 +45,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
@@ -54,6 +59,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 import dezz.status.widget.launcher.CombinedNavigationPanelPolicy;
 import dezz.status.widget.launcher.LauncherElementFrame;
@@ -63,6 +73,7 @@ import dezz.status.widget.launcher.LauncherMediaController;
 import dezz.status.widget.launcher.LauncherIconResolver;
 import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.launcher.NavigationDataRepository;
+import dezz.status.widget.launcher.SingleFlightRefresh;
 import dezz.status.widget.launcher.YandexWindowLauncher;
 import dezz.status.widget.launcher.apps.FavoriteAppConfig;
 import dezz.status.widget.launcher.apps.FavoriteAppsConfigStore;
@@ -87,11 +98,27 @@ import dezz.status.widget.scenario.IntentActionRuleStore;
 
 /** Full HOME implementation that coexists with the original Status Widget settings activity. */
 public final class LauncherActivity extends AppCompatActivity {
+    private static final String TAG = "LauncherActivity";
     public static final String EXTRA_EDIT_MODE = "dezz.status.widget.extra.EDIT_HOME";
     private static final long NAVIGATION_UI_REFRESH_MS = 30_000L;
-    private static final long NAVIGATION_DYNAMIC_REFRESH_MS = 1_000L;
+    private static final long NAVIGATION_DYNAMIC_REFRESH_MS = 5_000L;
+    private static final long APP_CATALOG_REFRESH_MS = 10L * 60L * 1_000L;
+    /** Gives the foreground WidgetService a chance to attach the status row before HOME work. */
+    private static final long PANEL_INITIALIZATION_GRACE_MS = 200L;
+    /** At most one optional panel is inflated in a display frame. */
+    private static final long PANEL_INITIALIZATION_STAGE_MS = 16L;
     private final Map<String, LauncherElementFrame> panels = new HashMap<>();
     private final Handler navigationUiHandler = new Handler(Looper.getMainLooper());
+    private final ExecutorService launcherWorker = Executors.newFixedThreadPool(2, runnable -> {
+        Thread thread = new Thread(() -> {
+            try { Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND); }
+            catch (RuntimeException ignored) { }
+            runnable.run();
+        }, "launcher-worker");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final SingleFlightRefresh navigationRefresh = new SingleFlightRefresh();
     private final Runnable navigationUiRefresh = new Runnable() {
         @Override public void run() {
             updateNavigation();
@@ -116,6 +143,10 @@ public final class LauncherActivity extends AppCompatActivity {
     private MaterialButton doneButton;
     private boolean editMode;
     private boolean panelsInitialized;
+    private boolean panelsInitializing;
+    private boolean panelInitializationAllowed;
+    private int panelInitializationStage;
+    private boolean navigationReceiverRegistered;
     private boolean navigationDynamicRefresh;
     private boolean navigationLiveContentAvailable;
     @Nullable private View navigationRouteContent;
@@ -145,6 +176,8 @@ public final class LauncherActivity extends AppCompatActivity {
             YandexWindowLauncher.Product.NAVIGATOR;
     private GridView favoritesGrid;
     private AppCatalog appCatalog;
+    private boolean appCatalogLoadInFlight;
+    private long lastAppCatalogLoadElapsed;
     private LauncherShortcutStore shortcutStore;
     private GridLayout shortcutGrid;
     private ScrollView shortcutScroll;
@@ -171,6 +204,11 @@ public final class LauncherActivity extends AppCompatActivity {
             if (binding.shortcut.target.equals(state.controlId)) applyCarState(binding, state);
         }
     };
+    private final Runnable allowPanelInitialization = () -> {
+        panelInitializationAllowed = true;
+        initializePanels();
+    };
+    private final Runnable panelInitializationStep = this::continuePanelInitialization;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -184,7 +222,18 @@ public final class LauncherActivity extends AppCompatActivity {
         vehicleInfoConfigStore = new VehicleInfoPanelConfigStore(preferences);
         configureWindow();
         setContentView(buildRoot());
-        workspace.post(this::initializePanels);
+        workspace.addOnLayoutChangeListener((view, left, top, right, bottom,
+                oldLeft, oldTop, oldRight, oldBottom) -> {
+            if (panelInitializationAllowed && !panelsInitialized && !panelsInitializing
+                    && right > left && bottom > top) {
+                initializePanels();
+            }
+        });
+        // HA1048 inflated every new panel before the service could draw the status row. On this
+        // shared main Looper that made both HOME and the row look dead. Delay briefly, then spread
+        // optional panel inflation across frames.
+        navigationUiHandler.postDelayed(allowPanelInitialization,
+                PANEL_INITIALIZATION_GRACE_MS);
     }
 
     @Override
@@ -200,9 +249,22 @@ public final class LauncherActivity extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
         activityStarted = true;
-        registerReceiver(navigationReceiver,
-                new IntentFilter(NavigationDataRepository.ACTION_UPDATED));
-        if (mediaController != null) mediaController.start();
+        if (!panelsInitialized) {
+            navigationUiHandler.removeCallbacks(allowPanelInitialization);
+            navigationUiHandler.removeCallbacks(panelInitializationStep);
+            if (!panelInitializationAllowed) {
+                navigationUiHandler.postDelayed(allowPanelInitialization,
+                        PANEL_INITIALIZATION_GRACE_MS);
+            } else if (panelsInitializing) {
+                navigationUiHandler.post(panelInitializationStep);
+            } else {
+                initializePanels();
+            }
+        }
+        registerNavigationReceiver();
+        WidgetServiceStarter.startIfNeeded(this);
+        reconcileMediaController();
+        if (panelsInitialized) refreshFavorites();
         updateNavigation();
         scheduleNavigationRefresh();
         resubscribeCarControls();
@@ -218,13 +280,39 @@ public final class LauncherActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         activityStarted = false;
+        // Never inflate optional panels behind another foreground application.
+        navigationUiHandler.removeCallbacks(allowPanelInitialization);
+        navigationUiHandler.removeCallbacks(panelInitializationStep);
         navigationUiHandler.removeCallbacks(navigationUiRefresh);
         if (climatePanel != null) climatePanel.stop();
         if (vehicleInfoPanel != null) vehicleInfoPanel.stop();
         if (carIntegration != null) carIntegration.unsubscribeControlStates(carStateListener);
         if (mediaController != null) mediaController.stop();
-        try { unregisterReceiver(navigationReceiver); } catch (IllegalArgumentException ignored) {}
+        releaseNavigationGraphics();
+        unregisterNavigationReceiver();
         super.onStop();
+    }
+
+    @Override
+    protected void onDestroy() {
+        navigationUiHandler.removeCallbacksAndMessages(null);
+        navigationRefresh.cancel();
+        launcherWorker.shutdownNow();
+        super.onDestroy();
+    }
+
+    @Override
+    public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (appCatalog != null && level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+            appCatalog.clearIcons();
+        }
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
+            // GridView children retain their Drawable even after the catalog cache is cleared.
+            // Drop the off-screen adapter; onStart rebuilds only the small favorite set.
+            if (favoritesGrid != null) favoritesGrid.setAdapter(null);
+            releaseNavigationGraphics();
+        }
     }
 
     @Override
@@ -236,13 +324,75 @@ public final class LauncherActivity extends AppCompatActivity {
             getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         }
         applyLauncherPreferences();
-        if (appCatalog != null) {
-            appCatalog.reload();
-            refreshFavorites();
-        }
+        if (appCatalog != null) reloadAppCatalogAsync(false);
         if (shortcutStore != null) {
             shortcutStore.load();
             refreshShortcutGrid();
+        }
+    }
+
+    private void registerNavigationReceiver() {
+        if (navigationReceiverRegistered) return;
+        try {
+            ContextCompat.registerReceiver(this, navigationReceiver,
+                    new IntentFilter(NavigationDataRepository.ACTION_UPDATED),
+                    ContextCompat.RECEIVER_NOT_EXPORTED);
+            navigationReceiverRegistered = true;
+        } catch (RuntimeException failure) {
+            // A vendor Context implementation must not take down HOME and WidgetService merely
+            // because one optional live-update receiver could not be registered.
+            navigationReceiverRegistered = false;
+            Log.e(TAG, "Could not register navigation refresh receiver", failure);
+        }
+    }
+
+    private void unregisterNavigationReceiver() {
+        if (!navigationReceiverRegistered) return;
+        navigationReceiverRegistered = false;
+        try { unregisterReceiver(navigationReceiver); }
+        catch (RuntimeException failure) {
+            Log.w(TAG, "Navigation receiver was already removed", failure);
+        }
+    }
+
+    private void reconcileMediaController() {
+        if (mediaController == null) return;
+        boolean needed = activityStarted && preferences.launcherMediaVisible.get()
+                && hasMediaPanelContent();
+        if (needed) mediaController.start(); else mediaController.stop();
+    }
+
+    private void reloadAppCatalogAsync(boolean force) {
+        if (appCatalogLoadInFlight || launcherWorker.isShutdown()) return;
+        if (!preferences.launcherAppsVisible.get() && !editMode) return;
+        long now = SystemClock.elapsedRealtime();
+        if (!force && now - lastAppCatalogLoadElapsed < APP_CATALOG_REFRESH_MS) return;
+        appCatalogLoadInFlight = true;
+        try {
+            launcherWorker.execute(() -> {
+                AppCatalog loaded = new AppCatalog(getApplicationContext());
+                RuntimeException error = null;
+                try { loaded.reload(); }
+                catch (RuntimeException failure) { error = failure; }
+                RuntimeException finalError = error;
+                navigationUiHandler.post(() -> {
+                    appCatalogLoadInFlight = false;
+                    if (isDestroyed() || isFinishing()) return;
+                    if (!activityStarted) {
+                        loaded.clearIcons();
+                        return;
+                    }
+                    if (finalError != null) {
+                        Log.e(TAG, "Application catalog refresh failed", finalError);
+                        return;
+                    }
+                    appCatalog = loaded;
+                    lastAppCatalogLoadElapsed = SystemClock.elapsedRealtime();
+                    refreshFavorites();
+                });
+            });
+        } catch (RejectedExecutionException failure) {
+            appCatalogLoadInFlight = false;
         }
     }
 
@@ -252,8 +402,11 @@ public final class LauncherActivity extends AppCompatActivity {
         if (root != null) root.setBackground(buildBackground());
         setPanelVisibility(LauncherLayoutStore.APPS, preferences.launcherAppsVisible.get()
                 && hasSimplePanelContent(LauncherLayoutStore.APPS));
+        if (preferences.launcherAppsVisible.get() && appCatalog != null
+                && appCatalog.isEmpty()) reloadAppCatalogAsync(true);
         setPanelVisibility(LauncherLayoutStore.MEDIA, preferences.launcherMediaVisible.get()
                 && hasMediaPanelContent());
+        reconcileMediaController();
         setPanelVisibility(LauncherLayoutStore.CLOCK, preferences.launcherClockVisible.get()
                 && hasSimplePanelContent(LauncherLayoutStore.CLOCK));
         if (favoriteRoutesPanel != null) {
@@ -416,61 +569,116 @@ public final class LauncherActivity extends AppCompatActivity {
     }
 
     private void initializePanels() {
-        if (panelsInitialized || workspace.getWidth() <= 0 || workspace.getHeight() <= 0) return;
-        panelsInitialized = true;
-        layoutStore.load(workspace.getWidth(), workspace.getHeight());
-        migrateLegacyNavigationPanel();
-        appCatalog = new AppCatalog(this);
-        appCatalog.reload();
+        if (!panelInitializationAllowed || panelsInitialized || panelsInitializing
+                || workspace.getWidth() <= 0 || workspace.getHeight() <= 0) return;
+        panelsInitializing = true;
+        try {
+            layoutStore.load(workspace.getWidth(), workspace.getHeight());
+            migrateLegacyNavigationPanel();
+        } catch (RuntimeException failure) {
+            panelsInitializing = false;
+            Log.e(TAG, "HOME geometry could not be loaded; retrying", failure);
+            navigationUiHandler.postDelayed(this::initializePanels, 500L);
+            return;
+        }
+        // Build the first HOME frame with an empty catalog. PackageManager queries and icon loads
+        // run on a worker, then atomically swap the completed catalog onto the UI thread.
+        appCatalog = new AppCatalog(getApplicationContext());
         shortcutStore = new LauncherShortcutStore(preferences);
+        panelInitializationStage = 0;
+        continuePanelInitialization();
+    }
 
-        addPanel(LauncherLayoutStore.APPS, "Приложения", buildAppsPanel(),
-                preferences.launcherAppsVisible.get()
-                        && hasSimplePanelContent(LauncherLayoutStore.APPS));
-        addPanel(LauncherLayoutStore.MEDIA, "Медиа", buildMediaPanel(),
-                preferences.launcherMediaVisible.get() && hasMediaPanelContent());
-        LauncherElementFrame mediaFrame = panels.get(LauncherLayoutStore.MEDIA);
-        if (mediaFrame != null) {
-            mediaFrame.setCardBackgroundColor(Color.TRANSPARENT);
-            mediaFrame.setCardElevation(0);
+    private void continuePanelInitialization() {
+        if (!panelsInitializing || panelsInitialized || isFinishing() || isDestroyed()) return;
+        try {
+            switch (panelInitializationStage) {
+                case 0:
+                    addPanelSafely(LauncherLayoutStore.APPS, "Приложения", this::buildAppsPanel,
+                            () -> preferences.launcherAppsVisible.get()
+                                    && hasSimplePanelContent(LauncherLayoutStore.APPS));
+                    break;
+                case 1:
+                    addPanelSafely(LauncherLayoutStore.MEDIA, "Медиа", this::buildMediaPanel,
+                            () -> preferences.launcherMediaVisible.get()
+                                    && hasMediaPanelContent());
+                    makePanelTransparent(LauncherLayoutStore.MEDIA);
+                    break;
+                case 2:
+                    addPanelSafely(LauncherLayoutStore.CLOCK, "Часы", this::buildClockPanel,
+                            () -> preferences.launcherClockVisible.get()
+                                    && hasSimplePanelContent(LauncherLayoutStore.CLOCK));
+                    break;
+                case 3:
+                    addPanelSafely(LauncherLayoutStore.NAVIGATION, "Маршрут и избранное",
+                            this::buildCombinedNavigationPanel,
+                            this::isCombinedNavigationFrameVisible);
+                    break;
+                case 4:
+                    addPanelSafely(LauncherLayoutStore.ACTIONS, "Действия",
+                            this::buildActionsPanel,
+                            () -> preferences.launcherActionsVisible.get()
+                                    && hasSimplePanelContent(LauncherLayoutStore.ACTIONS));
+                    break;
+                case 5:
+                    addPanelSafely(LauncherLayoutStore.CLIMATE, "Климат",
+                            this::buildClimatePanel,
+                            () -> preferences.launcherClimateVisible.get()
+                                    && hasClimatePanelContent());
+                    makePanelTransparent(LauncherLayoutStore.CLIMATE);
+                    break;
+                case 6:
+                    addPanelSafely(LauncherLayoutStore.VEHICLE_INFO, "Данные автомобиля",
+                            this::buildVehicleInfoPanel,
+                            preferences.launcherVehicleInfoVisible::get);
+                    makePanelTransparent(LauncherLayoutStore.VEHICLE_INFO);
+                    LauncherElementFrame vehicleFrame = panels.get(
+                            LauncherLayoutStore.VEHICLE_INFO);
+                    if (vehicleFrame != null) {
+                        vehicleFrame.setVisibility(preferences.launcherVehicleInfoVisible.get()
+                                && vehicleInfoPanel != null
+                                && vehicleInfoPanel.hasDisplayableSample()
+                                ? View.VISIBLE : View.GONE);
+                    }
+                    break;
+                default:
+                    finishPanelInitialization();
+                    return;
+            }
+        } catch (RuntimeException | LinkageError failure) {
+            // addPanelSafely already isolates normal panel failures. This outer guard also covers
+            // optional post-build styling supplied by vendor libraries.
+            Log.e(TAG, "HOME panel stage " + panelInitializationStage + " failed", failure);
         }
-        addPanel(LauncherLayoutStore.CLOCK, "Часы", buildClockPanel(),
-                preferences.launcherClockVisible.get()
-                        && hasSimplePanelContent(LauncherLayoutStore.CLOCK));
-        addPanel(LauncherLayoutStore.NAVIGATION, "Маршрут и избранное",
-                buildCombinedNavigationPanel(), isCombinedNavigationFrameVisible());
-        addPanel(LauncherLayoutStore.ACTIONS, "Действия", buildActionsPanel(),
-                preferences.launcherActionsVisible.get()
-                        && hasSimplePanelContent(LauncherLayoutStore.ACTIONS));
-        addPanel(LauncherLayoutStore.CLIMATE, "Климат", buildClimatePanel(),
-                preferences.launcherClimateVisible.get() && hasClimatePanelContent());
-        LauncherElementFrame climateFrame = panels.get(LauncherLayoutStore.CLIMATE);
-        if (climateFrame != null) {
-            climateFrame.setCardBackgroundColor(Color.TRANSPARENT);
-            climateFrame.setCardElevation(0);
-        }
-        addPanel(LauncherLayoutStore.VEHICLE_INFO, "Данные автомобиля",
-                buildVehicleInfoPanel(), preferences.launcherVehicleInfoVisible.get());
-        LauncherElementFrame vehicleFrame = panels.get(LauncherLayoutStore.VEHICLE_INFO);
-        if (vehicleFrame != null) {
-            vehicleFrame.setCardBackgroundColor(Color.TRANSPARENT);
-            vehicleFrame.setCardElevation(0);
-            vehicleFrame.setVisibility(preferences.launcherVehicleInfoVisible.get()
-                    && vehicleInfoPanel.hasDisplayableSample() ? View.VISIBLE : View.GONE);
-        }
+        panelInitializationStage++;
+        navigationUiHandler.postDelayed(panelInitializationStep,
+                PANEL_INITIALIZATION_STAGE_MS);
+    }
+
+    private void makePanelTransparent(@NonNull String id) {
+        LauncherElementFrame frame = panels.get(id);
+        if (frame == null) return;
+        frame.setCardBackgroundColor(Color.TRANSPARENT);
+        frame.setCardElevation(0);
+    }
+
+    private void finishPanelInitialization() {
 
         mediaController = new LauncherMediaController(this, this::updateMedia);
+        panelsInitialized = true;
+        panelsInitializing = false;
         // initializePanels() is posted from onCreate. If the activity was stopped before that
         // callback runs, starting here would leave a MediaSession listener alive off-screen.
         // onStart() will start it normally when HOME becomes active again.
-        if (activityStarted && !isFinishing()) mediaController.start();
+        reconcileMediaController();
+        if (preferences.launcherAppsVisible.get()) reloadAppCatalogAsync(true);
         refreshFavorites();
         updateNavigation();
         scheduleNavigationRefresh();
         if (activityStarted && preferences.launcherClimateVisible.get()
-                && hasClimatePanelContent()) climatePanel.start();
+                && hasClimatePanelContent() && climatePanel != null) climatePanel.start();
         if (activityStarted && preferences.launcherVehicleInfoVisible.get()) {
-            vehicleInfoPanel.start();
+            if (vehicleInfoPanel != null) vehicleInfoPanel.start();
         }
         appliedPanelElementsJson = preferences.launcherPanelElementsJson.get();
         appliedAppsColumns = preferences.launcherAppsColumns.get();
@@ -564,6 +772,25 @@ public final class LauncherActivity extends AppCompatActivity {
         workspace.addView(frame, lp);
         frame.setVisibility(visible ? View.VISIBLE : View.GONE);
         panels.put(id, frame);
+    }
+
+    /** One optional integration must never crash HOME and the status service in the same process. */
+    private void addPanelSafely(@NonNull String id, @NonNull String label,
+            @NonNull Supplier<View> content, @NonNull BooleanSupplier visible) {
+        try {
+            addPanel(id, label, content.get(), visible.getAsBoolean());
+        } catch (RuntimeException | LinkageError failure) {
+            Log.e(TAG, "Could not build HOME panel " + id, failure);
+            if (panels.containsKey(id)) return;
+            TextView diagnostic = text(16f, Color.LTGRAY, false);
+            diagnostic.setGravity(Gravity.CENTER);
+            diagnostic.setText(label + " временно недоступен");
+            try {
+                addPanel(id, label, diagnostic, editMode);
+            } catch (RuntimeException fallbackFailure) {
+                Log.e(TAG, "Could not add fallback HOME panel " + id, fallbackFailure);
+            }
+        }
     }
 
     @NonNull
@@ -1094,8 +1321,51 @@ public final class LauncherActivity extends AppCompatActivity {
     }
 
     private void updateNavigation() {
+        // HA1048 regressed by doing this read before posted panel initialization. The repository
+        // parses several JSON values and may decode four navigation PNGs; doing so on the shared
+        // main Looper can freeze both HOME and the status row. Coalesce bursts on a worker.
+        if (!panelsInitialized || isFinishing() || isDestroyed()
+                || (!isCombinedNavigationEnabled() && !editMode)) return;
+        if (!navigationRefresh.request()) return;
+        submitNavigationRead();
+    }
+
+    private void submitNavigationRead() {
+        try {
+            launcherWorker.execute(() -> {
+                NavigationDataRepository.Snapshot state = null;
+                RuntimeException error = null;
+                try { state = NavigationDataRepository.read(getApplicationContext()); }
+                catch (RuntimeException failure) { error = failure; }
+                NavigationDataRepository.Snapshot completedState = state;
+                RuntimeException completedError = error;
+                navigationUiHandler.post(() -> {
+                    boolean runAgain = navigationRefresh.complete();
+                    if (activityStarted && !isDestroyed() && !isFinishing()
+                            && panelsInitialized) {
+                        if (completedError == null && completedState != null) {
+                            renderNavigation(completedState);
+                        } else if (completedError != null) {
+                            Log.e(TAG, "Navigation snapshot could not be read", completedError);
+                        }
+                    }
+                    if (runAgain && activityStarted && !launcherWorker.isShutdown()) {
+                        submitNavigationRead();
+                    } else if (!activityStarted) {
+                        navigationRefresh.cancel();
+                        // load() may have populated the static bitmap cache after onStop trimmed
+                        // it. With no drawable HOME, discard those references again.
+                        NavigationDataRepository.trimGraphicMemoryCache();
+                    }
+                });
+            });
+        } catch (RejectedExecutionException failure) {
+            navigationRefresh.cancel();
+        }
+    }
+
+    private void renderNavigation(@NonNull NavigationDataRepository.Snapshot state) {
         navigationDynamicRefresh = false;
-        NavigationDataRepository.Snapshot state = NavigationDataRepository.read(this);
         boolean showFavorites = CombinedNavigationPanelPolicy.showFavorites(
                 state.routeActive, favoriteRoutesAvailable);
         if (favoriteRoutesPanel != null) {
@@ -1264,7 +1534,8 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private void scheduleNavigationRefresh() {
         navigationUiHandler.removeCallbacks(navigationUiRefresh);
-        if (!activityStarted) return;
+        if (!activityStarted || !panelsInitialized
+                || (!isCombinedNavigationEnabled() && !editMode)) return;
         navigationUiHandler.postDelayed(navigationUiRefresh, navigationDynamicRefresh
                 ? NAVIGATION_DYNAMIC_REFRESH_MS : NAVIGATION_UI_REFRESH_MS);
     }
@@ -1279,6 +1550,19 @@ public final class LauncherActivity extends AppCompatActivity {
         if (view == null) return;
         view.setImageDrawable(null);
         view.setVisibility(View.GONE);
+    }
+
+    /** Releases multi-megabyte route bitmaps whenever HOME is no longer drawable. */
+    private void releaseNavigationGraphics() {
+        hideNavigationImage(navigationManeuverImage);
+        hideNavigationImage(navigationLanesImage);
+        hideNavigationImage(navigationJamImage);
+        hideNavigationImage(navigationRainbowImage);
+        if (navigationCombinedImage != null) {
+            navigationCombinedImage.setImageDrawable(null);
+            navigationCombinedImage.setVisibility(View.GONE);
+        }
+        NavigationDataRepository.trimGraphicMemoryCache();
     }
 
     private void addTrafficLightRow(String color, String countdown, String arrow, int position) {
@@ -1319,7 +1603,7 @@ public final class LauncherActivity extends AppCompatActivity {
         grid.setNumColumns(5);
         grid.setPadding(dp(16), dp(16), dp(16), dp(16));
         grid.setVerticalSpacing(dp(8));
-        AppAdapter adapter = new AppAdapter(appCatalog.all());
+        AppAdapter adapter = new AppAdapter(appCatalog.all(), false);
         grid.setAdapter(adapter);
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Все приложения · удержание добавляет в избранное")
@@ -1342,7 +1626,7 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private void refreshFavorites() {
         if (favoritesGrid != null && appCatalog != null) {
-            favoritesGrid.setAdapter(new AppAdapter(appCatalog.favorites()));
+            favoritesGrid.setAdapter(new AppAdapter(appCatalog.favorites(), true));
         }
     }
 
@@ -1401,14 +1685,27 @@ public final class LauncherActivity extends AppCompatActivity {
         final String label;
         final String packageName;
         final ComponentName component;
-        final Drawable icon;
+        @Nullable private volatile Drawable cachedIcon;
 
-        AppEntry(String label, String packageName, ComponentName component, Drawable icon) {
+        AppEntry(String label, String packageName, ComponentName component) {
             this.label = label;
             this.packageName = packageName;
             this.component = component;
-            this.icon = icon;
         }
+
+        Drawable icon(Context context, boolean cache) {
+            Drawable value = cache ? cachedIcon : null;
+            if (value != null) return value;
+            try {
+                value = context.getPackageManager().getActivityIcon(component);
+            } catch (PackageManager.NameNotFoundException ignored) {
+                value = context.getPackageManager().getDefaultActivityIcon();
+            }
+            if (cache) cachedIcon = value;
+            return value;
+        }
+
+        void clearIcon() { cachedIcon = null; }
     }
 
     private static final class ShortcutPlacement {
@@ -1445,7 +1742,14 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private final class AppAdapter extends BaseAdapter {
         private final List<AppEntry> values;
-        AppAdapter(List<AppEntry> values) { this.values = values; }
+        private final boolean cacheIcons;
+        private final Map<String, FavoriteAppConfig> appearances;
+        AppAdapter(List<AppEntry> values, boolean cacheIcons) {
+            this.values = values;
+            this.cacheIcons = cacheIcons;
+            // One JSON parse for this adapter instead of one full parse for every recycled cell.
+            this.appearances = favoriteAppsConfigStore.appearanceSnapshot();
+        }
         @Override public int getCount() { return values.size(); }
         @Override public AppEntry getItem(int position) { return values.get(position); }
         @Override public long getItemId(int position) { return position; }
@@ -1459,9 +1763,10 @@ public final class LauncherActivity extends AppCompatActivity {
             cell.setGravity(Gravity.CENTER);
             cell.setPadding(dp(4), dp(5), dp(4), dp(5));
             AppEntry entry = getItem(position);
-            FavoriteAppConfig appearance = favoriteAppsConfigStore.appearance(entry.packageName);
+            FavoriteAppConfig appearance = appearances.get(entry.packageName);
+            if (appearance == null) appearance = new FavoriteAppConfig(entry.packageName);
             ImageView icon = new ImageView(LauncherActivity.this);
-            icon.setImageDrawable(entry.icon);
+            icon.setImageDrawable(entry.icon(LauncherActivity.this, cacheIcons));
             icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
             // iconSizePx is intentionally stored in physical pixels for head-unit layouts.
             int iconSize = Math.max(24,
@@ -1497,13 +1802,22 @@ public final class LauncherActivity extends AppCompatActivity {
                         info.activityInfo.name);
                 if (!components.add(component.flattenToString())) continue;
                 apps.add(new AppEntry(String.valueOf(info.loadLabel(manager)),
-                        info.activityInfo.packageName, component, info.loadIcon(manager)));
+                        info.activityInfo.packageName, component));
             }
             apps.sort(Comparator.comparing(value -> value.label.toLowerCase(Locale.ROOT)));
             ensureDefaultFavorites();
+            // Preload only the handful of icons shown on HOME. The full application list keeps
+            // lazy icons so dozens of adaptive drawables do not remain resident permanently.
+            for (AppEntry favorite : favorites()) favorite.icon(context, true);
         }
 
         List<AppEntry> all() { return new ArrayList<>(apps); }
+
+        boolean isEmpty() { return apps.isEmpty(); }
+
+        void clearIcons() {
+            for (AppEntry app : apps) app.clearIcon();
+        }
 
         List<AppEntry> favorites() {
             Set<String> wanted = favoritePackages();
