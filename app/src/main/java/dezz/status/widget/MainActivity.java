@@ -68,6 +68,8 @@ import java.util.List;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.automation.AutomationStateStore;
+import dezz.status.widget.climate.ClimatePanelService;
+import dezz.status.widget.climate.ScreenReservationStateStore;
 import dezz.status.widget.databinding.ActivityMainBinding;
 import dezz.status.widget.shell.PrivilegedShell;
 
@@ -145,6 +147,14 @@ public class MainActivity extends AppCompatActivity {
 
         if (prefs.widgetEnabled.get() && Permissions.allPermissionsGranted(this)) {
             startWidgetService();
+        }
+
+        // A screen reservation is global WindowManager state, not process-local UI. Reconcile it
+        // whenever the application is opened, even if normal preferences were cleared after a
+        // crash/force-stop. The dedicated journal lets the service restore the exact old inset.
+        if (prefs.climatePanelEnabled.get()
+                || new ScreenReservationStateStore(this).hasManagedReservation()) {
+            ClimatePanelService.apply(this);
         }
 
         maybeShowCrashReport();
@@ -381,6 +391,9 @@ public class MainActivity extends AppCompatActivity {
         if (prefs.widgetEnabled.get() && Permissions.allPermissionsGranted(this)) {
             startForegroundService(new Intent(this, WidgetService.class));
         }
+        // Import may switch between reserved/compact/off. Always reconcile so an imported
+        // disabled state also restores any reservation from the previous configuration.
+        ClimatePanelService.apply(this);
         recreate();
     }
 
@@ -723,6 +736,13 @@ public class MainActivity extends AppCompatActivity {
     private void resetAllSettings() {
         if (WidgetService.isRunning()) {
             stopService(new Intent(this, WidgetService.class));
+        }
+        boolean climateNeedsCleanup = prefs.climatePanelEnabled.get()
+                || new ScreenReservationStateStore(this).hasManagedReservation();
+        if (climateNeedsCleanup) {
+            // Queue an explicit exact restore before clearing ordinary preferences. Recovery data
+            // is held in a separate crash-safe journal and therefore remains available here.
+            ClimatePanelService.stopAndRestore(this);
         }
         prefs.resetAll();
         new AutomationStateStore(this).clearAll();

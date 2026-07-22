@@ -468,6 +468,23 @@ public class Preferences {
     // older HOME layouts migrate without moving any panel on upgrade.
     public final Str launcherPanelElementsJson = new Str(this, "launcherPanelElementsJson", "");
     public final Str launcherClimateConfigJson = new Str(this, "launcherClimateConfigJson", "");
+    // Optional always-on climate surface. It is deliberately independent from both the HOME
+    // climate panel above and the status widget service: a user may want climate controls while
+    // another application occupies the main display. Defaults are opt-in and preserve every
+    // existing installation's layout on update.
+    public final Bool climatePanelEnabled = new Bool(this, "climatePanelEnabled", false);
+    /** 0 = compact overlay button, 1 = persistent panel with a reserved screen edge. */
+    public final Int climatePanelMode = new Int(this, "climatePanelMode", 0);
+    /** 0 = bottom, 1 = top, 2 = left, 3 = right. */
+    public final Int climatePanelEdge = new Int(this, "climatePanelEdge", 0);
+    public final Int climatePanelExtent = new Int(this, "climatePanelExtent", 180);
+    public final Int climatePanelDisplayId = new Int(this, "climatePanelDisplayId", 0);
+    public final Int climateOverlayWidth = new Int(this, "climateOverlayWidth", 1200);
+    public final Int climateOverlayHeight = new Int(this, "climateOverlayHeight", 360);
+    public final Int climateButtonSize = new Int(this, "climateButtonSize", 84);
+    public final Int climateButtonX = new Int(this, "climateButtonX", 40);
+    public final Int climateButtonY = new Int(this, "climateButtonY", 300);
+    public final Bool climateButtonLocked = new Bool(this, "climateButtonLocked", false);
     public final Str launcherShortcutsJson = new Str(this, "launcherShortcutsJson", "");
     public final Int launcherAppsColumns = new Int(this, "launcherAppsColumns", 3);
     public final Int launcherActionsColumns = new Int(this, "launcherActionsColumns", 3);

@@ -172,6 +172,13 @@
             android:foregroundServiceType="location" />
 
         <service
+            android:name=".climate.ClimatePanelService"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="false"
+            android:stopWithTask="false" />
+
+        <service
             android:name=".MediaNotificationListener"
             android:exported="true"
             android:label="@string/app_name"
