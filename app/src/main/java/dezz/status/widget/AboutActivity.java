@@ -104,6 +104,8 @@ public class AboutActivity extends AppCompatActivity {
                 new Intent(this, AutomationSettingsActivity.class)));
         binding.popupSettingsButton.setOnClickListener(v -> startActivity(
                 new Intent(this, PopupSettingsActivity.class)));
+        binding.climatePanelSettingsButton.setOnClickListener(v -> startActivity(
+                new Intent(this, ClimatePanelSettingsActivity.class)));
         binding.scenarioSettingsButton.setOnClickListener(v -> startActivity(
                 new Intent(this, ScenarioSettingsActivity.class)));
         binding.intentSettingsButton.setOnClickListener(v -> startActivity(

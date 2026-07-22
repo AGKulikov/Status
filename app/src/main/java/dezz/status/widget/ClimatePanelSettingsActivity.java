@@ -8,7 +8,9 @@ package dezz.status.widget;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
@@ -16,8 +18,13 @@ import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -34,8 +41,11 @@ import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.launcher.climate.ClimatePanelConfig;
 import dezz.status.widget.launcher.climate.ClimatePanelConfigStore;
 import dezz.status.widget.launcher.climate.ClimatePanelView;
+import dezz.status.widget.climate.ClimatePanelService;
+import dezz.status.widget.climate.ScreenReservationStateStore;
+import dezz.status.widget.shell.PrivilegedShell;
 
-/** Code-free, immediate editor for the independent HOME climate panel. */
+/** Code-free, immediate editor for the HOME and always-on climate surfaces. */
 public final class ClimatePanelSettingsActivity extends AppCompatActivity {
     private interface BoolChange { void set(boolean value); }
     private interface IntChange { void set(int value); }
@@ -55,10 +65,28 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
     private ClimatePanelConfig config;
     private ClimatePanelView preview;
     private LinearLayout elementHost;
+    private LinearLayout compactModeSettings;
+    private LinearLayout reservedModeSettings;
+    private MaterialSwitch permanentPanelSwitch;
+    private TextView compactPositionInfo;
+    private TextView runtimeStatusInfo;
+    private boolean overlayPermissionRequestInFlight;
     private boolean liveUpdatePosted;
     private final Runnable liveUpdate = () -> {
         liveUpdatePosted = false;
         persistAndPreview();
+    };
+    private final Runnable runtimeStatusRefresh = new Runnable() {
+        @Override public void run() {
+            if (runtimeStatusInfo == null) return;
+            String detail = ClimatePanelService.getRuntimeDetail();
+            if (detail == null || detail.trim().isEmpty()) {
+                detail = preferences != null && preferences.climatePanelEnabled.get()
+                        ? "Ожидание запуска" : "Панель выключена";
+            }
+            runtimeStatusInfo.setText("Состояние: " + detail);
+            runtimeStatusInfo.postDelayed(this, 1_000L);
+        }
     };
 
     @Override
@@ -75,6 +103,33 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
         if (preview != null) preview.start();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // ACTION_MANAGE_OVERLAY_PERMISSION does not return a result on every Android 9 vendor
+        // build. Re-entering this screen is therefore our reliable completion signal, whether
+        // the user granted the permission or pressed Back.
+        overlayPermissionRequestInFlight = false;
+        // The compact button can be dragged while this screen is not in the foreground. Always
+        // show the persisted coordinates rather than the values captured during onCreate().
+        updateCompactPositionInfo();
+        if (preferences.climatePanelEnabled.get() && Settings.canDrawOverlays(this)) {
+            applyClimatePanel();
+        }
+        if (runtimeStatusInfo != null) {
+            runtimeStatusInfo.removeCallbacks(runtimeStatusRefresh);
+            runtimeStatusInfo.post(runtimeStatusRefresh);
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        if (runtimeStatusInfo != null) {
+            runtimeStatusInfo.removeCallbacks(runtimeStatusRefresh);
+        }
+        super.onPause();
     }
 
     @Override
@@ -99,6 +154,102 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
 
         addTitle(settings, "Панель климата");
         addHint(settings, "Все изменения сохраняются сразу. Справа показан живой вид панели с текущими значениями автомобиля.");
+
+        addTitle(settings, "Постоянная панель в приложениях");
+        addHint(settings, "Работает независимо от основного виджета и HOME. Выберите маленькую плавающую кнопку или постоянно занятую полосу экрана.");
+        permanentPanelSwitch = addSwitch(settings, "Включить постоянную климатическую панель",
+                preferences.climatePanelEnabled.get(), value -> {
+                    preferences.climatePanelEnabled.set(value);
+                    if (value && !Settings.canDrawOverlays(this)) {
+                        requestOverlayPermission();
+                    } else {
+                        applyClimatePanel();
+                    }
+                });
+        runtimeStatusInfo = new TextView(this);
+        runtimeStatusInfo.setTextSize(14);
+        runtimeStatusInfo.setAlpha(.82f);
+        settings.addView(runtimeStatusInfo, new LinearLayout.LayoutParams(match(), dp(34)));
+
+        TextView modeTitle = settingLabel("Режим отображения");
+        settings.addView(modeTitle, new LinearLayout.LayoutParams(match(), wrap()));
+        RadioGroup mode = new RadioGroup(this);
+        mode.setOrientation(RadioGroup.VERTICAL);
+        RadioButton compact = modeButton("Оверлей с маленькой кнопкой");
+        RadioButton reserved = modeButton("Закреплённая панель с резервированием места");
+        compact.setId(View.generateViewId());
+        reserved.setId(View.generateViewId());
+        mode.addView(compact, new RadioGroup.LayoutParams(match(), dp(44)));
+        mode.addView(reserved, new RadioGroup.LayoutParams(match(), dp(44)));
+        mode.check(preferences.climatePanelMode.get() == 1 ? reserved.getId() : compact.getId());
+        mode.setOnCheckedChangeListener((group, checkedId) -> {
+            int selected = checkedId == reserved.getId() ? 1 : 0;
+            preferences.climatePanelMode.set(selected);
+            updateModeSettings(selected);
+            applyClimatePanel();
+        });
+        settings.addView(mode, new LinearLayout.LayoutParams(match(), wrap()));
+
+        addSlider(settings, "Экран (Display ID)", preferences.climatePanelDisplayId.get(), 0, 7,
+                value -> preferences.climatePanelDisplayId.set(value),
+                value -> Integer.toString(value));
+        addHint(settings, "Обычно основной дисплей — 0. На некоторых магнитолах центральный экран может иметь другой ID.");
+
+        compactModeSettings = new LinearLayout(this);
+        compactModeSettings.setOrientation(LinearLayout.VERTICAL);
+        addTitle(compactModeSettings, "Оверлей с маленькой кнопкой");
+        addHint(compactModeSettings, "Кнопка остаётся поверх приложений. Нажмите её, чтобы открыть климатическую панель заданного размера.");
+        addSlider(compactModeSettings, "Ширина раскрытой панели",
+                preferences.climateOverlayWidth.get(), 320, 2560,
+                value -> preferences.climateOverlayWidth.set(value), value -> value + " px");
+        addSlider(compactModeSettings, "Высота раскрытой панели",
+                preferences.climateOverlayHeight.get(), 160, 1200,
+                value -> preferences.climateOverlayHeight.set(value), value -> value + " px");
+        addSlider(compactModeSettings, "Размер маленькой кнопки",
+                preferences.climateButtonSize.get(), 48, 180,
+                value -> preferences.climateButtonSize.set(value), value -> value + " px");
+        addSwitch(compactModeSettings, "Заблокировать перемещение кнопки",
+                preferences.climateButtonLocked.get(), value -> {
+                    preferences.climateButtonLocked.set(value);
+                    updateCompactPositionInfo();
+                    applyClimatePanel();
+                });
+        compactPositionInfo = new TextView(this);
+        compactPositionInfo.setTextSize(14);
+        compactPositionInfo.setAlpha(.8f);
+        compactModeSettings.addView(compactPositionInfo,
+                new LinearLayout.LayoutParams(match(), dp(38)));
+        addButton(compactModeSettings, "Вернуть кнопку в исходное положение", v -> {
+            preferences.climateButtonX.set(40);
+            preferences.climateButtonY.set(300);
+            updateCompactPositionInfo();
+            applyClimatePanel();
+        });
+        settings.addView(compactModeSettings, new LinearLayout.LayoutParams(match(), wrap()));
+
+        reservedModeSettings = new LinearLayout(this);
+        reservedModeSettings.setOrientation(LinearLayout.VERTICAL);
+        addTitle(reservedModeSettings, "Панель с резервированием места");
+        addHint(reservedModeSettings, "Другие приложения получают уменьшенную рабочую область и не рисуют содержимое под климатической панелью.");
+        addEdgeSelector(reservedModeSettings);
+        addSlider(reservedModeSettings, "Размер занятой полосы",
+                preferences.climatePanelExtent.get(), 80, 600,
+                value -> preferences.climatePanelExtent.set(value), value -> value + " px");
+        addHint(reservedModeSettings, "Если прошивка не поддерживает системное резервирование, сервис безопасно вернёт полную область экрана.");
+        settings.addView(reservedModeSettings, new LinearLayout.LayoutParams(match(), wrap()));
+        addButton(settings, "Отключить постоянную панель и вернуть полный экран", v -> {
+            if (permanentPanelSwitch != null && permanentPanelSwitch.isChecked()) {
+                permanentPanelSwitch.setChecked(false);
+            } else {
+                preferences.climatePanelEnabled.set(false);
+                ClimatePanelService.stopAndRestore(this);
+            }
+        });
+        addHint(settings, "Перед удалением приложения сначала используйте эту кнопку: сохранённые системные отступы будут восстановлены точно.");
+        updateCompactPositionInfo();
+        updateModeSettings(preferences.climatePanelMode.get());
+
+        addTitle(settings, "Панель внутри HOME");
         MaterialSwitch visible = addSwitch(settings, "Показывать панель на HOME",
                 preferences.launcherClimateVisible.get(),
                 value -> preferences.launcherClimateVisible.set(value));
@@ -189,6 +340,111 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
         config.normalize();
         store.save(config);
         if (preview != null) preview.setConfig(config);
+        applyClimatePanel();
+    }
+
+    private void applyClimatePanel() {
+        if (preferences.climatePanelEnabled.get()) {
+            ClimatePanelService.apply(this);
+            return;
+        }
+        // Do not flash a foreground-service notification while the user merely edits the HOME
+        // preview with the permanent panel disabled. A running compact panel or a crash journal
+        // still has to be stopped/restored immediately.
+        if (!"stopped".equals(ClimatePanelService.getRuntimeStatus())
+                || new ScreenReservationStateStore(this).hasManagedReservation()) {
+            ClimatePanelService.stopAndRestore(this);
+        }
+    }
+
+    private void requestOverlayPermission() {
+        if (overlayPermissionRequestInFlight) return;
+        overlayPermissionRequestInFlight = true;
+        PrivilegedShell.Request request = PrivilegedShell.Request
+                .forPackage(getPackageName())
+                .withOverlay()
+                .build();
+        PrivilegedShell.get(this).ensurePrivileges(request, result -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (Settings.canDrawOverlays(this)) {
+                overlayPermissionRequestInFlight = false;
+                applyClimatePanel();
+                Toast.makeText(this, "Разрешение поверх приложений получено",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
+            try {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + getPackageName()));
+                startActivity(intent);
+            } catch (RuntimeException error) {
+                overlayPermissionRequestInFlight = false;
+                Toast.makeText(this,
+                        "Не удалось открыть системную настройку. Разрешите приложению показ поверх других окон.",
+                        Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private void updateModeSettings(int mode) {
+        if (compactModeSettings != null) {
+            compactModeSettings.setVisibility(mode == 1 ? View.GONE : View.VISIBLE);
+        }
+        if (reservedModeSettings != null) {
+            reservedModeSettings.setVisibility(mode == 1 ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    private void updateCompactPositionInfo() {
+        if (compactPositionInfo == null) return;
+        compactPositionInfo.setText("Положение кнопки: X = " + preferences.climateButtonX.get()
+                + " px, Y = " + preferences.climateButtonY.get() + " px"
+                + (preferences.climateButtonLocked.get() ? " · закреплено" : " · можно перемещать"));
+    }
+
+    private void addEdgeSelector(@NonNull LinearLayout parent) {
+        TextView label = settingLabel("Сторона экрана");
+        parent.addView(label, new LinearLayout.LayoutParams(match(), wrap()));
+        String[] labels = {"Снизу", "Сверху", "Слева", "Справа"};
+        Spinner spinner = new Spinner(this);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, labels);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        int initial = Math.max(0, Math.min(labels.length - 1,
+                preferences.climatePanelEdge.get()));
+        spinner.setSelection(initial, false);
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view,
+                                                  int position, long id) {
+                if (preferences.climatePanelEdge.get() == position) return;
+                preferences.climatePanelEdge.set(position);
+                applyClimatePanel();
+            }
+
+            @Override public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), dp(52));
+        lp.bottomMargin = dp(5);
+        parent.addView(spinner, lp);
+    }
+
+    @NonNull
+    private RadioButton modeButton(@NonNull String text) {
+        RadioButton button = new RadioButton(this);
+        button.setText(text);
+        button.setTextSize(15);
+        return button;
+    }
+
+    @NonNull
+    private TextView settingLabel(@NonNull String text) {
+        TextView label = new TextView(this);
+        label.setText(text);
+        label.setTextSize(16);
+        label.setPadding(0, dp(6), 0, dp(3));
+        return label;
     }
 
     private void rebuildElementEditor() {

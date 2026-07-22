@@ -22,6 +22,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
 
+import dezz.status.widget.climate.ClimatePanelService;
+import dezz.status.widget.climate.ScreenReservationStateStore;
+
 public class BootReceiver extends BroadcastReceiver {
     private static final String TAG = "BootReceiver";
 
@@ -33,6 +36,8 @@ public class BootReceiver extends BroadcastReceiver {
             // Keystore-backed MQTT credentials can become readable only after unlock on some
             // OEM ROMs. Re-reading preferences restarts MQTT without touching either overlay.
             if (WidgetService.isRunning()) WidgetService.getInstance().applyPreferences();
+            Preferences prefs = new Preferences(context);
+            if (shouldReconcileClimate(context, prefs)) ClimatePanelService.apply(context);
             return;
         }
         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())
@@ -41,6 +46,13 @@ public class BootReceiver extends BroadcastReceiver {
             Log.d(TAG, "Device boot completed, checking if widget service should auto-start");
 
             final Preferences prefs = new Preferences(context);
+            // The permanent climate panel has its own lifecycle and does not depend on the main
+            // status widget being enabled. apply() selects compact/reserved mode and restores the
+            // saved display/geometry after every supported boot sequence.
+            if (shouldReconcileClimate(context, prefs)) {
+                Log.i(TAG, "Restoring permanent climate panel");
+                ClimatePanelService.apply(context);
+            }
             if (!prefs.widgetEnabled.get()) {
                 Log.d(TAG, "Widget service is not enabled. Don't start it.");
                 return;
@@ -55,5 +67,10 @@ public class BootReceiver extends BroadcastReceiver {
             Intent serviceIntent = new Intent(context, WidgetService.class);
             context.startForegroundService(serviceIntent);
         }
+    }
+
+    private static boolean shouldReconcileClimate(Context context, Preferences preferences) {
+        return preferences.climatePanelEnabled.get()
+                || new ScreenReservationStateStore(context).hasManagedReservation();
     }
 }
