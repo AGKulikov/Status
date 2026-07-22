@@ -28,12 +28,19 @@ import androidx.annotation.Nullable;
 import com.ecarx.xui.adaptapi.FunctionStatus;
 import com.ecarx.xui.adaptapi.car.Car;
 import com.ecarx.xui.adaptapi.car.ICar;
+import com.ecarx.xui.adaptapi.car.base.ICarFunction;
 import com.ecarx.xui.adaptapi.car.base.ICarInfo;
+import com.ecarx.xui.adaptapi.car.hvac.IHvac;
 import com.ecarx.xui.adaptapi.car.sensor.ISensor;
+import com.ecarx.xui.adaptapi.car.vehicle.IDriveMode;
+import com.ecarx.xui.adaptapi.car.vehicle.IVehicle;
+import com.ecarx.xui.adaptapi.vehicle.VehicleSeat;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
@@ -81,6 +88,10 @@ final class GeelyCarIntegration implements CarIntegration {
     private static final long AVAILABILITY_FAST_POLL_INTERVAL_MS = 2_000L;
     private static final int AVAILABILITY_FAST_POLL_ATTEMPTS = 30;   // first 60s
     private static final long AVAILABILITY_SLOW_POLL_INTERVAL_MS = 30_000L;
+    private static final long CONTROL_RETRY_MS = 2_000L;
+    private static final long CONTROL_HEALTH_POLL_MS = 30_000L;
+    private static final int CONTROL_WRITE_ATTEMPTS = 6;
+    private static final int NO_ZONE = Integer.MIN_VALUE;
 
     private final Context appContext;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -90,6 +101,11 @@ final class GeelyCarIntegration implements CarIntegration {
     private final Object telemetryLock = new Object();
     private final Map<TelemetryListener, TelemetrySubscription> telemetrySubscriptions =
             new IdentityHashMap<>();
+    private final Object controlsLock = new Object();
+    private final Map<ControlStateListener, ControlSubscription> controlSubscriptions =
+            new IdentityHashMap<>();
+    /** Main-thread cache used by HOME tiles and by toggle/cycle command calculation. */
+    private final Map<String, CarControlState> controlStateCache = new HashMap<>();
     /** Serialises the thirteen vendor registrations and initial Binder reads off the UI thread. */
     private final ExecutorService telemetryWorker = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "ecarx-telemetry");
@@ -101,6 +117,19 @@ final class GeelyCarIntegration implements CarIntegration {
     private volatile ISensor sensors;
     @Nullable
     private volatile ICar carApi;
+    @Nullable
+    private volatile ICarFunction carFunctions;
+
+    /** Accessed only by telemetryWorker, except vendor callbacks which merely post deliveries. */
+    @Nullable private ICarFunction controlWatcherSource;
+    @Nullable private ICarFunction.IFunctionValueWatcher controlWatcher;
+    private final Set<Integer> watchedControlFunctions = new HashSet<>();
+    private boolean controlRefreshScheduled;
+    private volatile int controlRetryAttempts;
+    private final Runnable controlRefreshTask = () -> {
+        controlRefreshScheduled = false;
+        executeTelemetryTask(this::refreshControlRegistrationAndStates);
+    };
 
     @Nullable
     private Runnable availabilityChangedListener;
@@ -211,6 +240,181 @@ final class GeelyCarIntegration implements CarIntegration {
         }
     }
 
+    private static final class ControlSubscription {
+        final ControlStateListener listener;
+        final Set<String> controlIds;
+        final AtomicBoolean cancelled = new AtomicBoolean(false);
+
+        ControlSubscription(ControlStateListener listener, Set<String> controlIds) {
+            this.listener = listener;
+            this.controlIds = controlIds;
+        }
+    }
+
+    private static final class ControlDefinition {
+        final CarControlDescriptor descriptor;
+        final int functionId;
+        final int zone;
+        final boolean customFloat;
+
+        ControlDefinition(String id, String label, String category, String icon,
+                          CarControlDescriptor.Kind kind, int functionId, int zone,
+                          boolean customFloat, List<CarControlDescriptor.Option> options,
+                          double min, double max, double step, String unit, String color) {
+            this.descriptor = new CarControlDescriptor(id, label, category, icon, kind,
+                    CarControlDescriptor.Availability.UNKNOWN, options,
+                    min, max, step, unit, color);
+            this.functionId = functionId;
+            this.zone = zone;
+            this.customFloat = customFloat;
+        }
+
+        boolean zoned() { return zone != NO_ZONE; }
+
+        CarControlDescriptor descriptorWithOptions(List<CarControlDescriptor.Option> options) {
+            return new CarControlDescriptor(descriptor.id, descriptor.label, descriptor.category,
+                    descriptor.iconKey, descriptor.kind, descriptor.availability, options,
+                    descriptor.minimum, descriptor.maximum, descriptor.step, descriptor.unit,
+                    descriptor.suggestedActiveColor);
+        }
+    }
+
+    private static CarControlDescriptor.Option option(double value, String label) {
+        return new CarControlDescriptor.Option(value, label);
+    }
+
+    private static List<CarControlDescriptor.Option> toggleOptions() {
+        return Arrays.asList(option(0, "Выкл"), option(1, "Вкл"));
+    }
+
+    private static List<CarControlDescriptor.Option> heatOptions() {
+        return Arrays.asList(option(IHvac.SEAT_HEATING_OFF, "Выкл"),
+                option(IHvac.SEAT_HEATING_LEVEL_1, "1"),
+                option(IHvac.SEAT_HEATING_LEVEL_2, "2"),
+                option(IHvac.SEAT_HEATING_LEVEL_3, "3"),
+                option(IHvac.SEAT_HEATING_LEVEL_AUTO, "Auto"));
+    }
+
+    private static List<CarControlDescriptor.Option> ventilationOptions() {
+        return Arrays.asList(option(IHvac.SEAT_VENTILATION_OFF, "Выкл"),
+                option(IHvac.SEAT_VENTILATION_LEVEL_1, "1"),
+                option(IHvac.SEAT_VENTILATION_LEVEL_2, "2"),
+                option(IHvac.SEAT_VENTILATION_LEVEL_3, "3"),
+                option(IHvac.SEAT_VENTILATION_LEVEL_AUTO, "Auto"));
+    }
+
+    private static List<CarControlDescriptor.Option> wheelHeatOptions() {
+        return Arrays.asList(option(IHvac.STEERING_WHEEL_HEAT_OFF, "Выкл"),
+                option(IHvac.STEERING_WHEEL_HEAT_LOW, "1"),
+                option(IHvac.STEERING_WHEEL_HEAT_MID, "2"),
+                option(IHvac.STEERING_WHEEL_HEAT_HIGH, "3"),
+                option(IHvac.STEERING_WHEEL_HEAT_AUTO, "Auto"));
+    }
+
+    private static List<CarControlDescriptor.Option> fanOptions() {
+        return Arrays.asList(option(IHvac.FAN_SPEED_OFF, "Выкл"),
+                option(IHvac.FAN_SPEED_LEVEL_1, "1"), option(IHvac.FAN_SPEED_LEVEL_2, "2"),
+                option(IHvac.FAN_SPEED_LEVEL_3, "3"), option(IHvac.FAN_SPEED_LEVEL_4, "4"),
+                option(IHvac.FAN_SPEED_LEVEL_5, "5"), option(IHvac.FAN_SPEED_LEVEL_6, "6"),
+                option(IHvac.FAN_SPEED_LEVEL_7, "7"), option(IHvac.FAN_SPEED_LEVEL_8, "8"),
+                option(IHvac.FAN_SPEED_LEVEL_9, "9"),
+                option(IHvac.FAN_SPEED_LEVEL_AUTO, "Auto"));
+    }
+
+    private static List<CarControlDescriptor.Option> driveModeOptions() {
+        return Arrays.asList(
+                option(IDriveMode.DRIVE_MODE_SELECTION_ECO, "Eco"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_COMFORT, "Comfort"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_DYNAMIC, "Dynamic"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_XC, "XC"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_HDC, "HDC"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_PURE, "Pure"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_HYBRID, "Hybrid"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_POWER, "Power"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_SNOW, "Snow"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_MUD, "Mud"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_ROCK, "Rock"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_PHEV, "PHEV"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_SAND, "Sand"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_AWD, "AWD"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_SAVE, "Save"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_ECO_HEV_PHEV, "Eco HEV"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_NORMAL, "Normal"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_eAWD, "eAWD"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_OFFROAD, "Offroad"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_ADAPTIVE, "Adaptive"),
+                option(IDriveMode.DRIVE_MODE_SELECTION_CUSTOM, "Custom"));
+    }
+
+    private static final ControlDefinition[] CONTROL_DEFINITIONS = {
+            new ControlDefinition("climate.power", "Климат", "Климат", "climate",
+                    CarControlDescriptor.Kind.TOGGLE, IHvac.HVAC_FUNC_POWER, NO_ZONE, false,
+                    toggleOptions(), 0, 1, 1, "", "#FF4FC3F7"),
+            new ControlDefinition("climate.ac", "Кондиционер", "Климат", "climate_ac",
+                    CarControlDescriptor.Kind.TOGGLE, IHvac.HVAC_FUNC_AC, NO_ZONE, false,
+                    toggleOptions(), 0, 1, 1, "", "#FF4FC3F7"),
+            new ControlDefinition("climate.auto", "Климат AUTO", "Климат", "climate_auto",
+                    CarControlDescriptor.Kind.TOGGLE, IHvac.HVAC_FUNC_AUTO, NO_ZONE, false,
+                    toggleOptions(), 0, 1, 1, "", "#FF66BB6A"),
+            new ControlDefinition("climate.defrost_front", "Обогрев лобового", "Климат",
+                    "defrost_front", CarControlDescriptor.Kind.ACTION,
+                    IHvac.HVAC_FUNC_DEFROST_FRONT, NO_ZONE, false, Collections.emptyList(),
+                    0, 1, 1, "", "#FF80DEEA"),
+            new ControlDefinition("climate.defrost_rear", "Обогрев заднего стекла", "Климат",
+                    "defrost_rear", CarControlDescriptor.Kind.ACTION,
+                    IHvac.HVAC_FUNC_DEFROST_REAR, NO_ZONE, false, Collections.emptyList(),
+                    0, 1, 1, "", "#FF80DEEA"),
+            new ControlDefinition("climate.seat_heat_driver", "Подогрев сиденья водителя",
+                    "Сиденья", "seat_heat", CarControlDescriptor.Kind.LEVELS,
+                    IHvac.HVAC_FUNC_SEAT_HEATING, VehicleSeat.SEAT_ROW_1_LEFT, false,
+                    heatOptions(), 0, 3, 1, "", "#FFFF9800"),
+            new ControlDefinition("climate.seat_heat_passenger", "Подогрев сиденья пассажира",
+                    "Сиденья", "seat_heat", CarControlDescriptor.Kind.LEVELS,
+                    IHvac.HVAC_FUNC_SEAT_HEATING, VehicleSeat.SEAT_ROW_1_RIGHT, false,
+                    heatOptions(), 0, 3, 1, "", "#FFFF9800"),
+            new ControlDefinition("climate.seat_vent_driver", "Вентиляция сиденья водителя",
+                    "Сиденья", "seat_vent", CarControlDescriptor.Kind.LEVELS,
+                    IHvac.HVAC_FUNC_SEAT_VENTILATION, VehicleSeat.SEAT_ROW_1_LEFT, false,
+                    ventilationOptions(), 0, 3, 1, "", "#FF29B6F6"),
+            new ControlDefinition("climate.seat_vent_passenger", "Вентиляция сиденья пассажира",
+                    "Сиденья", "seat_vent", CarControlDescriptor.Kind.LEVELS,
+                    IHvac.HVAC_FUNC_SEAT_VENTILATION, VehicleSeat.SEAT_ROW_1_RIGHT, false,
+                    ventilationOptions(), 0, 3, 1, "", "#FF29B6F6"),
+            new ControlDefinition("climate.wheel_heat", "Подогрев руля", "Климат",
+                    "wheel_heat", CarControlDescriptor.Kind.LEVELS,
+                    IHvac.HVAC_FUNC_STEERING_WHEEL_HEAT, NO_ZONE, false,
+                    wheelHeatOptions(), 0, 3, 1, "", "#FFFF9800"),
+            new ControlDefinition("climate.fan", "Скорость вентилятора", "Климат", "fan",
+                    CarControlDescriptor.Kind.LEVELS, IHvac.HVAC_FUNC_FAN_SPEED, 8, false,
+                    fanOptions(), 0, 9, 1, "", "#FF42A5F5"),
+            new ControlDefinition("climate.temp_driver", "Температура водителя", "Климат",
+                    "temperature", CarControlDescriptor.Kind.RANGE, IHvac.HVAC_FUNC_TEMP,
+                    VehicleSeat.SEAT_ROW_1_LEFT, true, Collections.emptyList(),
+                    16, 30, .5, "°C", "#FF66BB6A"),
+            new ControlDefinition("climate.temp_passenger", "Температура пассажира", "Климат",
+                    "temperature", CarControlDescriptor.Kind.RANGE, IHvac.HVAC_FUNC_TEMP,
+                    VehicleSeat.SEAT_ROW_1_RIGHT, true, Collections.emptyList(),
+                    16, 30, .5, "°C", "#FF66BB6A"),
+            new ControlDefinition("vehicle.drive_mode", "Режим движения", "Автомобиль",
+                    "drive_mode", CarControlDescriptor.Kind.OPTIONS,
+                    IDriveMode.DM_FUNC_DRIVE_MODE_SELECT, NO_ZONE, false,
+                    driveModeOptions(), 0, 0, 0, "", "#FFFFC107"),
+            new ControlDefinition("vehicle.wiper_service", "Сервисное положение дворников",
+                    "Автомобиль", "wiper", CarControlDescriptor.Kind.ACTION,
+                    IVehicle.SETTING_FUNC_WINDSCREEN_SERVICE_POSITION, NO_ZONE, false,
+                    Collections.emptyList(), 0, 1, 1, "", "#FFFFFFFF"),
+            new ControlDefinition("vehicle.auto_hold", "Auto Hold", "Автомобиль", "auto_hold",
+                    CarControlDescriptor.Kind.TOGGLE, IVehicle.SETTING_FUNC_AUTO_HOLD,
+                    NO_ZONE, false, toggleOptions(), 0, 1, 1, "", "#FF66BB6A"),
+            new ControlDefinition("vehicle.start_stop", "Start/Stop", "Автомобиль", "start_stop",
+                    CarControlDescriptor.Kind.TOGGLE, IVehicle.SETTING_FUNC_ENGINE_STOP_START,
+                    NO_ZONE, false, toggleOptions(), 0, 1, 1, "", "#FF66BB6A"),
+            new ControlDefinition("vehicle.fuel_save", "Экономия топлива", "Автомобиль",
+                    "fuel_save", CarControlDescriptor.Kind.TOGGLE,
+                    IVehicle.SETTING_FUNC_INTELLIGENT_FUEL_SAVE, NO_ZONE, false,
+                    toggleOptions(), 0, 1, 1, "", "#FF8BC34A")
+    };
+
     GeelyCarIntegration(@NonNull Context appContext) {
         this.appContext = appContext;
     }
@@ -297,6 +501,25 @@ final class GeelyCarIntegration implements CarIntegration {
         return sensors;
     }
 
+    /** Resolve the generic read/write function manager used by HVAC and vehicle controls. */
+    @Nullable
+    private synchronized ICarFunction ensureCarFunctions() {
+        if (carFunctions != null) return carFunctions;
+        try {
+            ICar car = ensureCarApi();
+            if (car == null) return null;
+            carFunctions = car.getICarFunction();
+            if (carFunctions == null) {
+                Log.w(TAG, "eCarX function manager is not ready; will retry");
+            }
+        } catch (Throwable t) {
+            carFunctions = null;
+            carApi = null;
+            Log.w(TAG, "eCarX function manager unavailable; will retry", t);
+        }
+        return carFunctions;
+    }
+
     /** Do not cache managers returned as null during the boot window. */
     @Nullable
     private ICarInfo ensureCarInfo() {
@@ -320,7 +543,15 @@ final class GeelyCarIntegration implements CarIntegration {
      */
     private synchronized void invalidateCarServices() {
         sensors = null;
+        carFunctions = null;
         carApi = null;
+    }
+
+    private synchronized void invalidateFunctionProxy(@Nullable ICarFunction failed) {
+        if (failed == null || carFunctions == failed) {
+            carFunctions = null;
+            carApi = null;
+        }
     }
 
     /** Avoid clearing a newer proxy when an asynchronous call on an older one fails later. */
@@ -964,6 +1195,608 @@ final class GeelyCarIntegration implements CarIntegration {
         }
     }
 
+    @Nullable
+    private static ControlDefinition controlDefinition(@NonNull String id) {
+        for (ControlDefinition definition : CONTROL_DEFINITIONS) {
+            if (definition.descriptor.id.equals(id)) return definition;
+        }
+        return null;
+    }
+
+    @NonNull
+    private static Set<String> selectKnownControlIds(@NonNull Set<String> requested) {
+        LinkedHashSet<String> result = new LinkedHashSet<>();
+        for (ControlDefinition definition : CONTROL_DEFINITIONS) {
+            if (requested.contains(definition.descriptor.id)) {
+                result.add(definition.descriptor.id);
+            }
+        }
+        return Collections.unmodifiableSet(result);
+    }
+
+    @Override
+    public void requestControlCatalog(@NonNull ControlCatalogListener listener) {
+        executeTelemetryTask(() -> {
+            ICarFunction source = ensureCarFunctions();
+            List<CarControlDescriptor> values = new ArrayList<>();
+            for (ControlDefinition definition : CONTROL_DEFINITIONS) {
+                CarControlDescriptor.Availability availability = source == null
+                        ? CarControlDescriptor.Availability.UNKNOWN
+                        : controlAvailability(source, definition);
+                // A definitive unsupported result hides a control for this exact vehicle. During
+                // the boot Binder window UNKNOWN remains visible and can be retried safely.
+                if (availability != CarControlDescriptor.Availability.UNSUPPORTED) {
+                    CarControlDescriptor descriptor = definition.descriptor;
+                    if (source != null
+                            && availability == CarControlDescriptor.Availability.SUPPORTED
+                            && descriptor.kind != CarControlDescriptor.Kind.ACTION
+                            && !descriptor.options.isEmpty()) {
+                        descriptor = definition.descriptorWithOptions(
+                                supportedOptions(source, definition));
+                    }
+                    values.add(descriptor.withAvailability(availability));
+                }
+            }
+            mainHandler.post(() -> listener.onCatalog(values));
+        });
+    }
+
+    @NonNull
+    private CarControlDescriptor.Availability controlAvailability(
+            @NonNull ICarFunction source, @NonNull ControlDefinition definition) {
+        try {
+            FunctionStatus status = definition.zoned()
+                    ? source.isFunctionSupported(definition.functionId, definition.zone)
+                    : source.isFunctionSupported(definition.functionId);
+            if (status == FunctionStatus.active) {
+                return CarControlDescriptor.Availability.SUPPORTED;
+            }
+            if (status == FunctionStatus.notavailable) {
+                return CarControlDescriptor.Availability.UNSUPPORTED;
+            }
+            return CarControlDescriptor.Availability.UNKNOWN;
+        } catch (Throwable t) {
+            invalidateFunctionProxy(source);
+            return CarControlDescriptor.Availability.UNKNOWN;
+        }
+    }
+
+    @Override
+    public void subscribeControlStates(@NonNull Set<String> controlIds,
+                                       @NonNull ControlStateListener listener) {
+        ControlSubscription next = new ControlSubscription(listener,
+                selectKnownControlIds(controlIds));
+        ControlSubscription previous;
+        synchronized (controlsLock) {
+            previous = controlSubscriptions.put(listener, next);
+        }
+        if (previous != null) previous.cancelled.set(true);
+        mainHandler.post(() -> {
+            // Immediately replay confirmed states while the vendor worker refreshes them.
+            for (String id : next.controlIds) {
+                CarControlState cached = controlStateCache.get(id);
+                if (cached != null && !next.cancelled.get()) listener.onControlState(cached);
+            }
+            controlRetryAttempts = 0;
+            scheduleControlRefresh(0);
+        });
+    }
+
+    @Override
+    public void unsubscribeControlStates(@NonNull ControlStateListener listener) {
+        ControlSubscription removed;
+        synchronized (controlsLock) {
+            removed = controlSubscriptions.remove(listener);
+        }
+        if (removed != null) removed.cancelled.set(true);
+        scheduleControlRefresh(0);
+    }
+
+    private void scheduleControlRefresh(long delayMillis) {
+        mainHandler.post(() -> {
+            if (controlRefreshScheduled) {
+                if (delayMillis > 0) return;
+                mainHandler.removeCallbacks(controlRefreshTask);
+            }
+            controlRefreshScheduled = true;
+            mainHandler.postDelayed(controlRefreshTask, Math.max(0, delayMillis));
+        });
+    }
+
+    private void scheduleControlRetry() {
+        long delay = controlRetryAttempts < AVAILABILITY_FAST_POLL_ATTEMPTS
+                ? CONTROL_RETRY_MS : CONTROL_HEALTH_POLL_MS;
+        if (controlRetryAttempts < AVAILABILITY_FAST_POLL_ATTEMPTS) controlRetryAttempts++;
+        scheduleControlRefresh(delay);
+    }
+
+    @NonNull
+    private Set<String> demandedControlIds() {
+        LinkedHashSet<String> result = new LinkedHashSet<>();
+        synchronized (controlsLock) {
+            for (ControlSubscription subscription : controlSubscriptions.values()) {
+                if (!subscription.cancelled.get()) result.addAll(subscription.controlIds);
+            }
+        }
+        return result;
+    }
+
+    private void refreshControlRegistrationAndStates() {
+        Set<String> demanded = demandedControlIds();
+        if (demanded.isEmpty()) {
+            detachControlWatcher();
+            return;
+        }
+        ICarFunction source = ensureCarFunctions();
+        if (source == null) {
+            deliverUnavailableControls(demanded, "…");
+            scheduleControlRetry();
+            return;
+        }
+        Set<Integer> functionIds = new LinkedHashSet<>();
+        for (String id : demanded) {
+            ControlDefinition definition = controlDefinition(id);
+            if (definition != null
+                    && definition.descriptor.kind != CarControlDescriptor.Kind.ACTION) {
+                functionIds.add(definition.functionId);
+            }
+        }
+        if (!functionIds.isEmpty() && !ensureControlWatcher(source, functionIds)) {
+            deliverUnavailableControls(demanded, "—");
+            scheduleControlRetry();
+            return;
+        } else if (functionIds.isEmpty()) {
+            detachControlWatcher();
+        }
+
+        boolean failed = false;
+        for (String id : demanded) {
+            ControlDefinition definition = controlDefinition(id);
+            if (definition != null && !readAndDeliverControl(source, definition)) failed = true;
+        }
+        if (failed) {
+            invalidateFunctionProxy(source);
+            detachControlWatcher();
+            scheduleControlRetry();
+        } else {
+            controlRetryAttempts = 0;
+            scheduleControlRefresh(CONTROL_HEALTH_POLL_MS);
+        }
+    }
+
+    private boolean ensureControlWatcher(ICarFunction source, Set<Integer> functionIds) {
+        if (source == controlWatcherSource && watchedControlFunctions.equals(functionIds)
+                && controlWatcher != null) return true;
+        detachControlWatcher();
+        ICarFunction.IFunctionValueWatcher watcher = new ICarFunction.IFunctionValueWatcher() {
+            @Override public void onCustomizeFunctionValueChanged(int functionId, int zone,
+                                                                   float value) {
+                deliverVendorControlValue(functionId, zone, value, true);
+            }
+
+            @Override public void onFunctionChanged(int functionId) {
+                executeTelemetryTask(() -> readDemandedFunction(functionId));
+            }
+
+            @Override public void onFunctionValueChanged(int functionId, int zone, int value) {
+                deliverVendorControlValue(functionId, zone, value, false);
+            }
+
+            @Override public void onSupportedFunctionStatusChanged(int functionId, int zone,
+                                                                    FunctionStatus status) {
+                scheduleControlRefresh(0);
+            }
+
+            @Override public void onSupportedFunctionValueChanged(int functionId, int[] values) {
+                scheduleControlRefresh(0);
+            }
+        };
+        try {
+            Set<Integer> registeredIds = new LinkedHashSet<>();
+            // MConfig uses the single-ID overload on this firmware. Registering separately also
+            // prevents one optional unsupported function from rejecting the entire batch.
+            for (Integer id : functionIds) {
+                if (source.registerFunctionValueWatcher(id, watcher)) registeredIds.add(id);
+            }
+            if (registeredIds.isEmpty()) {
+                Log.w(TAG, "all registerFunctionValueWatcher calls were rejected");
+                try { source.unregisterFunctionValueWatcher(watcher); }
+                catch (Throwable ignored) {}
+                return false;
+            }
+            controlWatcherSource = source;
+            controlWatcher = watcher;
+            watchedControlFunctions.addAll(registeredIds);
+            return true;
+        } catch (Throwable t) {
+            try { source.unregisterFunctionValueWatcher(watcher); }
+            catch (Throwable ignored) {}
+            invalidateFunctionProxy(source);
+            Log.w(TAG, "vehicle control watcher registration failed", t);
+            return false;
+        }
+    }
+
+    private void detachControlWatcher() {
+        ICarFunction source = controlWatcherSource;
+        ICarFunction.IFunctionValueWatcher watcher = controlWatcher;
+        controlWatcherSource = null;
+        controlWatcher = null;
+        watchedControlFunctions.clear();
+        if (source != null && watcher != null) {
+            try {
+                source.unregisterFunctionValueWatcher(watcher);
+            } catch (Throwable t) {
+                Log.w(TAG, "unregisterFunctionValueWatcher failed", t);
+            }
+        }
+    }
+
+    private void readDemandedFunction(int functionId) {
+        ICarFunction source = ensureCarFunctions();
+        if (source == null) {
+            scheduleControlRetry();
+            return;
+        }
+        Set<String> demanded = demandedControlIds();
+        for (ControlDefinition definition : CONTROL_DEFINITIONS) {
+            if (definition.functionId == functionId
+                    && demanded.contains(definition.descriptor.id)) {
+                readAndDeliverControl(source, definition);
+            }
+        }
+    }
+
+    private boolean readAndDeliverControl(ICarFunction source, ControlDefinition definition) {
+        CarControlDescriptor.Availability availability = controlAvailability(source, definition);
+        if (availability != CarControlDescriptor.Availability.SUPPORTED) {
+            deliverControlState(new CarControlState(definition.descriptor.id, false, false,
+                    Double.NaN, availability == CarControlDescriptor.Availability.UNKNOWN
+                    ? "…" : "—", false, 0, null, System.currentTimeMillis()));
+            return availability != CarControlDescriptor.Availability.UNKNOWN;
+        }
+        if (definition.descriptor.kind == CarControlDescriptor.Kind.ACTION) {
+            deliverControlState(new CarControlState(definition.descriptor.id, true, false,
+                    Double.NaN, "Готово", false, 0, null, System.currentTimeMillis()));
+            return true;
+        }
+        try {
+            double value;
+            if (definition.customFloat) {
+                value = definition.zoned()
+                        ? source.getCustomizeFunctionValue(definition.functionId, definition.zone)
+                        : source.getCustomizeFunctionValue(definition.functionId);
+            } else {
+                value = definition.zoned()
+                        ? source.getFunctionValue(definition.functionId, definition.zone)
+                        : source.getFunctionValue(definition.functionId);
+            }
+            if (!isValidControlValue(definition, value)) return false;
+            deliverControlState(normalizeControlState(definition, value));
+            return true;
+        } catch (Throwable t) {
+            invalidateFunctionProxy(source);
+            Log.w(TAG, "vehicle control read failed for " + definition.descriptor.id, t);
+            return false;
+        }
+    }
+
+    private void deliverVendorControlValue(int functionId, int zone, double value,
+                                           boolean customFloat) {
+        Set<String> demanded = demandedControlIds();
+        for (ControlDefinition definition : CONTROL_DEFINITIONS) {
+            if (definition.functionId != functionId || definition.customFloat != customFloat
+                    || !demanded.contains(definition.descriptor.id)) continue;
+            if (definition.zoned() && definition.zone != zone) continue;
+            if (!isValidControlValue(definition, value)) continue;
+            deliverControlState(normalizeControlState(definition, value));
+        }
+    }
+
+    @NonNull
+    private CarControlState normalizeControlState(ControlDefinition definition, double value) {
+        int level = 0;
+        String label;
+        boolean active;
+        if (definition.customFloat) {
+            label = String.format(java.util.Locale.ROOT, "%.1f%s", value,
+                    definition.descriptor.unit);
+            active = true;
+        } else {
+            label = Long.toString(Math.round(value));
+            active = value != 0;
+            for (int index = 0; index < definition.descriptor.options.size(); index++) {
+                CarControlDescriptor.Option option = definition.descriptor.options.get(index);
+                if (sameValue(option.value, value)) {
+                    label = option.label;
+                    level = index;
+                    break;
+                }
+            }
+        }
+        String color = stateColor(definition, active, level, value);
+        return new CarControlState(definition.descriptor.id, true, true, value, label,
+                active, level, color, System.currentTimeMillis());
+    }
+
+    @Nullable
+    private static String stateColor(ControlDefinition definition, boolean active, int level,
+                                     double value) {
+        if (!active) return null;
+        String id = definition.descriptor.id;
+        if (id.contains("seat_heat") || id.contains("wheel_heat")) {
+            if (level >= 4) return definition.descriptor.suggestedActiveColor;
+            if (level >= 3) return "#FFF44336";
+            if (level == 2) return "#FFFF9800";
+            return "#FFFFC107";
+        }
+        if (id.contains("seat_vent")) {
+            if (level >= 4) return definition.descriptor.suggestedActiveColor;
+            if (level >= 3) return "#FF0277BD";
+            if (level == 2) return "#FF039BE5";
+            return "#FF4FC3F7";
+        }
+        if (id.equals("vehicle.drive_mode")) {
+            if (sameValue(value, IDriveMode.DRIVE_MODE_SELECTION_DYNAMIC)
+                    || sameValue(value, IDriveMode.DRIVE_MODE_SELECTION_POWER)) {
+                return "#FFF44336";
+            }
+            if (sameValue(value, IDriveMode.DRIVE_MODE_SELECTION_ECO)
+                    || sameValue(value, IDriveMode.DRIVE_MODE_SELECTION_SAVE)) {
+                return "#FF8BC34A";
+            }
+            if (sameValue(value, IDriveMode.DRIVE_MODE_SELECTION_SNOW)) return "#FF81D4FA";
+        }
+        return definition.descriptor.suggestedActiveColor;
+    }
+
+    private void deliverUnavailableControls(Set<String> ids, String label) {
+        for (String id : ids) {
+            deliverControlState(new CarControlState(id, false, false, Double.NaN, label,
+                    false, 0, null, System.currentTimeMillis()));
+        }
+    }
+
+    private void deliverControlState(@NonNull CarControlState state) {
+        mainHandler.post(() -> {
+            controlStateCache.put(state.controlId, state);
+            List<ControlSubscription> listeners;
+            synchronized (controlsLock) {
+                listeners = new ArrayList<>(controlSubscriptions.values());
+            }
+            for (ControlSubscription subscription : listeners) {
+                if (!subscription.cancelled.get()
+                        && subscription.controlIds.contains(state.controlId)) {
+                    subscription.listener.onControlState(state);
+                }
+            }
+        });
+    }
+
+    @Override
+    public void executeControl(@NonNull CarControlCommand command,
+                               @NonNull ControlCommandListener listener) {
+        executeTelemetryTask(() -> executeControlOnWorker(command, listener));
+    }
+
+    private void executeControlOnWorker(CarControlCommand command,
+                                        ControlCommandListener listener) {
+        ControlDefinition definition = controlDefinition(command.controlId);
+        if (definition == null) {
+            postCommandResult(listener, false, "Неизвестная функция автомобиля");
+            return;
+        }
+        ICarFunction source = ensureCarFunctions();
+        if (source == null) {
+            postCommandResult(listener, false, "ECARX ещё не подключён");
+            scheduleControlRetry();
+            return;
+        }
+        if (controlAvailability(source, definition)
+                != CarControlDescriptor.Availability.SUPPORTED) {
+            postCommandResult(listener, false, "Функция не поддерживается автомобилем");
+            return;
+        }
+        boolean pulse = definition.descriptor.kind == CarControlDescriptor.Kind.ACTION;
+        Double current = pulse ? 0d : readControlValue(source, definition);
+        if (!pulse && current == null) {
+            postCommandResult(listener, false, "Не удалось прочитать текущее состояние");
+            return;
+        }
+        List<CarControlDescriptor.Option> runtimeOptions = supportedOptions(source, definition);
+        Double target = pulse ? 1d : commandTarget(definition, command, current, runtimeOptions);
+        if (target == null) {
+            postCommandResult(listener, false, "Недопустимое значение команды");
+            return;
+        }
+        try {
+            if (pulse) {
+                // MConfig uses these functions as write-only pulses. They can return to zero
+                // immediately, so requiring a pre-read or read-back would report a false error.
+                boolean accepted = writeControlValue(source, definition, target);
+                if (!accepted) {
+                    pauseControlWorker(200L);
+                    accepted = writeControlValue(source, definition, target);
+                }
+                postCommandResult(listener, accepted,
+                        accepted ? null : "ECARX отклонил одноразовую команду");
+                return;
+            }
+
+            // This firmware occasionally acknowledges a Binder write without applying it.
+            // Follow the proven MConfig policy: re-read and re-send up to six times instead of
+            // forcing the driver to tap the tile repeatedly.
+            boolean acceptedAtLeastOnce = false;
+            for (int attempt = 0; attempt < CONTROL_WRITE_ATTEMPTS; attempt++) {
+                Double beforeWrite = attempt == 0 ? current : readControlValue(source, definition);
+                if (beforeWrite != null && sameValue(beforeWrite, target)) {
+                    deliverControlState(normalizeControlState(definition, beforeWrite));
+                    postCommandResult(listener, true, null);
+                    return;
+                }
+                acceptedAtLeastOnce |= writeControlValue(source, definition, target);
+                if (!pauseControlWorker(200L + (attempt % 2) * 100L)) break;
+                Double confirmed = readControlValue(source, definition);
+                if (confirmed != null && sameValue(confirmed, target)) {
+                    deliverControlState(normalizeControlState(definition, confirmed));
+                    postCommandResult(listener, true, null);
+                    return;
+                }
+            }
+            postCommandResult(listener, false, acceptedAtLeastOnce
+                    ? "Команда отправлена, но автомобиль её не подтвердил"
+                    : "ECARX отклонил команду");
+        } catch (Throwable t) {
+            invalidateFunctionProxy(source);
+            scheduleControlRetry();
+            Log.w(TAG, "vehicle command failed for " + command.controlId, t);
+            postCommandResult(listener, false, "Ошибка связи с ECARX");
+        }
+    }
+
+    private boolean writeControlValue(ICarFunction source, ControlDefinition definition,
+                                      double target) {
+        if (definition.customFloat) {
+            return definition.zoned()
+                    ? source.setCustomizeFunctionValue(definition.functionId,
+                    definition.zone, (float) target)
+                    : source.setCustomizeFunctionValue(definition.functionId, (float) target);
+        }
+        int value = (int) Math.round(target);
+        return definition.zoned()
+                ? source.setFunctionValue(definition.functionId, definition.zone, value)
+                : source.setFunctionValue(definition.functionId, value);
+    }
+
+    private static boolean pauseControlWorker(long millis) {
+        try {
+            Thread.sleep(millis);
+            return true;
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    @Nullable
+    private Double readControlValue(ICarFunction source, ControlDefinition definition) {
+        try {
+            double value;
+            if (definition.customFloat) {
+                value = definition.zoned()
+                        ? source.getCustomizeFunctionValue(definition.functionId, definition.zone)
+                        : source.getCustomizeFunctionValue(definition.functionId);
+            } else {
+                value = definition.zoned()
+                        ? source.getFunctionValue(definition.functionId, definition.zone)
+                        : source.getFunctionValue(definition.functionId);
+            }
+            return isValidControlValue(definition, value) ? value : null;
+        } catch (Throwable t) {
+            invalidateFunctionProxy(source);
+            return null;
+        }
+    }
+
+    @Nullable
+    private static Double commandTarget(ControlDefinition definition, CarControlCommand command,
+                                        double current,
+                                        List<CarControlDescriptor.Option> availableOptions) {
+        switch (command.operation) {
+            case SET:
+                if (definition.customFloat) {
+                    double rounded = Math.round((command.value - definition.descriptor.minimum)
+                            / definition.descriptor.step) * definition.descriptor.step
+                            + definition.descriptor.minimum;
+                    if (rounded < definition.descriptor.minimum - .001
+                            || rounded > definition.descriptor.maximum + .001) return null;
+                    return rounded;
+                }
+                for (CarControlDescriptor.Option option : availableOptions) {
+                    if (sameValue(option.value, command.value)) return option.value;
+                }
+                return null;
+            case ACTIVATE:
+                for (CarControlDescriptor.Option option : definition.descriptor.options) {
+                    if (option.value != 0) return option.value;
+                }
+                return 1d;
+            case TOGGLE:
+                if (current != 0) return 0d;
+                for (CarControlDescriptor.Option option : definition.descriptor.options) {
+                    if (option.value != 0) return option.value;
+                }
+                return 1d;
+            case CYCLE:
+                List<CarControlDescriptor.Option> options = availableOptions;
+                if (options.isEmpty()) return null;
+                for (int index = 0; index < options.size(); index++) {
+                    if (sameValue(options.get(index).value, current)) {
+                        return options.get((index + 1) % options.size()).value;
+                    }
+                }
+                return options.get(0).value;
+            default:
+                return null;
+        }
+    }
+
+    @NonNull
+    private List<CarControlDescriptor.Option> supportedOptions(ICarFunction source,
+                                                                ControlDefinition definition) {
+        if (definition.customFloat || definition.descriptor.options.isEmpty()) {
+            return definition.descriptor.options;
+        }
+        try {
+            int[] values = definition.zoned()
+                    ? source.getSupportedFunctionValue(definition.functionId, definition.zone)
+                    : source.getSupportedFunctionValue(definition.functionId);
+            if (values == null || values.length == 0) return definition.descriptor.options;
+            Set<Integer> supported = new HashSet<>();
+            for (int value : values) supported.add(value);
+            List<CarControlDescriptor.Option> result = new ArrayList<>();
+            for (CarControlDescriptor.Option option : definition.descriptor.options) {
+                if (option.value == 0 || supported.contains((int) Math.round(option.value))) {
+                    result.add(option);
+                }
+            }
+            return result.isEmpty() ? definition.descriptor.options : result;
+        } catch (Throwable ignored) {
+            // Older firmware can reject discovery even though direct reads/writes work.
+            return definition.descriptor.options;
+        }
+    }
+
+    private static boolean sameValue(double left, double right) {
+        return Math.abs(left - right) < .01d;
+    }
+
+    private static boolean isValidControlValue(ControlDefinition definition, double value) {
+        if (!Double.isFinite(value) || value == -1 || value == Integer.MAX_VALUE
+                || value == Integer.MIN_VALUE) return false;
+        if (!definition.customFloat) {
+            if (sameValue(value, ICarFunction.COMMON_VALUE_ERROR)
+                    || sameValue(value, ICarFunction.COMMON_VALUE_NONE)
+                    || sameValue(value, ICarFunction.COMMON_VALUE_UNKNOWN)) return false;
+            if (!definition.descriptor.options.isEmpty()) {
+                for (CarControlDescriptor.Option option : definition.descriptor.options) {
+                    if (sameValue(option.value, value)) return true;
+                }
+                return false;
+            }
+            return definition.descriptor.kind == CarControlDescriptor.Kind.ACTION;
+        }
+        float asFloat = (float) value;
+        return !isObviousFloatSentinel(asFloat)
+                && value >= definition.descriptor.minimum - .01
+                && value <= definition.descriptor.maximum + .01;
+    }
+
+    private void postCommandResult(ControlCommandListener listener, boolean success,
+                                   @Nullable String message) {
+        mainHandler.post(() -> listener.onResult(success, message));
+    }
+
     @Override
     public void shutdown() {
         for (BrickType type : BrickType.values()) {
@@ -975,10 +1808,18 @@ final class GeelyCarIntegration implements CarIntegration {
             telemetrySubscriptions.clear();
         }
         for (TelemetrySubscription subscription : telemetry) subscription.cancelled.set(true);
+        List<ControlSubscription> controls;
+        synchronized (controlsLock) {
+            controls = new ArrayList<>(controlSubscriptions.values());
+            controlSubscriptions.clear();
+        }
+        for (ControlSubscription subscription : controls) subscription.cancelled.set(true);
+        mainHandler.removeCallbacks(controlRefreshTask);
         executeTelemetryTask(() -> {
             for (TelemetrySubscription subscription : telemetry) {
                 unregisterTelemetryVendorListeners(subscription);
             }
+            detachControlWatcher();
         });
         telemetryWorker.shutdown();
         availabilityChangedListener = null;

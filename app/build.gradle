@@ -81,6 +81,11 @@ android {
         }
         debug {
             debuggable true
+            // CI (and an authorised local build) supplies the stable update key. Without it,
+            // retain Android's normal debug signing so contributors can still compile forks.
+            if (file('../keystore.jks').exists() && System.getenv("KEY_PASSWORD")) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 

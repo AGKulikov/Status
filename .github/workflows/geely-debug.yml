@@ -40,11 +40,31 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;android-36" "build-tools;36.0.0"
 
+      - name: Decode stable update keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          REQUIRE_STABLE: ${{ github.event_name != 'pull_request' }}
+        shell: bash
+        run: |
+          if [[ -n "$KEYSTORE_BASE64" ]]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > keystore.jks
+            touch .stable-update-signing
+          elif [[ "$REQUIRE_STABLE" == "true" ]]; then
+            echo "KEYSTORE_BASE64 is required for installable update artifacts" >&2
+            exit 1
+          else
+            echo "Stable keystore secret is unavailable; fork/PR build will use debug signing"
+          fi
+
       - name: Test and build geelyDebug
         env:
-          VERSION_NAME: v2.8.2-ha${{ github.run_number }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          export VERSION_CODE=$((208020000 + GITHUB_RUN_NUMBER))
+          # CI revisions live above the earlier hand-built HA14..HA24 line, so every artifact is
+          # accepted by Android as an upgrade. Four digits are reserved by build.gradle.
+          REVISION=$((1000 + GITHUB_RUN_NUMBER))
+          export VERSION_NAME="v2.8.2-ha${REVISION}"
+          export VERSION_CODE=$((208020000 + REVISION))
           # Keep unit tests and APK assembly in separate Gradle invocations.
           # Running both task graphs together can make D8 see duplicate
           # non-namespaced AndroidX R classes in this legacy project.
@@ -59,7 +79,11 @@ jobs:
           test -n "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep "package: name='ru.natro.statuswidget'"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$APK"
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK"
+          CERTS=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK")
+          echo "$CERTS"
+          if [[ -f .stable-update-signing ]]; then
+            echo "$CERTS" | grep -qi "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
+          fi
           sha256sum "$APK" | tee "$APK.sha256"
 
       - name: Upload APK

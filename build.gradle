@@ -23,7 +23,7 @@ String getVersionName() {
 
     logger.warn('Environment variable `VERSION_NAME` was not set, using default version')
 
-    return 'v2.8.2-ha1'
+    return 'v2.8.2-ha24'
 }
 
 int getVersionCode() {
@@ -32,12 +32,18 @@ int getVersionCode() {
         return explicitCode.toInteger()
     }
     def version = getVersionName()
-    def (major, minor, patch) = version.replaceFirst('^v', '')
-            .replaceFirst('-\\w+$', '').tokenize('.').collect { it.toInteger() }
+    def matcher = version =~ /^v?(\d+)\.(\d+)\.(\d+)(?:-ha(\d+))?$/
+    if (!matcher.matches()) {
+        throw new GradleException("Unsupported VERSION_NAME: ${version}")
+    }
+    def major = matcher.group(1).toInteger()
+    def minor = matcher.group(2).toInteger()
+    def patch = matcher.group(3).toInteger()
+    def revision = matcher.group(4) ? matcher.group(4).toInteger() : 1
 
     // Reserve four decimal digits for CI revisions while remaining below Android's signed-int
     // limit. v2.8.2-ha1 -> 208020001; each Actions run supplies a larger explicit VERSION_CODE.
-    return major * 100000000 + minor * 1000000 + (patch ?: 0) * 10000 + 1
+    return major * 100000000 + minor * 1000000 + patch * 10000 + revision
 }
 
 ext {

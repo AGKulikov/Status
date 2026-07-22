@@ -16,6 +16,7 @@
   -->
 
 <resources>
+    <string name="launcher_settings_button">Home screen and panels</string>
     <string name="app_name">Status Widget HA</string>
     <string name="brick_title_home_assistant">Home Assistant</string>
     <string name="automation_settings_button">Smart-home elements</string>

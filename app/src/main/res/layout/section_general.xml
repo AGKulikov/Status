@@ -77,6 +77,14 @@
             android:layout_marginVertical="@dimen/optionsMarginSmall"
             android:text="@string/automation_settings_button" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/launcherSettingsButton"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginVertical="@dimen/optionsMarginSmall"
+            android:text="@string/launcher_settings_button" />
+
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/enableWidgetSwitch"
             android:layout_width="match_parent"

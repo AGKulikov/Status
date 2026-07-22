@@ -442,6 +442,25 @@ public class Preferences {
     public final Int popupBackgroundAlpha = new Int(this, "popupBackgroundAlpha", 0xCC);
     public final Int popupCornerRadius = new Int(this, "popupCornerRadius", 28);
 
+    // Optional HOME/launcher surface. These settings deliberately live in the same exported
+    // preference file as the widget and connector configuration, so installing a newer APK keeps
+    // one coherent setup and Import/Export can move the whole dashboard to another head unit.
+    // Geometry is stored as versioned JSON because launcher elements are independent rectangles
+    // (x/y/width/height) and the set will grow as new panels are added.
+    public final Str launcherLayoutJson = new Str(this, "launcherLayoutJson", "");
+    public final Str launcherFavoritePackages = new Str(this, "launcherFavoritePackages", "");
+    public final Str launcherBackgroundColor = new Str(this, "launcherBackgroundColor", "#101827");
+    public final Bool launcherShowGrid = new Bool(this, "launcherShowGrid", true);
+    public final Int launcherSnapPx = new Int(this, "launcherSnapPx", 20);
+    public final Bool launcherImmersive = new Bool(this, "launcherImmersive", true);
+    public final Bool launcherAppsVisible = new Bool(this, "launcherAppsVisible", true);
+    public final Bool launcherMediaVisible = new Bool(this, "launcherMediaVisible", true);
+    public final Bool launcherClockVisible = new Bool(this, "launcherClockVisible", true);
+    public final Bool launcherNavigationVisible = new Bool(this, "launcherNavigationVisible", true);
+    public final Bool launcherActionsVisible = new Bool(this, "launcherActionsVisible", true);
+    public final Str launcherShortcutsJson = new Str(this, "launcherShortcutsJson", "");
+    public final Int launcherActionsColumns = new Int(this, "launcherActionsColumns", 3);
+
     public final Bool mqttEnabled = new Bool(this, "mqttEnabled", false);
     public final Str mqttHost = new Str(this, "mqttHost", "");
     public final Int mqttPort = new Int(this, "mqttPort", 1883);

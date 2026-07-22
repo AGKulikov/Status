@@ -18,6 +18,9 @@
 package dezz.status.widget;
 
 import android.service.notification.NotificationListenerService;
+import android.service.notification.StatusBarNotification;
+
+import dezz.status.widget.launcher.NavigationDataRepository;
 
 /**
  * Minimal NotificationListenerService that exists so the user can grant Notification Access to
@@ -25,4 +28,17 @@ import android.service.notification.NotificationListenerService;
  * authorize calls to {@code getActiveSessions(ComponentName)}.
  */
 public class MediaNotificationListener extends NotificationListenerService {
+    @Override
+    public void onListenerConnected() {
+        StatusBarNotification[] active = getActiveNotifications();
+        if (active == null) return;
+        for (StatusBarNotification notification : active) {
+            NavigationDataRepository.update(this, notification);
+        }
+    }
+
+    @Override
+    public void onNotificationPosted(StatusBarNotification sbn) {
+        if (sbn != null) NavigationDataRepository.update(this, sbn);
+    }
 }

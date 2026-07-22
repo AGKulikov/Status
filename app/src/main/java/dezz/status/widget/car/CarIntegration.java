@@ -18,6 +18,7 @@
 package dezz.status.widget.car;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import dezz.status.widget.BrickType;
 import java.util.Collections;
@@ -86,6 +87,21 @@ public interface CarIntegration {
         void onTelemetry(@NonNull TelemetryValue value);
     }
 
+    /** Receives the vehicle's visual control catalog on the main thread. */
+    interface ControlCatalogListener {
+        void onCatalog(@NonNull List<CarControlDescriptor> controls);
+    }
+
+    /** Receives confirmed vehicle-function state on the main thread. */
+    interface ControlStateListener {
+        void onControlState(@NonNull CarControlState state);
+    }
+
+    /** Completion of a command request. Stateful values are confirmed by read-back. */
+    interface ControlCommandListener {
+        void onResult(boolean success, @Nullable String message);
+    }
+
     /** Whether this vehicle can feed the given brick right now. */
     boolean isBrickSupported(@NonNull BrickType type);
 
@@ -119,6 +135,30 @@ public interface CarIntegration {
     /** Asynchronous, read-only diagnostic snapshot; callback is delivered on the main thread. */
     default void requestDiagnostics(@NonNull DiagnosticsListener listener) {
         listener.onDiagnostics(Collections.emptyList());
+    }
+
+    /**
+     * Build the catalog of vehicle functions known to this flavor. Implementations may probe the
+     * vendor service asynchronously; unknown-at-boot entries can be returned with
+     * {@link CarControlDescriptor.Availability#UNKNOWN} so the editor remains usable.
+     */
+    default void requestControlCatalog(@NonNull ControlCatalogListener listener) {
+        listener.onCatalog(Collections.emptyList());
+    }
+
+    /** Replace this listener's requested control IDs and seed their current values. */
+    default void subscribeControlStates(@NonNull Set<String> controlIds,
+                                        @NonNull ControlStateListener listener) {
+    }
+
+    /** Stop only this listener's vehicle-control subscription. */
+    default void unsubscribeControlStates(@NonNull ControlStateListener listener) {
+    }
+
+    /** Execute off the UI thread; persistent values use read-back, pulse actions use SDK accept. */
+    default void executeControl(@NonNull CarControlCommand command,
+                                @NonNull ControlCommandListener listener) {
+        listener.onResult(false, "Функции автомобиля недоступны в этой сборке");
     }
 
     /** Release all subscriptions and vendor resources. The instance is not reusable afterwards. */

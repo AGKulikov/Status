@@ -23,6 +23,16 @@
         <item name="android:navigationBarColor">?attr/colorSurface</item>
     </style>
 
+    <style name="Theme.StatusWidget.Launcher" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">#101827</item>
+    </style>
+
     <!--
         Permanent value badge displayed next to each slider's title. Tappable — opens a numeric
         input dialog for exact values. Coloured to match colorPrimary so the user reads it as

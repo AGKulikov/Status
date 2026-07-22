@@ -1,0 +1,978 @@
+/*
+ * Copyright © 2025-2026 Dezz (https://github.com/DezzK)
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+package dezz.status.widget;
+
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Bundle;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
+import android.widget.BaseAdapter;
+import android.widget.FrameLayout;
+import android.widget.GridLayout;
+import android.widget.GridView;
+import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextClock;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+import dezz.status.widget.launcher.LauncherElementFrame;
+import dezz.status.widget.launcher.LauncherGridView;
+import dezz.status.widget.launcher.LauncherLayoutStore;
+import dezz.status.widget.launcher.LauncherMediaController;
+import dezz.status.widget.launcher.LauncherIconResolver;
+import dezz.status.widget.launcher.LauncherShortcutStore;
+import dezz.status.widget.launcher.NavigationDataRepository;
+import dezz.status.widget.launcher.YandexWindowLauncher;
+import dezz.status.widget.car.CarControlCommand;
+import dezz.status.widget.car.CarControlState;
+import dezz.status.widget.car.CarIntegration;
+import dezz.status.widget.car.CarIntegrations;
+import dezz.status.widget.automation.ScenarioTriggerReceiver;
+import dezz.status.widget.scenario.IntentActionRule;
+import dezz.status.widget.scenario.IntentActionRuleStore;
+
+/** Full HOME implementation that coexists with the original Status Widget settings activity. */
+public final class LauncherActivity extends AppCompatActivity {
+    public static final String EXTRA_EDIT_MODE = "dezz.status.widget.extra.EDIT_HOME";
+    private final Map<String, LauncherElementFrame> panels = new HashMap<>();
+    private final BroadcastReceiver navigationReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) { updateNavigation(); }
+    };
+
+    private Preferences preferences;
+    private LauncherLayoutStore layoutStore;
+    private FrameLayout workspace;
+    private LauncherGridView editorGrid;
+    private MaterialButton doneButton;
+    private boolean editMode;
+    private boolean panelsInitialized;
+    private LauncherMediaController mediaController;
+    private ImageView mediaArtwork;
+    private TextView mediaTitle;
+    private TextView mediaArtist;
+    private TextView mediaApplication;
+    private ImageButton playPauseButton;
+    private TextView navigationTitle;
+    private TextView navigationSummary;
+    private GridView favoritesGrid;
+    private AppCatalog appCatalog;
+    private LauncherShortcutStore shortcutStore;
+    private GridLayout shortcutGrid;
+    private ScrollView shortcutScroll;
+    private CarIntegration carIntegration;
+    private final Map<String, CarControlState> carControlStates = new HashMap<>();
+    private final Map<String, ShortcutTileBinding> carShortcutBindings = new HashMap<>();
+    private final Set<String> pendingCarControls = new LinkedHashSet<>();
+    private boolean activityStarted;
+    private final CarIntegration.ControlStateListener carStateListener = state -> {
+        carControlStates.put(state.controlId, state);
+        for (ShortcutTileBinding binding : new ArrayList<>(carShortcutBindings.values())) {
+            if (binding.shortcut.target.equals(state.controlId)) applyCarState(binding, state);
+        }
+    };
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        preferences = new Preferences(this);
+        carIntegration = CarIntegrations.get(this);
+        layoutStore = new LauncherLayoutStore(preferences);
+        configureWindow();
+        setContentView(buildRoot());
+        workspace.post(this::initializePanels);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent.getBooleanExtra(EXTRA_EDIT_MODE, false) && panelsInitialized) {
+            setEditMode(true);
+        }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        activityStarted = true;
+        registerReceiver(navigationReceiver,
+                new IntentFilter(NavigationDataRepository.ACTION_UPDATED));
+        if (mediaController != null) mediaController.start();
+        updateNavigation();
+        resubscribeCarControls();
+    }
+
+    @Override
+    protected void onStop() {
+        activityStarted = false;
+        if (carIntegration != null) carIntegration.unsubscribeControlStates(carStateListener);
+        if (mediaController != null) mediaController.stop();
+        try { unregisterReceiver(navigationReceiver); } catch (IllegalArgumentException ignored) {}
+        super.onStop();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (preferences.launcherImmersive.get()) {
+            applyImmersive();
+        } else {
+            getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+        }
+        applyLauncherPreferences();
+        if (appCatalog != null) {
+            appCatalog.reload();
+            refreshFavorites();
+        }
+        if (shortcutStore != null) {
+            shortcutStore.load();
+            refreshShortcutGrid();
+        }
+    }
+
+    private void applyLauncherPreferences() {
+        if (!panelsInitialized) return;
+        View root = (View) workspace.getParent();
+        if (root != null) root.setBackground(buildBackground());
+        setPanelVisibility(LauncherLayoutStore.APPS, preferences.launcherAppsVisible.get());
+        setPanelVisibility(LauncherLayoutStore.MEDIA, preferences.launcherMediaVisible.get());
+        setPanelVisibility(LauncherLayoutStore.CLOCK, preferences.launcherClockVisible.get());
+        setPanelVisibility(LauncherLayoutStore.NAVIGATION,
+                preferences.launcherNavigationVisible.get());
+        setPanelVisibility(LauncherLayoutStore.ACTIONS, preferences.launcherActionsVisible.get());
+
+        layoutStore.load(workspace.getWidth(), workspace.getHeight());
+        for (Map.Entry<String, LauncherElementFrame> entry : panels.entrySet()) {
+            LauncherLayoutStore.Geometry g = layoutStore.get(entry.getKey());
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) entry.getValue().getLayoutParams();
+            lp.width = g.width;
+            lp.height = g.height;
+            lp.leftMargin = g.x;
+            lp.topMargin = g.y;
+            entry.getValue().setLayoutParams(lp);
+        }
+    }
+
+    private void setPanelVisibility(@NonNull String id, boolean visible) {
+        LauncherElementFrame frame = panels.get(id);
+        if (frame != null) frame.setVisibility(visible ? View.VISIBLE : View.GONE);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (editMode) {
+            setEditMode(false);
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    private void configureWindow() {
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        if (preferences.launcherImmersive.get()) applyImmersive();
+    }
+
+    private void applyImmersive() {
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+    }
+
+    @NonNull
+    private View buildRoot() {
+        FrameLayout root = new FrameLayout(this);
+        root.setBackground(buildBackground());
+
+        editorGrid = new LauncherGridView(this);
+        editorGrid.setStepPx(preferences.launcherSnapPx.get());
+        editorGrid.setVisibility(View.GONE);
+        root.addView(editorGrid, match());
+
+        workspace = new FrameLayout(this);
+        workspace.setClipChildren(false);
+        workspace.setLongClickable(true);
+        workspace.setOnLongClickListener(v -> {
+            setEditMode(true);
+            return true;
+        });
+        root.addView(workspace, match());
+
+        doneButton = new MaterialButton(this);
+        doneButton.setText("Готово · закрепить компоновку");
+        doneButton.setOnClickListener(v -> setEditMode(false));
+        doneButton.setVisibility(View.GONE);
+        FrameLayout.LayoutParams doneLp = new FrameLayout.LayoutParams(dp(420), dp(56),
+                Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        doneLp.topMargin = dp(12);
+        root.addView(doneButton, doneLp);
+        return root;
+    }
+
+    private Drawable buildBackground() {
+        int base;
+        try { base = Color.parseColor(preferences.launcherBackgroundColor.get()); }
+        catch (IllegalArgumentException ignored) { base = Color.rgb(16, 24, 39); }
+        GradientDrawable drawable = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{base, blend(base, Color.rgb(22, 77, 110), .38f), Color.BLACK});
+        drawable.setGradientType(GradientDrawable.LINEAR_GRADIENT);
+        return drawable;
+    }
+
+    private void initializePanels() {
+        if (panelsInitialized || workspace.getWidth() <= 0 || workspace.getHeight() <= 0) return;
+        panelsInitialized = true;
+        layoutStore.load(workspace.getWidth(), workspace.getHeight());
+        appCatalog = new AppCatalog(this);
+        appCatalog.reload();
+        shortcutStore = new LauncherShortcutStore(preferences);
+
+        addPanel(LauncherLayoutStore.APPS, "Приложения", buildAppsPanel(),
+                preferences.launcherAppsVisible.get());
+        addPanel(LauncherLayoutStore.MEDIA, "Медиа", buildMediaPanel(),
+                preferences.launcherMediaVisible.get());
+        addPanel(LauncherLayoutStore.CLOCK, "Часы", buildClockPanel(),
+                preferences.launcherClockVisible.get());
+        addPanel(LauncherLayoutStore.NAVIGATION, "Маршрут", buildNavigationPanel(),
+                preferences.launcherNavigationVisible.get());
+        addPanel(LauncherLayoutStore.ACTIONS, "Действия", buildActionsPanel(),
+                preferences.launcherActionsVisible.get());
+
+        mediaController = new LauncherMediaController(this, this::updateMedia);
+        if (!isFinishing()) mediaController.start();
+        refreshFavorites();
+        updateNavigation();
+        if (getIntent().getBooleanExtra(EXTRA_EDIT_MODE, false)) setEditMode(true);
+    }
+
+    private void addPanel(@NonNull String id, @NonNull String label, @NonNull View content,
+                          boolean visible) {
+        LauncherElementFrame frame = new LauncherElementFrame(this, id, label,
+                (changedId, x, y, width, height) -> layoutStore.put(changedId,
+                        new LauncherLayoutStore.Geometry(x, y, width, height)));
+        frame.setContent(content);
+        LauncherLayoutStore.Geometry g = layoutStore.get(id);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(g.width, g.height);
+        lp.leftMargin = g.x;
+        lp.topMargin = g.y;
+        workspace.addView(frame, lp);
+        frame.setVisibility(visible ? View.VISIBLE : View.GONE);
+        panels.put(id, frame);
+    }
+
+    @NonNull
+    private View buildAppsPanel() {
+        LinearLayout root = verticalContainer();
+        TextView heading = heading("Избранное");
+        heading.setOnClickListener(v -> showAllApps());
+        root.addView(heading, new LinearLayout.LayoutParams(matchWidth(), dp(42)));
+        favoritesGrid = new GridView(this);
+        favoritesGrid.setNumColumns(3);
+        favoritesGrid.setVerticalSpacing(dp(4));
+        favoritesGrid.setHorizontalSpacing(dp(4));
+        favoritesGrid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
+        favoritesGrid.setSelector(new ColorDrawable(Color.TRANSPARENT));
+        favoritesGrid.setOnItemClickListener((parent, view, position, id) ->
+                launchApp((AppEntry) parent.getItemAtPosition(position)));
+        favoritesGrid.setOnItemLongClickListener((parent, view, position, id) -> {
+            AppEntry entry = (AppEntry) parent.getItemAtPosition(position);
+            appCatalog.toggleFavorite(entry.packageName);
+            refreshFavorites();
+            return true;
+        });
+        root.addView(favoritesGrid, new LinearLayout.LayoutParams(matchWidth(), 0, 1f));
+        return root;
+    }
+
+    @NonNull
+    private View buildMediaPanel() {
+        LinearLayout root = verticalContainer();
+        LinearLayout info = new LinearLayout(this);
+        info.setOrientation(LinearLayout.HORIZONTAL);
+        info.setGravity(Gravity.CENTER_VERTICAL);
+        mediaArtwork = new ImageView(this);
+        mediaArtwork.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        mediaArtwork.setImageResource(android.R.drawable.ic_media_play);
+        info.addView(mediaArtwork, new LinearLayout.LayoutParams(dp(112), dp(112)));
+
+        LinearLayout labels = new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        labels.setPadding(dp(18), 0, 0, 0);
+        mediaTitle = text(24, Color.WHITE, true);
+        mediaArtist = text(18, Color.LTGRAY, false);
+        mediaApplication = text(13, Color.GRAY, false);
+        labels.addView(mediaTitle);
+        labels.addView(mediaArtist);
+        labels.addView(mediaApplication);
+        info.addView(labels, new LinearLayout.LayoutParams(0, matchHeight(), 1f));
+        root.addView(info, new LinearLayout.LayoutParams(matchWidth(), 0, 1f));
+
+        LinearLayout controls = new LinearLayout(this);
+        controls.setGravity(Gravity.CENTER);
+        ImageButton previous = mediaButton(android.R.drawable.ic_media_previous);
+        playPauseButton = mediaButton(android.R.drawable.ic_media_play);
+        ImageButton next = mediaButton(android.R.drawable.ic_media_next);
+        previous.setOnClickListener(v -> mediaController.previous());
+        playPauseButton.setOnClickListener(v -> mediaController.playPause());
+        next.setOnClickListener(v -> mediaController.next());
+        controls.addView(previous, controlLp());
+        controls.addView(playPauseButton, controlLp());
+        controls.addView(next, controlLp());
+        root.addView(controls, new LinearLayout.LayoutParams(matchWidth(), dp(64)));
+        return root;
+    }
+
+    @NonNull
+    private View buildClockPanel() {
+        LinearLayout root = verticalContainer();
+        root.setGravity(Gravity.CENTER);
+        TextClock time = new TextClock(this);
+        time.setFormat24Hour("HH:mm");
+        time.setFormat12Hour("h:mm");
+        time.setTextColor(Color.WHITE);
+        time.setTextSize(50);
+        time.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL));
+        TextClock date = new TextClock(this);
+        date.setFormat24Hour("EEE, d MMMM");
+        date.setFormat12Hour("EEE, d MMMM");
+        date.setTextColor(Color.LTGRAY);
+        date.setTextSize(17);
+        root.addView(time);
+        root.addView(date);
+        return root;
+    }
+
+    @NonNull
+    private View buildNavigationPanel() {
+        LinearLayout root = verticalContainer();
+        root.setGravity(Gravity.CENTER_VERTICAL);
+        navigationTitle = text(24, Color.WHITE, true);
+        navigationSummary = text(18, Color.LTGRAY, false);
+        root.addView(navigationTitle);
+        root.addView(navigationSummary);
+        root.setOnClickListener(v -> launchYandex(YandexWindowLauncher.Product.MAPS, false));
+        return root;
+    }
+
+    @NonNull
+    private View buildActionsPanel() {
+        shortcutScroll = new ScrollView(this);
+        shortcutScroll.setFillViewport(true);
+        shortcutScroll.setVerticalScrollBarEnabled(false);
+        shortcutGrid = new GridLayout(this);
+        shortcutGrid.setPadding(dp(7), dp(7), dp(7), dp(7));
+        shortcutScroll.addView(shortcutGrid, new ScrollView.LayoutParams(
+                matchWidth(), wrapContent()));
+        shortcutGrid.post(this::refreshShortcutGrid);
+        return shortcutScroll;
+    }
+
+    private void refreshShortcutGrid() {
+        if (shortcutGrid == null || shortcutStore == null) return;
+        shortcutGrid.removeAllViews();
+        carShortcutBindings.clear();
+        int columns = Math.max(1, Math.min(6, preferences.launcherActionsColumns.get()));
+        List<ShortcutPlacement> placements = new ArrayList<>();
+        List<boolean[]> occupied = new ArrayList<>();
+        for (LauncherShortcutStore.Shortcut shortcut : shortcutStore.all()) {
+            if (!shortcut.enabled) continue;
+            placements.add(place(shortcut, columns, occupied));
+        }
+        LauncherShortcutStore.Shortcut add = new LauncherShortcutStore.Shortcut();
+        add.title = "Добавить";
+        add.icon = "apps";
+        add.backgroundColor = "#553A465B";
+        placements.add(place(add, columns, occupied));
+
+        int rows = Math.max(1, occupied.size());
+        shortcutGrid.setColumnCount(columns);
+        shortcutGrid.setRowCount(rows);
+        int availableWidth = shortcutGrid.getWidth();
+        if (availableWidth <= dp(20) && shortcutScroll != null) {
+            availableWidth = shortcutScroll.getWidth();
+        }
+        int cellWidth = Math.max(dp(72), (Math.max(dp(72), availableWidth) - dp(14)) / columns);
+        int cellHeight = Math.max(dp(82), cellWidth);
+        shortcutGrid.setMinimumHeight(rows * cellHeight + dp(14));
+        for (int index = 0; index < placements.size(); index++) {
+            ShortcutPlacement placement = placements.get(index);
+            boolean addButton = index == placements.size() - 1;
+            View tile = buildShortcutTile(placement.shortcut, addButton);
+            GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
+            lp.width = cellWidth * placement.columnSpan - dp(8);
+            lp.height = cellHeight * placement.rowSpan - dp(8);
+            lp.columnSpec = GridLayout.spec(placement.column, placement.columnSpan);
+            lp.rowSpec = GridLayout.spec(placement.row, placement.rowSpan);
+            lp.setMargins(dp(4), dp(4), dp(4), dp(4));
+            shortcutGrid.addView(tile, lp);
+        }
+        resubscribeCarControls();
+    }
+
+    @NonNull
+    private ShortcutPlacement place(@NonNull LauncherShortcutStore.Shortcut shortcut, int columns,
+                                    @NonNull List<boolean[]> occupied) {
+        int width = Math.max(1, Math.min(columns, shortcut.columnSpan));
+        int height = Math.max(1, Math.min(4, shortcut.rowSpan));
+        for (int row = 0; ; row++) {
+            while (occupied.size() < row + height) occupied.add(new boolean[columns]);
+            for (int column = 0; column <= columns - width; column++) {
+                boolean fits = true;
+                for (int y = row; y < row + height && fits; y++) {
+                    for (int x = column; x < column + width; x++) {
+                        if (occupied.get(y)[x]) { fits = false; break; }
+                    }
+                }
+                if (!fits) continue;
+                for (int y = row; y < row + height; y++) {
+                    for (int x = column; x < column + width; x++) occupied.get(y)[x] = true;
+                }
+                return new ShortcutPlacement(shortcut, row, column, width, height);
+            }
+        }
+    }
+
+    @NonNull
+    private View buildShortcutTile(@NonNull LauncherShortcutStore.Shortcut shortcut,
+                                   boolean addButton) {
+        MaterialCardView card = new MaterialCardView(this);
+        card.setRadius(dp(16));
+        card.setCardElevation(dp(2));
+        card.setClickable(true);
+        card.setFocusable(true);
+        try { card.setCardBackgroundColor(Color.parseColor(shortcut.backgroundColor)); }
+        catch (IllegalArgumentException ignored) { card.setCardBackgroundColor(Color.argb(180, 34, 39, 51)); }
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setGravity(Gravity.CENTER);
+        content.setPadding(dp(6), dp(6), dp(6), dp(6));
+        ImageView icon = new ImageView(this);
+        if (addButton) {
+            icon.setImageResource(android.R.drawable.ic_input_add);
+            icon.setColorFilter(Color.WHITE);
+        } else {
+            icon.setImageDrawable(LauncherIconResolver.resolve(this, shortcut));
+        }
+        int iconSize = Math.max(24, shortcut.iconSizePx);
+        content.addView(icon, new LinearLayout.LayoutParams(iconSize, iconSize));
+        if (shortcut.showTitle || addButton) {
+            TextView label = text(12, Color.WHITE, true);
+            try { label.setTextColor(Color.parseColor(shortcut.textColor)); }
+            catch (IllegalArgumentException ignored) { label.setTextColor(Color.WHITE); }
+            label.setGravity(Gravity.CENTER);
+            label.setText(addButton ? "+  Добавить" : shortcut.title);
+            label.setMaxLines(2);
+            LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(matchWidth(), wrapContent());
+            labelLp.topMargin = dp(4);
+            content.addView(label, labelLp);
+        }
+        TextView stateLabel = null;
+        if (!addButton && shortcut.kind == LauncherShortcutStore.Kind.CAR
+                && shortcut.showState) {
+            stateLabel = text(11, Color.LTGRAY, true);
+            stateLabel.setGravity(Gravity.CENTER);
+            stateLabel.setText("…");
+            stateLabel.setMaxLines(1);
+            stateLabel.setPadding(dp(5), 0, dp(5), 0);
+            GradientDrawable badge = new GradientDrawable();
+            badge.setColor(Color.argb(150, 0, 0, 0));
+            badge.setCornerRadius(dp(9));
+            stateLabel.setBackground(badge);
+        }
+        card.addView(content, new MaterialCardView.LayoutParams(matchWidth(), matchHeight()));
+        if (stateLabel != null) {
+            FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(
+                    wrapContent(), dp(22), Gravity.TOP | Gravity.END);
+            badgeLp.setMargins(dp(4), dp(4), dp(4), dp(4));
+            card.addView(stateLabel, badgeLp);
+        }
+        if (addButton) {
+            card.setOnClickListener(v -> startActivity(new Intent(this,
+                    LauncherShortcutSettingsActivity.class)
+                    .putExtra(LauncherShortcutSettingsActivity.EXTRA_ADD_NEW, true)));
+        } else {
+            card.setOnClickListener(v -> executeShortcut(shortcut));
+            card.setOnLongClickListener(v -> {
+                if (shortcut.hasLongAction) {
+                    LauncherShortcutStore.Shortcut action = shortcut.copy();
+                    action.kind = shortcut.longKind;
+                    action.target = shortcut.longTarget;
+                    action.packageName = shortcut.longPackageName;
+                    action.command = shortcut.longCommand;
+                    action.commandValue = shortcut.longCommandValue;
+                    executeShortcut(action);
+                } else {
+                    startActivity(new Intent(this, LauncherShortcutSettingsActivity.class));
+                }
+                return true;
+            });
+            if (shortcut.kind == LauncherShortcutStore.Kind.CAR) {
+                ShortcutTileBinding binding = new ShortcutTileBinding(shortcut.copy(), card,
+                        icon, stateLabel);
+                carShortcutBindings.put(shortcut.id, binding);
+                applyCarState(binding, carControlStates.get(shortcut.target));
+            }
+        }
+        return card;
+    }
+
+    private void executeShortcut(@NonNull LauncherShortcutStore.Shortcut shortcut) {
+        try {
+            if (shortcut.kind == LauncherShortcutStore.Kind.CAR) {
+                if (!pendingCarControls.add(shortcut.target)) return;
+                CarControlCommand command = new CarControlCommand(shortcut.target,
+                        shortcut.command, shortcut.commandValue);
+                carIntegration.executeControl(command, (success, message) -> {
+                    pendingCarControls.remove(shortcut.target);
+                    if (!success) {
+                        Toast.makeText(this, message == null ? "Команда не выполнена" : message,
+                                Toast.LENGTH_LONG).show();
+                    }
+                });
+                return;
+            }
+            if (shortcut.kind == LauncherShortcutStore.Kind.APP) {
+                ComponentName component = ComponentName.unflattenFromString(shortcut.target);
+                if (component == null) throw new IllegalArgumentException("component");
+                startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+                        .setComponent(component)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
+                return;
+            }
+            if (shortcut.kind == LauncherShortcutStore.Kind.INTENT) {
+                Intent command = new Intent(shortcut.target);
+                if (!shortcut.packageName.isEmpty()) command.setPackage(shortcut.packageName);
+                sendBroadcast(command);
+                Toast.makeText(this, "Intent отправлен", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (shortcut.kind == LauncherShortcutStore.Kind.RULE) {
+                executeSavedRule(shortcut.target);
+                return;
+            }
+            executeBuiltin(LauncherShortcutStore.Builtin.fromKey(shortcut.target));
+        } catch (RuntimeException error) {
+            if (shortcut.kind == LauncherShortcutStore.Kind.CAR) {
+                pendingCarControls.remove(shortcut.target);
+            }
+            Toast.makeText(this, "Действие не выполнено: " + shortcut.title,
+                    Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void resubscribeCarControls() {
+        if (!activityStarted || carIntegration == null || shortcutStore == null) return;
+        LinkedHashSet<String> ids = new LinkedHashSet<>();
+        for (LauncherShortcutStore.Shortcut shortcut : shortcutStore.all()) {
+            if (shortcut.enabled && shortcut.kind == LauncherShortcutStore.Kind.CAR) {
+                ids.add(shortcut.target);
+            }
+        }
+        if (ids.isEmpty()) {
+            carIntegration.unsubscribeControlStates(carStateListener);
+        } else {
+            carIntegration.subscribeControlStates(ids, carStateListener);
+        }
+    }
+
+    private void applyCarState(@NonNull ShortcutTileBinding binding,
+                               @Nullable CarControlState state) {
+        LauncherShortcutStore.Shortcut shortcut = binding.shortcut;
+        boolean confirmed = state != null && state.available && state.known;
+        boolean active = confirmed && state.active;
+        if (confirmed && shortcut.command == CarControlCommand.Operation.SET) {
+            active = Math.abs(state.value - shortcut.commandValue) < .01d;
+        }
+        String background = active ? shortcut.activeBackgroundColor : shortcut.backgroundColor;
+        try { binding.card.setCardBackgroundColor(Color.parseColor(background)); }
+        catch (IllegalArgumentException ignored) {
+            binding.card.setCardBackgroundColor(Color.argb(180, 34, 39, 51));
+        }
+        String tint = active ? shortcut.activeIconColor : shortcut.iconColor;
+        if (active && shortcut.useVehicleStateColor && state.suggestedColor != null) {
+            tint = state.suggestedColor;
+        }
+        binding.icon.setImageDrawable(LauncherIconResolver.resolve(this, shortcut, tint));
+        binding.card.setAlpha(state == null ? .62f : state.available ? 1f : .42f);
+        if (binding.stateLabel != null) {
+            binding.stateLabel.setText(state == null ? "…" : state.valueLabel);
+            try { binding.stateLabel.setTextColor(Color.parseColor(tint)); }
+            catch (IllegalArgumentException ignored) { binding.stateLabel.setTextColor(Color.LTGRAY); }
+        }
+        binding.card.setContentDescription(shortcut.title + (state == null
+                ? ", состояние неизвестно" : ", " + state.valueLabel));
+    }
+
+    private void executeSavedRule(@NonNull String ruleId) {
+        List<IntentActionRule> rules = new IntentActionRuleStore(preferences).loadStrict();
+        for (IntentActionRule rule : rules) {
+            if (!rule.enabled || !rule.id.equals(ruleId)) continue;
+            Intent trigger = new Intent(this, ScenarioTriggerReceiver.class)
+                    .setAction(ScenarioTriggerReceiver.ACTION_TRIGGER)
+                    .putExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_ID, rule.id)
+                    .putExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_TOKEN, rule.triggerToken);
+            sendBroadcast(trigger);
+            return;
+        }
+        throw new IllegalArgumentException("Saved action is missing");
+    }
+
+    private void executeBuiltin(@NonNull LauncherShortcutStore.Builtin action) {
+        switch (action) {
+            case MAPS_WINDOW: launchYandex(YandexWindowLauncher.Product.MAPS, false); break;
+            case MAPS_FULL: launchYandex(YandexWindowLauncher.Product.MAPS, true); break;
+            case NAVIGATOR_WINDOW: launchYandex(YandexWindowLauncher.Product.NAVIGATOR, false); break;
+            case NAVIGATOR_FULL: launchYandex(YandexWindowLauncher.Product.NAVIGATOR, true); break;
+            case MEDIA_PLAY_PAUSE: mediaController.playPause(); break;
+            case MEDIA_PREVIOUS: mediaController.previous(); break;
+            case MEDIA_NEXT: mediaController.next(); break;
+            case EDIT_HOME: setEditMode(true); break;
+            case HOME_SETTINGS: startActivity(new Intent(this, LauncherSettingsActivity.class)); break;
+            case WIDGET_SETTINGS: startActivity(new Intent(this, MainActivity.class)); break;
+            case POPUP_SETTINGS: startActivity(new Intent(this, PopupSettingsActivity.class)); break;
+            case AUTOMATION_SETTINGS: startActivity(new Intent(this, AutomationSettingsActivity.class)); break;
+            case SCENARIOS: startActivity(new Intent(this, ScenarioSettingsActivity.class)); break;
+            case INTENT_SCENARIOS: startActivity(new Intent(this, IntentScenarioSettingsActivity.class)); break;
+            case NOTIFICATION_ACCESS:
+                startActivity(new Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
+                break;
+            case ALL_APPS:
+            default: showAllApps(); break;
+        }
+    }
+
+    private void setEditMode(boolean enabled) {
+        editMode = enabled;
+        int snap = Math.max(4, preferences.launcherSnapPx.get());
+        editorGrid.setStepPx(snap);
+        editorGrid.setVisibility(enabled && preferences.launcherShowGrid.get()
+                ? View.VISIBLE : View.GONE);
+        doneButton.setVisibility(enabled ? View.VISIBLE : View.GONE);
+        for (LauncherElementFrame frame : panels.values()) frame.setEditMode(enabled, snap);
+        Toast.makeText(this, enabled
+                ? "Тащите панель; маркер внизу справа изменяет размер"
+                : "Компоновка сохранена", Toast.LENGTH_SHORT).show();
+    }
+
+    private void updateMedia(@NonNull LauncherMediaController.Snapshot state) {
+        if (mediaTitle == null) return;
+        mediaTitle.setText(state.title);
+        mediaArtist.setText(state.artist);
+        mediaArtist.setVisibility(state.artist.isEmpty() ? View.GONE : View.VISIBLE);
+        mediaApplication.setText(state.application);
+        if (state.artwork != null) mediaArtwork.setImageBitmap(state.artwork);
+        else mediaArtwork.setImageResource(android.R.drawable.ic_media_play);
+        playPauseButton.setImageResource(state.playing
+                ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
+    }
+
+    private void updateNavigation() {
+        if (navigationTitle == null) return;
+        NavigationDataRepository.Snapshot state = NavigationDataRepository.read(this);
+        if (!state.available) {
+            navigationTitle.setText("Маршрут не запущен");
+            navigationSummary.setText("Нажмите, чтобы открыть Яндекс Карты");
+            return;
+        }
+        navigationTitle.setText(state.arrival.isEmpty() ? "Маршрут активен"
+                : "Время прибытия: " + state.arrival);
+        List<String> summary = new ArrayList<>();
+        if (!state.duration.isEmpty()) summary.add(state.duration);
+        if (!state.distance.isEmpty()) summary.add(state.distance);
+        navigationSummary.setText(summary.isEmpty() ? "Данные маршрута получены"
+                : "Осталось: " + String.join(" · ", summary));
+    }
+
+    private void launchYandex(YandexWindowLauncher.Product product, boolean full) {
+        if (!YandexWindowLauncher.launch(this, product, full)) {
+            Toast.makeText(this, "Яндекс-приложение не найдено", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void showAllApps() {
+        GridView grid = new GridView(this);
+        grid.setNumColumns(5);
+        grid.setPadding(dp(16), dp(16), dp(16), dp(16));
+        grid.setVerticalSpacing(dp(8));
+        AppAdapter adapter = new AppAdapter(appCatalog.all());
+        grid.setAdapter(adapter);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Все приложения · удержание добавляет в избранное")
+                .setView(grid)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        grid.setOnItemClickListener((parent, view, position, id) -> {
+            dialog.dismiss();
+            launchApp((AppEntry) parent.getItemAtPosition(position));
+        });
+        grid.setOnItemLongClickListener((parent, view, position, id) -> {
+            AppEntry entry = (AppEntry) parent.getItemAtPosition(position);
+            appCatalog.toggleFavorite(entry.packageName);
+            refreshFavorites();
+            Toast.makeText(this, "Избранное обновлено", Toast.LENGTH_SHORT).show();
+            return true;
+        });
+        dialog.show();
+    }
+
+    private void refreshFavorites() {
+        if (favoritesGrid != null && appCatalog != null) {
+            favoritesGrid.setAdapter(new AppAdapter(appCatalog.favorites()));
+        }
+    }
+
+    private void launchApp(@NonNull AppEntry entry) {
+        try {
+            Intent intent = new Intent(Intent.ACTION_MAIN)
+                    .addCategory(Intent.CATEGORY_LAUNCHER)
+                    .setComponent(entry.component)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+            startActivity(intent);
+        } catch (RuntimeException error) {
+            Toast.makeText(this, "Не удалось открыть " + entry.label, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @NonNull private LinearLayout verticalContainer() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(14), dp(12), dp(14), dp(12));
+        return root;
+    }
+
+    @NonNull private TextView heading(String value) {
+        TextView text = text(18, Color.WHITE, true);
+        text.setText(value);
+        text.setGravity(Gravity.CENTER_VERTICAL);
+        return text;
+    }
+
+    @NonNull private TextView text(float size, int color, boolean bold) {
+        TextView text = new TextView(this);
+        text.setTextSize(size);
+        text.setTextColor(color);
+        if (bold) text.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        text.setMaxLines(2);
+        return text;
+    }
+
+    @NonNull private ImageButton mediaButton(int icon) {
+        ImageButton button = new ImageButton(this);
+        button.setImageResource(icon);
+        button.setColorFilter(Color.WHITE);
+        button.setBackgroundColor(Color.TRANSPARENT);
+        button.setPadding(dp(14), dp(14), dp(14), dp(14));
+        return button;
+    }
+
+    private LinearLayout.LayoutParams controlLp() {
+        return new LinearLayout.LayoutParams(dp(76), matchHeight());
+    }
+
+    private FrameLayout.LayoutParams match() {
+        return new FrameLayout.LayoutParams(matchWidth(), matchHeight());
+    }
+
+    private static int matchWidth() { return ViewGroup.LayoutParams.MATCH_PARENT; }
+    private static int matchHeight() { return ViewGroup.LayoutParams.MATCH_PARENT; }
+    private static int wrapContent() { return ViewGroup.LayoutParams.WRAP_CONTENT; }
+    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
+
+    private static int blend(int first, int second, float amount) {
+        float inverse = 1f - amount;
+        return Color.rgb(Math.round(Color.red(first) * inverse + Color.red(second) * amount),
+                Math.round(Color.green(first) * inverse + Color.green(second) * amount),
+                Math.round(Color.blue(first) * inverse + Color.blue(second) * amount));
+    }
+
+    private static final class AppEntry {
+        final String label;
+        final String packageName;
+        final ComponentName component;
+        final Drawable icon;
+
+        AppEntry(String label, String packageName, ComponentName component, Drawable icon) {
+            this.label = label;
+            this.packageName = packageName;
+            this.component = component;
+            this.icon = icon;
+        }
+    }
+
+    private static final class ShortcutPlacement {
+        final LauncherShortcutStore.Shortcut shortcut;
+        final int row;
+        final int column;
+        final int columnSpan;
+        final int rowSpan;
+
+        ShortcutPlacement(LauncherShortcutStore.Shortcut shortcut, int row, int column,
+                          int columnSpan, int rowSpan) {
+            this.shortcut = shortcut;
+            this.row = row;
+            this.column = column;
+            this.columnSpan = columnSpan;
+            this.rowSpan = rowSpan;
+        }
+    }
+
+    private static final class ShortcutTileBinding {
+        final LauncherShortcutStore.Shortcut shortcut;
+        final MaterialCardView card;
+        final ImageView icon;
+        @Nullable final TextView stateLabel;
+
+        ShortcutTileBinding(LauncherShortcutStore.Shortcut shortcut, MaterialCardView card,
+                            ImageView icon, @Nullable TextView stateLabel) {
+            this.shortcut = shortcut;
+            this.card = card;
+            this.icon = icon;
+            this.stateLabel = stateLabel;
+        }
+    }
+
+    private final class AppAdapter extends BaseAdapter {
+        private final List<AppEntry> values;
+        AppAdapter(List<AppEntry> values) { this.values = values; }
+        @Override public int getCount() { return values.size(); }
+        @Override public AppEntry getItem(int position) { return values.get(position); }
+        @Override public long getItemId(int position) { return position; }
+
+        @Override
+        public View getView(int position, View reusable, ViewGroup parent) {
+            LinearLayout cell = reusable instanceof LinearLayout
+                    ? (LinearLayout) reusable : new LinearLayout(LauncherActivity.this);
+            cell.removeAllViews();
+            cell.setOrientation(LinearLayout.VERTICAL);
+            cell.setGravity(Gravity.CENTER);
+            cell.setPadding(dp(4), dp(5), dp(4), dp(5));
+            AppEntry entry = getItem(position);
+            ImageView icon = new ImageView(LauncherActivity.this);
+            icon.setImageDrawable(entry.icon);
+            icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            cell.addView(icon, new LinearLayout.LayoutParams(dp(50), dp(50)));
+            TextView label = text(12, Color.WHITE, false);
+            label.setGravity(Gravity.CENTER);
+            label.setText(entry.label);
+            label.setMaxLines(1);
+            cell.addView(label, new LinearLayout.LayoutParams(matchWidth(), dp(25)));
+            return cell;
+        }
+    }
+
+    private final class AppCatalog {
+        private final Context context;
+        private final List<AppEntry> apps = new ArrayList<>();
+        AppCatalog(Context context) { this.context = context; }
+
+        void reload() {
+            apps.clear();
+            PackageManager manager = context.getPackageManager();
+            Intent query = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+            List<ResolveInfo> resolved = manager.queryIntentActivities(query, 0);
+            Set<String> components = new LinkedHashSet<>();
+            for (ResolveInfo info : resolved) {
+                if (info.activityInfo == null) continue;
+                ComponentName component = new ComponentName(info.activityInfo.packageName,
+                        info.activityInfo.name);
+                if (!components.add(component.flattenToString())) continue;
+                apps.add(new AppEntry(String.valueOf(info.loadLabel(manager)),
+                        info.activityInfo.packageName, component, info.loadIcon(manager)));
+            }
+            apps.sort(Comparator.comparing(value -> value.label.toLowerCase(Locale.ROOT)));
+            ensureDefaultFavorites();
+        }
+
+        List<AppEntry> all() { return new ArrayList<>(apps); }
+
+        List<AppEntry> favorites() {
+            Set<String> wanted = favoritePackages();
+            List<AppEntry> result = new ArrayList<>();
+            for (String packageName : wanted) {
+                for (AppEntry app : apps) {
+                    if (packageName.equals(app.packageName)) {
+                        result.add(app);
+                        break;
+                    }
+                }
+            }
+            return result;
+        }
+
+        void toggleFavorite(String packageName) {
+            Set<String> values = favoritePackages();
+            if (!values.remove(packageName)) values.add(packageName);
+            preferences.launcherFavoritePackages.set(String.join(",", values));
+        }
+
+        private void ensureDefaultFavorites() {
+            if (!preferences.launcherFavoritePackages.get().trim().isEmpty()) return;
+            String[] preferred = {"ru.yandex.yandexmaps", "ru.yandex.yandexnavi",
+                    "ru.yandex.music", "com.yandex.music", "com.android.settings",
+                    getPackageName()};
+            LinkedHashSet<String> initial = new LinkedHashSet<>();
+            for (String wanted : preferred) {
+                for (AppEntry app : apps) if (wanted.equals(app.packageName)) initial.add(wanted);
+            }
+            for (AppEntry app : apps) {
+                if (initial.size() >= 9) break;
+                initial.add(app.packageName);
+            }
+            preferences.launcherFavoritePackages.set(String.join(",", initial));
+        }
+
+        @NonNull
+        private Set<String> favoritePackages() {
+            LinkedHashSet<String> values = new LinkedHashSet<>();
+            String raw = preferences.launcherFavoritePackages.get();
+            if (raw != null) for (String value : raw.split(",")) {
+                if (!value.trim().isEmpty()) values.add(value.trim());
+            }
+            return values;
+        }
+    }
+}

@@ -130,6 +130,8 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(new Intent(this, AboutActivity.class)));
         binding.sectionGeneral.automationSettingsButton.setOnClickListener(v ->
                 startActivity(new Intent(this, AutomationSettingsActivity.class)));
+        binding.sectionGeneral.launcherSettingsButton.setOnClickListener(v ->
+                startActivity(new Intent(this, LauncherSettingsActivity.class)));
         binding.sectionGeneral.settingsButton.setOnClickListener(this::showSettingsMenu);
 
         final String appVersion = VersionGetter.getAppVersionName(this);
