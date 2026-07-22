@@ -458,6 +458,9 @@ public class Preferences {
     public final Bool launcherClockVisible = new Bool(this, "launcherClockVisible", true);
     public final Bool launcherNavigationVisible = new Bool(this, "launcherNavigationVisible", true);
     public final Bool launcherActionsVisible = new Bool(this, "launcherActionsVisible", true);
+    // Opt-in on upgrades so a new large panel never covers an existing hand-tuned HOME layout.
+    public final Bool launcherClimateVisible = new Bool(this, "launcherClimateVisible", false);
+    public final Str launcherClimateConfigJson = new Str(this, "launcherClimateConfigJson", "");
     public final Str launcherShortcutsJson = new Str(this, "launcherShortcutsJson", "");
     public final Int launcherActionsColumns = new Int(this, "launcherActionsColumns", 3);
 

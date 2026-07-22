@@ -18,6 +18,8 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -60,6 +62,8 @@ import dezz.status.widget.launcher.LauncherIconResolver;
 import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.launcher.NavigationDataRepository;
 import dezz.status.widget.launcher.YandexWindowLauncher;
+import dezz.status.widget.launcher.climate.ClimatePanelConfigStore;
+import dezz.status.widget.launcher.climate.ClimatePanelView;
 import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarControlState;
 import dezz.status.widget.car.CarIntegration;
@@ -71,7 +75,15 @@ import dezz.status.widget.scenario.IntentActionRuleStore;
 /** Full HOME implementation that coexists with the original Status Widget settings activity. */
 public final class LauncherActivity extends AppCompatActivity {
     public static final String EXTRA_EDIT_MODE = "dezz.status.widget.extra.EDIT_HOME";
+    private static final long NAVIGATION_UI_REFRESH_MS = 30_000L;
     private final Map<String, LauncherElementFrame> panels = new HashMap<>();
+    private final Handler navigationUiHandler = new Handler(Looper.getMainLooper());
+    private final Runnable navigationUiRefresh = new Runnable() {
+        @Override public void run() {
+            updateNavigation();
+            navigationUiHandler.postDelayed(this, NAVIGATION_UI_REFRESH_MS);
+        }
+    };
     private final BroadcastReceiver navigationReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) { updateNavigation(); }
     };
@@ -91,6 +103,9 @@ public final class LauncherActivity extends AppCompatActivity {
     private ImageButton playPauseButton;
     private TextView navigationTitle;
     private TextView navigationSummary;
+    /** Opens the same Yandex product that supplied the current route; Navigator is the default. */
+    private YandexWindowLauncher.Product navigationLaunchProduct =
+            YandexWindowLauncher.Product.NAVIGATOR;
     private GridView favoritesGrid;
     private AppCatalog appCatalog;
     private LauncherShortcutStore shortcutStore;
@@ -101,6 +116,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private final Map<String, ShortcutTileBinding> carShortcutBindings = new HashMap<>();
     private final Set<String> pendingCarControls = new LinkedHashSet<>();
     private boolean activityStarted;
+    private ClimatePanelView climatePanel;
     private final CarIntegration.ControlStateListener carStateListener = state -> {
         carControlStates.put(state.controlId, state);
         for (ShortcutTileBinding binding : new ArrayList<>(carShortcutBindings.values())) {
@@ -136,12 +152,19 @@ public final class LauncherActivity extends AppCompatActivity {
                 new IntentFilter(NavigationDataRepository.ACTION_UPDATED));
         if (mediaController != null) mediaController.start();
         updateNavigation();
+        navigationUiHandler.removeCallbacks(navigationUiRefresh);
+        navigationUiHandler.postDelayed(navigationUiRefresh, NAVIGATION_UI_REFRESH_MS);
         resubscribeCarControls();
+        if (climatePanel != null && preferences.launcherClimateVisible.get()) {
+            climatePanel.start();
+        }
     }
 
     @Override
     protected void onStop() {
         activityStarted = false;
+        navigationUiHandler.removeCallbacks(navigationUiRefresh);
+        if (climatePanel != null) climatePanel.stop();
         if (carIntegration != null) carIntegration.unsubscribeControlStates(carStateListener);
         if (mediaController != null) mediaController.stop();
         try { unregisterReceiver(navigationReceiver); } catch (IllegalArgumentException ignored) {}
@@ -177,6 +200,13 @@ public final class LauncherActivity extends AppCompatActivity {
         setPanelVisibility(LauncherLayoutStore.NAVIGATION,
                 preferences.launcherNavigationVisible.get());
         setPanelVisibility(LauncherLayoutStore.ACTIONS, preferences.launcherActionsVisible.get());
+        boolean climateVisible = preferences.launcherClimateVisible.get();
+        setPanelVisibility(LauncherLayoutStore.CLIMATE, climateVisible);
+        if (climatePanel != null) {
+            climatePanel.reloadConfig();
+            if (activityStarted && climateVisible) climatePanel.start();
+            else climatePanel.stop();
+        }
 
         layoutStore.load(workspace.getWidth(), workspace.getHeight());
         for (Map.Entry<String, LauncherElementFrame> entry : panels.entrySet()) {
@@ -280,11 +310,19 @@ public final class LauncherActivity extends AppCompatActivity {
                 preferences.launcherNavigationVisible.get());
         addPanel(LauncherLayoutStore.ACTIONS, "Действия", buildActionsPanel(),
                 preferences.launcherActionsVisible.get());
+        addPanel(LauncherLayoutStore.CLIMATE, "Климат", buildClimatePanel(),
+                preferences.launcherClimateVisible.get());
+        LauncherElementFrame climateFrame = panels.get(LauncherLayoutStore.CLIMATE);
+        if (climateFrame != null) {
+            climateFrame.setCardBackgroundColor(Color.TRANSPARENT);
+            climateFrame.setCardElevation(0);
+        }
 
         mediaController = new LauncherMediaController(this, this::updateMedia);
         if (!isFinishing()) mediaController.start();
         refreshFavorites();
         updateNavigation();
+        if (activityStarted && preferences.launcherClimateVisible.get()) climatePanel.start();
         if (getIntent().getBooleanExtra(EXTRA_EDIT_MODE, false)) setEditMode(true);
     }
 
@@ -393,7 +431,7 @@ public final class LauncherActivity extends AppCompatActivity {
         navigationSummary = text(18, Color.LTGRAY, false);
         root.addView(navigationTitle);
         root.addView(navigationSummary);
-        root.setOnClickListener(v -> launchYandex(YandexWindowLauncher.Product.MAPS, false));
+        root.setOnClickListener(v -> launchYandex(navigationLaunchProduct, false));
         return root;
     }
 
@@ -408,6 +446,13 @@ public final class LauncherActivity extends AppCompatActivity {
                 matchWidth(), wrapContent()));
         shortcutGrid.post(this::refreshShortcutGrid);
         return shortcutScroll;
+    }
+
+    @NonNull
+    private View buildClimatePanel() {
+        climatePanel = new ClimatePanelView(this, carIntegration,
+                new ClimatePanelConfigStore(preferences));
+        return climatePanel;
     }
 
     private void refreshShortcutGrid() {
@@ -714,10 +759,14 @@ public final class LauncherActivity extends AppCompatActivity {
         if (navigationTitle == null) return;
         NavigationDataRepository.Snapshot state = NavigationDataRepository.read(this);
         if (!state.available) {
+            navigationLaunchProduct = YandexWindowLauncher.Product.NAVIGATOR;
             navigationTitle.setText("Маршрут не запущен");
-            navigationSummary.setText("Нажмите, чтобы открыть Яндекс Карты");
+            navigationSummary.setText("Нажмите, чтобы открыть Яндекс Навигатор");
             return;
         }
+        navigationLaunchProduct = NavigationDataRepository.PRODUCT_MAPS.equals(state.sourceProduct)
+                ? YandexWindowLauncher.Product.MAPS
+                : YandexWindowLauncher.Product.NAVIGATOR;
         navigationTitle.setText(state.arrival.isEmpty() ? "Маршрут активен"
                 : "Время прибытия: " + state.arrival);
         List<String> summary = new ArrayList<>();

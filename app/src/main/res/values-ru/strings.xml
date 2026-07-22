@@ -35,8 +35,8 @@
     <string name="popup_add_item">Добавить плитку</string>
     <string name="car_diagnostics_loading">Диагностика данных автомобиля: загрузка…</string>
     <string name="car_diagnostics_empty">Диагностика данных автомобиля: интеграция недоступна</string>
-    <string name="accessibility_service_summary">Отслеживает активное приложение на каждом дисплее</string>
-    <string name="accessibility_service_description">Позволяет виджету определять, на каком физическом дисплее произошло переключение приложения. Нужно только для головных устройств с несколькими дисплеями: виджет будет скрываться/появляться только при переключении приложений на своём дисплее, не реагируя на другие.</string>
+    <string name="accessibility_service_summary">Отслеживает активные окна и читает маршрут Яндекс Навигатора</string>
+    <string name="accessibility_service_description">Позволяет виджету определять активное приложение на каждом физическом дисплее. Кроме того, читает только время прибытия, оставшееся время и расстояние из окон Яндекс Навигатора/Карт, если этих данных нет в уведомлении.</string>
 
     <string name="widget_title">Настройки виджета</string>
     <string name="section_general">Виджет</string>

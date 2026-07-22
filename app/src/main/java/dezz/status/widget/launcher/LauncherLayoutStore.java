@@ -27,6 +27,7 @@ public final class LauncherLayoutStore {
     public static final String CLOCK = "clock";
     public static final String NAVIGATION = "navigation";
     public static final String ACTIONS = "actions";
+    public static final String CLIMATE = "climate";
 
     public static final class Geometry {
         public int x;
@@ -162,6 +163,11 @@ public final class LauncherLayoutStore {
         int actionsH = Math.min(280, Math.max(180, height / 3));
         result.put(ACTIONS, new Geometry(Math.max(0, width - actionsW - 28),
                 Math.max(0, (height - actionsH) / 2), actionsW, actionsH));
+
+        int climateW = Math.min(920, Math.max(620, width / 2));
+        int climateH = Math.min(370, Math.max(290, height / 2));
+        result.put(CLIMATE, new Geometry(Math.max(0, (width - climateW) / 2),
+                Math.min(32, Math.max(0, height - climateH)), climateW, climateH));
         return result;
     }
 }

@@ -17,17 +17,14 @@
   -->
 
 <!--
-  We only need per-display "which app is on top" tracking. canRetrieveWindowContent is
-  required to read the root node's package name from AccessibilityWindowInfo. flagRetrieve-
-  InteractiveWindows lets us see windows on all displays (not just the one our service
-  binds to). No feedback (typeAccessibilityFeedbackGeneric is just the placeholder type
-  the framework requires).
+  Window content is used both for per-display foreground tracking and as a fallback for Yandex
+  Navigator builds which expose route ETA/distance only in their view tree.
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged|typeWindowsChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagRetrieveInteractiveWindows"
+    android:accessibilityFlags="flagRetrieveInteractiveWindows|flagIncludeNotImportantViews|flagReportViewIds"
     android:canRetrieveWindowContent="true"
     android:description="@string/accessibility_service_description"
-    android:notificationTimeout="100"
+    android:notificationTimeout="50"
     android:summary="@string/accessibility_service_summary" />

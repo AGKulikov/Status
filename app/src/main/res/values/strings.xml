@@ -35,8 +35,8 @@
     <string name="popup_add_item">Add tile</string>
     <string name="car_diagnostics_loading">Car data diagnostics: loading…</string>
     <string name="car_diagnostics_empty">Car data diagnostics: vendor integration unavailable</string>
-    <string name="accessibility_service_summary">Tracks which app is on top per display</string>
-    <string name="accessibility_service_description">Allows the widget to know on which physical display the foreground app changed. Required only on multi-display head units so the widget hides only when the foreground app changes on its own display, not on any other one.</string>
+    <string name="accessibility_service_summary">Tracks active windows and reads Yandex Navigator route data</string>
+    <string name="accessibility_service_description">Lets the widget identify the foreground app on every physical display. It also reads only ETA, remaining time and remaining distance from Yandex Navigator/Maps windows when those values are not available in a notification.</string>
 
     <string name="widget_title">Widget Configuration</string>
     <string name="section_general">Widget</string>

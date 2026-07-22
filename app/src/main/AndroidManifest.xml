@@ -47,6 +47,7 @@
     <queries>
         <package android:name="ru.yandex.yandexmaps" />
         <package android:name="ru.yandex.yandexnavi" />
+        <package android:name="com.yandex.yango" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
@@ -97,6 +98,11 @@
 
         <activity
             android:name=".LauncherShortcutSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".ClimatePanelSettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />
 
@@ -232,6 +238,19 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="ru.natro.statuswidget.SCENARIO_TRIGGER" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Route values published by supported Yandex Navigator/Maps builds and MConfig. -->
+        <receiver
+            android:name=".launcher.YandexNavigationReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.yandex.ARRIVAL" />
+                <action android:name="com.yandex.TIME" />
+                <action android:name="com.yandex.DISTANCE" />
             </intent-filter>
         </receiver>
     </application>
