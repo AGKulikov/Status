@@ -37,8 +37,10 @@ public final class MediaPanelConfigTest {
         assertFalse(copy.element(MediaPanelConfig.ARTWORK).enabled);
         assertEquals(100, original.element(MediaPanelConfig.TITLE).scalePercent);
         assertEquals(175, copy.element(MediaPanelConfig.TITLE).scalePercent);
-        assertEquals(MediaPanelConfig.NEXT,
-                copy.orderedElements().get(copy.orderedElements().size() - 2).id);
+        List<MediaPanelConfig.Element> moved = copy.orderedElements();
+        int nextIndex = indexOf(moved, MediaPanelConfig.NEXT);
+        int playPauseIndex = indexOf(moved, MediaPanelConfig.PLAY_PAUSE);
+        assertEquals(playPauseIndex - 1, nextIndex);
     }
 
     @Test
@@ -55,5 +57,12 @@ public final class MediaPanelConfigTest {
         assertEquals(64, config.contentPaddingPx);
         assertEquals("#FFFFFF", config.titleColor);
         assertEquals(45, config.element(MediaPanelConfig.PLAY_PAUSE).scalePercent);
+    }
+
+    private static int indexOf(List<MediaPanelConfig.Element> elements, String id) {
+        for (int index = 0; index < elements.size(); index++) {
+            if (id.equals(elements.get(index).id)) return index;
+        }
+        return -1;
     }
 }
