@@ -437,7 +437,6 @@ final class EcarxSignalFallback {
         return null;
     }
 
-    @Nullable
     private static final class Registration {
         final Method method;
         final boolean callbackFirst;
