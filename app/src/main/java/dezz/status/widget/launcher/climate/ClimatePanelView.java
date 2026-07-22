@@ -397,7 +397,10 @@ public final class ClimatePanelView extends FrameLayout {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         CarControlCommand.Operation operation = descriptor.kind == CarControlDescriptor.Kind.ACTION
                 ? CarControlCommand.Operation.ACTIVATE : CarControlCommand.Operation.CYCLE;
-        card.setOnClickListener(v -> execute(id, operation, 0));
+        card.setOnClickListener(v -> {
+            if (config.hasLevelCycleOrder(id)) cycleManualLevel(id, 1);
+            else execute(id, operation, 0);
+        });
         bindings.put(id, new ControlBinding(descriptor, card, icon, title, value,
                 Collections.emptyList()));
         flow.addView(card, flowLp(id, 116, 96));
@@ -450,6 +453,10 @@ public final class ClimatePanelView extends FrameLayout {
     }
 
     private void adjust(@NonNull String id, int direction) {
+        if (config.hasLevelCycleOrder(id)) {
+            cycleManualLevel(id, direction);
+            return;
+        }
         ControlBinding binding = bindings.get(id);
         CarControlState state = states.get(id);
         if (binding == null || isEditorPlaceholder(id) || !isFresh(state)
@@ -476,6 +483,34 @@ public final class ClimatePanelView extends FrameLayout {
                 target = descriptor.minimum
                         + Math.round((target - descriptor.minimum) / step) * step;
             }
+        }
+        execute(id, CarControlCommand.Operation.SET, target);
+    }
+
+    /**
+     * Converts a tile press into an explicit SET calculated from the last confirmed vehicle
+     * value. This is intentionally not optimistic: the current card remains unchanged until the
+     * ECARX read-back arrives through {@link #stateListener}.
+     */
+    private void cycleManualLevel(@NonNull String id, int direction) {
+        ControlBinding binding = bindings.get(id);
+        CarControlState state = states.get(id);
+        if (binding == null || pending.containsKey(id) || isEditorPlaceholder(id)) return;
+        if (!isFresh(state) || !state.available || !state.known
+                || !Double.isFinite(state.value)
+                || binding.descriptor.availability
+                != CarControlDescriptor.Availability.SUPPORTED
+                || binding.descriptor.options.isEmpty()) {
+            Toast.makeText(getContext(), "Текущий уровень ещё загружается",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Double target = ClimateLevelCyclePlanner.nextTarget(binding.descriptor.options,
+                state.value, config.levelCycleOrder(id), direction);
+        if (target == null) {
+            Toast.makeText(getContext(), "Для функции нет доступных уровней",
+                    Toast.LENGTH_SHORT).show();
+            return;
         }
         execute(id, CarControlCommand.Operation.SET, target);
     }
@@ -545,9 +580,12 @@ public final class ClimatePanelView extends FrameLayout {
                 : color(config.textColor, Color.WHITE));
         float alpha = pending.containsKey(id) ? .60f : available ? 1f : .42f;
         binding.card.setAlpha(alpha);
-        binding.card.setEnabled(editorPreviewMode || (available && !pending.containsKey(id)));
         boolean optionsReady = binding.descriptor.availability
                 == CarControlDescriptor.Availability.SUPPORTED;
+        boolean manualLevelReady = !config.hasLevelCycleOrder(id) || (known && optionsReady
+                && !binding.descriptor.options.isEmpty());
+        binding.card.setEnabled(editorPreviewMode
+                || (available && manualLevelReady && !pending.containsKey(id)));
         for (View interactive : binding.interactive) {
             interactive.setEnabled(known && optionsReady && !pending.containsKey(id));
             interactive.setAlpha(known && optionsReady ? 1f : .38f);

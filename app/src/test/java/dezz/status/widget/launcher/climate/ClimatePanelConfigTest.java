@@ -206,4 +206,71 @@ public final class ClimatePanelConfigTest {
         assertEquals(175, restored.elementWidthPercent(ClimatePanelConfig.TEMP_DRIVER));
         assertEquals(125, restored.elementHeightPercent(ClimatePanelConfig.TEMP_DRIVER));
     }
+
+    @Test
+    public void everyManualLevelControlHasAnIndependentAscendingDefault() {
+        ClimatePanelConfig config = new ClimatePanelConfig();
+        for (String id : ClimatePanelConfig.LEVEL_CYCLE_ELEMENTS) {
+            assertEquals(ClimatePanelConfig.LevelCycleOrder.ASCENDING,
+                    config.levelCycleOrder(id));
+        }
+        config.setLevelCycleOrder(ClimatePanelConfig.SEAT_HEAT_DRIVER,
+                ClimatePanelConfig.LevelCycleOrder.DESCENDING);
+        assertEquals(ClimatePanelConfig.LevelCycleOrder.DESCENDING,
+                config.levelCycleOrder(ClimatePanelConfig.SEAT_HEAT_DRIVER));
+        assertEquals(ClimatePanelConfig.LevelCycleOrder.ASCENDING,
+                config.levelCycleOrder(ClimatePanelConfig.SEAT_HEAT_PASSENGER));
+    }
+
+    @Test
+    public void versionThreeMigratesToAscendingWithoutChangingExistingAppearance() throws Exception {
+        JSONObject legacy = new JSONObject()
+                .put("version", 3)
+                .put("tileSpacingPx", 19)
+                .put("elements", new JSONObject()
+                        .put(ClimatePanelConfig.SEAT_HEAT_DRIVER, false));
+        ClimatePanelConfig restored = ClimatePanelConfigStore.decode(legacy.toString());
+        assertEquals(19, restored.tileSpacingPx);
+        assertFalse(restored.isElementEnabled(ClimatePanelConfig.SEAT_HEAT_DRIVER));
+        for (String id : ClimatePanelConfig.LEVEL_CYCLE_ELEMENTS) {
+            assertEquals(ClimatePanelConfig.LevelCycleOrder.ASCENDING,
+                    restored.levelCycleOrder(id));
+        }
+    }
+
+    @Test
+    public void versionFourRoundTripKeepsFiveSeparateCycleDirections() throws Exception {
+        ClimatePanelConfig source = new ClimatePanelConfig();
+        source.setLevelCycleOrder(ClimatePanelConfig.SEAT_HEAT_DRIVER,
+                ClimatePanelConfig.LevelCycleOrder.DESCENDING);
+        source.setLevelCycleOrder(ClimatePanelConfig.SEAT_VENT_PASSENGER,
+                ClimatePanelConfig.LevelCycleOrder.DESCENDING);
+
+        ClimatePanelConfig restored = ClimatePanelConfigStore.decode(
+                ClimatePanelConfigStore.encode(source).toString());
+        assertEquals(ClimatePanelConfig.LevelCycleOrder.DESCENDING,
+                restored.levelCycleOrder(ClimatePanelConfig.SEAT_HEAT_DRIVER));
+        assertEquals(ClimatePanelConfig.LevelCycleOrder.ASCENDING,
+                restored.levelCycleOrder(ClimatePanelConfig.SEAT_HEAT_PASSENGER));
+        assertEquals(ClimatePanelConfig.LevelCycleOrder.ASCENDING,
+                restored.levelCycleOrder(ClimatePanelConfig.SEAT_VENT_DRIVER));
+        assertEquals(ClimatePanelConfig.LevelCycleOrder.DESCENDING,
+                restored.levelCycleOrder(ClimatePanelConfig.SEAT_VENT_PASSENGER));
+        assertEquals(ClimatePanelConfig.LevelCycleOrder.ASCENDING,
+                restored.levelCycleOrder(ClimatePanelConfig.WHEEL_HEAT));
+    }
+
+    @Test
+    public void transitionalBooleanCycleDirectionIsStillAccepted() throws Exception {
+        JSONObject transitional = new JSONObject()
+                .put("version", 4)
+                .put("levelCycleOrders", new JSONObject()
+                        .put(ClimatePanelConfig.WHEEL_HEAT, true)
+                        .put(ClimatePanelConfig.SEAT_HEAT_DRIVER, false));
+        ClimatePanelConfig restored = ClimatePanelConfigStore.decode(transitional.toString());
+        assertEquals(ClimatePanelConfig.LevelCycleOrder.DESCENDING,
+                restored.levelCycleOrder(ClimatePanelConfig.WHEEL_HEAT));
+        assertEquals(ClimatePanelConfig.LevelCycleOrder.ASCENDING,
+                restored.levelCycleOrder(ClimatePanelConfig.SEAT_HEAT_DRIVER));
+    }
 }

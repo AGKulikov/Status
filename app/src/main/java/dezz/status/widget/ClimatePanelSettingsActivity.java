@@ -528,6 +528,9 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
                     65, 200, value -> config.setElementHeightPercent(element.id, value));
             addElementSlider(block, "Иконка/текст", config.elementScalePercent(element.id),
                     70, 180, value -> config.setElementScalePercent(element.id, value));
+            if (config.hasLevelCycleOrder(element.id)) {
+                addLevelCycleOrderSelector(block, element.id);
+            }
             card.addView(block, new MaterialCardView.LayoutParams(match(), wrap()));
             LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(match(), wrap());
             cardLp.topMargin = dp(6);
@@ -606,6 +609,43 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
         row.addView(slider, new LinearLayout.LayoutParams(0, dp(40), 1f));
         row.addView(value, new LinearLayout.LayoutParams(dp(62), dp(40)));
         parent.addView(row, new LinearLayout.LayoutParams(match(), dp(40)));
+    }
+
+    private void addLevelCycleOrderSelector(@NonNull LinearLayout parent,
+                                            @NonNull String elementId) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView label = new TextView(this);
+        label.setText("Уровни по нажатию");
+        label.setTextSize(13);
+
+        ClimatePanelConfig.LevelCycleOrder[] orders =
+                ClimatePanelConfig.LevelCycleOrder.values();
+        String[] labels = new String[orders.length];
+        for (int index = 0; index < orders.length; index++) labels[index] = orders[index].label;
+        Spinner spinner = new Spinner(this);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, labels);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        ClimatePanelConfig.LevelCycleOrder current = config.levelCycleOrder(elementId);
+        spinner.setSelection(current.ordinal(), false);
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view,
+                                                  int position, long id) {
+                int safe = Math.max(0, Math.min(orders.length - 1, position));
+                ClimatePanelConfig.LevelCycleOrder selected = orders[safe];
+                if (config.levelCycleOrder(elementId) == selected) return;
+                config.setLevelCycleOrder(elementId, selected);
+                persistAndPreview();
+            }
+
+            @Override public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+        row.addView(label, new LinearLayout.LayoutParams(dp(150), dp(48)));
+        row.addView(spinner, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        parent.addView(row, new LinearLayout.LayoutParams(match(), dp(48)));
     }
 
     private void moveElement(@NonNull String id, int direction) {

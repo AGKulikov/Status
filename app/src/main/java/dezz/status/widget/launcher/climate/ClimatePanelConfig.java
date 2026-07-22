@@ -32,6 +32,26 @@ public final class ClimatePanelConfig {
     public static final String DEFROST_FRONT = "climate.defrost_front";
     public static final String DEFROST_REAR = "climate.defrost_rear";
 
+    /** Manual level direction used when a heat/ventilation tile is pressed. */
+    public enum LevelCycleOrder {
+        ASCENDING("1 → 2 → 3"),
+        DESCENDING("3 → 2 → 1");
+
+        @NonNull public final String label;
+
+        LevelCycleOrder(@NonNull String label) {
+            this.label = label;
+        }
+    }
+
+    /**
+     * Controls whose ECARX value has three manual levels.  The order is configured separately
+     * for every physical heater/ventilator instead of sharing one global mSaver-style switch.
+     */
+    public static final List<String> LEVEL_CYCLE_ELEMENTS = Collections.unmodifiableList(
+            Arrays.asList(SEAT_HEAT_DRIVER, SEAT_HEAT_PASSENGER,
+                    SEAT_VENT_DRIVER, SEAT_VENT_PASSENGER, WHEEL_HEAT));
+
     public static final class Element {
         @NonNull public final String id;
         @NonNull public final String label;
@@ -75,6 +95,8 @@ public final class ClimatePanelConfig {
     private final LinkedHashMap<String, Integer> elementScales = new LinkedHashMap<>();
     private final LinkedHashMap<String, Integer> elementWidths = new LinkedHashMap<>();
     private final LinkedHashMap<String, Integer> elementHeights = new LinkedHashMap<>();
+    private final LinkedHashMap<String, LevelCycleOrder> levelCycleOrders =
+            new LinkedHashMap<>();
     private final ArrayList<String> elementOrder = new ArrayList<>();
 
     public ClimatePanelConfig() {
@@ -84,6 +106,9 @@ public final class ClimatePanelConfig {
             elementWidths.put(element.id, 100);
             elementHeights.put(element.id, 100);
             elementOrder.add(element.id);
+        }
+        for (String id : LEVEL_CYCLE_ELEMENTS) {
+            levelCycleOrders.put(id, LevelCycleOrder.ASCENDING);
         }
     }
 
@@ -131,6 +156,25 @@ public final class ClimatePanelConfig {
 
     public void setElementHeightPercent(@NonNull String id, int percent) {
         if (isKnownElement(id)) elementHeights.put(id, clamp(percent, 65, 200));
+    }
+
+    public boolean hasLevelCycleOrder(@NonNull String id) {
+        return LEVEL_CYCLE_ELEMENTS.contains(id);
+    }
+
+    @NonNull
+    public LevelCycleOrder levelCycleOrder(@NonNull String id) {
+        LevelCycleOrder value = levelCycleOrders.get(id);
+        return value == null ? LevelCycleOrder.ASCENDING : value;
+    }
+
+    public void setLevelCycleOrder(@NonNull String id, @NonNull LevelCycleOrder order) {
+        if (hasLevelCycleOrder(id)) levelCycleOrders.put(id, order);
+    }
+
+    @NonNull
+    public Map<String, LevelCycleOrder> levelCycleOrders() {
+        return Collections.unmodifiableMap(new LinkedHashMap<>(levelCycleOrders));
     }
 
     /** Moves one element in the global visual order; disabled elements retain their position. */
@@ -220,6 +264,8 @@ public final class ClimatePanelConfig {
         value.elementWidths.putAll(elementWidths);
         value.elementHeights.clear();
         value.elementHeights.putAll(elementHeights);
+        value.levelCycleOrders.clear();
+        value.levelCycleOrders.putAll(levelCycleOrders);
         value.elementOrder.clear();
         value.elementOrder.addAll(elementOrder);
         return value;
@@ -246,6 +292,12 @@ public final class ClimatePanelConfig {
             elementWidths.put(element.id, clamp(elementWidths.get(element.id), 55, 240));
             elementHeights.put(element.id, clamp(elementHeights.get(element.id), 65, 200));
         }
+        for (String id : LEVEL_CYCLE_ELEMENTS) {
+            if (!levelCycleOrders.containsKey(id) || levelCycleOrders.get(id) == null) {
+                levelCycleOrders.put(id, LevelCycleOrder.ASCENDING);
+            }
+        }
+        levelCycleOrders.keySet().retainAll(LEVEL_CYCLE_ELEMENTS);
         normalizeOrder();
     }
 

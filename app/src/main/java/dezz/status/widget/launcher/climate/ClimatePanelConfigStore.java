@@ -15,6 +15,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -22,7 +23,7 @@ import dezz.status.widget.Preferences;
 
 /** Versioned and defensive persistence for the climate panel's live settings. */
 public final class ClimatePanelConfigStore {
-    public static final int SCHEMA_VERSION = 3;
+    public static final int SCHEMA_VERSION = 4;
     private final Preferences preferences;
 
     public ClimatePanelConfigStore(@NonNull Preferences preferences) {
@@ -97,6 +98,14 @@ public final class ClimatePanelConfigStore {
                 value.setElementHeightPercent(element.id, heights == null
                         ? legacySize : heights.optInt(element.id, legacySize));
             }
+            JSONObject levelOrders = root.optJSONObject("levelCycleOrders");
+            if (levelOrders != null) {
+                for (String id : ClimatePanelConfig.LEVEL_CYCLE_ELEMENTS) {
+                    Object stored = levelOrders.opt(id);
+                    ClimatePanelConfig.LevelCycleOrder order = decodeLevelCycleOrder(stored);
+                    if (order != null) value.setLevelCycleOrder(id, order);
+                }
+            }
             JSONArray order = root.optJSONArray("elementOrder");
             if (order != null) {
                 List<String> ids = new ArrayList<>();
@@ -159,6 +168,12 @@ public final class ClimatePanelConfigStore {
             heights.put(entry.getKey(), entry.getValue());
         }
         root.put("elementHeights", heights);
+        JSONObject levelOrders = new JSONObject();
+        for (Map.Entry<String, ClimatePanelConfig.LevelCycleOrder> entry
+                : value.levelCycleOrders().entrySet()) {
+            levelOrders.put(entry.getKey(), entry.getValue().name().toLowerCase(Locale.ROOT));
+        }
+        root.put("levelCycleOrders", levelOrders);
         JSONArray order = new JSONArray();
         for (String id : value.elementOrder()) order.put(id);
         root.put("elementOrder", order);
@@ -167,6 +182,28 @@ public final class ClimatePanelConfigStore {
 
     public void reset() {
         preferences.launcherClimateConfigJson.set("");
+    }
+
+    @Nullable
+    private static ClimatePanelConfig.LevelCycleOrder decodeLevelCycleOrder(
+            @Nullable Object stored) {
+        // Accept a transitional boolean form as well: true meant the mSaver-style 3→2→1
+        // direction.  Unknown imported values deliberately fall back to the safe old default.
+        if (stored instanceof Boolean) {
+            return (Boolean) stored ? ClimatePanelConfig.LevelCycleOrder.DESCENDING
+                    : ClimatePanelConfig.LevelCycleOrder.ASCENDING;
+        }
+        if (!(stored instanceof String)) return null;
+        String normalized = ((String) stored).trim().toLowerCase(Locale.ROOT);
+        if ("descending".equals(normalized) || "3-2-1".equals(normalized)
+                || "3→2→1".equals(normalized)) {
+            return ClimatePanelConfig.LevelCycleOrder.DESCENDING;
+        }
+        if ("ascending".equals(normalized) || "1-2-3".equals(normalized)
+                || "1→2→3".equals(normalized)) {
+            return ClimatePanelConfig.LevelCycleOrder.ASCENDING;
+        }
+        return null;
     }
 
     /**
