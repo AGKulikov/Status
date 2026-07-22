@@ -39,4 +39,30 @@ public final class MediaPanelConfigMigrationTest {
         assertEquals(MediaPanelConfig.VOLUME,
                 config.orderedElements().get(config.orderedElements().size() - 1).id);
     }
+
+    @Test public void fixedGridSchemaMigratesToOriginalTwelveBySixGrid() {
+        String versionTwo = "{\"version\":2,\"elements\":["
+                + "{\"id\":\"media.next\",\"enabled\":true,\"order\":0,"
+                + "\"scalePercent\":135,\"column\":5,\"row\":4,"
+                + "\"columnSpan\":1,\"rowSpan\":1}]}";
+        MediaPanelConfig config = MediaPanelConfigStore.decode(versionTwo);
+        assertEquals(MediaPanelConfig.DEFAULT_GRID_COLUMNS, config.gridColumns);
+        assertEquals(MediaPanelConfig.DEFAULT_GRID_ROWS, config.gridRows);
+        assertEquals(5, config.element(MediaPanelConfig.NEXT).column);
+        assertEquals(4, config.element(MediaPanelConfig.NEXT).row);
+        assertEquals(135, config.element(MediaPanelConfig.NEXT).scalePercent);
+    }
+
+    @Test public void customGridSurvivesCurrentSchemaRoundTrip() {
+        MediaPanelConfig source = new MediaPanelConfig();
+        assertTrue(source.setGridSize(16, 8));
+        MediaPanelConfig restored = MediaPanelConfigStore.decode(
+                MediaPanelConfigStore.encode(source).toString());
+        assertEquals(16, restored.gridColumns);
+        assertEquals(8, restored.gridRows);
+        assertEquals(source.element(MediaPanelConfig.PLAY_PAUSE).column,
+                restored.element(MediaPanelConfig.PLAY_PAUSE).column);
+        assertEquals(source.element(MediaPanelConfig.PLAY_PAUSE).row,
+                restored.element(MediaPanelConfig.PLAY_PAUSE).row);
+    }
 }

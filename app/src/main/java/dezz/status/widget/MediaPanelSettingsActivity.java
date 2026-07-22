@@ -103,6 +103,25 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_MODE, true)));
 
+        addTitle(settings, "Сетка");
+        addHint(settings, "Число столбцов и строк задаёт размер ячейки внутри фактического "
+                + "размера панели. Если выбранная сетка не вмещает включённые элементы, "
+                + "приложение сохранит последний корректный размер.");
+        addGridSlider(settings, "Столбцы", config.gridColumns,
+                MediaPanelConfig.MIN_GRID_COLUMNS, MediaPanelConfig.MAX_GRID_COLUMNS,
+                selected -> {
+                    boolean changed = config.setGridSize(selected, config.gridRows);
+                    if (changed) rebuildElementControls();
+                    return config.gridColumns;
+                });
+        addGridSlider(settings, "Строки", config.gridRows,
+                MediaPanelConfig.MIN_GRID_ROWS, MediaPanelConfig.MAX_GRID_ROWS,
+                selected -> {
+                    boolean changed = config.setGridSize(config.gridColumns, selected);
+                    if (changed) rebuildElementControls();
+                    return config.gridRows;
+                });
+
         addTitle(settings, "Элементы");
         addHint(settings, "Перетаскивание задаёт позицию. Стрелки меняют слой, если элементы "
                 + "оказываются рядом. Ползунки ширины и высоты изменяют занимаемые ячейки, "
@@ -244,13 +263,13 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
             updatePositionLabel(element.id);
 
             addElementSlider(card, "Ширина", element.columnSpan, 1,
-                    MediaPanelConfig.GRID_COLUMNS, selected -> {
+                    config.gridColumns, selected -> {
                         MediaPanelConfig.Element current = config.element(element.id);
                         config.setSpan(element.id, selected, current.rowSpan);
                         return config.element(element.id).columnSpan;
                     }, selected -> selected + " яч.");
             addElementSlider(card, "Высота", element.rowSpan, 1,
-                    MediaPanelConfig.GRID_ROWS, selected -> {
+                    config.gridRows, selected -> {
                         MediaPanelConfig.Element current = config.element(element.id);
                         config.setSpan(element.id, current.columnSpan, selected);
                         return config.element(element.id).rowSpan;
@@ -341,8 +360,47 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         TextView label = positionLabels.get(id);
         if (label == null) return;
         MediaPanelConfig.Element element = config.element(id);
-        label.setText("Позиция: столбец " + (element.column + 1) + ", строка "
-                + (element.row + 1) + " · " + element.columnSpan + "×" + element.rowSpan);
+        label.setText("Позиция: столбец " + (element.column + 1) + "/" + config.gridColumns
+                + ", строка " + (element.row + 1) + "/" + config.gridRows + " · "
+                + element.columnSpan + "×" + element.rowSpan);
+    }
+
+    private void addGridSlider(@NonNull LinearLayout parent, @NonNull String title, int initial,
+                               int minimum, int maximum, @NonNull ElementIntChange change) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView label = new TextView(this);
+        label.setText(title);
+        label.setTextSize(16);
+        SeekBar seek = new SeekBar(this);
+        seek.setMax(maximum - minimum);
+        seek.setProgress(Math.max(0, Math.min(maximum - minimum, initial - minimum)));
+        TextView value = new TextView(this);
+        value.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        value.setText(String.valueOf(initial));
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean user) {
+                int selected = minimum + progress;
+                value.setText(String.valueOf(selected));
+                if (!user) return;
+                int actual = change.set(selected);
+                persistAndPreview();
+                if (actual != selected) {
+                    seek.setProgress(actual - minimum);
+                    value.setText(actual + " · нет места");
+                } else {
+                    value.setText(String.valueOf(actual));
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                editScheduler.flush();
+            }
+        });
+        row.addView(label, new LinearLayout.LayoutParams(dp(110), dp(44)));
+        row.addView(seek, new LinearLayout.LayoutParams(0, dp(44), 1f));
+        row.addView(value, new LinearLayout.LayoutParams(dp(118), dp(44)));
+        parent.addView(row, new LinearLayout.LayoutParams(match(), dp(44)));
     }
 
     private void addSlider(@NonNull LinearLayout parent, @NonNull String title, int initial,

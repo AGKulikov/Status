@@ -61,6 +61,22 @@ public final class LauncherIconResolver {
             new Preset("start_stop", "Start/Stop"),
             new Preset("fuel_save", "Экономия топлива"),
             new Preset("water", "Вода"),
+            new Preset("humidity", "Влажность"),
+            new Preset("motion", "Движение / присутствие"),
+            new Preset("smoke", "Дым / газ"),
+            new Preset("camera", "Камера / звонок"),
+            new Preset("blinds", "Шторы / жалюзи"),
+            new Preset("thermostat", "Термостат"),
+            new Preset("plug", "Розетка"),
+            new Preset("battery", "Батарея"),
+            new Preset("energy", "Энергия"),
+            new Preset("alarm", "Сигнализация"),
+            new Preset("vacuum", "Пылесос"),
+            new Preset("weather", "Погода"),
+            new Preset("music", "Музыка / колонка"),
+            new Preset("phone", "Телефон"),
+            new Preset("car", "Автомобиль"),
+            new Preset("location", "Местоположение"),
             new Preset("devices", "Умный дом"),
             new Preset("scenario", "Сценарий"),
             new Preset("edit", "Изменить"),
@@ -145,6 +161,22 @@ public final class LauncherIconResolver {
             case "auto_hold":
             case "start_stop": return R.drawable.ic_popup_power;
             case "water": return R.drawable.ic_popup_water;
+            case "humidity": return R.drawable.ic_smart_humidity;
+            case "motion": return R.drawable.ic_smart_motion;
+            case "smoke": return R.drawable.ic_smart_smoke;
+            case "camera": return R.drawable.ic_smart_camera;
+            case "blinds": return R.drawable.ic_smart_blinds;
+            case "thermostat": return R.drawable.ic_smart_thermostat;
+            case "plug": return R.drawable.ic_smart_plug;
+            case "battery": return R.drawable.ic_smart_battery;
+            case "energy": return R.drawable.ic_smart_energy;
+            case "alarm": return R.drawable.ic_smart_alarm;
+            case "vacuum": return R.drawable.ic_smart_vacuum;
+            case "weather": return R.drawable.ic_smart_weather;
+            case "music": return R.drawable.ic_smart_music;
+            case "phone": return R.drawable.ic_smart_phone;
+            case "car": return R.drawable.ic_smart_car;
+            case "location": return R.drawable.ic_smart_location;
             case "devices": return R.drawable.ic_section_widget;
             case "scenario": return R.drawable.ic_section_content;
             case "edit": return R.drawable.ic_drag_handle;

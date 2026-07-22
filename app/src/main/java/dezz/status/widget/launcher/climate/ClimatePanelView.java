@@ -65,10 +65,11 @@ public final class ClimatePanelView extends FrameLayout {
     private boolean editorPreviewMode;
     @Nullable private EditorLayoutListener editorLayoutListener;
     private boolean started;
+    /** Distinguishes the pre-probe bootstrap catalog from a real empty/unsupported result. */
+    private boolean catalogResolved;
     private int catalogGeneration;
     private boolean catalogRefreshPending;
     private int catalogRetryAttempts;
-    private long sessionStartedAtMillis;
     private long nextCommandToken;
 
     private final CarIntegration.ControlStateListener stateListener = state -> {
@@ -125,7 +126,7 @@ public final class ClimatePanelView extends FrameLayout {
         Set<String> previousIds = visibleControlIds();
         config = value.copy();
         config.normalize();
-        if (catalog.isEmpty() && !editorPreviewMode) renderLoading();
+        if (!started && !catalogResolved && !editorPreviewMode) renderLoading();
         else rebuildControls();
         if (started && !previousIds.equals(visibleControlIds())) subscribeVisibleControls();
     }
@@ -138,13 +139,12 @@ public final class ClimatePanelView extends FrameLayout {
         }
         started = true;
         catalogRetryAttempts = 0;
-        sessionStartedAtMillis = System.currentTimeMillis();
-        states.clear();
-        if (catalog.isEmpty() && !editorPreviewMode) renderLoading();
-        else {
-            rebuildControls();
-            subscribeVisibleControls();
-        }
+        // Keep a recently confirmed value while the fresh ECARX read is entering its worker.
+        // The timestamp gate below still prevents an old ignition/session value from being used.
+        // Subscribe from configured stable IDs before the comparatively expensive catalog probe;
+        // bootstrap cards remain disabled where their exact option/range metadata is still needed.
+        rebuildControls();
+        subscribeVisibleControls();
         requestCatalog(false);
     }
 
@@ -156,6 +156,7 @@ public final class ClimatePanelView extends FrameLayout {
         integration.requestControlCatalog(controls -> {
             if (!started || generation != catalogGeneration) return;
             catalogRefreshPending = false;
+            catalogResolved = true;
             catalog.clear();
             for (CarControlDescriptor control : controls) {
                 if (isClimateControl(control.id)
@@ -184,9 +185,7 @@ public final class ClimatePanelView extends FrameLayout {
         started = false;
         catalogGeneration++;
         catalogRefreshPending = false;
-        sessionStartedAtMillis = 0;
         integration.unsubscribeControlStates(stateListener);
-        states.clear();
     }
 
     @NonNull
@@ -222,7 +221,7 @@ public final class ClimatePanelView extends FrameLayout {
         connectionLabel = null;
         applySurface();
 
-        if (catalog.isEmpty() && !editorPreviewMode) {
+        if (catalogResolved && catalog.isEmpty() && !editorPreviewMode) {
             LinearLayout empty = new LinearLayout(getContext());
             empty.setGravity(Gravity.CENTER);
             TextView message = label("Климат автомобиля недоступен", scaledSp(16), true);
@@ -408,9 +407,9 @@ public final class ClimatePanelView extends FrameLayout {
     private CarControlDescriptor visibleDescriptor(@NonNull String id) {
         if (!config.isElementEnabled(id)) return null;
         CarControlDescriptor descriptor = catalog.get(id);
-        // A completely empty catalog cannot drive the editor preview. Once at least one real
-        // descriptor arrived, however, omitted IDs are genuinely unavailable and stay hidden.
-        if (descriptor == null && editorPreviewMode && catalog.isEmpty()) {
+        // Before the single real catalog callback, stable configured IDs seed both subscription
+        // and presentation. Once resolved, omitted IDs are genuinely unavailable and stay hidden.
+        if (descriptor == null && !catalogResolved) {
             return previewDescriptor(id);
         }
         return descriptor != null
@@ -430,8 +429,10 @@ public final class ClimatePanelView extends FrameLayout {
         LinkedHashSet<String> ids = new LinkedHashSet<>();
         for (ClimatePanelConfig.Element element : ClimatePanelConfig.ELEMENTS) {
             CarControlDescriptor descriptor = catalog.get(element.id);
-            if (config.isElementEnabled(element.id) && descriptor != null
-                    && descriptor.availability != CarControlDescriptor.Availability.UNSUPPORTED) {
+            if (config.isElementEnabled(element.id)
+                    && ((!catalogResolved && descriptor == null)
+                    || (descriptor != null && descriptor.availability
+                    != CarControlDescriptor.Availability.UNSUPPORTED))) {
                 ids.add(element.id);
             }
         }
@@ -545,8 +546,8 @@ public final class ClimatePanelView extends FrameLayout {
         float alpha = pending.containsKey(id) ? .60f : available ? 1f : .42f;
         binding.card.setAlpha(alpha);
         binding.card.setEnabled(editorPreviewMode || (available && !pending.containsKey(id)));
-        boolean optionsReady = binding.descriptor.options.isEmpty()
-                || binding.descriptor.availability == CarControlDescriptor.Availability.SUPPORTED;
+        boolean optionsReady = binding.descriptor.availability
+                == CarControlDescriptor.Availability.SUPPORTED;
         for (View interactive : binding.interactive) {
             interactive.setEnabled(known && optionsReady && !pending.containsKey(id));
             interactive.setAlpha(known && optionsReady ? 1f : .38f);
@@ -770,8 +771,7 @@ public final class ClimatePanelView extends FrameLayout {
     private boolean isFresh(@Nullable CarControlState state) {
         if (state == null || state.observedAtMillis <= 0) return false;
         long age = System.currentTimeMillis() - state.observedAtMillis;
-        return sessionStartedAtMillis > 0 && state.observedAtMillis >= sessionStartedAtMillis
-                && age >= 0 && age <= STATE_FRESH_MS;
+        return age >= 0 && age <= STATE_FRESH_MS;
     }
 
     private static int iconFor(@NonNull String id) {

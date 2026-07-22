@@ -6,6 +6,7 @@
 package dezz.status.widget.launcher.media;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -18,8 +19,9 @@ import dezz.status.widget.Preferences;
 
 /** Versioned persistence for the visual media-panel editor. */
 public final class MediaPanelConfigStore {
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 3;
     private static final int LEGACY_FLOW_SCHEMA_VERSION = 1;
+    private static final int FIXED_GRID_SCHEMA_VERSION = 2;
     private final Preferences preferences;
 
     public MediaPanelConfigStore(@NonNull Preferences preferences) {
@@ -28,13 +30,23 @@ public final class MediaPanelConfigStore {
 
     @NonNull
     public MediaPanelConfig load() {
+        return decode(preferences.launcherMediaConfigJson.get());
+    }
+
+    @NonNull
+    static MediaPanelConfig decode(@Nullable String raw) {
         MediaPanelConfig value = new MediaPanelConfig();
-        String raw = preferences.launcherMediaConfigJson.get();
         if (raw == null || raw.trim().isEmpty()) return value;
         try {
             JSONObject root = new JSONObject(raw);
             int version = root.optInt("version", 0);
-            if (version != SCHEMA_VERSION && version != LEGACY_FLOW_SCHEMA_VERSION) return value;
+            if (version != SCHEMA_VERSION && version != FIXED_GRID_SCHEMA_VERSION
+                    && version != LEGACY_FLOW_SCHEMA_VERSION) return value;
+            if (version >= SCHEMA_VERSION) {
+                value.gridColumns = root.optInt("gridColumns", value.gridColumns);
+                value.gridRows = root.optInt("gridRows", value.gridRows);
+                value.normalize();
+            }
             value.backgroundColor = root.optString("backgroundColor", value.backgroundColor);
             value.backgroundAlpha = root.optInt("backgroundAlpha", value.backgroundAlpha);
             value.cornerRadiusPx = root.optInt("cornerRadiusPx", value.cornerRadiusPx);
@@ -59,17 +71,16 @@ public final class MediaPanelConfigStore {
                     String id = item.optString("id", "");
                     if (MediaPanelConfig.spec(id) == null) continue;
                     restored.add(id);
-                    value.setEnabled(id, item.optBoolean("enabled", value.element(id).enabled));
-                    value.setScale(id, item.optInt("scalePercent",
-                            value.element(id).scalePercent));
+                    MediaPanelConfig.Element element = value.element(id);
+                    element.enabled = item.optBoolean("enabled", element.enabled);
+                    value.setScale(id, item.optInt("scalePercent", element.scalePercent));
                     // Applying moves in array order also makes hand-edited/imported JSON robust
                     // against duplicate or sparse order numbers.
                     value.element(id).order = item.optInt("order", index);
                     // Version 1 stored only flow order and content scale. The stable default
                     // slots retain every old setting without guessing pixel coordinates from a
                     // panel size that may have changed since the previous launch.
-                    if (version >= SCHEMA_VERSION) {
-                        MediaPanelConfig.Element element = value.element(id);
+                    if (version >= FIXED_GRID_SCHEMA_VERSION) {
                         element.column = item.optInt("column", element.column);
                         element.row = item.optInt("row", element.row);
                         element.columnSpan = item.optInt("columnSpan", element.columnSpan);
@@ -89,11 +100,18 @@ public final class MediaPanelConfigStore {
     }
 
     public void save(@NonNull MediaPanelConfig source) {
+        preferences.launcherMediaConfigJson.set(encode(source).toString());
+    }
+
+    @NonNull
+    static JSONObject encode(@NonNull MediaPanelConfig source) {
         MediaPanelConfig value = source.copy();
         value.normalize();
         try {
             JSONObject root = new JSONObject();
             root.put("version", SCHEMA_VERSION);
+            root.put("gridColumns", value.gridColumns);
+            root.put("gridRows", value.gridRows);
             root.put("backgroundColor", value.backgroundColor);
             root.put("backgroundAlpha", value.backgroundAlpha);
             root.put("cornerRadiusPx", value.cornerRadiusPx);
@@ -122,8 +140,9 @@ public final class MediaPanelConfigStore {
                 elements.put(item);
             }
             root.put("elements", elements);
-            preferences.launcherMediaConfigJson.set(root.toString());
+            return root;
         } catch (JSONException ignored) {
+            return new JSONObject();
         }
     }
 

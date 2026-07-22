@@ -104,6 +104,48 @@ public final class MediaPanelConfigTest {
         assertNoEnabledOverlap(config);
     }
 
+    @Test public void customGridRepositionsElementsWithoutOverlap() {
+        MediaPanelConfig config = new MediaPanelConfig();
+        assertTrue(config.setGridSize(16, 8));
+        assertEquals(16, config.gridColumns);
+        assertEquals(8, config.gridRows);
+        for (MediaPanelConfig.Element element : config.orderedElements()) {
+            assertTrue(element.column >= 0);
+            assertTrue(element.row >= 0);
+            assertTrue(element.column + element.columnSpan <= config.gridColumns);
+            assertTrue(element.row + element.rowSpan <= config.gridRows);
+        }
+        assertNoEnabledOverlap(config);
+    }
+
+    @Test public void impossibleGridKeepsLastValidLayout() {
+        MediaPanelConfig config = new MediaPanelConfig();
+        MediaPanelConfig before = config.copy();
+        assertFalse(config.setGridSize(2, 2));
+        assertEquals(before.gridColumns, config.gridColumns);
+        assertEquals(before.gridRows, config.gridRows);
+        for (MediaPanelConfig.Element element : before.orderedElements()) {
+            MediaPanelConfig.Element actual = config.element(element.id);
+            assertEquals(element.column, actual.column);
+            assertEquals(element.row, actual.row);
+            assertEquals(element.columnSpan, actual.columnSpan);
+            assertEquals(element.rowSpan, actual.rowSpan);
+        }
+    }
+
+    @Test public void compactSingleRowGridWorksForChosenControls() {
+        MediaPanelConfig config = new MediaPanelConfig();
+        for (MediaPanelConfig.Element element : config.orderedElements()) {
+            config.setEnabled(element.id, MediaPanelConfig.PREVIOUS.equals(element.id)
+                    || MediaPanelConfig.PLAY_PAUSE.equals(element.id)
+                    || MediaPanelConfig.NEXT.equals(element.id));
+        }
+        assertTrue(config.setGridSize(3, 1));
+        assertEquals(3, config.gridColumns);
+        assertEquals(1, config.gridRows);
+        assertNoEnabledOverlap(config);
+    }
+
     private static int indexOf(List<MediaPanelConfig.Element> elements, String id) {
         for (int index = 0; index < elements.size(); index++) {
             if (id.equals(elements.get(index).id)) return index;

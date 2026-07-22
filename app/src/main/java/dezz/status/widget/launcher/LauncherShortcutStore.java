@@ -38,6 +38,8 @@ public final class LauncherShortcutStore {
         public double commandValue = 0;
         /** app = original application icon; otherwise one of LauncherIconResolver preset keys. */
         @NonNull public String icon = "apps";
+        /** False means a connector may refresh the suggested icon; true preserves user choice. */
+        public boolean iconCustomized = false;
         @NonNull public String backgroundColor = "#B5222733";
         /** "none" preserves an app icon; otherwise an Android color string. */
         @NonNull public String iconColor = "#FFFFFFFF";
@@ -69,6 +71,7 @@ public final class LauncherShortcutStore {
             value.command = command;
             value.commandValue = commandValue;
             value.icon = icon;
+            value.iconCustomized = iconCustomized;
             value.backgroundColor = backgroundColor;
             value.iconColor = iconColor;
             value.textColor = textColor;
@@ -230,6 +233,7 @@ public final class LauncherShortcutStore {
                 .put("target", value.target).put("packageName", value.packageName)
                 .put("command", value.command.name()).put("commandValue", value.commandValue)
                 .put("icon", value.icon).put("backgroundColor", value.backgroundColor)
+                .put("iconCustomized", value.iconCustomized)
                 .put("iconColor", value.iconColor).put("textColor", value.textColor)
                 .put("hasLongAction", value.hasLongAction).put("longKind", value.longKind.name())
                 .put("longTarget", value.longTarget).put("longPackageName", value.longPackageName)
@@ -256,6 +260,9 @@ public final class LauncherShortcutStore {
                     "command", CarControlCommand.Operation.TOGGLE.name()));
             value.commandValue = json.optDouble("commandValue", 0);
             value.icon = json.optString("icon", "apps");
+            value.iconCustomized = json.has("iconCustomized")
+                    ? json.optBoolean("iconCustomized", false)
+                    : value.kind != Kind.RULE || !"devices".equals(value.icon);
             value.backgroundColor = json.optString("backgroundColor", "#B5222733");
             value.iconColor = json.optString("iconColor", "#FFFFFFFF");
             value.textColor = json.optString("textColor", "#FFFFFFFF");

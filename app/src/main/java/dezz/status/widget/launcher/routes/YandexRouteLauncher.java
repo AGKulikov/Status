@@ -6,7 +6,6 @@
 package dezz.status.widget.launcher.routes;
 
 import android.content.Context;
-import android.content.Intent;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
@@ -27,8 +26,11 @@ public final class YandexRouteLauncher {
                                  @NonNull FavoriteRouteConfig source) {
         FavoriteRouteConfig route = source.copy();
         final Uri deepLink;
+        final Uri alternateDeepLink;
         try {
             deepLink = deepLink(route.product, route.address, route.coordinates);
+            alternateDeepLink = deepLink(opposite(route.product),
+                    route.address, route.coordinates);
         } catch (IllegalArgumentException invalid) {
             Toast.makeText(context, route.coordinates.trim().isEmpty()
                     ? "Укажите адрес или координаты маршрута"
@@ -36,7 +38,9 @@ public final class YandexRouteLauncher {
             return false;
         }
 
-        if (!route.floating) return startDeepLink(context, route.product, deepLink);
+        if (!route.floating) {
+            return startDeepLink(context, route.product, deepLink, alternateDeepLink);
+        }
 
         // Do not create a second approximation of the vendor floating window here. The HOME
         // "Navigator" shortcut already uses Yandex' ECARX-specific TransparentSplashActivity
@@ -45,14 +49,14 @@ public final class YandexRouteLauncher {
         boolean opened = YandexWindowLauncher.launch(
                 context, windowProduct(route.product), false);
         if (!opened) {
-            return startDeepLink(context, route.product, deepLink);
+            return startDeepLink(context, route.product, deepLink, alternateDeepLink);
         }
 
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             // The Yandex task is now the same floating task created by the normal Navigator
             // button. ACTION_VIEW is delivered afterwards, so only its destination changes and
             // Android reuses that already-windowed task instead of constructing another window.
-            if (!startDeepLink(context, route.product, deepLink)) {
+            if (!startDeepLink(context, route.product, deepLink, alternateDeepLink)) {
                 Toast.makeText(context, "Не удалось передать маршрут в Яндекс",
                         Toast.LENGTH_LONG).show();
             }
@@ -81,32 +85,12 @@ public final class YandexRouteLauncher {
 
     private static boolean startDeepLink(@NonNull Context context,
                                          @NonNull FavoriteRouteConfig.Product product,
-                                         @NonNull Uri deepLink) {
-        Intent intent = new Intent(Intent.ACTION_VIEW, deepLink)
-                .setPackage(packageName(product))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                        | Intent.FLAG_ACTIVITY_CLEAR_TOP
-                        | Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                .putExtra("ddnavwin", true);
-        if (start(context, intent)) return true;
-        // Keep the proprietary URI as an implicit fallback for regional/Yandex builds whose
-        // package differs but still register the same scheme.
-        intent.setPackage(null);
-        return start(context, intent);
-    }
-
-    private static boolean start(@NonNull Context context, @NonNull Intent intent) {
-        try {
-            context.startActivity(intent);
-            return true;
-        } catch (RuntimeException ignored) {
-            return false;
-        }
-    }
-
-    @NonNull private static String packageName(@NonNull FavoriteRouteConfig.Product product) {
-        return product == FavoriteRouteConfig.Product.MAPS
-                ? "ru.yandex.yandexmaps" : "ru.yandex.yandexnavi";
+                                         @NonNull Uri deepLink,
+                                         @NonNull Uri alternateDeepLink) {
+        if (YandexWindowLauncher.launchDeepLink(
+                context, windowProduct(product), deepLink)) return true;
+        return YandexWindowLauncher.launchDeepLink(
+                context, windowProduct(opposite(product)), alternateDeepLink);
     }
 
     @NonNull
@@ -115,5 +99,13 @@ public final class YandexRouteLauncher {
         return product == FavoriteRouteConfig.Product.MAPS
                 ? YandexWindowLauncher.Product.MAPS
                 : YandexWindowLauncher.Product.NAVIGATOR;
+    }
+
+    @NonNull
+    private static FavoriteRouteConfig.Product opposite(
+            @NonNull FavoriteRouteConfig.Product product) {
+        return product == FavoriteRouteConfig.Product.MAPS
+                ? FavoriteRouteConfig.Product.NAVIGATOR
+                : FavoriteRouteConfig.Product.MAPS;
     }
 }

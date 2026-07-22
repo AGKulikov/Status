@@ -6,12 +6,17 @@
 package dezz.status.widget.launcher.media;
 
 import android.content.Context;
+import android.content.BroadcastReceiver;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -25,9 +30,11 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -37,6 +44,8 @@ import dezz.status.widget.launcher.MediaTimeline;
 
 /** Responsive HOME media surface whose contents are fully driven by {@link MediaPanelConfig}. */
 public final class MediaPanelView extends FrameLayout {
+    private static final String ACTION_VOLUME_CHANGED = "android.media.VOLUME_CHANGED_ACTION";
+    private static final String EXTRA_VOLUME_STREAM_TYPE = "android.media.EXTRA_VOLUME_STREAM_TYPE";
     public interface Controls {
         void previous();
         void playPause();
@@ -53,6 +62,16 @@ public final class MediaPanelView extends FrameLayout {
     @Nullable private final Controls controls;
     private final Map<String, View> elementViews = new LinkedHashMap<>();
     private final int[] dragGridLocation = new int[2];
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Runnable delayedVolumeSync = this::syncSystemVolume;
+    private boolean volumeReceiverRegistered;
+    private final BroadcastReceiver volumeReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            int stream = intent == null ? AudioManager.STREAM_MUSIC : intent.getIntExtra(
+                    EXTRA_VOLUME_STREAM_TYPE, AudioManager.STREAM_MUSIC);
+            if (stream == AudioManager.STREAM_MUSIC) syncSystemVolume();
+        }
+    };
     private MediaPanelConfig config;
     private MediaElementGridLayout grid;
     @Nullable private LayoutEditor layoutEditor;
@@ -82,6 +101,7 @@ public final class MediaPanelView extends FrameLayout {
         this.store = store;
         this.controls = controls;
         config = store.load();
+        if (controls != null) volumePercent = readSystemVolume();
         setClipChildren(false);
         setClipToPadding(false);
         rebuild();
@@ -152,9 +172,11 @@ public final class MediaPanelView extends FrameLayout {
         volumeLabel = null;
         playPause = null;
         applySurface();
+        configurePanelClick();
 
         grid = new MediaElementGridLayout(getContext());
         grid.setSpacing(config.spacingPx);
+        grid.setGridSize(config.gridColumns, config.gridRows);
         grid.setGridVisible(layoutEditor != null);
         grid.setPadding(config.contentPaddingPx, config.contentPaddingPx,
                 config.contentPaddingPx, config.contentPaddingPx);
@@ -294,10 +316,55 @@ public final class MediaPanelView extends FrameLayout {
         if (manager == null) return;
         try {
             int maximum = manager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-            int selected = Math.round(Math.max(0, Math.min(100, percent)) * maximum / 100f);
+            int selected = MediaVolumeMath.stepForPercent(percent, maximum);
             manager.setStreamVolume(AudioManager.STREAM_MUSIC, selected, 0);
-            volumePercent = percent;
+            // ECARX applies an absolute volume asynchronously on some firmware. Reflect the
+            // actual discrete stream step immediately and verify it once the vendor mixer settles.
+            volumePercent = MediaVolumeMath.percentForStep(
+                    manager.getStreamVolume(AudioManager.STREAM_MUSIC), maximum);
+            updateVolumeUi();
+            mainHandler.removeCallbacks(delayedVolumeSync);
+            mainHandler.postDelayed(delayedVolumeSync, 180L);
+            mainHandler.postDelayed(delayedVolumeSync, 650L);
         } catch (RuntimeException ignored) {}
+    }
+
+    private int readSystemVolume() {
+        AudioManager manager = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+        if (manager == null) return volumePercent;
+        try {
+            return MediaVolumeMath.percentForStep(
+                    manager.getStreamVolume(AudioManager.STREAM_MUSIC),
+                    manager.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+        } catch (RuntimeException ignored) {
+            return volumePercent;
+        }
+    }
+
+    private void syncSystemVolume() {
+        if (controls == null) return;
+        volumePercent = readSystemVolume();
+        updateVolumeUi();
+    }
+
+    private void updateVolumeUi() {
+        if (volume != null && !volume.isPressed()) volume.setProgress(volumePercent);
+        if (volumeLabel != null) volumeLabel.setText(volumePercent + "%");
+    }
+
+    private void configurePanelClick() {
+        if (controls == null || layoutEditor != null) {
+            setOnClickListener(null);
+            setClickable(false);
+            return;
+        }
+        setClickable(true);
+        setOnClickListener(view -> {
+            if (!MediaAppLauncher.launchYandexMusic(getContext())) {
+                Toast.makeText(getContext(), "Яндекс Музыка не найдена",
+                        Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     @NonNull
@@ -327,7 +394,8 @@ public final class MediaPanelView extends FrameLayout {
         value.setImageResource(icon);
         value.setScaleType(ImageView.ScaleType.FIT_CENTER);
         value.setColorFilter(color(config.controlColor, Color.WHITE));
-        value.setBackground(glassBackground(false, Math.max(dp(12), config.cornerRadiusPx / 2)));
+        // The whole grid cell remains the touch target; only the glyph is drawn.
+        value.setBackgroundColor(Color.TRANSPARENT);
         value.setContentDescription(description);
         // A larger content scale must make the glyph larger, not add more padding around it.
         int padding = Math.max(dp(3),
@@ -365,8 +433,8 @@ public final class MediaPanelView extends FrameLayout {
         if (playPause != null) {
             playPause.setImageResource(playing
                     ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
-            playPause.setBackground(glassBackground(playing,
-                    Math.max(dp(12), config.cornerRadiusPx / 2)));
+            playPause.setColorFilter(color(playing ? config.accentColor : config.controlColor,
+                    Color.WHITE));
         }
         if (timeline != null) {
             timeline.setText(MediaTimeline.format(positionMs) + " / "
@@ -378,8 +446,7 @@ public final class MediaPanelView extends FrameLayout {
             if (progressRoot != null) progressRoot.setVisibility(
                     durationMs > 0L ? View.VISIBLE : View.GONE);
         }
-        if (volume != null && !volume.isPressed()) volume.setProgress(volumePercent);
-        if (volumeLabel != null) volumeLabel.setText(volumePercent + "%");
+        updateVolumeUi();
     }
 
     private void applySurface() {
@@ -491,5 +558,28 @@ public final class MediaPanelView extends FrameLayout {
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    @Override protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        if (controls == null || volumeReceiverRegistered) return;
+        try {
+            ContextCompat.registerReceiver(getContext(), volumeReceiver,
+                    new IntentFilter(ACTION_VOLUME_CHANGED), ContextCompat.RECEIVER_EXPORTED);
+            volumeReceiverRegistered = true;
+        } catch (RuntimeException ignored) {
+            volumeReceiverRegistered = false;
+        }
+        syncSystemVolume();
+    }
+
+    @Override protected void onDetachedFromWindow() {
+        mainHandler.removeCallbacks(delayedVolumeSync);
+        if (volumeReceiverRegistered) {
+            volumeReceiverRegistered = false;
+            try { getContext().unregisterReceiver(volumeReceiver); }
+            catch (RuntimeException ignored) {}
+        }
+        super.onDetachedFromWindow();
     }
 }

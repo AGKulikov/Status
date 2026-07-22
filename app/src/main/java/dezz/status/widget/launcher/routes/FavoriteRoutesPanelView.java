@@ -180,6 +180,13 @@ public final class FavoriteRoutesPanelView extends FrameLayout {
                 getContext(), route.icon, route.iconColor);
         icon.setImageDrawable(drawable);
         int iconSize = Math.max(1, route.iconSizePx);
+        // Keep the configured size physical and exact. Intrinsic vector bounds must not make
+        // Home/Work icons appear unchanged while their editor slider is moving.
+        icon.setAdjustViewBounds(false);
+        icon.setMinimumWidth(iconSize);
+        icon.setMinimumHeight(iconSize);
+        icon.setMaxWidth(iconSize);
+        icon.setMaxHeight(iconSize);
         tile.addView(icon, new LinearLayout.LayoutParams(iconSize, iconSize));
 
         TextView label = new TextView(getContext());

@@ -33,6 +33,8 @@ final class MediaElementGridLayout extends ViewGroup {
 
     private final Paint gridPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private int spacing;
+    private int columns = MediaPanelConfig.DEFAULT_GRID_COLUMNS;
+    private int rows = MediaPanelConfig.DEFAULT_GRID_ROWS;
     private boolean gridVisible;
 
     MediaElementGridLayout(@NonNull Context context) {
@@ -54,6 +56,15 @@ final class MediaElementGridLayout extends ViewGroup {
         invalidate();
     }
 
+    void setGridSize(int columns, int rows) {
+        this.columns = Math.max(MediaPanelConfig.MIN_GRID_COLUMNS,
+                Math.min(MediaPanelConfig.MAX_GRID_COLUMNS, columns));
+        this.rows = Math.max(MediaPanelConfig.MIN_GRID_ROWS,
+                Math.min(MediaPanelConfig.MAX_GRID_ROWS, rows));
+        requestLayout();
+        invalidate();
+    }
+
     boolean moveToPixel(@NonNull View child, int left, int top) {
         ViewGroup.LayoutParams raw = child.getLayoutParams();
         if (!(raw instanceof ElementLayoutParams)) return false;
@@ -61,9 +72,9 @@ final class MediaElementGridLayout extends ViewGroup {
         int width = Math.max(0, getWidth() - getPaddingLeft() - getPaddingRight());
         int height = Math.max(0, getHeight() - getPaddingTop() - getPaddingBottom());
         int column = MediaGridLayoutMath.startForPx(left - getPaddingLeft(), width, spacing,
-                MediaPanelConfig.GRID_COLUMNS, lp.columnSpan);
+                columns, lp.columnSpan);
         int row = MediaGridLayoutMath.startForPx(top - getPaddingTop(), height, spacing,
-                MediaPanelConfig.GRID_ROWS, lp.rowSpan);
+                rows, lp.rowSpan);
         if (column == lp.column && row == lp.row) return false;
         lp.column = column;
         lp.row = row;
@@ -85,9 +96,9 @@ final class MediaElementGridLayout extends ViewGroup {
             ElementLayoutParams lp = (ElementLayoutParams) child.getLayoutParams();
             normalize(lp);
             int width = MediaGridLayoutMath.spanPx(availableWidth, spacing,
-                    MediaPanelConfig.GRID_COLUMNS, lp.column, lp.columnSpan);
+                    columns, lp.column, lp.columnSpan);
             int height = MediaGridLayoutMath.spanPx(availableHeight, spacing,
-                    MediaPanelConfig.GRID_ROWS, lp.row, lp.rowSpan);
+                    rows, lp.row, lp.rowSpan);
             child.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
                     MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY));
         }
@@ -104,9 +115,9 @@ final class MediaElementGridLayout extends ViewGroup {
             ElementLayoutParams lp = (ElementLayoutParams) child.getLayoutParams();
             normalize(lp);
             int childLeft = getPaddingLeft() + MediaGridLayoutMath.startPx(availableWidth,
-                    spacing, MediaPanelConfig.GRID_COLUMNS, lp.column);
+                    spacing, columns, lp.column);
             int childTop = getPaddingTop() + MediaGridLayoutMath.startPx(availableHeight,
-                    spacing, MediaPanelConfig.GRID_ROWS, lp.row);
+                    spacing, rows, lp.row);
             child.layout(childLeft, childTop, childLeft + child.getMeasuredWidth(),
                     childTop + child.getMeasuredHeight());
         }
@@ -117,26 +128,26 @@ final class MediaElementGridLayout extends ViewGroup {
         if (!gridVisible) return;
         int width = Math.max(0, getWidth() - getPaddingLeft() - getPaddingRight());
         int height = Math.max(0, getHeight() - getPaddingTop() - getPaddingBottom());
-        for (int column = 1; column < MediaPanelConfig.GRID_COLUMNS; column++) {
+        for (int column = 1; column < columns; column++) {
             int x = getPaddingLeft() + MediaGridLayoutMath.startPx(width, spacing,
-                    MediaPanelConfig.GRID_COLUMNS, column) - spacing / 2;
+                    columns, column) - spacing / 2;
             canvas.drawLine(x, getPaddingTop(), x, getHeight() - getPaddingBottom(), gridPaint);
         }
-        for (int row = 1; row < MediaPanelConfig.GRID_ROWS; row++) {
+        for (int row = 1; row < rows; row++) {
             int y = getPaddingTop() + MediaGridLayoutMath.startPx(height, spacing,
-                    MediaPanelConfig.GRID_ROWS, row) - spacing / 2;
+                    rows, row) - spacing / 2;
             canvas.drawLine(getPaddingLeft(), y, getWidth() - getPaddingRight(), y, gridPaint);
         }
     }
 
-    private static void normalize(@NonNull ElementLayoutParams lp) {
+    private void normalize(@NonNull ElementLayoutParams lp) {
         lp.columnSpan = MediaGridLayoutMath.clampSpan(lp.columnSpan,
-                MediaPanelConfig.GRID_COLUMNS);
-        lp.rowSpan = MediaGridLayoutMath.clampSpan(lp.rowSpan, MediaPanelConfig.GRID_ROWS);
+                columns);
+        lp.rowSpan = MediaGridLayoutMath.clampSpan(lp.rowSpan, rows);
         lp.column = MediaGridLayoutMath.clampStart(lp.column, lp.columnSpan,
-                MediaPanelConfig.GRID_COLUMNS);
+                columns);
         lp.row = MediaGridLayoutMath.clampStart(lp.row, lp.rowSpan,
-                MediaPanelConfig.GRID_ROWS);
+                rows);
     }
 
     @Override protected ViewGroup.LayoutParams generateDefaultLayoutParams() {

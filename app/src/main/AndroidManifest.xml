@@ -48,6 +48,8 @@
     <queries>
         <package android:name="ru.yandex.yandexmaps" />
         <package android:name="ru.yandex.yandexnavi" />
+        <package android:name="ru.yandex.music" />
+        <package android:name="com.yandex.music" />
         <package android:name="com.yandex.yango" />
         <intent>
             <action android:name="android.intent.action.MAIN" />

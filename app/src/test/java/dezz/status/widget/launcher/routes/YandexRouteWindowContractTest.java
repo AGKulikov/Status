@@ -25,7 +25,8 @@ public final class YandexRouteWindowContractTest {
         assertTrue(source.contains("YandexWindowLauncher.launch("));
         assertTrue(source.contains("windowProduct(route.product), false"));
         assertTrue(source.contains("postDelayed"));
-        assertTrue(source.contains("startDeepLink(context, route.product, deepLink)"));
+        assertTrue(source.contains(
+                "startDeepLink(context, route.product, deepLink, alternateDeepLink)"));
     }
 
     @Test

@@ -99,7 +99,14 @@ final class GeelyCarIntegration implements CarIntegration {
     private static final long AVAILABILITY_SLOW_POLL_INTERVAL_MS = 30_000L;
     private static final long CONTROL_RETRY_MS = 2_000L;
     private static final long CONTROL_HEALTH_POLL_MS = 30_000L;
-    private static final int CONTROL_WRITE_ATTEMPTS = 6;
+    /**
+     * ECARX applies HVAC writes asynchronously. Poll often enough for a responsive panel, but do
+     * not resend on every poll: flooding the slow Android 9 Binder is one of the reasons a write
+     * can be acknowledged without ever reaching the vehicle ECU.
+     */
+    private static final int CONTROL_CONFIRM_POLLS = 8;
+    private static final int CONTROL_RESEND_EVERY_POLLS = 3;
+    private static final long CONTROL_CONFIRM_POLL_MS = 140L;
     private static final int NO_ZONE = Integer.MIN_VALUE;
 
     /** Geely extension signals used by the instrument cluster but absent from this SDK's stubs. */
@@ -137,6 +144,18 @@ final class GeelyCarIntegration implements CarIntegration {
         thread.setDaemon(true);
         return thread;
     });
+    /**
+     * Climate reads/writes have their own serial lane. Sharing the telemetry worker made a tap
+     * wait behind TPMS/BCM/navigation reads and, on weak head units, delayed it for seconds.
+     */
+    private final ExecutorService controlWorker = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "ecarx-controls");
+        thread.setDaemon(true);
+        return thread;
+    });
+    /** Exact duplicate requests from HOME and the overlay share one confirmed result. */
+    private final ControlCommandDeduplicator pendingControlCommands =
+            new ControlCommandDeduplicator();
 
     @Nullable
     private volatile ISensor sensors;
@@ -151,15 +170,30 @@ final class GeelyCarIntegration implements CarIntegration {
     private volatile long lowLevelGearObservedMonoMillis;
     private volatile long lowLevelHighBeamObservedMonoMillis;
 
-    /** Accessed only by telemetryWorker, except vendor callbacks which merely post deliveries. */
+    /** Accessed only by controlWorker, except vendor callbacks which only enqueue work/delivery. */
     @Nullable private ICarFunction controlWatcherSource;
     @Nullable private ICarFunction.IFunctionValueWatcher controlWatcher;
     private final Set<Integer> watchedControlFunctions = new HashSet<>();
     private boolean controlRefreshScheduled;
+    private boolean controlRefreshInFlight;
+    private boolean controlRefreshAgain;
     private volatile int controlRetryAttempts;
     private final Runnable controlRefreshTask = () -> {
         controlRefreshScheduled = false;
-        executeTelemetryTask(this::refreshControlRegistrationAndStates);
+        if (controlRefreshInFlight) {
+            controlRefreshAgain = true;
+            return;
+        }
+        controlRefreshInFlight = true;
+        if (!executeControlTask(() -> {
+            try {
+                refreshControlRegistrationAndStates();
+            } finally {
+                mainHandler.post(this::finishControlRefresh);
+            }
+        })) {
+            controlRefreshInFlight = false;
+        }
     };
     /** Main-thread scheduler; the next tick is queued only after the previous Binder read ends. */
     private boolean bcmPollScheduled;
@@ -515,12 +549,12 @@ final class GeelyCarIntegration implements CarIntegration {
                     CarControlDescriptor.Kind.TOGGLE, IHvac.HVAC_FUNC_AUTO, NO_ZONE, false,
                     toggleOptions(), 0, 1, 1, "", "#FF66BB6A"),
             new ControlDefinition("climate.defrost_front", "Обогрев лобового", "Климат",
-                    "defrost_front", CarControlDescriptor.Kind.ACTION,
-                    IHvac.HVAC_FUNC_DEFROST_FRONT, NO_ZONE, false, Collections.emptyList(),
+                    "defrost_front", CarControlDescriptor.Kind.TOGGLE,
+                    IHvac.HVAC_FUNC_DEFROST_FRONT, NO_ZONE, false, toggleOptions(),
                     0, 1, 1, "", "#FF80DEEA"),
             new ControlDefinition("climate.defrost_rear", "Обогрев заднего стекла", "Климат",
-                    "defrost_rear", CarControlDescriptor.Kind.ACTION,
-                    IHvac.HVAC_FUNC_DEFROST_REAR, NO_ZONE, false, Collections.emptyList(),
+                    "defrost_rear", CarControlDescriptor.Kind.TOGGLE,
+                    IHvac.HVAC_FUNC_DEFROST_REAR, NO_ZONE, false, toggleOptions(),
                     0, 1, 1, "", "#FF80DEEA"),
             new ControlDefinition("climate.seat_heat_driver", "Подогрев сиденья водителя",
                     "Сиденья", "seat_heat", CarControlDescriptor.Kind.LEVELS,
@@ -1827,6 +1861,24 @@ final class GeelyCarIntegration implements CarIntegration {
         }
     }
 
+    /** @return false only after process-wide shutdown rejected the task. */
+    private boolean executeControlTask(Runnable task) {
+        try {
+            controlWorker.execute(task);
+            return true;
+        } catch (RejectedExecutionException ignored) {
+            return false;
+        }
+    }
+
+    /** Main-thread completion gate: at most one refresh may be queued behind an active refresh. */
+    private void finishControlRefresh() {
+        controlRefreshInFlight = false;
+        if (!controlRefreshAgain) return;
+        controlRefreshAgain = false;
+        scheduleControlRefresh(0);
+    }
+
     @Nullable
     private static ControlDefinition controlDefinition(@NonNull String id) {
         for (ControlDefinition definition : CONTROL_DEFINITIONS) {
@@ -1888,7 +1940,11 @@ final class GeelyCarIntegration implements CarIntegration {
             }
             return CarControlDescriptor.Availability.UNKNOWN;
         } catch (Throwable t) {
-            invalidateFunctionProxy(source);
+            // Some firmware throws UnsupportedOperationException for one optional function while
+            // the shared ICarFunction Binder remains perfectly usable for the rest of climate.
+            // A real read/write failure below still invalidates the dead proxy.
+            Log.d(TAG, "vehicle function support is not ready: "
+                    + definition.descriptor.id, t);
             return CarControlDescriptor.Availability.UNKNOWN;
         }
     }
@@ -1961,7 +2017,8 @@ final class GeelyCarIntegration implements CarIntegration {
         }
         ICarFunction source = ensureCarFunctions();
         if (source == null) {
-            deliverUnavailableControls(demanded, "…");
+            // No fresh read exists yet. Do not replace a last confirmed value with a synthetic
+            // offline dash; the panel already renders a genuine missing value as an ellipsis.
             scheduleControlRetry();
             return;
         }
@@ -1973,22 +2030,28 @@ final class GeelyCarIntegration implements CarIntegration {
                 functionIds.add(definition.functionId);
             }
         }
-        if (!functionIds.isEmpty() && !ensureControlWatcher(source, functionIds)) {
-            deliverUnavailableControls(demanded, "—");
-            scheduleControlRetry();
-            return;
-        } else if (functionIds.isEmpty()) {
+        boolean watcherReady = functionIds.isEmpty()
+                || ensureControlWatcher(source, functionIds);
+        if (functionIds.isEmpty()) {
             detachControlWatcher();
         }
 
-        boolean failed = false;
+        boolean retry = !watcherReady;
+        boolean connectionFailed = false;
         for (String id : demanded) {
             ControlDefinition definition = controlDefinition(id);
-            if (definition != null && !readAndDeliverControl(source, definition)) failed = true;
+            if (definition == null) continue;
+            ControlReadResult result = readAndDeliverControl(source, definition);
+            if (result == ControlReadResult.RETRY) retry = true;
+            else if (result == ControlReadResult.CONNECTION_FAILED) {
+                retry = true;
+                connectionFailed = true;
+            }
         }
-        if (failed) {
-            invalidateFunctionProxy(source);
+        if (connectionFailed) {
             detachControlWatcher();
+        }
+        if (retry) {
             scheduleControlRetry();
         } else {
             controlRetryAttempts = 0;
@@ -2007,7 +2070,7 @@ final class GeelyCarIntegration implements CarIntegration {
             }
 
             @Override public void onFunctionChanged(int functionId) {
-                executeTelemetryTask(() -> readDemandedFunction(functionId));
+                executeControlTask(() -> readDemandedFunction(functionId));
             }
 
             @Override public void onFunctionValueChanged(int functionId, int zone, int value) {
@@ -2074,23 +2137,34 @@ final class GeelyCarIntegration implements CarIntegration {
         for (ControlDefinition definition : CONTROL_DEFINITIONS) {
             if (definition.functionId == functionId
                     && demanded.contains(definition.descriptor.id)) {
-                readAndDeliverControl(source, definition);
+                ControlReadResult result = readAndDeliverControl(source, definition);
+                if (result == ControlReadResult.RETRY
+                        || result == ControlReadResult.CONNECTION_FAILED) {
+                    scheduleControlRetry();
+                }
             }
         }
     }
 
-    private boolean readAndDeliverControl(ICarFunction source, ControlDefinition definition) {
+    private enum ControlReadResult { CONFIRMED, UNSUPPORTED, RETRY, CONNECTION_FAILED }
+
+    @NonNull
+    private ControlReadResult readAndDeliverControl(ICarFunction source,
+                                                    ControlDefinition definition) {
         CarControlDescriptor.Availability availability = controlAvailability(source, definition);
-        if (availability != CarControlDescriptor.Availability.SUPPORTED) {
+        if (availability == CarControlDescriptor.Availability.UNSUPPORTED) {
             deliverControlState(new CarControlState(definition.descriptor.id, false, false,
-                    Double.NaN, availability == CarControlDescriptor.Availability.UNKNOWN
-                    ? "…" : "—", false, 0, null, System.currentTimeMillis()));
-            return availability != CarControlDescriptor.Availability.UNKNOWN;
+                    Double.NaN, "Недоступно", false, 0, null, System.currentTimeMillis()));
+            return ControlReadResult.UNSUPPORTED;
+        }
+        if (availability != CarControlDescriptor.Availability.SUPPORTED) {
+            // UNKNOWN is a transient Binder/service state, not a new vehicle value.
+            return ControlReadResult.RETRY;
         }
         if (definition.descriptor.kind == CarControlDescriptor.Kind.ACTION) {
             deliverControlState(new CarControlState(definition.descriptor.id, true, false,
                     Double.NaN, "Готово", false, 0, null, System.currentTimeMillis()));
-            return true;
+            return ControlReadResult.CONFIRMED;
         }
         try {
             double value;
@@ -2103,13 +2177,13 @@ final class GeelyCarIntegration implements CarIntegration {
                         ? source.getFunctionValue(definition.functionId, definition.zone)
                         : source.getFunctionValue(definition.functionId);
             }
-            if (!isValidControlValue(definition, value)) return false;
+            if (!isValidControlValue(definition, value)) return ControlReadResult.RETRY;
             deliverControlState(normalizeControlState(definition, value));
-            return true;
+            return ControlReadResult.CONFIRMED;
         } catch (Throwable t) {
             invalidateFunctionProxy(source);
             Log.w(TAG, "vehicle control read failed for " + definition.descriptor.id, t);
-            return false;
+            return ControlReadResult.CONNECTION_FAILED;
         }
     }
 
@@ -2182,13 +2256,6 @@ final class GeelyCarIntegration implements CarIntegration {
         return definition.descriptor.suggestedActiveColor;
     }
 
-    private void deliverUnavailableControls(Set<String> ids, String label) {
-        for (String id : ids) {
-            deliverControlState(new CarControlState(id, false, false, Double.NaN, label,
-                    false, 0, null, System.currentTimeMillis()));
-        }
-    }
-
     private void deliverControlState(@NonNull CarControlState state) {
         mainHandler.post(() -> {
             controlStateCache.put(state.controlId, state);
@@ -2208,7 +2275,31 @@ final class GeelyCarIntegration implements CarIntegration {
     @Override
     public void executeControl(@NonNull CarControlCommand command,
                                @NonNull ControlCommandListener listener) {
-        executeTelemetryTask(() -> executeControlOnWorker(command, listener));
+        final String key = controlCommandKey(command);
+        if (!pendingControlCommands.add(key, listener)) return;
+        ControlCommandListener sharedResult = (success, message) ->
+                finishControlCommand(key, success, message);
+        if (!executeControlTask(() -> executeControlOnWorker(command, sharedResult))) {
+            postCommandResult(sharedResult, false, "ECARX уже остановлен");
+        }
+    }
+
+    @NonNull
+    static String controlCommandKey(@NonNull CarControlCommand command) {
+        return command.controlId + '\u0000' + command.operation.name() + '\u0000'
+                + Long.toHexString(Double.doubleToLongBits(command.value));
+    }
+
+    private void finishControlCommand(@NonNull String key, boolean success,
+                                      @Nullable String message) {
+        List<ControlCommandListener> listeners = pendingControlCommands.take(key);
+        for (ControlCommandListener listener : listeners) {
+            try {
+                listener.onResult(success, message);
+            } catch (RuntimeException error) {
+                Log.w(TAG, "vehicle control result listener failed", error);
+            }
+        }
     }
 
     private void executeControlOnWorker(CarControlCommand command,
@@ -2224,8 +2315,14 @@ final class GeelyCarIntegration implements CarIntegration {
             scheduleControlRetry();
             return;
         }
-        if (controlAvailability(source, definition)
-                != CarControlDescriptor.Availability.SUPPORTED) {
+        CarControlDescriptor.Availability availability = controlAvailability(source, definition);
+        if (availability == CarControlDescriptor.Availability.UNKNOWN) {
+            postCommandResult(listener, false,
+                    "ECARX ещё синхронизирует эту функцию, повторите через секунду");
+            scheduleControlRetry();
+            return;
+        }
+        if (availability != CarControlDescriptor.Availability.SUPPORTED) {
             postCommandResult(listener, false, "Функция не поддерживается автомобилем");
             return;
         }
@@ -2233,12 +2330,18 @@ final class GeelyCarIntegration implements CarIntegration {
         Double current = pulse ? 0d : readControlValue(source, definition);
         if (!pulse && current == null) {
             postCommandResult(listener, false, "Не удалось прочитать текущее состояние");
+            scheduleControlRetry();
             return;
         }
         List<CarControlDescriptor.Option> runtimeOptions = supportedOptions(source, definition);
         Double target = pulse ? 1d : commandTarget(definition, command, current, runtimeOptions);
         if (target == null) {
             postCommandResult(listener, false, "Недопустимое значение команды");
+            return;
+        }
+        if (!pulse && isControlCommandConfirmed(current, target)) {
+            deliverControlState(normalizeControlState(definition, current));
+            postCommandResult(listener, true, null);
             return;
         }
         try {
@@ -2255,26 +2358,30 @@ final class GeelyCarIntegration implements CarIntegration {
                 return;
             }
 
-            // This firmware occasionally acknowledges a Binder write without applying it.
-            // Follow the proven MConfig policy: re-read and re-send up to six times instead of
-            // forcing the driver to tap the tile repeatedly.
+            // This firmware occasionally acknowledges a Binder write before it reaches the ECU.
+            // Confirm through actual state. Poll more often than we resend: repeatedly flooding
+            // the Binder can postpone the very state transition that is being awaited.
             boolean acceptedAtLeastOnce = false;
-            for (int attempt = 0; attempt < CONTROL_WRITE_ATTEMPTS; attempt++) {
-                Double beforeWrite = attempt == 0 ? current : readControlValue(source, definition);
-                if (beforeWrite != null && sameValue(beforeWrite, target)) {
-                    deliverControlState(normalizeControlState(definition, beforeWrite));
-                    postCommandResult(listener, true, null);
-                    return;
+            Double lastConfirmed = current;
+            for (int poll = 0; poll < CONTROL_CONFIRM_POLLS; poll++) {
+                if (shouldSendControlWrite(poll)) {
+                    acceptedAtLeastOnce |= writeControlValue(source, definition, target);
                 }
-                acceptedAtLeastOnce |= writeControlValue(source, definition, target);
-                if (!pauseControlWorker(200L + (attempt % 2) * 100L)) break;
+                if (!pauseControlWorker(CONTROL_CONFIRM_POLL_MS + poll * 10L)) break;
                 Double confirmed = readControlValue(source, definition);
-                if (confirmed != null && sameValue(confirmed, target)) {
+                if (confirmed != null) lastConfirmed = confirmed;
+                if (isControlCommandConfirmed(confirmed, target)) {
                     deliverControlState(normalizeControlState(definition, confirmed));
                     postCommandResult(listener, true, null);
                     return;
                 }
             }
+            // A failed command must snap the UI back to the latest value actually read from the
+            // car. Never leave an optimistic state behind after an acknowledged-only write.
+            if (lastConfirmed != null) {
+                deliverControlState(normalizeControlState(definition, lastConfirmed));
+            }
+            scheduleControlRefresh(0);
             postCommandResult(listener, false, acceptedAtLeastOnce
                     ? "Команда отправлена, но автомобиль её не подтвердил"
                     : "ECARX отклонил команду");
@@ -2284,6 +2391,16 @@ final class GeelyCarIntegration implements CarIntegration {
             Log.w(TAG, "vehicle command failed for " + command.controlId, t);
             postCommandResult(listener, false, "Ошибка связи с ECARX");
         }
+    }
+
+    static boolean shouldSendControlWrite(int confirmationPoll) {
+        return confirmationPoll >= 0
+                && (confirmationPoll == 0
+                || confirmationPoll % CONTROL_RESEND_EVERY_POLLS == 0);
+    }
+
+    static boolean isControlCommandConfirmed(@Nullable Double actual, double target) {
+        return actual != null && sameValue(actual, target);
     }
 
     private boolean writeControlValue(ICarFunction source, ControlDefinition definition,
@@ -2447,6 +2564,8 @@ final class GeelyCarIntegration implements CarIntegration {
         }
         for (ControlSubscription subscription : controls) subscription.cancelled.set(true);
         mainHandler.removeCallbacks(controlRefreshTask);
+        controlRefreshScheduled = false;
+        controlRefreshAgain = false;
         mainHandler.removeCallbacks(bcmPollTask);
         bcmPollScheduled = false;
         if (autoHoldReceiverRegistered) {
@@ -2459,10 +2578,15 @@ final class GeelyCarIntegration implements CarIntegration {
                 unregisterTelemetryVendorListeners(subscription);
             }
             bcmLastOnMillis.clear();
-            detachControlWatcher();
         });
+        executeControlTask(this::detachControlWatcher);
         signalFallback.shutdown();
         telemetryWorker.shutdown();
+        controlWorker.shutdown();
+        List<ControlCommandListener> abandoned = pendingControlCommands.drain();
+        for (ControlCommandListener listener : abandoned) {
+            mainHandler.post(() -> listener.onResult(false, "ECARX остановлен"));
+        }
         availabilityChangedListener = null;
     }
 }

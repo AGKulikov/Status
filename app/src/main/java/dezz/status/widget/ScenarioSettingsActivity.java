@@ -1116,8 +1116,7 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             EditText destination = falseBranch ? falseStringValue : stringValue;
             Button destinationButton = falseBranch ? chooseFalseStyleValue : chooseStyleValue;
             if (field == LocalField.ICON) {
-                String[] labels = {"Ворота", "Гараж", "Свет", "Замок", "Питание",
-                        "Температура", "Вода", "Дверь", "Wi-Fi", "GPS", "Bluetooth"};
+                String[] labels = PopupIconCatalog.LABELS.toArray(new String[0]);
                 new AlertDialog.Builder(ScenarioSettingsActivity.this).setTitle("Иконка")
                         .setItems(labels, (d, which) -> {
                             String value = PopupIconCatalog.IDS.get(which);

@@ -81,9 +81,17 @@ public final class MediaPanelConfig {
         }
     }
 
-    /** A small fixed grid keeps layout work deterministic on the Android 9 head unit. */
-    public static final int GRID_COLUMNS = 12;
-    public static final int GRID_ROWS = 6;
+    /** Defaults preserve every layout saved before the grid became user-configurable. */
+    public static final int DEFAULT_GRID_COLUMNS = 12;
+    public static final int DEFAULT_GRID_ROWS = 6;
+    public static final int MIN_GRID_COLUMNS = 1;
+    public static final int MAX_GRID_COLUMNS = 24;
+    public static final int MIN_GRID_ROWS = 1;
+    public static final int MAX_GRID_ROWS = 16;
+
+    /** Kept for source compatibility with older tests/downstream extensions. */
+    @Deprecated public static final int GRID_COLUMNS = DEFAULT_GRID_COLUMNS;
+    @Deprecated public static final int GRID_ROWS = DEFAULT_GRID_ROWS;
 
     public static final List<Spec> SPECS = Collections.unmodifiableList(Arrays.asList(
             new Spec(ARTWORK, "Обложка", 112, 112, 0, 0, 3, 3),
@@ -111,6 +119,8 @@ public final class MediaPanelConfig {
     @NonNull public String outlineColor = "#FFFFFF";
     public int outlineAlpha = 42;
     public int outlineWidthPx = 1;
+    public int gridColumns = DEFAULT_GRID_COLUMNS;
+    public int gridRows = DEFAULT_GRID_ROWS;
 
     private final LinkedHashMap<String, Element> elements = new LinkedHashMap<>();
 
@@ -193,6 +203,53 @@ public final class MediaPanelConfig {
         return true;
     }
 
+    /**
+     * Changes the editor/runtime grid without allowing saved elements to overlap. Existing spans
+     * remain cell based, so adding columns/rows really creates smaller, more precise cells. The
+     * closest valid positions are chosen in visual order; an impossibly small grid is rejected
+     * and the previous layout is left untouched.
+     */
+    public boolean setGridSize(int columns, int rows) {
+        int selectedColumns = clamp(columns, MIN_GRID_COLUMNS, MAX_GRID_COLUMNS);
+        int selectedRows = clamp(rows, MIN_GRID_ROWS, MAX_GRID_ROWS);
+        if (selectedColumns == gridColumns && selectedRows == gridRows) return true;
+
+        int oldColumns = gridColumns;
+        int oldRows = gridRows;
+        LinkedHashMap<String, Element> snapshot = snapshotElements();
+        gridColumns = selectedColumns;
+        gridRows = selectedRows;
+        boolean[][] occupied = new boolean[gridRows][gridColumns];
+
+        for (Element element : orderedElements()) {
+            int oldColumn = element.column;
+            int oldRow = element.row;
+            element.columnSpan = clamp(element.columnSpan, 1, gridColumns);
+            element.rowSpan = clamp(element.rowSpan, 1, gridRows);
+            int preferredColumn = scaledStart(oldColumn, oldColumns, gridColumns,
+                    element.columnSpan);
+            int preferredRow = scaledStart(oldRow, oldRows, gridRows, element.rowSpan);
+            if (!element.enabled) {
+                element.column = preferredColumn;
+                element.row = preferredRow;
+                continue;
+            }
+            int[] slot = nearestFree(occupied, preferredColumn, preferredRow,
+                    element.columnSpan, element.rowSpan);
+            if (slot == null) {
+                gridColumns = oldColumns;
+                gridRows = oldRows;
+                restoreElements(snapshot);
+                return false;
+            }
+            element.column = slot[0];
+            element.row = slot[1];
+            occupy(occupied, element.column, element.row,
+                    element.columnSpan, element.rowSpan);
+        }
+        return true;
+    }
+
     /** Appends built-ins introduced after a saved layout without unexpectedly enabling them. */
     void appendMissingDisabled(@NonNull Set<String> restoredIds, int maximumOrder) {
         int order = maximumOrder;
@@ -238,6 +295,8 @@ public final class MediaPanelConfig {
         value.outlineColor = outlineColor;
         value.outlineAlpha = outlineAlpha;
         value.outlineWidthPx = outlineWidthPx;
+        value.gridColumns = gridColumns;
+        value.gridRows = gridRows;
         value.elements.clear();
         for (Map.Entry<String, Element> entry : elements.entrySet()) {
             value.elements.put(entry.getKey(), entry.getValue().copy());
@@ -246,6 +305,8 @@ public final class MediaPanelConfig {
     }
 
     public void normalize() {
+        gridColumns = clamp(gridColumns, MIN_GRID_COLUMNS, MAX_GRID_COLUMNS);
+        gridRows = clamp(gridRows, MIN_GRID_ROWS, MAX_GRID_ROWS);
         backgroundAlpha = clamp(backgroundAlpha, 0, 255);
         cornerRadiusPx = clamp(cornerRadiusPx, 0, 96);
         spacingPx = clamp(spacingPx, 0, 48);
@@ -302,11 +363,11 @@ public final class MediaPanelConfig {
         return Math.max(minimum, Math.min(maximum, value));
     }
 
-    private static void normalizePlacement(@NonNull Element element) {
-        element.columnSpan = clamp(element.columnSpan, 1, GRID_COLUMNS);
-        element.rowSpan = clamp(element.rowSpan, 1, GRID_ROWS);
-        element.column = clamp(element.column, 0, GRID_COLUMNS - element.columnSpan);
-        element.row = clamp(element.row, 0, GRID_ROWS - element.rowSpan);
+    private void normalizePlacement(@NonNull Element element) {
+        element.columnSpan = clamp(element.columnSpan, 1, gridColumns);
+        element.rowSpan = clamp(element.rowSpan, 1, gridRows);
+        element.column = clamp(element.column, 0, gridColumns - element.columnSpan);
+        element.row = clamp(element.row, 0, gridRows - element.rowSpan);
     }
 
     /**
@@ -338,8 +399,8 @@ public final class MediaPanelConfig {
     }
 
     private int[] nearestFree(@NonNull Element moving, int preferredColumn, int preferredRow) {
-        int maximumColumn = GRID_COLUMNS - moving.columnSpan;
-        int maximumRow = GRID_ROWS - moving.rowSpan;
+        int maximumColumn = gridColumns - moving.columnSpan;
+        int maximumRow = gridRows - moving.rowSpan;
         int bestColumn = -1;
         int bestRow = -1;
         int bestDistance = Integer.MAX_VALUE;
@@ -387,6 +448,53 @@ public final class MediaPanelConfig {
         elements.clear();
         for (Map.Entry<String, Element> entry : snapshot.entrySet()) {
             elements.put(entry.getKey(), entry.getValue().copy());
+        }
+    }
+
+    private static int scaledStart(int oldStart, int oldCount, int newCount, int span) {
+        int oldMaximum = Math.max(0, oldCount - span);
+        int newMaximum = Math.max(0, newCount - span);
+        if (oldMaximum == 0 || newMaximum == 0) return 0;
+        return clamp(Math.round(oldStart * newMaximum / (float) oldMaximum), 0, newMaximum);
+    }
+
+    private static int[] nearestFree(@NonNull boolean[][] occupied, int preferredColumn,
+                                     int preferredRow, int columnSpan, int rowSpan) {
+        int rows = occupied.length;
+        int columns = rows == 0 ? 0 : occupied[0].length;
+        int maximumColumn = columns - columnSpan;
+        int maximumRow = rows - rowSpan;
+        int bestColumn = -1;
+        int bestRow = -1;
+        int bestDistance = Integer.MAX_VALUE;
+        for (int row = 0; row <= maximumRow; row++) {
+            for (int column = 0; column <= maximumColumn; column++) {
+                if (!isFree(occupied, column, row, columnSpan, rowSpan)) continue;
+                int distance = Math.abs(column - preferredColumn) + Math.abs(row - preferredRow);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    bestColumn = column;
+                    bestRow = row;
+                }
+            }
+        }
+        return bestColumn < 0 ? null : new int[] {bestColumn, bestRow};
+    }
+
+    private static boolean isFree(@NonNull boolean[][] occupied, int column, int row,
+                                  int columnSpan, int rowSpan) {
+        for (int y = row; y < row + rowSpan; y++) {
+            for (int x = column; x < column + columnSpan; x++) {
+                if (occupied[y][x]) return false;
+            }
+        }
+        return true;
+    }
+
+    private static void occupy(@NonNull boolean[][] occupied, int column, int row,
+                               int columnSpan, int rowSpan) {
+        for (int y = row; y < row + rowSpan; y++) {
+            for (int x = column; x < column + columnSpan; x++) occupied[y][x] = true;
         }
     }
 }

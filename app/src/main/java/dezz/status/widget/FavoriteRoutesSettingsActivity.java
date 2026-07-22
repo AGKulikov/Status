@@ -342,11 +342,11 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
 
         addSlider(editorHost, "Размер иконки", route.iconSizePx, 24, 180, value -> {
             route.iconSizePx = value;
-            persistWithoutList();
+            previewAndPersist();
         }, " px");
         addSlider(editorHost, "Размер подписи", route.labelSizeSp, 8, 36, value -> {
             route.labelSizeSp = value;
-            persistWithoutList();
+            previewAndPersist();
         }, " sp");
         addColorField(editorHost, "Цвет плитки", route.backgroundColor,
                 value -> route.backgroundColor = value);
@@ -377,6 +377,12 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
     }
 
     private void persistWithoutList() {
+        if (editScheduler != null) editScheduler.request();
+    }
+
+    /** Size controls are visual, so repaint them in this callback before the autosave debounce. */
+    private void previewAndPersist() {
+        applyPreviewState();
         if (editScheduler != null) editScheduler.request();
     }
 
