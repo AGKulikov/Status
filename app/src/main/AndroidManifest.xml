@@ -102,7 +102,22 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".FavoriteAppsSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".ClimatePanelSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".MediaPanelSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".PanelElementSettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />
 

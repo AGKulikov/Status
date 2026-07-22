@@ -449,6 +449,9 @@ public class Preferences {
     // (x/y/width/height) and the set will grow as new panels are added.
     public final Str launcherLayoutJson = new Str(this, "launcherLayoutJson", "");
     public final Str launcherFavoritePackages = new Str(this, "launcherFavoritePackages", "");
+    /** Per-application HOME icon/label sizes; selection and order remain in the legacy list. */
+    public final Str launcherFavoriteAppsAppearanceJson = new Str(this,
+            "launcherFavoriteAppsAppearanceJson", "");
     public final Str launcherBackgroundColor = new Str(this, "launcherBackgroundColor", "#101827");
     public final Bool launcherShowGrid = new Bool(this, "launcherShowGrid", true);
     public final Int launcherSnapPx = new Int(this, "launcherSnapPx", 20);
@@ -458,10 +461,15 @@ public class Preferences {
     public final Bool launcherClockVisible = new Bool(this, "launcherClockVisible", true);
     public final Bool launcherNavigationVisible = new Bool(this, "launcherNavigationVisible", true);
     public final Bool launcherActionsVisible = new Bool(this, "launcherActionsVisible", true);
+    public final Str launcherMediaConfigJson = new Str(this, "launcherMediaConfigJson", "");
     // Opt-in on upgrades so a new large panel never covers an existing hand-tuned HOME layout.
     public final Bool launcherClimateVisible = new Bool(this, "launcherClimateVisible", false);
+    // Per-panel inner element visibility/order/scale. Kept separate from outer pixel geometry so
+    // older HOME layouts migrate without moving any panel on upgrade.
+    public final Str launcherPanelElementsJson = new Str(this, "launcherPanelElementsJson", "");
     public final Str launcherClimateConfigJson = new Str(this, "launcherClimateConfigJson", "");
     public final Str launcherShortcutsJson = new Str(this, "launcherShortcutsJson", "");
+    public final Int launcherAppsColumns = new Int(this, "launcherAppsColumns", 3);
     public final Int launcherActionsColumns = new Int(this, "launcherActionsColumns", 3);
 
     public final Bool mqttEnabled = new Bool(this, "mqttEnabled", false);

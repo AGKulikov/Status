@@ -27,6 +27,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
 import dezz.status.widget.car.CarIntegrations;
@@ -53,6 +54,12 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
     private ClimatePanelConfigStore store;
     private ClimatePanelConfig config;
     private ClimatePanelView preview;
+    private LinearLayout elementHost;
+    private boolean liveUpdatePosted;
+    private final Runnable liveUpdate = () -> {
+        liveUpdatePosted = false;
+        persistAndPreview();
+    };
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -72,6 +79,7 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
 
     @Override
     protected void onStop() {
+        flushLiveUpdate();
         if (preview != null) preview.stop();
         super.onStop();
     }
@@ -109,7 +117,7 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
                 value -> Math.round(value * 100f / 255f) + "%");
         addSlider(settings, "Скругление", config.cornerRadiusPx, 0, 96,
                 value -> config.cornerRadiusPx = value, value -> value + " px");
-        addSlider(settings, "Масштаб элементов", config.scalePercent, 60, 160,
+        addSlider(settings, "Общий масштаб панели", config.scalePercent, 60, 160,
                 value -> config.scalePercent = value, value -> value + "%");
         addColor(settings, "Активный цвет", () -> config.accentColor,
                 value -> config.accentColor = value);
@@ -124,19 +132,18 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
         addHint(settings, "При включённом цвете уровня подогревы и вентиляция меняют оттенок вместе с реальным уровнем.");
 
         addTitle(settings, "Что показывать");
-        addHint(settings, "Неподдерживаемые конкретным автомобилем функции скрываются автоматически.");
-        for (ClimatePanelConfig.Element element : ClimatePanelConfig.ELEMENTS) {
-            addSwitch(settings, element.label, config.isElementEnabled(element.id), value -> {
-                config.setElementEnabled(element.id, value);
-                persistAndPreview();
-            });
-        }
+        addHint(settings, "Включайте элементы, меняйте их порядок стрелками и настраивайте размер каждого отдельно. Неподдерживаемые автомобилем функции скрываются автоматически.");
+        elementHost = new LinearLayout(this);
+        elementHost.setOrientation(LinearLayout.VERTICAL);
+        settings.addView(elementHost, new LinearLayout.LayoutParams(match(), wrap()));
+        rebuildElementEditor();
 
         addButton(settings, "Вернуть оформление по умолчанию", v ->
                 new AlertDialog.Builder(this)
                         .setTitle("Сбросить климатическую панель?")
                         .setMessage("Оформление и выбор элементов вернутся к исходным. Размер и положение на HOME сохранятся.")
                         .setPositiveButton("Сбросить", (dialog, which) -> {
+                            flushLiveUpdate();
                             store.reset();
                             config = store.load();
                             recreate();
@@ -162,6 +169,7 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
         previewHost.setBackground(hostBackground);
         previewHost.setPadding(dp(14), dp(14), dp(14), dp(14));
         preview = new ClimatePanelView(this, CarIntegrations.get(this), store);
+        preview.setEditorPreviewMode(true);
         preview.setConfig(config);
         previewHost.addView(preview, new FrameLayout.LayoutParams(match(), match()));
         previewColumn.addView(previewHost, new LinearLayout.LayoutParams(match(), 0, 1f));
@@ -181,6 +189,119 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
         config.normalize();
         store.save(config);
         if (preview != null) preview.setConfig(config);
+    }
+
+    private void rebuildElementEditor() {
+        if (elementHost == null) return;
+        elementHost.removeAllViews();
+        java.util.List<ClimatePanelConfig.Element> ordered = config.orderedElements();
+        for (int index = 0; index < ordered.size(); index++) {
+            ClimatePanelConfig.Element element = ordered.get(index);
+            final int position = index;
+            MaterialCardView card = new MaterialCardView(this);
+            card.setRadius(dp(16));
+            card.setCardElevation(0);
+            card.setStrokeWidth(dp(1));
+            card.setStrokeColor(Color.argb(48, 255, 255, 255));
+            card.setCardBackgroundColor(Color.argb(28, 255, 255, 255));
+
+            LinearLayout block = new LinearLayout(this);
+            block.setOrientation(LinearLayout.VERTICAL);
+            block.setPadding(dp(12), dp(6), dp(8), dp(8));
+            LinearLayout header = new LinearLayout(this);
+            header.setGravity(Gravity.CENTER_VERTICAL);
+            MaterialSwitch enabled = new MaterialSwitch(this);
+            enabled.setText(element.label);
+            enabled.setTextSize(15);
+            enabled.setChecked(config.isElementEnabled(element.id));
+            enabled.setOnCheckedChangeListener((button, checked) -> {
+                config.setElementEnabled(element.id, checked);
+                persistAndPreview();
+            });
+            header.addView(enabled, new LinearLayout.LayoutParams(0, dp(48), 1f));
+            MaterialButton up = orderButton("↑", "Переместить выше");
+            MaterialButton down = orderButton("↓", "Переместить ниже");
+            up.setEnabled(position > 0);
+            down.setEnabled(position < ordered.size() - 1);
+            up.setOnClickListener(v -> moveElement(element.id, -1));
+            down.setOnClickListener(v -> moveElement(element.id, 1));
+            header.addView(up, new LinearLayout.LayoutParams(dp(48), dp(42)));
+            header.addView(down, new LinearLayout.LayoutParams(dp(48), dp(42)));
+            block.addView(header, new LinearLayout.LayoutParams(match(), dp(50)));
+
+            LinearLayout scaleRow = new LinearLayout(this);
+            scaleRow.setGravity(Gravity.CENTER_VERTICAL);
+            TextView scaleLabel = new TextView(this);
+            scaleLabel.setText("Размер");
+            scaleLabel.setTextSize(14);
+            TextView scaleValue = new TextView(this);
+            scaleValue.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+            scaleValue.setMinWidth(dp(64));
+            int currentScale = config.elementScalePercent(element.id);
+            scaleValue.setText(currentScale + "%");
+            SeekBar scale = new SeekBar(this);
+            scale.setMax(110);
+            scale.setProgress(currentScale - 70);
+            scale.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override public void onProgressChanged(SeekBar bar, int progress, boolean user) {
+                    int selected = progress + 70;
+                    scaleValue.setText(selected + "%");
+                    if (user) {
+                        config.setElementScalePercent(element.id, selected);
+                        scheduleLiveUpdate();
+                    }
+                }
+                @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+                @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                    flushLiveUpdate();
+                }
+            });
+            scaleRow.addView(scaleLabel, new LinearLayout.LayoutParams(dp(68), dp(42)));
+            scaleRow.addView(scale, new LinearLayout.LayoutParams(0, dp(42), 1f));
+            scaleRow.addView(scaleValue, new LinearLayout.LayoutParams(dp(72), dp(42)));
+            block.addView(scaleRow, new LinearLayout.LayoutParams(match(), dp(44)));
+            card.addView(block, new MaterialCardView.LayoutParams(match(), wrap()));
+            LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(match(), wrap());
+            cardLp.topMargin = dp(6);
+            elementHost.addView(card, cardLp);
+        }
+    }
+
+    private void moveElement(@NonNull String id, int direction) {
+        if (!config.moveElement(id, direction)) return;
+        persistAndPreview();
+        rebuildElementEditor();
+    }
+
+    private void scheduleLiveUpdate() {
+        View scheduler = preview != null ? preview : elementHost;
+        if (scheduler == null) {
+            persistAndPreview();
+            return;
+        }
+        if (liveUpdatePosted) scheduler.removeCallbacks(liveUpdate);
+        liveUpdatePosted = true;
+        scheduler.postDelayed(liveUpdate, 40L);
+    }
+
+    private void flushLiveUpdate() {
+        if (!liveUpdatePosted) return;
+        View scheduler = preview != null ? preview : elementHost;
+        if (scheduler != null) scheduler.removeCallbacks(liveUpdate);
+        liveUpdatePosted = false;
+        persistAndPreview();
+    }
+
+    @NonNull
+    private MaterialButton orderButton(@NonNull String symbol, @NonNull String description) {
+        MaterialButton button = new MaterialButton(this);
+        button.setText(symbol);
+        button.setTextSize(20);
+        button.setMinWidth(0);
+        button.setMinimumWidth(0);
+        button.setPadding(0, 0, 0, 0);
+        button.setContentDescription(description);
+        return button;
     }
 
     private MaterialSwitch addSwitch(@NonNull LinearLayout parent, @NonNull String label,
@@ -221,11 +342,13 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
                 value.setText(formatter.format(selected));
                 if (user) {
                     listener.set(selected);
-                    persistAndPreview();
+                    scheduleLiveUpdate();
                 }
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                flushLiveUpdate();
+            }
         });
         block.addView(heading);
         block.addView(seek, new LinearLayout.LayoutParams(match(), dp(38)));

@@ -70,6 +70,10 @@ public final class LauncherElementFrame extends MaterialCardView {
     }
 
     public void setContent(@NonNull View view) {
+        // The launcher applies inner-panel edits when returning from the visual editor. Replace
+        // the old content while preserving the edit badge instead of stacking another view over
+        // it on every resume.
+        while (contentHost.getChildCount() > 1) contentHost.removeViewAt(0);
         contentHost.addView(view, 0, new FrameLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
     }

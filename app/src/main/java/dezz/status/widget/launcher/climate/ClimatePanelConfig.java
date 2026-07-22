@@ -7,11 +7,14 @@ package dezz.status.widget.launcher.climate;
 
 import androidx.annotation.NonNull;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** User-facing appearance and content selection for the independent HOME climate panel. */
 public final class ClimatePanelConfig {
@@ -65,9 +68,15 @@ public final class ClimatePanelConfig {
     public boolean showTitle = true;
     public boolean useVehicleStateColors = true;
     private final LinkedHashMap<String, Boolean> elements = new LinkedHashMap<>();
+    private final LinkedHashMap<String, Integer> elementScales = new LinkedHashMap<>();
+    private final ArrayList<String> elementOrder = new ArrayList<>();
 
     public ClimatePanelConfig() {
-        for (Element element : ELEMENTS) elements.put(element.id, true);
+        for (Element element : ELEMENTS) {
+            elements.put(element.id, true);
+            elementScales.put(element.id, 100);
+            elementOrder.add(element.id);
+        }
     }
 
     public boolean isElementEnabled(@NonNull String id) {
@@ -79,9 +88,63 @@ public final class ClimatePanelConfig {
         if (isKnownElement(id)) elements.put(id, enabled);
     }
 
+    /** True when the HOME panel contains at least one user-selected climate control. */
+    public boolean hasEnabledElements() {
+        for (Element element : ELEMENTS) {
+            if (isElementEnabled(element.id)) return true;
+        }
+        return false;
+    }
+
+    public int elementScalePercent(@NonNull String id) {
+        Integer value = elementScales.get(id);
+        return value == null ? 100 : clamp(value, 70, 180);
+    }
+
+    public void setElementScalePercent(@NonNull String id, int percent) {
+        if (isKnownElement(id)) elementScales.put(id, clamp(percent, 70, 180));
+    }
+
+    /** Moves one element in the global visual order; disabled elements retain their position. */
+    public boolean moveElement(@NonNull String id, int direction) {
+        int from = elementOrder.indexOf(id);
+        if (from < 0 || direction == 0) return false;
+        int to = Math.max(0, Math.min(elementOrder.size() - 1, from + direction));
+        if (from == to) return false;
+        elementOrder.remove(from);
+        elementOrder.add(to, id);
+        return true;
+    }
+
+    public void setElementOrder(@NonNull List<String> ids) {
+        elementOrder.clear();
+        elementOrder.addAll(ids);
+        normalizeOrder();
+    }
+
+    @NonNull
+    public List<String> elementOrder() {
+        return Collections.unmodifiableList(new ArrayList<>(elementOrder));
+    }
+
+    @NonNull
+    public List<Element> orderedElements() {
+        ArrayList<Element> result = new ArrayList<>();
+        for (String id : elementOrder) {
+            Element element = elementById(id);
+            if (element != null) result.add(element);
+        }
+        return Collections.unmodifiableList(result);
+    }
+
     @NonNull
     public Map<String, Boolean> elementSelections() {
         return Collections.unmodifiableMap(new LinkedHashMap<>(elements));
+    }
+
+    @NonNull
+    public Map<String, Integer> elementScales() {
+        return Collections.unmodifiableMap(new LinkedHashMap<>(elementScales));
     }
 
     @NonNull
@@ -98,6 +161,10 @@ public final class ClimatePanelConfig {
         value.useVehicleStateColors = useVehicleStateColors;
         value.elements.clear();
         value.elements.putAll(elements);
+        value.elementScales.clear();
+        value.elementScales.putAll(elementScales);
+        value.elementOrder.clear();
+        value.elementOrder.addAll(elementOrder);
         return value;
     }
 
@@ -111,7 +178,27 @@ public final class ClimatePanelConfig {
         if (!isHexColor(textColor)) textColor = "#FFFFFF";
         for (Element element : ELEMENTS) {
             if (!elements.containsKey(element.id)) elements.put(element.id, true);
+            if (!elementScales.containsKey(element.id)) elementScales.put(element.id, 100);
+            elementScales.put(element.id, clamp(elementScales.get(element.id), 70, 180));
         }
+        normalizeOrder();
+    }
+
+    private void normalizeOrder() {
+        Set<String> seen = new HashSet<>();
+        ArrayList<String> valid = new ArrayList<>();
+        for (String id : elementOrder) {
+            if (isKnownElement(id) && seen.add(id)) valid.add(id);
+        }
+        for (Element element : ELEMENTS) if (seen.add(element.id)) valid.add(element.id);
+        elementOrder.clear();
+        elementOrder.addAll(valid);
+    }
+
+    @androidx.annotation.Nullable
+    private static Element elementById(@NonNull String id) {
+        for (Element element : ELEMENTS) if (element.id.equals(id)) return element;
+        return null;
     }
 
     private static boolean isKnownElement(@NonNull String id) {

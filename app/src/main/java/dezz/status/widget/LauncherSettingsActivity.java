@@ -82,6 +82,12 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         addSwitch("Маршрут", preferences.launcherNavigationVisible);
         addSwitch("Быстрые действия", preferences.launcherActionsVisible);
         addSwitch("Отдельная климатическая панель", preferences.launcherClimateVisible);
+        addButton("Состав, порядок и размеры элементов панелей…", v ->
+                startActivity(new Intent(this, PanelElementSettingsActivity.class)));
+        addButton("Настроить избранные приложения…", v ->
+                startActivity(new Intent(this, FavoriteAppsSettingsActivity.class)));
+        addButton("Настроить медиапанель…", v ->
+                startActivity(new Intent(this, MediaPanelSettingsActivity.class)));
         addButton("Настроить климатическую панель…", v ->
                 startActivity(new Intent(this, ClimatePanelSettingsActivity.class)));
         addButton("Иконки, функции и приложения…", v ->

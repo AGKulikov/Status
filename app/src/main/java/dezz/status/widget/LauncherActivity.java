@@ -29,7 +29,6 @@ import android.widget.BaseAdapter;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.GridView;
-import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -52,6 +51,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import dezz.status.widget.launcher.LauncherElementFrame;
@@ -62,8 +62,15 @@ import dezz.status.widget.launcher.LauncherIconResolver;
 import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.launcher.NavigationDataRepository;
 import dezz.status.widget.launcher.YandexWindowLauncher;
+import dezz.status.widget.launcher.apps.FavoriteAppConfig;
+import dezz.status.widget.launcher.apps.FavoriteAppsConfigStore;
+import dezz.status.widget.launcher.climate.ClimatePanelConfig;
 import dezz.status.widget.launcher.climate.ClimatePanelConfigStore;
 import dezz.status.widget.launcher.climate.ClimatePanelView;
+import dezz.status.widget.launcher.media.MediaPanelConfig;
+import dezz.status.widget.launcher.media.MediaPanelConfigStore;
+import dezz.status.widget.launcher.media.MediaPanelView;
+import dezz.status.widget.launcher.panels.PanelElementConfigStore;
 import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarControlState;
 import dezz.status.widget.car.CarIntegration;
@@ -90,19 +97,19 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private Preferences preferences;
     private LauncherLayoutStore layoutStore;
+    private PanelElementConfigStore panelElementStore;
+    private FavoriteAppsConfigStore favoriteAppsConfigStore;
     private FrameLayout workspace;
     private LauncherGridView editorGrid;
     private MaterialButton doneButton;
     private boolean editMode;
     private boolean panelsInitialized;
     private LauncherMediaController mediaController;
-    private ImageView mediaArtwork;
-    private TextView mediaTitle;
-    private TextView mediaArtist;
-    private TextView mediaApplication;
-    private ImageButton playPauseButton;
-    private TextView navigationTitle;
-    private TextView navigationSummary;
+    private MediaPanelView mediaPanel;
+    private TextView navigationArrival;
+    private TextView navigationDuration;
+    private TextView navigationDistance;
+    private TextView navigationInactive;
     /** Opens the same Yandex product that supplied the current route; Navigator is the default. */
     private YandexWindowLauncher.Product navigationLaunchProduct =
             YandexWindowLauncher.Product.NAVIGATOR;
@@ -117,6 +124,14 @@ public final class LauncherActivity extends AppCompatActivity {
     private final Set<String> pendingCarControls = new LinkedHashSet<>();
     private boolean activityStarted;
     private ClimatePanelView climatePanel;
+    @Nullable private String appliedPanelElementsJson;
+    private int appliedAppsColumns = -1;
+    private int appliedActionsColumns = -1;
+    private int appsGridScalePercent = 100;
+    private int actionsTileScalePercent = 100;
+    private int actionsAddScalePercent = 100;
+    private boolean showActionTiles = true;
+    private boolean showActionAdd = true;
     private final CarIntegration.ControlStateListener carStateListener = state -> {
         carControlStates.put(state.controlId, state);
         for (ShortcutTileBinding binding : new ArrayList<>(carShortcutBindings.values())) {
@@ -130,6 +145,8 @@ public final class LauncherActivity extends AppCompatActivity {
         preferences = new Preferences(this);
         carIntegration = CarIntegrations.get(this);
         layoutStore = new LauncherLayoutStore(preferences);
+        panelElementStore = new PanelElementConfigStore(preferences);
+        favoriteAppsConfigStore = new FavoriteAppsConfigStore(preferences);
         configureWindow();
         setContentView(buildRoot());
         workspace.post(this::initializePanels);
@@ -155,7 +172,8 @@ public final class LauncherActivity extends AppCompatActivity {
         navigationUiHandler.removeCallbacks(navigationUiRefresh);
         navigationUiHandler.postDelayed(navigationUiRefresh, NAVIGATION_UI_REFRESH_MS);
         resubscribeCarControls();
-        if (climatePanel != null && preferences.launcherClimateVisible.get()) {
+        if (climatePanel != null && preferences.launcherClimateVisible.get()
+                && hasClimatePanelContent()) {
             climatePanel.start();
         }
     }
@@ -194,19 +212,26 @@ public final class LauncherActivity extends AppCompatActivity {
         if (!panelsInitialized) return;
         View root = (View) workspace.getParent();
         if (root != null) root.setBackground(buildBackground());
-        setPanelVisibility(LauncherLayoutStore.APPS, preferences.launcherAppsVisible.get());
-        setPanelVisibility(LauncherLayoutStore.MEDIA, preferences.launcherMediaVisible.get());
-        setPanelVisibility(LauncherLayoutStore.CLOCK, preferences.launcherClockVisible.get());
+        setPanelVisibility(LauncherLayoutStore.APPS, preferences.launcherAppsVisible.get()
+                && hasSimplePanelContent(LauncherLayoutStore.APPS));
+        setPanelVisibility(LauncherLayoutStore.MEDIA, preferences.launcherMediaVisible.get()
+                && hasMediaPanelContent());
+        setPanelVisibility(LauncherLayoutStore.CLOCK, preferences.launcherClockVisible.get()
+                && hasSimplePanelContent(LauncherLayoutStore.CLOCK));
         setPanelVisibility(LauncherLayoutStore.NAVIGATION,
-                preferences.launcherNavigationVisible.get());
-        setPanelVisibility(LauncherLayoutStore.ACTIONS, preferences.launcherActionsVisible.get());
-        boolean climateVisible = preferences.launcherClimateVisible.get();
+                preferences.launcherNavigationVisible.get()
+                        && hasSimplePanelContent(LauncherLayoutStore.NAVIGATION));
+        setPanelVisibility(LauncherLayoutStore.ACTIONS, preferences.launcherActionsVisible.get()
+                && hasSimplePanelContent(LauncherLayoutStore.ACTIONS));
+        boolean climateVisible = preferences.launcherClimateVisible.get()
+                && hasClimatePanelContent();
         setPanelVisibility(LauncherLayoutStore.CLIMATE, climateVisible);
         if (climatePanel != null) {
             climatePanel.reloadConfig();
             if (activityStarted && climateVisible) climatePanel.start();
             else climatePanel.stop();
         }
+        if (mediaPanel != null) mediaPanel.reloadConfig();
 
         layoutStore.load(workspace.getWidth(), workspace.getHeight());
         for (Map.Entry<String, LauncherElementFrame> entry : panels.entrySet()) {
@@ -218,11 +243,56 @@ public final class LauncherActivity extends AppCompatActivity {
             lp.topMargin = g.y;
             entry.getValue().setLayoutParams(lp);
         }
+        refreshSimplePanelContentsIfNeeded();
+    }
+
+    /** Applies inner-element edits after returning from the visual panel editor. */
+    private void refreshSimplePanelContentsIfNeeded() {
+        String raw = preferences.launcherPanelElementsJson.get();
+        int appsColumns = preferences.launcherAppsColumns.get();
+        int actionsColumns = preferences.launcherActionsColumns.get();
+        if (Objects.equals(appliedPanelElementsJson, raw)
+                && appliedAppsColumns == appsColumns
+                && appliedActionsColumns == actionsColumns) return;
+        appliedPanelElementsJson = raw;
+        appliedAppsColumns = appsColumns;
+        appliedActionsColumns = actionsColumns;
+        replacePanelContent(LauncherLayoutStore.APPS, buildAppsPanel());
+        replacePanelContent(LauncherLayoutStore.CLOCK, buildClockPanel());
+        replacePanelContent(LauncherLayoutStore.NAVIGATION, buildNavigationPanel());
+        replacePanelContent(LauncherLayoutStore.ACTIONS, buildActionsPanel());
+        refreshFavorites();
+        updateNavigation();
+        refreshShortcutGrid();
+    }
+
+    private void replacePanelContent(@NonNull String id, @NonNull View content) {
+        LauncherElementFrame frame = panels.get(id);
+        if (frame != null) frame.setContent(content);
     }
 
     private void setPanelVisibility(@NonNull String id, boolean visible) {
         LauncherElementFrame frame = panels.get(id);
         if (frame != null) frame.setVisibility(visible ? View.VISIBLE : View.GONE);
+    }
+
+    private boolean hasSimplePanelContent(@NonNull String id) {
+        return !panelElementStore.load(id).enabled().isEmpty();
+    }
+
+    private boolean hasMediaPanelContent() {
+        for (MediaPanelConfig.Element element :
+                new MediaPanelConfigStore(preferences).load().orderedElements()) {
+            if (element.enabled) return true;
+        }
+        return false;
+    }
+
+    private boolean hasClimatePanelContent() {
+        ClimatePanelConfig config = new ClimatePanelConfigStore(preferences).load();
+        // The heading is decoration, not useful panel content. When every control is disabled,
+        // hide the outer frame as well instead of leaving an empty rectangle on HOME.
+        return config.hasEnabledElements();
     }
 
     @Override
@@ -301,17 +371,26 @@ public final class LauncherActivity extends AppCompatActivity {
         shortcutStore = new LauncherShortcutStore(preferences);
 
         addPanel(LauncherLayoutStore.APPS, "Приложения", buildAppsPanel(),
-                preferences.launcherAppsVisible.get());
+                preferences.launcherAppsVisible.get()
+                        && hasSimplePanelContent(LauncherLayoutStore.APPS));
         addPanel(LauncherLayoutStore.MEDIA, "Медиа", buildMediaPanel(),
-                preferences.launcherMediaVisible.get());
+                preferences.launcherMediaVisible.get() && hasMediaPanelContent());
+        LauncherElementFrame mediaFrame = panels.get(LauncherLayoutStore.MEDIA);
+        if (mediaFrame != null) {
+            mediaFrame.setCardBackgroundColor(Color.TRANSPARENT);
+            mediaFrame.setCardElevation(0);
+        }
         addPanel(LauncherLayoutStore.CLOCK, "Часы", buildClockPanel(),
-                preferences.launcherClockVisible.get());
+                preferences.launcherClockVisible.get()
+                        && hasSimplePanelContent(LauncherLayoutStore.CLOCK));
         addPanel(LauncherLayoutStore.NAVIGATION, "Маршрут", buildNavigationPanel(),
-                preferences.launcherNavigationVisible.get());
+                preferences.launcherNavigationVisible.get()
+                        && hasSimplePanelContent(LauncherLayoutStore.NAVIGATION));
         addPanel(LauncherLayoutStore.ACTIONS, "Действия", buildActionsPanel(),
-                preferences.launcherActionsVisible.get());
+                preferences.launcherActionsVisible.get()
+                        && hasSimplePanelContent(LauncherLayoutStore.ACTIONS));
         addPanel(LauncherLayoutStore.CLIMATE, "Климат", buildClimatePanel(),
-                preferences.launcherClimateVisible.get());
+                preferences.launcherClimateVisible.get() && hasClimatePanelContent());
         LauncherElementFrame climateFrame = panels.get(LauncherLayoutStore.CLIMATE);
         if (climateFrame != null) {
             climateFrame.setCardBackgroundColor(Color.TRANSPARENT);
@@ -319,10 +398,17 @@ public final class LauncherActivity extends AppCompatActivity {
         }
 
         mediaController = new LauncherMediaController(this, this::updateMedia);
-        if (!isFinishing()) mediaController.start();
+        // initializePanels() is posted from onCreate. If the activity was stopped before that
+        // callback runs, starting here would leave a MediaSession listener alive off-screen.
+        // onStart() will start it normally when HOME becomes active again.
+        if (activityStarted && !isFinishing()) mediaController.start();
         refreshFavorites();
         updateNavigation();
-        if (activityStarted && preferences.launcherClimateVisible.get()) climatePanel.start();
+        if (activityStarted && preferences.launcherClimateVisible.get()
+                && hasClimatePanelContent()) climatePanel.start();
+        appliedPanelElementsJson = preferences.launcherPanelElementsJson.get();
+        appliedAppsColumns = preferences.launcherAppsColumns.get();
+        appliedActionsColumns = preferences.launcherActionsColumns.get();
         if (getIntent().getBooleanExtra(EXTRA_EDIT_MODE, false)) setEditMode(true);
     }
 
@@ -343,100 +429,123 @@ public final class LauncherActivity extends AppCompatActivity {
 
     @NonNull
     private View buildAppsPanel() {
+        PanelElementConfigStore.Panel config = panelElementStore.load(LauncherLayoutStore.APPS);
         LinearLayout root = verticalContainer();
-        TextView heading = heading("Избранное");
-        heading.setOnClickListener(v -> showAllApps());
-        root.addView(heading, new LinearLayout.LayoutParams(matchWidth(), dp(42)));
-        favoritesGrid = new GridView(this);
-        favoritesGrid.setNumColumns(3);
-        favoritesGrid.setVerticalSpacing(dp(4));
-        favoritesGrid.setHorizontalSpacing(dp(4));
-        favoritesGrid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
-        favoritesGrid.setSelector(new ColorDrawable(Color.TRANSPARENT));
-        favoritesGrid.setOnItemClickListener((parent, view, position, id) ->
-                launchApp((AppEntry) parent.getItemAtPosition(position)));
-        favoritesGrid.setOnItemLongClickListener((parent, view, position, id) -> {
-            AppEntry entry = (AppEntry) parent.getItemAtPosition(position);
-            appCatalog.toggleFavorite(entry.packageName);
-            refreshFavorites();
-            return true;
-        });
-        root.addView(favoritesGrid, new LinearLayout.LayoutParams(matchWidth(), 0, 1f));
+        favoritesGrid = null;
+        appsGridScalePercent = config.scale(PanelElementConfigStore.APPS_GRID);
+        for (PanelElementConfigStore.Element element : config.enabled()) {
+            if (PanelElementConfigStore.APPS_HEADING.equals(element.id)) {
+                TextView heading = heading("Избранное");
+                heading.setTextSize(18f * element.scalePercent / 100f);
+                heading.setOnClickListener(v -> showAllApps());
+                int height = Math.max(dp(34), dp(42) * element.scalePercent / 100);
+                root.addView(heading, new LinearLayout.LayoutParams(matchWidth(), height));
+            } else if (PanelElementConfigStore.APPS_GRID.equals(element.id)) {
+                favoritesGrid = new GridView(this);
+                favoritesGrid.setNumColumns(Math.max(1, Math.min(6,
+                        preferences.launcherAppsColumns.get())));
+                favoritesGrid.setVerticalSpacing(dp(4));
+                favoritesGrid.setHorizontalSpacing(dp(4));
+                favoritesGrid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
+                favoritesGrid.setSelector(new ColorDrawable(Color.TRANSPARENT));
+                favoritesGrid.setOnItemClickListener((parent, view, position, id) ->
+                        launchApp((AppEntry) parent.getItemAtPosition(position)));
+                favoritesGrid.setOnItemLongClickListener((parent, view, position, id) -> {
+                    AppEntry entry = (AppEntry) parent.getItemAtPosition(position);
+                    appCatalog.toggleFavorite(entry.packageName);
+                    refreshFavorites();
+                    return true;
+                });
+                root.addView(favoritesGrid,
+                        new LinearLayout.LayoutParams(matchWidth(), 0, 1f));
+            }
+        }
         return root;
     }
 
     @NonNull
     private View buildMediaPanel() {
-        LinearLayout root = verticalContainer();
-        LinearLayout info = new LinearLayout(this);
-        info.setOrientation(LinearLayout.HORIZONTAL);
-        info.setGravity(Gravity.CENTER_VERTICAL);
-        mediaArtwork = new ImageView(this);
-        mediaArtwork.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        mediaArtwork.setImageResource(android.R.drawable.ic_media_play);
-        info.addView(mediaArtwork, new LinearLayout.LayoutParams(dp(112), dp(112)));
-
-        LinearLayout labels = new LinearLayout(this);
-        labels.setOrientation(LinearLayout.VERTICAL);
-        labels.setPadding(dp(18), 0, 0, 0);
-        mediaTitle = text(24, Color.WHITE, true);
-        mediaArtist = text(18, Color.LTGRAY, false);
-        mediaApplication = text(13, Color.GRAY, false);
-        labels.addView(mediaTitle);
-        labels.addView(mediaArtist);
-        labels.addView(mediaApplication);
-        info.addView(labels, new LinearLayout.LayoutParams(0, matchHeight(), 1f));
-        root.addView(info, new LinearLayout.LayoutParams(matchWidth(), 0, 1f));
-
-        LinearLayout controls = new LinearLayout(this);
-        controls.setGravity(Gravity.CENTER);
-        ImageButton previous = mediaButton(android.R.drawable.ic_media_previous);
-        playPauseButton = mediaButton(android.R.drawable.ic_media_play);
-        ImageButton next = mediaButton(android.R.drawable.ic_media_next);
-        previous.setOnClickListener(v -> mediaController.previous());
-        playPauseButton.setOnClickListener(v -> mediaController.playPause());
-        next.setOnClickListener(v -> mediaController.next());
-        controls.addView(previous, controlLp());
-        controls.addView(playPauseButton, controlLp());
-        controls.addView(next, controlLp());
-        root.addView(controls, new LinearLayout.LayoutParams(matchWidth(), dp(64)));
-        return root;
+        mediaPanel = new MediaPanelView(this, new MediaPanelConfigStore(preferences),
+                new MediaPanelView.Controls() {
+                    @Override public void previous() {
+                        if (mediaController != null) mediaController.previous();
+                    }
+                    @Override public void playPause() {
+                        if (mediaController != null) mediaController.playPause();
+                    }
+                    @Override public void next() {
+                        if (mediaController != null) mediaController.next();
+                    }
+                });
+        return mediaPanel;
     }
 
     @NonNull
     private View buildClockPanel() {
+        PanelElementConfigStore.Panel config = panelElementStore.load(LauncherLayoutStore.CLOCK);
         LinearLayout root = verticalContainer();
         root.setGravity(Gravity.CENTER);
-        TextClock time = new TextClock(this);
-        time.setFormat24Hour("HH:mm");
-        time.setFormat12Hour("h:mm");
-        time.setTextColor(Color.WHITE);
-        time.setTextSize(50);
-        time.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL));
-        TextClock date = new TextClock(this);
-        date.setFormat24Hour("EEE, d MMMM");
-        date.setFormat12Hour("EEE, d MMMM");
-        date.setTextColor(Color.LTGRAY);
-        date.setTextSize(17);
-        root.addView(time);
-        root.addView(date);
+        for (PanelElementConfigStore.Element element : config.enabled()) {
+            TextClock value = new TextClock(this);
+            if (PanelElementConfigStore.CLOCK_TIME.equals(element.id)) {
+                value.setFormat24Hour("HH:mm");
+                value.setFormat12Hour("h:mm");
+                value.setTextColor(Color.WHITE);
+                value.setTextSize(50f * element.scalePercent / 100f);
+            } else if (PanelElementConfigStore.CLOCK_DATE.equals(element.id)) {
+                value.setFormat24Hour("EEE, d MMMM");
+                value.setFormat12Hour("EEE, d MMMM");
+                value.setTextColor(Color.LTGRAY);
+                value.setTextSize(17f * element.scalePercent / 100f);
+            } else {
+                continue;
+            }
+            value.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL));
+            root.addView(value);
+        }
         return root;
     }
 
     @NonNull
     private View buildNavigationPanel() {
+        PanelElementConfigStore.Panel config = panelElementStore.load(
+                LauncherLayoutStore.NAVIGATION);
         LinearLayout root = verticalContainer();
         root.setGravity(Gravity.CENTER_VERTICAL);
-        navigationTitle = text(24, Color.WHITE, true);
-        navigationSummary = text(18, Color.LTGRAY, false);
-        root.addView(navigationTitle);
-        root.addView(navigationSummary);
+        navigationArrival = null;
+        navigationDuration = null;
+        navigationDistance = null;
+        navigationInactive = null;
+        for (PanelElementConfigStore.Element element : config.enabled()) {
+            TextView value;
+            if (PanelElementConfigStore.NAV_ARRIVAL.equals(element.id)) {
+                navigationArrival = value = text(24f * element.scalePercent / 100f,
+                        Color.WHITE, true);
+            } else if (PanelElementConfigStore.NAV_DURATION.equals(element.id)) {
+                navigationDuration = value = text(18f * element.scalePercent / 100f,
+                        Color.LTGRAY, false);
+            } else if (PanelElementConfigStore.NAV_DISTANCE.equals(element.id)) {
+                navigationDistance = value = text(18f * element.scalePercent / 100f,
+                        Color.LTGRAY, false);
+            } else if (PanelElementConfigStore.NAV_INACTIVE.equals(element.id)) {
+                navigationInactive = value = text(16f * element.scalePercent / 100f,
+                        Color.GRAY, false);
+            } else {
+                continue;
+            }
+            root.addView(value);
+        }
         root.setOnClickListener(v -> launchYandex(navigationLaunchProduct, false));
         return root;
     }
 
     @NonNull
     private View buildActionsPanel() {
+        PanelElementConfigStore.Panel config = panelElementStore.load(LauncherLayoutStore.ACTIONS);
+        showActionTiles = config.isEnabled(PanelElementConfigStore.ACTION_TILES);
+        showActionAdd = config.isEnabled(PanelElementConfigStore.ACTION_ADD);
+        actionsTileScalePercent = config.scale(PanelElementConfigStore.ACTION_TILES);
+        actionsAddScalePercent = config.scale(PanelElementConfigStore.ACTION_ADD);
         shortcutScroll = new ScrollView(this);
         shortcutScroll.setFillViewport(true);
         shortcutScroll.setVerticalScrollBarEnabled(false);
@@ -462,15 +571,19 @@ public final class LauncherActivity extends AppCompatActivity {
         int columns = Math.max(1, Math.min(6, preferences.launcherActionsColumns.get()));
         List<ShortcutPlacement> placements = new ArrayList<>();
         List<boolean[]> occupied = new ArrayList<>();
-        for (LauncherShortcutStore.Shortcut shortcut : shortcutStore.all()) {
-            if (!shortcut.enabled) continue;
-            placements.add(place(shortcut, columns, occupied));
+        if (showActionTiles) {
+            for (LauncherShortcutStore.Shortcut shortcut : shortcutStore.all()) {
+                if (!shortcut.enabled) continue;
+                placements.add(place(shortcut, columns, occupied));
+            }
         }
-        LauncherShortcutStore.Shortcut add = new LauncherShortcutStore.Shortcut();
-        add.title = "Добавить";
-        add.icon = "apps";
-        add.backgroundColor = "#553A465B";
-        placements.add(place(add, columns, occupied));
+        if (showActionAdd) {
+            LauncherShortcutStore.Shortcut add = new LauncherShortcutStore.Shortcut();
+            add.title = "Добавить";
+            add.icon = "apps";
+            add.backgroundColor = "#553A465B";
+            placements.add(place(add, columns, occupied));
+        }
 
         int rows = Math.max(1, occupied.size());
         shortcutGrid.setColumnCount(columns);
@@ -480,11 +593,12 @@ public final class LauncherActivity extends AppCompatActivity {
             availableWidth = shortcutScroll.getWidth();
         }
         int cellWidth = Math.max(dp(72), (Math.max(dp(72), availableWidth) - dp(14)) / columns);
-        int cellHeight = Math.max(dp(82), cellWidth);
+        int groupScale = showActionTiles ? actionsTileScalePercent : actionsAddScalePercent;
+        int cellHeight = Math.max(dp(56), cellWidth * groupScale / 100);
         shortcutGrid.setMinimumHeight(rows * cellHeight + dp(14));
         for (int index = 0; index < placements.size(); index++) {
             ShortcutPlacement placement = placements.get(index);
-            boolean addButton = index == placements.size() - 1;
+            boolean addButton = showActionAdd && index == placements.size() - 1;
             View tile = buildShortcutTile(placement.shortcut, addButton);
             GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
             lp.width = cellWidth * placement.columnSpan - dp(8);
@@ -542,10 +656,11 @@ public final class LauncherActivity extends AppCompatActivity {
         } else {
             icon.setImageDrawable(LauncherIconResolver.resolve(this, shortcut));
         }
-        int iconSize = Math.max(24, shortcut.iconSizePx);
+        int contentScale = addButton ? actionsAddScalePercent : actionsTileScalePercent;
+        int iconSize = Math.max(24, shortcut.iconSizePx) * contentScale / 100;
         content.addView(icon, new LinearLayout.LayoutParams(iconSize, iconSize));
         if (shortcut.showTitle || addButton) {
-            TextView label = text(12, Color.WHITE, true);
+            TextView label = text(12f * contentScale / 100f, Color.WHITE, true);
             try { label.setTextColor(Color.parseColor(shortcut.textColor)); }
             catch (IllegalArgumentException ignored) { label.setTextColor(Color.WHITE); }
             label.setGravity(Gravity.CENTER);
@@ -744,36 +859,41 @@ public final class LauncherActivity extends AppCompatActivity {
     }
 
     private void updateMedia(@NonNull LauncherMediaController.Snapshot state) {
-        if (mediaTitle == null) return;
-        mediaTitle.setText(state.title);
-        mediaArtist.setText(state.artist);
-        mediaArtist.setVisibility(state.artist.isEmpty() ? View.GONE : View.VISIBLE);
-        mediaApplication.setText(state.application);
-        if (state.artwork != null) mediaArtwork.setImageBitmap(state.artwork);
-        else mediaArtwork.setImageResource(android.R.drawable.ic_media_play);
-        playPauseButton.setImageResource(state.playing
-                ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
+        if (mediaPanel != null) mediaPanel.setSnapshot(state);
     }
 
     private void updateNavigation() {
-        if (navigationTitle == null) return;
+        if (navigationArrival == null && navigationDuration == null
+                && navigationDistance == null && navigationInactive == null) return;
         NavigationDataRepository.Snapshot state = NavigationDataRepository.read(this);
         if (!state.available) {
             navigationLaunchProduct = YandexWindowLauncher.Product.NAVIGATOR;
-            navigationTitle.setText("Маршрут не запущен");
-            navigationSummary.setText("Нажмите, чтобы открыть Яндекс Навигатор");
+            if (navigationArrival != null) navigationArrival.setVisibility(View.GONE);
+            if (navigationDuration != null) navigationDuration.setVisibility(View.GONE);
+            if (navigationDistance != null) navigationDistance.setVisibility(View.GONE);
+            if (navigationInactive != null) {
+                navigationInactive.setVisibility(View.VISIBLE);
+                navigationInactive.setText("Маршрут не запущен\nНажмите, чтобы открыть Яндекс Навигатор");
+            }
             return;
         }
         navigationLaunchProduct = NavigationDataRepository.PRODUCT_MAPS.equals(state.sourceProduct)
                 ? YandexWindowLauncher.Product.MAPS
                 : YandexWindowLauncher.Product.NAVIGATOR;
-        navigationTitle.setText(state.arrival.isEmpty() ? "Маршрут активен"
-                : "Время прибытия: " + state.arrival);
-        List<String> summary = new ArrayList<>();
-        if (!state.duration.isEmpty()) summary.add(state.duration);
-        if (!state.distance.isEmpty()) summary.add(state.distance);
-        navigationSummary.setText(summary.isEmpty() ? "Данные маршрута получены"
-                : "Осталось: " + String.join(" · ", summary));
+        if (navigationInactive != null) navigationInactive.setVisibility(View.GONE);
+        if (navigationArrival != null) {
+            navigationArrival.setVisibility(View.VISIBLE);
+            navigationArrival.setText(state.arrival.isEmpty() ? "Маршрут активен"
+                    : "Время прибытия: " + state.arrival);
+        }
+        if (navigationDuration != null) {
+            navigationDuration.setVisibility(state.duration.isEmpty() ? View.GONE : View.VISIBLE);
+            navigationDuration.setText(state.duration.isEmpty() ? "" : "Осталось: " + state.duration);
+        }
+        if (navigationDistance != null) {
+            navigationDistance.setVisibility(state.distance.isEmpty() ? View.GONE : View.VISIBLE);
+            navigationDistance.setText(state.distance);
+        }
     }
 
     private void launchYandex(YandexWindowLauncher.Product product, boolean full) {
@@ -847,19 +967,6 @@ public final class LauncherActivity extends AppCompatActivity {
         if (bold) text.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         text.setMaxLines(2);
         return text;
-    }
-
-    @NonNull private ImageButton mediaButton(int icon) {
-        ImageButton button = new ImageButton(this);
-        button.setImageResource(icon);
-        button.setColorFilter(Color.WHITE);
-        button.setBackgroundColor(Color.TRANSPARENT);
-        button.setPadding(dp(14), dp(14), dp(14), dp(14));
-        return button;
-    }
-
-    private LinearLayout.LayoutParams controlLp() {
-        return new LinearLayout.LayoutParams(dp(76), matchHeight());
     }
 
     private FrameLayout.LayoutParams match() {
@@ -940,15 +1047,23 @@ public final class LauncherActivity extends AppCompatActivity {
             cell.setGravity(Gravity.CENTER);
             cell.setPadding(dp(4), dp(5), dp(4), dp(5));
             AppEntry entry = getItem(position);
+            FavoriteAppConfig appearance = favoriteAppsConfigStore.appearance(entry.packageName);
             ImageView icon = new ImageView(LauncherActivity.this);
             icon.setImageDrawable(entry.icon);
             icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            cell.addView(icon, new LinearLayout.LayoutParams(dp(50), dp(50)));
-            TextView label = text(12, Color.WHITE, false);
-            label.setGravity(Gravity.CENTER);
-            label.setText(entry.label);
-            label.setMaxLines(1);
-            cell.addView(label, new LinearLayout.LayoutParams(matchWidth(), dp(25)));
+            // iconSizePx is intentionally stored in physical pixels for head-unit layouts.
+            int iconSize = Math.max(24,
+                    appearance.iconSizePx * appsGridScalePercent / 100);
+            cell.addView(icon, new LinearLayout.LayoutParams(iconSize, iconSize));
+            if (appearance.showLabel) {
+                TextView label = text(appearance.labelSizeSp * appsGridScalePercent / 100f,
+                        Color.WHITE, false);
+                label.setGravity(Gravity.CENTER);
+                label.setText(entry.label);
+                label.setMaxLines(1);
+                cell.addView(label, new LinearLayout.LayoutParams(matchWidth(),
+                        Math.max(dp(18), dp(25) * appsGridScalePercent / 100)));
+            }
             return cell;
         }
     }
@@ -993,9 +1108,11 @@ public final class LauncherActivity extends AppCompatActivity {
         }
 
         void toggleFavorite(String packageName) {
-            Set<String> values = favoritePackages();
-            if (!values.remove(packageName)) values.add(packageName);
-            preferences.launcherFavoritePackages.set(String.join(",", values));
+            if (favoriteAppsConfigStore.contains(packageName)) {
+                favoriteAppsConfigStore.remove(packageName);
+            } else {
+                favoriteAppsConfigStore.add(packageName);
+            }
         }
 
         private void ensureDefaultFavorites() {
@@ -1017,9 +1134,8 @@ public final class LauncherActivity extends AppCompatActivity {
         @NonNull
         private Set<String> favoritePackages() {
             LinkedHashSet<String> values = new LinkedHashSet<>();
-            String raw = preferences.launcherFavoritePackages.get();
-            if (raw != null) for (String value : raw.split(",")) {
-                if (!value.trim().isEmpty()) values.add(value.trim());
+            for (FavoriteAppConfig value : favoriteAppsConfigStore.load()) {
+                values.add(value.packageName);
             }
             return values;
         }
