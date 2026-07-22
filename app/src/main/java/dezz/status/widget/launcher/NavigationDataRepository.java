@@ -101,6 +101,7 @@ public final class NavigationDataRepository {
     private static final String PREF_DURATION = "duration";
     private static final String PREF_DISTANCE = "distance";
     private static final String PREF_UPDATED_AT = "updatedAt";
+    private static final String PREF_ROUTE_ACTIVE = "routeActive";
     private static final String PREF_SOURCE_PACKAGE = "sourcePackage";
     private static final String PREF_SOURCE_KEY = "sourceKey";
     private static final String PREF_MANEUVER_TITLE = "maneuverTitle";
@@ -131,7 +132,7 @@ public final class NavigationDataRepository {
     private static final String PREF_TRAFFIC_UPDATED_AT = "trafficUpdatedAt";
     private static final String PREF_BOOT_COUNT = "bootCount";
     private static final String PREF_BOOT_EPOCH = "bootEpoch";
-    private static final long STALE_MS = 30L * 60L * 1000L;
+    private static final long STALE_MS = NavigationRouteStatePolicy.ROUTE_STALE_MS;
     private static final long TRAFFIC_STALE_MS = 120_000L;
     private static final long LANE_STALE_MS = 120_000L;
     private static final long MANEUVER_IMAGE_STALE_MS = STALE_MS;
@@ -222,17 +223,20 @@ public final class NavigationDataRepository {
         @Nullable public final Bitmap rainbowImage;
         public final boolean laneAvailable;
         public final boolean trafficAvailable;
+        /** True only for a fresh main route in this Android boot. */
+        public final boolean routeActive;
+        /** Compatibility alias retained for existing navigation panel code. */
         public final boolean available;
 
         Snapshot(String arrival, String duration, String distance, String sourcePackage,
-                boolean available, String maneuverTitle, String maneuverText, String speedLimit,
+                String maneuverTitle, String maneuverText, String speedLimit,
                 String trafficColor, String trafficCountdown, String trafficArrow,
                 boolean trafficAvailable, String maneuverSubtext,
                 List<TrafficLight> trafficLights, String lanes, String laneDistance,
                 double laneDistanceMeters, double laneLatitude, double laneLongitude,
                 boolean laneAlongRoute, List<LaneRecord> laneRecords, String laneRawLanes,
                 String laneRawLatitudes, String laneRawLongitudes, String laneRawDistances,
-                String laneRawAlongRoute, boolean laneAvailable,
+                String laneRawAlongRoute, boolean laneAvailable, boolean routeActive,
                 Bitmap maneuverImage,
                 Bitmap lanesImage, Bitmap jamImage, Bitmap rainbowImage) {
             this.arrival = arrival;
@@ -266,7 +270,8 @@ public final class NavigationDataRepository {
             this.jamImage = jamImage;
             this.rainbowImage = rainbowImage;
             this.trafficAvailable = trafficAvailable;
-            this.available = available;
+            this.routeActive = routeActive;
+            this.available = routeActive;
         }
     }
 
@@ -560,7 +565,8 @@ public final class NavigationDataRepository {
                     || prefs.getLong(PREF_JAM_IMAGE_UPDATED_AT, 0L) > 0
                     || prefs.getLong(PREF_RAINBOW_IMAGE_UPDATED_AT, 0L) > 0;
             prefs.edit().remove(PREF_ARRIVAL).remove(PREF_DURATION).remove(PREF_DISTANCE)
-                    .remove(PREF_UPDATED_AT).remove(PREF_SOURCE_PACKAGE)
+                    .remove(PREF_UPDATED_AT).remove(PREF_ROUTE_ACTIVE)
+                    .remove(PREF_SOURCE_PACKAGE)
                     .remove(PREF_SOURCE_KEY).remove(PREF_MANEUVER_TITLE)
                     .remove(PREF_MANEUVER_TEXT).remove(PREF_MANEUVER_SUBTEXT)
                     .remove(PREF_SPEED_LIMIT).remove(PREF_MANEUVER_IMAGE_UPDATED_AT)
@@ -588,7 +594,10 @@ public final class NavigationDataRepository {
         SharedPreferences prefs = preferences(context);
         long updatedAt = prefs.getLong(PREF_UPDATED_AT, 0L);
         long now = System.currentTimeMillis();
-        boolean available = isFresh(updatedAt, STALE_MS, now);
+        boolean hasMainRouteEvidence = hasMainRouteEvidence(prefs);
+        boolean routeActive = NavigationRouteStatePolicy.isRouteActive(
+                prefs.contains(PREF_ROUTE_ACTIVE), prefs.getBoolean(PREF_ROUTE_ACTIVE, false),
+                hasMainRouteEvidence, updatedAt, now, true);
         List<TrafficLight> trafficLights = readTrafficLights(prefs, now);
         long trafficUpdatedAt = prefs.getLong(PREF_TRAFFIC_UPDATED_AT, 0L);
         boolean legacyTrafficAvailable = !prefs.contains(PREF_TRAFFIC_LIGHTS_JSON)
@@ -614,7 +623,7 @@ public final class NavigationDataRepository {
                 RAINBOW_IMAGE_STALE_MS, NavigationGraphicStore.RAINBOW, now);
         return new Snapshot(prefs.getString(PREF_ARRIVAL, ""),
                 prefs.getString(PREF_DURATION, ""), prefs.getString(PREF_DISTANCE, ""),
-                prefs.getString(PREF_SOURCE_PACKAGE, ""), available,
+                prefs.getString(PREF_SOURCE_PACKAGE, ""),
                 prefs.getString(PREF_MANEUVER_TITLE, ""),
                 prefs.getString(PREF_MANEUVER_TEXT, ""),
                 prefs.getString(PREF_SPEED_LIMIT, ""),
@@ -629,8 +638,20 @@ public final class NavigationDataRepository {
                 prefs.getString(PREF_LANE_RAW_LATITUDES, ""),
                 prefs.getString(PREF_LANE_RAW_LONGITUDES, ""),
                 prefs.getString(PREF_LANE_RAW_DISTANCES, ""),
-                prefs.getString(PREF_LANE_RAW_ALONG_ROUTE, ""), laneAvailable,
+                prefs.getString(PREF_LANE_RAW_ALONG_ROUTE, ""), laneAvailable, routeActive,
                 maneuverImage, lanesImage, jamImage, rainbowImage);
+    }
+
+    /** Main-route evidence used only to migrate snapshots written before routeActive existed. */
+    private static boolean hasMainRouteEvidence(SharedPreferences prefs) {
+        return !prefs.getString(PREF_ARRIVAL, "").isEmpty()
+                || !prefs.getString(PREF_DURATION, "").isEmpty()
+                || !prefs.getString(PREF_DISTANCE, "").isEmpty()
+                || !prefs.getString(PREF_MANEUVER_TITLE, "").isEmpty()
+                || !prefs.getString(PREF_MANEUVER_TEXT, "").isEmpty()
+                || !prefs.getString(PREF_MANEUVER_SUBTEXT, "").isEmpty()
+                || !prefs.getString(PREF_SPEED_LIMIT, "").isEmpty()
+                || prefs.getLong(PREF_MANEUVER_IMAGE_UPDATED_AT, 0L) > 0L;
     }
 
     private static boolean updateFromMonjaroNavigation(@NonNull Context context,
@@ -666,12 +687,19 @@ public final class NavigationDataRepository {
         }
         if (!parsed.hasData() && title.isEmpty() && maneuver.isEmpty() && subtext.isEmpty()
                 && speedLimit.isEmpty()) {
+            boolean explicitActive = intent.hasExtra("route_active");
             if (imageStored) {
-                preferences(context).edit().putLong(PREF_MANEUVER_IMAGE_UPDATED_AT,
-                        System.currentTimeMillis()).apply();
+                long now = System.currentTimeMillis();
+                preferences(context).edit().putLong(PREF_MANEUVER_IMAGE_UPDATED_AT, now)
+                        .putLong(PREF_UPDATED_AT, now)
+                        .putBoolean(PREF_ROUTE_ACTIVE, true).apply();
+            } else if (explicitActive) {
+                long now = System.currentTimeMillis();
+                preferences(context).edit().putLong(PREF_UPDATED_AT, now)
+                        .putBoolean(PREF_ROUTE_ACTIVE, true).apply();
             }
-            if (imageChanged) notifyChanged(context);
-            return imageChanged;
+            if (imageChanged || explicitActive) notifyChanged(context);
+            return imageChanged || explicitActive;
         }
         SharedPreferences prefs = preferences(context);
         long now = System.currentTimeMillis();
@@ -685,6 +713,7 @@ public final class NavigationDataRepository {
                 .putString(PREF_SPEED_LIMIT, speedLimit)
                 .putString(PREF_SOURCE_PACKAGE, sourcePackage)
                 .putString(PREF_SOURCE_KEY, "broadcast:plus.monjaro")
+                .putBoolean(PREF_ROUTE_ACTIVE, true)
                 .putLong(PREF_UPDATED_AT, now);
         if (imageStored) editor.putLong(PREF_MANEUVER_IMAGE_UPDATED_AT, now);
         editor.apply();
@@ -1215,6 +1244,7 @@ public final class NavigationDataRepository {
                     .putString(PREF_DISTANCE, distance)
                     .putString(PREF_SOURCE_PACKAGE, sourcePackage)
                     .putString(PREF_SOURCE_KEY, sourceKeyToWrite)
+                    .putBoolean(PREF_ROUTE_ACTIVE, true)
                     .putLong(PREF_UPDATED_AT, now)
                     .apply();
             if (changed) notifyChanged(context);

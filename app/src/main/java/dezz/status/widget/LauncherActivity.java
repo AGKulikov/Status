@@ -55,6 +55,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import dezz.status.widget.launcher.CombinedNavigationPanelPolicy;
 import dezz.status.widget.launcher.LauncherElementFrame;
 import dezz.status.widget.launcher.LauncherGridView;
 import dezz.status.widget.launcher.LauncherLayoutStore;
@@ -116,6 +117,8 @@ public final class LauncherActivity extends AppCompatActivity {
     private boolean editMode;
     private boolean panelsInitialized;
     private boolean navigationDynamicRefresh;
+    private boolean navigationLiveContentAvailable;
+    @Nullable private View navigationRouteContent;
     private LauncherMediaController mediaController;
     private MediaPanelView mediaPanel;
     private TextView navigationArrival;
@@ -152,6 +155,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private boolean activityStarted;
     private ClimatePanelView climatePanel;
     private FavoriteRoutesPanelView favoriteRoutesPanel;
+    private boolean favoriteRoutesAvailable;
     private VehicleInfoPanelView vehicleInfoPanel;
     @Nullable private String appliedPanelElementsJson;
     private int appliedAppsColumns = -1;
@@ -252,17 +256,13 @@ public final class LauncherActivity extends AppCompatActivity {
                 && hasMediaPanelContent());
         setPanelVisibility(LauncherLayoutStore.CLOCK, preferences.launcherClockVisible.get()
                 && hasSimplePanelContent(LauncherLayoutStore.CLOCK));
-        setPanelVisibility(LauncherLayoutStore.NAVIGATION,
-                preferences.launcherNavigationVisible.get()
-                        && hasSimplePanelContent(LauncherLayoutStore.NAVIGATION));
-        boolean favoriteRoutesVisible = preferences.launcherFavoriteRoutesVisible.get()
-                && favoriteRoutesConfigStore.hasEnabled();
-        setPanelVisibility(LauncherLayoutStore.FAVORITE_ROUTES, favoriteRoutesVisible);
         if (favoriteRoutesPanel != null) {
             favoriteRoutesPanel.setColumns(Math.max(1, Math.min(6,
                     preferences.launcherFavoriteRoutesColumns.get())));
             favoriteRoutesPanel.reloadConfig();
+            favoriteRoutesAvailable = favoriteRoutesPanel.hasEnabledRoutes();
         }
+        updateCombinedNavigationFrameVisibility();
         setPanelVisibility(LauncherLayoutStore.ACTIONS, preferences.launcherActionsVisible.get()
                 && hasSimplePanelContent(LauncherLayoutStore.ACTIONS));
         boolean climateVisible = preferences.launcherClimateVisible.get()
@@ -293,6 +293,8 @@ public final class LauncherActivity extends AppCompatActivity {
             entry.getValue().setLayoutParams(lp);
         }
         refreshSimplePanelContentsIfNeeded();
+        updateNavigation();
+        scheduleNavigationRefresh();
     }
 
     /** Applies inner-element edits after returning from the visual panel editor. */
@@ -308,7 +310,8 @@ public final class LauncherActivity extends AppCompatActivity {
         appliedActionsColumns = actionsColumns;
         replacePanelContent(LauncherLayoutStore.APPS, buildAppsPanel());
         replacePanelContent(LauncherLayoutStore.CLOCK, buildClockPanel());
-        replacePanelContent(LauncherLayoutStore.NAVIGATION, buildNavigationPanel());
+        replacePanelContent(LauncherLayoutStore.NAVIGATION,
+                buildCombinedNavigationPanel());
         replacePanelContent(LauncherLayoutStore.ACTIONS, buildActionsPanel());
         refreshFavorites();
         updateNavigation();
@@ -416,6 +419,7 @@ public final class LauncherActivity extends AppCompatActivity {
         if (panelsInitialized || workspace.getWidth() <= 0 || workspace.getHeight() <= 0) return;
         panelsInitialized = true;
         layoutStore.load(workspace.getWidth(), workspace.getHeight());
+        migrateLegacyNavigationPanel();
         appCatalog = new AppCatalog(this);
         appCatalog.reload();
         shortcutStore = new LauncherShortcutStore(preferences);
@@ -433,12 +437,8 @@ public final class LauncherActivity extends AppCompatActivity {
         addPanel(LauncherLayoutStore.CLOCK, "Часы", buildClockPanel(),
                 preferences.launcherClockVisible.get()
                         && hasSimplePanelContent(LauncherLayoutStore.CLOCK));
-        addPanel(LauncherLayoutStore.NAVIGATION, "Маршрут", buildNavigationPanel(),
-                preferences.launcherNavigationVisible.get()
-                        && hasSimplePanelContent(LauncherLayoutStore.NAVIGATION));
-        addPanel(LauncherLayoutStore.FAVORITE_ROUTES, "Избранные маршруты",
-                buildFavoriteRoutesPanel(), preferences.launcherFavoriteRoutesVisible.get()
-                        && favoriteRoutesConfigStore.hasEnabled());
+        addPanel(LauncherLayoutStore.NAVIGATION, "Маршрут и избранное",
+                buildCombinedNavigationPanel(), isCombinedNavigationFrameVisible());
         addPanel(LauncherLayoutStore.ACTIONS, "Действия", buildActionsPanel(),
                 preferences.launcherActionsVisible.get()
                         && hasSimplePanelContent(LauncherLayoutStore.ACTIONS));
@@ -482,7 +482,62 @@ public final class LauncherActivity extends AppCompatActivity {
     private View buildFavoriteRoutesPanel() {
         favoriteRoutesPanel = new FavoriteRoutesPanelView(this, favoriteRoutesConfigStore,
                 Math.max(1, Math.min(6, preferences.launcherFavoriteRoutesColumns.get())));
+        favoriteRoutesAvailable = favoriteRoutesPanel.hasEnabledRoutes();
         return favoriteRoutesPanel;
+    }
+
+    /**
+     * One physical HOME panel owns both states: favorite destinations while idle and the
+     * user-selected navigation data while a real route is active.
+     */
+    @NonNull
+    private View buildCombinedNavigationPanel() {
+        FrameLayout host = new FrameLayout(this);
+        navigationRouteContent = buildNavigationPanel();
+        host.addView(navigationRouteContent, new FrameLayout.LayoutParams(
+                matchWidth(), ViewGroup.LayoutParams.MATCH_PARENT));
+        View favorites = buildFavoriteRoutesPanel();
+        host.addView(favorites, new FrameLayout.LayoutParams(
+                matchWidth(), ViewGroup.LayoutParams.MATCH_PARENT));
+        return host;
+    }
+
+    /** Preserves the old favorite-only rectangle when upgrading from two independent panels. */
+    private void migrateLegacyNavigationPanel() {
+        if (preferences.launcherCombinedNavigationMigrated.get()) return;
+        boolean navigationEnabled = preferences.launcherNavigationVisible.get();
+        boolean favoritesEnabled = preferences.launcherFavoriteRoutesVisible.get();
+        if (CombinedNavigationPanelPolicy.shouldUseLegacyFavoriteGeometry(false,
+                navigationEnabled, favoritesEnabled)) {
+            layoutStore.put(LauncherLayoutStore.NAVIGATION,
+                    layoutStore.get(LauncherLayoutStore.FAVORITE_ROUTES));
+        }
+        boolean combinedEnabled = CombinedNavigationPanelPolicy.isEnabled(
+                navigationEnabled, favoritesEnabled);
+        if (navigationEnabled != combinedEnabled) {
+            preferences.launcherNavigationVisible.set(combinedEnabled);
+        }
+        if (favoritesEnabled != combinedEnabled) {
+            preferences.launcherFavoriteRoutesVisible.set(combinedEnabled);
+        }
+        preferences.launcherCombinedNavigationMigrated.set(true);
+    }
+
+    private boolean isCombinedNavigationEnabled() {
+        return CombinedNavigationPanelPolicy.isEnabled(
+                preferences.launcherNavigationVisible.get(),
+                preferences.launcherFavoriteRoutesVisible.get());
+    }
+
+    private boolean isCombinedNavigationFrameVisible() {
+        return isCombinedNavigationEnabled()
+                && (hasSimplePanelContent(LauncherLayoutStore.NAVIGATION)
+                || favoriteRoutesAvailable);
+    }
+
+    private void updateCombinedNavigationFrameVisibility() {
+        setPanelVisibility(LauncherLayoutStore.NAVIGATION,
+                isCombinedNavigationFrameVisible());
     }
 
     @NonNull
@@ -614,6 +669,7 @@ public final class LauncherActivity extends AppCompatActivity {
         navigationJamImage = null;
         navigationRainbowImage = null;
         navigationInactive = null;
+        navigationLiveContentAvailable = false;
         for (PanelElementConfigStore.Element element : config.enabled()) {
             TextView value = null;
             if (PanelElementConfigStore.NAV_ARRIVAL.equals(element.id)) {
@@ -666,6 +722,9 @@ public final class LauncherActivity extends AppCompatActivity {
                         Color.GRAY, false);
             } else {
                 continue;
+            }
+            if (!PanelElementConfigStore.NAV_INACTIVE.equals(element.id)) {
+                navigationLiveContentAvailable = true;
             }
             if (value != null) root.addView(value);
         }
@@ -1020,6 +1079,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 ? View.VISIBLE : View.GONE);
         doneButton.setVisibility(enabled ? View.VISIBLE : View.GONE);
         for (LauncherElementFrame frame : panels.values()) frame.setEditMode(enabled, snap);
+        updateNavigation();
         if (vehicleInfoPanel != null && preferences.launcherVehicleInfoVisible.get()) {
             setPanelVisibility(LauncherLayoutStore.VEHICLE_INFO,
                     enabled || vehicleInfoPanel.hasDisplayableSample());
@@ -1035,6 +1095,20 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private void updateNavigation() {
         navigationDynamicRefresh = false;
+        NavigationDataRepository.Snapshot state = NavigationDataRepository.read(this);
+        boolean showFavorites = CombinedNavigationPanelPolicy.showFavorites(
+                state.routeActive, favoriteRoutesAvailable);
+        if (favoriteRoutesPanel != null) {
+            favoriteRoutesPanel.setVisibility(showFavorites ? View.VISIBLE : View.GONE);
+        }
+        if (navigationRouteContent != null) {
+            navigationRouteContent.setVisibility(showFavorites ? View.GONE : View.VISIBLE);
+        }
+        boolean phaseHasContent = CombinedNavigationPanelPolicy.hasVisibleContent(
+                state.routeActive, favoriteRoutesAvailable,
+                navigationLiveContentAvailable, navigationInactive != null);
+        setPanelVisibility(LauncherLayoutStore.NAVIGATION,
+                isCombinedNavigationEnabled() && (editMode || phaseHasContent));
         if (navigationArrival == null && navigationDuration == null
                 && navigationDistance == null && navigationManeuverImage == null
                 && navigationManeuverDistance == null && navigationManeuver == null
@@ -1044,15 +1118,12 @@ public final class LauncherActivity extends AppCompatActivity {
                 && navigationLaneInfo == null && navigationJamImage == null
                 && navigationRainbowImage == null
                 && navigationInactive == null) return;
-        NavigationDataRepository.Snapshot state = NavigationDataRepository.read(this);
         boolean laneTextAvailable = state.laneAvailable && (!state.lanes.isEmpty()
                 || !state.laneDistance.isEmpty() || Double.isFinite(state.laneDistanceMeters));
-        navigationDynamicRefresh = state.trafficAvailable || state.jamImage != null
-                || state.lanesImage != null || state.rainbowImage != null || laneTextAvailable;
-        boolean visualAvailable = state.maneuverImage != null || state.lanesImage != null
-                || state.jamImage != null || state.rainbowImage != null || laneTextAvailable;
-        boolean anyAvailable = state.available || state.trafficAvailable || visualAvailable;
-        if (!anyAvailable) {
+        navigationDynamicRefresh = state.routeActive && (state.trafficAvailable
+                || state.jamImage != null
+                || state.lanesImage != null || state.rainbowImage != null || laneTextAvailable);
+        if (!state.routeActive) {
             navigationLaunchProduct = YandexWindowLauncher.Product.NAVIGATOR;
             if (navigationArrival != null) navigationArrival.setVisibility(View.GONE);
             if (navigationDuration != null) navigationDuration.setVisibility(View.GONE);
@@ -1080,7 +1151,9 @@ public final class LauncherActivity extends AppCompatActivity {
             hideNavigationImage(navigationRainbowImage);
             if (navigationInactive != null) {
                 navigationInactive.setVisibility(View.VISIBLE);
-                navigationInactive.setText("Маршрут не запущен\nНажмите, чтобы открыть Яндекс Навигатор");
+                navigationInactive.setText(favoriteRoutesAvailable
+                        ? "Маршрут не запущен"
+                        : "Маршрут не запущен\nДобавьте избранные маршруты в настройках");
             }
             return;
         }
@@ -1088,7 +1161,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 ? YandexWindowLauncher.Product.MAPS
                 : YandexWindowLauncher.Product.NAVIGATOR;
         if (navigationInactive != null) {
-            navigationInactive.setVisibility(anyAvailable ? View.GONE : View.VISIBLE);
+            navigationInactive.setVisibility(View.GONE);
         }
         if (navigationArrival != null) {
             navigationArrival.setVisibility(state.available ? View.VISIBLE : View.GONE);

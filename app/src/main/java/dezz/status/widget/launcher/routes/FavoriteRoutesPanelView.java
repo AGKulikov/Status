@@ -94,6 +94,14 @@ public final class FavoriteRoutesPanelView extends FrameLayout {
         return previewMode;
     }
 
+    /** True when the current saved configuration contains at least one visible destination. */
+    public boolean hasEnabledRoutes() {
+        for (FavoriteRouteConfig route : routes) {
+            if (route != null && route.enabled) return true;
+        }
+        return false;
+    }
+
     private void rebuild() {
         removeAllViews();
 

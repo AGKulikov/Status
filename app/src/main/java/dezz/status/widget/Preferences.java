@@ -464,14 +464,17 @@ public class Preferences {
     public final Bool launcherNavigationVisible = new Bool(this, "launcherNavigationVisible", true);
     public final Bool launcherActionsVisible = new Bool(this, "launcherActionsVisible", true);
     public final Str launcherMediaConfigJson = new Str(this, "launcherMediaConfigJson", "");
-    // User-defined one-tap destinations (Home, Work, etc.). Kept as its own visual panel so it
-    // can be positioned and resized independently from current-route information.
+    // User-defined one-tap destinations (Home, Work, etc.). They share one adaptive HOME panel
+    // with current-route information: favorites are the idle state, navigation is the live state.
     public final Str launcherFavoriteRoutesJson = new Str(this,
             "launcherFavoriteRoutesJson", "");
     public final Bool launcherFavoriteRoutesVisible = new Bool(this,
             "launcherFavoriteRoutesVisible", false);
     public final Int launcherFavoriteRoutesColumns = new Int(this,
             "launcherFavoriteRoutesColumns", 2);
+    /** One-shot migration prevents a later partial import/toggle from re-anchoring the panel. */
+    public final Bool launcherCombinedNavigationMigrated = new Bool(this,
+            "launcherCombinedNavigationMigrated", false);
     // Opt-in on upgrades so a new large panel never covers an existing hand-tuned HOME layout.
     public final Bool launcherClimateVisible = new Bool(this, "launcherClimateVisible", false);
     // Independent HOME surface for live eCarX/HUD telemetry.  Content and appearance live in a

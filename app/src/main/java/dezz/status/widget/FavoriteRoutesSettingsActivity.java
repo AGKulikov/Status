@@ -42,7 +42,7 @@ import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
 import dezz.status.widget.launcher.routes.FavoriteRoutesPanelView;
 import dezz.status.widget.launcher.routes.RouteDestinationParser;
 
-/** Visual autosaving editor for the independent HOME favorite-routes panel. */
+/** Visual autosaving editor for the idle state of the combined navigation HOME panel. */
 public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
     private interface IntChange { void set(int value); }
 
@@ -63,7 +63,7 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
         preferences = new Preferences(this);
         store = new FavoriteRoutesConfigStore(preferences);
         routes.addAll(store.load());
-        setTitle("Избранные маршруты HOME");
+        setTitle("Маршрут и избранное HOME");
         setContentView(buildScreen());
         rebuildList();
         if (!routes.isEmpty()) select(routes.get(0));
@@ -82,18 +82,24 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
         left.setOrientation(LinearLayout.VERTICAL);
         left.setPadding(0, 0, dp(14), dp(28));
         listScroll.addView(left, new ScrollView.LayoutParams(match(), wrap()));
-        addTitle(left, "ЧАСТЫЕ МАРШРУТЫ");
-        addHint(left, "Кнопки «Домой», «Работа» и любые другие адреса. Все изменения сохраняются сразу.");
+        addTitle(left, "МАРШРУТ И ИЗБРАННОЕ");
+        addHint(left, "Пока маршрут не построен, здесь видны кнопки «Домой», «Работа» и другие адреса. После построения маршрута плитка сама переключится на выбранную навигационную информацию.");
 
         panelVisibleSwitch = new MaterialSwitch(this);
-        panelVisibleSwitch.setText("Показывать панель на HOME");
-        panelVisibleSwitch.setChecked(preferences.launcherFavoriteRoutesVisible.get());
+        panelVisibleSwitch.setText("Показывать объединённую плитку на HOME");
+        panelVisibleSwitch.setChecked(preferences.launcherNavigationVisible.get()
+                || preferences.launcherFavoriteRoutesVisible.get());
         panelVisibleSwitch.setMinHeight(dp(48));
         panelVisibleSwitch.setOnCheckedChangeListener((button, checked) -> {
+            preferences.launcherNavigationVisible.set(checked);
             preferences.launcherFavoriteRoutesVisible.set(checked);
             markSaved();
         });
         left.addView(panelVisibleSwitch, new LinearLayout.LayoutParams(match(), wrap()));
+        addButton(left, "Выбрать данные активного маршрута…", v ->
+                startActivity(new Intent(this, PanelElementSettingsActivity.class)
+                        .putExtra(PanelElementSettingsActivity.EXTRA_PANEL_ID,
+                                dezz.status.widget.launcher.LauncherLayoutStore.NAVIGATION)));
         addSlider(left, "Столбцов в панели", preferences.launcherFavoriteRoutesColumns.get(),
                 1, 6, value -> {
                     preferences.launcherFavoriteRoutesColumns.set(value);
@@ -116,7 +122,7 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
         listHost = new LinearLayout(this);
         listHost.setOrientation(LinearLayout.VERTICAL);
         left.addView(listHost, new LinearLayout.LayoutParams(match(), wrap()));
-        addButton(left, "Размер и положение панели на HOME…", v ->
+        addButton(left, "Размер и положение объединённой плитки на HOME…", v ->
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_MODE, true)));
 

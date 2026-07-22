@@ -34,6 +34,8 @@ import dezz.status.widget.launcher.panels.PanelElementConfigStore;
 
 /** Visual, code-free editor for the functional elements placed inside HOME panels. */
 public final class PanelElementSettingsActivity extends AppCompatActivity {
+    public static final String EXTRA_PANEL_ID =
+            "dezz.status.widget.extra.PANEL_ELEMENT_SETTINGS_ID";
     private Preferences preferences;
     private PanelElementConfigStore store;
     private LinearLayout editor;
@@ -46,6 +48,11 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         preferences = new Preferences(this);
         store = new PanelElementConfigStore(preferences);
+        String requestedPanel = getIntent().getStringExtra(EXTRA_PANEL_ID);
+        if (requestedPanel != null
+                && !PanelElementConfigStore.definitions(requestedPanel).isEmpty()) {
+            selectedPanel = requestedPanel;
+        }
         setTitle("Элементы панелей HOME");
         setContentView(buildContent());
         showPanel(selectedPanel);
@@ -66,9 +73,7 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         addPanelButton(navigation, "Приложения", LauncherLayoutStore.APPS);
         addExternalButton(navigation, "Медиа", MediaPanelSettingsActivity.class);
         addPanelButton(navigation, "Часы", LauncherLayoutStore.CLOCK);
-        addPanelButton(navigation, "Маршрут", LauncherLayoutStore.NAVIGATION);
-        addExternalButton(navigation, "Избранные маршруты",
-                FavoriteRoutesSettingsActivity.class);
+        addPanelButton(navigation, "Маршрут и избранное", LauncherLayoutStore.NAVIGATION);
         addPanelButton(navigation, "Иконки и действия", LauncherLayoutStore.ACTIONS);
         addExternalButton(navigation, "Климат", ClimatePanelSettingsActivity.class);
         addExternalButton(navigation, "Данные автомобиля / HUD",
@@ -151,7 +156,11 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         if (panel == null) return;
         editor.removeAllViews();
         addTitle(editor, panelTitle(panel.id));
-        addHint(editor, "Убирайте ненужные элементы, меняйте их порядок стрелками и размер ползунком. Изменения применятся при возврате на HOME.");
+        if (LauncherLayoutStore.NAVIGATION.equals(panel.id)) {
+            addHint(editor, "Без активного маршрута эта плитка показывает кнопки избранных направлений. Как только маршрут построен, кнопки автоматически скрываются и появляются выбранные ниже навигационные данные.");
+        } else {
+            addHint(editor, "Убирайте ненужные элементы, меняйте их порядок стрелками и размер ползунком. Изменения применятся при возврате на HOME.");
+        }
         if (LauncherLayoutStore.APPS.equals(panel.id)) {
             addColumnsControl(editor, "Столбцов приложений", preferences.launcherAppsColumns, 1, 6);
             MaterialButton favorites = new MaterialButton(this);
@@ -160,6 +169,16 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
             favorites.setOnClickListener(v -> startActivity(
                     new Intent(this, FavoriteAppsSettingsActivity.class)));
             editor.addView(favorites, buttonLp());
+        } else if (LauncherLayoutStore.NAVIGATION.equals(panel.id)) {
+            addColumnsControl(editor, "Столбцов избранного",
+                    preferences.launcherFavoriteRoutesColumns, 1, 6);
+            MaterialButton routes = new MaterialButton(this);
+            routes.setAllCaps(false);
+            routes.setText("Настроить кнопки избранных маршрутов…");
+            routes.setOnClickListener(v -> startActivity(
+                    new Intent(this, FavoriteRoutesSettingsActivity.class)));
+            editor.addView(routes, buttonLp());
+            addHint(editor, "Ниже выбирается только содержимое плитки во время движения по маршруту: манёвр, расстояние до него, нужная полоса, время прибытия и другие данные.");
         } else if (LauncherLayoutStore.ACTIONS.equals(panel.id)) {
             addColumnsControl(editor, "Столбцов плиток", preferences.launcherActionsColumns, 1, 6);
             MaterialButton shortcuts = new MaterialButton(this);
@@ -171,8 +190,11 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         }
 
         List<PanelElementConfigStore.Element> enabled = panel.enabled();
-        if (enabled.isEmpty()) addHint(editor,
-                "Панель сейчас пустая и на HOME будет скрыта полностью.");
+        if (enabled.isEmpty()) {
+            addHint(editor, LauncherLayoutStore.NAVIGATION.equals(panel.id)
+                    ? "Во время активного маршрута плитка будет пустой. Кнопки избранного без маршрута продолжат работать."
+                    : "Панель сейчас пустая и на HOME будет скрыта полностью.");
+        }
         for (PanelElementConfigStore.Element element : enabled) addElementEditor(panel, element);
 
         MaterialButton add = new MaterialButton(this);
@@ -391,7 +413,7 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
     @NonNull private static String panelTitle(@NonNull String id) {
         if (LauncherLayoutStore.APPS.equals(id)) return "Панель приложений";
         if (LauncherLayoutStore.CLOCK.equals(id)) return "Панель часов";
-        if (LauncherLayoutStore.NAVIGATION.equals(id)) return "Панель маршрута";
+        if (LauncherLayoutStore.NAVIGATION.equals(id)) return "Маршрут и избранное";
         return "Панель иконок и действий";
     }
 

@@ -312,7 +312,8 @@ public final class PanelElementConfigStore {
                 new Definition(NAV_LANE_INFO, "Полосы / съезд и расстояние", false),
                 new Definition(NAV_JAM_PROGRESS, "Графика прогресса / пробок", false),
                 new Definition(NAV_RAINBOW_IMAGE, "Графика Rainbow", false),
-                new Definition(NAV_INACTIVE, "Сообщение, когда маршрут не запущен")));
+                new Definition(NAV_INACTIVE,
+                        "Запасное сообщение, если избранные маршруты не настроены")));
         result.put(LauncherLayoutStore.ACTIONS, list(
                 new Definition(ACTION_TILES, "Пользовательские плитки"),
                 new Definition(ACTION_ADD, "Плитка «Добавить»")));
