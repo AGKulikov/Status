@@ -36,6 +36,8 @@ import java.util.Set;
 
 public class Preferences {
     private static final String TAG = "Preferences";
+    /** New large HOME surfaces must remain opt-in when an existing layout is upgraded. */
+    static final boolean DEFAULT_LAUNCHER_VEHICLE_INFO_VISIBLE = false;
     /** Secrets and installation identities never leave the device through settings exports or
      * presets. Keep future connector credentials/identities here as well so adding a transport
      * cannot accidentally make them exportable or clone one client identity to another device. */
@@ -462,19 +464,31 @@ public class Preferences {
     public final Bool launcherNavigationVisible = new Bool(this, "launcherNavigationVisible", true);
     public final Bool launcherActionsVisible = new Bool(this, "launcherActionsVisible", true);
     public final Str launcherMediaConfigJson = new Str(this, "launcherMediaConfigJson", "");
-    // User-defined one-tap destinations (Home, Work, etc.). Kept as its own visual panel so it
-    // can be positioned and resized independently from current-route information.
+    // User-defined one-tap destinations (Home, Work, etc.). They share one adaptive HOME panel
+    // with current-route information: favorites are the idle state, navigation is the live state.
     public final Str launcherFavoriteRoutesJson = new Str(this,
             "launcherFavoriteRoutesJson", "");
     public final Bool launcherFavoriteRoutesVisible = new Bool(this,
             "launcherFavoriteRoutesVisible", false);
     public final Int launcherFavoriteRoutesColumns = new Int(this,
             "launcherFavoriteRoutesColumns", 2);
+    /** One-shot migration prevents a later partial import/toggle from re-anchoring the panel. */
+    public final Bool launcherCombinedNavigationMigrated = new Bool(this,
+            "launcherCombinedNavigationMigrated", false);
     // Opt-in on upgrades so a new large panel never covers an existing hand-tuned HOME layout.
     public final Bool launcherClimateVisible = new Bool(this, "launcherClimateVisible", false);
+    // Independent HOME surface for live eCarX/HUD telemetry.  Content and appearance live in a
+    // versioned JSON document so new metrics can be added without invalidating existing layouts.
+    public final Bool launcherVehicleInfoVisible = new Bool(this,
+            "launcherVehicleInfoVisible", DEFAULT_LAUNCHER_VEHICLE_INFO_VISIBLE);
+    public final Str launcherVehicleInfoConfigJson = new Str(this,
+            "launcherVehicleInfoConfigJson", "");
     // Per-panel inner element visibility/order/scale. Kept separate from outer pixel geometry so
     // older HOME layouts migrate without moving any panel on upgrade.
     public final Str launcherPanelElementsJson = new Str(this, "launcherPanelElementsJson", "");
+    /** Cell geometry for the WYSIWYG navigation editor; migrated from launcherPanelElementsJson. */
+    public final Str launcherNavigationConfigJson = new Str(this,
+            "launcherNavigationConfigJson", "");
     public final Str launcherClimateConfigJson = new Str(this, "launcherClimateConfigJson", "");
     // Optional always-on climate surface. It is deliberately independent from both the HOME
     // climate panel above and the status widget service: a user may want climate controls while

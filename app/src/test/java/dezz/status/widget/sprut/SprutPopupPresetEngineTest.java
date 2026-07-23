@@ -142,7 +142,7 @@ public final class SprutPopupPresetEngineTest {
         assertFamily("Switch", "On", SprutCatalog.ValueType.BOOLEAN,
                 "power", SprutPopupPreset.Presentation.BOOLEAN);
         assertFamily("Outlet", "On", SprutCatalog.ValueType.BOOLEAN,
-                "power", SprutPopupPreset.Presentation.BOOLEAN);
+                "plug", SprutPopupPreset.Presentation.BOOLEAN);
         assertFamily("WindowCovering", "CurrentPosition", SprutCatalog.ValueType.INTEGER,
                 "gate", SprutPopupPreset.Presentation.COVER);
         assertFamily("Door", "CurrentPosition", SprutCatalog.ValueType.INTEGER,
@@ -152,25 +152,25 @@ public final class SprutPopupPresetEngineTest {
         assertFamily("LockMechanism", "LockCurrentState", SprutCatalog.ValueType.INTEGER,
                 "lock", SprutPopupPreset.Presentation.RAW);
         assertFamily("Thermostat", "CurrentTemperature", SprutCatalog.ValueType.DOUBLE,
-                "temperature", SprutPopupPreset.Presentation.TEMPERATURE);
+                "thermostat", SprutPopupPreset.Presentation.TEMPERATURE);
         assertFamily("HeaterCooler", "CurrentTemperature", SprutCatalog.ValueType.DOUBLE,
-                "temperature", SprutPopupPreset.Presentation.TEMPERATURE);
+                "thermostat", SprutPopupPreset.Presentation.TEMPERATURE);
         assertFamily("HumiditySensor", "CurrentRelativeHumidity", SprutCatalog.ValueType.DOUBLE,
-                "water", SprutPopupPreset.Presentation.RAW);
+                "humidity", SprutPopupPreset.Presentation.RAW);
         assertFamily("MotionSensor", "MotionDetected", SprutCatalog.ValueType.BOOLEAN,
-                "door", SprutPopupPreset.Presentation.BOOLEAN);
+                "motion", SprutPopupPreset.Presentation.BOOLEAN);
         assertFamily("OccupancySensor", "OccupancyDetected", SprutCatalog.ValueType.BOOLEAN,
-                "door", SprutPopupPreset.Presentation.BOOLEAN);
+                "motion", SprutPopupPreset.Presentation.BOOLEAN);
         assertFamily("ContactSensor", "ContactSensorState", SprutCatalog.ValueType.INTEGER,
                 "door", SprutPopupPreset.Presentation.BOOLEAN);
         assertFamily("LeakSensor", "LeakDetected", SprutCatalog.ValueType.INTEGER,
                 "water", SprutPopupPreset.Presentation.BOOLEAN);
         assertFamily("SmokeSensor", "SmokeDetected", SprutCatalog.ValueType.INTEGER,
-                "power", SprutPopupPreset.Presentation.BOOLEAN);
+                "smoke", SprutPopupPreset.Presentation.BOOLEAN);
         assertFamily("CarbonMonoxideSensor", "CarbonMonoxideDetected",
-                SprutCatalog.ValueType.INTEGER, "power", SprutPopupPreset.Presentation.BOOLEAN);
+                SprutCatalog.ValueType.INTEGER, "smoke", SprutPopupPreset.Presentation.BOOLEAN);
         assertFamily("FanV2", "Active", SprutCatalog.ValueType.BOOLEAN,
-                "power", SprutPopupPreset.Presentation.BOOLEAN);
+                "fan", SprutPopupPreset.Presentation.BOOLEAN);
         assertFamily("Valve", "Active", SprutCatalog.ValueType.BOOLEAN,
                 "water", SprutPopupPreset.Presentation.BOOLEAN);
         assertFamily("Faucet", "Active", SprutCatalog.ValueType.BOOLEAN,
@@ -178,11 +178,11 @@ public final class SprutPopupPresetEngineTest {
         assertFamily("IrrigationSystem", "Active", SprutCatalog.ValueType.BOOLEAN,
                 "water", SprutPopupPreset.Presentation.BOOLEAN);
         assertFamily("SecuritySystem", "SecuritySystemCurrentState",
-                SprutCatalog.ValueType.INTEGER, "lock", SprutPopupPreset.Presentation.RAW);
+                SprutCatalog.ValueType.INTEGER, "alarm", SprutPopupPreset.Presentation.RAW);
         assertFamily("AirQualitySensor", "AirQuality", SprutCatalog.ValueType.INTEGER,
                 "power", SprutPopupPreset.Presentation.RAW);
         assertFamily("BatteryService", "BatteryLevel", SprutCatalog.ValueType.INTEGER,
-                "power", SprutPopupPreset.Presentation.RAW);
+                "battery", SprutPopupPreset.Presentation.RAW);
     }
 
     @Test public void batteryRulesUseRangesAcrossNumberTypes() {

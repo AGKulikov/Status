@@ -66,6 +66,25 @@ public final class FavoriteAppsConfigStore {
         }
     }
 
+    /**
+     * One immutable-by-convention snapshot for a complete GridView adapter pass.
+     *
+     * <p>Calling {@link #appearance(String)} from every recycled cell reparses the complete JSON
+     * document hundreds of times while the user scrolls the application catalog. Keeping one
+     * defensive snapshot per adapter makes scrolling effectively allocation-free on weak head
+     * units while preserving the same live-reload semantics when a new adapter is installed.</p>
+     */
+    @NonNull
+    public Map<String, FavoriteAppConfig> appearanceSnapshot() {
+        synchronized (LOCK) {
+            Map<String, FavoriteAppConfig> result = new LinkedHashMap<>();
+            for (Map.Entry<String, FavoriteAppConfig> entry : readStyles().entrySet()) {
+                result.put(entry.getKey(), entry.getValue().copy());
+            }
+            return result;
+        }
+    }
+
     public boolean contains(@NonNull String packageName) {
         synchronized (LOCK) {
             return readOrder().contains(validPackage(packageName));

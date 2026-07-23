@@ -32,6 +32,26 @@ public final class ClimatePanelConfig {
     public static final String DEFROST_FRONT = "climate.defrost_front";
     public static final String DEFROST_REAR = "climate.defrost_rear";
 
+    /** Manual level direction used when a heat/ventilation tile is pressed. */
+    public enum LevelCycleOrder {
+        ASCENDING("1 → 2 → 3"),
+        DESCENDING("3 → 2 → 1");
+
+        @NonNull public final String label;
+
+        LevelCycleOrder(@NonNull String label) {
+            this.label = label;
+        }
+    }
+
+    /**
+     * Controls whose ECARX value has three manual levels.  The order is configured separately
+     * for every physical heater/ventilator instead of sharing one global mSaver-style switch.
+     */
+    public static final List<String> LEVEL_CYCLE_ELEMENTS = Collections.unmodifiableList(
+            Arrays.asList(SEAT_HEAT_DRIVER, SEAT_HEAT_PASSENGER,
+                    SEAT_VENT_DRIVER, SEAT_VENT_PASSENGER, WHEEL_HEAT));
+
     public static final class Element {
         @NonNull public final String id;
         @NonNull public final String label;
@@ -58,24 +78,37 @@ public final class ClimatePanelConfig {
             new Element(DEFROST_FRONT, "Обогрев лобового стекла"),
             new Element(DEFROST_REAR, "Обогрев заднего стекла")));
 
-    @NonNull public String backgroundColor = "#141A24";
-    public int backgroundAlpha = 218;
-    public int cornerRadiusPx = 30;
-    @NonNull public String accentColor = "#35B7FF";
-    @NonNull public String inactiveColor = "#B7C1CE";
+    @NonNull public String backgroundColor = "#171820";
+    public int backgroundAlpha = 224;
+    public int cornerRadiusPx = 34;
+    public int tileCornerRadiusPx = 24;
+    public int tileSpacingPx = 10;
+    public int activeTileAlpha = 228;
+    public int inactiveTileAlpha = 72;
+    @NonNull public String accentColor = "#59A9FF";
+    @NonNull public String inactiveColor = "#E4E5EA";
     @NonNull public String textColor = "#FFFFFF";
     public int scalePercent = 100;
     public boolean showTitle = true;
     public boolean useVehicleStateColors = true;
     private final LinkedHashMap<String, Boolean> elements = new LinkedHashMap<>();
     private final LinkedHashMap<String, Integer> elementScales = new LinkedHashMap<>();
+    private final LinkedHashMap<String, Integer> elementWidths = new LinkedHashMap<>();
+    private final LinkedHashMap<String, Integer> elementHeights = new LinkedHashMap<>();
+    private final LinkedHashMap<String, LevelCycleOrder> levelCycleOrders =
+            new LinkedHashMap<>();
     private final ArrayList<String> elementOrder = new ArrayList<>();
 
     public ClimatePanelConfig() {
         for (Element element : ELEMENTS) {
             elements.put(element.id, true);
             elementScales.put(element.id, 100);
+            elementWidths.put(element.id, 100);
+            elementHeights.put(element.id, 100);
             elementOrder.add(element.id);
+        }
+        for (String id : LEVEL_CYCLE_ELEMENTS) {
+            levelCycleOrders.put(id, LevelCycleOrder.ASCENDING);
         }
     }
 
@@ -105,11 +138,61 @@ public final class ClimatePanelConfig {
         if (isKnownElement(id)) elementScales.put(id, clamp(percent, 70, 180));
     }
 
+    /** Physical tile width, independent of its icon/text scale. */
+    public int elementWidthPercent(@NonNull String id) {
+        Integer value = elementWidths.get(id);
+        return value == null ? 100 : clamp(value, 55, 240);
+    }
+
+    public void setElementWidthPercent(@NonNull String id, int percent) {
+        if (isKnownElement(id)) elementWidths.put(id, clamp(percent, 55, 240));
+    }
+
+    /** Physical tile height, independent of its icon/text scale. */
+    public int elementHeightPercent(@NonNull String id) {
+        Integer value = elementHeights.get(id);
+        return value == null ? 100 : clamp(value, 65, 200);
+    }
+
+    public void setElementHeightPercent(@NonNull String id, int percent) {
+        if (isKnownElement(id)) elementHeights.put(id, clamp(percent, 65, 200));
+    }
+
+    public boolean hasLevelCycleOrder(@NonNull String id) {
+        return LEVEL_CYCLE_ELEMENTS.contains(id);
+    }
+
+    @NonNull
+    public LevelCycleOrder levelCycleOrder(@NonNull String id) {
+        LevelCycleOrder value = levelCycleOrders.get(id);
+        return value == null ? LevelCycleOrder.ASCENDING : value;
+    }
+
+    public void setLevelCycleOrder(@NonNull String id, @NonNull LevelCycleOrder order) {
+        if (hasLevelCycleOrder(id)) levelCycleOrders.put(id, order);
+    }
+
+    @NonNull
+    public Map<String, LevelCycleOrder> levelCycleOrders() {
+        return Collections.unmodifiableMap(new LinkedHashMap<>(levelCycleOrders));
+    }
+
     /** Moves one element in the global visual order; disabled elements retain their position. */
     public boolean moveElement(@NonNull String id, int direction) {
         int from = elementOrder.indexOf(id);
         if (from < 0 || direction == 0) return false;
         int to = Math.max(0, Math.min(elementOrder.size() - 1, from + direction));
+        if (from == to) return false;
+        elementOrder.remove(from);
+        elementOrder.add(to, id);
+        return true;
+    }
+
+    /** Moves an element to an absolute slot. Used by the visual drag-and-drop editor. */
+    public boolean moveElementTo(@NonNull String id, int targetIndex) {
+        int from = elementOrder.indexOf(id);
+        if (from < 0 || elementOrder.size() < 2) return false;
+        int to = Math.max(0, Math.min(elementOrder.size() - 1, targetIndex));
         if (from == to) return false;
         elementOrder.remove(from);
         elementOrder.add(to, id);
@@ -148,11 +231,25 @@ public final class ClimatePanelConfig {
     }
 
     @NonNull
+    public Map<String, Integer> elementWidths() {
+        return Collections.unmodifiableMap(new LinkedHashMap<>(elementWidths));
+    }
+
+    @NonNull
+    public Map<String, Integer> elementHeights() {
+        return Collections.unmodifiableMap(new LinkedHashMap<>(elementHeights));
+    }
+
+    @NonNull
     public ClimatePanelConfig copy() {
         ClimatePanelConfig value = new ClimatePanelConfig();
         value.backgroundColor = backgroundColor;
         value.backgroundAlpha = backgroundAlpha;
         value.cornerRadiusPx = cornerRadiusPx;
+        value.tileCornerRadiusPx = tileCornerRadiusPx;
+        value.tileSpacingPx = tileSpacingPx;
+        value.activeTileAlpha = activeTileAlpha;
+        value.inactiveTileAlpha = inactiveTileAlpha;
         value.accentColor = accentColor;
         value.inactiveColor = inactiveColor;
         value.textColor = textColor;
@@ -163,6 +260,12 @@ public final class ClimatePanelConfig {
         value.elements.putAll(elements);
         value.elementScales.clear();
         value.elementScales.putAll(elementScales);
+        value.elementWidths.clear();
+        value.elementWidths.putAll(elementWidths);
+        value.elementHeights.clear();
+        value.elementHeights.putAll(elementHeights);
+        value.levelCycleOrders.clear();
+        value.levelCycleOrders.putAll(levelCycleOrders);
         value.elementOrder.clear();
         value.elementOrder.addAll(elementOrder);
         return value;
@@ -171,16 +274,30 @@ public final class ClimatePanelConfig {
     public void normalize() {
         backgroundAlpha = clamp(backgroundAlpha, 0, 255);
         cornerRadiusPx = clamp(cornerRadiusPx, 0, 96);
+        tileCornerRadiusPx = clamp(tileCornerRadiusPx, 4, 64);
+        tileSpacingPx = clamp(tileSpacingPx, 0, 40);
+        activeTileAlpha = clamp(activeTileAlpha, 24, 255);
+        inactiveTileAlpha = clamp(inactiveTileAlpha, 0, 220);
         scalePercent = clamp(scalePercent, 60, 160);
-        if (!isHexColor(backgroundColor)) backgroundColor = "#141A24";
-        if (!isHexColor(accentColor)) accentColor = "#35B7FF";
-        if (!isHexColor(inactiveColor)) inactiveColor = "#B7C1CE";
+        if (!isHexColor(backgroundColor)) backgroundColor = "#171820";
+        if (!isHexColor(accentColor)) accentColor = "#59A9FF";
+        if (!isHexColor(inactiveColor)) inactiveColor = "#E4E5EA";
         if (!isHexColor(textColor)) textColor = "#FFFFFF";
         for (Element element : ELEMENTS) {
             if (!elements.containsKey(element.id)) elements.put(element.id, true);
             if (!elementScales.containsKey(element.id)) elementScales.put(element.id, 100);
+            if (!elementWidths.containsKey(element.id)) elementWidths.put(element.id, 100);
+            if (!elementHeights.containsKey(element.id)) elementHeights.put(element.id, 100);
             elementScales.put(element.id, clamp(elementScales.get(element.id), 70, 180));
+            elementWidths.put(element.id, clamp(elementWidths.get(element.id), 55, 240));
+            elementHeights.put(element.id, clamp(elementHeights.get(element.id), 65, 200));
         }
+        for (String id : LEVEL_CYCLE_ELEMENTS) {
+            if (!levelCycleOrders.containsKey(id) || levelCycleOrders.get(id) == null) {
+                levelCycleOrders.put(id, LevelCycleOrder.ASCENDING);
+            }
+        }
+        levelCycleOrders.keySet().retainAll(LEVEL_CYCLE_ELEMENTS);
         normalizeOrder();
     }
 

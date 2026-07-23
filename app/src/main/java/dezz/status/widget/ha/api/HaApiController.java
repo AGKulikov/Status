@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -68,6 +69,8 @@ public final class HaApiController implements HaWebSocketConnector.Listener {
     private final ConnectorValueRegistry values;
     private final HaBrickConfigStore mainConfigs;
     private final PopupItemConfigStore popupConfigs;
+    private volatile List<HaBrickConfig> configuredMain = Collections.emptyList();
+    private volatile List<PopupItemConfig> configuredPopup = Collections.emptyList();
     private final Listener listener;
     private final HaWebSocketConnector connector;
     private final OkHttpClient http = new OkHttpClient();
@@ -105,11 +108,11 @@ public final class HaApiController implements HaWebSocketConnector.Listener {
     public void reapplyCrossSourceBindings() {
         HaEntityCatalog current = connector.catalog();
         boolean fresh = connector.isOnline();
-        for (HaBrickConfig item : mainConfigs.loadMain()) {
+        for (HaBrickConfig item : configuredMain) {
             if (item.displayRules == null || item.displayRules.usesOwnSource()) continue;
             applyMain(item, current, fresh, null);
         }
-        for (PopupItemConfig item : popupConfigs.load()) {
+        for (PopupItemConfig item : configuredPopup) {
             if (item.displayRules == null || item.displayRules.usesOwnSource()) continue;
             applyPopup(item, current, fresh, null);
         }
@@ -118,23 +121,27 @@ public final class HaApiController implements HaWebSocketConnector.Listener {
     /** Re-renders popup presentation from the current authoritative HA catalog. No transport
      * restart or network request is performed. */
     public void reapplyPopupBindings() {
+        configuredPopup = popupConfigs.load();
         HaEntityCatalog current = connector.catalog();
         boolean fresh = connector.isOnline();
-        for (PopupItemConfig item : popupConfigs.load()) {
+        for (PopupItemConfig item : configuredPopup) {
             applyPopup(item, current, fresh, null);
         }
     }
 
     /** Main-row counterpart of {@link #reapplyPopupBindings()}. */
     public void reapplyMainBindings() {
+        configuredMain = mainConfigs.loadMain();
         HaEntityCatalog current = connector.catalog();
         boolean fresh = connector.isOnline();
-        for (HaBrickConfig item : mainConfigs.loadMain()) {
+        for (HaBrickConfig item : configuredMain) {
             applyMain(item, current, fresh, null);
         }
     }
 
     public synchronized void reconfigure() {
+        configuredMain = mainConfigs.loadMain();
+        configuredPopup = popupConfigs.load();
         String next = settingsSignature();
         if (Objects.equals(signature, next) && started) {
             applyAllBindings(connector.catalog(), connector.isOnline());
@@ -158,6 +165,7 @@ public final class HaApiController implements HaWebSocketConnector.Listener {
         } catch (RuntimeException error) {
             started = false;
             releaseLocks();
+            if (activeInstance == this) activeInstance = null;
             lastDetail = "configuration error: " + safeMessage(error);
             listener.onConnectionChanged(HaWebSocketConnector.ConnectionState.STOPPED,
                     lastDetail);
@@ -167,6 +175,13 @@ public final class HaApiController implements HaWebSocketConnector.Listener {
     public synchronized void stop() {
         signature = "";
         stopTransport();
+        connector.close();
+        main.removeCallbacksAndMessages(null);
+        // This REST client is private to the controller. Cancel delayed/in-flight commands and
+        // release its threads/sockets when WidgetService is destroyed.
+        http.dispatcher().cancelAll();
+        http.dispatcher().executorService().shutdown();
+        http.connectionPool().evictAll();
         markAllStale();
         if (activeInstance == this) activeInstance = null;
     }
@@ -306,13 +321,13 @@ public final class HaApiController implements HaWebSocketConnector.Listener {
     }
 
     private void applyAllBindings(HaEntityCatalog catalog, boolean fresh) {
-        for (HaBrickConfig item : mainConfigs.loadMain()) applyMain(item, catalog, fresh, null);
-        for (PopupItemConfig item : popupConfigs.load()) applyPopup(item, catalog, fresh, null);
+        for (HaBrickConfig item : configuredMain) applyMain(item, catalog, fresh, null);
+        for (PopupItemConfig item : configuredPopup) applyPopup(item, catalog, fresh, null);
     }
 
     private void applyBindingsForEntity(String entityId, HaEntityCatalog catalog, boolean fresh) {
-        for (HaBrickConfig item : mainConfigs.loadMain()) applyMain(item, catalog, fresh, entityId);
-        for (PopupItemConfig item : popupConfigs.load()) applyPopup(item, catalog, fresh, entityId);
+        for (HaBrickConfig item : configuredMain) applyMain(item, catalog, fresh, entityId);
+        for (PopupItemConfig item : configuredPopup) applyPopup(item, catalog, fresh, entityId);
     }
 
     private void applyMain(HaBrickConfig item, HaEntityCatalog catalog, boolean fresh,
@@ -411,12 +426,12 @@ public final class HaApiController implements HaWebSocketConnector.Listener {
     }
 
     private void markBoundStatesStale() {
-        for (HaBrickConfig item : mainConfigs.loadMain()) {
+        for (HaBrickConfig item : configuredMain) {
             if (!isHaFamily(item.sourceBinding)) continue;
             states.markStale(AutomationContract.SCOPE_MAIN, item.id);
             listener.onStateChanged(AutomationContract.SCOPE_MAIN, item.id);
         }
-        for (PopupItemConfig item : popupConfigs.load()) {
+        for (PopupItemConfig item : configuredPopup) {
             if (!isHaFamily(item.sourceBinding)) continue;
             states.markStale(AutomationContract.SCOPE_POPUP, item.automationId);
             listener.onStateChanged(AutomationContract.SCOPE_POPUP, item.automationId);
@@ -424,7 +439,7 @@ public final class HaApiController implements HaWebSocketConnector.Listener {
     }
 
     private void markEntityStale(String entityId) {
-        for (HaBrickConfig item : mainConfigs.loadMain()) {
+        for (HaBrickConfig item : configuredMain) {
             if (!isHaFamily(item.sourceBinding)
                     || !entityId.equals(item.sourceBinding.resourceId)) {
                 continue;
@@ -432,7 +447,7 @@ public final class HaApiController implements HaWebSocketConnector.Listener {
             states.markStale(AutomationContract.SCOPE_MAIN, item.id);
             listener.onStateChanged(AutomationContract.SCOPE_MAIN, item.id);
         }
-        for (PopupItemConfig item : popupConfigs.load()) {
+        for (PopupItemConfig item : configuredPopup) {
             if (!isHaFamily(item.sourceBinding)
                     || !entityId.equals(item.sourceBinding.resourceId)) {
                 continue;

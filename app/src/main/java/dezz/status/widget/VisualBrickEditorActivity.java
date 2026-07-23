@@ -838,8 +838,7 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
     }
 
     private void chooseIcon(Button button) {
-        String[] labels = {"Ворота", "Гараж", "Свет", "Замок", "Питание", "Температура",
-                "Вода", "Дверь", "Wi‑Fi", "GPS", "Bluetooth"};
+        String[] labels = PopupIconCatalog.LABELS.toArray(new String[0]);
         new AlertDialog.Builder(this).setTitle("Иконка").setItems(labels, (d, which) -> {
             popup.icon = PopupIconCatalog.IDS.get(which);
             button.setText("Выбрать иконку: " + labels[which]);

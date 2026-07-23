@@ -6,6 +6,7 @@
 package dezz.status.widget.climate;
 
 import android.content.Context;
+import android.os.Build;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -179,6 +180,7 @@ public final class ScreenReservationController {
     private final Object lock = new Object();
     private final ScreenReservationStateStore stateStore;
     private final CommandRunner commandRunner;
+    private final int sdkInt;
     private long generation;
     /** Set only after read-only `wm help` explicitly advertises per-display overscan. */
     private boolean nonDefaultDisplayTargetingProven;
@@ -187,6 +189,7 @@ public final class ScreenReservationController {
         Context app = context.getApplicationContext();
         stateStore = new ScreenReservationStateStore(app);
         commandRunner = new PrivilegedCommandRunner(PrivilegedShell.get(app));
+        sdkInt = Build.VERSION.SDK_INT;
     }
 
     /** Test-only dependency-injection constructor. */
@@ -194,12 +197,18 @@ public final class ScreenReservationController {
                                 @NonNull CommandRunner commandRunner) {
         this.stateStore = stateStore;
         this.commandRunner = commandRunner;
+        this.sdkInt = Build.VERSION_CODES.Q;
     }
 
     /** Applies one reservation, first restoring any other display managed by this app. */
     public void apply(@NonNull Edge edge, int extentPx, int displayId,
                       @NonNull Callback callback) {
         startReservation(Operation.APPLY, edge, extentPx, displayId, callback);
+    }
+
+    /** Invalidates callbacks and follow-up mutations from an in-flight apply operation. */
+    public void cancelPending() {
+        beginGeneration();
     }
 
     /** Restores every managed display to its exact journalled baseline. */
@@ -298,6 +307,13 @@ public final class ScreenReservationController {
         if (displayId < 0) {
             deliver(current, callback, failure(operation, displayId,
                     "Display id must be non-negative", null, null, null));
+            return;
+        }
+        if (!legacyOverscanSupported(sdkInt)) {
+            deliver(current, callback, failure(operation, displayId,
+                    "Legacy WindowManager overscan is unavailable on Android "
+                            + sdkInt,
+                    null, null, null));
             return;
         }
         ArrayList<ScreenReservationStateStore.Entry> otherDisplays = new ArrayList<>();
@@ -632,7 +648,8 @@ public final class ScreenReservationController {
 
     @NonNull
     static String queryCommand(int displayId) {
-        return "wm overscan -d " + displayId;
+        return displayId == DisplayIds.DEFAULT
+                ? "wm overscan" : "wm overscan -d " + displayId;
     }
 
     @NonNull
@@ -647,12 +664,25 @@ public final class ScreenReservationController {
 
     @NonNull
     static String setCommand(int displayId, @NonNull Insets value) {
-        return "wm overscan " + value + " -d " + displayId;
+        return displayId == DisplayIds.DEFAULT
+                ? "wm overscan " + value
+                : "wm overscan " + value + " -d " + displayId;
     }
 
     @NonNull
-    private static String resetCommand(int displayId) {
-        return "wm overscan reset -d " + displayId;
+    static String resetCommand(int displayId) {
+        return displayId == DisplayIds.DEFAULT
+                ? "wm overscan reset" : "wm overscan reset -d " + displayId;
+    }
+
+    static boolean legacyOverscanSupported(int sdkInt) {
+        return sdkInt <= Build.VERSION_CODES.Q;
+    }
+
+    /** Avoids an android.view.Display dependency in pure command-builder tests. */
+    private static final class DisplayIds {
+        static final int DEFAULT = 0;
+        private DisplayIds() {}
     }
 
     private long beginGeneration() {

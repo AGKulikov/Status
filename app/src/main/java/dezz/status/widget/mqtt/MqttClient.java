@@ -39,6 +39,7 @@ public final class MqttClient {
     private static final long QOS1_RETRY_MS = 5_000L;
     private static final long MIN_RECONNECT_DELAY_MS = 1_000L;
     private static final long MAX_RECONNECT_DELAY_MS = 60_000L;
+    private static final long STABLE_SESSION_MS = 30_000L;
 
     public interface Listener {
         void onMessage(@NonNull String topic, @NonNull byte[] payload, boolean retained);
@@ -144,10 +145,11 @@ public final class MqttClient {
                         notifyConnectionChanged(generation, false, detail);
                     }
                 }
-                // A confirmed CONNACK+SUBACK proves that the previous outage ended. The next
-                // independent drop therefore starts at one second instead of inheriting an old
-                // exponential delay that may already have reached a minute.
-                if (attempt.established) backoff.onConnectionEstablished();
+                // A broker which accepts SUBACK and immediately kicks a duplicate client must not
+                // force a permanent one-second reconnect loop. Reset backoff only after the
+                // connection has actually remained useful for a while.
+                backoff.onConnectionEnded(attempt.connectedDuration(
+                        SystemClock.elapsedRealtime()));
                 if (!isCurrent(generation)) break;
                 try {
                     Thread.sleep(backoff.takeDelay());
@@ -199,8 +201,8 @@ public final class MqttClient {
             awaitSubAck(input, generation, subscriptionId);
             // Do this immediately after a validated SUBACK: later availability/QoS writes may
             // fail, but the broker session itself was nevertheless established successfully.
-            attempt.established = true;
-            next.setSoTimeout(1_000);
+            attempt.markEstablished(SystemClock.elapsedRealtime());
+            next.setSoTimeout(socketReadTimeoutMillis(config.keepAliveSeconds));
             resendPendingAfterReconnect();
             publish(config.availabilityTopic, "online".getBytes(StandardCharsets.UTF_8), true,
                     config.qos == 1);
@@ -290,6 +292,12 @@ public final class MqttClient {
         if (grantedQos > 1 || grantedQos > (requestedQos <= 0 ? 0 : 1)) {
             throw new IOException("Invalid MQTT SUBACK QoS=" + grantedQos);
         }
+    }
+
+    /** Periodic protocol maintenance without waking an idle head unit once per second. */
+    static int socketReadTimeoutMillis(int keepAliveSeconds) {
+        long halfKeepAlive = Math.max(1L, keepAliveSeconds) * 500L;
+        return (int) Math.max(1_000L, Math.min(5_000L, halfKeepAlive));
     }
 
     private void handlePacket(Packet packet, long generation) throws IOException {
@@ -522,15 +530,26 @@ public final class MqttClient {
     }
 
     private static final class ConnectionAttempt {
-        boolean established;
+        private long establishedAt = -1L;
+
+        void markEstablished(long nowElapsed) {
+            establishedAt = nowElapsed;
+        }
+
+        long connectedDuration(long nowElapsed) {
+            return establishedAt < 0L || nowElapsed < establishedAt
+                    ? 0L : nowElapsed - establishedAt;
+        }
     }
 
     /** Pure reconnect policy kept package-visible for local JVM tests. */
     static final class ReconnectBackoff {
         private long nextDelay = MIN_RECONNECT_DELAY_MS;
 
-        void onConnectionEstablished() {
-            nextDelay = MIN_RECONNECT_DELAY_MS;
+        void onConnectionEnded(long connectedDurationMs) {
+            if (connectedDurationMs >= STABLE_SESSION_MS) {
+                nextDelay = MIN_RECONNECT_DELAY_MS;
+            }
         }
 
         long takeDelay() {

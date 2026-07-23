@@ -11,15 +11,24 @@ import org.junit.Test;
 import java.io.IOException;
 
 public final class MqttClientPolicyTest {
-    @Test public void successfulSessionResetsAccumulatedReconnectDelay() {
+    @Test public void onlyStableSessionResetsAccumulatedReconnectDelay() {
         MqttClient.ReconnectBackoff backoff = new MqttClient.ReconnectBackoff();
 
         assertEquals(1_000L, backoff.takeDelay());
         assertEquals(2_000L, backoff.takeDelay());
         assertEquals(4_000L, backoff.takeDelay());
 
-        backoff.onConnectionEstablished();
+        backoff.onConnectionEnded(29_999L);
+        assertEquals(8_000L, backoff.takeDelay());
+
+        backoff.onConnectionEnded(30_000L);
         assertEquals(1_000L, backoff.takeDelay());
+    }
+
+    @Test public void socketMaintenanceCadenceIsBoundedByKeepAlive() {
+        assertEquals(1_000, MqttClient.socketReadTimeoutMillis(1));
+        assertEquals(5_000, MqttClient.socketReadTimeoutMillis(10));
+        assertEquals(5_000, MqttClient.socketReadTimeoutMillis(600));
     }
 
     @Test public void pingMustReceiveItsOwnResponseBeforeDeadline() {

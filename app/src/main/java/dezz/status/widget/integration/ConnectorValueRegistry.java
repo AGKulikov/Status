@@ -85,19 +85,30 @@ public final class ConnectorValueRegistry implements ValueResolver {
 
         ArrayList<ConnectorValue> changed = new ArrayList<>();
         synchronized (this) {
-            LinkedHashMap<Key, ConnectorValue> next = new LinkedHashMap<>(values);
+            int existingForConnector = 0;
             for (Map.Entry<Key, ConnectorValue> entry : values.entrySet()) {
                 Key key = entry.getKey();
                 if (key.type == type && key.connectorId.equals(normalizedId)) {
-                    next.remove(key);
-                    if (!replacement.containsKey(key)) changed.add(entry.getValue().asStale());
+                    existingForConnector++;
                 }
             }
-            next.putAll(replacement);
-            if (next.size() > MAX_VALUES) throw new IllegalStateException("Too many connector values");
+            if (values.size() - existingForConnector + replacement.size() > MAX_VALUES) {
+                throw new IllegalStateException("Too many connector values");
+            }
+            // Mutate only after the complete replacement has been validated. The old code made
+            // a full copy of the whole multi-connector map here, briefly doubling thousands of
+            // Sprut characteristics on 500+ device hubs during every reconnect.
+            java.util.Iterator<Map.Entry<Key, ConnectorValue>> iterator =
+                    values.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<Key, ConnectorValue> entry = iterator.next();
+                Key key = entry.getKey();
+                if (key.type != type || !key.connectorId.equals(normalizedId)) continue;
+                iterator.remove();
+                if (!replacement.containsKey(key)) changed.add(entry.getValue().asStale());
+            }
+            values.putAll(replacement);
             changed.addAll(replacement.values());
-            values.clear();
-            values.putAll(next);
         }
         notifyListeners(changed);
     }

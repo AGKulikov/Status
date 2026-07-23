@@ -63,6 +63,7 @@ import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.TypedValue;
+import android.view.Choreographer;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -71,7 +72,6 @@ import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -83,12 +83,15 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -181,6 +184,8 @@ public class WidgetService extends Service {
 
     /** Cross-fade duration for the entire overlay (show/hide / per-app hide). */
     private static final int OVERLAY_FADE_DURATION_MS = 500;
+    private static final long OVERLAY_ATTACH_RETRY_MS = 1_500L;
+    private static final long MAX_OVERLAY_ATTACH_RETRY_MS = 30_000L;
     /**
      * Duration of the combined Fade + ChangeBounds transition that handles per-brick
      * visibility flips. See {@link #beginVisibilityTransition} for the "window-buffer"
@@ -200,15 +205,18 @@ public class WidgetService extends Service {
     private static final String TAG = "WidgetService";
     private static final int NOTIFICATION_ID = 1001;
     private static final String CHANNEL_ID = "WidgetServiceChannel";
-    private static final long GNSS_STATUS_CHECK_INTERVAL = 1000;
+    private static final long GNSS_STATUS_CHECK_INTERVAL = 2_000L;
+    private static final long GNSS_LOCATION_INTERVAL_MS = 2_000L;
     private static final long DATETIME_UPDATE_INTERVAL_MS = 60_000L;
     /** Cadence for advancing the media progress bar while a track is actively playing. 250ms
      *  is fast enough to look smooth on a thin bar and slow enough to not show up in profilers. */
-    private static final long MEDIA_PROGRESS_TICK_MS = 250L;
+    // One repaint per second is visually sufficient for a compact status-row progress line and
+    // halves MediaSession polling/layout invalidation versus HA1048 on low-end head units.
+    private static final long MEDIA_PROGRESS_TICK_MS = 1_000L;
     /** Gap between the play/pause indicator and the text it precedes, as a fraction of that
      *  text's size — same rationale as the icon's own size: it must track the font sliders. */
     private static final float STATE_ICON_GAP_RATIO = 0.25f;
-    private static final long FOREGROUND_APP_CHECK_INTERVAL_MS = 1000L;
+    private static final long FOREGROUND_APP_CHECK_INTERVAL_MS = 2_000L;
     private static final long FOREGROUND_APP_LOOKBACK_MS = 60_000L;
     private static final String GNSSSHARE_CLIENT_PACKAGE = "dezz.gnssshare.client";
     private static final String GNSSSHARE_SATELLITE_STATUS_ACTION = "dezz.gnssshare.action.SATELLITE_STATUS";
@@ -238,6 +246,38 @@ public class WidgetService extends Service {
     private SprutHubController sprutController;
     private CarTelemetryExporter carTelemetryExporter;
     private PopupOverlayManager popupOverlay;
+    /** Parsed only when settings change; connector packets must never reparse the JSON document. */
+    private List<HaBrickConfig> configuredMainBricks = Collections.emptyList();
+    private final Object automationUiLock = new Object();
+    private final Map<String, Set<String>> pendingAutomationUi = new LinkedHashMap<>();
+    private boolean automationUiRefreshScheduled;
+    private final Runnable automationUiRefresh = () -> {
+        Map<String, Set<String>> changed = new LinkedHashMap<>();
+        synchronized (automationUiLock) {
+            for (Map.Entry<String, Set<String>> entry : pendingAutomationUi.entrySet()) {
+                changed.put(entry.getKey(), new HashSet<>(entry.getValue()));
+            }
+            pendingAutomationUi.clear();
+            automationUiRefreshScheduled = false;
+        }
+        if (WidgetService.this.destroyed || changed.isEmpty()) return;
+        boolean affectsStatusRow = changed.containsKey(AutomationContract.SCOPE_MAIN)
+                || changed.containsKey(AutomationContract.SCOPE_BUILTIN);
+        if (popupOverlay != null) {
+            for (Map.Entry<String, Set<String>> entry : changed.entrySet()) {
+                for (String id : entry.getValue()) {
+                    popupOverlay.onStateChanged(entry.getKey(), id);
+                }
+            }
+        }
+        // Popup windows have an independent WindowManager lifecycle. A failed/retrying status-row
+        // attachment must not discard their connector updates.
+        if (WidgetService.this.binding == null) return;
+        if (changed.containsKey(AutomationContract.SCOPE_MAIN)) renderHomeAssistantBricks();
+        // A popup-only temperature/sensor stream must not remeasure and animate the independent
+        // status row. HA1048 did that for every packet even when no status brick had changed.
+        if (affectsStatusRow) applyBrickVisibility(currentBrickSet());
+    };
     private volatile boolean destroyed;
     private final AtomicBoolean crossSourceRuleRefreshScheduled = new AtomicBoolean();
     private final ConnectorValueRegistry.Listener crossSourceRuleListener =
@@ -262,6 +302,15 @@ public class WidgetService extends Service {
     private WindowManager.LayoutParams params;
 
     private OverlayStatusWidgetBinding binding;
+    private int overlayAttachAttempts;
+    private final Runnable overlayAttachRetry = () -> {
+        if (destroyed || binding != null || !prefs.widgetEnabled.get()) return;
+        if (!Permissions.allPermissionsGranted(this)) {
+            stopSelf();
+            return;
+        }
+        createOverlayView();
+    };
 
     private int initialX;
     private int initialY;
@@ -274,6 +323,19 @@ public class WidgetService extends Service {
     private boolean btReceiverRegistered = false;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    /**
+     * Connector startup is deliberately independent from the status-window binding. WindowManager
+     * can transiently reject addView during boot while an already-running connector still needs to
+     * re-read Keystore credentials on USER_UNLOCKED.
+     */
+    private boolean integrationsStarted;
+    private boolean integrationStartupScheduled;
+    private boolean initialIntegrationStartupInProgress;
+    private final Runnable integrationStartup = this::runInitialIntegrationStartup;
+    private final Choreographer.FrameCallback integrationStartupFrame = frameTimeNanos ->
+            // Frame callbacks run before traversal. Posting once more lets traversal draw the
+            // attached status row before connector JSON/Keystore work begins on the main Looper.
+            mainHandler.post(integrationStartup);
     /** Re-evaluates TTL/stale rules even when no new packet arrives. */
     private final Runnable automationFreshnessTick = new Runnable() {
         @Override public void run() {
@@ -282,13 +344,11 @@ public class WidgetService extends Service {
                 renderHomeAssistantBricks();
                 applyBrickVisibility(currentBrickSet());
             }
-            if (popupOverlay != null) popupOverlay.applyPreferences();
+            applyPopupPreferencesSafely();
             if (!destroyed) mainHandler.postDelayed(this, 30_000L);
         }
     };
-    private final Runnable popupRefresh = () -> {
-        if (popupOverlay != null) popupOverlay.applyPreferences();
-    };
+    private final Runnable popupRefresh = this::applyPopupPreferencesSafely;
 
     private void schedulePopupRefresh() {
         if (destroyed) return;
@@ -297,6 +357,10 @@ public class WidgetService extends Service {
     }
     private LocationManager locationManager = null;
     private ConnectivityManager connectivityManager = null;
+    private boolean gnssStatusCallbackRegistered;
+    private boolean locationUpdatesRegistered;
+    private boolean networkCallbackRegistered;
+    private boolean overlayAttached;
     private long lastLocationUpdateTime = 0;
 
     private GradientDrawable background = null;
@@ -485,7 +549,6 @@ public class WidgetService extends Service {
     private final LocationListener locationListener = new LocationListener() {
         @Override
         public void onLocationChanged(@NonNull Location location) {
-            Log.d(TAG, "Location changed: " + location);
             lastLocationUpdateTime = System.currentTimeMillis();
             if (location.hasAccuracy() && location.getAccuracy() < 20.0) {
                 setGnssStatus(GnssState.GOOD);
@@ -584,6 +647,7 @@ public class WidgetService extends Service {
         // startup snapshot/retained replay, preventing a missed offline change from looking live.
         automationStates.markAllStale();
         haConfigs = new HaBrickConfigStore(prefs);
+        configuredMainBricks = haConfigs.loadMain();
         mqttController = new MqttController(this, prefs, automationStates, connectorValues,
                 new MqttController.StateListener() {
                     @Override public void onStateChanged(String scope, String id) {
@@ -648,20 +712,26 @@ public class WidgetService extends Service {
         actionDispatcher = new ConnectorActionDispatcher(
                 mqttController, sprutController, haApiController);
         scenarioController = new LocalScenarioController(prefs, automationStates, connectorValues,
-                targets -> mainHandler.post(() -> {
-                    if (destroyed) return;
-                    if (binding != null) renderHomeAssistantBricks();
-                    if (popupOverlay != null) popupOverlay.applyPreferences();
-                    if (binding != null) applyBrickVisibility(currentBrickSet());
-                }));
+                targets -> {
+                    // Initial startup performs one consolidated render after all providers and
+                    // scenarios are configured. Do not enqueue a second popup/layout pass.
+                    if (initialIntegrationStartupInProgress) return;
+                    mainHandler.post(() -> {
+                        if (destroyed) return;
+                        if (binding != null) renderHomeAssistantBricks();
+                        applyPopupPreferencesSafely();
+                        if (binding != null) applyBrickVisibility(currentBrickSet());
+                    });
+                });
         intentScenarioController = new IntentScenarioController(this, prefs, actionDispatcher);
         popupOverlay = new PopupOverlayManager(this, prefs, automationStates,
                 actionDispatcher, this::popupBuiltinValue);
 
         if (!Permissions.allPermissionsGranted(this)) {
-            prefs.widgetEnabled.set(false);
-            Toast.makeText(this, R.string.permissions_required, Toast.LENGTH_LONG).show();
-            startMainActivity();
+            // Locked boot and a few OEM AppOps implementations can report a temporary denial.
+            // Never turn that transient state into a permanent user preference and never pull
+            // the settings activity over HOME without an explicit user action.
+            Log.w(TAG, "Overlay permissions are not available yet; keeping widget enabled");
             stopSelf();
             return;
         }
@@ -678,18 +748,94 @@ public class WidgetService extends Service {
         // the first applyPreferences runs before the vendor service is up and would otherwise
         // hide configured car bricks until the user happens to open the settings UI.
         CarIntegrations.get(this).setAvailabilityChangedListener(() -> {
-            if (binding != null) applyPreferences();
+            // Only supported/unsupported car bricks changed. Connector credentials and large
+            // catalogs are unrelated and must not be reparsed when the vendor service binds.
+            if (binding != null) applyPreferences(false);
         });
 
         createOverlayView();
-        mqttController.reconfigure();
-        carTelemetryExporter.reconfigure();
-        sprutController.reconfigure();
-        haApiController.reconfigure();
-        scenarioController.reconfigure();
-        intentScenarioController.reconfigure();
-        popupOverlay.applyPreferences();
+    }
+
+    /** Starts the long-lived integrations once, after the first attached status frame was drawn. */
+    private void runInitialIntegrationStartup() {
+        integrationStartupScheduled = false;
+        if (destroyed || integrationsStarted) return;
+        integrationsStarted = true;
+        initialIntegrationStartupInProgress = true;
+        try {
+            reconfigureIntegrationControllers();
+        } finally {
+            initialIntegrationStartupInProgress = false;
+        }
+        if (binding != null) {
+            runIntegrationStep("initial status-row projection", () -> {
+                renderHomeAssistantBricks();
+                applyBrickVisibility(currentBrickSet());
+            });
+        }
+        applyPopupPreferencesSafely();
+        mainHandler.removeCallbacks(automationFreshnessTick);
         mainHandler.postDelayed(automationFreshnessTick, 30_000L);
+    }
+
+    private void scheduleInitialIntegrationStartupAfterFrame() {
+        if (destroyed || integrationsStarted || integrationStartupScheduled) return;
+        integrationStartupScheduled = true;
+        try {
+            Choreographer.getInstance().postFrameCallback(integrationStartupFrame);
+        } catch (RuntimeException failure) {
+            // Choreographer should always be available on the service main Looper. A broken OEM
+            // implementation must not leave all connectors permanently stopped, however.
+            Log.w(TAG, "Could not defer integrations to the first frame", failure);
+            mainHandler.post(integrationStartup);
+        }
+    }
+
+    /** Reconfigures each independent integration without letting one bad provider block the rest. */
+    private void reconfigureIntegrationControllers() {
+        runIntegrationStep("MQTT", () -> {
+            if (mqttController != null) mqttController.reconfigure();
+        });
+        runIntegrationStep("car telemetry", () -> {
+            if (carTelemetryExporter != null) carTelemetryExporter.reconfigure();
+        });
+        runIntegrationStep("Sprut.hub", () -> {
+            if (sprutController != null) sprutController.reconfigure();
+        });
+        runIntegrationStep("Home Assistant", () -> {
+            if (haApiController != null) haApiController.reconfigure();
+        });
+        runIntegrationStep("visual scenarios", () -> {
+            if (scenarioController != null) scenarioController.reconfigure();
+        });
+        runIntegrationStep("intent scenarios", () -> {
+            if (intentScenarioController != null) intentScenarioController.reconfigure();
+        });
+    }
+
+    private void runIntegrationStep(@NonNull String name, @NonNull Runnable step) {
+        try {
+            step.run();
+        } catch (RuntimeException failure) {
+            Log.e(TAG, "Could not configure " + name, failure);
+        }
+    }
+
+    private void runCleanupStep(@NonNull String name, @NonNull Runnable step) {
+        try {
+            step.run();
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Could not completely stop " + name, failure);
+        }
+    }
+
+    private void applyPopupPreferencesSafely() {
+        if (popupOverlay == null) return;
+        try {
+            popupOverlay.applyPreferences();
+        } catch (RuntimeException failure) {
+            Log.e(TAG, "Could not apply popup overlays", failure);
+        }
     }
 
     @Override
@@ -829,15 +975,32 @@ public class WidgetService extends Service {
         params.y = statusBar ? 0 : prefs.overlayY.get();
         params.windowAnimations = 0;
 
+        overlayAttached = false;
         try {
             windowManager.addView(binding.getRoot(), params);
         } catch (Exception e) {
-            Toast.makeText(this, R.string.overlay_permission_required, Toast.LENGTH_LONG).show();
-            stopSelf();
+            Log.e(TAG, "Could not attach status overlay (attempt "
+                    + (overlayAttachAttempts + 1) + ")", e);
+            // Some vendor WindowManager implementations can throw after accepting the view.
+            // Remove that partial attachment before dropping our reference and retrying.
+            removeStatusOverlaySafely("failed attach");
+            binding = null;
+            params = null;
+            overlayAttachAttempts++;
+            if (!destroyed && prefs.widgetEnabled.get()) {
+                mainHandler.removeCallbacks(overlayAttachRetry);
+                long delay = Math.min(MAX_OVERLAY_ATTACH_RETRY_MS,
+                        OVERLAY_ATTACH_RETRY_MS * Math.max(1, overlayAttachAttempts));
+                mainHandler.postDelayed(overlayAttachRetry, delay);
+            }
             return;
         }
 
-        applyPreferences();
+        overlayAttached = true;
+        overlayAttachAttempts = 0;
+        // Reconnecting here used to duplicate the explicit startup reconfigure block in
+        // onCreate(), including a full mapping pass over large Sprut.hub catalogs.
+        applyPreferences(false);
 
         updateWifiStatus();
         updateGnssStatus();
@@ -847,6 +1010,23 @@ public class WidgetService extends Service {
                 .alpha(1f)
                 .setDuration(OVERLAY_FADE_DURATION_MS)
                 .start();
+        scheduleInitialIntegrationStartupAfterFrame();
+    }
+
+    private void removeStatusOverlaySafely(@NonNull String reason) {
+        if (binding == null || windowManager == null) {
+            overlayAttached = false;
+            return;
+        }
+        View root = binding.getRoot();
+        if (!overlayAttached && !root.isAttachedToWindow()) return;
+        try {
+            windowManager.removeView(root);
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Status overlay was already detached during " + reason, failure);
+        } finally {
+            overlayAttached = false;
+        }
     }
 
     @Override
@@ -862,8 +1042,11 @@ public class WidgetService extends Service {
         appliedThemePref = -1;
 
         if (binding != null) {
-            windowManager.removeView(binding.getRoot());
+            removeStatusOverlaySafely("configuration change");
+            binding = null;
+            params = null;
             createOverlayView();
+            if (integrationsStarted) applyPopupPreferencesSafely();
         }
     }
 
@@ -874,16 +1057,33 @@ public class WidgetService extends Service {
 
     @SuppressLint("MissingPermission")
     private void applyPreferences(boolean reconfigureIntegrations) {
-        if (destroyed || prefs == null || binding == null) return;
+        if (destroyed || prefs == null) return;
+
+        boolean popupAppliedByStartup = false;
         if (reconfigureIntegrations) {
-            if (mqttController != null) mqttController.reconfigure();
-            if (sprutController != null) sprutController.reconfigure();
-            if (carTelemetryExporter != null) carTelemetryExporter.reconfigure();
-            if (haApiController != null) haApiController.reconfigure();
-            if (scenarioController != null) scenarioController.reconfigure();
-            if (intentScenarioController != null) intentScenarioController.reconfigure();
+            if (integrationsStarted) {
+                reconfigureIntegrationControllers();
+            } else if (binding == null) {
+                // USER_UNLOCKED can arrive while WindowManager is still rejecting the status
+                // window. Credentials must nevertheless be re-read now; a later successful
+                // attach uses the already-running authoritative connector sessions.
+                runInitialIntegrationStartup();
+                popupAppliedByStartup = integrationsStarted;
+            } else {
+                // Normal cold start: preserve the first-frame guarantee. The deferred startup
+                // reads current preferences, so no separate pre-frame reconfigure is required.
+                scheduleInitialIntegrationStartupAfterFrame();
+            }
         }
-        if (popupOverlay != null) popupOverlay.applyPreferences();
+
+        if (reconfigureIntegrations && !popupAppliedByStartup && integrationsStarted) {
+            applyPopupPreferencesSafely();
+        }
+        if (binding == null) return;
+
+        // Configuration changes are comparatively rare. Cache the parsed document here so
+        // frequent connector packets only update existing views and in-memory states.
+        if (haConfigs != null) configuredMainBricks = haConfigs.loadMain();
         hiddenInPackages = prefs.hideInPackages.get();
         rebuildEffectiveHideLists();
         updateForegroundAppTracking();
@@ -920,7 +1120,7 @@ public class WidgetService extends Service {
         applyBluetoothBrickSettings();
         applyIndoorTempBrickSettings();
         applyOutdoorTempBrickSettings();
-        renderHomeAssistantBricks();
+        renderHomeAssistantBricks(true);
 
         applyBrickVisibility(bricksSet);
         applyOverlayPosition();
@@ -966,58 +1166,23 @@ public class WidgetService extends Service {
         }
 
         if (trackingSet.contains(BrickType.WIFI)) {
-            if (connectivityManager == null) {
-                connectivityManager = getSystemService(ConnectivityManager.class);
-
-                // Initial state: assume "no internet" until our async probe determines whether
-                // the connection is full / whitelisted / broken.
-                boolean wifiPresent = false;
-                for (Network net : connectivityManager.getAllNetworks()) {
-                    NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(net);
-                    if (capabilities != null && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                        setWifiStatus(WiFiState.NO_INTERNET);
-                        wifiPresent = true;
-                        break;
-                    }
-                }
-
-                NetworkRequest networkRequest = new NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build();
-                // Deliver callbacks on the main thread: they touch the overlay views and the
-                // themedContext, which must not be read from the default ConnectivityThread.
-                connectivityManager.registerNetworkCallback(networkRequest, networkCallback, mainHandler);
-
-                if (wifiPresent) {
-                    probeReachability();
-                }
-                mainHandler.postDelayed(reachabilityProbeRunnable, INTERNET_PROBE_INTERVAL_MS);
-            }
+            ensureConnectivityTracking();
             updateWifiStatus();
-        } else if (connectivityManager != null) {
-            mainHandler.removeCallbacks(reachabilityProbeRunnable);
-            connectivityManager.unregisterNetworkCallback(networkCallback);
-            connectivityManager = null;
+        } else {
+            stopConnectivityTracking();
         }
 
         if (trackingSet.contains(BrickType.GPS)) {
-            if (locationManager == null) {
-                locationManager = getSystemService(LocationManager.class);
-
-                locationManager.registerGnssStatusCallback(gnssStatusCallback, mainHandler);
-                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0, locationListener, Looper.getMainLooper());
-                mainHandler.postDelayed(updateGnssStatusRunnable, GNSS_STATUS_CHECK_INTERVAL);
-            }
+            ensureLocationTracking();
             if (prefs.gps.showSatelliteBadge.get()) {
                 registerSatelliteStatusReceiver();
             } else {
                 unregisterSatelliteStatusReceiver();
             }
             updateGnssStatus();
-        } else if (locationManager != null) {
-            mainHandler.removeCallbacks(updateGnssStatusRunnable);
+        } else {
             unregisterSatelliteStatusReceiver();
-            locationManager.removeUpdates(locationListener);
-            locationManager.unregisterGnssStatusCallback(gnssStatusCallback);
-            locationManager = null;
+            stopLocationTracking();
         }
 
         if (trackingSet.contains(BrickType.BLUETOOTH)) {
@@ -1042,11 +1207,132 @@ public class WidgetService extends Service {
         updateCarTempSubscription(BrickType.OUTDOOR_TEMP, trackingSet, binding.outdoorTempText);
     }
 
+    private void ensureConnectivityTracking() {
+        if (connectivityManager == null) {
+            try {
+                connectivityManager = getSystemService(ConnectivityManager.class);
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "ConnectivityManager is unavailable", failure);
+            }
+        }
+        ConnectivityManager manager = connectivityManager;
+        if (manager == null) return;
+
+        boolean wifiPresent = false;
+        try {
+            for (Network network : manager.getAllNetworks()) {
+                NetworkCapabilities capabilities = manager.getNetworkCapabilities(network);
+                if (capabilities != null
+                        && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                    setWifiStatus(WiFiState.NO_INTERNET);
+                    wifiPresent = true;
+                    break;
+                }
+            }
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Could not inspect active Wi-Fi networks", failure);
+        }
+
+        if (!networkCallbackRegistered) {
+            try {
+                NetworkRequest request = new NetworkRequest.Builder()
+                        .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                        .build();
+                // Deliver callbacks on the main thread: they touch overlay views and theme state.
+                manager.registerNetworkCallback(request, networkCallback, mainHandler);
+                networkCallbackRegistered = true;
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "Could not register Wi-Fi network callback", failure);
+            }
+        }
+
+        if (wifiPresent) probeReachability();
+        mainHandler.removeCallbacks(reachabilityProbeRunnable);
+        mainHandler.postDelayed(reachabilityProbeRunnable, INTERNET_PROBE_INTERVAL_MS);
+    }
+
+    private void stopConnectivityTracking() {
+        mainHandler.removeCallbacks(reachabilityProbeRunnable);
+        ConnectivityManager manager = connectivityManager;
+        if (manager != null && networkCallbackRegistered) {
+            try {
+                manager.unregisterNetworkCallback(networkCallback);
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "Wi-Fi network callback was already unregistered", failure);
+            }
+        }
+        networkCallbackRegistered = false;
+        connectivityManager = null;
+    }
+
+    @SuppressLint("MissingPermission")
+    private void ensureLocationTracking() {
+        if (locationManager == null) {
+            try {
+                locationManager = getSystemService(LocationManager.class);
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "LocationManager is unavailable", failure);
+            }
+        }
+        LocationManager manager = locationManager;
+        if (manager == null) return;
+
+        if (!gnssStatusCallbackRegistered) {
+            try {
+                gnssStatusCallbackRegistered = manager.registerGnssStatusCallback(
+                        gnssStatusCallback, mainHandler);
+                if (!gnssStatusCallbackRegistered) {
+                    Log.w(TAG, "GNSS status callback registration was rejected");
+                }
+            } catch (RuntimeException failure) {
+                gnssStatusCallbackRegistered = false;
+                Log.w(TAG, "Could not register GNSS status callback", failure);
+            }
+        }
+
+        if (!locationUpdatesRegistered) {
+            try {
+                manager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
+                        GNSS_LOCATION_INTERVAL_MS, 0, locationListener,
+                        Looper.getMainLooper());
+                locationUpdatesRegistered = true;
+            } catch (RuntimeException failure) {
+                locationUpdatesRegistered = false;
+                Log.w(TAG, "Could not request GPS location updates", failure);
+            }
+        }
+
+        mainHandler.removeCallbacks(updateGnssStatusRunnable);
+        mainHandler.postDelayed(updateGnssStatusRunnable, GNSS_STATUS_CHECK_INTERVAL);
+    }
+
+    private void stopLocationTracking() {
+        mainHandler.removeCallbacks(updateGnssStatusRunnable);
+        LocationManager manager = locationManager;
+        if (manager != null && locationUpdatesRegistered) {
+            try {
+                manager.removeUpdates(locationListener);
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "GPS location updates were already removed", failure);
+            }
+        }
+        if (manager != null && gnssStatusCallbackRegistered) {
+            try {
+                manager.unregisterGnssStatusCallback(gnssStatusCallback);
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "GNSS status callback was already unregistered", failure);
+            }
+        }
+        locationUpdatesRegistered = false;
+        gnssStatusCallbackRegistered = false;
+        locationManager = null;
+    }
+
     /** Applies only floating-window geometry/visibility. Used by live popup sliders so changing
      * a pixel value does not re-scan every connector binding on every touch sample. */
     public void applyPopupPreferences() {
         if (destroyed || popupOverlay == null) return;
-        popupOverlay.applyPreferences();
+        applyPopupPreferencesSafely();
     }
 
     /** Applies a popup tile's rules/action/style live from in-memory connector snapshots. This
@@ -1057,7 +1343,7 @@ public class WidgetService extends Service {
         if (mqttController != null) mqttController.reapplyPopupBindings();
         if (sprutController != null) sprutController.reapplyPopupBindings();
         if (haApiController != null) haApiController.reapplyPopupBindings();
-        popupOverlay.applyPreferences();
+        applyPopupPreferencesSafely();
     }
 
     /** Live main-row appearance/rule update without restarting an offline connector. */
@@ -1286,13 +1572,25 @@ public class WidgetService extends Service {
         applySingleLineTextBrick(binding.outdoorTempText, prefs.outdoorTemp);
     }
 
-    /** Rebuilds the dynamic HA row from independent configs and persistent runtime state. */
+    /** Reconciles the dynamic smart-home row without reallocating every tile on each packet. */
     private void renderHomeAssistantBricks() {
+        renderHomeAssistantBricks(false);
+    }
+
+    private void renderHomeAssistantBricks(boolean forceStyle) {
         if (binding == null || automationStates == null || haConfigs == null) return;
         LinearLayout container = binding.homeAssistantContainer;
-        container.removeAllViews();
+        Map<String, MarqueeOutlineTextView> existing = new LinkedHashMap<>();
+        for (int index = 0; index < container.getChildCount(); index++) {
+            View child = container.getChildAt(index);
+            Object tag = child.getTag();
+            if (child instanceof MarqueeOutlineTextView && tag instanceof String) {
+                existing.put((String) tag, (MarqueeOutlineTextView) child);
+            }
+        }
+        List<MarqueeOutlineTextView> desired = new ArrayList<>();
         long now = System.currentTimeMillis();
-        for (HaBrickConfig config : haConfigs.loadMain()) {
+        for (HaBrickConfig config : configuredMainBricks) {
             if (!config.enabled) continue;
             AutomationState state = automationStates.get(AutomationContract.SCOPE_MAIN, config.id);
             if (!state.visible) continue;
@@ -1329,37 +1627,67 @@ public class WidgetService extends Service {
             // retained states written by older builds before connectors recompute visibility.
             if (AutomationState.isFullyTransparentColor(color)) continue;
 
-            MarqueeOutlineTextView view = new MarqueeOutlineTextView(
-                    themedContext != null ? themedContext : this);
-            view.setTag(config.id);
-            view.setIncludeFontPadding(false);
-            view.setSingleLine(true);
-            view.setTextSize(TypedValue.COMPLEX_UNIT_PX, config.fontSize);
-            view.setTypeface(Fonts.resolve(this, config.fontFamily, config.bold, config.italic));
-            view.setTextColor(AutomationState.parseColor(color, 0xFFFFFFFF));
-            int outlineBase = AutomationState.parseColor(config.outlineColor, 0xFF000000);
-            view.setOutlineColor((outlineBase & 0x00FFFFFF) | (config.outlineAlpha << 24));
-            view.setOutlineWidth(config.outlineWidth);
-            view.setAlpha(config.contentAlpha / 255f);
-            if (hiddenByOwnAppList || hiddenByGroupList) view.setAlpha(0f);
-            view.setTranslationY(config.adjustY);
-            view.setPadding(config.paddingLeft, config.paddingTop,
-                    config.paddingRight, config.paddingBottom);
-            if (config.maxWidth > 0) view.setMaxWidth(config.maxWidth);
-            view.setMarqueeEnabled(config.marquee);
+            MarqueeOutlineTextView view = existing.remove(config.id);
+            boolean created = view == null;
+            if (created) {
+                view = new MarqueeOutlineTextView(
+                        themedContext != null ? themedContext : this);
+                view.setTag(config.id);
+                view.setIncludeFontPadding(false);
+                view.setSingleLine(true);
+            }
+            if (created || forceStyle) {
+                view.setTextSize(TypedValue.COMPLEX_UNIT_PX, config.fontSize);
+                view.setTypeface(Fonts.resolve(this, config.fontFamily,
+                        config.bold, config.italic));
+                int outlineBase = AutomationState.parseColor(
+                        config.outlineColor, 0xFF000000);
+                view.setOutlineColor((outlineBase & 0x00FFFFFF)
+                        | (config.outlineAlpha << 24));
+                view.setOutlineWidth(config.outlineWidth);
+                view.setTranslationY(config.adjustY);
+                view.setPadding(config.paddingLeft, config.paddingTop,
+                        config.paddingRight, config.paddingBottom);
+                if (config.maxWidth > 0) view.setMaxWidth(config.maxWidth);
+                else view.setMaxWidth(Integer.MAX_VALUE);
+                view.setMarqueeEnabled(config.marquee);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT);
+                lp.gravity = Gravity.CENTER_VERTICAL;
+                lp.setMarginStart(config.marginStart);
+                lp.setMarginEnd(config.marginEnd);
+                view.setLayoutParams(lp);
+            }
+            int textColor = AutomationState.parseColor(color, 0xFFFFFFFF);
+            if (view.getCurrentTextColor() != textColor) view.setTextColor(textColor);
+            float alpha = (hiddenByOwnAppList || hiddenByGroupList)
+                    ? 0f : config.contentAlpha / 255f;
+            if (view.getAlpha() != alpha) view.setAlpha(alpha);
             view.setMarqueeText(text);
-
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.gravity = Gravity.CENTER_VERTICAL;
-            lp.setMarginStart(config.marginStart);
-            lp.setMarginEnd(config.marginEnd);
-            container.addView(view, lp);
+            desired.add(view);
         }
-        applyHorizontalMargins(container, prefs.homeAssistant.marginStart.get(),
-                prefs.homeAssistant.marginEnd.get());
-        container.setTranslationY(prefs.homeAssistant.adjustY.get());
-        container.setAlpha(prefs.homeAssistant.contentAlpha.get() / 255f);
+        // Remove hidden/deleted bricks, then move only children whose configured order changed.
+        for (MarqueeOutlineTextView obsolete : existing.values()) {
+            container.removeView(obsolete);
+        }
+        for (int index = 0; index < desired.size(); index++) {
+            MarqueeOutlineTextView view = desired.get(index);
+            if (index < container.getChildCount() && container.getChildAt(index) == view) continue;
+            ViewGroup.LayoutParams layout = view.getLayoutParams();
+            if (view.getParent() == container) container.removeView(view);
+            if (layout == null) {
+                layout = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT);
+            }
+            container.addView(view, index, layout);
+        }
+        if (forceStyle) {
+            applyHorizontalMargins(container, prefs.homeAssistant.marginStart.get(),
+                    prefs.homeAssistant.marginEnd.get());
+            container.setTranslationY(prefs.homeAssistant.adjustY.get());
+            container.setAlpha(prefs.homeAssistant.contentAlpha.get() / 255f);
+        }
     }
 
     private void applyDateBrickSettings() {
@@ -1603,10 +1931,8 @@ public class WidgetService extends Service {
         for (Set<String> s : effectiveHideLists.values()) {
             if (s != null && !s.isEmpty()) return true;
         }
-        if (haConfigs != null) {
-            for (HaBrickConfig config : haConfigs.loadMain()) {
-                if (!config.hideInPackages.isEmpty()) return true;
-            }
+        for (HaBrickConfig config : configuredMainBricks) {
+            if (!config.hideInPackages.isEmpty()) return true;
         }
         return false;
     }
@@ -1752,12 +2078,13 @@ public class WidgetService extends Service {
     /** Called after either an exported Broadcast or MQTT packet has been persisted. */
     public void onAutomationStateChanged(String scope, String id) {
         if (destroyed) return;
-        mainHandler.post(() -> {
-            if (destroyed || binding == null) return;
-            if (AutomationContract.SCOPE_MAIN.equals(scope)) renderHomeAssistantBricks();
-            if (popupOverlay != null) popupOverlay.onStateChanged(scope, id);
-            applyBrickVisibility(currentBrickSet());
-        });
+        synchronized (automationUiLock) {
+            pendingAutomationUi.computeIfAbsent(scope, ignored -> new HashSet<>()).add(id);
+            if (automationUiRefreshScheduled) return;
+            automationUiRefreshScheduled = true;
+        }
+        // One rendered frame per connector burst instead of rebuilding the row once per entity.
+        mainHandler.postDelayed(automationUiRefresh, 32L);
     }
 
     /** Read-only snapshots let the second overlay reuse original brick data without duplicating
@@ -2238,7 +2565,7 @@ public class WidgetService extends Service {
     /**
      * Snap the progress bar to the current playback position and arm/disarm the periodic ticker.
      * Called both from {@link #updateMediaInfo} (state/metadata flips) and from
-     * {@link #mediaProgressTick} (every ~250ms while playing) to advance the bar smoothly.
+     * {@link #mediaProgressTick} (once per second while playing) to advance the bar smoothly.
      */
     private void updateMediaProgress(@Nullable MediaController playing) {
         if (binding == null) return;
@@ -2404,19 +2731,25 @@ public class WidgetService extends Service {
     private void registerSatelliteStatusReceiver() {
         if (satelliteReceiverRegistered) return;
         IntentFilter filter = new IntentFilter(GNSSSHARE_SATELLITE_STATUS_ACTION);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(satelliteStatusReceiver, filter, RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(satelliteStatusReceiver, filter);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(satelliteStatusReceiver, filter, RECEIVER_NOT_EXPORTED);
+            } else {
+                registerReceiver(satelliteStatusReceiver, filter);
+            }
+            satelliteReceiverRegistered = true;
+        } catch (RuntimeException failure) {
+            satelliteReceiverRegistered = false;
+            Log.w(TAG, "Could not register satellite status receiver", failure);
         }
-        satelliteReceiverRegistered = true;
     }
 
     private void unregisterSatelliteStatusReceiver() {
         if (!satelliteReceiverRegistered) return;
         try {
             unregisterReceiver(satelliteStatusReceiver);
-        } catch (IllegalArgumentException ignored) {
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Satellite status receiver was already unregistered", failure);
         }
         satelliteReceiverRegistered = false;
         mainHandler.removeCallbacks(satellitesCountResetRunnable);
@@ -2442,7 +2775,8 @@ public class WidgetService extends Service {
         if (!btReceiverRegistered) return;
         try {
             unregisterReceiver(bluetoothReceiver);
-        } catch (IllegalArgumentException ignored) {
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Bluetooth receiver was already unregistered", failure);
         }
         btReceiverRegistered = false;
     }
@@ -3059,6 +3393,12 @@ public class WidgetService extends Service {
     public void onDestroy() {
         destroyed = true;
         instance = null;
+        integrationStartupScheduled = false;
+        try {
+            Choreographer.getInstance().removeFrameCallback(integrationStartupFrame);
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Could not remove deferred integration startup", failure);
+        }
 
         mainHandler.removeCallbacksAndMessages(null);
 
@@ -3066,51 +3406,59 @@ public class WidgetService extends Service {
         // with the guards above and no scenario/popup listeners left, none can recreate a window.
         if (connectorValues != null) connectorValues.removeListener(crossSourceRuleListener);
         crossSourceRuleRefreshScheduled.set(false);
-        if (intentScenarioController != null) intentScenarioController.destroy();
+        synchronized (automationUiLock) {
+            pendingAutomationUi.clear();
+            automationUiRefreshScheduled = false;
+        }
+        if (intentScenarioController != null) {
+            runCleanupStep("intent scenarios", intentScenarioController::destroy);
+        }
         intentScenarioController = null;
-        if (scenarioController != null) scenarioController.destroy();
+        if (scenarioController != null) {
+            runCleanupStep("visual scenarios", scenarioController::destroy);
+        }
         scenarioController = null;
-        if (popupOverlay != null) popupOverlay.destroy();
+        if (popupOverlay != null) runCleanupStep("popup overlays", popupOverlay::destroy);
         popupOverlay = null;
-        if (carTelemetryExporter != null) carTelemetryExporter.stop();
+        if (carTelemetryExporter != null) {
+            runCleanupStep("car telemetry", carTelemetryExporter::stop);
+        }
         carTelemetryExporter = null;
-        if (mqttController != null) mqttController.stop();
+        if (mqttController != null) runCleanupStep("MQTT", mqttController::stop);
         mqttController = null;
-        if (sprutController != null) sprutController.stop();
+        if (sprutController != null) runCleanupStep("Sprut.hub", sprutController::stop);
         sprutController = null;
-        if (haApiController != null) haApiController.stop();
+        if (haApiController != null) {
+            runCleanupStep("Home Assistant", haApiController::stop);
+        }
         haApiController = null;
         actionDispatcher = null;
         mainHandler.removeCallbacksAndMessages(null);
 
-        if (binding != null && windowManager != null) {
-            windowManager.removeView(binding.getRoot());
-        }
+        removeStatusOverlaySafely("service shutdown");
         binding = null;
+        params = null;
 
-        if (locationManager != null) {
-            locationManager.unregisterGnssStatusCallback(gnssStatusCallback);
-            locationManager.removeUpdates(locationListener);
-        }
-
-        if (connectivityManager != null) {
-            connectivityManager.unregisterNetworkCallback(networkCallback);
-        }
+        stopLocationTracking();
+        stopConnectivityTracking();
 
         if (reachabilityChecker != null) {
-            reachabilityChecker.shutdown();
+            ReachabilityChecker checker = reachabilityChecker;
             reachabilityChecker = null;
+            runCleanupStep("reachability checker", checker::shutdown);
         }
 
         unregisterSatelliteStatusReceiver();
         unregisterBluetoothReceiver();
-        disableMediaTracking();
+        runCleanupStep("media tracking", this::disableMediaTracking);
         // Drop car sensor subscriptions but keep the process-wide integration alive — the
         // settings UI may still query isBrickSupported after the overlay service stops.
-        CarIntegration car = CarIntegrations.get(this);
-        car.setAvailabilityChangedListener(null);
-        car.unsubscribe(BrickType.INDOOR_TEMP);
-        car.unsubscribe(BrickType.OUTDOOR_TEMP);
+        runCleanupStep("car sensor subscriptions", () -> {
+            CarIntegration car = CarIntegrations.get(this);
+            car.setAvailabilityChangedListener(null);
+            car.unsubscribe(BrickType.INDOOR_TEMP);
+            car.unsubscribe(BrickType.OUTDOOR_TEMP);
+        });
         super.onDestroy();
     }
 
@@ -3128,11 +3476,50 @@ public class WidgetService extends Service {
         return instance != null;
     }
 
+    /**
+     * Read-only same-process geometry for HOME safe-area calculation.
+     *
+     * <p>The returned value is the actual measured top-row window, not a duplicated estimate
+     * from font/icon settings. Zero means that no status-bar-mode overlay currently occupies the
+     * top edge.</p>
+     */
+    public int getStatusBarOverlayHeight() {
+        if (destroyed || prefs == null || !prefs.widgetEnabled.get()
+                || prefs.widgetMode.get() != WIDGET_MODE_STATUS_BAR || binding == null) {
+            return 0;
+        }
+        View root = binding.getRoot();
+        return Math.max(root.getHeight(), root.getMeasuredHeight());
+    }
+
     /** Immutable read-only connector snapshot for settings/catalog pickers. */
     @NonNull
     public List<ConnectorValue> connectorValueSnapshot() {
         ConnectorValueRegistry current = connectorValues;
         return current == null ? java.util.Collections.emptyList() : current.snapshot();
+    }
+
+    /**
+     * Subscribes a same-process HOME surface to raw HA/MQTT/Sprut value changes.
+     *
+     * <p>The returned initial snapshot closes the first-launch race: the connector may have
+     * completed synchronization before LauncherActivity obtained the service singleton.</p>
+     */
+    @NonNull
+    public List<ConnectorValue> addConnectorValueListener(
+            @NonNull ConnectorValueRegistry.Listener listener) {
+        ConnectorValueRegistry current = connectorValues;
+        if (current == null) return java.util.Collections.emptyList();
+        // Subscribe before reading: an update racing this snapshot is either already included or
+        // arrives through the listener immediately afterwards, never lost between the two steps.
+        current.addListener(listener);
+        return current.snapshot();
+    }
+
+    public void removeConnectorValueListener(
+            @NonNull ConnectorValueRegistry.Listener listener) {
+        ConnectorValueRegistry current = connectorValues;
+        if (current != null) current.removeListener(listener);
     }
 
     private static Rect getBounds(View view) {

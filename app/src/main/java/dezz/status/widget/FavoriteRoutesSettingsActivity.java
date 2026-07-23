@@ -37,12 +37,13 @@ import java.util.Collections;
 import java.util.List;
 
 import dezz.status.widget.launcher.LauncherIconResolver;
+import dezz.status.widget.launcher.panels.PanelEditScheduler;
 import dezz.status.widget.launcher.routes.FavoriteRouteConfig;
 import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
 import dezz.status.widget.launcher.routes.FavoriteRoutesPanelView;
 import dezz.status.widget.launcher.routes.RouteDestinationParser;
 
-/** Visual autosaving editor for the independent HOME favorite-routes panel. */
+/** Visual autosaving editor for the idle state of the combined navigation HOME panel. */
 public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
     private interface IntChange { void set(int value); }
 
@@ -56,6 +57,7 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
     private MaterialSwitch panelVisibleSwitch;
     @Nullable private FavoriteRouteConfig selected;
     @Nullable private FavoriteRoutesPanelView preview;
+    @Nullable private PanelEditScheduler editScheduler;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -63,12 +65,29 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
         preferences = new Preferences(this);
         store = new FavoriteRoutesConfigStore(preferences);
         routes.addAll(store.load());
-        setTitle("Избранные маршруты HOME");
+        editScheduler = PanelEditScheduler.onMainThread(this::applyPreviewState, () -> {
+            store.save(routes);
+            markSaved();
+            rebuildList();
+        });
+        setTitle("Маршрут и избранное HOME");
         setContentView(buildScreen());
         rebuildList();
         if (!routes.isEmpty()) select(routes.get(0));
         else showEmptyEditor();
         rebuildPreview();
+    }
+
+    @Override
+    protected void onStop() {
+        if (editScheduler != null) editScheduler.flush();
+        super.onStop();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (editScheduler != null) editScheduler.cancel();
+        super.onDestroy();
     }
 
     @NonNull
@@ -82,18 +101,22 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
         left.setOrientation(LinearLayout.VERTICAL);
         left.setPadding(0, 0, dp(14), dp(28));
         listScroll.addView(left, new ScrollView.LayoutParams(match(), wrap()));
-        addTitle(left, "ЧАСТЫЕ МАРШРУТЫ");
-        addHint(left, "Кнопки «Домой», «Работа» и любые другие адреса. Все изменения сохраняются сразу.");
+        addTitle(left, "МАРШРУТ И ИЗБРАННОЕ");
+        addHint(left, "Пока маршрут не построен, здесь видны кнопки «Домой», «Работа» и другие адреса. После построения маршрута плитка сама переключится на выбранную навигационную информацию.");
 
         panelVisibleSwitch = new MaterialSwitch(this);
-        panelVisibleSwitch.setText("Показывать панель на HOME");
-        panelVisibleSwitch.setChecked(preferences.launcherFavoriteRoutesVisible.get());
+        panelVisibleSwitch.setText("Показывать объединённую плитку на HOME");
+        panelVisibleSwitch.setChecked(preferences.launcherNavigationVisible.get()
+                || preferences.launcherFavoriteRoutesVisible.get());
         panelVisibleSwitch.setMinHeight(dp(48));
         panelVisibleSwitch.setOnCheckedChangeListener((button, checked) -> {
+            preferences.launcherNavigationVisible.set(checked);
             preferences.launcherFavoriteRoutesVisible.set(checked);
             markSaved();
         });
         left.addView(panelVisibleSwitch, new LinearLayout.LayoutParams(match(), wrap()));
+        addButton(left, "Выбрать данные активного маршрута…", v ->
+                startActivity(new Intent(this, NavigationPanelSettingsActivity.class)));
         addSlider(left, "Столбцов в панели", preferences.launcherFavoriteRoutesColumns.get(),
                 1, 6, value -> {
                     preferences.launcherFavoriteRoutesColumns.set(value);
@@ -116,7 +139,7 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
         listHost = new LinearLayout(this);
         listHost.setOrientation(LinearLayout.VERTICAL);
         left.addView(listHost, new LinearLayout.LayoutParams(match(), wrap()));
-        addButton(left, "Размер и положение панели на HOME…", v ->
+        addButton(left, "Размер и положение объединённой плитки на HOME…", v ->
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_MODE, true)));
 
@@ -317,11 +340,11 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
 
         addSlider(editorHost, "Размер иконки", route.iconSizePx, 24, 180, value -> {
             route.iconSizePx = value;
-            persistWithoutList();
+            previewAndPersist();
         }, " px");
         addSlider(editorHost, "Размер подписи", route.labelSizeSp, 8, 36, value -> {
             route.labelSizeSp = value;
-            persistWithoutList();
+            previewAndPersist();
         }, " sp");
         addColorField(editorHost, "Цвет плитки", route.backgroundColor,
                 value -> route.backgroundColor = value);
@@ -352,18 +375,33 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
     }
 
     private void persistWithoutList() {
-        store.save(routes);
-        if (preview != null) preview.reloadConfig();
-        markSaved();
+        if (editScheduler != null) editScheduler.request();
+    }
+
+    /** Size controls are visual, so repaint them in this callback before the autosave debounce. */
+    private void previewAndPersist() {
+        applyPreviewState();
+        if (editScheduler != null) editScheduler.request();
     }
 
     private void rebuildPreview() {
         if (previewHost == null) return;
-        previewHost.removeAllViews();
-        preview = new FavoriteRoutesPanelView(this, store,
-                Math.max(1, Math.min(6, preferences.launcherFavoriteRoutesColumns.get())));
-        preview.setPreviewMode(true);
-        previewHost.addView(preview, new FrameLayout.LayoutParams(match(), match()));
+        if (preview == null) {
+            previewHost.removeAllViews();
+            preview = new FavoriteRoutesPanelView(this, store,
+                    Math.max(1, Math.min(6,
+                            preferences.launcherFavoriteRoutesColumns.get())));
+            preview.setPreviewMode(true);
+            previewHost.addView(preview, new FrameLayout.LayoutParams(match(), match()));
+        }
+        applyPreviewState();
+    }
+
+    private void applyPreviewState() {
+        if (preview == null) return;
+        preview.setColumns(Math.max(1, Math.min(6,
+                preferences.launcherFavoriteRoutesColumns.get())));
+        preview.setPreviewRoutes(routes);
     }
 
     private void markSaved() {

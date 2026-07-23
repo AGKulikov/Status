@@ -17,9 +17,14 @@
 
 package dezz.status.widget.car;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -32,8 +37,11 @@ import com.ecarx.xui.adaptapi.car.base.ICarFunction;
 import com.ecarx.xui.adaptapi.car.base.ICarInfo;
 import com.ecarx.xui.adaptapi.car.hvac.IHvac;
 import com.ecarx.xui.adaptapi.car.sensor.ISensor;
+import com.ecarx.xui.adaptapi.car.vehicle.IBcm;
 import com.ecarx.xui.adaptapi.car.vehicle.IDriveMode;
 import com.ecarx.xui.adaptapi.car.vehicle.IVehicle;
+import com.ecarx.xui.adaptapi.tpms.ITireState;
+import com.ecarx.xui.adaptapi.tpms.TPMS;
 import com.ecarx.xui.adaptapi.vehicle.VehicleSeat;
 
 import java.util.ArrayList;
@@ -53,6 +61,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import dezz.status.widget.BrickType;
+import dezz.status.widget.launcher.vehicle.VehicleDerivedMetrics;
 
 /**
  * eCarX AdaptAPI backend for car-specific bricks: cabin ("indoor") and ambient ("outdoor")
@@ -90,8 +99,46 @@ final class GeelyCarIntegration implements CarIntegration {
     private static final long AVAILABILITY_SLOW_POLL_INTERVAL_MS = 30_000L;
     private static final long CONTROL_RETRY_MS = 2_000L;
     private static final long CONTROL_HEALTH_POLL_MS = 30_000L;
-    private static final int CONTROL_WRITE_ATTEMPTS = 6;
+    /**
+     * ECARX applies HVAC writes asynchronously. Poll often enough for a responsive panel, but do
+     * not resend on every poll: flooding the slow Android 9 Binder is one of the reasons a write
+     * can be acknowledged without ever reaching the vehicle ECU.
+     */
+    /** Limit active Binder writes; passive read-back polling continues to the full deadline. */
+    private static final int CONTROL_WRITE_WINDOW_POLLS = 8;
+    private static final int CONTROL_RESEND_EVERY_POLLS = 3;
+    private static final long CONTROL_CONFIRM_POLL_MS = 140L;
+    /** Hard upper bound for a command state-machine, excluding a Binder call already in flight. */
+    private static final long CONTROL_COMMAND_TIMEOUT_MS = 5_000L;
+    private static final int CONTROL_PULSE_ATTEMPTS = 2;
+    private static final long CONTROL_PULSE_RETRY_MS = 200L;
     private static final int NO_ZONE = Integer.MIN_VALUE;
+    private static final String FAN_CONTROL_ID = "climate.fan";
+    /** ECARX front-row aggregate zone used by both manual and AUTO fan functions. */
+    private static final int FRONT_FAN_ZONE = 8;
+    /**
+     * A short Binder failure may hide the AUTO bit while the ECU is still in AUTO. Reuse only a
+     * recent confirmed mode; after this window an unresolved mode is UNKNOWN and no fan write is
+     * routed at all.
+     */
+    private static final long FAN_MODE_CACHE_MAX_AGE_MS = 75_000L;
+    private static final int AUTO_FAN_FAMILY_UNKNOWN = 0;
+    private static final int AUTO_FAN_FAMILY_THREE_PROFILE = 3;
+    private static final int AUTO_FAN_FAMILY_TWO_PROFILE = 2;
+
+    /** Geely extension signals used by the instrument cluster but absent from this SDK's stubs. */
+    private static final int SENSOR_TYPE_AVERAGE_CONSUMPTION = 4_194_560;
+    private static final int SENSOR_TYPE_INSTANT_CONSUMPTION = 4_194_816;
+    private static final int SENSOR_TYPE_AVERAGE_CONSUMPTION_ONE_IGNITION = 4_195_072;
+    private static final long BCM_STATE_POLL_INTERVAL_MS = 300L;
+    /** A dead/silent reflective callback must never suppress the supported AdaptAPI path forever. */
+    private static final long LOW_LEVEL_PRIORITY_TTL_MS = 15_000L;
+    /** Longer than a normal indicator's dark half-cycle, but still quick when it is cancelled. */
+    private static final long TURN_SIGNAL_OFF_HOLD_MS = 1_000L;
+    private static final String GEAR_ID = "ISensor.gear";
+    private static final String LOW_LEVEL_GEAR_ACTUAL_ID = "ECarx.gear_actual";
+    private static final String LOW_LEVEL_GEAR_MANUAL_ID = "ECarx.gear_manual_mode";
+    private static final String HIGH_BEAM_ID = "IBcm.high_beam";
 
     private final Context appContext;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -101,6 +148,8 @@ final class GeelyCarIntegration implements CarIntegration {
     private final Object telemetryLock = new Object();
     private final Map<TelemetryListener, TelemetrySubscription> telemetrySubscriptions =
             new IdentityHashMap<>();
+    /** Worker-thread-only debounce state shared by all subscribers of the same physical lamp. */
+    private final Map<String, Long> bcmLastOnMillis = new HashMap<>();
     private final Object controlsLock = new Object();
     private final Map<ControlStateListener, ControlSubscription> controlSubscriptions =
             new IdentityHashMap<>();
@@ -112,6 +161,32 @@ final class GeelyCarIntegration implements CarIntegration {
         thread.setDaemon(true);
         return thread;
     });
+    /**
+     * Climate reads/writes have their own serial lane. Sharing the telemetry worker made a tap
+     * wait behind TPMS/BCM/navigation reads and, on weak head units, delayed it for seconds.
+     */
+    private final ExecutorService controlWorker = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "ecarx-controls");
+        thread.setDaemon(true);
+        return thread;
+    });
+    /**
+     * Worker-owned command state. Every vendor call still runs on {@link #controlWorker}, while
+     * confirmation delays live on the main handler so one slow ECU transition cannot park that
+     * serial lane or starve watcher refreshes and commands for other functions.
+     */
+    private final Map<String, ActiveControlCommand> activeControlCommands = new HashMap<>();
+    private final Object controlCommandSubmissionLock = new Object();
+    /** Latest caller intent is visible before its worker task reaches the serial queue. */
+    private final Map<String, ControlCommandSubmission> latestControlCommandSubmissions =
+            new HashMap<>();
+    private long nextControlCommandGeneration;
+    private volatile boolean controlsShuttingDown;
+    /** Confirmed routing facts are published across the catalog and control workers. */
+    @Nullable private volatile ConfirmedFanMode lastConfirmedClimateAutoMode;
+    @Nullable private volatile Double lastConfirmedAutoFanProfile;
+    @NonNull private volatile List<CarControlDescriptor.Option>
+            lastConfirmedAutoFanRuntimeOptions = Collections.emptyList();
 
     @Nullable
     private volatile ISensor sensors;
@@ -119,17 +194,65 @@ final class GeelyCarIntegration implements CarIntegration {
     private volatile ICar carApi;
     @Nullable
     private volatile ICarFunction carFunctions;
+    private final EcarxSignalFallback signalFallback;
+    /** Prefer the richer callback once it has produced a value; AdaptAPI remains the cold fallback. */
+    private volatile boolean lowLevelGearKnown;
+    private volatile boolean lowLevelHighBeamKnown;
+    private volatile long lowLevelGearObservedMonoMillis;
+    private volatile long lowLevelHighBeamObservedMonoMillis;
 
-    /** Accessed only by telemetryWorker, except vendor callbacks which merely post deliveries. */
+    /** Accessed only by controlWorker, except vendor callbacks which only enqueue work/delivery. */
     @Nullable private ICarFunction controlWatcherSource;
     @Nullable private ICarFunction.IFunctionValueWatcher controlWatcher;
     private final Set<Integer> watchedControlFunctions = new HashSet<>();
     private boolean controlRefreshScheduled;
+    private boolean controlRefreshInFlight;
+    private boolean controlRefreshAgain;
     private volatile int controlRetryAttempts;
     private final Runnable controlRefreshTask = () -> {
         controlRefreshScheduled = false;
-        executeTelemetryTask(this::refreshControlRegistrationAndStates);
+        if (controlRefreshInFlight) {
+            controlRefreshAgain = true;
+            return;
+        }
+        controlRefreshInFlight = true;
+        if (!executeControlTask(() -> {
+            try {
+                refreshControlRegistrationAndStates();
+            } finally {
+                mainHandler.post(this::finishControlRefresh);
+            }
+        })) {
+            controlRefreshInFlight = false;
+        }
     };
+    /** Main-thread scheduler; the next tick is queued only after the previous Binder read ends. */
+    private boolean bcmPollScheduled;
+    private boolean bcmPollInFlight;
+    private final Runnable bcmPollTask = () -> {
+        bcmPollScheduled = false;
+        if (!hasBcmTelemetryDemand()) return;
+        bcmPollInFlight = true;
+        executeTelemetryTask(() -> {
+            try {
+                pollBcmTelemetryOnce();
+            } finally {
+                mainHandler.post(() -> {
+                    bcmPollInFlight = false;
+                    scheduleNextBcmPoll();
+                });
+            }
+        });
+    };
+    /** Internal wake-up after the exported manifest receiver persisted a current-boot state. */
+    private final BroadcastReceiver autoHoldChangedReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (AutoHoldStateRepository.ACTION_CHANGED.equals(intent.getAction())) {
+                deliverCurrentAutoHoldState();
+            }
+        }
+    };
+    private boolean autoHoldReceiverRegistered;
 
     @Nullable
     private Runnable availabilityChangedListener;
@@ -173,17 +296,32 @@ final class GeelyCarIntegration implements CarIntegration {
         final String unitNote;
         final String telemetryUnit;
         final boolean boundedTemperature;
+        final boolean eventOnly;
+        final boolean probeWithoutSupport;
+        final long staleAfterMillis;
 
         TelemetrySignal(String id, String label, int sensorType, String unitNote,
                         boolean boundedTemperature) {
+            this(id, label, sensorType, unitNote, boundedTemperature ? "°C" : "raw",
+                    boundedTemperature, false, false, 120_000L);
+        }
+
+        TelemetrySignal(String id, String label, int sensorType, String unitNote,
+                        String telemetryUnit, boolean boundedTemperature, boolean eventOnly,
+                        boolean probeWithoutSupport, long staleAfterMillis) {
             this.id = "ISensor." + id;
             this.label = label;
             this.sensorType = sensorType;
             this.unitNote = unitNote;
             this.boundedTemperature = boundedTemperature;
-            // Streaming consumers need a compact machine-facing unit. Detailed uncertainty and
-            // provenance remain in the diagnostics-only unitNote above.
-            this.telemetryUnit = boundedTemperature ? "°C" : "raw";
+            this.telemetryUnit = telemetryUnit;
+            this.eventOnly = eventOnly;
+            this.probeWithoutSupport = probeWithoutSupport;
+            this.staleAfterMillis = staleAfterMillis;
+        }
+
+        CarTelemetryDescriptor descriptor() {
+            return new CarTelemetryDescriptor(id, label, telemetryUnit, true, staleAfterMillis);
         }
     }
 
@@ -218,7 +356,26 @@ final class GeelyCarIntegration implements CarIntegration {
             new TelemetrySignal("vehicle_weight", "Масса автомобиля — raw",
                     ISensor.SENSOR_TYPE_VEHICLE_WEIGHT, "raw", false),
             new TelemetrySignal("ev_battery_level", "Заряд тяговой батареи — raw",
-                    ISensor.SENSOR_TYPE_EV_BATTERY_LEVEL, "raw", false)
+                    ISensor.SENSOR_TYPE_EV_BATTERY_LEVEL, "raw", false),
+            new TelemetrySignal("avg_fuel_consumption", "Средний расход",
+                    SENSOR_TYPE_AVERAGE_CONSUMPTION,
+                    "Расширенный сигнал Geely; литры на 100 км", "L/100 km",
+                    false, false, true, 120_000L),
+            new TelemetrySignal("instant_fuel_consumption", "Мгновенный расход",
+                    SENSOR_TYPE_INSTANT_CONSUMPTION,
+                    "Расширенный сигнал Geely; литры на 100 км", "L/100 km",
+                    false, false, true, 30_000L),
+            new TelemetrySignal("avg_fuel_consumption_ignition",
+                    "Средний расход за текущую поездку",
+                    SENSOR_TYPE_AVERAGE_CONSUMPTION_ONE_IGNITION,
+                    "Расширенный сигнал Geely с момента включения зажигания; литры на 100 км",
+                    "L/100 km", false, false, true, 120_000L),
+            new TelemetrySignal("gear", "Передача", ISensor.SENSOR_TYPE_GEAR,
+                    "Код ISensorEvent.GEAR_*", "", false, true, true, 0L),
+            new TelemetrySignal("ignition_state", "Состояние зажигания",
+                    ISensor.SENSOR_TYPE_IGNITION_STATE,
+                    "Код ISensorEvent.IGNITION_STATE_*", "",
+                    false, true, false, 0L)
     };
 
     private static final String FUEL_CAPACITY_ID = "ICarInfo.fuel_capacity";
@@ -227,12 +384,78 @@ final class GeelyCarIntegration implements CarIntegration {
             "Единица AdaptAPI не указана; нужна сверка на автомобиле";
     private static final String FUEL_CAPACITY_TELEMETRY_UNIT = "raw";
 
+    private static final class TireMetric {
+        final String id;
+        final String label;
+        final int tireId;
+        final boolean pressure;
+
+        TireMetric(String positionId, String positionLabel, int tireId, boolean pressure) {
+            this.id = "TPMS." + (pressure ? "pressure." : "temperature.") + positionId;
+            this.label = (pressure ? "Давление" : "Температура") + " — " + positionLabel;
+            this.tireId = tireId;
+            this.pressure = pressure;
+        }
+
+        String unit() { return pressure ? "bar" : "°C"; }
+
+        CarTelemetryDescriptor descriptor() {
+            return new CarTelemetryDescriptor(id, label, unit(), true, 600_000L);
+        }
+    }
+
+    private static final TireMetric[] TIRE_METRICS = {
+            new TireMetric("front_left", "переднее левое", TPMS.TIRE_ID_LEFT_FRONT, true),
+            new TireMetric("front_left", "переднее левое", TPMS.TIRE_ID_LEFT_FRONT, false),
+            new TireMetric("front_right", "переднее правое", TPMS.TIRE_ID_RIGHT_FRONT, true),
+            new TireMetric("front_right", "переднее правое", TPMS.TIRE_ID_RIGHT_FRONT, false),
+            new TireMetric("rear_left", "заднее левое", TPMS.TIRE_ID_LEFT_REAR, true),
+            new TireMetric("rear_left", "заднее левое", TPMS.TIRE_ID_LEFT_REAR, false),
+            new TireMetric("rear_right", "заднее правое", TPMS.TIRE_ID_RIGHT_REAR, true),
+            new TireMetric("rear_right", "заднее правое", TPMS.TIRE_ID_RIGHT_REAR, false)
+    };
+
+    private static final class BcmMetric {
+        final String id;
+        final String label;
+        final int functionId;
+        final boolean turnSignal;
+
+        BcmMetric(String id, String label, int functionId, boolean turnSignal) {
+            this.id = "IBcm." + id;
+            this.label = label;
+            this.functionId = functionId;
+            this.turnSignal = turnSignal;
+        }
+
+        CarTelemetryDescriptor descriptor() {
+            return new CarTelemetryDescriptor(id, label, "", true,
+                    id.equals(HIGH_BEAM_ID) ? 5_000L : 1_500L);
+        }
+    }
+
+    private static final BcmMetric[] BCM_METRICS = {
+            new BcmMetric("high_beam", "Дальний свет",
+                    IBcm.BCM_FUNC_LIGHT_MAIN_BEAM, false),
+            new BcmMetric("turn_signal_left", "Левый указатель поворота",
+                    IBcm.BCM_FUNC_LIGHT_LEFT_TRUN_SIGNAL, true),
+            new BcmMetric("turn_signal_right", "Правый указатель поворота",
+                    IBcm.BCM_FUNC_LIGHT_RIGHT_TRUN_SIGNAL, true)
+    };
+
+    private static final List<CarTelemetryDescriptor> TELEMETRY_CATALOG =
+            buildTelemetryCatalog();
+
     private static final class TelemetrySubscription {
         final TelemetryListener listener;
         final Set<String> metricIds;
         final AtomicBoolean cancelled = new AtomicBoolean(false);
         /** Accessed only by telemetryWorker. */
         final List<VendorRegistration> vendorListeners = new ArrayList<>();
+        /** Worker-thread-only per-listener dedupe; new listeners still receive an initial state. */
+        final Map<String, Integer> lastBcmValues = new HashMap<>();
+        @Nullable TPMS tpmsSource;
+        @Nullable TPMS.ITireStateMonitor tireStateMonitor;
 
         TelemetrySubscription(TelemetryListener listener, Set<String> metricIds) {
             this.listener = listener;
@@ -279,6 +502,55 @@ final class GeelyCarIntegration implements CarIntegration {
         }
     }
 
+    /**
+     * One latest-wins command per logical control. Access is confined to {@link #controlWorker}.
+     * Exact duplicates share the same result; a different request supersedes this object and all
+     * delayed reads become harmless through the identity/generation check.
+     */
+    private static final class ActiveControlCommand {
+        @NonNull final CarControlCommand command;
+        @NonNull final String key;
+        final long generation;
+        final long deadlineElapsedMillis;
+        @NonNull final List<ControlCommandListener> listeners = new ArrayList<>();
+        @Nullable ControlDefinition definition;
+        @Nullable Double lastConfirmed;
+        double target = Double.NaN;
+        boolean pulse;
+        boolean acceptedAtLeastOnce;
+        int pulseAttempts;
+
+        ActiveControlCommand(@NonNull CarControlCommand command, @NonNull String key,
+                             long generation, long deadlineElapsedMillis,
+                             @NonNull ControlCommandListener listener) {
+            this.command = command;
+            this.key = key;
+            this.generation = generation;
+            this.deadlineElapsedMillis = deadlineElapsedMillis;
+            listeners.add(listener);
+        }
+    }
+
+    private static final class ControlCommandSubmission {
+        @NonNull final String key;
+        final long generation;
+
+        ControlCommandSubmission(@NonNull String key, long generation) {
+            this.key = key;
+            this.generation = generation;
+        }
+    }
+
+    private static final class ConfirmedFanMode {
+        final boolean autoActive;
+        final long observedElapsedMillis;
+
+        ConfirmedFanMode(boolean autoActive, long observedElapsedMillis) {
+            this.autoActive = autoActive;
+            this.observedElapsedMillis = observedElapsedMillis;
+        }
+    }
+
     private static CarControlDescriptor.Option option(double value, String label) {
         return new CarControlDescriptor.Option(value, label);
     }
@@ -317,8 +589,33 @@ final class GeelyCarIntegration implements CarIntegration {
                 option(IHvac.FAN_SPEED_LEVEL_3, "3"), option(IHvac.FAN_SPEED_LEVEL_4, "4"),
                 option(IHvac.FAN_SPEED_LEVEL_5, "5"), option(IHvac.FAN_SPEED_LEVEL_6, "6"),
                 option(IHvac.FAN_SPEED_LEVEL_7, "7"), option(IHvac.FAN_SPEED_LEVEL_8, "8"),
-                option(IHvac.FAN_SPEED_LEVEL_9, "9"),
-                option(IHvac.FAN_SPEED_LEVEL_AUTO, "Auto"));
+                option(IHvac.FAN_SPEED_LEVEL_9, "9"));
+    }
+
+    /**
+     * AUTO fan intensity is a separate AdaptAPI function, not FAN_SPEED_LEVEL_AUTO. The ECARX
+     * implementation maps these values to raw PA fan levels 10..14 while manual fan speed owns
+     * raw 0..9. A vehicle normally exposes either the three named profiles or the two relative
+     * profiles; runtime discovery filters this superset.
+     */
+    private static List<CarControlDescriptor.Option> autoFanOptions() {
+        List<CarControlDescriptor.Option> result = new ArrayList<>();
+        result.addAll(autoFanThreeProfileOptions());
+        result.addAll(autoFanTwoProfileOptions());
+        return Collections.unmodifiableList(result);
+    }
+
+    private static List<CarControlDescriptor.Option> autoFanThreeProfileOptions() {
+        return Arrays.asList(
+                option(IHvac.AUTO_FAN_SETTING_SILENT, "AUTO · тихо"),
+                option(IHvac.AUTO_FAN_SETTING_NORMAL, "AUTO · обычно"),
+                option(IHvac.AUTO_FAN_SETTING_HIGH, "AUTO · интенсивно"));
+    }
+
+    private static List<CarControlDescriptor.Option> autoFanTwoProfileOptions() {
+        return Arrays.asList(
+                option(IHvac.AUTO_FAN_SETTING_QUIETER, "AUTO · тише"),
+                option(IHvac.AUTO_FAN_SETTING_HIGHER, "AUTO · выше"));
     }
 
     private static List<CarControlDescriptor.Option> driveModeOptions() {
@@ -346,6 +643,16 @@ final class GeelyCarIntegration implements CarIntegration {
                 option(IDriveMode.DRIVE_MODE_SELECTION_CUSTOM, "Custom"));
     }
 
+    private static final ControlDefinition FAN_DEFINITION =
+            new ControlDefinition(FAN_CONTROL_ID, "Скорость вентилятора", "Климат", "fan",
+                    CarControlDescriptor.Kind.LEVELS, IHvac.HVAC_FUNC_FAN_SPEED,
+                    FRONT_FAN_ZONE, false, fanOptions(), 0, 9, 1, "", "#FF42A5F5");
+
+    private static final ControlDefinition AUTO_FAN_DEFINITION =
+            new ControlDefinition(FAN_CONTROL_ID, "Скорость вентилятора AUTO", "Климат", "fan",
+                    CarControlDescriptor.Kind.LEVELS, IHvac.HVAC_FUNC_AUTO_FAN_SETTING,
+                    FRONT_FAN_ZONE, false, autoFanOptions(), 0, 0, 0, "", "#FF42A5F5");
+
     private static final ControlDefinition[] CONTROL_DEFINITIONS = {
             new ControlDefinition("climate.power", "Климат", "Климат", "climate",
                     CarControlDescriptor.Kind.TOGGLE, IHvac.HVAC_FUNC_POWER, NO_ZONE, false,
@@ -357,12 +664,12 @@ final class GeelyCarIntegration implements CarIntegration {
                     CarControlDescriptor.Kind.TOGGLE, IHvac.HVAC_FUNC_AUTO, NO_ZONE, false,
                     toggleOptions(), 0, 1, 1, "", "#FF66BB6A"),
             new ControlDefinition("climate.defrost_front", "Обогрев лобового", "Климат",
-                    "defrost_front", CarControlDescriptor.Kind.ACTION,
-                    IHvac.HVAC_FUNC_DEFROST_FRONT, NO_ZONE, false, Collections.emptyList(),
+                    "defrost_front", CarControlDescriptor.Kind.TOGGLE,
+                    IHvac.HVAC_FUNC_DEFROST_FRONT, NO_ZONE, false, toggleOptions(),
                     0, 1, 1, "", "#FF80DEEA"),
             new ControlDefinition("climate.defrost_rear", "Обогрев заднего стекла", "Климат",
-                    "defrost_rear", CarControlDescriptor.Kind.ACTION,
-                    IHvac.HVAC_FUNC_DEFROST_REAR, NO_ZONE, false, Collections.emptyList(),
+                    "defrost_rear", CarControlDescriptor.Kind.TOGGLE,
+                    IHvac.HVAC_FUNC_DEFROST_REAR, NO_ZONE, false, toggleOptions(),
                     0, 1, 1, "", "#FF80DEEA"),
             new ControlDefinition("climate.seat_heat_driver", "Подогрев сиденья водителя",
                     "Сиденья", "seat_heat", CarControlDescriptor.Kind.LEVELS,
@@ -384,9 +691,7 @@ final class GeelyCarIntegration implements CarIntegration {
                     "wheel_heat", CarControlDescriptor.Kind.LEVELS,
                     IHvac.HVAC_FUNC_STEERING_WHEEL_HEAT, NO_ZONE, false,
                     wheelHeatOptions(), 0, 3, 1, "", "#FFFF9800"),
-            new ControlDefinition("climate.fan", "Скорость вентилятора", "Климат", "fan",
-                    CarControlDescriptor.Kind.LEVELS, IHvac.HVAC_FUNC_FAN_SPEED, 8, false,
-                    fanOptions(), 0, 9, 1, "", "#FF42A5F5"),
+            FAN_DEFINITION,
             new ControlDefinition("climate.temp_driver", "Температура водителя", "Климат",
                     "temperature", CarControlDescriptor.Kind.RANGE, IHvac.HVAC_FUNC_TEMP,
                     VehicleSeat.SEAT_ROW_1_LEFT, true, Collections.emptyList(),
@@ -417,6 +722,28 @@ final class GeelyCarIntegration implements CarIntegration {
 
     GeelyCarIntegration(@NonNull Context appContext) {
         this.appContext = appContext;
+        signalFallback = new EcarxSignalFallback(appContext,
+                new EcarxSignalFallback.Listener() {
+                    @Override public void onGear(int adaptGear, int actualGear,
+                                                 boolean manualMode) {
+                        lowLevelGearKnown = true;
+                        lowLevelGearObservedMonoMillis = monotonicMillis();
+                        deliverLowLevelGear(adaptGear, actualGear, manualMode);
+                    }
+
+                    @Override public void onHighBeam(int enabled) {
+                        lowLevelHighBeamKnown = true;
+                        lowLevelHighBeamObservedMonoMillis = monotonicMillis();
+                        deliverLowLevelHighBeam(enabled);
+                    }
+
+                    @Override public void onChannelLost() {
+                        lowLevelGearKnown = false;
+                        lowLevelHighBeamKnown = false;
+                        lowLevelGearObservedMonoMillis = 0L;
+                        lowLevelHighBeamObservedMonoMillis = 0L;
+                    }
+                });
     }
 
     private static int sensorTypeFor(@NonNull BrickType type) {
@@ -446,8 +773,20 @@ final class GeelyCarIntegration implements CarIntegration {
 
     /** Integer-valued event channels use both extrema as their documented/observed no-data form. */
     static boolean isValidTelemetryEventValue(int value, boolean boundedTemperature) {
-        return value != Integer.MIN_VALUE && value != Integer.MAX_VALUE
+        return value != -1 && value != Integer.MIN_VALUE && value != Integer.MAX_VALUE
                 && isValidTelemetryValue(value, boundedTemperature);
+    }
+
+    /** TPMS implementations observed in the field return either bar or hundredths of a bar. */
+    static float normalizeTirePressureBar(float rawPressure) {
+        if (!Float.isFinite(rawPressure) || rawPressure <= 0f) return Float.NaN;
+        float bar = rawPressure >= 40f ? rawPressure / 100f : rawPressure;
+        return bar >= 0.1f && bar <= 10f ? bar : Float.NaN;
+    }
+
+    static boolean isValidTireTemperature(float celsius) {
+        return Float.isFinite(celsius) && !isObviousFloatSentinel(celsius)
+                && celsius >= -40f && celsius <= 150f;
     }
 
     private static boolean isObviousFloatSentinel(float value) {
@@ -465,7 +804,43 @@ final class GeelyCarIntegration implements CarIntegration {
             if (requested.contains(signal.id)) selected.add(signal.id);
         }
         if (requested.contains(FUEL_CAPACITY_ID)) selected.add(FUEL_CAPACITY_ID);
+        for (TireMetric metric : TIRE_METRICS) {
+            if (requested.contains(metric.id)) selected.add(metric.id);
+        }
+        for (BcmMetric metric : BCM_METRICS) {
+            if (requested.contains(metric.id)) selected.add(metric.id);
+        }
+        if (requested.contains(LOW_LEVEL_GEAR_ACTUAL_ID)) {
+            selected.add(LOW_LEVEL_GEAR_ACTUAL_ID);
+        }
+        if (requested.contains(LOW_LEVEL_GEAR_MANUAL_ID)) {
+            selected.add(LOW_LEVEL_GEAR_MANUAL_ID);
+        }
+        if (requested.contains(VehicleDerivedMetrics.AUTO_HOLD_ID)) {
+            selected.add(VehicleDerivedMetrics.AUTO_HOLD_ID);
+        }
         return Collections.unmodifiableSet(selected);
+    }
+
+    private static List<CarTelemetryDescriptor> buildTelemetryCatalog() {
+        List<CarTelemetryDescriptor> catalog = new ArrayList<>();
+        for (TelemetrySignal signal : TELEMETRY_SIGNALS) catalog.add(signal.descriptor());
+        catalog.add(new CarTelemetryDescriptor(FUEL_CAPACITY_ID, FUEL_CAPACITY_LABEL,
+                FUEL_CAPACITY_TELEMETRY_UNIT, false, 0L));
+        for (TireMetric metric : TIRE_METRICS) catalog.add(metric.descriptor());
+        for (BcmMetric metric : BCM_METRICS) catalog.add(metric.descriptor());
+        catalog.add(new CarTelemetryDescriptor(LOW_LEVEL_GEAR_ACTUAL_ID,
+                "Фактическая передача", "", true, LOW_LEVEL_PRIORITY_TTL_MS));
+        catalog.add(new CarTelemetryDescriptor(LOW_LEVEL_GEAR_MANUAL_ID,
+                "Ручной режим коробки", "", true, LOW_LEVEL_PRIORITY_TTL_MS));
+        catalog.add(new CarTelemetryDescriptor(VehicleDerivedMetrics.AUTO_HOLD_ID,
+                "Auto Hold", "", true, 5L * 60L * 1_000L));
+        return Collections.unmodifiableList(catalog);
+    }
+
+    @Override
+    public void requestTelemetryCatalog(@NonNull TelemetryCatalogListener listener) {
+        mainHandler.post(() -> listener.onCatalog(TELEMETRY_CATALOG));
     }
 
     /** Resolve the AdaptAPI root service; an early null/exception is deliberately retryable. */
@@ -578,6 +953,7 @@ final class GeelyCarIntegration implements CarIntegration {
                 if (s == null) addUnavailableSensor(values, TELEMETRY_SIGNALS[index]);
                 else addSensor(values, s, TELEMETRY_SIGNALS[index]);
             }
+            addTireDiagnostics(values);
             mainHandler.post(() -> listener.onDiagnostics(values));
         }, "ecarx-diagnostics").start();
     }
@@ -601,11 +977,19 @@ final class GeelyCarIntegration implements CarIntegration {
         }
         String raw = "—";
         Float numeric = null;
-        if (status == FunctionStatus.active || status == FunctionStatus.notactive) {
+        if (isSupported(status) || signal.probeWithoutSupport) {
             try {
-                float latest = s.getSensorLatestValue(signal.sensorType);
-                raw = Float.toString(latest);
-                if (isValidTelemetryValue(latest, signal.boundedTemperature)) numeric = latest;
+                if (signal.eventOnly) {
+                    int latest = s.getSensorEvent(signal.sensorType);
+                    raw = Integer.toString(latest);
+                    if (isValidTelemetryEventValue(latest, signal.boundedTemperature)) {
+                        numeric = (float) latest;
+                    }
+                } else {
+                    float latest = s.getSensorLatestValue(signal.sensorType);
+                    raw = Float.toString(latest);
+                    if (isValidTelemetryValue(latest, signal.boundedTemperature)) numeric = latest;
+                }
             } catch (Throwable t) {
                 invalidateSensorProxy(s);
                 raw = "error: " + t.getClass().getSimpleName();
@@ -613,6 +997,41 @@ final class GeelyCarIntegration implements CarIntegration {
         }
         out.add(new CarDiagnosticValue(signal.id, signal.label, String.valueOf(status), raw,
                 signal.unitNote + "; signal=" + signal.sensorType, numeric));
+    }
+
+    private void addTireDiagnostics(List<CarDiagnosticValue> out) {
+        TPMS tpms;
+        try {
+            tpms = TPMS.create(appContext);
+            if (tpms == null) throw new IllegalStateException("TPMS.create returned null");
+        } catch (Throwable t) {
+            for (TireMetric metric : TIRE_METRICS) {
+                out.add(new CarDiagnosticValue(metric.id, metric.label, "error",
+                        t.getClass().getSimpleName(), metric.unit()));
+            }
+            return;
+        }
+        for (TireMetric metric : TIRE_METRICS) {
+            String raw = "—";
+            Float numeric = null;
+            try {
+                ITireState state = tpms.getTireState(metric.tireId);
+                if (state != null) {
+                    float value = metric.pressure ? state.getPressure() : state.getTemperature();
+                    raw = Float.toString(value);
+                    if (metric.pressure) {
+                        float bar = normalizeTirePressureBar(value);
+                        if (Float.isFinite(bar)) numeric = bar;
+                    } else if (isValidTireTemperature(value)) {
+                        numeric = value;
+                    }
+                }
+            } catch (Throwable t) {
+                raw = "error: " + t.getClass().getSimpleName();
+            }
+            out.add(new CarDiagnosticValue(metric.id, metric.label, "unknown", raw,
+                    metric.unit() + "; tire=" + metric.tireId, numeric));
+        }
     }
 
     private void addCarInfo(List<CarDiagnosticValue> out, String id, String label,
@@ -994,6 +1413,9 @@ final class GeelyCarIntegration implements CarIntegration {
             if (previous != null) unregisterTelemetryVendorListeners(previous);
             activateTelemetrySubscription(next);
         });
+        mainHandler.post(this::reconcileBcmPolling);
+        mainHandler.post(this::reconcileSignalFallback);
+        mainHandler.post(this::reconcileAutoHoldReceiver);
     }
 
     @Override
@@ -1006,14 +1428,24 @@ final class GeelyCarIntegration implements CarIntegration {
         removed.cancelled.set(true);
         executeTelemetryTask(() -> unregisterTelemetryVendorListeners(removed));
         mainHandler.post(this::pruneRecoveryRequests);
+        mainHandler.post(this::reconcileBcmPolling);
+        mainHandler.post(this::reconcileSignalFallback);
+        mainHandler.post(this::reconcileAutoHoldReceiver);
     }
 
     private void activateTelemetrySubscription(TelemetrySubscription subscription) {
         if (subscription.cancelled.get()) return;
         boolean needsSensors = false;
+        boolean needsTires = false;
         for (TelemetrySignal signal : TELEMETRY_SIGNALS) {
             if (subscription.metricIds.contains(signal.id)) {
                 needsSensors = true;
+                break;
+            }
+        }
+        for (TireMetric metric : TIRE_METRICS) {
+            if (subscription.metricIds.contains(metric.id)) {
+                needsTires = true;
                 break;
             }
         }
@@ -1035,20 +1467,257 @@ final class GeelyCarIntegration implements CarIntegration {
         if (subscription.metricIds.contains(FUEL_CAPACITY_ID)) {
             emitInitialFuelCapacity(subscription);
         }
+        if (needsTires && !subscription.cancelled.get()) {
+            registerTireTelemetry(subscription);
+        }
+    }
+
+    private boolean hasBcmTelemetryDemand() {
+        synchronized (telemetryLock) {
+            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
+                if (subscription.cancelled.get()) continue;
+                for (BcmMetric metric : BCM_METRICS) {
+                    if (subscription.metricIds.contains(metric.id)) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean hasAutoHoldTelemetryDemand() {
+        synchronized (telemetryLock) {
+            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
+                if (!subscription.cancelled.get()
+                        && subscription.metricIds.contains(VehicleDerivedMetrics.AUTO_HOLD_ID)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void reconcileSignalFallback() {
+        boolean needsGear = false;
+        boolean needsHighBeam = false;
+        synchronized (telemetryLock) {
+            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
+                if (subscription.cancelled.get()) continue;
+                if (subscription.metricIds.contains(GEAR_ID)
+                        || subscription.metricIds.contains(LOW_LEVEL_GEAR_ACTUAL_ID)
+                        || subscription.metricIds.contains(LOW_LEVEL_GEAR_MANUAL_ID)) {
+                    needsGear = true;
+                }
+                if (subscription.metricIds.contains(HIGH_BEAM_ID)) needsHighBeam = true;
+            }
+        }
+        if (!needsGear) {
+            lowLevelGearKnown = false;
+            lowLevelGearObservedMonoMillis = 0L;
+        }
+        if (!needsHighBeam) {
+            lowLevelHighBeamKnown = false;
+            lowLevelHighBeamObservedMonoMillis = 0L;
+        }
+        signalFallback.updateDemand(needsGear, needsHighBeam);
+    }
+
+    private void deliverLowLevelGear(int adaptGear, int actualGear, boolean manualMode) {
+        List<TelemetrySubscription> subscribers = currentTelemetrySubscribers();
+        for (TelemetrySubscription subscription : subscribers) {
+            if (subscription.metricIds.contains(GEAR_ID)) {
+                deliverTelemetry(subscription, GEAR_ID, "Передача", "", adaptGear);
+            }
+            if (actualGear > 0
+                    && subscription.metricIds.contains(LOW_LEVEL_GEAR_ACTUAL_ID)) {
+                deliverTelemetry(subscription, LOW_LEVEL_GEAR_ACTUAL_ID,
+                        "Фактическая передача", "", actualGear);
+            }
+            if (subscription.metricIds.contains(LOW_LEVEL_GEAR_MANUAL_ID)) {
+                deliverTelemetry(subscription, LOW_LEVEL_GEAR_MANUAL_ID,
+                        "Ручной режим коробки", "", manualMode ? 1 : 0);
+            }
+        }
+    }
+
+    private void deliverLowLevelHighBeam(int enabled) {
+        for (TelemetrySubscription subscription : currentTelemetrySubscribers()) {
+            if (subscription.metricIds.contains(HIGH_BEAM_ID)) {
+                deliverTelemetry(subscription, HIGH_BEAM_ID, "Дальний свет", "", enabled);
+            }
+        }
+    }
+
+    private List<TelemetrySubscription> currentTelemetrySubscribers() {
+        List<TelemetrySubscription> subscribers = new ArrayList<>();
+        synchronized (telemetryLock) {
+            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
+                if (!subscription.cancelled.get()) subscribers.add(subscription);
+            }
+        }
+        return subscribers;
+    }
+
+    /** Main-thread demand registration; the external broadcast itself is manifest-received. */
+    private void reconcileAutoHoldReceiver() {
+        if (!hasAutoHoldTelemetryDemand()) {
+            if (autoHoldReceiverRegistered) {
+                try { appContext.unregisterReceiver(autoHoldChangedReceiver); }
+                catch (IllegalArgumentException ignored) {}
+                autoHoldReceiverRegistered = false;
+            }
+            return;
+        }
+        if (!autoHoldReceiverRegistered) {
+            IntentFilter filter = new IntentFilter(AutoHoldStateRepository.ACTION_CHANGED);
+            try {
+                if (Build.VERSION.SDK_INT >= 33) {
+                    appContext.registerReceiver(autoHoldChangedReceiver, filter,
+                            Context.RECEIVER_NOT_EXPORTED);
+                } else {
+                    appContext.registerReceiver(autoHoldChangedReceiver, filter);
+                }
+                autoHoldReceiverRegistered = true;
+            } catch (RuntimeException error) {
+                Log.w(TAG, "Auto Hold state receiver registration failed", error);
+            }
+        }
+        // The manifest receiver may have run while the launcher/process was not visible.
+        deliverCurrentAutoHoldState();
+    }
+
+    private void deliverCurrentAutoHoldState() {
+        AutoHoldStateRepository.Snapshot current = AutoHoldStateRepository.read(appContext);
+        if (!current.available) return;
+        List<TelemetrySubscription> subscribers = new ArrayList<>();
+        synchronized (telemetryLock) {
+            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
+                if (!subscription.cancelled.get()
+                        && subscription.metricIds.contains(VehicleDerivedMetrics.AUTO_HOLD_ID)) {
+                    subscribers.add(subscription);
+                }
+            }
+        }
+        TelemetryValue sample = new TelemetryValue(VehicleDerivedMetrics.AUTO_HOLD_ID,
+                "Auto Hold", current.value ? 1d : 0d, "", current.observedAtMillis);
+        for (TelemetrySubscription subscription : subscribers) {
+            deliverTelemetry(subscription, sample);
+        }
+    }
+
+    /** Main-thread only: start immediately on first demand and fully stop after the last one. */
+    private void reconcileBcmPolling() {
+        if (!hasBcmTelemetryDemand()) {
+            mainHandler.removeCallbacks(bcmPollTask);
+            bcmPollScheduled = false;
+            executeTelemetryTask(bcmLastOnMillis::clear);
+            return;
+        }
+        if (!bcmPollScheduled && !bcmPollInFlight) {
+            bcmPollScheduled = true;
+            mainHandler.post(bcmPollTask);
+        }
+    }
+
+    private void scheduleNextBcmPoll() {
+        if (!hasBcmTelemetryDemand()) {
+            reconcileBcmPolling();
+            return;
+        }
+        if (!bcmPollScheduled && !bcmPollInFlight) {
+            bcmPollScheduled = true;
+            mainHandler.postDelayed(bcmPollTask, BCM_STATE_POLL_INTERVAL_MS);
+        }
+    }
+
+    private void pollBcmTelemetryOnce() {
+        List<TelemetrySubscription> subscribers = new ArrayList<>();
+        LinkedHashSet<String> demandedIds = new LinkedHashSet<>();
+        synchronized (telemetryLock) {
+            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
+                if (subscription.cancelled.get()) continue;
+                boolean demanded = false;
+                for (BcmMetric metric : BCM_METRICS) {
+                    if (subscription.metricIds.contains(metric.id)) {
+                        demandedIds.add(metric.id);
+                        demanded = true;
+                    }
+                }
+                if (demanded) subscribers.add(subscription);
+            }
+        }
+        bcmLastOnMillis.keySet().retainAll(demandedIds);
+        if (demandedIds.isEmpty()) return;
+
+        ICarFunction source = ensureCarFunctions();
+        if (source == null) return;
+        long nowMillis = System.nanoTime() / 1_000_000L;
+        for (BcmMetric metric : BCM_METRICS) {
+            if (!demandedIds.contains(metric.id)) continue;
+            // On firmware where IBcm reports a constant/default value, mHUD obtains the real
+            // steady high-beam state from CarSignalManager. Once that path is known-good, do not
+            // let the lower-fidelity poll overwrite it.
+            if (metric.id.equals(HIGH_BEAM_ID) && isLowLevelHighBeamFresh()) continue;
+            final int raw;
+            try {
+                raw = source.getFunctionValue(metric.functionId);
+            } catch (UnsupportedOperationException ignored) {
+                continue;
+            } catch (Throwable t) {
+                invalidateFunctionProxy(source);
+                Log.w(TAG, "BCM telemetry read failed for " + metric.id, t);
+                return;
+            }
+            int binary = normalizeBcmBinaryValue(raw);
+            if (binary < 0) continue;
+            int stable = binary;
+            if (metric.turnSignal) {
+                Long lastOn = bcmLastOnMillis.get(metric.id);
+                if (binary == 1) {
+                    bcmLastOnMillis.put(metric.id, nowMillis);
+                } else {
+                    stable = stabilizeTurnSignalValue(binary,
+                            lastOn == null ? -1L : lastOn, nowMillis);
+                }
+            }
+            for (TelemetrySubscription subscription : subscribers) {
+                if (subscription.cancelled.get()
+                        || !subscription.metricIds.contains(metric.id)) continue;
+                Integer previous = subscription.lastBcmValues.put(metric.id, stable);
+                if (previous != null && previous == stable) continue;
+                deliverTelemetry(subscription, metric.id, metric.label, "", stable);
+            }
+        }
+    }
+
+    /** Only real off/on values are exposed; SDK unknown/error/default codes are ignored. */
+    static int normalizeBcmBinaryValue(int raw) {
+        if (raw == ICarFunction.COMMON_VALUE_OFF) return 0;
+        if (raw == ICarFunction.COMMON_VALUE_ON) return 1;
+        return -1;
+    }
+
+    /** Keep an active indicator lit across the lamp's normal dark half-cycle. */
+    static int stabilizeTurnSignalValue(int binary, long lastOnMillis, long nowMillis) {
+        if (binary == 1) return 1;
+        if (binary != 0) return -1;
+        return lastOnMillis >= 0L && nowMillis >= lastOnMillis
+                && nowMillis - lastOnMillis <= TURN_SIGNAL_OFF_HOLD_MS ? 1 : 0;
     }
 
     private void registerTelemetrySignal(ISensor source, TelemetrySignal signal,
                                          TelemetrySubscription subscription) {
         FunctionStatus initialStatus = sensorSupportStatus(source, signal.sensorType);
         AtomicBoolean supported = new AtomicBoolean(isSupported(initialStatus));
-        if (!supported.get() && (initialStatus == null || initialStatus == FunctionStatus.error)) {
+        if (!signal.probeWithoutSupport && !supported.get()
+                && (initialStatus == null || initialStatus == FunctionStatus.error)) {
             requestSensorRecovery(signal.sensorType);
         }
         ISensor.ISensorListener vendorListener = new ISensor.ISensorListener() {
             @Override public void onSensorEventChanged(int changedType, int value) {
                 if (subscription.cancelled.get() || changedType != signal.sensorType
                         || !isValidTelemetryEventValue(value, signal.boundedTemperature)
-                        || !supported.get()) return;
+                        || isLowLevelGearPreferred(signal)) return;
+                supported.set(true);
                 // Several nominally numeric AdaptAPI signals (notably fluid/oil levels) are
                 // exposed through the integer event callback on some firmware revisions.
                 deliverTelemetry(subscription, signal.id, signal.label,
@@ -1059,7 +1728,8 @@ final class GeelyCarIntegration implements CarIntegration {
                 if (changedType != signal.sensorType || subscription.cancelled.get()) return;
                 supported.set(isSupported(status));
                 if (!isSupported(status)) {
-                    if (status == null || status == FunctionStatus.error) {
+                    if (!signal.probeWithoutSupport
+                            && (status == null || status == FunctionStatus.error)) {
                         requestSensorRecovery(signal.sensorType);
                     }
                     return;
@@ -1073,8 +1743,10 @@ final class GeelyCarIntegration implements CarIntegration {
 
             @Override public void onSensorValueChanged(int changedType, float value) {
                 if (subscription.cancelled.get() || changedType != signal.sensorType
+                        || signal.eventOnly
                         || !isValidTelemetryValue(value, signal.boundedTemperature)
-                        || !supported.get()) return;
+                        || isLowLevelGearPreferred(signal)) return;
+                supported.set(true);
                 deliverTelemetry(subscription, signal.id, signal.label,
                         signal.telemetryUnit, value);
             }
@@ -1098,27 +1770,123 @@ final class GeelyCarIntegration implements CarIntegration {
     private void emitInitialSensorValue(ISensor source, TelemetrySignal signal,
                                         TelemetrySubscription subscription,
                                         AtomicBoolean supported) {
-        if (subscription.cancelled.get()) return;
+        if (subscription.cancelled.get() || isLowLevelGearPreferred(signal)) return;
         FunctionStatus status = sensorSupportStatus(source, signal.sensorType);
         supported.set(isSupported(status));
-        if (!isSupported(status)) {
+        if (!isSupported(status) && !signal.probeWithoutSupport) {
             if (status == null || status == FunctionStatus.error) {
                 requestSensorRecovery(signal.sensorType);
             }
             return;
         }
         try {
-            float latest = source.getSensorLatestValue(signal.sensorType);
-            if (isValidTelemetryValue(latest, signal.boundedTemperature)) {
-                deliverTelemetry(subscription, signal.id, signal.label,
-                        signal.telemetryUnit, latest);
-            } else if (isObviousFloatSentinel(latest)) {
-                requestSensorRecovery(signal.sensorType);
+            if (signal.eventOnly) {
+                int latest = source.getSensorEvent(signal.sensorType);
+                if (isValidTelemetryEventValue(latest, signal.boundedTemperature)) {
+                    supported.set(true);
+                    deliverTelemetry(subscription, signal.id, signal.label,
+                            signal.telemetryUnit, latest);
+                } else if (!signal.probeWithoutSupport) {
+                    requestSensorRecovery(signal.sensorType);
+                }
+            } else {
+                float latest = source.getSensorLatestValue(signal.sensorType);
+                if (isValidTelemetryValue(latest, signal.boundedTemperature)) {
+                    supported.set(true);
+                    deliverTelemetry(subscription, signal.id, signal.label,
+                            signal.telemetryUnit, latest);
+                } else if (isObviousFloatSentinel(latest) && !signal.probeWithoutSupport) {
+                    requestSensorRecovery(signal.sensorType);
+                }
             }
         } catch (Throwable t) {
             invalidateSensorProxy(source);
             Log.w(TAG, "telemetry initial read failed for " + signal.id, t);
-            requestSensorRecovery(signal.sensorType);
+            if (!signal.probeWithoutSupport) requestSensorRecovery(signal.sensorType);
+        }
+    }
+
+    private boolean isLowLevelGearPreferred(TelemetrySignal signal) {
+        return signal.id.equals(GEAR_ID) && isLowLevelGearFresh();
+    }
+
+    private boolean isLowLevelGearFresh() {
+        return lowLevelGearKnown
+                && isFreshLowLevelSample(lowLevelGearObservedMonoMillis, monotonicMillis());
+    }
+
+    private boolean isLowLevelHighBeamFresh() {
+        return lowLevelHighBeamKnown
+                && isFreshLowLevelSample(lowLevelHighBeamObservedMonoMillis, monotonicMillis());
+    }
+
+    static boolean isFreshLowLevelSample(long observedMonoMillis, long nowMonoMillis) {
+        return observedMonoMillis > 0L && nowMonoMillis >= observedMonoMillis
+                && nowMonoMillis - observedMonoMillis <= LOW_LEVEL_PRIORITY_TTL_MS;
+    }
+
+    private static long monotonicMillis() {
+        return SystemClock.elapsedRealtime();
+    }
+
+    private void registerTireTelemetry(TelemetrySubscription subscription) {
+        TPMS tpms;
+        try {
+            tpms = TPMS.create(appContext);
+            if (tpms == null) throw new IllegalStateException("TPMS.create returned null");
+        } catch (Throwable t) {
+            Log.w(TAG, "TPMS service unavailable", t);
+            return;
+        }
+        TPMS.ITireStateMonitor monitor = (tireId, state) -> {
+            if (subscription.cancelled.get() || state == null) return;
+            emitTireState(subscription, tireId, state);
+        };
+        try {
+            if (tpms.registerTireStateMonitor(monitor)) {
+                subscription.tpmsSource = tpms;
+                subscription.tireStateMonitor = monitor;
+            } else {
+                Log.w(TAG, "TPMS monitor registration was rejected");
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "TPMS subscription failed", t);
+            try {
+                tpms.unregisterTireStateMonitor(monitor);
+            } catch (Throwable ignored) {
+            }
+        }
+        // Some firmware exposes snapshots but rejects the monitor API. Initial values remain
+        // useful in that case and will be refreshed by the next launcher subscription.
+        for (int tireId : new int[] { TPMS.TIRE_ID_LEFT_FRONT, TPMS.TIRE_ID_RIGHT_FRONT,
+                TPMS.TIRE_ID_LEFT_REAR, TPMS.TIRE_ID_RIGHT_REAR }) {
+            if (subscription.cancelled.get()) break;
+            try {
+                ITireState state = tpms.getTireState(tireId);
+                if (state != null) emitTireState(subscription, tireId, state);
+            } catch (Throwable t) {
+                Log.w(TAG, "Initial TPMS read failed for tire " + tireId, t);
+            }
+        }
+    }
+
+    private void emitTireState(TelemetrySubscription subscription, int tireId,
+                               @NonNull ITireState state) {
+        for (TireMetric metric : TIRE_METRICS) {
+            if (metric.tireId != tireId || !subscription.metricIds.contains(metric.id)) continue;
+            try {
+                float value;
+                if (metric.pressure) {
+                    value = normalizeTirePressureBar(state.getPressure());
+                    if (!Float.isFinite(value)) continue;
+                } else {
+                    value = state.getTemperature();
+                    if (!isValidTireTemperature(value)) continue;
+                }
+                deliverTelemetry(subscription, metric.id, metric.label, metric.unit(), value);
+            } catch (Throwable t) {
+                Log.w(TAG, "TPMS value read failed for " + metric.id, t);
+            }
         }
     }
 
@@ -1185,6 +1953,17 @@ final class GeelyCarIntegration implements CarIntegration {
             }
         }
         subscription.vendorListeners.clear();
+        TPMS tpms = subscription.tpmsSource;
+        TPMS.ITireStateMonitor monitor = subscription.tireStateMonitor;
+        subscription.tpmsSource = null;
+        subscription.tireStateMonitor = null;
+        if (tpms != null && monitor != null) {
+            try {
+                tpms.unregisterTireStateMonitor(monitor);
+            } catch (Throwable t) {
+                Log.w(TAG, "TPMS monitor unregister failed", t);
+            }
+        }
     }
 
     private void executeTelemetryTask(Runnable task) {
@@ -1195,12 +1974,87 @@ final class GeelyCarIntegration implements CarIntegration {
         }
     }
 
+    /** @return false only after process-wide shutdown rejected the task. */
+    private boolean executeControlTask(Runnable task) {
+        try {
+            controlWorker.execute(task);
+            return true;
+        } catch (RejectedExecutionException ignored) {
+            return false;
+        }
+    }
+
+    /** Main-thread completion gate: at most one refresh may be queued behind an active refresh. */
+    private void finishControlRefresh() {
+        controlRefreshInFlight = false;
+        if (!controlRefreshAgain) return;
+        controlRefreshAgain = false;
+        scheduleControlRefresh(0);
+    }
+
     @Nullable
     private static ControlDefinition controlDefinition(@NonNull String id) {
         for (ControlDefinition definition : CONTROL_DEFINITIONS) {
             if (definition.descriptor.id.equals(id)) return definition;
         }
         return null;
+    }
+
+    private static boolean isFanDefinition(@NonNull ControlDefinition definition) {
+        return FAN_CONTROL_ID.equals(definition.descriptor.id);
+    }
+
+    private static boolean isAutoFanDefinition(@NonNull ControlDefinition definition) {
+        return definition.functionId == IHvac.HVAC_FUNC_AUTO_FAN_SETTING;
+    }
+
+    private static boolean isFanRelatedFunction(int functionId) {
+        return functionId == IHvac.HVAC_FUNC_FAN_SPEED
+                || functionId == IHvac.HVAC_FUNC_AUTO_FAN_SETTING
+                || functionId == IHvac.HVAC_FUNC_AUTO;
+    }
+
+    static int fanFunctionIdForMode(boolean climateAutoActive) {
+        return climateAutoActive
+                ? IHvac.HVAC_FUNC_AUTO_FAN_SETTING : IHvac.HVAC_FUNC_FAN_SPEED;
+    }
+
+    /**
+     * A missing fresh observation is not equivalent to MANUAL. A recent confirmed mode may bridge
+     * a transient Binder gap; with no such fact the caller must treat routing as UNKNOWN.
+     */
+    @Nullable
+    static Boolean conservativeFanAutoMode(@Nullable Boolean freshObservation,
+                                           @Nullable Boolean lastConfirmed,
+                                           long lastConfirmedAgeMillis) {
+        if (freshObservation != null) return freshObservation;
+        if (lastConfirmed == null || lastConfirmedAgeMillis < 0
+                || lastConfirmedAgeMillis > FAN_MODE_CACHE_MAX_AGE_MS) {
+            return null;
+        }
+        return lastConfirmed;
+    }
+
+    @Nullable
+    private Boolean readConfirmedClimateAutoMode(@NonNull ICarFunction source) {
+        ControlDefinition climateAuto = controlDefinition("climate.auto");
+        Double observedValue = climateAuto == null ? null : readControlValue(source, climateAuto);
+        Boolean fresh = observedValue == null ? null : observedValue != 0d;
+        ConfirmedFanMode cached = lastConfirmedClimateAutoMode;
+        long age = cached == null ? Long.MAX_VALUE
+                : SystemClock.elapsedRealtime() - cached.observedElapsedMillis;
+        return conservativeFanAutoMode(fresh,
+                cached == null ? null : cached.autoActive, age);
+    }
+
+    @Nullable
+    private ControlDefinition effectiveControlDefinition(@NonNull ICarFunction source,
+                                                         @NonNull ControlDefinition requested) {
+        if (!isFanDefinition(requested)) return requested;
+        Boolean autoActive = readConfirmedClimateAutoMode(source);
+        if (autoActive == null) return null;
+        return fanFunctionIdForMode(autoActive) == IHvac.HVAC_FUNC_AUTO_FAN_SETTING
+                ? AUTO_FAN_DEFINITION : FAN_DEFINITION;
     }
 
     @NonNull
@@ -1220,14 +2074,22 @@ final class GeelyCarIntegration implements CarIntegration {
             ICarFunction source = ensureCarFunctions();
             List<CarControlDescriptor> values = new ArrayList<>();
             for (ControlDefinition definition : CONTROL_DEFINITIONS) {
-                CarControlDescriptor.Availability availability = source == null
-                        ? CarControlDescriptor.Availability.UNKNOWN
-                        : controlAvailability(source, definition);
+                CarControlDescriptor.Availability availability;
+                if (source == null) {
+                    availability = CarControlDescriptor.Availability.UNKNOWN;
+                } else if (isFanDefinition(definition)) {
+                    availability = fanAvailability(source);
+                } else {
+                    availability = controlAvailability(source, definition);
+                }
                 // A definitive unsupported result hides a control for this exact vehicle. During
                 // the boot Binder window UNKNOWN remains visible and can be retried safely.
                 if (availability != CarControlDescriptor.Availability.UNSUPPORTED) {
                     CarControlDescriptor descriptor = definition.descriptor;
-                    if (source != null
+                    if (isFanDefinition(definition)) {
+                        descriptor = definition.descriptorWithOptions(
+                                fanCatalogOptions(source));
+                    } else if (source != null
                             && availability == CarControlDescriptor.Availability.SUPPORTED
                             && descriptor.kind != CarControlDescriptor.Kind.ACTION
                             && !descriptor.options.isEmpty()) {
@@ -1239,6 +2101,167 @@ final class GeelyCarIntegration implements CarIntegration {
             }
             mainHandler.post(() -> listener.onCatalog(values));
         });
+    }
+
+    @NonNull
+    static List<CarControlDescriptor.Option> safeAutoFanOptions(
+            @NonNull List<CarControlDescriptor.Option> discovered,
+            @Nullable Double confirmedProfile,
+            @NonNull List<CarControlDescriptor.Option> lastConfirmedRuntimeOptions) {
+        int confirmedFamily = confirmedProfile == null ? AUTO_FAN_FAMILY_UNKNOWN
+                : autoFanProfileFamily(confirmedProfile);
+        int discoveredFamily = autoFanFamily(discovered);
+        int cachedFamily = autoFanFamily(lastConfirmedRuntimeOptions);
+        int selectedFamily = confirmedFamily != AUTO_FAN_FAMILY_UNKNOWN
+                ? confirmedFamily : discoveredFamily != AUTO_FAN_FAMILY_UNKNOWN
+                ? discoveredFamily : cachedFamily;
+        if (selectedFamily == AUTO_FAN_FAMILY_UNKNOWN) return Collections.emptyList();
+
+        List<CarControlDescriptor.Option> source;
+        if (discoveredFamily == selectedFamily) {
+            source = discovered;
+        } else if (confirmedFamily == selectedFamily
+                && containsAutoFanFamily(discovered, selectedFamily)) {
+            // AdaptAPI 1.0 advertises all five constants on some builds. A confirmed current
+            // profile selects the actual two- or three-profile vehicle family.
+            source = discovered;
+        } else if (cachedFamily == selectedFamily) {
+            source = lastConfirmedRuntimeOptions;
+        } else {
+            source = Collections.emptyList();
+        }
+
+        List<CarControlDescriptor.Option> canonical =
+                autoFanOptionsForFamily(selectedFamily);
+        boolean familyFallback = source.isEmpty()
+                && confirmedFamily == selectedFamily;
+        List<CarControlDescriptor.Option> result = new ArrayList<>();
+        for (CarControlDescriptor.Option option : canonical) {
+            if (familyFallback || containsOptionValue(source, option.value)
+                    || (confirmedProfile != null
+                    && sameValue(option.value, confirmedProfile))) {
+                result.add(option);
+            }
+        }
+        return result;
+    }
+
+    static int autoFanProfileFamily(double value) {
+        if (sameValue(value, IHvac.AUTO_FAN_SETTING_SILENT)
+                || sameValue(value, IHvac.AUTO_FAN_SETTING_NORMAL)
+                || sameValue(value, IHvac.AUTO_FAN_SETTING_HIGH)) {
+            return AUTO_FAN_FAMILY_THREE_PROFILE;
+        }
+        if (sameValue(value, IHvac.AUTO_FAN_SETTING_QUIETER)
+                || sameValue(value, IHvac.AUTO_FAN_SETTING_HIGHER)) {
+            return AUTO_FAN_FAMILY_TWO_PROFILE;
+        }
+        return AUTO_FAN_FAMILY_UNKNOWN;
+    }
+
+    private static int autoFanFamily(
+            @NonNull List<CarControlDescriptor.Option> options) {
+        int family = AUTO_FAN_FAMILY_UNKNOWN;
+        for (CarControlDescriptor.Option option : options) {
+            int optionFamily = autoFanProfileFamily(option.value);
+            if (optionFamily == AUTO_FAN_FAMILY_UNKNOWN) continue;
+            if (family != AUTO_FAN_FAMILY_UNKNOWN && family != optionFamily) {
+                return AUTO_FAN_FAMILY_UNKNOWN;
+            }
+            family = optionFamily;
+        }
+        return family;
+    }
+
+    private static boolean containsAutoFanFamily(
+            @NonNull List<CarControlDescriptor.Option> options, int family) {
+        for (CarControlDescriptor.Option option : options) {
+            if (autoFanProfileFamily(option.value) == family) return true;
+        }
+        return false;
+    }
+
+    private static boolean containsOptionValue(
+            @NonNull List<CarControlDescriptor.Option> options, double value) {
+        for (CarControlDescriptor.Option option : options) {
+            if (sameValue(option.value, value)) return true;
+        }
+        return false;
+    }
+
+    @NonNull
+    private static List<CarControlDescriptor.Option> autoFanOptionsForFamily(int family) {
+        if (family == AUTO_FAN_FAMILY_THREE_PROFILE) {
+            return autoFanThreeProfileOptions();
+        }
+        if (family == AUTO_FAN_FAMILY_TWO_PROFILE) {
+            return autoFanTwoProfileOptions();
+        }
+        return Collections.emptyList();
+    }
+
+    private void rememberConfirmedRuntimeValue(@NonNull ControlDefinition definition,
+                                               double value) {
+        if (definition.functionId == IHvac.HVAC_FUNC_AUTO) {
+            lastConfirmedClimateAutoMode =
+                    new ConfirmedFanMode(value != 0d, SystemClock.elapsedRealtime());
+            return;
+        }
+        if (!isAutoFanDefinition(definition)
+                || autoFanProfileFamily(value) == AUTO_FAN_FAMILY_UNKNOWN) {
+            return;
+        }
+        lastConfirmedAutoFanProfile = value;
+        int cachedFamily = autoFanFamily(lastConfirmedAutoFanRuntimeOptions);
+        int observedFamily = autoFanProfileFamily(value);
+        if (cachedFamily != AUTO_FAN_FAMILY_UNKNOWN && cachedFamily != observedFamily) {
+            lastConfirmedAutoFanRuntimeOptions = Collections.emptyList();
+        }
+    }
+
+    private void rememberAutoFanRuntimeOptions(
+            @NonNull List<CarControlDescriptor.Option> options) {
+        if (options.isEmpty()
+                || autoFanFamily(options) == AUTO_FAN_FAMILY_UNKNOWN) return;
+        lastConfirmedAutoFanRuntimeOptions =
+                Collections.unmodifiableList(new ArrayList<>(options));
+    }
+
+    @NonNull
+    private List<CarControlDescriptor.Option> fanCatalogOptions(@Nullable ICarFunction source) {
+        List<CarControlDescriptor.Option> result = new ArrayList<>();
+        if (source == null) {
+            result.addAll(FAN_DEFINITION.descriptor.options);
+            result.addAll(safeAutoFanOptions(Collections.emptyList(),
+                    lastConfirmedAutoFanProfile, lastConfirmedAutoFanRuntimeOptions));
+            return result;
+        }
+        Boolean autoActive = readConfirmedClimateAutoMode(source);
+        if (Boolean.TRUE.equals(autoActive)) {
+            // A current profile is stronger evidence than AdaptAPI's five-value superset and
+            // identifies whether this vehicle implements the 3-profile or 2-profile family.
+            readControlValue(source, AUTO_FAN_DEFINITION);
+        }
+        result.addAll(supportedOptions(source, FAN_DEFINITION));
+        result.addAll(supportedOptions(source, AUTO_FAN_DEFINITION));
+        return result;
+    }
+
+    @NonNull
+    private CarControlDescriptor.Availability fanAvailability(@NonNull ICarFunction source) {
+        CarControlDescriptor.Availability manual =
+                controlAvailability(source, FAN_DEFINITION);
+        CarControlDescriptor.Availability automatic =
+                controlAvailability(source, AUTO_FAN_DEFINITION);
+        if (manual == CarControlDescriptor.Availability.SUPPORTED
+                || automatic == CarControlDescriptor.Availability.SUPPORTED) {
+            return CarControlDescriptor.Availability.SUPPORTED;
+        }
+        if (manual == CarControlDescriptor.Availability.UNSUPPORTED
+                && automatic == CarControlDescriptor.Availability.UNSUPPORTED) {
+            return CarControlDescriptor.Availability.UNSUPPORTED;
+        }
+        return CarControlDescriptor.Availability.UNKNOWN;
     }
 
     @NonNull
@@ -1256,7 +2279,11 @@ final class GeelyCarIntegration implements CarIntegration {
             }
             return CarControlDescriptor.Availability.UNKNOWN;
         } catch (Throwable t) {
-            invalidateFunctionProxy(source);
+            // Some firmware throws UnsupportedOperationException for one optional function while
+            // the shared ICarFunction Binder remains perfectly usable for the rest of climate.
+            // A real read/write failure below still invalidates the dead proxy.
+            Log.d(TAG, "vehicle function support is not ready: "
+                    + definition.descriptor.id, t);
             return CarControlDescriptor.Availability.UNKNOWN;
         }
     }
@@ -1329,7 +2356,8 @@ final class GeelyCarIntegration implements CarIntegration {
         }
         ICarFunction source = ensureCarFunctions();
         if (source == null) {
-            deliverUnavailableControls(demanded, "…");
+            // No fresh read exists yet. Do not replace a last confirmed value with a synthetic
+            // offline dash; the panel already renders a genuine missing value as an ellipsis.
             scheduleControlRetry();
             return;
         }
@@ -1339,24 +2367,34 @@ final class GeelyCarIntegration implements CarIntegration {
             if (definition != null
                     && definition.descriptor.kind != CarControlDescriptor.Kind.ACTION) {
                 functionIds.add(definition.functionId);
+                if (isFanDefinition(definition)) {
+                    functionIds.add(IHvac.HVAC_FUNC_AUTO_FAN_SETTING);
+                    functionIds.add(IHvac.HVAC_FUNC_AUTO);
+                }
             }
         }
-        if (!functionIds.isEmpty() && !ensureControlWatcher(source, functionIds)) {
-            deliverUnavailableControls(demanded, "—");
-            scheduleControlRetry();
-            return;
-        } else if (functionIds.isEmpty()) {
+        boolean watcherReady = functionIds.isEmpty()
+                || ensureControlWatcher(source, functionIds);
+        if (functionIds.isEmpty()) {
             detachControlWatcher();
         }
 
-        boolean failed = false;
+        boolean retry = !watcherReady;
+        boolean connectionFailed = false;
         for (String id : demanded) {
             ControlDefinition definition = controlDefinition(id);
-            if (definition != null && !readAndDeliverControl(source, definition)) failed = true;
+            if (definition == null) continue;
+            ControlReadResult result = readAndDeliverControl(source, definition);
+            if (result == ControlReadResult.RETRY) retry = true;
+            else if (result == ControlReadResult.CONNECTION_FAILED) {
+                retry = true;
+                connectionFailed = true;
+            }
         }
-        if (failed) {
-            invalidateFunctionProxy(source);
+        if (connectionFailed) {
             detachControlWatcher();
+        }
+        if (retry) {
             scheduleControlRetry();
         } else {
             controlRetryAttempts = 0;
@@ -1371,15 +2409,17 @@ final class GeelyCarIntegration implements CarIntegration {
         ICarFunction.IFunctionValueWatcher watcher = new ICarFunction.IFunctionValueWatcher() {
             @Override public void onCustomizeFunctionValueChanged(int functionId, int zone,
                                                                    float value) {
-                deliverVendorControlValue(functionId, zone, value, true);
+                executeControlTask(() ->
+                        deliverVendorControlValue(functionId, zone, value, true));
             }
 
             @Override public void onFunctionChanged(int functionId) {
-                executeTelemetryTask(() -> readDemandedFunction(functionId));
+                executeControlTask(() -> readDemandedFunction(functionId));
             }
 
             @Override public void onFunctionValueChanged(int functionId, int zone, int value) {
-                deliverVendorControlValue(functionId, zone, value, false);
+                executeControlTask(() ->
+                        deliverVendorControlValue(functionId, zone, value, false));
             }
 
             @Override public void onSupportedFunctionStatusChanged(int functionId, int zone,
@@ -1439,26 +2479,53 @@ final class GeelyCarIntegration implements CarIntegration {
             return;
         }
         Set<String> demanded = demandedControlIds();
+        boolean routedFan = demanded.contains(FAN_CONTROL_ID)
+                && isFanRelatedFunction(functionId);
+        if (routedFan) {
+            ControlReadResult result = readAndDeliverControl(source, FAN_DEFINITION);
+            if (result == ControlReadResult.RETRY
+                    || result == ControlReadResult.CONNECTION_FAILED) {
+                scheduleControlRetry();
+            }
+        }
         for (ControlDefinition definition : CONTROL_DEFINITIONS) {
             if (definition.functionId == functionId
+                    && !(routedFan && isFanDefinition(definition))
                     && demanded.contains(definition.descriptor.id)) {
-                readAndDeliverControl(source, definition);
+                ControlReadResult result = readAndDeliverControl(source, definition);
+                if (result == ControlReadResult.RETRY
+                        || result == ControlReadResult.CONNECTION_FAILED) {
+                    scheduleControlRetry();
+                }
             }
         }
     }
 
-    private boolean readAndDeliverControl(ICarFunction source, ControlDefinition definition) {
+    private enum ControlReadResult { CONFIRMED, UNSUPPORTED, RETRY, CONNECTION_FAILED }
+
+    @NonNull
+    private ControlReadResult readAndDeliverControl(ICarFunction source,
+                                                    ControlDefinition definition) {
+        ControlDefinition effective = effectiveControlDefinition(source, definition);
+        if (effective == null) {
+            // Do not reinterpret an unresolved AUTO fan as manual speed.
+            return ControlReadResult.RETRY;
+        }
+        definition = effective;
         CarControlDescriptor.Availability availability = controlAvailability(source, definition);
-        if (availability != CarControlDescriptor.Availability.SUPPORTED) {
+        if (availability == CarControlDescriptor.Availability.UNSUPPORTED) {
             deliverControlState(new CarControlState(definition.descriptor.id, false, false,
-                    Double.NaN, availability == CarControlDescriptor.Availability.UNKNOWN
-                    ? "…" : "—", false, 0, null, System.currentTimeMillis()));
-            return availability != CarControlDescriptor.Availability.UNKNOWN;
+                    Double.NaN, "Недоступно", false, 0, null, System.currentTimeMillis()));
+            return ControlReadResult.UNSUPPORTED;
+        }
+        if (availability != CarControlDescriptor.Availability.SUPPORTED) {
+            // UNKNOWN is a transient Binder/service state, not a new vehicle value.
+            return ControlReadResult.RETRY;
         }
         if (definition.descriptor.kind == CarControlDescriptor.Kind.ACTION) {
             deliverControlState(new CarControlState(definition.descriptor.id, true, false,
                     Double.NaN, "Готово", false, 0, null, System.currentTimeMillis()));
-            return true;
+            return ControlReadResult.CONFIRMED;
         }
         try {
             double value;
@@ -1471,26 +2538,65 @@ final class GeelyCarIntegration implements CarIntegration {
                         ? source.getFunctionValue(definition.functionId, definition.zone)
                         : source.getFunctionValue(definition.functionId);
             }
-            if (!isValidControlValue(definition, value)) return false;
+            if (!isValidControlValue(definition, value)) {
+                if (isReadableUnknownControlValue(definition, value)) {
+                    deliverControlState(unknownControlState(definition, value));
+                }
+                return ControlReadResult.RETRY;
+            }
+            rememberConfirmedRuntimeValue(definition, value);
             deliverControlState(normalizeControlState(definition, value));
-            return true;
+            confirmActiveControlCommandFromState(definition, value);
+            return ControlReadResult.CONFIRMED;
         } catch (Throwable t) {
             invalidateFunctionProxy(source);
             Log.w(TAG, "vehicle control read failed for " + definition.descriptor.id, t);
-            return false;
+            return ControlReadResult.CONNECTION_FAILED;
         }
     }
 
     private void deliverVendorControlValue(int functionId, int zone, double value,
                                            boolean customFloat) {
+        if (!customFloat && functionId == IHvac.HVAC_FUNC_AUTO) {
+            ControlDefinition climateAuto = controlDefinition("climate.auto");
+            if (climateAuto != null && isValidControlValue(climateAuto, value)) {
+                rememberConfirmedRuntimeValue(climateAuto, value);
+            }
+        } else if (!customFloat && functionId == IHvac.HVAC_FUNC_AUTO_FAN_SETTING
+                && zone == FRONT_FAN_ZONE
+                && isValidControlValue(AUTO_FAN_DEFINITION, value)) {
+            rememberConfirmedRuntimeValue(AUTO_FAN_DEFINITION, value);
+        }
         Set<String> demanded = demandedControlIds();
+        if (!customFloat && demanded.contains(FAN_CONTROL_ID)
+                && isFanRelatedFunction(functionId)) {
+            // AUTO and manual fan values share one raw PA channel but use different public value
+            // domains. Re-read through the current climate mode instead of interpreting a callback
+            // against the definition that happened to register it.
+            readDemandedFunction(functionId);
+            return;
+        }
         for (ControlDefinition definition : CONTROL_DEFINITIONS) {
             if (definition.functionId != functionId || definition.customFloat != customFloat
                     || !demanded.contains(definition.descriptor.id)) continue;
             if (definition.zoned() && definition.zone != zone) continue;
-            if (!isValidControlValue(definition, value)) continue;
+            if (!isValidControlValue(definition, value)) {
+                if (isReadableUnknownControlValue(definition, value)) {
+                    deliverControlState(unknownControlState(definition, value));
+                }
+                continue;
+            }
+            rememberConfirmedRuntimeValue(definition, value);
             deliverControlState(normalizeControlState(definition, value));
+            confirmActiveControlCommandFromState(definition, value);
         }
+    }
+
+    @NonNull
+    private static CarControlState unknownControlState(@NonNull ControlDefinition definition,
+                                                       double value) {
+        return new CarControlState(definition.descriptor.id, true, false, value,
+                "Неизвестно", false, 0, null, System.currentTimeMillis());
     }
 
     @NonNull
@@ -1550,13 +2656,6 @@ final class GeelyCarIntegration implements CarIntegration {
         return definition.descriptor.suggestedActiveColor;
     }
 
-    private void deliverUnavailableControls(Set<String> ids, String label) {
-        for (String id : ids) {
-            deliverControlState(new CarControlState(id, false, false, Double.NaN, label,
-                    false, 0, null, System.currentTimeMillis()));
-        }
-    }
-
     private void deliverControlState(@NonNull CarControlState state) {
         mainHandler.post(() -> {
             controlStateCache.put(state.controlId, state);
@@ -1576,82 +2675,314 @@ final class GeelyCarIntegration implements CarIntegration {
     @Override
     public void executeControl(@NonNull CarControlCommand command,
                                @NonNull ControlCommandListener listener) {
-        executeTelemetryTask(() -> executeControlOnWorker(command, listener));
+        if (controlsShuttingDown) {
+            postCommandResult(listener, false, "ECARX уже остановлен");
+            return;
+        }
+        String key = controlCommandKey(command);
+        long generation = reserveControlCommandSubmission(command.controlId, key);
+        if (!executeControlTask(() -> enqueueControlCommandOnWorker(
+                command, key, generation, listener))) {
+            postCommandResult(listener, false, "ECARX уже остановлен");
+        }
     }
 
-    private void executeControlOnWorker(CarControlCommand command,
-                                        ControlCommandListener listener) {
+    @NonNull
+    static String controlCommandKey(@NonNull CarControlCommand command) {
+        return command.controlId + '\u0000' + command.operation.name() + '\u0000'
+                + Long.toHexString(Double.doubleToLongBits(command.value));
+    }
+
+    private void enqueueControlCommandOnWorker(@NonNull CarControlCommand command,
+                                               @NonNull String key, long generation,
+                                               @NonNull ControlCommandListener listener) {
+        if (controlsShuttingDown) {
+            postCommandResult(listener, false, "ECARX уже остановлен");
+            return;
+        }
+        if (!isLatestControlCommandSubmission(command.controlId, key, generation)) {
+            postCommandResult(listener, false, "Команда заменена более новой");
+            return;
+        }
+        ActiveControlCommand previous = activeControlCommands.get(command.controlId);
+        if (previous != null && previous.key.equals(key)
+                && previous.generation == generation) {
+            previous.listeners.add(listener);
+            return;
+        }
+        if (previous != null) {
+            cancelActiveControlCommand(previous, "Команда заменена более новой");
+        }
+        ActiveControlCommand active = new ActiveControlCommand(command, key, generation,
+                SystemClock.elapsedRealtime() + CONTROL_COMMAND_TIMEOUT_MS, listener);
+        activeControlCommands.put(command.controlId, active);
+        startControlCommand(active);
+    }
+
+    private long reserveControlCommandSubmission(@NonNull String controlId,
+                                                 @NonNull String key) {
+        synchronized (controlCommandSubmissionLock) {
+            ControlCommandSubmission previous = latestControlCommandSubmissions.get(controlId);
+            if (previous != null && previous.key.equals(key)) return previous.generation;
+            long generation = ++nextControlCommandGeneration;
+            latestControlCommandSubmissions.put(controlId,
+                    new ControlCommandSubmission(key, generation));
+            return generation;
+        }
+    }
+
+    private boolean isLatestControlCommandSubmission(@NonNull String controlId,
+                                                     @NonNull String key, long generation) {
+        synchronized (controlCommandSubmissionLock) {
+            ControlCommandSubmission latest = latestControlCommandSubmissions.get(controlId);
+            return latest != null && latest.key.equals(key)
+                    && isLatestControlCommand(latest.generation, generation);
+        }
+    }
+
+    private void startControlCommand(@NonNull ActiveControlCommand active) {
+        if (!isCurrentControlCommand(active)) return;
+        CarControlCommand command = active.command;
         ControlDefinition definition = controlDefinition(command.controlId);
         if (definition == null) {
-            postCommandResult(listener, false, "Неизвестная функция автомобиля");
+            completeControlCommand(active, false, "Неизвестная функция автомобиля");
             return;
         }
         ICarFunction source = ensureCarFunctions();
         if (source == null) {
-            postCommandResult(listener, false, "ECARX ещё не подключён");
+            completeControlCommand(active, false, "ECARX ещё не подключён");
             scheduleControlRetry();
             return;
         }
-        if (controlAvailability(source, definition)
-                != CarControlDescriptor.Availability.SUPPORTED) {
-            postCommandResult(listener, false, "Функция не поддерживается автомобилем");
+        ControlDefinition effective = effectiveControlDefinition(source, definition);
+        if (effective == null) {
+            completeControlCommand(active, false,
+                    "Не удалось подтвердить режим AUTO. Команда не отправлена");
+            scheduleControlRetry();
             return;
         }
-        boolean pulse = definition.descriptor.kind == CarControlDescriptor.Kind.ACTION;
-        Double current = pulse ? 0d : readControlValue(source, definition);
-        if (!pulse && current == null) {
-            postCommandResult(listener, false, "Не удалось прочитать текущее состояние");
+        definition = effective;
+        active.definition = definition;
+        CarControlDescriptor.Availability availability = controlAvailability(source, definition);
+        if (availability == CarControlDescriptor.Availability.UNKNOWN) {
+            completeControlCommand(active, false,
+                    "ECARX ещё синхронизирует эту функцию, повторите через секунду");
+            scheduleControlRetry();
+            return;
+        }
+        if (availability != CarControlDescriptor.Availability.SUPPORTED) {
+            completeControlCommand(active, false, "Функция не поддерживается автомобилем");
+            return;
+        }
+        active.pulse = definition.descriptor.kind == CarControlDescriptor.Kind.ACTION;
+        Double current = active.pulse ? 0d : readControlValue(source, definition);
+        if (!active.pulse && current == null) {
+            completeControlCommand(active, false, "Не удалось прочитать текущее состояние");
+            scheduleControlRetry();
             return;
         }
         List<CarControlDescriptor.Option> runtimeOptions = supportedOptions(source, definition);
-        Double target = pulse ? 1d : commandTarget(definition, command, current, runtimeOptions);
+        Double target = active.pulse ? 1d
+                : commandTarget(definition, command, current, runtimeOptions);
         if (target == null) {
-            postCommandResult(listener, false, "Недопустимое значение команды");
+            completeControlCommand(active, false, "Недопустимое значение команды");
             return;
         }
+        active.target = target;
+        active.lastConfirmed = current;
+        if (!active.pulse && isControlCommandConfirmed(current, target)) {
+            deliverControlState(normalizeControlState(definition, current));
+            completeControlCommand(active, true, null);
+            return;
+        }
+        if (active.pulse) attemptPulseControl(active);
+        else beginControlConfirmationPoll(active, 0);
+    }
+
+    /** One short pulse attempt; its optional retry is delayed without sleeping on controlWorker. */
+    private void attemptPulseControl(@NonNull ActiveControlCommand active) {
+        if (!isCurrentControlCommand(active)) return;
+        if (controlCommandExpired(active)) {
+            failControlCommandTimeout(active);
+            return;
+        }
+        ControlDefinition definition = active.definition;
+        ICarFunction source = ensureCarFunctions();
+        if (definition == null || source == null) {
+            completeControlCommand(active, false, "Ошибка связи с ECARX");
+            scheduleControlRetry();
+            return;
+        }
+        active.pulseAttempts++;
         try {
-            if (pulse) {
-                // MConfig uses these functions as write-only pulses. They can return to zero
-                // immediately, so requiring a pre-read or read-back would report a false error.
-                boolean accepted = writeControlValue(source, definition, target);
-                if (!accepted) {
-                    pauseControlWorker(200L);
-                    accepted = writeControlValue(source, definition, target);
-                }
-                postCommandResult(listener, accepted,
-                        accepted ? null : "ECARX отклонил одноразовую команду");
+            if (writeControlValue(source, definition, active.target)) {
+                completeControlCommand(active, true, null);
                 return;
             }
-
-            // This firmware occasionally acknowledges a Binder write without applying it.
-            // Follow the proven MConfig policy: re-read and re-send up to six times instead of
-            // forcing the driver to tap the tile repeatedly.
-            boolean acceptedAtLeastOnce = false;
-            for (int attempt = 0; attempt < CONTROL_WRITE_ATTEMPTS; attempt++) {
-                Double beforeWrite = attempt == 0 ? current : readControlValue(source, definition);
-                if (beforeWrite != null && sameValue(beforeWrite, target)) {
-                    deliverControlState(normalizeControlState(definition, beforeWrite));
-                    postCommandResult(listener, true, null);
-                    return;
-                }
-                acceptedAtLeastOnce |= writeControlValue(source, definition, target);
-                if (!pauseControlWorker(200L + (attempt % 2) * 100L)) break;
-                Double confirmed = readControlValue(source, definition);
-                if (confirmed != null && sameValue(confirmed, target)) {
-                    deliverControlState(normalizeControlState(definition, confirmed));
-                    postCommandResult(listener, true, null);
-                    return;
-                }
-            }
-            postCommandResult(listener, false, acceptedAtLeastOnce
-                    ? "Команда отправлена, но автомобиль её не подтвердил"
-                    : "ECARX отклонил команду");
-        } catch (Throwable t) {
+        } catch (Throwable error) {
             invalidateFunctionProxy(source);
             scheduleControlRetry();
-            Log.w(TAG, "vehicle command failed for " + command.controlId, t);
-            postCommandResult(listener, false, "Ошибка связи с ECARX");
+            Log.w(TAG, "vehicle pulse failed for " + active.command.controlId, error);
         }
+        if (active.pulseAttempts >= CONTROL_PULSE_ATTEMPTS) {
+            completeControlCommand(active, false, "ECARX отклонил одноразовую команду");
+            return;
+        }
+        mainHandler.postDelayed(() -> executeControlTask(() -> attemptPulseControl(active)),
+                CONTROL_PULSE_RETRY_MS);
+    }
+
+    /**
+     * Starts one write/wait/read state-machine step. Only the Binder write occupies controlWorker;
+     * the settling delay is posted to the main looper, allowing watcher reads and other controls
+     * to pass through the same serial vendor lane in the meantime.
+     */
+    private void beginControlConfirmationPoll(@NonNull ActiveControlCommand active, int poll) {
+        if (!isCurrentControlCommand(active)) return;
+        if (controlCommandExpired(active)) {
+            failControlCommandTimeout(active);
+            return;
+        }
+        ControlDefinition definition = active.definition;
+        ICarFunction source = ensureCarFunctions();
+        if (definition == null) {
+            completeControlCommand(active, false, "Неизвестная функция автомобиля");
+            return;
+        }
+        if (source != null && shouldSendControlWrite(poll)) {
+            try {
+                active.acceptedAtLeastOnce |= writeControlValue(
+                        source, definition, active.target);
+            } catch (Throwable error) {
+                invalidateFunctionProxy(source);
+                scheduleControlRetry();
+                Log.w(TAG, "vehicle command write failed for "
+                        + active.command.controlId, error);
+            }
+        }
+        long delay = controlConfirmDelayMillis(poll);
+        mainHandler.postDelayed(() -> executeControlTask(() ->
+                readControlConfirmation(active, poll)), delay);
+    }
+
+    private void readControlConfirmation(@NonNull ActiveControlCommand active, int poll) {
+        if (!isCurrentControlCommand(active)) return;
+        if (controlCommandExpired(active)) {
+            failControlCommandTimeout(active);
+            return;
+        }
+        ControlDefinition definition = active.definition;
+        ICarFunction source = ensureCarFunctions();
+        Double confirmed = definition == null || source == null
+                ? null : readControlValue(source, definition);
+        if (!isCurrentControlCommand(active)) return;
+        if (confirmed != null) {
+            active.lastConfirmed = confirmed;
+            if (isControlCommandConfirmed(confirmed, active.target)) {
+                deliverControlState(normalizeControlState(definition, confirmed));
+                completeControlCommand(active, true, null);
+                return;
+            }
+        }
+        int nextPoll = poll + 1;
+        beginControlConfirmationPoll(active, nextPoll);
+    }
+
+    /**
+     * A vendor watcher/read may confirm a command before the scheduled poll. Only the latest
+     * per-control generation is eligible; an old target can therefore never finish a replacement.
+     */
+    private void confirmActiveControlCommandFromState(@NonNull ControlDefinition definition,
+                                                      double value) {
+        ActiveControlCommand active = activeControlCommands.get(definition.descriptor.id);
+        if (active == null || active.pulse || !isCurrentControlCommand(active)) return;
+        if (controlCommandExpired(active)) {
+            failControlCommandTimeout(active);
+            return;
+        }
+        active.lastConfirmed = value;
+        if (isControlCommandConfirmed(value, active.target)) {
+            completeControlCommand(active, true, null);
+        }
+    }
+
+    private boolean isCurrentControlCommand(@NonNull ActiveControlCommand candidate) {
+        if (!isActiveControlCommand(candidate)) return false;
+        return isLatestControlCommandSubmission(candidate.command.controlId,
+                candidate.key, candidate.generation);
+    }
+
+    private boolean isActiveControlCommand(@NonNull ActiveControlCommand candidate) {
+        ActiveControlCommand current = activeControlCommands.get(candidate.command.controlId);
+        return current == candidate
+                && isLatestControlCommand(current.generation, candidate.generation);
+    }
+
+    static boolean isLatestControlCommand(long activeGeneration, long candidateGeneration) {
+        return activeGeneration > 0L && activeGeneration == candidateGeneration;
+    }
+
+    static long controlConfirmDelayMillis(int confirmationPoll) {
+        return CONTROL_CONFIRM_POLL_MS + Math.max(0, confirmationPoll) * 10L;
+    }
+
+    private static boolean controlCommandExpired(@NonNull ActiveControlCommand active) {
+        return SystemClock.elapsedRealtime() >= active.deadlineElapsedMillis;
+    }
+
+    private void failControlCommandTimeout(@NonNull ActiveControlCommand active) {
+        restoreLastConfirmedControlState(active);
+        scheduleControlRefresh(0);
+        completeControlCommand(active, false, active.acceptedAtLeastOnce
+                ? "Команда отправлена, но автомобиль не подтвердил её за 5 секунд"
+                : "ECARX отклонил команду");
+    }
+
+    private void restoreLastConfirmedControlState(@NonNull ActiveControlCommand active) {
+        if (active.definition != null && active.lastConfirmed != null) {
+            deliverControlState(normalizeControlState(active.definition, active.lastConfirmed));
+        }
+    }
+
+    private void completeControlCommand(@NonNull ActiveControlCommand active, boolean success,
+                                        @Nullable String message) {
+        if (!isCurrentControlCommand(active)) return;
+        finishActiveControlCommand(active, success, message);
+    }
+
+    private void cancelActiveControlCommand(@NonNull ActiveControlCommand active,
+                                            @NonNull String message) {
+        if (!isActiveControlCommand(active)) return;
+        finishActiveControlCommand(active, false, message);
+    }
+
+    private void finishActiveControlCommand(@NonNull ActiveControlCommand active, boolean success,
+                                            @Nullable String message) {
+        activeControlCommands.remove(active.command.controlId);
+        List<ControlCommandListener> listeners = new ArrayList<>(active.listeners);
+        active.listeners.clear();
+        for (ControlCommandListener listener : listeners) {
+            postCommandResult(listener, success, message);
+        }
+    }
+
+    private void cancelActiveControlCommandsOnWorker(@NonNull String message) {
+        List<ActiveControlCommand> active =
+                new ArrayList<>(activeControlCommands.values());
+        for (ActiveControlCommand command : active) {
+            cancelActiveControlCommand(command, message);
+        }
+    }
+
+    static boolean shouldSendControlWrite(int confirmationPoll) {
+        return confirmationPoll >= 0
+                && confirmationPoll < CONTROL_WRITE_WINDOW_POLLS
+                && (confirmationPoll == 0
+                || confirmationPoll % CONTROL_RESEND_EVERY_POLLS == 0);
+    }
+
+    static boolean isControlCommandConfirmed(@Nullable Double actual, double target) {
+        return actual != null && sameValue(actual, target);
     }
 
     private boolean writeControlValue(ICarFunction source, ControlDefinition definition,
@@ -1668,16 +2999,6 @@ final class GeelyCarIntegration implements CarIntegration {
                 : source.setFunctionValue(definition.functionId, value);
     }
 
-    private static boolean pauseControlWorker(long millis) {
-        try {
-            Thread.sleep(millis);
-            return true;
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-            return false;
-        }
-    }
-
     @Nullable
     private Double readControlValue(ICarFunction source, ControlDefinition definition) {
         try {
@@ -1691,7 +3012,9 @@ final class GeelyCarIntegration implements CarIntegration {
                         ? source.getFunctionValue(definition.functionId, definition.zone)
                         : source.getFunctionValue(definition.functionId);
             }
-            return isValidControlValue(definition, value) ? value : null;
+            if (!isValidControlValue(definition, value)) return null;
+            rememberConfirmedRuntimeValue(definition, value);
+            return value;
         } catch (Throwable t) {
             invalidateFunctionProxy(source);
             return null;
@@ -1747,24 +3070,35 @@ final class GeelyCarIntegration implements CarIntegration {
         if (definition.customFloat || definition.descriptor.options.isEmpty()) {
             return definition.descriptor.options;
         }
+        List<CarControlDescriptor.Option> discovered = Collections.emptyList();
         try {
             int[] values = definition.zoned()
                     ? source.getSupportedFunctionValue(definition.functionId, definition.zone)
                     : source.getSupportedFunctionValue(definition.functionId);
-            if (values == null || values.length == 0) return definition.descriptor.options;
-            Set<Integer> supported = new HashSet<>();
-            for (int value : values) supported.add(value);
-            List<CarControlDescriptor.Option> result = new ArrayList<>();
-            for (CarControlDescriptor.Option option : definition.descriptor.options) {
-                if (option.value == 0 || supported.contains((int) Math.round(option.value))) {
-                    result.add(option);
+            if (values != null && values.length > 0) {
+                Set<Integer> supported = new HashSet<>();
+                for (int value : values) supported.add(value);
+                List<CarControlDescriptor.Option> result = new ArrayList<>();
+                for (CarControlDescriptor.Option option : definition.descriptor.options) {
+                    if (option.value == 0
+                            || supported.contains((int) Math.round(option.value))) {
+                        result.add(option);
+                    }
                 }
+                discovered = result;
             }
-            return result.isEmpty() ? definition.descriptor.options : result;
         } catch (Throwable ignored) {
-            // Older firmware can reject discovery even though direct reads/writes work.
-            return definition.descriptor.options;
+            // The safe fallback below is definition-specific.
         }
+        if (isAutoFanDefinition(definition)) {
+            List<CarControlDescriptor.Option> safe = safeAutoFanOptions(discovered,
+                    lastConfirmedAutoFanProfile, lastConfirmedAutoFanRuntimeOptions);
+            rememberAutoFanRuntimeOptions(safe);
+            return safe;
+        }
+        // Older firmware can reject discovery even though direct reads/writes work. The ordinary
+        // toggle/manual domains do not contain mutually incompatible vehicle families.
+        return discovered.isEmpty() ? definition.descriptor.options : discovered;
     }
 
     private static boolean sameValue(double left, double right) {
@@ -1792,13 +3126,44 @@ final class GeelyCarIntegration implements CarIntegration {
                 && value <= definition.descriptor.maximum + .01;
     }
 
+    /**
+     * A finite vendor extension is still a real observation even when this SDK revision has no
+     * semantic label for it. Show an explicit unknown state and keep the control disabled instead
+     * of collapsing it into the same silent retry path as Binder error sentinels.
+     */
+    private static boolean isReadableUnknownControlValue(@NonNull ControlDefinition definition,
+                                                         double value) {
+        if (definition.customFloat || definition.descriptor.options.isEmpty()
+                || !Double.isFinite(value) || value == -1 || value == Integer.MAX_VALUE
+                || value == Integer.MIN_VALUE
+                || sameValue(value, ICarFunction.COMMON_VALUE_ERROR)
+                || sameValue(value, ICarFunction.COMMON_VALUE_NONE)
+                || sameValue(value, ICarFunction.COMMON_VALUE_UNKNOWN)) {
+            return false;
+        }
+        for (CarControlDescriptor.Option option : definition.descriptor.options) {
+            if (sameValue(option.value, value)) return false;
+        }
+        return true;
+    }
+
     private void postCommandResult(ControlCommandListener listener, boolean success,
                                    @Nullable String message) {
-        mainHandler.post(() -> listener.onResult(success, message));
+        mainHandler.post(() -> {
+            try {
+                listener.onResult(success, message);
+            } catch (RuntimeException error) {
+                Log.w(TAG, "vehicle control result listener failed", error);
+            }
+        });
     }
 
     @Override
     public void shutdown() {
+        controlsShuttingDown = true;
+        synchronized (controlCommandSubmissionLock) {
+            latestControlCommandSubmissions.clear();
+        }
         for (BrickType type : BrickType.values()) {
             unsubscribe(type);
         }
@@ -1815,13 +3180,28 @@ final class GeelyCarIntegration implements CarIntegration {
         }
         for (ControlSubscription subscription : controls) subscription.cancelled.set(true);
         mainHandler.removeCallbacks(controlRefreshTask);
+        controlRefreshScheduled = false;
+        controlRefreshAgain = false;
+        mainHandler.removeCallbacks(bcmPollTask);
+        bcmPollScheduled = false;
+        if (autoHoldReceiverRegistered) {
+            try { appContext.unregisterReceiver(autoHoldChangedReceiver); }
+            catch (IllegalArgumentException ignored) {}
+            autoHoldReceiverRegistered = false;
+        }
         executeTelemetryTask(() -> {
             for (TelemetrySubscription subscription : telemetry) {
                 unregisterTelemetryVendorListeners(subscription);
             }
-            detachControlWatcher();
+            bcmLastOnMillis.clear();
         });
+        executeControlTask(() -> {
+            detachControlWatcher();
+            cancelActiveControlCommandsOnWorker("ECARX остановлен");
+        });
+        signalFallback.shutdown();
         telemetryWorker.shutdown();
+        controlWorker.shutdown();
         availabilityChangedListener = null;
     }
 }

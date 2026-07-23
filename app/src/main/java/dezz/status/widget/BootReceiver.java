@@ -32,20 +32,49 @@ public class BootReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (Intent.ACTION_USER_UNLOCKED.equals(intent.getAction())) {
-            // Keystore-backed MQTT credentials can become readable only after unlock on some
-            // OEM ROMs. Re-reading preferences restarts MQTT without touching either overlay.
-            if (WidgetService.isRunning()) WidgetService.getInstance().applyPreferences();
-            Preferences prefs = new Preferences(context);
-            if (shouldReconcileClimate(context, prefs)) ClimatePanelService.apply(context);
+        String action = intent == null ? null : intent.getAction();
+        if (WidgetServiceStarter.ACTION_RETRY.equals(action)) {
+            WidgetServiceStarter.retryFromAlarm(context,
+                    intent.getIntExtra(WidgetServiceStarter.EXTRA_RETRY_ATTEMPT, -1));
             return;
         }
-        if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())
-                || Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(intent.getAction())
-                || ACTION_QUICKBOOT_POWERON.equals(intent.getAction())) {
-            Log.d(TAG, "Device boot completed, checking if widget service should auto-start");
+        if (Intent.ACTION_USER_UNLOCKED.equals(action)) {
+            // Keystore-backed MQTT credentials can become readable only after unlock on some
+            // OEM ROMs. This reconfigure is independent from status-window attachment.
+            restoreStatusWidget(context, true);
+            restoreClimateSafely(context);
+            return;
+        }
+        if (Intent.ACTION_BOOT_COMPLETED.equals(action)
+                || Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(action)
+                || ACTION_QUICKBOOT_POWERON.equals(action)
+                || Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
+            Log.d(TAG, "System lifecycle event, restoring enabled services: "
+                    + action);
 
-            final Preferences prefs = new Preferences(context);
+            // Restore independently. A transient OEM rejection of the climate foreground service
+            // must never prevent the status row from being started (or vice versa).
+            restoreStatusWidget(context, false);
+            restoreClimateSafely(context);
+        }
+    }
+
+    private static void restoreStatusWidget(Context context, boolean forceReconfigure) {
+        try {
+            WidgetService current = WidgetService.getInstance();
+            if (current != null) {
+                if (forceReconfigure) current.applyPreferences();
+                return;
+            }
+            WidgetServiceStarter.startIfNeededWithRetry(context);
+        } catch (RuntimeException failure) {
+            Log.e(TAG, "Could not restore status widget", failure);
+        }
+    }
+
+    private static void restoreClimateSafely(Context context) {
+        try {
+            Preferences prefs = new Preferences(context);
             // The permanent climate panel has its own lifecycle and does not depend on the main
             // status widget being enabled. apply() selects compact/reserved mode and restores the
             // saved display/geometry after every supported boot sequence.
@@ -53,19 +82,8 @@ public class BootReceiver extends BroadcastReceiver {
                 Log.i(TAG, "Restoring permanent climate panel");
                 ClimatePanelService.apply(context);
             }
-            if (!prefs.widgetEnabled.get()) {
-                Log.d(TAG, "Widget service is not enabled. Don't start it.");
-                return;
-            }
-
-            if (WidgetService.isRunning()) {
-                Log.d(TAG, "Widget service is already running. Don't start it again.");
-                return;
-            }
-
-            Log.i(TAG, "Auto-starting widget service");
-            Intent serviceIntent = new Intent(context, WidgetService.class);
-            context.startForegroundService(serviceIntent);
+        } catch (RuntimeException failure) {
+            Log.e(TAG, "Could not restore permanent climate panel", failure);
         }
     }
 

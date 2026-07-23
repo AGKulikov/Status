@@ -2,8 +2,10 @@
 package dezz.status.widget.ha.api;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -62,6 +64,28 @@ public final class HaSnapshotSynchronizerTest {
         HaSnapshotSynchronizer.Completion completion = synchronizer.completeSnapshot(snapshot);
         assertEquals("recreated", completion.catalog().find("sensor.fixture_value").state());
         assertTrue(completion.replayedUpdates().isEmpty());
+    }
+
+    @Test public void eventBacklogIsBoundedAndCannotPublishAnIncompleteSnapshot()
+            throws Exception {
+        HaSnapshotSynchronizer synchronizer = new HaSnapshotSynchronizer();
+        synchronizer.beginSnapshot();
+        HaWebSocketProtocol.StateChange change = event(HaApiFixtures.stateEvent(
+                "sensor.fixture_temperature", "21.0", "2026-01-01T10:01:00Z"));
+        for (int index = 0; index <= HaSnapshotSynchronizer.MAX_BUFFERED_CHANGES; index++) {
+            assertTrue(synchronizer.buffer(change));
+        }
+        assertEquals(HaSnapshotSynchronizer.MAX_BUFFERED_CHANGES,
+                synchronizer.bufferedCount());
+
+        try {
+            synchronizer.completeSnapshot(new JSONArray(HaApiFixtures.SNAPSHOT));
+            fail("Expected an overflowing replay to reject the snapshot");
+        } catch (IllegalStateException expected) {
+            assertTrue(expected.getMessage().contains("Too many"));
+        }
+        assertEquals(0, synchronizer.bufferedCount());
+        assertFalse(synchronizer.snapshotPending());
     }
 
     private static HaWebSocketProtocol.StateChange event(String raw) throws Exception {

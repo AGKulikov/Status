@@ -25,6 +25,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -71,6 +72,19 @@ public final class FavoriteRoutesPanelView extends FrameLayout {
         rebuild();
     }
 
+    /**
+     * Applies an in-memory editor snapshot without forcing a JSON write/read round-trip.
+     * Production HOME continues to use {@link #reloadConfig()} as its durable source of truth.
+     */
+    public void setPreviewRoutes(@NonNull List<FavoriteRouteConfig> source) {
+        ArrayList<FavoriteRouteConfig> snapshot = new ArrayList<>();
+        for (FavoriteRouteConfig value : source) {
+            if (value != null) snapshot.add(value.copy());
+        }
+        routes = Collections.unmodifiableList(snapshot);
+        rebuild();
+    }
+
     /** Changes the responsive grid width without re-reading persistent configuration. */
     public void setColumns(int value) {
         int normalized = normalizeColumns(value);
@@ -92,6 +106,14 @@ public final class FavoriteRoutesPanelView extends FrameLayout {
 
     public boolean isPreviewMode() {
         return previewMode;
+    }
+
+    /** True when the current saved configuration contains at least one visible destination. */
+    public boolean hasEnabledRoutes() {
+        for (FavoriteRouteConfig route : routes) {
+            if (route != null && route.enabled) return true;
+        }
+        return false;
     }
 
     private void rebuild() {
@@ -152,12 +174,22 @@ public final class FavoriteRoutesPanelView extends FrameLayout {
         tile.setContentDescription(title);
 
         ImageView icon = new ImageView(getContext());
-        icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        // CENTER_INSIDE never enlarges a drawable above its intrinsic size. Android's built-in
+        // Home/Work icons are small bitmaps, so the old size slider only grew the empty ImageView
+        // around them. FIT_CENTER makes the drawable itself follow the configured pixel size.
+        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
         icon.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
         Drawable drawable = LauncherIconResolver.resolvePreset(
                 getContext(), route.icon, route.iconColor);
         icon.setImageDrawable(drawable);
         int iconSize = Math.max(1, route.iconSizePx);
+        // Keep the configured size physical and exact. Intrinsic vector bounds must not make
+        // Home/Work icons appear unchanged while their editor slider is moving.
+        icon.setAdjustViewBounds(false);
+        icon.setMinimumWidth(iconSize);
+        icon.setMinimumHeight(iconSize);
+        icon.setMaxWidth(iconSize);
+        icon.setMaxHeight(iconSize);
         tile.addView(icon, new LinearLayout.LayoutParams(iconSize, iconSize));
 
         TextView label = new TextView(getContext());

@@ -20,6 +20,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -29,13 +30,18 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import dezz.status.widget.launcher.media.MediaPanelConfig;
 import dezz.status.widget.launcher.media.MediaPanelConfigStore;
 import dezz.status.widget.launcher.media.MediaPanelView;
+import dezz.status.widget.launcher.panels.PanelEditScheduler;
 
 /** Visual, immediate editor for every element inside the HOME media panel. */
 public final class MediaPanelSettingsActivity extends AppCompatActivity {
     private interface IntChange { void set(int value); }
+    private interface ElementIntChange { int set(int value); }
     private interface ColorChange { void set(@NonNull String value); }
     private interface ColorValue { String get(); }
     private interface ValueLabel { String format(int value); }
@@ -54,6 +60,8 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
     private MediaPanelConfig config;
     private MediaPanelView preview;
     private LinearLayout elementList;
+    private PanelEditScheduler editScheduler;
+    private final Map<String, TextView> positionLabels = new LinkedHashMap<>();
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -61,6 +69,7 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         preferences = new Preferences(this);
         store = new MediaPanelConfigStore(preferences);
         config = store.load();
+        editScheduler = PanelEditScheduler.onMainThread(this::updatePreviewNow, this::saveNow);
         setTitle("Медиапанель");
         setContentView(buildContent());
     }
@@ -79,7 +88,9 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         settingsScroll.addView(settings, new ScrollView.LayoutParams(match(), wrap()));
 
         addTitle(settings, "Медиапанель");
-        addHint(settings, "Включайте элементы, меняйте их порядок и собственный размер. Все изменения сохраняются сразу и видны справа.");
+        addHint(settings, "Расположение и размер элементов удобнее менять прямо на фактической "
+                + "медиапанели HOME: там сетка использует её реальную геометрию. Здесь остаются "
+                + "точные ползунки, состав элементов, оформление и прокрутка текста.");
         MaterialSwitch panelVisible = new MaterialSwitch(this);
         panelVisible.setText("Показывать медиапанель на HOME");
         panelVisible.setTextSize(16);
@@ -91,9 +102,33 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         addButton(settings, "Размер и положение панели на HOME…", v ->
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_MODE, true)));
+        addButton(settings, "Расположение элементов внутри панели на HOME…", v ->
+                startActivity(new Intent(this, LauncherActivity.class)
+                        .putExtra(LauncherActivity.EXTRA_EDIT_MEDIA_CONTENT, true)));
 
-        addTitle(settings, "Элементы и порядок");
-        addHint(settings, "Стрелки меняют последовательность. Размер каждого элемента не зависит от остальных; узкая панель автоматически переносит их на следующую строку.");
+        addTitle(settings, "Сетка");
+        addHint(settings, "Число столбцов и строк задаёт размер ячейки внутри фактического "
+                + "размера панели. Если выбранная сетка не вмещает включённые элементы, "
+                + "приложение сохранит последний корректный размер.");
+        addGridSlider(settings, "Столбцы", config.gridColumns,
+                MediaPanelConfig.MIN_GRID_COLUMNS, MediaPanelConfig.MAX_GRID_COLUMNS,
+                selected -> {
+                    boolean changed = config.setGridSize(selected, config.gridRows);
+                    if (changed) rebuildElementControls();
+                    return config.gridColumns;
+                });
+        addGridSlider(settings, "Строки", config.gridRows,
+                MediaPanelConfig.MIN_GRID_ROWS, MediaPanelConfig.MAX_GRID_ROWS,
+                selected -> {
+                    boolean changed = config.setGridSize(config.gridColumns, selected);
+                    if (changed) rebuildElementControls();
+                    return config.gridRows;
+                });
+
+        addTitle(settings, "Элементы");
+        addHint(settings, "Перетаскивание и изменение размера выполняются на HOME. Эти ползунки "
+                + "задают точные ширину и высоту в ячейках; масштаб меняет только текст или "
+                + "значок. Стрелки сохраняют порядок элементов.");
         elementList = new LinearLayout(this);
         elementList.setOrientation(LinearLayout.VERTICAL);
         settings.addView(elementList, new LinearLayout.LayoutParams(match(), wrap()));
@@ -113,10 +148,25 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
                 value -> config.backgroundColor = value);
         addColor(settings, "Название", () -> config.titleColor,
                 value -> config.titleColor = value);
-        addColor(settings, "Исполнитель и приложение", () -> config.secondaryColor,
+        addColor(settings, "Исполнитель, альбом, время и приложение",
+                () -> config.secondaryColor,
                 value -> config.secondaryColor = value);
         addColor(settings, "Кнопки", () -> config.controlColor,
                 value -> config.controlColor = value);
+        addSlider(settings, "Стекло кнопок", config.glassAlpha, 0, 160,
+                value -> config.glassAlpha = value,
+                value -> Math.round(value * 100f / 255f) + "%");
+        addSlider(settings, "Прозрачность тонкой рамки", config.outlineAlpha, 0, 160,
+                value -> config.outlineAlpha = value,
+                value -> Math.round(value * 100f / 255f) + "%");
+        addSlider(settings, "Толщина тонкой рамки", config.outlineWidthPx, 0, 8,
+                value -> config.outlineWidthPx = value, value -> value + " px");
+        addColor(settings, "Цвет стекла", () -> config.glassColor,
+                value -> config.glassColor = value);
+        addColor(settings, "Акцент активной кнопки", () -> config.accentColor,
+                value -> config.accentColor = value);
+        addColor(settings, "Тонкая рамка", () -> config.outlineColor,
+                value -> config.outlineColor = value);
 
         addButton(settings, "Вернуть медиапанель по умолчанию", v ->
                 new AlertDialog.Builder(this)
@@ -134,7 +184,7 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         previewColumn.setOrientation(LinearLayout.VERTICAL);
         previewColumn.setPadding(dp(10), 0, 0, 0);
         TextView previewTitle = new TextView(this);
-        previewTitle.setText("ЖИВОЙ ПРЕДПРОСМОТР");
+        previewTitle.setText("ПРЕДПРОСМОТР · ТОЛЬКО ПРОСМОТР");
         previewTitle.setTextSize(14);
         previewTitle.setTextColor(Color.rgb(105, 165, 255));
         previewTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -148,7 +198,8 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         previewHost.setPadding(dp(14), dp(14), dp(14), dp(14));
         preview = new MediaPanelView(this, store, null);
         preview.setConfig(config);
-        preview.setPreviewContent("Название композиции", "Исполнитель", "Яндекс Музыка", true);
+        preview.setPreviewContent("Очень длинное название композиции для проверки прокрутки",
+                "Исполнитель с длинным именем", "Яндекс Музыка", true);
         previewHost.addView(preview, new FrameLayout.LayoutParams(match(), match()));
         previewColumn.addView(previewHost, new LinearLayout.LayoutParams(match(), 0, 1f));
         TextView saved = new TextView(this);
@@ -166,6 +217,7 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
     private void rebuildElementControls() {
         if (elementList == null) return;
         elementList.removeAllViews();
+        positionLabels.clear();
         for (MediaPanelConfig.Element element : config.orderedElements()) {
             MediaPanelConfig.Spec spec = MediaPanelConfig.spec(element.id);
             if (spec == null) continue;
@@ -180,7 +232,12 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
             enabled.setTextSize(16);
             enabled.setChecked(element.enabled);
             enabled.setOnCheckedChangeListener((button, checked) -> {
-                config.setEnabled(element.id, checked);
+                boolean actual = config.setEnabled(element.id, checked);
+                if (actual != checked) {
+                    button.setChecked(actual);
+                    Toast.makeText(this, "На сетке нет свободного места для элемента",
+                            Toast.LENGTH_SHORT).show();
+                }
                 persistAndPreview();
             });
             heading.addView(enabled, new LinearLayout.LayoutParams(0, dp(48), 1f));
@@ -194,33 +251,44 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
             heading.addView(down, new LinearLayout.LayoutParams(dp(54), dp(44)));
             card.addView(heading, new LinearLayout.LayoutParams(match(), wrap()));
 
-            LinearLayout scaleRow = new LinearLayout(this);
-            scaleRow.setGravity(Gravity.CENTER_VERTICAL);
-            TextView label = new TextView(this);
-            label.setText("Размер");
-            label.setTextSize(14);
-            SeekBar scale = new SeekBar(this);
-            scale.setMax(155);
-            scale.setProgress(element.scalePercent - 45);
-            TextView value = new TextView(this);
-            value.setGravity(Gravity.END);
-            value.setText(element.scalePercent + "%");
-            scale.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                @Override public void onProgressChanged(SeekBar bar, int progress, boolean user) {
-                    int selected = progress + 45;
-                    value.setText(selected + "%");
-                    if (user) {
+            TextView position = new TextView(this);
+            position.setTextSize(13);
+            position.setAlpha(.75f);
+            position.setPadding(dp(6), 0, dp(6), 0);
+            positionLabels.put(element.id, position);
+            card.addView(position, new LinearLayout.LayoutParams(match(), dp(27)));
+            updatePositionLabel(element.id);
+
+            addElementSlider(card, "Ширина", element.columnSpan, 1,
+                    config.gridColumns, selected -> {
+                        MediaPanelConfig.Element current = config.element(element.id);
+                        config.setSpan(element.id, selected, current.rowSpan);
+                        return config.element(element.id).columnSpan;
+                    }, selected -> selected + " яч.");
+            addElementSlider(card, "Высота", element.rowSpan, 1,
+                    config.gridRows, selected -> {
+                        MediaPanelConfig.Element current = config.element(element.id);
+                        config.setSpan(element.id, current.columnSpan, selected);
+                        return config.element(element.id).rowSpan;
+                    }, selected -> selected + " яч.");
+            addElementSlider(card, "Содержимое", element.scalePercent, 45, 220,
+                    selected -> {
                         config.setScale(element.id, selected);
-                        persistAndPreview();
-                    }
-                }
-                @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-                @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-            });
-            scaleRow.addView(label, new LinearLayout.LayoutParams(dp(66), wrap()));
-            scaleRow.addView(scale, new LinearLayout.LayoutParams(0, dp(40), 1f));
-            scaleRow.addView(value, new LinearLayout.LayoutParams(dp(64), wrap()));
-            card.addView(scaleRow, new LinearLayout.LayoutParams(match(), wrap()));
+                        return config.element(element.id).scalePercent;
+                    },
+                    selected -> selected + "%");
+            if (MediaPanelConfig.supportsMarquee(element.id)) {
+                MaterialSwitch marquee = new MaterialSwitch(this);
+                marquee.setText("Прокручивать длинный текст");
+                marquee.setTextSize(13);
+                marquee.setMinHeight(dp(42));
+                marquee.setChecked(element.marqueeEnabled);
+                marquee.setOnCheckedChangeListener((button, checked) -> {
+                    config.setMarqueeEnabled(element.id, checked);
+                    persistAndPreview();
+                });
+                card.addView(marquee, new LinearLayout.LayoutParams(match(), dp(42)));
+            }
 
             GradientDrawable background = new GradientDrawable();
             background.setColor(Color.argb(35, 120, 170, 230));
@@ -240,12 +308,108 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
 
     private void persistAndPreview() {
         config.normalize();
+        for (String id : positionLabels.keySet()) updatePositionLabel(id);
+        editScheduler.request();
+    }
+
+    private void updatePreviewNow() {
+        config.normalize();
+        if (preview == null) return;
+        preview.setConfig(config);
+        preview.setPreviewContent("Очень длинное название композиции для проверки прокрутки",
+                "Исполнитель с длинным именем", "Яндекс Музыка", true);
+    }
+
+    private void saveNow() {
+        config.normalize();
         store.save(config);
-        if (preview != null) {
-            preview.setConfig(config);
-            preview.setPreviewContent("Название композиции", "Исполнитель",
-                    "Яндекс Музыка", true);
-        }
+    }
+
+    private void addElementSlider(@NonNull LinearLayout parent, @NonNull String title,
+                                  int initial, int minimum, int maximum,
+                                  @NonNull ElementIntChange change,
+                                  @NonNull ValueLabel formatter) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView label = new TextView(this);
+        label.setText(title);
+        label.setTextSize(13);
+        SeekBar seek = new SeekBar(this);
+        seek.setMax(maximum - minimum);
+        seek.setProgress(Math.max(0, Math.min(maximum - minimum, initial - minimum)));
+        TextView value = new TextView(this);
+        value.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        value.setText(formatter.format(initial));
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean user) {
+                int selected = minimum + progress;
+                value.setText(formatter.format(selected));
+                if (!user) return;
+                int actual = change.set(selected);
+                persistAndPreview();
+                if (actual != selected) {
+                    seek.setProgress(Math.max(0, Math.min(maximum - minimum, actual - minimum)));
+                    value.setText(formatter.format(actual) + " · занято");
+                } else {
+                    value.setText(formatter.format(actual));
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                editScheduler.flush();
+            }
+        });
+        row.addView(label, new LinearLayout.LayoutParams(dp(96), dp(38)));
+        row.addView(seek, new LinearLayout.LayoutParams(0, dp(38), 1f));
+        row.addView(value, new LinearLayout.LayoutParams(dp(72), dp(38)));
+        parent.addView(row, new LinearLayout.LayoutParams(match(), dp(38)));
+    }
+
+    private void updatePositionLabel(@NonNull String id) {
+        TextView label = positionLabels.get(id);
+        if (label == null) return;
+        MediaPanelConfig.Element element = config.element(id);
+        label.setText("Позиция: столбец " + (element.column + 1) + "/" + config.gridColumns
+                + ", строка " + (element.row + 1) + "/" + config.gridRows + " · "
+                + element.columnSpan + "×" + element.rowSpan);
+    }
+
+    private void addGridSlider(@NonNull LinearLayout parent, @NonNull String title, int initial,
+                               int minimum, int maximum, @NonNull ElementIntChange change) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView label = new TextView(this);
+        label.setText(title);
+        label.setTextSize(16);
+        SeekBar seek = new SeekBar(this);
+        seek.setMax(maximum - minimum);
+        seek.setProgress(Math.max(0, Math.min(maximum - minimum, initial - minimum)));
+        TextView value = new TextView(this);
+        value.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        value.setText(String.valueOf(initial));
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean user) {
+                int selected = minimum + progress;
+                value.setText(String.valueOf(selected));
+                if (!user) return;
+                int actual = change.set(selected);
+                persistAndPreview();
+                if (actual != selected) {
+                    seek.setProgress(actual - minimum);
+                    value.setText(actual + " · нет места");
+                } else {
+                    value.setText(String.valueOf(actual));
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                editScheduler.flush();
+            }
+        });
+        row.addView(label, new LinearLayout.LayoutParams(dp(110), dp(44)));
+        row.addView(seek, new LinearLayout.LayoutParams(0, dp(44), 1f));
+        row.addView(value, new LinearLayout.LayoutParams(dp(118), dp(44)));
+        parent.addView(row, new LinearLayout.LayoutParams(match(), dp(44)));
     }
 
     private void addSlider(@NonNull LinearLayout parent, @NonNull String title, int initial,
@@ -276,7 +440,9 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
                 }
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                editScheduler.flush();
+            }
         });
         block.addView(heading);
         block.addView(seek, new LinearLayout.LayoutParams(match(), dp(38)));
@@ -395,5 +561,17 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
     private static int wrap() { return ViewGroup.LayoutParams.WRAP_CONTENT; }
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    @Override protected void onStop() {
+        // Also persists the last drag if the system stops the Activity before ACTION_UP.
+        editScheduler.flush();
+        saveNow();
+        super.onStop();
+    }
+
+    @Override protected void onDestroy() {
+        editScheduler.cancel();
+        super.onDestroy();
     }
 }
