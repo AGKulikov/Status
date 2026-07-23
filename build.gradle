@@ -83,6 +83,9 @@ allprojects {
             force libs.kotlin.stdlib
             force libs.kotlin.stdlib.common
             force libs.kotlin.stdlib.jdk8
+            // ProfileInstaller calls ResolvableFuture on Android 9, but the class is optional in
+            // its dependency metadata. Keep one concrete runtime version in every APK.
+            force 'androidx.concurrent:concurrent-futures:1.3.0'
 
             // Fail on version conflict
             failOnVersionConflict()
