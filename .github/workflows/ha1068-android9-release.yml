@@ -32,43 +32,40 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Decode stable update keystore
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      - name: Create staging signing key
         shell: bash
         run: |
-          test -n "$KEYSTORE_BASE64"
-          echo "$KEYSTORE_BASE64" | base64 -d > keystore.jks
+          keytool -genkeypair -keystore keystore.jks \
+            -storepass ci-staging-only -keypass ci-staging-only \
+            -alias status-widget-ha -keyalg RSA -keysize 2048 -validity 1 \
+            -dname "CN=CI Staging"
 
-      - name: Test and build stable HA1075
+      - name: Test and build HA1075 release staging APK
         env:
           VERSION_NAME: v2.8.2-ha1075
           VERSION_CODE: '208021075'
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ci-staging-only
+          KEY_ALIAS: status-widget-ha
         run: |
-          test -n "$KEY_PASSWORD"
           ./gradlew --no-daemon clean
           ./gradlew --no-daemon testGeelyDebugUnitTest
           ./gradlew --no-daemon assembleGeelyRelease
 
-      - name: Verify release APK
+      - name: Verify staging release APK
         shell: bash
         run: |
           APK="$(find app/build/outputs/apk/geely/release -name '*.apk' -print -quit)"
           test -n "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep "package: name='ru.natro.statuswidget' versionCode='208021075' versionName='v2.8.2-ha1075'"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$APK"
-          CERTS=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs --min-sdk-version 28 "$APK")
-          echo "$CERTS"
-          echo "$CERTS" | grep -qi "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs --min-sdk-version 28 "$APK"
           unzip -t "$APK"
           sha256sum "$APK" | tee "$APK.sha256"
 
-      - name: Upload stable APK
+      - name: Upload release staging APK
         uses: actions/upload-artifact@v4
         with:
-          name: status-widget-ha-v2.8.2-ha1075-stable
+          name: status-widget-ha-v2.8.2-ha1075-release-staging
           path: |
             app/build/outputs/apk/geely/release/*.apk
             app/build/outputs/apk/geely/release/*.sha256
