@@ -124,6 +124,11 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".InformationPanelSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".MediaPanelSettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />

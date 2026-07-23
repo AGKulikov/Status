@@ -483,6 +483,11 @@ public class Preferences {
             "launcherVehicleInfoVisible", DEFAULT_LAUNCHER_VEHICLE_INFO_VISIBLE);
     public final Str launcherVehicleInfoConfigJson = new Str(this,
             "launcherVehicleInfoConfigJson", "");
+    /** Independent read-only HOME panel combining car/system and smart-home statuses. */
+    public final Bool launcherInformationVisible = new Bool(this,
+            "launcherInformationVisible", false);
+    public final Str launcherInformationConfigJson = new Str(this,
+            "launcherInformationConfigJson", "");
     // Per-panel inner element visibility/order/scale. Kept separate from outer pixel geometry so
     // older HOME layouts migrate without moving any panel on upgrade.
     public final Str launcherPanelElementsJson = new Str(this, "launcherPanelElementsJson", "");

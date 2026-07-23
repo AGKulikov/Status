@@ -102,6 +102,8 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         addExternalButton(navigation, "Климат", ClimatePanelSettingsActivity.class);
         addExternalButton(navigation, "Данные автомобиля / HUD",
                 VehicleInfoPanelSettingsActivity.class);
+        addExternalButton(navigation, "Информация: автомобиль и умный дом",
+                InformationPanelSettingsActivity.class);
         TextView hint = new TextView(this);
         hint.setText("Размер и положение самой панели меняются в редакторе компоновки HOME. Здесь настраивается её содержимое.");
         hint.setTextSize(13);

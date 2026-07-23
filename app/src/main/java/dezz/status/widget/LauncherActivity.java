@@ -88,6 +88,8 @@ import dezz.status.widget.launcher.climate.ClimatePanelView;
 import dezz.status.widget.launcher.media.MediaPanelConfig;
 import dezz.status.widget.launcher.media.MediaPanelConfigStore;
 import dezz.status.widget.launcher.media.MediaPanelView;
+import dezz.status.widget.launcher.information.InformationPanelConfigStore;
+import dezz.status.widget.launcher.information.InformationPanelView;
 import dezz.status.widget.launcher.navigation.NavigationPanelConfig;
 import dezz.status.widget.launcher.navigation.NavigationPanelConfigStore;
 import dezz.status.widget.launcher.panels.PanelContentEditOverlay;
@@ -156,6 +158,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private FavoriteAppsConfigStore favoriteAppsConfigStore;
     private FavoriteRoutesConfigStore favoriteRoutesConfigStore;
     private VehicleInfoPanelConfigStore vehicleInfoConfigStore;
+    private InformationPanelConfigStore informationConfigStore;
     private FrameLayout workspace;
     private LauncherGridView editorGrid;
     private MaterialButton doneButton;
@@ -224,6 +227,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private FavoriteRoutesPanelView favoriteRoutesPanel;
     private boolean favoriteRoutesAvailable;
     private VehicleInfoPanelView vehicleInfoPanel;
+    private InformationPanelView informationPanel;
     @Nullable private String appliedPanelElementsJson;
     @Nullable private String appliedNavigationConfigJson;
     private int appliedAppsColumns = -1;
@@ -285,6 +289,7 @@ public final class LauncherActivity extends AppCompatActivity {
         favoriteAppsConfigStore = new FavoriteAppsConfigStore(preferences);
         favoriteRoutesConfigStore = new FavoriteRoutesConfigStore(preferences);
         vehicleInfoConfigStore = new VehicleInfoPanelConfigStore(preferences);
+        informationConfigStore = new InformationPanelConfigStore(preferences);
         configureWindow();
         View root = buildRoot();
         setContentView(root);
@@ -361,6 +366,10 @@ public final class LauncherActivity extends AppCompatActivity {
         if (vehicleInfoPanel != null && preferences.launcherVehicleInfoVisible.get()) {
             vehicleInfoPanel.start();
         }
+        if (informationPanel != null && preferences.launcherInformationVisible.get()
+                && informationPanel.hasConfiguredItems()) {
+            informationPanel.start();
+        }
     }
 
     @Override
@@ -380,6 +389,7 @@ public final class LauncherActivity extends AppCompatActivity {
         applySmartHomeValues(Collections.emptyList());
         if (climatePanel != null) climatePanel.stop();
         if (vehicleInfoPanel != null) vehicleInfoPanel.stop();
+        if (informationPanel != null) informationPanel.stop();
         if (carIntegration != null) carIntegration.unsubscribeControlStates(carStateListener);
         if (mediaController != null) mediaController.stop();
         releaseNavigationGraphics();
@@ -530,6 +540,18 @@ public final class LauncherActivity extends AppCompatActivity {
             vehicleInfoPanel.reloadConfig();
             if (activityStarted && vehicleInfoVisible) vehicleInfoPanel.start();
             else vehicleInfoPanel.stop();
+        }
+        boolean informationVisible = preferences.launcherInformationVisible.get();
+        if (informationPanel != null) {
+            informationPanel.reloadConfig();
+            boolean hasInformation = informationPanel.hasConfiguredItems();
+            setPanelVisibility(LauncherLayoutStore.INFORMATION,
+                    informationVisible && (editMode || hasInformation));
+            if (activityStarted && informationVisible && hasInformation) {
+                informationPanel.start();
+            } else {
+                informationPanel.stop();
+            }
         }
 
         layoutStore.load(workspace.getWidth(), workspace.getHeight());
@@ -807,6 +829,13 @@ public final class LauncherActivity extends AppCompatActivity {
                                 ? View.VISIBLE : View.GONE);
                     }
                     break;
+                case 7:
+                    addPanelSafely(LauncherLayoutStore.INFORMATION, "Информация",
+                            this::buildInformationPanel,
+                            () -> preferences.launcherInformationVisible.get()
+                                    && informationConfigStore.load().hasEnabledItems());
+                    makePanelTransparent(LauncherLayoutStore.INFORMATION);
+                    break;
                 default:
                     finishPanelInitialization();
                     return;
@@ -845,6 +874,10 @@ public final class LauncherActivity extends AppCompatActivity {
                 && hasClimatePanelContent() && climatePanel != null) climatePanel.start();
         if (activityStarted && preferences.launcherVehicleInfoVisible.get()) {
             if (vehicleInfoPanel != null) vehicleInfoPanel.start();
+        }
+        if (activityStarted && preferences.launcherInformationVisible.get()
+                && informationPanel != null && informationPanel.hasConfiguredItems()) {
+            informationPanel.start();
         }
         appliedPanelElementsJson = preferences.launcherPanelElementsJson.get();
         appliedNavigationConfigJson = preferences.launcherNavigationConfigJson.get();
@@ -930,6 +963,17 @@ public final class LauncherActivity extends AppCompatActivity {
                         preferences.launcherVehicleInfoVisible.get()
                                 && (editMode || contentVisible)));
         return vehicleInfoPanel;
+    }
+
+    @NonNull
+    private View buildInformationPanel() {
+        informationPanel = new InformationPanelView(this, carIntegration,
+                informationConfigStore);
+        informationPanel.setContentListener(hasItems ->
+                setPanelVisibility(LauncherLayoutStore.INFORMATION,
+                        preferences.launcherInformationVisible.get()
+                                && (editMode || hasItems)));
+        return informationPanel;
     }
 
     private void addPanel(@NonNull String id, @NonNull String label, @NonNull View content,
@@ -1654,6 +1698,10 @@ public final class LauncherActivity extends AppCompatActivity {
         if (vehicleInfoPanel != null && preferences.launcherVehicleInfoVisible.get()) {
             setPanelVisibility(LauncherLayoutStore.VEHICLE_INFO,
                     enabled || vehicleInfoPanel.hasDisplayableSample());
+        }
+        if (informationPanel != null && preferences.launcherInformationVisible.get()) {
+            setPanelVisibility(LauncherLayoutStore.INFORMATION,
+                    enabled || informationPanel.hasConfiguredItems());
         }
         Toast.makeText(this, enabled
                 ? "Тащите панель; маркер внизу справа изменяет размер"
