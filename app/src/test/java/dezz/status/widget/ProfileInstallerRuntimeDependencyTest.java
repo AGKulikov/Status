@@ -9,7 +9,7 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
-/** Prevents Android 9 startup crashes caused by ProfileInstaller's optional future dependency. */
+/** Guards the exact Android 9 crash caused by ProfileInstaller's optional future dependency. */
 public final class ProfileInstallerRuntimeDependencyTest {
     @Test
     public void resolvableFutureIsAvailableAtRuntime() throws ClassNotFoundException {
