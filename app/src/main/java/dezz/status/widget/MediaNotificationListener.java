@@ -211,7 +211,10 @@ public class MediaNotificationListener extends NotificationListenerService {
             } catch (RuntimeException | LinkageError ignored) {
                 continue;
             }
-            if (candidate != null) candidates.add(candidate);
+            if (candidate != null && NavigationDataRepository.isNotificationCandidateLive(
+                    candidate, System.currentTimeMillis())) {
+                candidates.add(candidate);
+            }
         }
         // Completeness comes first: a stale Navigator notice containing only one value must not
         // hide a complete current route from Maps. At equal completeness standalone Navigator

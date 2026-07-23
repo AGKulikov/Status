@@ -94,6 +94,7 @@ public final class MediaPanelView extends FrameLayout {
     private long positionMs;
     private int volumePercent;
     private boolean playing;
+    private boolean restartTextMarquee;
 
     public MediaPanelView(@NonNull Context context, @NonNull MediaPanelConfigStore store,
                           @Nullable Controls controls) {
@@ -120,7 +121,23 @@ public final class MediaPanelView extends FrameLayout {
 
     /** Enables drag-to-place, slot highlighting and disables media actions in the preview. */
     public void setLayoutEditor(@Nullable LayoutEditor editor) {
-        layoutEditor = editor;
+        setInPlaceEditMode(editor != null, editor);
+    }
+
+    /**
+     * Uses this exact rendered panel as the editor, so grid placement cannot differ from HOME.
+     * A drag moves an element; dragging its bottom-right 30dp corner resizes its cell span.
+     */
+    public void setInPlaceEditMode(boolean enabled) {
+        setInPlaceEditMode(enabled, enabled
+                ? (updated, movedId, finished) -> {
+                    if (finished) store.save(updated);
+                }
+                : null);
+    }
+
+    public void setInPlaceEditMode(boolean enabled, @Nullable LayoutEditor editor) {
+        layoutEditor = enabled ? editor : null;
         rebuild();
     }
 
@@ -131,6 +148,10 @@ public final class MediaPanelView extends FrameLayout {
 
     /** Existing Android MediaSession state remains owned by LauncherMediaController. */
     public void setSnapshot(@NonNull LauncherMediaController.Snapshot state) {
+        restartTextMarquee |= !titleValue.equals(state.title)
+                || !artistValue.equals(state.artist)
+                || !albumValue.equals(state.album)
+                || !applicationValue.equals(state.application);
         titleValue = state.title;
         artistValue = state.artist;
         albumValue = state.album;
@@ -146,9 +167,14 @@ public final class MediaPanelView extends FrameLayout {
     /** Realistic content for the settings screen without requiring notification access there. */
     public void setPreviewContent(@NonNull String title, @NonNull String artist,
                                   @NonNull String application, boolean playing) {
+        String previewAlbum = "Очень длинное название альбома для проверки прокрутки";
+        restartTextMarquee |= !titleValue.equals(title)
+                || !artistValue.equals(artist)
+                || !albumValue.equals(previewAlbum)
+                || !applicationValue.equals(application);
         titleValue = title;
         artistValue = artist;
-        albumValue = "Альбом";
+        albumValue = previewAlbum;
         applicationValue = application;
         artworkBitmap = null;
         durationMs = 4L * 60L * 1_000L + 12_000L;
@@ -202,7 +228,6 @@ public final class MediaPanelView extends FrameLayout {
                 artwork = new ImageView(getContext());
                 artwork.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 artwork.setContentDescription("Обложка");
-                artwork.setBackground(glassBackground(false, config.cornerRadiusPx / 2));
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     artwork.setClipToOutline(true);
                     artwork.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
@@ -232,14 +257,17 @@ public final class MediaPanelView extends FrameLayout {
                 return progressElement(element.scalePercent);
             case MediaPanelConfig.PREVIOUS:
                 return button(android.R.drawable.ic_media_previous, "Предыдущий трек",
-                        controls == null ? null : v -> controls.previous(), element.scalePercent);
+                        controls == null || layoutEditor != null
+                                ? null : v -> controls.previous(), element.scalePercent);
             case MediaPanelConfig.PLAY_PAUSE:
                 playPause = button(android.R.drawable.ic_media_play, "Играть или поставить на паузу",
-                        controls == null ? null : v -> controls.playPause(), element.scalePercent);
+                        controls == null || layoutEditor != null
+                                ? null : v -> controls.playPause(), element.scalePercent);
                 return playPause;
             case MediaPanelConfig.NEXT:
                 return button(android.R.drawable.ic_media_next, "Следующий трек",
-                        controls == null ? null : v -> controls.next(), element.scalePercent);
+                        controls == null || layoutEditor != null
+                                ? null : v -> controls.next(), element.scalePercent);
             case MediaPanelConfig.VOLUME:
                 return volumeElement(element.scalePercent);
             default:
@@ -287,13 +315,13 @@ public final class MediaPanelView extends FrameLayout {
         root.addView(icon, new LinearLayout.LayoutParams(iconSize, iconSize));
         volume = new SeekBar(getContext());
         volume.setMax(100);
-        volume.setEnabled(controls != null);
+        volume.setEnabled(controls != null && layoutEditor == null);
         volume.setProgressTintList(ColorStateList.valueOf(color(config.controlColor, Color.WHITE)));
         volume.setThumbTintList(ColorStateList.valueOf(color(config.controlColor, Color.WHITE)));
         volume.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
                 if (volumeLabel != null) volumeLabel.setText(value + "%");
-                if (fromUser && controls != null) setSystemVolume(value);
+                if (fromUser && controls != null && layoutEditor == null) setSystemVolume(value);
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
@@ -408,13 +436,21 @@ public final class MediaPanelView extends FrameLayout {
     }
 
     private void applySnapshot() {
-        if (title != null) title.setText(titleValue);
+        if (title != null) {
+            applyMediaText(title, titleValue,
+                    config.element(MediaPanelConfig.TITLE).marqueeEnabled,
+                    restartTextMarquee);
+        }
         if (artist != null) {
-            artist.setText(artistValue);
+            applyMediaText(artist, artistValue,
+                    config.element(MediaPanelConfig.ARTIST).marqueeEnabled,
+                    restartTextMarquee);
             artist.setVisibility(artistValue.isEmpty() ? View.GONE : View.VISIBLE);
         }
         if (album != null) {
-            album.setText(albumValue);
+            applyMediaText(album, albumValue,
+                    config.element(MediaPanelConfig.ALBUM).marqueeEnabled,
+                    restartTextMarquee);
             album.setVisibility(albumValue.isEmpty() ? View.GONE : View.VISIBLE);
         }
         if (application != null) {
@@ -422,11 +458,15 @@ public final class MediaPanelView extends FrameLayout {
             application.setVisibility(applicationValue.isEmpty() ? View.GONE : View.VISIBLE);
         }
         if (artwork != null) {
-            if (artworkBitmap != null) artwork.setImageBitmap(artworkBitmap);
-            else artwork.setImageResource(android.R.drawable.ic_media_play);
             if (artworkBitmap == null) {
-                artwork.setColorFilter(color(config.controlColor, Color.WHITE));
+                // Clear both the previous track bitmap and its backing shape. Missing artwork is
+                // deliberately an empty transparent grid cell, never a media-icon placeholder.
+                artwork.setImageDrawable(null);
+                artwork.setBackground(null);
+                artwork.clearColorFilter();
             } else {
+                artwork.setBackground(glassBackground(false, config.cornerRadiusPx / 2));
+                artwork.setImageBitmap(artworkBitmap);
                 artwork.clearColorFilter();
             }
         }
@@ -447,6 +487,24 @@ public final class MediaPanelView extends FrameLayout {
                     durationMs > 0L ? View.VISIBLE : View.GONE);
         }
         updateVolumeUi();
+        restartTextMarquee = false;
+    }
+
+    /**
+     * Toggling selected around a changed value resets Android's marquee immediately, so a new
+     * track can never continue scrolling pixels/text from the previous one. Android itself starts
+     * marquee only when the laid-out line overflows, therefore short strings remain stationary.
+     */
+    private static void applyMediaText(@NonNull TextView view, @NonNull String value,
+                                       boolean marqueeEnabled, boolean forceRestart) {
+        boolean changed = !TextUtils.equals(view.getText(), value);
+        if (changed || forceRestart) view.setSelected(false);
+        view.setSingleLine(true);
+        view.setEllipsize(marqueeEnabled
+                ? TextUtils.TruncateAt.MARQUEE : TextUtils.TruncateAt.END);
+        view.setMarqueeRepeatLimit(-1);
+        if (changed || forceRestart) view.setText(value);
+        view.setSelected(marqueeEnabled && !value.isEmpty());
     }
 
     private void applySurface() {
@@ -481,12 +539,16 @@ public final class MediaPanelView extends FrameLayout {
         child.setOnTouchListener(new OnTouchListener() {
             private float touchOffsetX;
             private float touchOffsetY;
+            private boolean resizing;
 
             @Override public boolean onTouch(View view, MotionEvent event) {
                 switch (event.getActionMasked()) {
                     case MotionEvent.ACTION_DOWN:
                         touchOffsetX = event.getX();
                         touchOffsetY = event.getY();
+                        int handle = dp(30);
+                        resizing = event.getX() >= view.getWidth() - handle
+                                && event.getY() >= view.getHeight() - handle;
                         if (view.getParent() != null) {
                             view.getParent().requestDisallowInterceptTouchEvent(true);
                         }
@@ -499,6 +561,22 @@ public final class MediaPanelView extends FrameLayout {
                         return true;
                     case MotionEvent.ACTION_MOVE:
                         grid.getLocationOnScreen(dragGridLocation);
+                        if (resizing) {
+                            int right = Math.round(event.getRawX() - dragGridLocation[0]);
+                            int bottom = Math.round(event.getRawY() - dragGridLocation[1]);
+                            if (grid.resizeToPixel(view, right, bottom)) {
+                                MediaElementGridLayout.ElementLayoutParams lp =
+                                        (MediaElementGridLayout.ElementLayoutParams)
+                                                view.getLayoutParams();
+                                config.setSpan(id, lp.columnSpan, lp.rowSpan);
+                                syncGridPlacements();
+                                LayoutEditor editor = layoutEditor;
+                                if (editor != null) {
+                                    editor.onLayoutChanged(config.copy(), id, false);
+                                }
+                            }
+                            return true;
+                        }
                         int left = Math.round(event.getRawX() - dragGridLocation[0] - touchOffsetX);
                         int top = Math.round(event.getRawY() - dragGridLocation[1] - touchOffsetY);
                         if (grid.moveToPixel(view, left, top)) {
@@ -512,6 +590,9 @@ public final class MediaPanelView extends FrameLayout {
                         return true;
                     case MotionEvent.ACTION_UP:
                     case MotionEvent.ACTION_CANCEL:
+                        if (view.getParent() != null) {
+                            view.getParent().requestDisallowInterceptTouchEvent(false);
+                        }
                         view.setScaleX(1f);
                         view.setScaleY(1f);
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {

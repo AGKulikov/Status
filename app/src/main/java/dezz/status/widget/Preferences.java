@@ -486,6 +486,9 @@ public class Preferences {
     // Per-panel inner element visibility/order/scale. Kept separate from outer pixel geometry so
     // older HOME layouts migrate without moving any panel on upgrade.
     public final Str launcherPanelElementsJson = new Str(this, "launcherPanelElementsJson", "");
+    /** Cell geometry for the WYSIWYG navigation editor; migrated from launcherPanelElementsJson. */
+    public final Str launcherNavigationConfigJson = new Str(this,
+            "launcherNavigationConfigJson", "");
     public final Str launcherClimateConfigJson = new Str(this, "launcherClimateConfigJson", "");
     // Optional always-on climate surface. It is deliberately independent from both the HOME
     // climate panel above and the status widget service: a user may want climate controls while

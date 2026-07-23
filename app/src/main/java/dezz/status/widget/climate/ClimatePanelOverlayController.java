@@ -54,6 +54,8 @@ public final class ClimatePanelOverlayController {
     private static final int MODE_RESERVED = 1;
     /** Coalesce live extent-slider changes instead of queueing dozens of shell commands. */
     private static final long RESERVATION_DEBOUNCE_MS = 160L;
+    private static final long VENDOR_RESERVATION_VERIFY_MS = 250L;
+    private static final int VENDOR_RESERVATION_VERIFY_ATTEMPTS = 3;
     private static final long FAILURE_TOAST_THROTTLE_MS = 5_000L;
     /** PrivilegedShell suppresses a failed discovery for 60 s; retry just after that window. */
     private static final long RESTORE_RETRY_MS = 65_000L;
@@ -67,6 +69,7 @@ public final class ClimatePanelOverlayController {
     private final Preferences preferences;
     private final ClimatePanelConfigStore configStore;
     private final ScreenReservationController reservationController;
+    private final ScreenReservationStateStore reservationStateStore;
     @Nullable private final StatusListener statusListener;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final int dragThreshold;
@@ -89,6 +92,12 @@ public final class ClimatePanelOverlayController {
     private boolean destroyed;
     private boolean compactReservationReconciled;
     private boolean exactStopRestorePending;
+    private ReservationBackend reservationBackend = ReservationBackend.NONE;
+    private boolean vendorReservationVerificationPending;
+    private int vendorReservationVerificationAttempt;
+    private int vendorUnreservedAppWidth;
+    private int vendorUnreservedAppHeight;
+    private int reservedWindowType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
 
     private int reservationGeneration;
     private int requestedEdge;
@@ -108,6 +117,15 @@ public final class ClimatePanelOverlayController {
     private final Runnable reservationApply = this::beginReservationApply;
     private final Runnable missingPermissionRetry = this::applyPreferences;
 
+    private enum ReservationBackend {
+        NONE,
+        VENDOR,
+        OVERSCAN_PENDING,
+        OVERSCAN,
+        /** Ordinary overlay plus a HOME-only safe area; this is not a global reservation. */
+        LOCAL
+    }
+
     public ClimatePanelOverlayController(@NonNull Context context,
                                          @NonNull Preferences preferences) {
         this(context, preferences, null);
@@ -121,6 +139,7 @@ public final class ClimatePanelOverlayController {
         this.statusListener = statusListener;
         configStore = new ClimatePanelConfigStore(preferences);
         reservationController = new ScreenReservationController(appContext);
+        reservationStateStore = new ScreenReservationStateStore(appContext);
         int slop = ViewConfiguration.get(appContext).getScaledTouchSlop();
         dragThreshold = Math.max(slop * 2, dpFrom(appContext, 12));
     }
@@ -157,10 +176,14 @@ public final class ClimatePanelOverlayController {
 
         if (preferences.climatePanelMode.get() == MODE_RESERVED) {
             compactReservationReconciled = false;
-            requestReservedMode(displayId);
+            requestReservedMode(attachedDisplayId);
         } else {
             requestCompactMode();
         }
+    }
+
+    int getAttachedDisplayId() {
+        return attachedDisplayId;
     }
 
     /** Remove both windows and restore the complete application work area. */
@@ -174,6 +197,10 @@ public final class ClimatePanelOverlayController {
         main.removeCallbacks(missingPermissionRetry);
         compactPanelExpanded = false;
         reservedActive = false;
+        reservationBackend = ReservationBackend.NONE;
+        vendorReservationVerificationPending = false;
+        vendorUnreservedAppWidth = vendorUnreservedAppHeight = 0;
+        reservedWindowType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
         exactStopRestorePending = true;
         removeAllWindows();
         stopClimatePanel();
@@ -196,6 +223,10 @@ public final class ClimatePanelOverlayController {
         exactStopRestorePending = false;
         reservationGeneration++;
         main.removeCallbacksAndMessages(null);
+        reservationBackend = ReservationBackend.NONE;
+        vendorReservationVerificationPending = false;
+        vendorUnreservedAppWidth = vendorUnreservedAppHeight = 0;
+        reservedWindowType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
         removeAllWindows();
         stopClimatePanel();
         if (restoreReservation) reservationController.restore(result -> { });
@@ -203,9 +234,15 @@ public final class ClimatePanelOverlayController {
 
     private void requestCompactMode() {
         main.removeCallbacks(reservationApply);
-        boolean shouldRestore = reservedActive || !compactReservationReconciled;
+        boolean shouldRestore = reservationBackend == ReservationBackend.OVERSCAN
+                || reservationStateStore.hasManagedReservation()
+                || !compactReservationReconciled;
         if (shouldRestore) reservationGeneration++;
         reservedActive = false;
+        reservationBackend = ReservationBackend.NONE;
+        vendorReservationVerificationPending = false;
+        vendorUnreservedAppWidth = vendorUnreservedAppHeight = 0;
+        reservedWindowType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
         appliedEdge = appliedExtent = appliedDisplayId = -1;
         hidePanelWindow();
         compactPanelExpanded = false;
@@ -231,22 +268,159 @@ public final class ClimatePanelOverlayController {
         requestedExtent = clamp(preferences.climatePanelExtent.get(), 80,
                 Math.max(80, maximum));
         reservationGeneration++;
+        // The overlay generation only suppresses our callback; this separately stops an older
+        // ScreenReservationController generation before it can issue a delayed global mutation.
+        reservationController.cancelPending();
 
         if (reservedActive
                 && requestedEdge == appliedEdge
                 && requestedExtent == appliedExtent
                 && requestedDisplayId == appliedDisplayId) {
-            removeButtonWindow();
             compactPanelExpanded = false;
-            showPanelWindow(true);
+            if (!showPanelWindow(true)) {
+                failCurrentReservationWindow(
+                        "Закреплённое окно не создано; включена плавающая кнопка");
+                return;
+            }
+            if (reservationBackend == ReservationBackend.OVERSCAN_PENDING) {
+                // applied* still describes the last verified strip. A newer shell request may
+                // have been cancelled or may already have mutated WindowManager, so always
+                // converge and verify again even when the slider returns to the old geometry.
+                main.removeCallbacks(reservationApply);
+                main.postDelayed(reservationApply, RESERVATION_DEBOUNCE_MS);
+            } else if (vendorReservationVerificationPending) {
+                ensureButtonWindow();
+                scheduleVendorReservationVerification(reservationGeneration);
+            } else {
+                removeButtonWindow();
+                if (reservationBackend == ReservationBackend.LOCAL
+                        && reservationStateStore.hasManagedReservation()) {
+                    attemptFallbackRestore(reservationGeneration);
+                }
+            }
             return;
         }
 
+        // An old overscan journal means the display is already globally modified. Keep using that
+        // verified backend until it is restored; attaching an OEM inset on top would reserve the
+        // same strip twice after an in-place update from an older build.
+        if (reservationBackend != ReservationBackend.OVERSCAN
+                && reservationBackend != ReservationBackend.OVERSCAN_PENDING
+                && !reservationStateStore.hasManagedReservation()) {
+            Display targetDisplay = windowManager == null
+                    ? null : windowManager.getDefaultDisplay();
+            int nativeType = ClimateReservationWindowPolicy.resolve(
+                    appContext, targetDisplay, requestedEdge);
+            boolean replacingOwnVendorWindow = reservationBackend == ReservationBackend.VENDOR
+                    && panelAttached && panelParams != null && panelParams.type == nativeType;
+            if (ClimateReservationWindowPolicy.isVendorType(nativeType)
+                    && (replacingOwnVendorWindow
+                    || !ClimateReservationWindowPolicy.isOccupied(
+                            appContext, targetDisplay, nativeType))) {
+                beginVendorReservation(nativeType);
+                return;
+            }
+        }
+
+        beginOverscanReservation();
+    }
+
+    /**
+     * Tries the ECARX WindowManager bar type first. Unlike an application overlay, that window is
+     * part of the vendor inset policy. Merely accepting addView is not enough: Display#getSize()
+     * must also report the requested reduction before this backend is considered active.
+     */
+    private void beginVendorReservation(int nativeType) {
+        main.removeCallbacks(reservationApply);
+        boolean replacingVendor = reservationBackend == ReservationBackend.VENDOR
+                && vendorUnreservedAppWidth > 0 && vendorUnreservedAppHeight > 0;
+        int previousUnreservedWidth = vendorUnreservedAppWidth;
+        int previousUnreservedHeight = vendorUnreservedAppHeight;
+        hidePanelWindow();
+        reservationBackend = ReservationBackend.NONE;
+        reservedActive = false;
+        vendorReservationVerificationPending = true;
+        vendorReservationVerificationAttempt = 0;
+        reservedWindowType = nativeType;
+        appliedEdge = requestedEdge;
+        appliedExtent = requestedExtent;
+        appliedDisplayId = requestedDisplayId;
+        Point before = applicationDisplaySize();
+        vendorUnreservedAppWidth = replacingVendor ? previousUnreservedWidth : before.x;
+        vendorUnreservedAppHeight = replacingVendor ? previousUnreservedHeight : before.y;
+        compactPanelExpanded = false;
+
+        // Keep the compact control until the native work-area change has been measured.
+        ensureButtonWindow();
+        updateButtonGeometry();
+        if (!showPanelWindow(true)) {
+            fallbackFromVendorReservation(
+                    "OEM-окно резервирования отклонено WindowManager");
+            return;
+        }
+        reservedActive = true;
+        reservationBackend = ReservationBackend.VENDOR;
+        publishStatus("reserved_vendor_pending",
+                "Проверяем рабочую область, созданную системной панелью ECARX");
+        scheduleVendorReservationVerification(reservationGeneration);
+    }
+
+    private void scheduleVendorReservationVerification(int generation) {
+        main.postDelayed(() -> verifyVendorReservation(generation),
+                VENDOR_RESERVATION_VERIFY_MS);
+    }
+
+    private void verifyVendorReservation(int generation) {
+        if (destroyed || generation != reservationGeneration
+                || !vendorReservationVerificationPending
+                || reservationBackend != ReservationBackend.VENDOR
+                || !preferences.climatePanelEnabled.get()
+                || preferences.climatePanelMode.get() != MODE_RESERVED) {
+            return;
+        }
+        Point after = applicationDisplaySize();
+        if (ClimateReservationAreaPolicy.isReserved(appliedEdge, appliedExtent,
+                vendorUnreservedAppWidth, vendorUnreservedAppHeight, after.x, after.y)) {
+            vendorReservationVerificationPending = false;
+            removeButtonWindow();
+            publishStatus("reserved_vendor",
+                    "Место зарезервировано системной панелью ECARX");
+            return;
+        }
+        vendorReservationVerificationAttempt++;
+        if (vendorReservationVerificationAttempt < VENDOR_RESERVATION_VERIFY_ATTEMPTS) {
+            scheduleVendorReservationVerification(generation);
+            return;
+        }
+        fallbackFromVendorReservation(
+                "OEM-панель не изменила рабочую область приложений");
+    }
+
+    private void fallbackFromVendorReservation(@NonNull String detail) {
+        vendorReservationVerificationPending = false;
+        reservationBackend = ReservationBackend.NONE;
+        reservedActive = false;
+        vendorUnreservedAppWidth = vendorUnreservedAppHeight = 0;
+        hidePanelWindow();
+        reservedWindowType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+        appliedEdge = appliedExtent = appliedDisplayId = -1;
+        publishStatus("reserved_vendor_fallback", detail);
+        beginOverscanReservation();
+    }
+
+    private void beginOverscanReservation() {
+        reservedWindowType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+        vendorReservationVerificationPending = false;
+        vendorUnreservedAppWidth = vendorUnreservedAppHeight = 0;
         // A usable control must remain on screen while the privileged command is being checked.
-        // If a previously-confirmed strip is still active, keep its panel visible until the new
-        // geometry succeeds to avoid a distracting flash during live slider movement.
-        if (!reservedActive) {
+        // If a previously-confirmed overscan strip is still active, keep its panel visible until
+        // the new geometry succeeds to avoid a distracting flash during live slider movement.
+        boolean keepVerifiedPanel =
+                reservationBackend == ReservationBackend.OVERSCAN && reservedActive;
+        if (!keepVerifiedPanel) {
             hidePanelWindow();
+            reservedActive = false;
+            reservationBackend = ReservationBackend.NONE;
             compactPanelExpanded = false;
             if (!ensureButtonWindow()) {
                 publishStatus("overlay_error",
@@ -256,6 +430,7 @@ public final class ClimatePanelOverlayController {
             }
             updateButtonGeometry();
         }
+        reservationBackend = ReservationBackend.OVERSCAN_PENDING;
         publishStatus("reserved_pending", "Проверяем системное резервирование");
         main.removeCallbacks(reservationApply);
         main.postDelayed(reservationApply, RESERVATION_DEBOUNCE_MS);
@@ -280,26 +455,76 @@ public final class ClimatePanelOverlayController {
             }
             if (result.success) {
                 reservedActive = true;
+                reservationBackend = ReservationBackend.OVERSCAN;
+                vendorReservationVerificationPending = false;
+                reservedWindowType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
                 appliedEdge = edge;
                 appliedExtent = extent;
                 appliedDisplayId = displayId;
                 compactPanelExpanded = false;
                 removeButtonWindow();
-                showPanelWindow(true);
-                publishStatus("reserved", "Место под климатическую панель зарезервировано");
+                if (showPanelWindow(true)) {
+                    publishStatus("reserved",
+                            "Место под климатическую панель зарезервировано");
+                } else {
+                    failCurrentReservationWindow(
+                            "Закреплённое окно не создано; включена плавающая кнопка");
+                }
             } else {
                 Log.w(TAG, "Screen reservation failed: " + result.message);
-                reservedActive = false;
-                appliedEdge = appliedExtent = appliedDisplayId = -1;
-                hidePanelWindow();
-                ensureButtonWindow();
-                updateButtonGeometry();
-                // A failed multi-command attempt must never leave an inaccessible empty strip.
-                attemptFallbackRestore(reservationGeneration);
-                publishStatus("fallback", result.message);
                 showReservationFailure(result.message);
+                showLocalReservationFallback(result.message);
             }
         });
+    }
+
+    /**
+     * Keeps the requested fixed panel usable when the firmware exposes neither a working ECARX
+     * bar type nor legacy overscan. This only reserves space inside our own HOME activity; other
+     * applications still see an ordinary overlay, so the runtime status deliberately says local.
+     */
+    private void showLocalReservationFallback(@NonNull String globalFailure) {
+        reservedActive = false;
+        reservationBackend = ReservationBackend.LOCAL;
+        vendorReservationVerificationPending = false;
+        reservedWindowType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+        appliedEdge = requestedEdge;
+        appliedExtent = requestedExtent;
+        appliedDisplayId = requestedDisplayId;
+        compactPanelExpanded = false;
+        hidePanelWindow();
+        if (!showPanelWindow(true)) {
+            reservationBackend = ReservationBackend.NONE;
+            appliedEdge = appliedExtent = appliedDisplayId = -1;
+            ensureButtonWindow();
+            updateButtonGeometry();
+            attemptFallbackRestore(reservationGeneration);
+            publishStatus("fallback",
+                    globalFailure + "; доступна только плавающая кнопка");
+            return;
+        }
+        reservedActive = true;
+        removeButtonWindow();
+        publishStatus("reserved_local",
+                "Глобальное резервирование недоступно: " + globalFailure
+                        + ". Лаунчер использует локальную безопасную область");
+        // A failed verified overscan operation may have created a recovery journal. Restore it
+        // behind the local panel so no partly-applied global strip survives.
+        attemptFallbackRestore(reservationGeneration);
+    }
+
+    private void failCurrentReservationWindow(@NonNull String detail) {
+        reservedActive = false;
+        reservationBackend = ReservationBackend.NONE;
+        vendorReservationVerificationPending = false;
+        vendorUnreservedAppWidth = vendorUnreservedAppHeight = 0;
+        reservedWindowType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+        appliedEdge = appliedExtent = appliedDisplayId = -1;
+        hidePanelWindow();
+        ensureButtonWindow();
+        updateButtonGeometry();
+        attemptFallbackRestore(reservationGeneration);
+        publishStatus("fallback", detail);
     }
 
     @NonNull
@@ -328,6 +553,10 @@ public final class ClimatePanelOverlayController {
         // been detached. Treat the new display as pending so it gets a usable compact button until
         // ScreenReservationController restores the old display and verifies the new one.
         reservedActive = false;
+        reservationBackend = ReservationBackend.NONE;
+        vendorReservationVerificationPending = false;
+        vendorUnreservedAppWidth = vendorUnreservedAppHeight = 0;
+        reservedWindowType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
         compactPanelExpanded = false;
         compactReservationReconciled = false;
         appliedEdge = appliedExtent = appliedDisplayId = -1;
@@ -461,15 +690,20 @@ public final class ClimatePanelOverlayController {
         else hidePanelWindow();
     }
 
-    private void showPanelWindow(boolean reserved) {
-        if (!canDrawOverlays() || windowManager == null) return;
+    private boolean showPanelWindow(boolean reserved) {
+        if (!canDrawOverlays() || windowManager == null) return false;
         ensureClimatePanel();
-        if (climatePanel == null) return;
+        if (climatePanel == null) return false;
         ensurePanelRoot();
-        if (panelRoot == null) return;
+        if (panelRoot == null) return false;
 
         WindowManager.LayoutParams desired = reserved
                 ? reservedPanelParams() : compactPanelParams();
+        // Window type is immutable after addView. Edge changes can switch an OEM dock between
+        // STATUS_BAR and NAVIGATION_BAR, so detach before applying the new type.
+        if (panelAttached && panelParams != null && panelParams.type != desired.type) {
+            hidePanelWindow();
+        }
         if (panelParams == null) panelParams = desired;
         else copyGeometryAndFlags(desired, panelParams);
         if (collapseButton != null) {
@@ -482,18 +716,13 @@ public final class ClimatePanelOverlayController {
             } catch (RuntimeException error) {
                 Log.e(TAG, "Could not add climate panel overlay", error);
                 panelAttached = false;
-                if (reserved) {
-                    reservedActive = false;
-                    appliedEdge = appliedExtent = appliedDisplayId = -1;
-                    attemptFallbackRestore(reservationGeneration);
-                    ensureButtonWindow();
-                    publishStatus("fallback",
-                            "Закреплённое окно не создано; включена плавающая кнопка");
-                }
+                panelParams = null;
+                return false;
             }
         } else {
             updateWindow(panelRoot, panelParams);
         }
+        return panelAttached;
     }
 
     private void ensurePanelRoot() {
@@ -548,14 +777,34 @@ public final class ClimatePanelOverlayController {
         int edge = appliedEdge >= 0 ? appliedEdge : requestedEdge;
         int width = isHorizontalEdge(edge) ? display.x : extent;
         int height = isHorizontalEdge(edge) ? extent : display.y;
-        WindowManager.LayoutParams result = overlayParams(width, height, true);
-        if (edge == 0) {
-            result.x = 0;
-            result.y = Math.max(0, display.y - extent);
-        } else if (edge == 1) {
+        boolean vendor = ClimateReservationWindowPolicy.isVendorType(reservedWindowType);
+        WindowManager.LayoutParams result = overlayParams(width, height,
+                reservationBackend == ReservationBackend.OVERSCAN
+                        || reservationBackend == ReservationBackend.OVERSCAN_PENDING);
+        result.type = reservedWindowType;
+        if (vendor) {
+            // OEM bar windows must be attached to an edge, not positioned as an unrestricted
+            // application overlay. This is what lets ECARX WindowManager derive its inset frame.
+            result.flags &= ~WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
+            if (edge == ClimateReservationWindowPolicy.EDGE_BOTTOM) {
+                result.gravity = Gravity.BOTTOM | Gravity.LEFT;
+            } else if (edge == ClimateReservationWindowPolicy.EDGE_TOP) {
+                result.gravity = Gravity.TOP | Gravity.LEFT;
+            } else if (edge == ClimateReservationWindowPolicy.EDGE_LEFT) {
+                result.gravity = Gravity.LEFT | Gravity.TOP;
+            } else {
+                result.gravity = Gravity.RIGHT | Gravity.TOP;
+            }
             result.x = 0;
             result.y = 0;
-        } else if (edge == 2) {
+            result.setTitle("Status Widget climate system dock");
+        } else if (edge == ClimateReservationWindowPolicy.EDGE_BOTTOM) {
+            result.x = 0;
+            result.y = Math.max(0, display.y - extent);
+        } else if (edge == ClimateReservationWindowPolicy.EDGE_TOP) {
+            result.x = 0;
+            result.y = 0;
+        } else if (edge == ClimateReservationWindowPolicy.EDGE_LEFT) {
             result.x = 0;
             result.y = 0;
         } else {
@@ -670,6 +919,21 @@ public final class ClimatePanelOverlayController {
         return point;
     }
 
+    @SuppressWarnings("deprecation")
+    @NonNull
+    private Point applicationDisplaySize() {
+        Point point = new Point();
+        if (windowManager != null) {
+            windowManager.getDefaultDisplay().getSize(point);
+        }
+        if (point.x <= 0 || point.y <= 0) {
+            Point real = displaySize();
+            point.x = real.x;
+            point.y = real.y;
+        }
+        return point;
+    }
+
     private boolean canDrawOverlays() {
         boolean granted = Settings.canDrawOverlays(appContext);
         if (!granted) Log.w(TAG, "Overlay permission is not granted");
@@ -683,6 +947,10 @@ public final class ClimatePanelOverlayController {
         removeAllWindows();
         stopClimatePanel();
         reservedActive = false;
+        reservationBackend = ReservationBackend.NONE;
+        vendorReservationVerificationPending = false;
+        vendorUnreservedAppWidth = vendorUnreservedAppHeight = 0;
+        reservedWindowType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
         compactPanelExpanded = false;
         publishStatus("waiting_overlay_permission",
                 "Нужно разрешение Android «Поверх других приложений»");
@@ -742,19 +1010,34 @@ public final class ClimatePanelOverlayController {
         if (destroyed || generation != reservationGeneration
                 || !preferences.climatePanelEnabled.get()
                 || preferences.climatePanelMode.get() != MODE_RESERVED
-                || reservedActive) return;
+                || reservationBackend == ReservationBackend.VENDOR
+                || reservationBackend == ReservationBackend.OVERSCAN_PENDING
+                || reservationBackend == ReservationBackend.OVERSCAN) return;
         reservationController.restore(result -> {
             if (destroyed || generation != reservationGeneration
                     || !preferences.climatePanelEnabled.get()
                     || preferences.climatePanelMode.get() != MODE_RESERVED
-                    || reservedActive) return;
+                    || reservationBackend == ReservationBackend.VENDOR
+                    || reservationBackend == ReservationBackend.OVERSCAN_PENDING
+                    || reservationBackend == ReservationBackend.OVERSCAN) return;
             if (result.success) {
-                appliedEdge = appliedExtent = appliedDisplayId = -1;
-                publishStatus("fallback",
-                        "Полная область экрана восстановлена; доступна плавающая кнопка");
+                if (reservationBackend == ReservationBackend.LOCAL && reservedActive) {
+                    publishStatus("reserved_local",
+                            "Глобальное резервирование недоступно; лаунчер использует "
+                                    + "локальную безопасную область");
+                } else {
+                    appliedEdge = appliedExtent = appliedDisplayId = -1;
+                    publishStatus("fallback",
+                            "Полная область экрана восстановлена; доступна плавающая кнопка");
+                }
                 return;
             }
-            publishStatus("restore_retry", result.message);
+            if (reservationBackend == ReservationBackend.LOCAL && reservedActive) {
+                publishStatus("reserved_local",
+                        "Локальная область активна; повтор восстановления: " + result.message);
+            } else {
+                publishStatus("restore_retry", result.message);
+            }
             main.postDelayed(() -> attemptFallbackRestore(generation), RESTORE_RETRY_MS);
         });
     }

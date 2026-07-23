@@ -82,6 +82,23 @@ final class MediaElementGridLayout extends ViewGroup {
         return true;
     }
 
+    boolean resizeToPixel(@NonNull View child, int right, int bottom) {
+        ViewGroup.LayoutParams raw = child.getLayoutParams();
+        if (!(raw instanceof ElementLayoutParams)) return false;
+        ElementLayoutParams lp = (ElementLayoutParams) raw;
+        int width = Math.max(0, getWidth() - getPaddingLeft() - getPaddingRight());
+        int height = Math.max(0, getHeight() - getPaddingTop() - getPaddingBottom());
+        int columnSpan = MediaGridLayoutMath.spanForEndPx(
+                right - getPaddingLeft(), width, spacing, columns, lp.column);
+        int rowSpan = MediaGridLayoutMath.spanForEndPx(
+                bottom - getPaddingTop(), height, spacing, rows, lp.row);
+        if (columnSpan == lp.columnSpan && rowSpan == lp.rowSpan) return false;
+        lp.columnSpan = columnSpan;
+        lp.rowSpan = rowSpan;
+        child.setLayoutParams(lp);
+        return true;
+    }
+
     @Override protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int measuredWidth = resolveSize(getSuggestedMinimumWidth(), widthMeasureSpec);
         int measuredHeight = resolveSize(getSuggestedMinimumHeight(), heightMeasureSpec);

@@ -13,8 +13,13 @@ import org.junit.Test;
 public class NavigationRouteStatePolicyTest {
     private static final long NOW = 2_000_000L;
 
-    @Test public void explicitFreshRouteIsActiveWithoutSummaryFields() {
+    @Test public void confirmedFreshRouteIsActiveWithoutSummaryFields() {
         assertTrue(NavigationRouteStatePolicy.isRouteActive(true, true, false,
+                NOW - 1_000L, NOW, true));
+    }
+
+    @Test public void legacyActiveFlagWithoutPrimaryEvidenceIsDiscarded() {
+        assertFalse(NavigationRouteStatePolicy.isRouteActive(false, true, false,
                 NOW - 1_000L, NOW, true));
     }
 
@@ -53,5 +58,38 @@ public class NavigationRouteStatePolicyTest {
     @Test public void previousBootRouteIsAlwaysInactive() {
         assertFalse(NavigationRouteStatePolicy.isRouteActive(true, true, true,
                 NOW - 1_000L, NOW, false));
+    }
+
+    @Test public void speedLimitAndGraphicsAreNotPrimaryRouteEvidence() {
+        assertFalse(NavigationRouteStatePolicy.hasPrimaryEvidence(
+                "", "", "", "", "", ""));
+        assertTrue(NavigationRouteStatePolicy.hasPrimaryEvidence(
+                "", "18 мин", "", "", "", ""));
+        assertTrue(NavigationRouteStatePolicy.hasPrimaryEvidence(
+                "", "", "", "Поверните направо", "", ""));
+    }
+
+    @Test public void standaloneMonjaroSpeedUpdateCannotActivateRoute() {
+        assertFalse(NavigationRouteStatePolicy.monjaroRouteActive(
+                false, false, false, "", "", "", false));
+    }
+
+    @Test public void positiveMonjaroFlagStillNeedsRealRouteEvidence() {
+        assertFalse(NavigationRouteStatePolicy.monjaroRouteActive(
+                true, true, false, "", "", "", false));
+        assertTrue(NavigationRouteStatePolicy.monjaroRouteActive(
+                true, true, false, "", "", "", true));
+        assertFalse(NavigationRouteStatePolicy.monjaroRouteActive(
+                true, false, true, "Поворот", "", "", true));
+    }
+
+    @Test public void monjaroManeuverInfersRouteOnlyWhenFlagIsMissing() {
+        assertTrue(NavigationRouteStatePolicy.monjaroRouteActive(
+                false, false, false, "Поворот", "", "", false));
+    }
+
+    @Test public void imageOnlyManeuverCanActivateWithoutSpeedLimitEvidence() {
+        assertTrue(NavigationRouteStatePolicy.monjaroRouteActive(
+                false, false, false, "", "", "", true));
     }
 }

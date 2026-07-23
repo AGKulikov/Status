@@ -29,4 +29,16 @@ public final class MediaGridLayoutMathTest {
         assertEquals(12, MediaGridLayoutMath.clampSpan(99, 12));
         assertEquals(7, MediaGridLayoutMath.clampStart(99, 5, 12));
     }
+
+    @Test public void resizeHandleUsesTheSameRenderedGridEdges() {
+        int width = 1_200;
+        int spacing = 8;
+        int expectedRight = MediaGridLayoutMath.startPx(width, spacing, 12, 9) - spacing;
+        assertEquals(6, MediaGridLayoutMath.spanForEndPx(
+                expectedRight, width, spacing, 12, 3));
+        assertEquals(1, MediaGridLayoutMath.spanForEndPx(
+                -500, width, spacing, 12, 3));
+        assertEquals(9, MediaGridLayoutMath.spanForEndPx(
+                5_000, width, spacing, 12, 3));
+    }
 }

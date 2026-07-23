@@ -56,6 +56,7 @@ public final class MediaPanelConfigMigrationTest {
     @Test public void customGridSurvivesCurrentSchemaRoundTrip() {
         MediaPanelConfig source = new MediaPanelConfig();
         assertTrue(source.setGridSize(16, 8));
+        source.setMarqueeEnabled(MediaPanelConfig.TITLE, false);
         MediaPanelConfig restored = MediaPanelConfigStore.decode(
                 MediaPanelConfigStore.encode(source).toString());
         assertEquals(16, restored.gridColumns);
@@ -64,5 +65,15 @@ public final class MediaPanelConfigMigrationTest {
                 restored.element(MediaPanelConfig.PLAY_PAUSE).column);
         assertEquals(source.element(MediaPanelConfig.PLAY_PAUSE).row,
                 restored.element(MediaPanelConfig.PLAY_PAUSE).row);
+        assertFalse(restored.element(MediaPanelConfig.TITLE).marqueeEnabled);
+    }
+
+    @Test public void versionThreeDefaultsMarqueeOnForOverflowingText() {
+        String versionThree = "{\"version\":3,\"gridColumns\":12,\"gridRows\":6,"
+                + "\"elements\":[{\"id\":\"media.title\",\"enabled\":true,\"order\":0,"
+                + "\"scalePercent\":100,\"column\":3,\"row\":0,"
+                + "\"columnSpan\":5,\"rowSpan\":1}]}";
+        MediaPanelConfig restored = MediaPanelConfigStore.decode(versionThree);
+        assertTrue(restored.element(MediaPanelConfig.TITLE).marqueeEnabled);
     }
 }

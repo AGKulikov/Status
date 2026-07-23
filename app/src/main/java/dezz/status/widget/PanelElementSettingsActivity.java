@@ -55,6 +55,11 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
             if (panel != null) store.save(panel);
         });
         String requestedPanel = getIntent().getStringExtra(EXTRA_PANEL_ID);
+        if (LauncherLayoutStore.NAVIGATION.equals(requestedPanel)) {
+            startActivity(new Intent(this, NavigationPanelSettingsActivity.class));
+            finish();
+            return;
+        }
         if (requestedPanel != null
                 && !PanelElementConfigStore.definitions(requestedPanel).isEmpty()) {
             selectedPanel = requestedPanel;
@@ -91,7 +96,8 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         addPanelButton(navigation, "Приложения", LauncherLayoutStore.APPS);
         addExternalButton(navigation, "Медиа", MediaPanelSettingsActivity.class);
         addPanelButton(navigation, "Часы", LauncherLayoutStore.CLOCK);
-        addPanelButton(navigation, "Маршрут и избранное", LauncherLayoutStore.NAVIGATION);
+        addExternalButton(navigation, "Маршрут и избранное",
+                NavigationPanelSettingsActivity.class);
         addPanelButton(navigation, "Иконки и действия", LauncherLayoutStore.ACTIONS);
         addExternalButton(navigation, "Климат", ClimatePanelSettingsActivity.class);
         addExternalButton(navigation, "Данные автомобиля / HUD",

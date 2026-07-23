@@ -87,6 +87,60 @@ public final class ClimateLevelCyclePlanner {
         return sequence.get(next).value;
     }
 
+    /**
+     * Plans a +/- step without mixing manual and AUTO value domains. This distinction matters for
+     * the Geely fan: manual levels 0..9 and AUTO intensity profiles are backed by two different
+     * AdaptAPI functions even though the panel presents them as one logical control.
+     *
+     * <p>When {@code includeAuto} is false, an AUTO observation converges to OFF exactly like the
+     * manual heater/ventilation cycle above. When true, +/- walks only the available AUTO profiles
+     * while the climate is in AUTO; manual mode still walks only manual levels.</p>
+     */
+    @Nullable
+    public static Double nextStepperTarget(
+            @NonNull List<CarControlDescriptor.Option> source,
+            double current, int direction, boolean includeAuto) {
+        if (source.isEmpty() || direction == 0) return null;
+
+        CarControlDescriptor.Option off = null;
+        ArrayList<CarControlDescriptor.Option> manual = new ArrayList<>();
+        ArrayList<CarControlDescriptor.Option> automatic = new ArrayList<>();
+        for (CarControlDescriptor.Option option : source) {
+            String label = option.label == null ? "" : option.label.trim();
+            String normalized = label.toLowerCase(Locale.ROOT);
+            if (isOff(normalized, option.value)) {
+                if (off == null) off = option;
+                manual.add(option);
+            } else if (normalized.contains("auto") || normalized.contains("авто")) {
+                automatic.add(option);
+            } else {
+                manual.add(option);
+            }
+        }
+        manual.sort(Comparator.comparingDouble(value -> value.value));
+
+        int automaticIndex = findValue(automatic, current);
+        if (automaticIndex >= 0) {
+            if (!includeAuto) return off == null ? firstValue(manual) : off.value;
+            int step = direction > 0 ? 1 : -1;
+            int next = (automaticIndex + step + automatic.size()) % automatic.size();
+            return automatic.get(next).value;
+        }
+
+        int manualIndex = findValue(manual, current);
+        if (manualIndex < 0) {
+            return off == null ? firstValue(manual) : off.value;
+        }
+        int next = Math.max(0, Math.min(manual.size() - 1,
+                manualIndex + (direction > 0 ? 1 : -1)));
+        return manual.get(next).value;
+    }
+
+    @Nullable
+    private static Double firstValue(@NonNull List<CarControlDescriptor.Option> values) {
+        return values.isEmpty() ? null : values.get(0).value;
+    }
+
     private static int findValue(@NonNull List<CarControlDescriptor.Option> values,
                                  double target) {
         for (int index = 0; index < values.size(); index++) {

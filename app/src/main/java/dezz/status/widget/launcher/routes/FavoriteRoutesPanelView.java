@@ -174,7 +174,10 @@ public final class FavoriteRoutesPanelView extends FrameLayout {
         tile.setContentDescription(title);
 
         ImageView icon = new ImageView(getContext());
-        icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        // CENTER_INSIDE never enlarges a drawable above its intrinsic size. Android's built-in
+        // Home/Work icons are small bitmaps, so the old size slider only grew the empty ImageView
+        // around them. FIT_CENTER makes the drawable itself follow the configured pixel size.
+        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
         icon.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
         Drawable drawable = LauncherIconResolver.resolvePreset(
                 getContext(), route.icon, route.iconColor);

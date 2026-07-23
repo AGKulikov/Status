@@ -102,6 +102,12 @@ public final class NavigationDataRepository {
     private static final String PREF_DISTANCE = "distance";
     private static final String PREF_UPDATED_AT = "updatedAt";
     private static final String PREF_ROUTE_ACTIVE = "routeActive";
+    /**
+     * Written only by versions which separate primary route evidence from auxiliary channels.
+     * Its absence makes old snapshots fall back to their primary text/summary fields instead of
+     * trusting a legacy routeActive=true that may have been created by a speed-limit broadcast.
+     */
+    private static final String PREF_ROUTE_CONFIRMED = "routeConfirmed";
     private static final String PREF_SOURCE_PACKAGE = "sourcePackage";
     private static final String PREF_SOURCE_KEY = "sourceKey";
     private static final String PREF_MANEUVER_TITLE = "maneuverTitle";
@@ -353,7 +359,10 @@ public final class NavigationDataRepository {
     /** Reads one notification. Returns true when it contained at least one route value. */
     public static boolean update(@NonNull Context context, @NonNull StatusBarNotification sbn) {
         NotificationCandidate candidate = inspectNotification(context, sbn);
-        if (candidate == null) return false;
+        if (candidate == null
+                || !isNotificationCandidateLive(candidate, System.currentTimeMillis())) {
+            return false;
+        }
         persistNotification(context, candidate);
         return true;
     }
@@ -419,7 +428,19 @@ public final class NavigationDataRepository {
     /** Persists a candidate previously returned by {@link #inspectNotification}. */
     public static void persistNotification(@NonNull Context context,
             @NonNull NotificationCandidate candidate) {
-        persist(context, candidate.parsed, candidate.packageName, candidate.sourceKey, true);
+        long now = System.currentTimeMillis();
+        if (!isNotificationCandidateLive(candidate, now)) return;
+        // A watchdog repeatedly sees the same StatusBarNotification. Use its actual post time,
+        // not the time of our scan, so polling an orphaned route notification cannot keep it
+        // active forever.
+        persist(context, candidate.parsed, candidate.packageName, candidate.sourceKey, true,
+                candidate.postTime);
+    }
+
+    /** Pure-time gate used by the notification collector and JVM contracts. */
+    public static boolean isNotificationCandidateLive(@NonNull NotificationCandidate candidate,
+            long now) {
+        return NavigationRouteStatePolicy.isFresh(candidate.postTime, now);
     }
 
     /** Updates route data harvested from a Yandex Accessibility tree. */
@@ -588,6 +609,7 @@ public final class NavigationDataRepository {
                     || prefs.getLong(PREF_RAINBOW_IMAGE_UPDATED_AT, 0L) > 0;
             prefs.edit().remove(PREF_ARRIVAL).remove(PREF_DURATION).remove(PREF_DISTANCE)
                     .remove(PREF_UPDATED_AT).remove(PREF_ROUTE_ACTIVE)
+                    .remove(PREF_ROUTE_CONFIRMED)
                     .remove(PREF_SOURCE_PACKAGE)
                     .remove(PREF_SOURCE_KEY).remove(PREF_MANEUVER_TITLE)
                     .remove(PREF_MANEUVER_TEXT).remove(PREF_MANEUVER_SUBTEXT)
@@ -618,7 +640,9 @@ public final class NavigationDataRepository {
         long now = System.currentTimeMillis();
         boolean hasMainRouteEvidence = hasMainRouteEvidence(prefs);
         boolean routeActive = NavigationRouteStatePolicy.isRouteActive(
-                prefs.contains(PREF_ROUTE_ACTIVE), prefs.getBoolean(PREF_ROUTE_ACTIVE, false),
+                prefs.contains(PREF_ROUTE_CONFIRMED),
+                prefs.getBoolean(PREF_ROUTE_ACTIVE, false)
+                        && prefs.getBoolean(PREF_ROUTE_CONFIRMED, false),
                 hasMainRouteEvidence, updatedAt, now, true);
         List<TrafficLight> trafficLights = readTrafficLights(prefs, now);
         long trafficUpdatedAt = prefs.getLong(PREF_TRAFFIC_UPDATED_AT, 0L);
@@ -670,69 +694,99 @@ public final class NavigationDataRepository {
         SharedPreferences prefs = preferences(context);
         long updatedAt = prefs.getLong(PREF_UPDATED_AT, 0L);
         boolean routeActive = NavigationRouteStatePolicy.isRouteActive(
-                prefs.contains(PREF_ROUTE_ACTIVE), prefs.getBoolean(PREF_ROUTE_ACTIVE, false),
+                prefs.contains(PREF_ROUTE_CONFIRMED),
+                prefs.getBoolean(PREF_ROUTE_ACTIVE, false)
+                        && prefs.getBoolean(PREF_ROUTE_CONFIRMED, false),
                 hasMainRouteEvidence(prefs), updatedAt, System.currentTimeMillis(), true);
         return new RouteStatus(routeActive, prefs.getString(PREF_SPEED_LIMIT, ""));
     }
 
     /** Main-route evidence used only to migrate snapshots written before routeActive existed. */
     private static boolean hasMainRouteEvidence(SharedPreferences prefs) {
-        return !prefs.getString(PREF_ARRIVAL, "").isEmpty()
-                || !prefs.getString(PREF_DURATION, "").isEmpty()
-                || !prefs.getString(PREF_DISTANCE, "").isEmpty()
-                || !prefs.getString(PREF_MANEUVER_TITLE, "").isEmpty()
-                || !prefs.getString(PREF_MANEUVER_TEXT, "").isEmpty()
-                || !prefs.getString(PREF_MANEUVER_SUBTEXT, "").isEmpty()
-                || !prefs.getString(PREF_SPEED_LIMIT, "").isEmpty()
-                || prefs.getLong(PREF_MANEUVER_IMAGE_UPDATED_AT, 0L) > 0L;
+        return NavigationRouteStatePolicy.hasPrimaryEvidence(
+                prefs.getString(PREF_ARRIVAL, ""),
+                prefs.getString(PREF_DURATION, ""),
+                prefs.getString(PREF_DISTANCE, ""),
+                prefs.getString(PREF_MANEUVER_TITLE, ""),
+                prefs.getString(PREF_MANEUVER_TEXT, ""),
+                prefs.getString(PREF_MANEUVER_SUBTEXT, ""));
     }
 
     private static boolean updateFromMonjaroNavigation(@NonNull Context context,
             @NonNull Intent intent) {
-        if (!intent.getBooleanExtra("route_active", true)) {
-            clear(context);
-            return true;
-        }
         Bundle extras = intent.getExtras();
         String title = text(value(extras, "title"));
         String maneuver = text(value(extras, "text"));
         String subtext = text(value(extras, "subtext"));
         String speedLimit = text(value(extras, "speedlimit"));
+        boolean hasSpeedLimitField = extras != null && extras.containsKey("speedlimit");
         List<String> values = new ArrayList<>();
         if (!subtext.isEmpty()) values.add(subtext);
         NavigationDataParser.Parsed parsed = NavigationDataParser.parse(values);
-        String sourcePackage = sourcePackageFromHint(text(value(extras, "source")));
-        if (parsed.hasData()) {
-            persist(context, parsed, sourcePackage, "broadcast:plus.monjaro", true);
+        boolean explicitStateStored = intent.hasExtra("route_active");
+        boolean explicitlyActive = intent.getBooleanExtra("route_active", false);
+
+        if (explicitStateStored && !explicitlyActive) {
+            // Speed limit is a free-driving channel as well as a route field. End the route, then
+            // retain an explicitly supplied limit without allowing it to reactivate navigation.
+            clear(context);
+            if (hasSpeedLimitField) updateStandaloneSpeedLimit(context, speedLimit);
+            return true;
         }
+
+        String sourcePackage = sourcePackageFromHint(text(value(extras, "source")));
         boolean imageChanged = false;
         boolean imageStored = false;
         boolean hasImageFlag = intent.hasExtra("has_image");
         boolean hasImage = intent.getBooleanExtra("has_image", false);
-        if (hasImage || intent.hasExtra("image_bytes")) {
+        boolean hasImagePayload = intent.hasExtra("image_bytes")
+                || intent.hasExtra("maneuver_bitmap")
+                || intent.hasExtra("image");
+        if (hasImageFlag && !hasImage) {
+            // The explicit producer flag is authoritative even if it leaves a nullable/empty
+            // payload key in the Bundle. Do not retain a maneuver from the previous route.
+            imageChanged = clearGraphicWithoutNotify(context, NavigationGraphicStore.MANEUVER,
+                    PREF_MANEUVER_IMAGE_UPDATED_AT);
+        } else if (hasImage || hasImagePayload) {
             imageChanged = NavigationGraphicStore.saveFromIntent(context,
                     NavigationGraphicStore.MANEUVER, intent, "image_bytes", "maneuver_bitmap",
                     "image");
+            // A nullable/empty/corrupt extra is not route evidence. Only pixels which were
+            // successfully decoded and atomically stored may activate an image-only route.
             imageStored = imageChanged;
-        } else if (hasImageFlag) {
-            imageChanged = clearGraphicWithoutNotify(context, NavigationGraphicStore.MANEUVER,
-                    PREF_MANEUVER_IMAGE_UPDATED_AT);
+        }
+        boolean routeActiveSignal = NavigationRouteStatePolicy.monjaroRouteActive(
+                explicitStateStored, explicitlyActive, parsed.hasData(), title, maneuver,
+                subtext, imageStored);
+        if (!routeActiveSignal) {
+            // Auxiliary data can arrive with no route at all. It may update the vehicle speed
+            // warning or clear an old maneuver image, but it must not refresh PREF_UPDATED_AT or
+            // hide favorite destinations.
+            boolean speedHandled = hasSpeedLimitField
+                    && updateStandaloneSpeedLimit(context, speedLimit);
+            if (imageChanged) notifyChanged(context);
+            return speedHandled || imageChanged;
+        }
+
+        if (parsed.hasData()) {
+            persist(context, parsed, sourcePackage, "broadcast:plus.monjaro", true);
         }
         if (!parsed.hasData() && title.isEmpty() && maneuver.isEmpty() && subtext.isEmpty()
                 && speedLimit.isEmpty()) {
-            boolean explicitActive = intent.hasExtra("route_active");
             if (imageStored) {
                 long now = System.currentTimeMillis();
                 preferences(context).edit().putLong(PREF_MANEUVER_IMAGE_UPDATED_AT, now)
                         .putLong(PREF_UPDATED_AT, now)
-                        .putBoolean(PREF_ROUTE_ACTIVE, true).apply();
-            } else if (explicitActive) {
+                        .putBoolean(PREF_ROUTE_ACTIVE, true)
+                        .putBoolean(PREF_ROUTE_CONFIRMED, true).apply();
+            } else if (explicitStateStored) {
                 long now = System.currentTimeMillis();
                 preferences(context).edit().putLong(PREF_UPDATED_AT, now)
-                        .putBoolean(PREF_ROUTE_ACTIVE, true).apply();
+                        .putBoolean(PREF_ROUTE_ACTIVE, true)
+                        .putBoolean(PREF_ROUTE_CONFIRMED, true).apply();
             }
-            if (imageChanged || explicitActive) notifyChanged(context);
-            return imageChanged || explicitActive;
+            if (imageChanged || explicitStateStored) notifyChanged(context);
+            return imageChanged || explicitStateStored;
         }
         SharedPreferences prefs = preferences(context);
         long now = System.currentTimeMillis();
@@ -747,10 +801,22 @@ public final class NavigationDataRepository {
                 .putString(PREF_SOURCE_PACKAGE, sourcePackage)
                 .putString(PREF_SOURCE_KEY, "broadcast:plus.monjaro")
                 .putBoolean(PREF_ROUTE_ACTIVE, true)
+                .putBoolean(PREF_ROUTE_CONFIRMED, true)
                 .putLong(PREF_UPDATED_AT, now);
         if (imageStored) editor.putLong(PREF_MANEUVER_IMAGE_UPDATED_AT, now);
         editor.apply();
         if (changed || imageChanged || !parsed.hasData()) notifyChanged(context);
+        return true;
+    }
+
+    /** Updates the independent speed-limit channel without creating or refreshing a route. */
+    private static boolean updateStandaloneSpeedLimit(@NonNull Context context,
+            @NonNull String speedLimit) {
+        SharedPreferences prefs = preferences(context);
+        String previous = prefs.getString(PREF_SPEED_LIMIT, "");
+        if (Objects.equals(previous, speedLimit)) return true;
+        prefs.edit().putString(PREF_SPEED_LIMIT, speedLimit).apply();
+        notifyChanged(context);
         return true;
     }
 
@@ -1231,6 +1297,12 @@ public final class NavigationDataRepository {
 
     private static void persist(Context context, NavigationDataParser.Parsed parsed,
             String sourcePackage, String sourceKey, boolean mergeMissing) {
+        persist(context, parsed, sourcePackage, sourceKey, mergeMissing,
+                System.currentTimeMillis());
+    }
+
+    private static void persist(Context context, NavigationDataParser.Parsed parsed,
+            String sourcePackage, String sourceKey, boolean mergeMissing, long observedAt) {
         synchronized (NavigationDataRepository.class) {
             SharedPreferences prefs = preferences(context);
             String previousArrival = prefs.getString(PREF_ARRIVAL, "");
@@ -1241,6 +1313,10 @@ public final class NavigationDataRepository {
             long previousUpdatedAt = prefs.getLong(PREF_UPDATED_AT, 0L);
 
             long now = System.currentTimeMillis();
+            // Notification postTime is the liveness clock. Other transports pass the current
+            // wall time. Reject impossible clocks rather than turning stale input into a fresh
+            // route during a system-time correction.
+            if (observedAt <= 0L || observedAt > now) return;
             boolean sameSource = Objects.equals(sourcePackage, previousPackage);
             boolean sameLogicalSource = sameSource && Objects.equals(sourceKey, previousSourceKey);
             boolean previousFresh = previousUpdatedAt > 0
@@ -1269,7 +1345,7 @@ public final class NavigationDataRepository {
                 sourceKeyToWrite = previousSourceKey;
             }
             boolean sourceKeyChanged = !Objects.equals(sourceKeyToWrite, previousSourceKey);
-            boolean timestampDue = now - previousUpdatedAt >= TIMESTAMP_WRITE_INTERVAL_MS;
+            boolean timestampDue = observedAt - previousUpdatedAt >= TIMESTAMP_WRITE_INTERVAL_MS;
             if (!changed && !sourceKeyChanged && !timestampDue) return;
 
             prefs.edit().putString(PREF_ARRIVAL, arrival)
@@ -1278,7 +1354,8 @@ public final class NavigationDataRepository {
                     .putString(PREF_SOURCE_PACKAGE, sourcePackage)
                     .putString(PREF_SOURCE_KEY, sourceKeyToWrite)
                     .putBoolean(PREF_ROUTE_ACTIVE, true)
-                    .putLong(PREF_UPDATED_AT, now)
+                    .putBoolean(PREF_ROUTE_CONFIRMED, true)
+                    .putLong(PREF_UPDATED_AT, observedAt)
                     .apply();
             if (changed) notifyChanged(context);
         }

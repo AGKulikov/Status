@@ -89,6 +89,8 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
                 startActivity(new Intent(this, FavoriteAppsSettingsActivity.class)));
         addButton("Настроить медиапанель…", v ->
                 startActivity(new Intent(this, MediaPanelSettingsActivity.class)));
+        addButton("Сетка данных навигации…", v ->
+                startActivity(new Intent(this, NavigationPanelSettingsActivity.class)));
         addButton("Настроить маршрут и избранное…", v ->
                 startActivity(new Intent(this, FavoriteRoutesSettingsActivity.class)));
         addButton("Настроить климатическую панель…", v ->

@@ -58,17 +58,21 @@ public final class MediaPanelConfig {
         public int order;
         /** Size of text/icon inside the cell. The occupied area is controlled by spans. */
         public int scalePercent;
+        /** Scroll overflowing title/artist/album text; short text remains stationary. */
+        public boolean marqueeEnabled;
         public int column;
         public int row;
         public int columnSpan;
         public int rowSpan;
 
         private Element(@NonNull String id, boolean enabled, int order, int scalePercent,
-                        int column, int row, int columnSpan, int rowSpan) {
+                        boolean marqueeEnabled, int column, int row,
+                        int columnSpan, int rowSpan) {
             this.id = id;
             this.enabled = enabled;
             this.order = order;
             this.scalePercent = scalePercent;
+            this.marqueeEnabled = marqueeEnabled;
             this.column = column;
             this.row = row;
             this.columnSpan = columnSpan;
@@ -76,7 +80,7 @@ public final class MediaPanelConfig {
         }
 
         @NonNull private Element copy() {
-            return new Element(id, enabled, order, scalePercent,
+            return new Element(id, enabled, order, scalePercent, marqueeEnabled,
                     column, row, columnSpan, rowSpan);
         }
     }
@@ -128,6 +132,7 @@ public final class MediaPanelConfig {
         for (int index = 0; index < SPECS.size(); index++) {
             Spec spec = SPECS.get(index);
             elements.put(spec.id, new Element(spec.id, true, index, 100,
+                    supportsMarquee(spec.id),
                     spec.defaultColumn, spec.defaultRow,
                     spec.defaultColumnSpan, spec.defaultRowSpan));
         }
@@ -139,7 +144,7 @@ public final class MediaPanelConfig {
         if (value != null) return value;
         // Public callers use stable built-ins; returning a detached disabled value is safer than
         // crashing HOME if an imported future schema contains an unknown id.
-        return new Element(id, false, SPECS.size(), 100, 0, 0, 1, 1);
+        return new Element(id, false, SPECS.size(), 100, false, 0, 0, 1, 1);
     }
 
     @NonNull
@@ -169,6 +174,11 @@ public final class MediaPanelConfig {
     public void setScale(@NonNull String id, int scalePercent) {
         Element value = elements.get(id);
         if (value != null) value.scalePercent = scalePercent;
+    }
+
+    public void setMarqueeEnabled(@NonNull String id, boolean enabled) {
+        Element value = elements.get(id);
+        if (value != null && supportsMarquee(id)) value.marqueeEnabled = enabled;
     }
 
     public boolean setPosition(@NonNull String id, int column, int row) {
@@ -326,12 +336,14 @@ public final class MediaPanelConfig {
             Spec spec = SPECS.get(index);
             if (!elements.containsKey(spec.id)) {
                 elements.put(spec.id, new Element(spec.id, true, index, 100,
+                        supportsMarquee(spec.id),
                         spec.defaultColumn, spec.defaultRow,
                         spec.defaultColumnSpan, spec.defaultRowSpan));
             }
             Element element = elements.get(spec.id);
             if (element != null) {
                 element.scalePercent = clamp(element.scalePercent, 45, 220);
+                if (!supportsMarquee(element.id)) element.marqueeEnabled = false;
                 normalizePlacement(element);
             }
         }
@@ -353,6 +365,10 @@ public final class MediaPanelConfig {
     public static Spec spec(@NonNull String id) {
         for (Spec value : SPECS) if (value.id.equals(id)) return value;
         return null;
+    }
+
+    public static boolean supportsMarquee(@NonNull String id) {
+        return TITLE.equals(id) || ARTIST.equals(id) || ALBUM.equals(id);
     }
 
     private static boolean isHexColor(String value) {

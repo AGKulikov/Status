@@ -17,6 +17,7 @@ import androidx.annotation.Nullable;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 /** Opens Yandex Music across the package variants found on stock and modified head units. */
 public final class MediaAppLauncher {
@@ -34,17 +35,12 @@ public final class MediaAppLauncher {
         PackageManager manager = context.getPackageManager();
         for (String packageName : YANDEX_MUSIC_PACKAGES) {
             Intent intent = launchIntent(manager, packageName);
-            if (intent == null) continue;
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                    | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-            try {
-                context.startActivity(intent);
-                return true;
-            } catch (RuntimeException ignored) {
-                // A stale package-manager record must not prevent trying the second known build.
-            }
+            if (intent != null && start(context, intent)) return true;
         }
-        return false;
+        // Modified head units often ship a vendor-repacked build. Discover it by both package and
+        // localized application label instead of assuming only the two public package names.
+        return launchDiscovered(context, manager, Intent.CATEGORY_LAUNCHER)
+                || launchDiscovered(context, manager, Intent.CATEGORY_LEANBACK_LAUNCHER);
     }
 
     @Nullable
@@ -79,5 +75,58 @@ public final class MediaAppLauncher {
         } catch (RuntimeException ignored) {
         }
         return null;
+    }
+
+    private static boolean launchDiscovered(@NonNull Context context,
+                                            @NonNull PackageManager manager,
+                                            @NonNull String category) {
+        Intent query = new Intent(Intent.ACTION_MAIN).addCategory(category);
+        final List<ResolveInfo> candidates;
+        try {
+            // The legacy overload is deliberate: the launcher supports the Android 9 head unit.
+            candidates = manager.queryIntentActivities(query, 0);
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+        if (candidates == null) return false;
+        for (ResolveInfo candidate : candidates) {
+            if (candidate.activityInfo == null) continue;
+            String packageName = candidate.activityInfo.packageName;
+            String label;
+            try {
+                label = String.valueOf(candidate.loadLabel(manager));
+            } catch (RuntimeException ignored) {
+                label = "";
+            }
+            if (!looksLikeYandexMusic(packageName, label)) continue;
+            Intent intent = new Intent(query).setComponent(new ComponentName(
+                    packageName, candidate.activityInfo.name));
+            if (start(context, intent)) return true;
+        }
+        return false;
+    }
+
+    static boolean looksLikeYandexMusic(@Nullable String packageName, @Nullable String label) {
+        String packageWords = packageName == null
+                ? "" : packageName.toLowerCase(Locale.ROOT);
+        String labelWords = label == null ? "" : label.toLowerCase(Locale.ROOT);
+        boolean yandexPackage = packageWords.contains("yandex")
+                && (packageWords.contains("music") || packageWords.contains("музык"));
+        boolean yandexLabel = (labelWords.contains("yandex")
+                || labelWords.contains("яндекс"))
+                && (labelWords.contains("music") || labelWords.contains("музык"));
+        return yandexPackage || yandexLabel;
+    }
+
+    private static boolean start(@NonNull Context context, @NonNull Intent intent) {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+        try {
+            context.startActivity(intent);
+            return true;
+        } catch (RuntimeException ignored) {
+            // A stale package-manager record must not prevent trying another candidate.
+            return false;
+        }
     }
 }

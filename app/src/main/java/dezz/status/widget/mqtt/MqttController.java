@@ -59,6 +59,7 @@ public final class MqttController implements MqttClient.Listener {
     private final ConnectorValueRegistry values;
     private final HaBrickConfigStore mainConfigs;
     private final PopupItemConfigStore popupConfigs;
+    private final MqttShortcutCatalogStore shortcutCatalog;
     private final StateListener listener;
     private volatile List<HaBrickConfig> configuredMain = Collections.emptyList();
     private volatile List<PopupItemConfig> configuredPopup = Collections.emptyList();
@@ -81,6 +82,7 @@ public final class MqttController implements MqttClient.Listener {
         this.values = values;
         mainConfigs = new HaBrickConfigStore(prefs);
         popupConfigs = new PopupItemConfigStore(prefs);
+        shortcutCatalog = new MqttShortcutCatalogStore(this.context, prefs);
         this.listener = listener;
     }
 
@@ -317,8 +319,17 @@ public final class MqttController implements MqttClient.Listener {
         String valueType = payload.optString("type",
                 raw == null ? "" : raw.getClass().getSimpleName());
         String unit = payload.optString("unit", "");
+        String logicalResource = scope + "/" + id;
+        ConnectorValue observed = new ConnectorValue(ConnectorType.MQTT,
+                SourceBinding.DEFAULT_CONNECTOR_ID, logicalResource, raw, fresh, available,
+                true, payload.optBoolean("writable", false), valueType, unit, attributes,
+                updatedAt);
+        // Persist only the metadata-only logical resource. The catalog store intentionally drops
+        // raw/action payloads and never derives a broker command topic from this state topic.
+        shortcutCatalog.upsert(observed);
         for (String resourceId : resourceAliases(topic, scope, id)) {
-            values.upsert(new ConnectorValue(ConnectorType.MQTT,
+            values.upsert(logicalResource.equals(resourceId) ? observed
+                    : new ConnectorValue(ConnectorType.MQTT,
                     SourceBinding.DEFAULT_CONNECTOR_ID, resourceId, raw, fresh, available,
                     true, payload.optBoolean("writable", false), valueType, unit, attributes,
                     updatedAt));
@@ -326,6 +337,7 @@ public final class MqttController implements MqttClient.Listener {
     }
 
     private void clearValue(String topic, String scope, String id) throws JSONException {
+        shortcutCatalog.remove(scope + "/" + id);
         for (String resourceId : resourceAliases(topic, scope, id)) {
             values.remove(ConnectorType.MQTT, SourceBinding.DEFAULT_CONNECTOR_ID, resourceId);
         }

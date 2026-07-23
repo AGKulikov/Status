@@ -25,4 +25,16 @@ final class MediaBroadcastFreshness {
         }
         return Math.min(result, MAX_TTL_MS);
     }
+
+    static boolean expired(long nowElapsedMs, long receivedElapsedMs, long ttlMs) {
+        long age = Math.max(0L, nowElapsedMs - Math.max(0L, receivedElapsedMs));
+        return age > Math.max(0L, ttlMs);
+    }
+
+    static long remaining(long nowElapsedMs, long receivedElapsedMs, long ttlMs) {
+        long safeTtl = Math.max(0L, ttlMs);
+        long age = Math.max(0L, nowElapsedMs - Math.max(0L, receivedElapsedMs));
+        if (age > safeTtl) return 0L;
+        return safeTtl - age + 1L;
+    }
 }

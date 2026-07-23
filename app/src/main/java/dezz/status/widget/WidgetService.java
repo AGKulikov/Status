@@ -3476,11 +3476,50 @@ public class WidgetService extends Service {
         return instance != null;
     }
 
+    /**
+     * Read-only same-process geometry for HOME safe-area calculation.
+     *
+     * <p>The returned value is the actual measured top-row window, not a duplicated estimate
+     * from font/icon settings. Zero means that no status-bar-mode overlay currently occupies the
+     * top edge.</p>
+     */
+    public int getStatusBarOverlayHeight() {
+        if (destroyed || prefs == null || !prefs.widgetEnabled.get()
+                || prefs.widgetMode.get() != WIDGET_MODE_STATUS_BAR || binding == null) {
+            return 0;
+        }
+        View root = binding.getRoot();
+        return Math.max(root.getHeight(), root.getMeasuredHeight());
+    }
+
     /** Immutable read-only connector snapshot for settings/catalog pickers. */
     @NonNull
     public List<ConnectorValue> connectorValueSnapshot() {
         ConnectorValueRegistry current = connectorValues;
         return current == null ? java.util.Collections.emptyList() : current.snapshot();
+    }
+
+    /**
+     * Subscribes a same-process HOME surface to raw HA/MQTT/Sprut value changes.
+     *
+     * <p>The returned initial snapshot closes the first-launch race: the connector may have
+     * completed synchronization before LauncherActivity obtained the service singleton.</p>
+     */
+    @NonNull
+    public List<ConnectorValue> addConnectorValueListener(
+            @NonNull ConnectorValueRegistry.Listener listener) {
+        ConnectorValueRegistry current = connectorValues;
+        if (current == null) return java.util.Collections.emptyList();
+        // Subscribe before reading: an update racing this snapshot is either already included or
+        // arrives through the listener immediately afterwards, never lost between the two steps.
+        current.addListener(listener);
+        return current.snapshot();
+    }
+
+    public void removeConnectorValueListener(
+            @NonNull ConnectorValueRegistry.Listener listener) {
+        ConnectorValueRegistry current = connectorValues;
+        if (current != null) current.removeListener(listener);
     }
 
     private static Rect getBounds(View view) {

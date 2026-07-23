@@ -24,8 +24,8 @@ android {
     buildToolsVersion "36.0.0"
 
     defaultConfig {
-        // Deliberately different from the upstream package so the fork can be installed next
-        // to Status Widget 2.8.2 and keeps an entirely independent preference/database space.
+        // Keep the historical HA fork package unchanged: together with the stable signing key
+        // this allows every build to install as an in-place update over HA1058 and newer builds.
         applicationId "ru.natro.statuswidget"
         minSdk 28
         //noinspection ExpiredTargetSdkVersion
@@ -67,7 +67,9 @@ android {
 
     signingConfigs {
         release {
-            storeFile file('../keystore.jks')
+            // CI/recovery builds keep the stable update key outside the repository. Local builds
+            // may still use the gitignored root keystore.jks for backwards compatibility.
+            storeFile file(System.getenv("KEYSTORE_FILE") ?: '../keystore.jks')
             storePassword System.getenv("KEY_PASSWORD")
             // The stable HA14+ update container uses this alias. Keep it overridable for
             // downstream forks, but never silently fall back to Android's debug key in CI.

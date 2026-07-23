@@ -104,10 +104,27 @@ final class GeelyCarIntegration implements CarIntegration {
      * not resend on every poll: flooding the slow Android 9 Binder is one of the reasons a write
      * can be acknowledged without ever reaching the vehicle ECU.
      */
-    private static final int CONTROL_CONFIRM_POLLS = 8;
+    /** Limit active Binder writes; passive read-back polling continues to the full deadline. */
+    private static final int CONTROL_WRITE_WINDOW_POLLS = 8;
     private static final int CONTROL_RESEND_EVERY_POLLS = 3;
     private static final long CONTROL_CONFIRM_POLL_MS = 140L;
+    /** Hard upper bound for a command state-machine, excluding a Binder call already in flight. */
+    private static final long CONTROL_COMMAND_TIMEOUT_MS = 5_000L;
+    private static final int CONTROL_PULSE_ATTEMPTS = 2;
+    private static final long CONTROL_PULSE_RETRY_MS = 200L;
     private static final int NO_ZONE = Integer.MIN_VALUE;
+    private static final String FAN_CONTROL_ID = "climate.fan";
+    /** ECARX front-row aggregate zone used by both manual and AUTO fan functions. */
+    private static final int FRONT_FAN_ZONE = 8;
+    /**
+     * A short Binder failure may hide the AUTO bit while the ECU is still in AUTO. Reuse only a
+     * recent confirmed mode; after this window an unresolved mode is UNKNOWN and no fan write is
+     * routed at all.
+     */
+    private static final long FAN_MODE_CACHE_MAX_AGE_MS = 75_000L;
+    private static final int AUTO_FAN_FAMILY_UNKNOWN = 0;
+    private static final int AUTO_FAN_FAMILY_THREE_PROFILE = 3;
+    private static final int AUTO_FAN_FAMILY_TWO_PROFILE = 2;
 
     /** Geely extension signals used by the instrument cluster but absent from this SDK's stubs. */
     private static final int SENSOR_TYPE_AVERAGE_CONSUMPTION = 4_194_560;
@@ -153,9 +170,23 @@ final class GeelyCarIntegration implements CarIntegration {
         thread.setDaemon(true);
         return thread;
     });
-    /** Exact duplicate requests from HOME and the overlay share one confirmed result. */
-    private final ControlCommandDeduplicator pendingControlCommands =
-            new ControlCommandDeduplicator();
+    /**
+     * Worker-owned command state. Every vendor call still runs on {@link #controlWorker}, while
+     * confirmation delays live on the main handler so one slow ECU transition cannot park that
+     * serial lane or starve watcher refreshes and commands for other functions.
+     */
+    private final Map<String, ActiveControlCommand> activeControlCommands = new HashMap<>();
+    private final Object controlCommandSubmissionLock = new Object();
+    /** Latest caller intent is visible before its worker task reaches the serial queue. */
+    private final Map<String, ControlCommandSubmission> latestControlCommandSubmissions =
+            new HashMap<>();
+    private long nextControlCommandGeneration;
+    private volatile boolean controlsShuttingDown;
+    /** Confirmed routing facts are published across the catalog and control workers. */
+    @Nullable private volatile ConfirmedFanMode lastConfirmedClimateAutoMode;
+    @Nullable private volatile Double lastConfirmedAutoFanProfile;
+    @NonNull private volatile List<CarControlDescriptor.Option>
+            lastConfirmedAutoFanRuntimeOptions = Collections.emptyList();
 
     @Nullable
     private volatile ISensor sensors;
@@ -471,6 +502,55 @@ final class GeelyCarIntegration implements CarIntegration {
         }
     }
 
+    /**
+     * One latest-wins command per logical control. Access is confined to {@link #controlWorker}.
+     * Exact duplicates share the same result; a different request supersedes this object and all
+     * delayed reads become harmless through the identity/generation check.
+     */
+    private static final class ActiveControlCommand {
+        @NonNull final CarControlCommand command;
+        @NonNull final String key;
+        final long generation;
+        final long deadlineElapsedMillis;
+        @NonNull final List<ControlCommandListener> listeners = new ArrayList<>();
+        @Nullable ControlDefinition definition;
+        @Nullable Double lastConfirmed;
+        double target = Double.NaN;
+        boolean pulse;
+        boolean acceptedAtLeastOnce;
+        int pulseAttempts;
+
+        ActiveControlCommand(@NonNull CarControlCommand command, @NonNull String key,
+                             long generation, long deadlineElapsedMillis,
+                             @NonNull ControlCommandListener listener) {
+            this.command = command;
+            this.key = key;
+            this.generation = generation;
+            this.deadlineElapsedMillis = deadlineElapsedMillis;
+            listeners.add(listener);
+        }
+    }
+
+    private static final class ControlCommandSubmission {
+        @NonNull final String key;
+        final long generation;
+
+        ControlCommandSubmission(@NonNull String key, long generation) {
+            this.key = key;
+            this.generation = generation;
+        }
+    }
+
+    private static final class ConfirmedFanMode {
+        final boolean autoActive;
+        final long observedElapsedMillis;
+
+        ConfirmedFanMode(boolean autoActive, long observedElapsedMillis) {
+            this.autoActive = autoActive;
+            this.observedElapsedMillis = observedElapsedMillis;
+        }
+    }
+
     private static CarControlDescriptor.Option option(double value, String label) {
         return new CarControlDescriptor.Option(value, label);
     }
@@ -509,8 +589,33 @@ final class GeelyCarIntegration implements CarIntegration {
                 option(IHvac.FAN_SPEED_LEVEL_3, "3"), option(IHvac.FAN_SPEED_LEVEL_4, "4"),
                 option(IHvac.FAN_SPEED_LEVEL_5, "5"), option(IHvac.FAN_SPEED_LEVEL_6, "6"),
                 option(IHvac.FAN_SPEED_LEVEL_7, "7"), option(IHvac.FAN_SPEED_LEVEL_8, "8"),
-                option(IHvac.FAN_SPEED_LEVEL_9, "9"),
-                option(IHvac.FAN_SPEED_LEVEL_AUTO, "Auto"));
+                option(IHvac.FAN_SPEED_LEVEL_9, "9"));
+    }
+
+    /**
+     * AUTO fan intensity is a separate AdaptAPI function, not FAN_SPEED_LEVEL_AUTO. The ECARX
+     * implementation maps these values to raw PA fan levels 10..14 while manual fan speed owns
+     * raw 0..9. A vehicle normally exposes either the three named profiles or the two relative
+     * profiles; runtime discovery filters this superset.
+     */
+    private static List<CarControlDescriptor.Option> autoFanOptions() {
+        List<CarControlDescriptor.Option> result = new ArrayList<>();
+        result.addAll(autoFanThreeProfileOptions());
+        result.addAll(autoFanTwoProfileOptions());
+        return Collections.unmodifiableList(result);
+    }
+
+    private static List<CarControlDescriptor.Option> autoFanThreeProfileOptions() {
+        return Arrays.asList(
+                option(IHvac.AUTO_FAN_SETTING_SILENT, "AUTO · тихо"),
+                option(IHvac.AUTO_FAN_SETTING_NORMAL, "AUTO · обычно"),
+                option(IHvac.AUTO_FAN_SETTING_HIGH, "AUTO · интенсивно"));
+    }
+
+    private static List<CarControlDescriptor.Option> autoFanTwoProfileOptions() {
+        return Arrays.asList(
+                option(IHvac.AUTO_FAN_SETTING_QUIETER, "AUTO · тише"),
+                option(IHvac.AUTO_FAN_SETTING_HIGHER, "AUTO · выше"));
     }
 
     private static List<CarControlDescriptor.Option> driveModeOptions() {
@@ -537,6 +642,16 @@ final class GeelyCarIntegration implements CarIntegration {
                 option(IDriveMode.DRIVE_MODE_SELECTION_ADAPTIVE, "Adaptive"),
                 option(IDriveMode.DRIVE_MODE_SELECTION_CUSTOM, "Custom"));
     }
+
+    private static final ControlDefinition FAN_DEFINITION =
+            new ControlDefinition(FAN_CONTROL_ID, "Скорость вентилятора", "Климат", "fan",
+                    CarControlDescriptor.Kind.LEVELS, IHvac.HVAC_FUNC_FAN_SPEED,
+                    FRONT_FAN_ZONE, false, fanOptions(), 0, 9, 1, "", "#FF42A5F5");
+
+    private static final ControlDefinition AUTO_FAN_DEFINITION =
+            new ControlDefinition(FAN_CONTROL_ID, "Скорость вентилятора AUTO", "Климат", "fan",
+                    CarControlDescriptor.Kind.LEVELS, IHvac.HVAC_FUNC_AUTO_FAN_SETTING,
+                    FRONT_FAN_ZONE, false, autoFanOptions(), 0, 0, 0, "", "#FF42A5F5");
 
     private static final ControlDefinition[] CONTROL_DEFINITIONS = {
             new ControlDefinition("climate.power", "Климат", "Климат", "climate",
@@ -576,9 +691,7 @@ final class GeelyCarIntegration implements CarIntegration {
                     "wheel_heat", CarControlDescriptor.Kind.LEVELS,
                     IHvac.HVAC_FUNC_STEERING_WHEEL_HEAT, NO_ZONE, false,
                     wheelHeatOptions(), 0, 3, 1, "", "#FFFF9800"),
-            new ControlDefinition("climate.fan", "Скорость вентилятора", "Климат", "fan",
-                    CarControlDescriptor.Kind.LEVELS, IHvac.HVAC_FUNC_FAN_SPEED, 8, false,
-                    fanOptions(), 0, 9, 1, "", "#FF42A5F5"),
+            FAN_DEFINITION,
             new ControlDefinition("climate.temp_driver", "Температура водителя", "Климат",
                     "temperature", CarControlDescriptor.Kind.RANGE, IHvac.HVAC_FUNC_TEMP,
                     VehicleSeat.SEAT_ROW_1_LEFT, true, Collections.emptyList(),
@@ -1887,6 +2000,63 @@ final class GeelyCarIntegration implements CarIntegration {
         return null;
     }
 
+    private static boolean isFanDefinition(@NonNull ControlDefinition definition) {
+        return FAN_CONTROL_ID.equals(definition.descriptor.id);
+    }
+
+    private static boolean isAutoFanDefinition(@NonNull ControlDefinition definition) {
+        return definition.functionId == IHvac.HVAC_FUNC_AUTO_FAN_SETTING;
+    }
+
+    private static boolean isFanRelatedFunction(int functionId) {
+        return functionId == IHvac.HVAC_FUNC_FAN_SPEED
+                || functionId == IHvac.HVAC_FUNC_AUTO_FAN_SETTING
+                || functionId == IHvac.HVAC_FUNC_AUTO;
+    }
+
+    static int fanFunctionIdForMode(boolean climateAutoActive) {
+        return climateAutoActive
+                ? IHvac.HVAC_FUNC_AUTO_FAN_SETTING : IHvac.HVAC_FUNC_FAN_SPEED;
+    }
+
+    /**
+     * A missing fresh observation is not equivalent to MANUAL. A recent confirmed mode may bridge
+     * a transient Binder gap; with no such fact the caller must treat routing as UNKNOWN.
+     */
+    @Nullable
+    static Boolean conservativeFanAutoMode(@Nullable Boolean freshObservation,
+                                           @Nullable Boolean lastConfirmed,
+                                           long lastConfirmedAgeMillis) {
+        if (freshObservation != null) return freshObservation;
+        if (lastConfirmed == null || lastConfirmedAgeMillis < 0
+                || lastConfirmedAgeMillis > FAN_MODE_CACHE_MAX_AGE_MS) {
+            return null;
+        }
+        return lastConfirmed;
+    }
+
+    @Nullable
+    private Boolean readConfirmedClimateAutoMode(@NonNull ICarFunction source) {
+        ControlDefinition climateAuto = controlDefinition("climate.auto");
+        Double observedValue = climateAuto == null ? null : readControlValue(source, climateAuto);
+        Boolean fresh = observedValue == null ? null : observedValue != 0d;
+        ConfirmedFanMode cached = lastConfirmedClimateAutoMode;
+        long age = cached == null ? Long.MAX_VALUE
+                : SystemClock.elapsedRealtime() - cached.observedElapsedMillis;
+        return conservativeFanAutoMode(fresh,
+                cached == null ? null : cached.autoActive, age);
+    }
+
+    @Nullable
+    private ControlDefinition effectiveControlDefinition(@NonNull ICarFunction source,
+                                                         @NonNull ControlDefinition requested) {
+        if (!isFanDefinition(requested)) return requested;
+        Boolean autoActive = readConfirmedClimateAutoMode(source);
+        if (autoActive == null) return null;
+        return fanFunctionIdForMode(autoActive) == IHvac.HVAC_FUNC_AUTO_FAN_SETTING
+                ? AUTO_FAN_DEFINITION : FAN_DEFINITION;
+    }
+
     @NonNull
     private static Set<String> selectKnownControlIds(@NonNull Set<String> requested) {
         LinkedHashSet<String> result = new LinkedHashSet<>();
@@ -1904,14 +2074,22 @@ final class GeelyCarIntegration implements CarIntegration {
             ICarFunction source = ensureCarFunctions();
             List<CarControlDescriptor> values = new ArrayList<>();
             for (ControlDefinition definition : CONTROL_DEFINITIONS) {
-                CarControlDescriptor.Availability availability = source == null
-                        ? CarControlDescriptor.Availability.UNKNOWN
-                        : controlAvailability(source, definition);
+                CarControlDescriptor.Availability availability;
+                if (source == null) {
+                    availability = CarControlDescriptor.Availability.UNKNOWN;
+                } else if (isFanDefinition(definition)) {
+                    availability = fanAvailability(source);
+                } else {
+                    availability = controlAvailability(source, definition);
+                }
                 // A definitive unsupported result hides a control for this exact vehicle. During
                 // the boot Binder window UNKNOWN remains visible and can be retried safely.
                 if (availability != CarControlDescriptor.Availability.UNSUPPORTED) {
                     CarControlDescriptor descriptor = definition.descriptor;
-                    if (source != null
+                    if (isFanDefinition(definition)) {
+                        descriptor = definition.descriptorWithOptions(
+                                fanCatalogOptions(source));
+                    } else if (source != null
                             && availability == CarControlDescriptor.Availability.SUPPORTED
                             && descriptor.kind != CarControlDescriptor.Kind.ACTION
                             && !descriptor.options.isEmpty()) {
@@ -1923,6 +2101,167 @@ final class GeelyCarIntegration implements CarIntegration {
             }
             mainHandler.post(() -> listener.onCatalog(values));
         });
+    }
+
+    @NonNull
+    static List<CarControlDescriptor.Option> safeAutoFanOptions(
+            @NonNull List<CarControlDescriptor.Option> discovered,
+            @Nullable Double confirmedProfile,
+            @NonNull List<CarControlDescriptor.Option> lastConfirmedRuntimeOptions) {
+        int confirmedFamily = confirmedProfile == null ? AUTO_FAN_FAMILY_UNKNOWN
+                : autoFanProfileFamily(confirmedProfile);
+        int discoveredFamily = autoFanFamily(discovered);
+        int cachedFamily = autoFanFamily(lastConfirmedRuntimeOptions);
+        int selectedFamily = confirmedFamily != AUTO_FAN_FAMILY_UNKNOWN
+                ? confirmedFamily : discoveredFamily != AUTO_FAN_FAMILY_UNKNOWN
+                ? discoveredFamily : cachedFamily;
+        if (selectedFamily == AUTO_FAN_FAMILY_UNKNOWN) return Collections.emptyList();
+
+        List<CarControlDescriptor.Option> source;
+        if (discoveredFamily == selectedFamily) {
+            source = discovered;
+        } else if (confirmedFamily == selectedFamily
+                && containsAutoFanFamily(discovered, selectedFamily)) {
+            // AdaptAPI 1.0 advertises all five constants on some builds. A confirmed current
+            // profile selects the actual two- or three-profile vehicle family.
+            source = discovered;
+        } else if (cachedFamily == selectedFamily) {
+            source = lastConfirmedRuntimeOptions;
+        } else {
+            source = Collections.emptyList();
+        }
+
+        List<CarControlDescriptor.Option> canonical =
+                autoFanOptionsForFamily(selectedFamily);
+        boolean familyFallback = source.isEmpty()
+                && confirmedFamily == selectedFamily;
+        List<CarControlDescriptor.Option> result = new ArrayList<>();
+        for (CarControlDescriptor.Option option : canonical) {
+            if (familyFallback || containsOptionValue(source, option.value)
+                    || (confirmedProfile != null
+                    && sameValue(option.value, confirmedProfile))) {
+                result.add(option);
+            }
+        }
+        return result;
+    }
+
+    static int autoFanProfileFamily(double value) {
+        if (sameValue(value, IHvac.AUTO_FAN_SETTING_SILENT)
+                || sameValue(value, IHvac.AUTO_FAN_SETTING_NORMAL)
+                || sameValue(value, IHvac.AUTO_FAN_SETTING_HIGH)) {
+            return AUTO_FAN_FAMILY_THREE_PROFILE;
+        }
+        if (sameValue(value, IHvac.AUTO_FAN_SETTING_QUIETER)
+                || sameValue(value, IHvac.AUTO_FAN_SETTING_HIGHER)) {
+            return AUTO_FAN_FAMILY_TWO_PROFILE;
+        }
+        return AUTO_FAN_FAMILY_UNKNOWN;
+    }
+
+    private static int autoFanFamily(
+            @NonNull List<CarControlDescriptor.Option> options) {
+        int family = AUTO_FAN_FAMILY_UNKNOWN;
+        for (CarControlDescriptor.Option option : options) {
+            int optionFamily = autoFanProfileFamily(option.value);
+            if (optionFamily == AUTO_FAN_FAMILY_UNKNOWN) continue;
+            if (family != AUTO_FAN_FAMILY_UNKNOWN && family != optionFamily) {
+                return AUTO_FAN_FAMILY_UNKNOWN;
+            }
+            family = optionFamily;
+        }
+        return family;
+    }
+
+    private static boolean containsAutoFanFamily(
+            @NonNull List<CarControlDescriptor.Option> options, int family) {
+        for (CarControlDescriptor.Option option : options) {
+            if (autoFanProfileFamily(option.value) == family) return true;
+        }
+        return false;
+    }
+
+    private static boolean containsOptionValue(
+            @NonNull List<CarControlDescriptor.Option> options, double value) {
+        for (CarControlDescriptor.Option option : options) {
+            if (sameValue(option.value, value)) return true;
+        }
+        return false;
+    }
+
+    @NonNull
+    private static List<CarControlDescriptor.Option> autoFanOptionsForFamily(int family) {
+        if (family == AUTO_FAN_FAMILY_THREE_PROFILE) {
+            return autoFanThreeProfileOptions();
+        }
+        if (family == AUTO_FAN_FAMILY_TWO_PROFILE) {
+            return autoFanTwoProfileOptions();
+        }
+        return Collections.emptyList();
+    }
+
+    private void rememberConfirmedRuntimeValue(@NonNull ControlDefinition definition,
+                                               double value) {
+        if (definition.functionId == IHvac.HVAC_FUNC_AUTO) {
+            lastConfirmedClimateAutoMode =
+                    new ConfirmedFanMode(value != 0d, SystemClock.elapsedRealtime());
+            return;
+        }
+        if (!isAutoFanDefinition(definition)
+                || autoFanProfileFamily(value) == AUTO_FAN_FAMILY_UNKNOWN) {
+            return;
+        }
+        lastConfirmedAutoFanProfile = value;
+        int cachedFamily = autoFanFamily(lastConfirmedAutoFanRuntimeOptions);
+        int observedFamily = autoFanProfileFamily(value);
+        if (cachedFamily != AUTO_FAN_FAMILY_UNKNOWN && cachedFamily != observedFamily) {
+            lastConfirmedAutoFanRuntimeOptions = Collections.emptyList();
+        }
+    }
+
+    private void rememberAutoFanRuntimeOptions(
+            @NonNull List<CarControlDescriptor.Option> options) {
+        if (options.isEmpty()
+                || autoFanFamily(options) == AUTO_FAN_FAMILY_UNKNOWN) return;
+        lastConfirmedAutoFanRuntimeOptions =
+                Collections.unmodifiableList(new ArrayList<>(options));
+    }
+
+    @NonNull
+    private List<CarControlDescriptor.Option> fanCatalogOptions(@Nullable ICarFunction source) {
+        List<CarControlDescriptor.Option> result = new ArrayList<>();
+        if (source == null) {
+            result.addAll(FAN_DEFINITION.descriptor.options);
+            result.addAll(safeAutoFanOptions(Collections.emptyList(),
+                    lastConfirmedAutoFanProfile, lastConfirmedAutoFanRuntimeOptions));
+            return result;
+        }
+        Boolean autoActive = readConfirmedClimateAutoMode(source);
+        if (Boolean.TRUE.equals(autoActive)) {
+            // A current profile is stronger evidence than AdaptAPI's five-value superset and
+            // identifies whether this vehicle implements the 3-profile or 2-profile family.
+            readControlValue(source, AUTO_FAN_DEFINITION);
+        }
+        result.addAll(supportedOptions(source, FAN_DEFINITION));
+        result.addAll(supportedOptions(source, AUTO_FAN_DEFINITION));
+        return result;
+    }
+
+    @NonNull
+    private CarControlDescriptor.Availability fanAvailability(@NonNull ICarFunction source) {
+        CarControlDescriptor.Availability manual =
+                controlAvailability(source, FAN_DEFINITION);
+        CarControlDescriptor.Availability automatic =
+                controlAvailability(source, AUTO_FAN_DEFINITION);
+        if (manual == CarControlDescriptor.Availability.SUPPORTED
+                || automatic == CarControlDescriptor.Availability.SUPPORTED) {
+            return CarControlDescriptor.Availability.SUPPORTED;
+        }
+        if (manual == CarControlDescriptor.Availability.UNSUPPORTED
+                && automatic == CarControlDescriptor.Availability.UNSUPPORTED) {
+            return CarControlDescriptor.Availability.UNSUPPORTED;
+        }
+        return CarControlDescriptor.Availability.UNKNOWN;
     }
 
     @NonNull
@@ -2028,6 +2367,10 @@ final class GeelyCarIntegration implements CarIntegration {
             if (definition != null
                     && definition.descriptor.kind != CarControlDescriptor.Kind.ACTION) {
                 functionIds.add(definition.functionId);
+                if (isFanDefinition(definition)) {
+                    functionIds.add(IHvac.HVAC_FUNC_AUTO_FAN_SETTING);
+                    functionIds.add(IHvac.HVAC_FUNC_AUTO);
+                }
             }
         }
         boolean watcherReady = functionIds.isEmpty()
@@ -2066,7 +2409,8 @@ final class GeelyCarIntegration implements CarIntegration {
         ICarFunction.IFunctionValueWatcher watcher = new ICarFunction.IFunctionValueWatcher() {
             @Override public void onCustomizeFunctionValueChanged(int functionId, int zone,
                                                                    float value) {
-                deliverVendorControlValue(functionId, zone, value, true);
+                executeControlTask(() ->
+                        deliverVendorControlValue(functionId, zone, value, true));
             }
 
             @Override public void onFunctionChanged(int functionId) {
@@ -2074,7 +2418,8 @@ final class GeelyCarIntegration implements CarIntegration {
             }
 
             @Override public void onFunctionValueChanged(int functionId, int zone, int value) {
-                deliverVendorControlValue(functionId, zone, value, false);
+                executeControlTask(() ->
+                        deliverVendorControlValue(functionId, zone, value, false));
             }
 
             @Override public void onSupportedFunctionStatusChanged(int functionId, int zone,
@@ -2134,8 +2479,18 @@ final class GeelyCarIntegration implements CarIntegration {
             return;
         }
         Set<String> demanded = demandedControlIds();
+        boolean routedFan = demanded.contains(FAN_CONTROL_ID)
+                && isFanRelatedFunction(functionId);
+        if (routedFan) {
+            ControlReadResult result = readAndDeliverControl(source, FAN_DEFINITION);
+            if (result == ControlReadResult.RETRY
+                    || result == ControlReadResult.CONNECTION_FAILED) {
+                scheduleControlRetry();
+            }
+        }
         for (ControlDefinition definition : CONTROL_DEFINITIONS) {
             if (definition.functionId == functionId
+                    && !(routedFan && isFanDefinition(definition))
                     && demanded.contains(definition.descriptor.id)) {
                 ControlReadResult result = readAndDeliverControl(source, definition);
                 if (result == ControlReadResult.RETRY
@@ -2151,6 +2506,12 @@ final class GeelyCarIntegration implements CarIntegration {
     @NonNull
     private ControlReadResult readAndDeliverControl(ICarFunction source,
                                                     ControlDefinition definition) {
+        ControlDefinition effective = effectiveControlDefinition(source, definition);
+        if (effective == null) {
+            // Do not reinterpret an unresolved AUTO fan as manual speed.
+            return ControlReadResult.RETRY;
+        }
+        definition = effective;
         CarControlDescriptor.Availability availability = controlAvailability(source, definition);
         if (availability == CarControlDescriptor.Availability.UNSUPPORTED) {
             deliverControlState(new CarControlState(definition.descriptor.id, false, false,
@@ -2177,8 +2538,15 @@ final class GeelyCarIntegration implements CarIntegration {
                         ? source.getFunctionValue(definition.functionId, definition.zone)
                         : source.getFunctionValue(definition.functionId);
             }
-            if (!isValidControlValue(definition, value)) return ControlReadResult.RETRY;
+            if (!isValidControlValue(definition, value)) {
+                if (isReadableUnknownControlValue(definition, value)) {
+                    deliverControlState(unknownControlState(definition, value));
+                }
+                return ControlReadResult.RETRY;
+            }
+            rememberConfirmedRuntimeValue(definition, value);
             deliverControlState(normalizeControlState(definition, value));
+            confirmActiveControlCommandFromState(definition, value);
             return ControlReadResult.CONFIRMED;
         } catch (Throwable t) {
             invalidateFunctionProxy(source);
@@ -2189,14 +2557,46 @@ final class GeelyCarIntegration implements CarIntegration {
 
     private void deliverVendorControlValue(int functionId, int zone, double value,
                                            boolean customFloat) {
+        if (!customFloat && functionId == IHvac.HVAC_FUNC_AUTO) {
+            ControlDefinition climateAuto = controlDefinition("climate.auto");
+            if (climateAuto != null && isValidControlValue(climateAuto, value)) {
+                rememberConfirmedRuntimeValue(climateAuto, value);
+            }
+        } else if (!customFloat && functionId == IHvac.HVAC_FUNC_AUTO_FAN_SETTING
+                && zone == FRONT_FAN_ZONE
+                && isValidControlValue(AUTO_FAN_DEFINITION, value)) {
+            rememberConfirmedRuntimeValue(AUTO_FAN_DEFINITION, value);
+        }
         Set<String> demanded = demandedControlIds();
+        if (!customFloat && demanded.contains(FAN_CONTROL_ID)
+                && isFanRelatedFunction(functionId)) {
+            // AUTO and manual fan values share one raw PA channel but use different public value
+            // domains. Re-read through the current climate mode instead of interpreting a callback
+            // against the definition that happened to register it.
+            readDemandedFunction(functionId);
+            return;
+        }
         for (ControlDefinition definition : CONTROL_DEFINITIONS) {
             if (definition.functionId != functionId || definition.customFloat != customFloat
                     || !demanded.contains(definition.descriptor.id)) continue;
             if (definition.zoned() && definition.zone != zone) continue;
-            if (!isValidControlValue(definition, value)) continue;
+            if (!isValidControlValue(definition, value)) {
+                if (isReadableUnknownControlValue(definition, value)) {
+                    deliverControlState(unknownControlState(definition, value));
+                }
+                continue;
+            }
+            rememberConfirmedRuntimeValue(definition, value);
             deliverControlState(normalizeControlState(definition, value));
+            confirmActiveControlCommandFromState(definition, value);
         }
+    }
+
+    @NonNull
+    private static CarControlState unknownControlState(@NonNull ControlDefinition definition,
+                                                       double value) {
+        return new CarControlState(definition.descriptor.id, true, false, value,
+                "Неизвестно", false, 0, null, System.currentTimeMillis());
     }
 
     @NonNull
@@ -2275,12 +2675,15 @@ final class GeelyCarIntegration implements CarIntegration {
     @Override
     public void executeControl(@NonNull CarControlCommand command,
                                @NonNull ControlCommandListener listener) {
-        final String key = controlCommandKey(command);
-        if (!pendingControlCommands.add(key, listener)) return;
-        ControlCommandListener sharedResult = (success, message) ->
-                finishControlCommand(key, success, message);
-        if (!executeControlTask(() -> executeControlOnWorker(command, sharedResult))) {
-            postCommandResult(sharedResult, false, "ECARX уже остановлен");
+        if (controlsShuttingDown) {
+            postCommandResult(listener, false, "ECARX уже остановлен");
+            return;
+        }
+        String key = controlCommandKey(command);
+        long generation = reserveControlCommandSubmission(command.controlId, key);
+        if (!executeControlTask(() -> enqueueControlCommandOnWorker(
+                command, key, generation, listener))) {
+            postCommandResult(listener, false, "ECARX уже остановлен");
         }
     }
 
@@ -2290,111 +2693,290 @@ final class GeelyCarIntegration implements CarIntegration {
                 + Long.toHexString(Double.doubleToLongBits(command.value));
     }
 
-    private void finishControlCommand(@NonNull String key, boolean success,
-                                      @Nullable String message) {
-        List<ControlCommandListener> listeners = pendingControlCommands.take(key);
-        for (ControlCommandListener listener : listeners) {
-            try {
-                listener.onResult(success, message);
-            } catch (RuntimeException error) {
-                Log.w(TAG, "vehicle control result listener failed", error);
-            }
+    private void enqueueControlCommandOnWorker(@NonNull CarControlCommand command,
+                                               @NonNull String key, long generation,
+                                               @NonNull ControlCommandListener listener) {
+        if (controlsShuttingDown) {
+            postCommandResult(listener, false, "ECARX уже остановлен");
+            return;
+        }
+        if (!isLatestControlCommandSubmission(command.controlId, key, generation)) {
+            postCommandResult(listener, false, "Команда заменена более новой");
+            return;
+        }
+        ActiveControlCommand previous = activeControlCommands.get(command.controlId);
+        if (previous != null && previous.key.equals(key)
+                && previous.generation == generation) {
+            previous.listeners.add(listener);
+            return;
+        }
+        if (previous != null) {
+            cancelActiveControlCommand(previous, "Команда заменена более новой");
+        }
+        ActiveControlCommand active = new ActiveControlCommand(command, key, generation,
+                SystemClock.elapsedRealtime() + CONTROL_COMMAND_TIMEOUT_MS, listener);
+        activeControlCommands.put(command.controlId, active);
+        startControlCommand(active);
+    }
+
+    private long reserveControlCommandSubmission(@NonNull String controlId,
+                                                 @NonNull String key) {
+        synchronized (controlCommandSubmissionLock) {
+            ControlCommandSubmission previous = latestControlCommandSubmissions.get(controlId);
+            if (previous != null && previous.key.equals(key)) return previous.generation;
+            long generation = ++nextControlCommandGeneration;
+            latestControlCommandSubmissions.put(controlId,
+                    new ControlCommandSubmission(key, generation));
+            return generation;
         }
     }
 
-    private void executeControlOnWorker(CarControlCommand command,
-                                        ControlCommandListener listener) {
+    private boolean isLatestControlCommandSubmission(@NonNull String controlId,
+                                                     @NonNull String key, long generation) {
+        synchronized (controlCommandSubmissionLock) {
+            ControlCommandSubmission latest = latestControlCommandSubmissions.get(controlId);
+            return latest != null && latest.key.equals(key)
+                    && isLatestControlCommand(latest.generation, generation);
+        }
+    }
+
+    private void startControlCommand(@NonNull ActiveControlCommand active) {
+        if (!isCurrentControlCommand(active)) return;
+        CarControlCommand command = active.command;
         ControlDefinition definition = controlDefinition(command.controlId);
         if (definition == null) {
-            postCommandResult(listener, false, "Неизвестная функция автомобиля");
+            completeControlCommand(active, false, "Неизвестная функция автомобиля");
             return;
         }
         ICarFunction source = ensureCarFunctions();
         if (source == null) {
-            postCommandResult(listener, false, "ECARX ещё не подключён");
+            completeControlCommand(active, false, "ECARX ещё не подключён");
             scheduleControlRetry();
             return;
         }
+        ControlDefinition effective = effectiveControlDefinition(source, definition);
+        if (effective == null) {
+            completeControlCommand(active, false,
+                    "Не удалось подтвердить режим AUTO. Команда не отправлена");
+            scheduleControlRetry();
+            return;
+        }
+        definition = effective;
+        active.definition = definition;
         CarControlDescriptor.Availability availability = controlAvailability(source, definition);
         if (availability == CarControlDescriptor.Availability.UNKNOWN) {
-            postCommandResult(listener, false,
+            completeControlCommand(active, false,
                     "ECARX ещё синхронизирует эту функцию, повторите через секунду");
             scheduleControlRetry();
             return;
         }
         if (availability != CarControlDescriptor.Availability.SUPPORTED) {
-            postCommandResult(listener, false, "Функция не поддерживается автомобилем");
+            completeControlCommand(active, false, "Функция не поддерживается автомобилем");
             return;
         }
-        boolean pulse = definition.descriptor.kind == CarControlDescriptor.Kind.ACTION;
-        Double current = pulse ? 0d : readControlValue(source, definition);
-        if (!pulse && current == null) {
-            postCommandResult(listener, false, "Не удалось прочитать текущее состояние");
+        active.pulse = definition.descriptor.kind == CarControlDescriptor.Kind.ACTION;
+        Double current = active.pulse ? 0d : readControlValue(source, definition);
+        if (!active.pulse && current == null) {
+            completeControlCommand(active, false, "Не удалось прочитать текущее состояние");
             scheduleControlRetry();
             return;
         }
         List<CarControlDescriptor.Option> runtimeOptions = supportedOptions(source, definition);
-        Double target = pulse ? 1d : commandTarget(definition, command, current, runtimeOptions);
+        Double target = active.pulse ? 1d
+                : commandTarget(definition, command, current, runtimeOptions);
         if (target == null) {
-            postCommandResult(listener, false, "Недопустимое значение команды");
+            completeControlCommand(active, false, "Недопустимое значение команды");
             return;
         }
-        if (!pulse && isControlCommandConfirmed(current, target)) {
+        active.target = target;
+        active.lastConfirmed = current;
+        if (!active.pulse && isControlCommandConfirmed(current, target)) {
             deliverControlState(normalizeControlState(definition, current));
-            postCommandResult(listener, true, null);
+            completeControlCommand(active, true, null);
             return;
         }
+        if (active.pulse) attemptPulseControl(active);
+        else beginControlConfirmationPoll(active, 0);
+    }
+
+    /** One short pulse attempt; its optional retry is delayed without sleeping on controlWorker. */
+    private void attemptPulseControl(@NonNull ActiveControlCommand active) {
+        if (!isCurrentControlCommand(active)) return;
+        if (controlCommandExpired(active)) {
+            failControlCommandTimeout(active);
+            return;
+        }
+        ControlDefinition definition = active.definition;
+        ICarFunction source = ensureCarFunctions();
+        if (definition == null || source == null) {
+            completeControlCommand(active, false, "Ошибка связи с ECARX");
+            scheduleControlRetry();
+            return;
+        }
+        active.pulseAttempts++;
         try {
-            if (pulse) {
-                // MConfig uses these functions as write-only pulses. They can return to zero
-                // immediately, so requiring a pre-read or read-back would report a false error.
-                boolean accepted = writeControlValue(source, definition, target);
-                if (!accepted) {
-                    pauseControlWorker(200L);
-                    accepted = writeControlValue(source, definition, target);
-                }
-                postCommandResult(listener, accepted,
-                        accepted ? null : "ECARX отклонил одноразовую команду");
+            if (writeControlValue(source, definition, active.target)) {
+                completeControlCommand(active, true, null);
                 return;
             }
-
-            // This firmware occasionally acknowledges a Binder write before it reaches the ECU.
-            // Confirm through actual state. Poll more often than we resend: repeatedly flooding
-            // the Binder can postpone the very state transition that is being awaited.
-            boolean acceptedAtLeastOnce = false;
-            Double lastConfirmed = current;
-            for (int poll = 0; poll < CONTROL_CONFIRM_POLLS; poll++) {
-                if (shouldSendControlWrite(poll)) {
-                    acceptedAtLeastOnce |= writeControlValue(source, definition, target);
-                }
-                if (!pauseControlWorker(CONTROL_CONFIRM_POLL_MS + poll * 10L)) break;
-                Double confirmed = readControlValue(source, definition);
-                if (confirmed != null) lastConfirmed = confirmed;
-                if (isControlCommandConfirmed(confirmed, target)) {
-                    deliverControlState(normalizeControlState(definition, confirmed));
-                    postCommandResult(listener, true, null);
-                    return;
-                }
-            }
-            // A failed command must snap the UI back to the latest value actually read from the
-            // car. Never leave an optimistic state behind after an acknowledged-only write.
-            if (lastConfirmed != null) {
-                deliverControlState(normalizeControlState(definition, lastConfirmed));
-            }
-            scheduleControlRefresh(0);
-            postCommandResult(listener, false, acceptedAtLeastOnce
-                    ? "Команда отправлена, но автомобиль её не подтвердил"
-                    : "ECARX отклонил команду");
-        } catch (Throwable t) {
+        } catch (Throwable error) {
             invalidateFunctionProxy(source);
             scheduleControlRetry();
-            Log.w(TAG, "vehicle command failed for " + command.controlId, t);
-            postCommandResult(listener, false, "Ошибка связи с ECARX");
+            Log.w(TAG, "vehicle pulse failed for " + active.command.controlId, error);
+        }
+        if (active.pulseAttempts >= CONTROL_PULSE_ATTEMPTS) {
+            completeControlCommand(active, false, "ECARX отклонил одноразовую команду");
+            return;
+        }
+        mainHandler.postDelayed(() -> executeControlTask(() -> attemptPulseControl(active)),
+                CONTROL_PULSE_RETRY_MS);
+    }
+
+    /**
+     * Starts one write/wait/read state-machine step. Only the Binder write occupies controlWorker;
+     * the settling delay is posted to the main looper, allowing watcher reads and other controls
+     * to pass through the same serial vendor lane in the meantime.
+     */
+    private void beginControlConfirmationPoll(@NonNull ActiveControlCommand active, int poll) {
+        if (!isCurrentControlCommand(active)) return;
+        if (controlCommandExpired(active)) {
+            failControlCommandTimeout(active);
+            return;
+        }
+        ControlDefinition definition = active.definition;
+        ICarFunction source = ensureCarFunctions();
+        if (definition == null) {
+            completeControlCommand(active, false, "Неизвестная функция автомобиля");
+            return;
+        }
+        if (source != null && shouldSendControlWrite(poll)) {
+            try {
+                active.acceptedAtLeastOnce |= writeControlValue(
+                        source, definition, active.target);
+            } catch (Throwable error) {
+                invalidateFunctionProxy(source);
+                scheduleControlRetry();
+                Log.w(TAG, "vehicle command write failed for "
+                        + active.command.controlId, error);
+            }
+        }
+        long delay = controlConfirmDelayMillis(poll);
+        mainHandler.postDelayed(() -> executeControlTask(() ->
+                readControlConfirmation(active, poll)), delay);
+    }
+
+    private void readControlConfirmation(@NonNull ActiveControlCommand active, int poll) {
+        if (!isCurrentControlCommand(active)) return;
+        if (controlCommandExpired(active)) {
+            failControlCommandTimeout(active);
+            return;
+        }
+        ControlDefinition definition = active.definition;
+        ICarFunction source = ensureCarFunctions();
+        Double confirmed = definition == null || source == null
+                ? null : readControlValue(source, definition);
+        if (!isCurrentControlCommand(active)) return;
+        if (confirmed != null) {
+            active.lastConfirmed = confirmed;
+            if (isControlCommandConfirmed(confirmed, active.target)) {
+                deliverControlState(normalizeControlState(definition, confirmed));
+                completeControlCommand(active, true, null);
+                return;
+            }
+        }
+        int nextPoll = poll + 1;
+        beginControlConfirmationPoll(active, nextPoll);
+    }
+
+    /**
+     * A vendor watcher/read may confirm a command before the scheduled poll. Only the latest
+     * per-control generation is eligible; an old target can therefore never finish a replacement.
+     */
+    private void confirmActiveControlCommandFromState(@NonNull ControlDefinition definition,
+                                                      double value) {
+        ActiveControlCommand active = activeControlCommands.get(definition.descriptor.id);
+        if (active == null || active.pulse || !isCurrentControlCommand(active)) return;
+        if (controlCommandExpired(active)) {
+            failControlCommandTimeout(active);
+            return;
+        }
+        active.lastConfirmed = value;
+        if (isControlCommandConfirmed(value, active.target)) {
+            completeControlCommand(active, true, null);
+        }
+    }
+
+    private boolean isCurrentControlCommand(@NonNull ActiveControlCommand candidate) {
+        if (!isActiveControlCommand(candidate)) return false;
+        return isLatestControlCommandSubmission(candidate.command.controlId,
+                candidate.key, candidate.generation);
+    }
+
+    private boolean isActiveControlCommand(@NonNull ActiveControlCommand candidate) {
+        ActiveControlCommand current = activeControlCommands.get(candidate.command.controlId);
+        return current == candidate
+                && isLatestControlCommand(current.generation, candidate.generation);
+    }
+
+    static boolean isLatestControlCommand(long activeGeneration, long candidateGeneration) {
+        return activeGeneration > 0L && activeGeneration == candidateGeneration;
+    }
+
+    static long controlConfirmDelayMillis(int confirmationPoll) {
+        return CONTROL_CONFIRM_POLL_MS + Math.max(0, confirmationPoll) * 10L;
+    }
+
+    private static boolean controlCommandExpired(@NonNull ActiveControlCommand active) {
+        return SystemClock.elapsedRealtime() >= active.deadlineElapsedMillis;
+    }
+
+    private void failControlCommandTimeout(@NonNull ActiveControlCommand active) {
+        restoreLastConfirmedControlState(active);
+        scheduleControlRefresh(0);
+        completeControlCommand(active, false, active.acceptedAtLeastOnce
+                ? "Команда отправлена, но автомобиль не подтвердил её за 5 секунд"
+                : "ECARX отклонил команду");
+    }
+
+    private void restoreLastConfirmedControlState(@NonNull ActiveControlCommand active) {
+        if (active.definition != null && active.lastConfirmed != null) {
+            deliverControlState(normalizeControlState(active.definition, active.lastConfirmed));
+        }
+    }
+
+    private void completeControlCommand(@NonNull ActiveControlCommand active, boolean success,
+                                        @Nullable String message) {
+        if (!isCurrentControlCommand(active)) return;
+        finishActiveControlCommand(active, success, message);
+    }
+
+    private void cancelActiveControlCommand(@NonNull ActiveControlCommand active,
+                                            @NonNull String message) {
+        if (!isActiveControlCommand(active)) return;
+        finishActiveControlCommand(active, false, message);
+    }
+
+    private void finishActiveControlCommand(@NonNull ActiveControlCommand active, boolean success,
+                                            @Nullable String message) {
+        activeControlCommands.remove(active.command.controlId);
+        List<ControlCommandListener> listeners = new ArrayList<>(active.listeners);
+        active.listeners.clear();
+        for (ControlCommandListener listener : listeners) {
+            postCommandResult(listener, success, message);
+        }
+    }
+
+    private void cancelActiveControlCommandsOnWorker(@NonNull String message) {
+        List<ActiveControlCommand> active =
+                new ArrayList<>(activeControlCommands.values());
+        for (ActiveControlCommand command : active) {
+            cancelActiveControlCommand(command, message);
         }
     }
 
     static boolean shouldSendControlWrite(int confirmationPoll) {
         return confirmationPoll >= 0
+                && confirmationPoll < CONTROL_WRITE_WINDOW_POLLS
                 && (confirmationPoll == 0
                 || confirmationPoll % CONTROL_RESEND_EVERY_POLLS == 0);
     }
@@ -2417,16 +2999,6 @@ final class GeelyCarIntegration implements CarIntegration {
                 : source.setFunctionValue(definition.functionId, value);
     }
 
-    private static boolean pauseControlWorker(long millis) {
-        try {
-            Thread.sleep(millis);
-            return true;
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-            return false;
-        }
-    }
-
     @Nullable
     private Double readControlValue(ICarFunction source, ControlDefinition definition) {
         try {
@@ -2440,7 +3012,9 @@ final class GeelyCarIntegration implements CarIntegration {
                         ? source.getFunctionValue(definition.functionId, definition.zone)
                         : source.getFunctionValue(definition.functionId);
             }
-            return isValidControlValue(definition, value) ? value : null;
+            if (!isValidControlValue(definition, value)) return null;
+            rememberConfirmedRuntimeValue(definition, value);
+            return value;
         } catch (Throwable t) {
             invalidateFunctionProxy(source);
             return null;
@@ -2496,24 +3070,35 @@ final class GeelyCarIntegration implements CarIntegration {
         if (definition.customFloat || definition.descriptor.options.isEmpty()) {
             return definition.descriptor.options;
         }
+        List<CarControlDescriptor.Option> discovered = Collections.emptyList();
         try {
             int[] values = definition.zoned()
                     ? source.getSupportedFunctionValue(definition.functionId, definition.zone)
                     : source.getSupportedFunctionValue(definition.functionId);
-            if (values == null || values.length == 0) return definition.descriptor.options;
-            Set<Integer> supported = new HashSet<>();
-            for (int value : values) supported.add(value);
-            List<CarControlDescriptor.Option> result = new ArrayList<>();
-            for (CarControlDescriptor.Option option : definition.descriptor.options) {
-                if (option.value == 0 || supported.contains((int) Math.round(option.value))) {
-                    result.add(option);
+            if (values != null && values.length > 0) {
+                Set<Integer> supported = new HashSet<>();
+                for (int value : values) supported.add(value);
+                List<CarControlDescriptor.Option> result = new ArrayList<>();
+                for (CarControlDescriptor.Option option : definition.descriptor.options) {
+                    if (option.value == 0
+                            || supported.contains((int) Math.round(option.value))) {
+                        result.add(option);
+                    }
                 }
+                discovered = result;
             }
-            return result.isEmpty() ? definition.descriptor.options : result;
         } catch (Throwable ignored) {
-            // Older firmware can reject discovery even though direct reads/writes work.
-            return definition.descriptor.options;
+            // The safe fallback below is definition-specific.
         }
+        if (isAutoFanDefinition(definition)) {
+            List<CarControlDescriptor.Option> safe = safeAutoFanOptions(discovered,
+                    lastConfirmedAutoFanProfile, lastConfirmedAutoFanRuntimeOptions);
+            rememberAutoFanRuntimeOptions(safe);
+            return safe;
+        }
+        // Older firmware can reject discovery even though direct reads/writes work. The ordinary
+        // toggle/manual domains do not contain mutually incompatible vehicle families.
+        return discovered.isEmpty() ? definition.descriptor.options : discovered;
     }
 
     private static boolean sameValue(double left, double right) {
@@ -2541,13 +3126,44 @@ final class GeelyCarIntegration implements CarIntegration {
                 && value <= definition.descriptor.maximum + .01;
     }
 
+    /**
+     * A finite vendor extension is still a real observation even when this SDK revision has no
+     * semantic label for it. Show an explicit unknown state and keep the control disabled instead
+     * of collapsing it into the same silent retry path as Binder error sentinels.
+     */
+    private static boolean isReadableUnknownControlValue(@NonNull ControlDefinition definition,
+                                                         double value) {
+        if (definition.customFloat || definition.descriptor.options.isEmpty()
+                || !Double.isFinite(value) || value == -1 || value == Integer.MAX_VALUE
+                || value == Integer.MIN_VALUE
+                || sameValue(value, ICarFunction.COMMON_VALUE_ERROR)
+                || sameValue(value, ICarFunction.COMMON_VALUE_NONE)
+                || sameValue(value, ICarFunction.COMMON_VALUE_UNKNOWN)) {
+            return false;
+        }
+        for (CarControlDescriptor.Option option : definition.descriptor.options) {
+            if (sameValue(option.value, value)) return false;
+        }
+        return true;
+    }
+
     private void postCommandResult(ControlCommandListener listener, boolean success,
                                    @Nullable String message) {
-        mainHandler.post(() -> listener.onResult(success, message));
+        mainHandler.post(() -> {
+            try {
+                listener.onResult(success, message);
+            } catch (RuntimeException error) {
+                Log.w(TAG, "vehicle control result listener failed", error);
+            }
+        });
     }
 
     @Override
     public void shutdown() {
+        controlsShuttingDown = true;
+        synchronized (controlCommandSubmissionLock) {
+            latestControlCommandSubmissions.clear();
+        }
         for (BrickType type : BrickType.values()) {
             unsubscribe(type);
         }
@@ -2579,14 +3195,13 @@ final class GeelyCarIntegration implements CarIntegration {
             }
             bcmLastOnMillis.clear();
         });
-        executeControlTask(this::detachControlWatcher);
+        executeControlTask(() -> {
+            detachControlWatcher();
+            cancelActiveControlCommandsOnWorker("ECARX остановлен");
+        });
         signalFallback.shutdown();
         telemetryWorker.shutdown();
         controlWorker.shutdown();
-        List<ControlCommandListener> abandoned = pendingControlCommands.drain();
-        for (ControlCommandListener listener : abandoned) {
-            mainHandler.post(() -> listener.onResult(false, "ECARX остановлен"));
-        }
         availabilityChangedListener = null;
     }
 }

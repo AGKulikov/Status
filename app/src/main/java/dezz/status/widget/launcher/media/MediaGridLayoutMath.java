@@ -54,4 +54,23 @@ public final class MediaGridLayoutMath {
         }
         return best;
     }
+
+    /** Nearest valid span when an element's bottom/right resize handle is dragged. */
+    public static int spanForEndPx(int pixel, int availablePx, int spacingPx,
+                                   int count, int start) {
+        int safeCount = Math.max(1, count);
+        int safeStart = Math.max(0, Math.min(safeCount - 1, start));
+        int bestSpan = 1;
+        int bestDistance = Integer.MAX_VALUE;
+        for (int end = safeStart + 1; end <= safeCount; end++) {
+            int edge = startPx(availablePx, spacingPx, safeCount, end)
+                    - Math.max(0, spacingPx);
+            int distance = Math.abs(pixel - edge);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestSpan = end - safeStart;
+            }
+        }
+        return bestSpan;
+    }
 }

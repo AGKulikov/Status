@@ -26,6 +26,7 @@ public final class FavoriteRoutesAppearanceContractTest {
         assertTrue(settings.contains("private void previewAndPersist()"));
         assertTrue(panel.contains("new LinearLayout.LayoutParams(iconSize, iconSize)"));
         assertTrue(panel.contains("icon.setMaxWidth(iconSize)"));
+        assertTrue(panel.contains("icon.setScaleType(ImageView.ScaleType.FIT_CENTER)"));
     }
 
     private static String source(String relative) throws IOException {

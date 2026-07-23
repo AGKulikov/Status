@@ -29,6 +29,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.widget.BaseAdapter;
 import android.widget.FrameLayout;
@@ -43,7 +44,6 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
@@ -51,6 +51,8 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -72,8 +74,11 @@ import dezz.status.widget.launcher.LauncherLayoutStore;
 import dezz.status.widget.launcher.LauncherMediaController;
 import dezz.status.widget.launcher.LauncherIconResolver;
 import dezz.status.widget.launcher.LauncherShortcutStore;
+import dezz.status.widget.launcher.LauncherSafeAreaPolicy;
+import dezz.status.widget.launcher.LauncherSafeAreaResolver;
 import dezz.status.widget.launcher.NavigationDataRepository;
 import dezz.status.widget.launcher.SingleFlightRefresh;
+import dezz.status.widget.launcher.SmartHomeShortcutStatePolicy;
 import dezz.status.widget.launcher.YandexWindowLauncher;
 import dezz.status.widget.launcher.apps.FavoriteAppConfig;
 import dezz.status.widget.launcher.apps.FavoriteAppsConfigStore;
@@ -83,7 +88,11 @@ import dezz.status.widget.launcher.climate.ClimatePanelView;
 import dezz.status.widget.launcher.media.MediaPanelConfig;
 import dezz.status.widget.launcher.media.MediaPanelConfigStore;
 import dezz.status.widget.launcher.media.MediaPanelView;
+import dezz.status.widget.launcher.navigation.NavigationPanelConfig;
+import dezz.status.widget.launcher.navigation.NavigationPanelConfigStore;
+import dezz.status.widget.launcher.panels.PanelContentEditOverlay;
 import dezz.status.widget.launcher.panels.PanelElementConfigStore;
+import dezz.status.widget.launcher.panels.PanelGridLayout;
 import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
 import dezz.status.widget.launcher.routes.FavoriteRoutesPanelView;
 import dezz.status.widget.launcher.vehicle.VehicleInfoPanelConfigStore;
@@ -93,6 +102,9 @@ import dezz.status.widget.car.CarControlState;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.automation.ScenarioTriggerReceiver;
+import dezz.status.widget.integration.ConnectorValue;
+import dezz.status.widget.integration.ConnectorValueRegistry;
+import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.scenario.IntentActionRule;
 import dezz.status.widget.scenario.IntentActionRuleStore;
 
@@ -100,8 +112,13 @@ import dezz.status.widget.scenario.IntentActionRuleStore;
 public final class LauncherActivity extends AppCompatActivity {
     private static final String TAG = "LauncherActivity";
     public static final String EXTRA_EDIT_MODE = "dezz.status.widget.extra.EDIT_HOME";
+    public static final String EXTRA_EDIT_NAVIGATION_CONTENT =
+            "dezz.status.widget.extra.EDIT_NAVIGATION_CONTENT";
+    public static final String EXTRA_EDIT_MEDIA_CONTENT =
+            "dezz.status.widget.extra.EDIT_MEDIA_CONTENT";
     private static final long NAVIGATION_UI_REFRESH_MS = 30_000L;
     private static final long NAVIGATION_DYNAMIC_REFRESH_MS = 5_000L;
+    private static final long SAFE_AREA_REFRESH_MS = 500L;
     private static final long APP_CATALOG_REFRESH_MS = 10L * 60L * 1_000L;
     /** Gives the foreground WidgetService a chance to attach the status row before HOME work. */
     private static final long PANEL_INITIALIZATION_GRACE_MS = 200L;
@@ -135,6 +152,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private Preferences preferences;
     private LauncherLayoutStore layoutStore;
     private PanelElementConfigStore panelElementStore;
+    private NavigationPanelConfigStore navigationPanelConfigStore;
     private FavoriteAppsConfigStore favoriteAppsConfigStore;
     private FavoriteRoutesConfigStore favoriteRoutesConfigStore;
     private VehicleInfoPanelConfigStore vehicleInfoConfigStore;
@@ -142,6 +160,13 @@ public final class LauncherActivity extends AppCompatActivity {
     private LauncherGridView editorGrid;
     private MaterialButton doneButton;
     private boolean editMode;
+    private boolean navigationContentEditMode;
+    private boolean mediaContentEditMode;
+    private int systemLeftInset;
+    private int systemTopInset;
+    private int systemRightInset;
+    private int systemBottomInset;
+    @Nullable private LauncherSafeAreaPolicy.Insets appliedSafeInsets;
     private boolean panelsInitialized;
     private boolean panelsInitializing;
     private boolean panelInitializationAllowed;
@@ -150,8 +175,13 @@ public final class LauncherActivity extends AppCompatActivity {
     private boolean navigationDynamicRefresh;
     private boolean navigationLiveContentAvailable;
     @Nullable private View navigationRouteContent;
+    @Nullable private PanelGridLayout navigationGrid;
+    @Nullable private PanelContentEditOverlay navigationContentEditOverlay;
+    @Nullable private NavigationPanelConfig navigationPanelConfig;
+    @Nullable private NavigationDataRepository.Snapshot lastNavigationSnapshot;
     private LauncherMediaController mediaController;
     private MediaPanelView mediaPanel;
+    @Nullable private android.app.AlertDialog allAppsDialog;
     private TextView navigationArrival;
     private TextView navigationDuration;
     private TextView navigationDistance;
@@ -184,6 +214,10 @@ public final class LauncherActivity extends AppCompatActivity {
     private CarIntegration carIntegration;
     private final Map<String, CarControlState> carControlStates = new HashMap<>();
     private final Map<String, ShortcutTileBinding> carShortcutBindings = new HashMap<>();
+    private final Map<String, ShortcutTileBinding> smartHomeShortcutBindings = new HashMap<>();
+    private Map<String, IntentActionRule> smartHomeRules = Collections.emptyMap();
+    private final Map<String, ConnectorValue> smartHomeValueIndex = new HashMap<>();
+    @Nullable private WidgetService smartHomeValueService;
     private final Set<String> pendingCarControls = new LinkedHashSet<>();
     private boolean activityStarted;
     private ClimatePanelView climatePanel;
@@ -191,6 +225,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private boolean favoriteRoutesAvailable;
     private VehicleInfoPanelView vehicleInfoPanel;
     @Nullable private String appliedPanelElementsJson;
+    @Nullable private String appliedNavigationConfigJson;
     private int appliedAppsColumns = -1;
     private int appliedActionsColumns = -1;
     private int appsGridScalePercent = 100;
@@ -202,6 +237,35 @@ public final class LauncherActivity extends AppCompatActivity {
         carControlStates.put(state.controlId, state);
         for (ShortcutTileBinding binding : new ArrayList<>(carShortcutBindings.values())) {
             if (binding.shortcut.target.equals(state.controlId)) applyCarState(binding, state);
+        }
+    };
+    private final ConnectorValueRegistry.Listener smartHomeValueListener = changed -> {
+        List<ConnectorValue> copy = new ArrayList<>(changed);
+        navigationUiHandler.post(() -> applySmartHomeChanges(copy));
+    };
+    private final Runnable ensureSmartHomeValueSubscription = new Runnable() {
+        @Override public void run() {
+            if (!activityStarted || isFinishing() || isDestroyed()) return;
+            WidgetService current = WidgetService.getInstance();
+            if (current != smartHomeValueService) {
+                if (smartHomeValueService != null) {
+                    smartHomeValueService.removeConnectorValueListener(smartHomeValueListener);
+                }
+                smartHomeValueService = current;
+                if (current != null) {
+                    applySmartHomeValues(
+                            current.addConnectorValueListener(smartHomeValueListener));
+                }
+                else applySmartHomeValues(Collections.emptyList());
+            }
+            navigationUiHandler.postDelayed(this, current == null ? 250L : 2_000L);
+        }
+    };
+    private final Runnable safeAreaRefresh = new Runnable() {
+        @Override public void run() {
+            if (!activityStarted || isFinishing() || isDestroyed()) return;
+            updateLauncherSafeArea();
+            navigationUiHandler.postDelayed(this, SAFE_AREA_REFRESH_MS);
         }
     };
     private final Runnable allowPanelInitialization = () -> {
@@ -217,11 +281,23 @@ public final class LauncherActivity extends AppCompatActivity {
         carIntegration = CarIntegrations.get(this);
         layoutStore = new LauncherLayoutStore(preferences);
         panelElementStore = new PanelElementConfigStore(preferences);
+        navigationPanelConfigStore = new NavigationPanelConfigStore(preferences);
         favoriteAppsConfigStore = new FavoriteAppsConfigStore(preferences);
         favoriteRoutesConfigStore = new FavoriteRoutesConfigStore(preferences);
         vehicleInfoConfigStore = new VehicleInfoPanelConfigStore(preferences);
         configureWindow();
-        setContentView(buildRoot());
+        View root = buildRoot();
+        setContentView(root);
+        root.setOnApplyWindowInsetsListener((view, insets) -> {
+            systemLeftInset = Math.max(0, insets.getSystemWindowInsetLeft());
+            systemTopInset = Math.max(0, insets.getSystemWindowInsetTop());
+            systemRightInset = Math.max(0, insets.getSystemWindowInsetRight());
+            systemBottomInset = Math.max(0, insets.getSystemWindowInsetBottom());
+            updateLauncherSafeArea();
+            return insets;
+        });
+        root.requestApplyInsets();
+        updateLauncherSafeArea();
         workspace.addOnLayoutChangeListener((view, left, top, right, bottom,
                 oldLeft, oldTop, oldRight, oldBottom) -> {
             if (panelInitializationAllowed && !panelsInitialized && !panelsInitializing
@@ -240,8 +316,14 @@ public final class LauncherActivity extends AppCompatActivity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        if (intent.getBooleanExtra(EXTRA_EDIT_MODE, false) && panelsInitialized) {
-            setEditMode(true);
+        if (panelsInitialized) {
+            if (intent.getBooleanExtra(EXTRA_EDIT_MEDIA_CONTENT, false)) {
+                setMediaContentEditMode(true);
+            } else if (intent.getBooleanExtra(EXTRA_EDIT_NAVIGATION_CONTENT, false)) {
+                setNavigationContentEditMode(true);
+            } else if (intent.getBooleanExtra(EXTRA_EDIT_MODE, false)) {
+                setEditMode(true);
+            }
         }
     }
 
@@ -263,6 +345,10 @@ public final class LauncherActivity extends AppCompatActivity {
         }
         registerNavigationReceiver();
         WidgetServiceStarter.startIfNeeded(this);
+        navigationUiHandler.removeCallbacks(safeAreaRefresh);
+        navigationUiHandler.post(safeAreaRefresh);
+        navigationUiHandler.removeCallbacks(ensureSmartHomeValueSubscription);
+        navigationUiHandler.post(ensureSmartHomeValueSubscription);
         reconcileMediaController();
         if (panelsInitialized) refreshFavorites();
         updateNavigation();
@@ -284,6 +370,14 @@ public final class LauncherActivity extends AppCompatActivity {
         navigationUiHandler.removeCallbacks(allowPanelInitialization);
         navigationUiHandler.removeCallbacks(panelInitializationStep);
         navigationUiHandler.removeCallbacks(navigationUiRefresh);
+        navigationUiHandler.removeCallbacks(ensureSmartHomeValueSubscription);
+        navigationUiHandler.removeCallbacks(safeAreaRefresh);
+        dismissAllAppsDialog();
+        if (smartHomeValueService != null) {
+            smartHomeValueService.removeConnectorValueListener(smartHomeValueListener);
+            smartHomeValueService = null;
+        }
+        applySmartHomeValues(Collections.emptyList());
         if (climatePanel != null) climatePanel.stop();
         if (vehicleInfoPanel != null) vehicleInfoPanel.stop();
         if (carIntegration != null) carIntegration.unsubscribeControlStates(carStateListener);
@@ -323,6 +417,8 @@ public final class LauncherActivity extends AppCompatActivity {
         } else {
             getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         }
+        getWindow().getDecorView().requestApplyInsets();
+        updateLauncherSafeArea();
         applyLauncherPreferences();
         if (appCatalog != null) reloadAppCatalogAsync(false);
         if (shortcutStore != null) {
@@ -359,6 +455,7 @@ public final class LauncherActivity extends AppCompatActivity {
         if (mediaController == null) return;
         boolean needed = activityStarted && preferences.launcherMediaVisible.get()
                 && hasMediaPanelContent();
+        if (activityStarted && mediaContentEditMode && hasMediaPanelContent()) needed = true;
         if (needed) mediaController.start(); else mediaController.stop();
     }
 
@@ -404,8 +501,8 @@ public final class LauncherActivity extends AppCompatActivity {
                 && hasSimplePanelContent(LauncherLayoutStore.APPS));
         if (preferences.launcherAppsVisible.get() && appCatalog != null
                 && appCatalog.isEmpty()) reloadAppCatalogAsync(true);
-        setPanelVisibility(LauncherLayoutStore.MEDIA, preferences.launcherMediaVisible.get()
-                && hasMediaPanelContent());
+        setPanelVisibility(LauncherLayoutStore.MEDIA, mediaContentEditMode
+                || (preferences.launcherMediaVisible.get() && hasMediaPanelContent()));
         reconcileMediaController();
         setPanelVisibility(LauncherLayoutStore.CLOCK, preferences.launcherClockVisible.get()
                 && hasSimplePanelContent(LauncherLayoutStore.CLOCK));
@@ -436,15 +533,7 @@ public final class LauncherActivity extends AppCompatActivity {
         }
 
         layoutStore.load(workspace.getWidth(), workspace.getHeight());
-        for (Map.Entry<String, LauncherElementFrame> entry : panels.entrySet()) {
-            LauncherLayoutStore.Geometry g = layoutStore.get(entry.getKey());
-            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) entry.getValue().getLayoutParams();
-            lp.width = g.width;
-            lp.height = g.height;
-            lp.leftMargin = g.x;
-            lp.topMargin = g.y;
-            entry.getValue().setLayoutParams(lp);
-        }
+        applyStoredPanelGeometry();
         refreshSimplePanelContentsIfNeeded();
         updateNavigation();
         scheduleNavigationRefresh();
@@ -453,19 +542,27 @@ public final class LauncherActivity extends AppCompatActivity {
     /** Applies inner-element edits after returning from the visual panel editor. */
     private void refreshSimplePanelContentsIfNeeded() {
         String raw = preferences.launcherPanelElementsJson.get();
+        String navigationRaw = preferences.launcherNavigationConfigJson.get();
         int appsColumns = preferences.launcherAppsColumns.get();
         int actionsColumns = preferences.launcherActionsColumns.get();
-        if (Objects.equals(appliedPanelElementsJson, raw)
-                && appliedAppsColumns == appsColumns
-                && appliedActionsColumns == actionsColumns) return;
-        appliedPanelElementsJson = raw;
-        appliedAppsColumns = appsColumns;
-        appliedActionsColumns = actionsColumns;
-        replacePanelContent(LauncherLayoutStore.APPS, buildAppsPanel());
-        replacePanelContent(LauncherLayoutStore.CLOCK, buildClockPanel());
-        replacePanelContent(LauncherLayoutStore.NAVIGATION,
-                buildCombinedNavigationPanel());
-        replacePanelContent(LauncherLayoutStore.ACTIONS, buildActionsPanel());
+        boolean simpleChanged = !Objects.equals(appliedPanelElementsJson, raw)
+                || appliedAppsColumns != appsColumns
+                || appliedActionsColumns != actionsColumns;
+        boolean navigationChanged = !Objects.equals(appliedNavigationConfigJson, navigationRaw);
+        if (!simpleChanged && !navigationChanged) return;
+        if (simpleChanged) {
+            appliedPanelElementsJson = raw;
+            appliedAppsColumns = appsColumns;
+            appliedActionsColumns = actionsColumns;
+            replacePanelContent(LauncherLayoutStore.APPS, buildAppsPanel());
+            replacePanelContent(LauncherLayoutStore.CLOCK, buildClockPanel());
+            replacePanelContent(LauncherLayoutStore.ACTIONS, buildActionsPanel());
+        }
+        if (navigationChanged) {
+            appliedNavigationConfigJson = navigationRaw;
+            replacePanelContent(LauncherLayoutStore.NAVIGATION,
+                    buildCombinedNavigationPanel());
+        }
         refreshFavorites();
         updateNavigation();
         scheduleNavigationRefresh();
@@ -486,6 +583,10 @@ public final class LauncherActivity extends AppCompatActivity {
         return !panelElementStore.load(id).enabled().isEmpty();
     }
 
+    private boolean hasNavigationPanelContent() {
+        return navigationPanelConfigStore.load().hasEnabledElements();
+    }
+
     private boolean hasMediaPanelContent() {
         for (MediaPanelConfig.Element element :
                 new MediaPanelConfigStore(preferences).load().orderedElements()) {
@@ -503,7 +604,11 @@ public final class LauncherActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        if (editMode) {
+        if (mediaContentEditMode) {
+            setMediaContentEditMode(false);
+        } else if (navigationContentEditMode) {
+            setNavigationContentEditMode(false);
+        } else if (editMode) {
             setEditMode(false);
         } else {
             super.onBackPressed();
@@ -542,20 +647,81 @@ public final class LauncherActivity extends AppCompatActivity {
         workspace.setClipChildren(false);
         workspace.setLongClickable(true);
         workspace.setOnLongClickListener(v -> {
-            setEditMode(true);
+            if (!navigationContentEditMode && !mediaContentEditMode) setEditMode(true);
             return true;
         });
         root.addView(workspace, match());
 
         doneButton = new MaterialButton(this);
         doneButton.setText("Готово · закрепить компоновку");
-        doneButton.setOnClickListener(v -> setEditMode(false));
+        doneButton.setOnClickListener(v -> finishActiveEditor());
         doneButton.setVisibility(View.GONE);
         FrameLayout.LayoutParams doneLp = new FrameLayout.LayoutParams(dp(420), dp(56),
                 Gravity.TOP | Gravity.CENTER_HORIZONTAL);
         doneLp.topMargin = dp(12);
         root.addView(doneButton, doneLp);
         return root;
+    }
+
+    /** Keeps HOME content inside every live app-owned and system-owned safe edge. */
+    private void updateLauncherSafeArea() {
+        if (preferences == null || workspace == null || editorGrid == null
+                || doneButton == null) return;
+        LauncherSafeAreaPolicy.Insets safe = LauncherSafeAreaResolver.resolveInsets(
+                preferences, systemLeftInset, systemTopInset,
+                systemRightInset, systemBottomInset,
+                getWindowManager().getDefaultDisplay().getDisplayId());
+        if (safe.equals(appliedSafeInsets)) return;
+        appliedSafeInsets = safe;
+        applySafeMargins(workspace, safe);
+        applySafeMargins(editorGrid, safe);
+        FrameLayout.LayoutParams doneParams =
+                (FrameLayout.LayoutParams) doneButton.getLayoutParams();
+        doneParams.leftMargin = safe.left;
+        doneParams.topMargin = safe.top + dp(12);
+        doneParams.rightMargin = safe.right;
+        doneParams.bottomMargin = safe.bottom;
+        doneButton.setLayoutParams(doneParams);
+        if (panelsInitialized) workspace.post(this::reflowPanelsInsideSafeArea);
+    }
+
+    private void applySafeMargins(@NonNull View view,
+                                  @NonNull LauncherSafeAreaPolicy.Insets safe) {
+        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) view.getLayoutParams();
+        params.leftMargin = safe.left;
+        params.topMargin = safe.top;
+        params.rightMargin = safe.right;
+        params.bottomMargin = safe.bottom;
+        view.setLayoutParams(params);
+    }
+
+    private void reflowPanelsInsideSafeArea() {
+        if (!panelsInitialized || workspace.getWidth() <= 0 || workspace.getHeight() <= 0) return;
+        layoutStore.load(workspace.getWidth(), workspace.getHeight());
+        applyStoredPanelGeometry();
+    }
+
+    private void applyStoredPanelGeometry() {
+        for (Map.Entry<String, LauncherElementFrame> entry : panels.entrySet()) {
+            LauncherLayoutStore.Geometry geometry = layoutStore.get(entry.getKey());
+            FrameLayout.LayoutParams params =
+                    (FrameLayout.LayoutParams) entry.getValue().getLayoutParams();
+            params.width = geometry.width;
+            params.height = geometry.height;
+            params.leftMargin = geometry.x;
+            params.topMargin = geometry.y;
+            entry.getValue().setLayoutParams(params);
+        }
+    }
+
+    private void finishActiveEditor() {
+        if (mediaContentEditMode) {
+            setMediaContentEditMode(false);
+        } else if (navigationContentEditMode) {
+            setNavigationContentEditMode(false);
+        } else {
+            setEditMode(false);
+        }
     }
 
     private Drawable buildBackground() {
@@ -681,9 +847,16 @@ public final class LauncherActivity extends AppCompatActivity {
             if (vehicleInfoPanel != null) vehicleInfoPanel.start();
         }
         appliedPanelElementsJson = preferences.launcherPanelElementsJson.get();
+        appliedNavigationConfigJson = preferences.launcherNavigationConfigJson.get();
         appliedAppsColumns = preferences.launcherAppsColumns.get();
         appliedActionsColumns = preferences.launcherActionsColumns.get();
-        if (getIntent().getBooleanExtra(EXTRA_EDIT_MODE, false)) setEditMode(true);
+        if (getIntent().getBooleanExtra(EXTRA_EDIT_MEDIA_CONTENT, false)) {
+            setMediaContentEditMode(true);
+        } else if (getIntent().getBooleanExtra(EXTRA_EDIT_NAVIGATION_CONTENT, false)) {
+            setNavigationContentEditMode(true);
+        } else if (getIntent().getBooleanExtra(EXTRA_EDIT_MODE, false)) {
+            setEditMode(true);
+        }
     }
 
     @NonNull
@@ -739,13 +912,13 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private boolean isCombinedNavigationFrameVisible() {
         return isCombinedNavigationEnabled()
-                && (hasSimplePanelContent(LauncherLayoutStore.NAVIGATION)
+                && (hasNavigationPanelContent()
                 || favoriteRoutesAvailable);
     }
 
     private void updateCombinedNavigationFrameVisibility() {
         setPanelVisibility(LauncherLayoutStore.NAVIGATION,
-                isCombinedNavigationFrameVisible());
+                navigationContentEditMode || isCombinedNavigationFrameVisible());
     }
 
     @NonNull
@@ -874,10 +1047,13 @@ public final class LauncherActivity extends AppCompatActivity {
 
     @NonNull
     private View buildNavigationPanel() {
-        PanelElementConfigStore.Panel config = panelElementStore.load(
-                LauncherLayoutStore.NAVIGATION);
-        LinearLayout root = verticalContainer();
-        root.setGravity(Gravity.CENTER_VERTICAL);
+        NavigationPanelConfig config = navigationPanelConfigStore.load();
+        navigationPanelConfig = config;
+        FrameLayout host = new FrameLayout(this);
+        navigationGrid = new PanelGridLayout(this);
+        navigationGrid.setGridSize(config.gridColumns, config.gridRows);
+        navigationGrid.setCellGapPx(dp(4));
+        host.addView(navigationGrid, match());
         navigationArrival = null;
         navigationDuration = null;
         navigationDistance = null;
@@ -897,66 +1073,134 @@ public final class LauncherActivity extends AppCompatActivity {
         navigationRainbowImage = null;
         navigationInactive = null;
         navigationLiveContentAvailable = false;
-        for (PanelElementConfigStore.Element element : config.enabled()) {
+        for (NavigationPanelConfig.Element element : config.enabledElements()) {
             TextView value = null;
-            if (PanelElementConfigStore.NAV_ARRIVAL.equals(element.id)) {
+            View content;
+            if (NavigationPanelConfig.ARRIVAL.equals(element.id)) {
                 navigationArrival = value = text(24f * element.scalePercent / 100f,
                         Color.WHITE, true);
-            } else if (PanelElementConfigStore.NAV_DURATION.equals(element.id)) {
+                content = value;
+            } else if (NavigationPanelConfig.DURATION.equals(element.id)) {
                 navigationDuration = value = text(18f * element.scalePercent / 100f,
                         Color.LTGRAY, false);
-            } else if (PanelElementConfigStore.NAV_DISTANCE.equals(element.id)) {
+                content = value;
+            } else if (NavigationPanelConfig.DISTANCE.equals(element.id)) {
                 navigationDistance = value = text(18f * element.scalePercent / 100f,
                         Color.LTGRAY, false);
-            } else if (PanelElementConfigStore.NAV_MANEUVER_IMAGE.equals(element.id)) {
+                content = value;
+            } else if (NavigationPanelConfig.MANEUVER_IMAGE.equals(element.id)) {
                 navigationManeuverImage = navigationImage(element.scalePercent, 76);
-                root.addView(navigationManeuverImage);
-            } else if (PanelElementConfigStore.NAV_MANEUVER_DISTANCE.equals(element.id)) {
+                content = navigationManeuverImage;
+            } else if (NavigationPanelConfig.MANEUVER_DISTANCE.equals(element.id)) {
                 navigationManeuverDistance = value = text(25f * element.scalePercent / 100f,
                         Color.WHITE, true);
-            } else if (PanelElementConfigStore.NAV_MANEUVER.equals(element.id)) {
+                content = value;
+            } else if (NavigationPanelConfig.MANEUVER.equals(element.id)) {
                 navigationManeuver = value = text(17f * element.scalePercent / 100f,
                         Color.WHITE, false);
-            } else if (PanelElementConfigStore.NAV_TRIP_INFO.equals(element.id)) {
+                content = value;
+            } else if (NavigationPanelConfig.TRIP_INFO.equals(element.id)) {
                 navigationTripInfo = value = text(16f * element.scalePercent / 100f,
                         Color.LTGRAY, false);
-            } else if (PanelElementConfigStore.NAV_COMBINED.equals(element.id)) {
+                content = value;
+            } else if (NavigationPanelConfig.COMBINED.equals(element.id)) {
                 navigationCombined = buildNavigationCombined(element.scalePercent);
-                root.addView(navigationCombined);
-            } else if (PanelElementConfigStore.NAV_SPEED_LIMIT.equals(element.id)) {
+                content = navigationCombined;
+            } else if (NavigationPanelConfig.SPEED_LIMIT.equals(element.id)) {
                 navigationSpeedLimit = value = text(18f * element.scalePercent / 100f,
                         Color.rgb(255, 210, 90), true);
-            } else if (PanelElementConfigStore.NAV_TRAFFIC_LIGHT.equals(element.id)) {
+                content = value;
+            } else if (NavigationPanelConfig.TRAFFIC_LIGHT.equals(element.id)) {
                 navigationTrafficScalePercent = element.scalePercent;
                 navigationTrafficLights = new LinearLayout(this);
                 navigationTrafficLights.setOrientation(LinearLayout.VERTICAL);
-                root.addView(navigationTrafficLights, new LinearLayout.LayoutParams(
-                        matchWidth(), wrapContent()));
-            } else if (PanelElementConfigStore.NAV_LANES_IMAGE.equals(element.id)) {
+                navigationTrafficLights.setGravity(Gravity.CENTER_VERTICAL);
+                content = navigationTrafficLights;
+            } else if (NavigationPanelConfig.LANES_IMAGE.equals(element.id)) {
                 navigationLanesImage = navigationImage(element.scalePercent, 82);
-                root.addView(navigationLanesImage);
-            } else if (PanelElementConfigStore.NAV_LANE_INFO.equals(element.id)) {
+                content = navigationLanesImage;
+            } else if (NavigationPanelConfig.LANE_INFO.equals(element.id)) {
                 navigationLaneInfo = value = text(16f * element.scalePercent / 100f,
                         Color.WHITE, false);
-            } else if (PanelElementConfigStore.NAV_JAM_PROGRESS.equals(element.id)) {
+                content = value;
+            } else if (NavigationPanelConfig.JAM_PROGRESS.equals(element.id)) {
                 navigationJamImage = navigationImage(element.scalePercent, 58);
-                root.addView(navigationJamImage);
-            } else if (PanelElementConfigStore.NAV_RAINBOW_IMAGE.equals(element.id)) {
+                content = navigationJamImage;
+            } else if (NavigationPanelConfig.RAINBOW_IMAGE.equals(element.id)) {
                 navigationRainbowImage = navigationImage(element.scalePercent, 58);
-                root.addView(navigationRainbowImage);
-            } else if (PanelElementConfigStore.NAV_INACTIVE.equals(element.id)) {
+                content = navigationRainbowImage;
+            } else if (NavigationPanelConfig.INACTIVE.equals(element.id)) {
                 navigationInactive = value = text(16f * element.scalePercent / 100f,
                         Color.GRAY, false);
+                content = value;
             } else {
                 continue;
             }
-            if (!PanelElementConfigStore.NAV_INACTIVE.equals(element.id)) {
+            if (value != null) value.setGravity(Gravity.CENTER);
+            if (!NavigationPanelConfig.INACTIVE.equals(element.id)) {
                 navigationLiveContentAvailable = true;
             }
-            if (value != null) root.addView(value);
+            addNavigationGridElement(element, content);
         }
-        root.setOnClickListener(v -> launchYandex(navigationLaunchProduct, false));
-        return root;
+        navigationContentEditOverlay = new PanelContentEditOverlay(this);
+        navigationContentEditOverlay.setModel(new PanelContentEditOverlay.Model() {
+            @Override public int columns() { return config.gridColumns; }
+            @Override public int rows() { return config.gridRows; }
+            @NonNull @Override public List<PanelContentEditOverlay.Item> items() {
+                List<PanelContentEditOverlay.Item> result = new ArrayList<>();
+                for (NavigationPanelConfig.Element element : config.enabledElements()) {
+                    NavigationPanelConfig.Spec spec = NavigationPanelConfig.spec(element.id);
+                    result.add(new PanelContentEditOverlay.Item(element.id,
+                            spec == null ? element.id : spec.label,
+                            element.column, element.row,
+                            element.columnSpan, element.rowSpan));
+                }
+                return result;
+            }
+            @Override public boolean setPlacement(@NonNull String id, int column, int row,
+                                                  int columnSpan, int rowSpan) {
+                return config.setPlacement(id, column, row, columnSpan, rowSpan);
+            }
+        }, (id, finished) -> {
+            applyNavigationGridPlacements();
+            navigationPanelConfigStore.save(config);
+            appliedNavigationConfigJson = preferences.launcherNavigationConfigJson.get();
+        });
+        host.addView(navigationContentEditOverlay, match());
+        navigationContentEditOverlay.setEditing(navigationContentEditMode);
+        host.setOnClickListener(v -> {
+            if (!navigationContentEditMode) {
+                launchYandex(navigationLaunchProduct, false);
+            }
+        });
+        return host;
+    }
+
+    private void addNavigationGridElement(@NonNull NavigationPanelConfig.Element element,
+                                          @NonNull View content) {
+        PanelGridLayout grid = navigationGrid;
+        if (grid == null) return;
+        FrameLayout cell = new FrameLayout(this);
+        cell.setTag(element.id);
+        cell.setPadding(dp(4), dp(2), dp(4), dp(2));
+        ViewGroup.LayoutParams existing = content.getLayoutParams();
+        FrameLayout.LayoutParams contentParams = existing instanceof FrameLayout.LayoutParams
+                ? (FrameLayout.LayoutParams) existing : match();
+        cell.addView(content, contentParams);
+        grid.addView(cell, new PanelGridLayout.LayoutParams(
+                element.column, element.row, element.columnSpan, element.rowSpan));
+    }
+
+    private void applyNavigationGridPlacements() {
+        NavigationPanelConfig config = navigationPanelConfig;
+        PanelGridLayout grid = navigationGrid;
+        if (config == null || grid == null) return;
+        grid.setGridSize(config.gridColumns, config.gridRows);
+        for (NavigationPanelConfig.Element element : config.enabledElements()) {
+            grid.updatePlacement(element.id, element.column, element.row,
+                    element.columnSpan, element.rowSpan);
+        }
+        if (navigationContentEditOverlay != null) navigationContentEditOverlay.invalidate();
     }
 
     @NonNull
@@ -966,7 +1210,7 @@ public final class LauncherActivity extends AppCompatActivity {
         value.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         value.setVisibility(View.GONE);
         int height = dp(Math.max(28, baseHeightDp * scalePercent / 100));
-        value.setLayoutParams(new LinearLayout.LayoutParams(matchWidth(), height));
+        value.setLayoutParams(new FrameLayout.LayoutParams(matchWidth(), height, Gravity.CENTER));
         return value;
     }
 
@@ -1021,6 +1265,8 @@ public final class LauncherActivity extends AppCompatActivity {
         if (shortcutGrid == null || shortcutStore == null) return;
         shortcutGrid.removeAllViews();
         carShortcutBindings.clear();
+        smartHomeShortcutBindings.clear();
+        smartHomeRules = loadSmartHomeRules();
         int columns = Math.max(1, Math.min(6, preferences.launcherActionsColumns.get()));
         List<ShortcutPlacement> placements = new ArrayList<>();
         List<boolean[]> occupied = new ArrayList<>();
@@ -1062,6 +1308,21 @@ public final class LauncherActivity extends AppCompatActivity {
             shortcutGrid.addView(tile, lp);
         }
         resubscribeCarControls();
+        applySmartHomeStates();
+    }
+
+    @NonNull
+    private Map<String, IntentActionRule> loadSmartHomeRules() {
+        try {
+            Map<String, IntentActionRule> result = new HashMap<>();
+            for (IntentActionRule rule : new IntentActionRuleStore(preferences).loadStrict()) {
+                result.put(rule.id, rule);
+            }
+            return result;
+        } catch (IllegalArgumentException invalid) {
+            Log.w(TAG, "Could not load smart-home rules for live HOME state", invalid);
+            return Collections.emptyMap();
+        }
     }
 
     @NonNull
@@ -1124,7 +1385,8 @@ public final class LauncherActivity extends AppCompatActivity {
             content.addView(label, labelLp);
         }
         TextView stateLabel = null;
-        if (!addButton && shortcut.kind == LauncherShortcutStore.Kind.CAR
+        if (!addButton && (shortcut.kind == LauncherShortcutStore.Kind.CAR
+                || shortcut.kind == LauncherShortcutStore.Kind.RULE)
                 && shortcut.showState) {
             stateLabel = text(11, Color.LTGRAY, true);
             stateLabel.setGravity(Gravity.CENTER);
@@ -1168,6 +1430,11 @@ public final class LauncherActivity extends AppCompatActivity {
                         icon, stateLabel);
                 carShortcutBindings.put(shortcut.id, binding);
                 applyCarState(binding, carControlStates.get(shortcut.target));
+            } else if (shortcut.kind == LauncherShortcutStore.Kind.RULE) {
+                ShortcutTileBinding binding = new ShortcutTileBinding(shortcut.copy(), card,
+                        icon, stateLabel);
+                smartHomeShortcutBindings.put(shortcut.id, binding);
+                applySmartHomeState(binding);
             }
         }
         return card;
@@ -1260,6 +1527,78 @@ public final class LauncherActivity extends AppCompatActivity {
                 ? ", состояние неизвестно" : ", " + state.valueLabel));
     }
 
+    private void applySmartHomeValues(@NonNull Collection<ConnectorValue> values) {
+        smartHomeValueIndex.clear();
+        for (ConnectorValue value : values) {
+            smartHomeValueIndex.put(smartHomeValueKey(value), value);
+        }
+        applySmartHomeStates();
+    }
+
+    private void applySmartHomeChanges(@NonNull Collection<ConnectorValue> changed) {
+        if (!activityStarted) return;
+        for (ConnectorValue value : changed) {
+            // Registry removals are reported as stale values. Retaining that last-known value is
+            // more truthful than flashing an active state and is replaced on the next snapshot.
+            smartHomeValueIndex.put(smartHomeValueKey(value), value);
+        }
+        applySmartHomeStates();
+    }
+
+    private void applySmartHomeStates() {
+        for (ShortcutTileBinding binding :
+                new ArrayList<>(smartHomeShortcutBindings.values())) {
+            applySmartHomeState(binding);
+        }
+    }
+
+    private void applySmartHomeState(@NonNull ShortcutTileBinding binding) {
+        LauncherShortcutStore.Shortcut shortcut = binding.shortcut;
+        IntentActionRule rule = smartHomeRules.get(shortcut.target);
+        SourceBinding source = SmartHomeShortcutStatePolicy.bindingFor(shortcut, rule);
+        ConnectorValue value = source == null ? null
+                : smartHomeValueIndex.get(smartHomeValueKey(source));
+        SmartHomeShortcutStatePolicy.State state =
+                SmartHomeShortcutStatePolicy.resolveValue(shortcut, rule, value);
+        boolean active = state.present && state.fresh && state.available
+                && state.activeKnown && state.active;
+        String background = active
+                ? shortcut.activeBackgroundColor : shortcut.backgroundColor;
+        try { binding.card.setCardBackgroundColor(Color.parseColor(background)); }
+        catch (IllegalArgumentException ignored) {
+            binding.card.setCardBackgroundColor(Color.argb(180, 34, 39, 51));
+        }
+        String tint = active ? shortcut.activeIconColor : shortcut.iconColor;
+        LauncherShortcutStore.Shortcut visual = shortcut.copy();
+        visual.icon = state.iconKey;
+        binding.icon.setImageDrawable(LauncherIconResolver.resolve(this, visual, tint));
+        binding.card.setAlpha(!state.present ? .62f
+                : !state.available ? .42f : !state.fresh ? .68f : 1f);
+        if (binding.stateLabel != null) {
+            binding.stateLabel.setText(state.valueLabel);
+            try { binding.stateLabel.setTextColor(Color.parseColor(tint)); }
+            catch (IllegalArgumentException ignored) {
+                binding.stateLabel.setTextColor(Color.LTGRAY);
+            }
+        }
+        binding.card.setContentDescription(shortcut.title + ", " + state.valueLabel);
+        // State is presentation only. Never disable or replace the card listener: even an
+        // unavailable device may recover exactly when the user retries its action.
+        binding.card.setClickable(true);
+    }
+
+    @NonNull
+    private static String smartHomeValueKey(@NonNull ConnectorValue value) {
+        return value.connectorType.jsonName() + '\u0000' + value.connectorId + '\u0000'
+                + value.resourceId;
+    }
+
+    @NonNull
+    private static String smartHomeValueKey(@NonNull SourceBinding binding) {
+        return binding.connectorType.jsonName() + '\u0000' + binding.connectorId + '\u0000'
+                + binding.resourceId;
+    }
+
     private void executeSavedRule(@NonNull String ruleId) {
         List<IntentActionRule> rules = new IntentActionRuleStore(preferences).loadStrict();
         for (IntentActionRule rule : rules) {
@@ -1299,13 +1638,18 @@ public final class LauncherActivity extends AppCompatActivity {
     }
 
     private void setEditMode(boolean enabled) {
+        if (enabled && navigationContentEditMode) setNavigationContentEditMode(false);
+        if (enabled && mediaContentEditMode) setMediaContentEditMode(false);
         editMode = enabled;
         int snap = Math.max(4, preferences.launcherSnapPx.get());
         editorGrid.setStepPx(snap);
         editorGrid.setVisibility(enabled && preferences.launcherShowGrid.get()
                 ? View.VISIBLE : View.GONE);
-        doneButton.setVisibility(enabled ? View.VISIBLE : View.GONE);
+        doneButton.setText("Готово · закрепить компоновку");
+        doneButton.setVisibility(enabled || navigationContentEditMode || mediaContentEditMode
+                ? View.VISIBLE : View.GONE);
         for (LauncherElementFrame frame : panels.values()) frame.setEditMode(enabled, snap);
+        updateLauncherSafeArea();
         updateNavigation();
         if (vehicleInfoPanel != null && preferences.launcherVehicleInfoVisible.get()) {
             setPanelVisibility(LauncherLayoutStore.VEHICLE_INFO,
@@ -1314,6 +1658,67 @@ public final class LauncherActivity extends AppCompatActivity {
         Toast.makeText(this, enabled
                 ? "Тащите панель; маркер внизу справа изменяет размер"
                 : "Компоновка сохранена", Toast.LENGTH_SHORT).show();
+    }
+
+    private void setNavigationContentEditMode(boolean enabled) {
+        if (enabled && editMode) setEditMode(false);
+        if (enabled && mediaContentEditMode) setMediaContentEditMode(false);
+        navigationContentEditMode = enabled;
+        if (navigationContentEditOverlay != null) {
+            navigationContentEditOverlay.setEditing(enabled);
+        }
+        editorGrid.setVisibility(View.GONE);
+        doneButton.setText(enabled
+                ? "Готово · сохранить элементы навигации"
+                : "Готово · закрепить компоновку");
+        doneButton.setVisibility(enabled || editMode || mediaContentEditMode
+                ? View.VISIBLE : View.GONE);
+        updateLauncherSafeArea();
+        if (enabled) {
+            setPanelVisibility(LauncherLayoutStore.NAVIGATION, true);
+            if (favoriteRoutesPanel != null) favoriteRoutesPanel.setVisibility(View.GONE);
+            if (navigationRouteContent != null) {
+                navigationRouteContent.setVisibility(View.VISIBLE);
+            }
+        }
+        NavigationDataRepository.Snapshot snapshot = lastNavigationSnapshot;
+        if (snapshot != null) renderNavigation(snapshot); else updateNavigation();
+        if (!enabled) updateCombinedNavigationFrameVisibility();
+        Toast.makeText(this, enabled
+                ? "Тащите элементы; потяните выделенный правый нижний угол для размера"
+                : "Сетка навигации сохранена", Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * Edits the actual rendered media grid while the outer HOME frame stays fixed. Keeping this
+     * separate from {@link #setEditMode(boolean)} is essential: LauncherElementFrame deliberately
+     * intercepts every touch while moving/resizing an outer panel.
+     */
+    private void setMediaContentEditMode(boolean enabled) {
+        if (enabled && editMode) setEditMode(false);
+        if (enabled && navigationContentEditMode) setNavigationContentEditMode(false);
+        mediaContentEditMode = enabled;
+        if (mediaPanel != null) {
+            if (enabled) mediaPanel.reloadConfig();
+            mediaPanel.setInPlaceEditMode(enabled);
+        }
+        editorGrid.setVisibility(View.GONE);
+        doneButton.setText(enabled
+                ? "Готово · сохранить элементы медиапанели"
+                : "Готово · закрепить компоновку");
+        doneButton.setVisibility(enabled || editMode || navigationContentEditMode
+                ? View.VISIBLE : View.GONE);
+        if (enabled) {
+            setPanelVisibility(LauncherLayoutStore.MEDIA, true);
+        } else {
+            setPanelVisibility(LauncherLayoutStore.MEDIA,
+                    preferences.launcherMediaVisible.get() && hasMediaPanelContent());
+        }
+        reconcileMediaController();
+        updateLauncherSafeArea();
+        Toast.makeText(this, enabled
+                ? "Тащите элементы; правый нижний угол изменяет размер"
+                : "Сетка медиапанели сохранена", Toast.LENGTH_SHORT).show();
     }
 
     private void updateMedia(@NonNull LauncherMediaController.Snapshot state) {
@@ -1325,7 +1730,8 @@ public final class LauncherActivity extends AppCompatActivity {
         // parses several JSON values and may decode four navigation PNGs; doing so on the shared
         // main Looper can freeze both HOME and the status row. Coalesce bursts on a worker.
         if (!panelsInitialized || isFinishing() || isDestroyed()
-                || (!isCombinedNavigationEnabled() && !editMode)) return;
+                || (!isCombinedNavigationEnabled() && !editMode
+                && !navigationContentEditMode)) return;
         if (!navigationRefresh.request()) return;
         submitNavigationRead();
     }
@@ -1365,8 +1771,10 @@ public final class LauncherActivity extends AppCompatActivity {
     }
 
     private void renderNavigation(@NonNull NavigationDataRepository.Snapshot state) {
+        lastNavigationSnapshot = state;
         navigationDynamicRefresh = false;
-        boolean showFavorites = CombinedNavigationPanelPolicy.showFavorites(
+        boolean showFavorites = !navigationContentEditMode
+                && CombinedNavigationPanelPolicy.showFavorites(
                 state.routeActive, favoriteRoutesAvailable);
         if (favoriteRoutesPanel != null) {
             favoriteRoutesPanel.setVisibility(showFavorites ? View.VISIBLE : View.GONE);
@@ -1378,7 +1786,8 @@ public final class LauncherActivity extends AppCompatActivity {
                 state.routeActive, favoriteRoutesAvailable,
                 navigationLiveContentAvailable, navigationInactive != null);
         setPanelVisibility(LauncherLayoutStore.NAVIGATION,
-                isCombinedNavigationEnabled() && (editMode || phaseHasContent));
+                (navigationContentEditMode || isCombinedNavigationEnabled())
+                        && (editMode || navigationContentEditMode || phaseHasContent));
         if (navigationArrival == null && navigationDuration == null
                 && navigationDistance == null && navigationManeuverImage == null
                 && navigationManeuverDistance == null && navigationManeuver == null
@@ -1395,47 +1804,27 @@ public final class LauncherActivity extends AppCompatActivity {
                 || state.lanesImage != null || state.rainbowImage != null || laneTextAvailable);
         if (!state.routeActive) {
             navigationLaunchProduct = YandexWindowLauncher.Product.NAVIGATOR;
-            if (navigationArrival != null) navigationArrival.setVisibility(View.GONE);
-            if (navigationDuration != null) navigationDuration.setVisibility(View.GONE);
-            if (navigationDistance != null) navigationDistance.setVisibility(View.GONE);
-            hideNavigationImage(navigationManeuverImage);
-            if (navigationManeuverDistance != null) {
-                navigationManeuverDistance.setVisibility(View.GONE);
-            }
-            if (navigationManeuver != null) navigationManeuver.setVisibility(View.GONE);
-            if (navigationTripInfo != null) navigationTripInfo.setVisibility(View.GONE);
-            if (navigationCombined != null) {
-                navigationCombined.setVisibility(View.GONE);
-                if (navigationCombinedImage != null) {
-                    navigationCombinedImage.setImageDrawable(null);
-                }
-            }
-            if (navigationSpeedLimit != null) navigationSpeedLimit.setVisibility(View.GONE);
-            if (navigationTrafficLights != null) {
-                navigationTrafficLights.removeAllViews();
-                navigationTrafficLights.setVisibility(View.GONE);
-            }
-            hideNavigationImage(navigationLanesImage);
-            if (navigationLaneInfo != null) navigationLaneInfo.setVisibility(View.GONE);
-            hideNavigationImage(navigationJamImage);
-            hideNavigationImage(navigationRainbowImage);
+            clearNavigationRouteViews();
             if (navigationInactive != null) {
                 navigationInactive.setVisibility(View.VISIBLE);
                 navigationInactive.setText(favoriteRoutesAvailable
                         ? "Маршрут не запущен"
                         : "Маршрут не запущен\nДобавьте избранные маршруты в настройках");
             }
+            if (navigationContentEditMode) showNavigationEditorSamples();
             return;
         }
         navigationLaunchProduct = NavigationDataRepository.PRODUCT_MAPS.equals(state.sourceProduct)
                 ? YandexWindowLauncher.Product.MAPS
                 : YandexWindowLauncher.Product.NAVIGATOR;
         if (navigationInactive != null) {
+            navigationInactive.setText("");
             navigationInactive.setVisibility(View.GONE);
         }
         if (navigationArrival != null) {
             navigationArrival.setVisibility(state.available ? View.VISIBLE : View.GONE);
-            navigationArrival.setText(state.arrival.isEmpty() ? "Маршрут активен"
+            navigationArrival.setText(!state.available ? ""
+                    : state.arrival.isEmpty() ? "Маршрут активен"
                     : "Время прибытия: " + state.arrival);
         }
         if (navigationDuration != null) {
@@ -1448,7 +1837,8 @@ public final class LauncherActivity extends AppCompatActivity {
                     ? View.VISIBLE : View.GONE);
             navigationDistance.setText(state.distance);
         }
-        showNavigationImage(navigationManeuverImage, state.maneuverImage);
+        showNavigationImage(navigationManeuverImage,
+                state.available ? state.maneuverImage : null);
         if (navigationManeuverDistance != null) {
             navigationManeuverDistance.setVisibility(state.available
                     && !state.maneuverTitle.isEmpty() ? View.VISIBLE : View.GONE);
@@ -1471,13 +1861,14 @@ public final class LauncherActivity extends AppCompatActivity {
             String combinedManeuver = state.available
                     ? (state.maneuverText.isEmpty()
                     ? state.maneuverSubtext : state.maneuverText) : "";
-            boolean combinedVisible = state.maneuverImage != null
+            Bitmap combinedBitmap = state.available ? state.maneuverImage : null;
+            boolean combinedVisible = combinedBitmap != null
                     || (state.available && (!combinedTitle.isEmpty()
                     || !combinedManeuver.isEmpty()));
             navigationCombined.setVisibility(combinedVisible ? View.VISIBLE : View.GONE);
             if (navigationCombinedImage != null) {
-                navigationCombinedImage.setImageBitmap(state.maneuverImage);
-                navigationCombinedImage.setVisibility(state.maneuverImage == null
+                navigationCombinedImage.setImageBitmap(combinedBitmap);
+                navigationCombinedImage.setVisibility(combinedBitmap == null
                         ? View.GONE : View.VISIBLE);
             }
             if (navigationCombinedDistance != null) {
@@ -1513,7 +1904,8 @@ public final class LauncherActivity extends AppCompatActivity {
             navigationTrafficLights.setVisibility(state.trafficAvailable
                     && navigationTrafficLights.getChildCount() > 0 ? View.VISIBLE : View.GONE);
         }
-        showNavigationImage(navigationLanesImage, state.lanesImage);
+        showNavigationImage(navigationLanesImage,
+                state.laneAvailable ? state.lanesImage : null);
         if (navigationLaneInfo != null) {
             StringBuilder value = new StringBuilder();
             if (!state.lanes.isEmpty()) value.append(state.lanes.replace(";", " · "));
@@ -1528,14 +1920,74 @@ public final class LauncherActivity extends AppCompatActivity {
             navigationLaneInfo.setVisibility(state.laneAvailable && value.length() > 0
                     ? View.VISIBLE : View.GONE);
         }
-        showNavigationImage(navigationJamImage, state.jamImage);
-        showNavigationImage(navigationRainbowImage, state.rainbowImage);
+        showNavigationImage(navigationJamImage, state.available ? state.jamImage : null);
+        showNavigationImage(navigationRainbowImage,
+                state.available ? state.rainbowImage : null);
+    }
+
+    /** Clears every live field before idle/stale rendering so no old route can flash back. */
+    private void clearNavigationRouteViews() {
+        clearNavigationText(navigationArrival);
+        clearNavigationText(navigationDuration);
+        clearNavigationText(navigationDistance);
+        hideNavigationImage(navigationManeuverImage);
+        clearNavigationText(navigationManeuverDistance);
+        clearNavigationText(navigationManeuver);
+        clearNavigationText(navigationTripInfo);
+        if (navigationCombined != null) navigationCombined.setVisibility(View.GONE);
+        hideNavigationImage(navigationCombinedImage);
+        clearNavigationText(navigationCombinedDistance);
+        clearNavigationText(navigationCombinedManeuver);
+        clearNavigationText(navigationSpeedLimit);
+        if (navigationTrafficLights != null) {
+            navigationTrafficLights.removeAllViews();
+            navigationTrafficLights.setVisibility(View.GONE);
+        }
+        // Arrow and lane guidance are intentionally cleared independently.
+        hideNavigationImage(navigationLanesImage);
+        clearNavigationText(navigationLaneInfo);
+        hideNavigationImage(navigationJamImage);
+        hideNavigationImage(navigationRainbowImage);
+    }
+
+    private void clearNavigationText(@Nullable TextView view) {
+        if (view == null) return;
+        view.setText("");
+        view.setVisibility(View.GONE);
+    }
+
+    /** Uses labels only in edit mode; bitmaps remain cleared so stale pixels are never previews. */
+    private void showNavigationEditorSamples() {
+        showNavigationSample(navigationArrival, "Прибытие 18:45");
+        showNavigationSample(navigationDuration, "Осталось 24 мин");
+        showNavigationSample(navigationDistance, "12,4 км");
+        showNavigationSample(navigationManeuverDistance, "Через 350 м");
+        showNavigationSample(navigationManeuver, "Поверните направо");
+        showNavigationSample(navigationTripInfo, "Затем держитесь левее");
+        if (navigationCombined != null) navigationCombined.setVisibility(View.VISIBLE);
+        showNavigationSample(navigationCombinedDistance, "Через 350 м");
+        showNavigationSample(navigationCombinedManeuver, "Поверните направо");
+        showNavigationSample(navigationSpeedLimit, "Ограничение: 60");
+        if (navigationTrafficLights != null) {
+            navigationTrafficLights.removeAllViews();
+            addTrafficLightRow("GREEN", "12", "", -1);
+            navigationTrafficLights.setVisibility(View.VISIBLE);
+        }
+        showNavigationSample(navigationLaneInfo, "Левая полоса · 500 м");
+        showNavigationSample(navigationInactive, "Маршрут не запущен");
+    }
+
+    private void showNavigationSample(@Nullable TextView view, @NonNull String value) {
+        if (view == null) return;
+        view.setText(value);
+        view.setVisibility(View.VISIBLE);
     }
 
     private void scheduleNavigationRefresh() {
         navigationUiHandler.removeCallbacks(navigationUiRefresh);
         if (!activityStarted || !panelsInitialized
-                || (!isCombinedNavigationEnabled() && !editMode)) return;
+                || (!isCombinedNavigationEnabled() && !editMode
+                && !navigationContentEditMode)) return;
         navigationUiHandler.postDelayed(navigationUiRefresh, navigationDynamicRefresh
                 ? NAVIGATION_DYNAMIC_REFRESH_MS : NAVIGATION_UI_REFRESH_MS);
     }
@@ -1599,19 +2051,35 @@ public final class LauncherActivity extends AppCompatActivity {
     }
 
     private void showAllApps() {
+        dismissAllAppsDialog();
         GridView grid = new GridView(this);
         grid.setNumColumns(5);
         grid.setPadding(dp(16), dp(16), dp(16), dp(16));
         grid.setVerticalSpacing(dp(8));
         AppAdapter adapter = new AppAdapter(appCatalog.all(), false);
         grid.setAdapter(adapter);
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        boolean overlay = Permissions.checkOverlayPermission(this);
+        Context dialogContext = overlay ? getApplicationContext() : this;
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(dialogContext,
+                android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("Все приложения · удержание добавляет в избранное")
                 .setView(grid)
                 .setNegativeButton(android.R.string.cancel, null)
                 .create();
+        Window dialogWindow = dialog.getWindow();
+        if (overlay && dialogWindow != null) {
+            // A normal activity dialog remains below an already-open Yandex freeform window.
+            // The launcher already owns overlay permission for Status Widget; using the same
+            // interactive window tier keeps the app stack above Navigator, Maps and any app.
+            dialogWindow.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
+            dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
+        }
+        allAppsDialog = dialog;
+        dialog.setOnDismissListener(ignored -> {
+            if (allAppsDialog == dialog) allAppsDialog = null;
+        });
         grid.setOnItemClickListener((parent, view, position, id) -> {
-            dialog.dismiss();
+            dismissAllAppsDialog();
             launchApp((AppEntry) parent.getItemAtPosition(position));
         });
         grid.setOnItemLongClickListener((parent, view, position, id) -> {
@@ -1621,7 +2089,24 @@ public final class LauncherActivity extends AppCompatActivity {
             Toast.makeText(this, "Избранное обновлено", Toast.LENGTH_SHORT).show();
             return true;
         });
-        dialog.show();
+        try {
+            dialog.show();
+        } catch (RuntimeException failure) {
+            allAppsDialog = null;
+            Log.e(TAG, "Could not show all-apps overlay", failure);
+            Toast.makeText(this, overlay
+                    ? "Не удалось показать список поверх приложений"
+                    : "Не удалось открыть список приложений",
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void dismissAllAppsDialog() {
+        android.app.AlertDialog dialog = allAppsDialog;
+        allAppsDialog = null;
+        if (dialog == null) return;
+        try { dialog.dismiss(); }
+        catch (RuntimeException ignored) {}
     }
 
     private void refreshFavorites() {

@@ -24,6 +24,10 @@ public final class MediaPanelConfigTest {
             assertTrue(elements.get(index).enabled);
             assertEquals(100, elements.get(index).scalePercent);
         }
+        assertTrue(config.element(MediaPanelConfig.TITLE).marqueeEnabled);
+        assertTrue(config.element(MediaPanelConfig.ARTIST).marqueeEnabled);
+        assertTrue(config.element(MediaPanelConfig.ALBUM).marqueeEnabled);
+        assertFalse(config.element(MediaPanelConfig.APPLICATION).marqueeEnabled);
         assertNoEnabledOverlap(config);
     }
 
@@ -33,11 +37,14 @@ public final class MediaPanelConfigTest {
         MediaPanelConfig copy = original.copy();
         copy.setEnabled(MediaPanelConfig.ARTWORK, false);
         copy.setScale(MediaPanelConfig.TITLE, 175);
+        copy.setMarqueeEnabled(MediaPanelConfig.TITLE, false);
         copy.move(MediaPanelConfig.NEXT, -1);
         assertTrue(original.element(MediaPanelConfig.ARTWORK).enabled);
         assertFalse(copy.element(MediaPanelConfig.ARTWORK).enabled);
         assertEquals(100, original.element(MediaPanelConfig.TITLE).scalePercent);
         assertEquals(175, copy.element(MediaPanelConfig.TITLE).scalePercent);
+        assertTrue(original.element(MediaPanelConfig.TITLE).marqueeEnabled);
+        assertFalse(copy.element(MediaPanelConfig.TITLE).marqueeEnabled);
         List<MediaPanelConfig.Element> moved = copy.orderedElements();
         int nextIndex = indexOf(moved, MediaPanelConfig.NEXT);
         int playPauseIndex = indexOf(moved, MediaPanelConfig.PLAY_PAUSE);

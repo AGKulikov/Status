@@ -116,9 +116,7 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
         });
         left.addView(panelVisibleSwitch, new LinearLayout.LayoutParams(match(), wrap()));
         addButton(left, "Выбрать данные активного маршрута…", v ->
-                startActivity(new Intent(this, PanelElementSettingsActivity.class)
-                        .putExtra(PanelElementSettingsActivity.EXTRA_PANEL_ID,
-                                dezz.status.widget.launcher.LauncherLayoutStore.NAVIGATION)));
+                startActivity(new Intent(this, NavigationPanelSettingsActivity.class)));
         addSlider(left, "Столбцов в панели", preferences.launcherFavoriteRoutesColumns.get(),
                 1, 6, value -> {
                     preferences.launcherFavoriteRoutesColumns.set(value);

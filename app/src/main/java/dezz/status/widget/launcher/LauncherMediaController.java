@@ -47,6 +47,12 @@ public final class LauncherMediaController {
     private static final int MAX_ARTWORK_BYTES = 4 * 1024 * 1024;
     private static final int MAX_ARTWORK_EDGE = 640;
     private static final long UI_TICK_MS = 1_000L;
+    private static final long SESSION_REFRESH_PLAYING_MS = 2_500L;
+    /** Some ECARX players miss callbacks while paused; keep stale metadata bounded. */
+    private static final long SESSION_REFRESH_PAUSED_MS = 20_000L;
+    private static final long COMMAND_RECONCILE_FAST_MS = 140L;
+    private static final long COMMAND_RECONCILE_SETTLED_MS = 720L;
+    private static final long COMMAND_RECONCILE_FINAL_MS = 2_400L;
     /** Small tolerance for publishers whose wall-clock timestamps are not emitted atomically. */
     private static final long DIFFERENT_SOURCE_RECENCY_SLOP_MS = 10_000L;
 
@@ -94,27 +100,37 @@ public final class LauncherMediaController {
         @NonNull final String packageName;
         @NonNull final String application;
         @Nullable final Bitmap artwork;
+        final long artworkIdentity;
         final long durationMs;
         final long positionMs;
         final boolean playing;
         final long positionTimestampWallMs;
         final long receivedElapsedMs;
+        final long contentChangedElapsedMs;
+        final long playbackChangedElapsedMs;
+        final long artworkChangedElapsedMs;
 
         MediaState(@NonNull String title, @NonNull String artist, @NonNull String album,
                    @NonNull String packageName, @NonNull String application,
                    @Nullable Bitmap artwork, long durationMs, long positionMs, boolean playing,
-                   long positionTimestampWallMs, long receivedElapsedMs) {
+                   long positionTimestampWallMs, long receivedElapsedMs,
+                   long contentChangedElapsedMs, long playbackChangedElapsedMs,
+                   long artworkChangedElapsedMs) {
             this.title = title;
             this.artist = artist;
             this.album = album;
             this.packageName = packageName;
             this.application = application;
             this.artwork = artwork;
+            this.artworkIdentity = artworkIdentity(artwork);
             this.durationMs = Math.max(0L, durationMs);
             this.positionMs = Math.max(0L, positionMs);
             this.playing = playing;
             this.positionTimestampWallMs = positionTimestampWallMs;
             this.receivedElapsedMs = receivedElapsedMs;
+            this.contentChangedElapsedMs = contentChangedElapsedMs;
+            this.playbackChangedElapsedMs = playbackChangedElapsedMs;
+            this.artworkChangedElapsedMs = artworkChangedElapsedMs;
         }
 
         long currentPosition(long nowWallMs) {
@@ -140,11 +156,44 @@ public final class LauncherMediaController {
     private boolean cacheReadInFlight;
     private boolean cacheReloadPending;
     private int cacheLoadGeneration;
+    private long lastSessionRefreshElapsedMs;
 
     private final Runnable ticker = new Runnable() {
         @Override public void run() {
             if (!started) return;
-            publish();
+            long nowElapsed = SystemClock.elapsedRealtime();
+            boolean playing = (sessionState != null && sessionState.playing)
+                    || (broadcastState != null && broadcastState.playing);
+            long refreshInterval = playing
+                    ? SESSION_REFRESH_PLAYING_MS : SESSION_REFRESH_PAUSED_MS;
+            if (MediaStateFreshness.shouldRefreshSession(current != null,
+                    nowElapsed, lastSessionRefreshElapsedMs, refreshInterval)) {
+                // Mark before the Binder call so an OEM exception cannot create a tight retry loop.
+                lastSessionRefreshElapsedMs = nowElapsed;
+                refresh();
+            } else {
+                publish();
+            }
+        }
+    };
+
+    /**
+     * Some ECARX MediaSession implementations accept a transport command without dispatching the
+     * corresponding callback. Three bounded refreshes keep the button state responsive without
+     * turning the panel into a polling loop.
+     */
+    private final Runnable commandReconcile = new Runnable() {
+        @Override public void run() {
+            if (!started) return;
+            refresh();
+        }
+    };
+
+    private final Runnable broadcastExpiry = new Runnable() {
+        @Override public void run() {
+            if (!started) return;
+            if (expireBroadcastIfNeeded()) publish();
+            else scheduleBroadcastExpiry();
         }
     };
 
@@ -225,6 +274,9 @@ public final class LauncherMediaController {
         if (!started) return;
         started = false;
         mainHandler.removeCallbacks(ticker);
+        mainHandler.removeCallbacks(commandReconcile);
+        mainHandler.removeCallbacks(broadcastExpiry);
+        lastSessionRefreshElapsedMs = 0L;
         boolean removeSessionsListener = sessionsListenerRegistered;
         sessionsListenerRegistered = false;
         if (manager != null && removeSessionsListener) {
@@ -260,6 +312,7 @@ public final class LauncherMediaController {
         MediaController controller = current;
         if (controller == null) {
             dispatchMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE);
+            scheduleCommandReconcile();
             return;
         }
         try {
@@ -272,12 +325,14 @@ public final class LauncherMediaController {
         } catch (RuntimeException ignored) {
             dispatchMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE);
         }
+        scheduleCommandReconcile();
     }
 
     public void previous() {
         MediaController controller = current;
         if (controller == null) {
             dispatchMediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS);
+            scheduleCommandReconcile();
             return;
         }
         try {
@@ -285,12 +340,14 @@ public final class LauncherMediaController {
         } catch (RuntimeException ignored) {
             dispatchMediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS);
         }
+        scheduleCommandReconcile();
     }
 
     public void next() {
         MediaController controller = current;
         if (controller == null) {
             dispatchMediaKey(KeyEvent.KEYCODE_MEDIA_NEXT);
+            scheduleCommandReconcile();
             return;
         }
         try {
@@ -298,6 +355,15 @@ public final class LauncherMediaController {
         } catch (RuntimeException ignored) {
             dispatchMediaKey(KeyEvent.KEYCODE_MEDIA_NEXT);
         }
+        scheduleCommandReconcile();
+    }
+
+    private void scheduleCommandReconcile() {
+        mainHandler.removeCallbacks(commandReconcile);
+        if (!started) return;
+        mainHandler.postDelayed(commandReconcile, COMMAND_RECONCILE_FAST_MS);
+        mainHandler.postDelayed(commandReconcile, COMMAND_RECONCILE_SETTLED_MS);
+        mainHandler.postDelayed(commandReconcile, COMMAND_RECONCILE_FINAL_MS);
     }
 
     private void dispatchMediaKey(int keyCode) {
@@ -336,13 +402,9 @@ public final class LauncherMediaController {
     }
 
     private void receiveBroadcast(@NonNull Intent intent) {
-        // The manifest receiver handles this while HOME is closed. Persist here as well because
-        // some Android Automotive builds deliver custom implicit broadcasts only to dynamically
-        // registered receivers while the process is in the foreground.
         // Do not let an older disk read started during HOME initialization overwrite this newer
         // in-memory update before the cache writer sends ACTION_CACHE_UPDATED.
         invalidateCacheRead();
-        MediaBroadcastRepository.processAsync(context, intent, null);
         boolean titlePresent = hasExtra(intent, "title");
         boolean artistPresent = hasExtra(intent, "artist");
         boolean albumPresent = hasExtra(intent, "album");
@@ -350,10 +412,18 @@ public final class LauncherMediaController {
         boolean durationPresent = hasExtra(intent, "duration_ms");
         boolean positionPresent = hasExtra(intent, "position_ms");
         boolean playingPresent = hasExtra(intent, "is_playing");
+        boolean artworkDirectivePresent = hasExtra(intent, "artwork_uri")
+                || hasExtra(intent, "artwork_bytes") || hasExtra(intent, "has_artwork");
         String title = cleanText(stringExtra(intent, "title"));
         String artist = cleanText(stringExtra(intent, "artist"));
         String album = cleanText(stringExtra(intent, "album"));
         String packageName = cleanText(stringExtra(intent, "package_name"));
+        String artworkUri = cleanText(stringExtra(intent, "artwork_uri"));
+        boolean artworkSourcePresent = !artworkUri.isEmpty()
+                || hasNonEmptyByteArrayExtra(intent, "artwork_bytes");
+        boolean artworkExpected = artworkSourcePresent
+                || booleanExtra(intent, "has_artwork", false);
+        boolean explicitArtworkClear = artworkDirectivePresent && !artworkExpected;
         long duration = Math.max(0L, longExtra(intent, "duration_ms", 0L));
         long position = Math.max(0L, longExtra(intent, "position_ms", 0L));
         boolean playing = booleanExtra(intent, "is_playing", false);
@@ -364,15 +434,11 @@ public final class LauncherMediaController {
                 || timestamp < receivedWall - 24L * 60L * 60L * 1_000L) {
             timestamp = receivedWall;
         }
-        // Position-only mHUD packets should not make the UI throw away text/artwork and decode
-        // the same PNG again. Merge omitted scalar fields only for the same publisher/track; a
-        // changed title deliberately drops the old cover until the cache writer publishes it.
+        // Position-only mHUD packets should not make the UI throw away metadata or the current
+        // cover. Omitted fields are inherited only from the same publisher.
         MediaState previous = broadcastState;
         boolean sameSource = MediaBroadcastMergePolicy.sameSource(previous != null,
                 packagePresent, packageName, previous == null ? "" : previous.packageName);
-        boolean sameTrack = MediaBroadcastMergePolicy.sameTrack(sameSource, titlePresent,
-                title, previous == null ? "" : previous.title);
-        Bitmap inheritedArtwork = null;
         if (sameSource) {
             title = MediaBroadcastMergePolicy.text(titlePresent, title, true, previous.title);
             artist = MediaBroadcastMergePolicy.text(artistPresent, artist, true, previous.artist);
@@ -389,16 +455,36 @@ public final class LauncherMediaController {
             }
             playing = MediaBroadcastMergePolicy.flag(playingPresent, playing, true,
                     previous.playing);
-            if (sameTrack) inheritedArtwork = previous.artwork;
         }
+        // An explicitly changed title is authoritative even if a publisher accidentally repeats
+        // stale artist/album values. With no explicit title, use the remaining identity fields.
+        boolean sameTrack = previous != null && sameSource
+                && (!titlePresent || title.equals(previous.title))
+                && MediaStateFreshness.sameTrack(previous.packageName, previous.title,
+                previous.artist, previous.album, packageName, title, artist, album);
+        Bitmap inheritedArtwork = sameTrack && !explicitArtworkClear ? previous.artwork : null;
+        long receivedElapsed = SystemClock.elapsedRealtime();
+        boolean contentChanged = previous == null || !MediaStateFreshness.sameContent(
+                previous.packageName, previous.title, previous.artist, previous.album,
+                previous.durationMs, packageName, title, artist, album, duration);
+        boolean playbackChanged = previous == null || previous.playing != playing;
         MediaState state = new MediaState(title, artist, album, packageName,
                 applicationLabel(packageName), inheritedArtwork, duration, position, playing,
-                timestamp, SystemClock.elapsedRealtime());
+                timestamp, receivedElapsed,
+                MediaStateFreshness.changedAt(contentChanged, receivedElapsed,
+                        previous == null ? 0L : previous.contentChangedElapsedMs),
+                MediaStateFreshness.changedAt(playbackChanged, receivedElapsed,
+                        previous == null ? 0L : previous.playbackChangedElapsedMs),
+                MediaStateFreshness.changedAt(previous == null || !sameTrack
+                                || artworkDirectivePresent,
+                        receivedElapsed,
+                        previous == null ? 0L : previous.artworkChangedElapsedMs));
         replaceBroadcastState(state);
         publish();
-        // Artwork is decoded once by MediaBroadcastRepository. Its cache-updated broadcast then
-        // reloads the complete state here; decoding it again in the controller doubled CPU and
-        // peak bitmap memory whenever HOME was visible.
+        // Persist only after the direct state has received its monotonic markers. An older artwork
+        // decode that finishes late can then be merged field-by-field instead of rolling back the
+        // newer track or play/pause state.
+        MediaBroadcastRepository.processAsync(context, intent, null);
     }
 
     private void loadCachedBroadcast() {
@@ -427,10 +513,11 @@ public final class LauncherMediaController {
             if (state == null) {
                 replaceBroadcastState(null);
             } else {
-                replaceBroadcastState(new MediaState(state.title, state.artist, state.album,
+                mergeCachedBroadcastState(new MediaState(state.title, state.artist, state.album,
                         state.packageName, applicationLabel(state.packageName), state.artwork,
                         state.durationMs, state.positionMs, state.playing, state.timestampWallMs,
-                        state.receivedElapsedMs));
+                        state.receivedElapsedMs, state.contentChangedElapsedMs,
+                        state.playbackChangedElapsedMs, state.artworkChangedElapsedMs));
             }
             publish();
         }
@@ -453,9 +540,78 @@ public final class LauncherMediaController {
         }
     }
 
+    private boolean expireBroadcastIfNeeded() {
+        MediaState state = broadcastState;
+        if (state == null) return false;
+        long ttl = broadcastTtl(state);
+        if (!MediaBroadcastFreshness.expired(SystemClock.elapsedRealtime(),
+                state.receivedElapsedMs, ttl)) return false;
+        replaceBroadcastState(null);
+        return true;
+    }
+
+    private void scheduleBroadcastExpiry() {
+        mainHandler.removeCallbacks(broadcastExpiry);
+        MediaState state = broadcastState;
+        if (!started || state == null) return;
+        long delay = MediaBroadcastFreshness.remaining(SystemClock.elapsedRealtime(),
+                state.receivedElapsedMs, broadcastTtl(state));
+        mainHandler.postDelayed(broadcastExpiry, Math.max(1L, delay));
+    }
+
+    private static long broadcastTtl(@NonNull MediaState state) {
+        boolean known = !state.title.isEmpty() || !state.artist.isEmpty()
+                || !state.packageName.isEmpty();
+        return MediaBroadcastFreshness.ttl(
+                known, state.playing, state.durationMs, state.positionMs);
+    }
+
+    /**
+     * A cache read may have started before a newer foreground packet arrived. Select each field by
+     * its own clock, then reject any playback/timeline/artwork belonging to another track.
+     */
+    private void mergeCachedBroadcastState(@NonNull MediaState incoming) {
+        MediaState currentState = broadcastState;
+        if (currentState == null) {
+            replaceBroadcastState(incoming);
+            return;
+        }
+        MediaState content = MediaStateFreshness.incomingWins(
+                incoming.contentChangedElapsedMs, currentState.contentChangedElapsedMs)
+                ? incoming : currentState;
+        MediaState playback = MediaStateFreshness.incomingWins(
+                incoming.playbackChangedElapsedMs, currentState.playbackChangedElapsedMs)
+                ? incoming : currentState;
+        MediaState artwork = MediaStateFreshness.incomingWins(
+                incoming.artworkChangedElapsedMs, currentState.artworkChangedElapsedMs)
+                ? incoming : currentState;
+        MediaState timeline = incoming.receivedElapsedMs >= currentState.receivedElapsedMs
+                ? incoming : currentState;
+        if (!sameTrack(content, playback)) playback = content;
+        if (!sameTrack(content, artwork)) artwork = content;
+        if (!sameTrack(content, timeline)) timeline = content;
+
+        MediaState merged = new MediaState(content.title, content.artist, content.album,
+                content.packageName, content.application, artwork.artwork, content.durationMs,
+                timeline.positionMs, playback.playing, timeline.positionTimestampWallMs,
+                Math.max(incoming.receivedElapsedMs, currentState.receivedElapsedMs),
+                content.contentChangedElapsedMs, playback.playbackChangedElapsedMs,
+                artwork.artworkChangedElapsedMs);
+        replaceBroadcastState(merged);
+
+        // replaceBroadcastState owns currentState's bitmap. Recycle only an incoming bitmap that
+        // lost every field-selection race and is therefore not referenced by the merged state.
+        Bitmap discarded = incoming.artwork;
+        if (discarded != null && discarded != merged.artwork
+                && discarded != currentState.artwork && !discarded.isRecycled()) {
+            discarded.recycle();
+        }
+    }
+
     private void replaceBroadcastState(@Nullable MediaState next) {
         MediaState previous = broadcastState;
         broadcastState = next;
+        scheduleBroadcastExpiry();
         Bitmap obsolete = previous == null ? null : previous.artwork;
         if (obsolete == null || (next != null && obsolete == next.artwork)
                 || obsolete.isRecycled()) return;
@@ -523,6 +679,8 @@ public final class LauncherMediaController {
     }
 
     private void publishSession() {
+        long observedElapsed = SystemClock.elapsedRealtime();
+        lastSessionRefreshElapsedMs = observedElapsed;
         MediaController controller = current;
         if (controller == null) {
             sessionState = null;
@@ -555,9 +713,24 @@ public final class LauncherMediaController {
             }
             boolean playing = playback != null
                     && playback.getState() == PlaybackState.STATE_PLAYING;
+            long receivedElapsed = observedElapsed;
+            MediaState previous = sessionState;
+            boolean contentChanged = previous == null || !MediaStateFreshness.sameContent(
+                    previous.packageName, previous.title, previous.artist, previous.album,
+                    previous.durationMs, packageName, title, artist, album, duration);
+            boolean playbackChanged = previous == null || previous.playing != playing;
+            long incomingArtworkIdentity = artworkIdentity(artwork);
+            boolean artworkChanged = previous == null || MediaStateFreshness.artworkChanged(
+                    contentChanged, previous.artworkIdentity, incomingArtworkIdentity);
             sessionState = new MediaState(title, artist, album, packageName,
                     applicationLabel(packageName), artwork, duration, position, playing,
-                    updateWall, SystemClock.elapsedRealtime());
+                    updateWall, receivedElapsed,
+                    MediaStateFreshness.changedAt(contentChanged, receivedElapsed,
+                            previous == null ? 0L : previous.contentChangedElapsedMs),
+                    MediaStateFreshness.changedAt(playbackChanged, receivedElapsed,
+                            previous == null ? 0L : previous.playbackChangedElapsedMs),
+                    MediaStateFreshness.changedAt(artworkChanged, receivedElapsed,
+                            previous == null ? 0L : previous.artworkChangedElapsedMs));
         } catch (RuntimeException ignored) {
             // A dead or malformed vendor session must not take the shared launcher/widget process
             // down. Drop only this source; the durable mHUD broadcast can still drive the panel.
@@ -567,6 +740,7 @@ public final class LauncherMediaController {
     }
 
     private void publish() {
+        expireBroadcastIfNeeded();
         int volume = volumePercent();
         MediaState session = sessionState;
         MediaState broadcast = broadcastState;
@@ -575,54 +749,72 @@ public final class LauncherMediaController {
             scheduleTicker(false);
             return;
         }
-        MediaState primary;
-        MediaState supplement = null;
         if (session == null) {
-            primary = broadcast;
+            publish(broadcast, null, broadcast, broadcast, broadcast, volume);
+            return;
         } else if (broadcast == null) {
-            primary = session;
+            publish(session, null, session, session, session, volume);
+            return;
         } else if (samePackage(session.packageName, broadcast.packageName)) {
-            primary = session;
-            supplement = broadcast;
-        } else if (session.playing) {
-            primary = session;
+            MediaState content = broadcast.contentChangedElapsedMs
+                    > session.contentChangedElapsedMs ? broadcast : session;
+            MediaState supplement = content == broadcast ? session : broadcast;
+            MediaState playback = broadcast.playbackChangedElapsedMs
+                    > session.playbackChangedElapsedMs ? broadcast : session;
+            MediaState artwork = broadcast.artworkChangedElapsedMs
+                    > session.artworkChangedElapsedMs ? broadcast : session;
+            MediaState timeline = broadcast.receivedElapsedMs
+                    > session.receivedElapsedMs ? broadcast : session;
+            if (!sameTrack(content, playback)) playback = content;
+            if (!sameTrack(content, artwork)) artwork = content;
+            if (!sameTrack(content, timeline)) timeline = content;
+            if (!sameTrack(content, supplement)) supplement = null;
+            publish(content, supplement, playback, artwork, timeline, volume);
+            return;
+        }
+
+        MediaState content;
+        if (session.playing) {
+            content = session;
         } else if (broadcast.playing) {
-            primary = broadcast;
+            content = broadcast;
         } else if (broadcast.positionTimestampWallMs + DIFFERENT_SOURCE_RECENCY_SLOP_MS
                 >= session.positionTimestampWallMs) {
             // A paused rich-broadcast player may intentionally expose no MediaSession. Do not
             // replace it after an arbitrary grace period with an unrelated, older paused session.
-            primary = broadcast;
+            content = broadcast;
         } else {
-            primary = session;
+            content = session;
         }
-        if (primary == null) {
-            listener.onMediaChanged(Snapshot.empty(volume));
-            scheduleTicker(false);
-            return;
-        }
-        String title = preferred(primary.title, supplement == null ? "" : supplement.title);
-        String artist = preferred(primary.artist, supplement == null ? "" : supplement.artist);
-        String album = preferred(primary.album, supplement == null ? "" : supplement.album);
-        String application = preferred(primary.application,
+        publish(content, null, content, content, content, volume);
+    }
+
+    private void publish(@NonNull MediaState content, @Nullable MediaState supplement,
+                         @NonNull MediaState playback, @NonNull MediaState artwork,
+                         @NonNull MediaState timeline, int volume) {
+        String title = preferred(content.title, supplement == null ? "" : supplement.title);
+        String artist = preferred(content.artist, supplement == null ? "" : supplement.artist);
+        String album = preferred(content.album, supplement == null ? "" : supplement.album);
+        String application = preferred(content.application,
                 supplement == null ? "" : supplement.application);
-        Bitmap artwork = primary.artwork != null ? primary.artwork
-                : supplement == null ? null : supplement.artwork;
-        long duration = primary.durationMs > 0L ? primary.durationMs
+        Bitmap artworkBitmap = artwork.artwork;
+        long duration = content.durationMs > 0L ? content.durationMs
                 : supplement == null ? 0L : supplement.durationMs;
-        long position = primary.currentPosition(System.currentTimeMillis());
+        long position = timeline.currentPosition(System.currentTimeMillis());
         if (position <= 0L && supplement != null) {
             position = supplement.currentPosition(System.currentTimeMillis());
         }
         listener.onMediaChanged(new Snapshot(title.isEmpty() ? "Неизвестный трек" : title,
-                artist, album, application, artwork, duration, position, primary.playing, true,
+                artist, album, application, artworkBitmap, duration, position, playback.playing, true,
                 volume));
-        scheduleTicker(primary.playing);
+        scheduleTicker(playback.playing);
     }
 
     private void scheduleTicker(boolean playing) {
         mainHandler.removeCallbacks(ticker);
-        if (started && playing) mainHandler.postDelayed(ticker, UI_TICK_MS);
+        if (started) {
+            mainHandler.postDelayed(ticker, playing ? UI_TICK_MS : SESSION_REFRESH_PAUSED_MS);
+        }
     }
 
     private int volumePercent() {
@@ -670,6 +862,20 @@ public final class LauncherMediaController {
         }
     }
 
+    private static long artworkIdentity(@Nullable Bitmap artwork) {
+        if (artwork == null) return 0L;
+        try {
+            long value = ((long) artwork.getGenerationId()) & 0xffff_ffffL;
+            value = value * 31L + artwork.getWidth();
+            value = value * 31L + artwork.getHeight();
+            value = value * 31L
+                    + (((long) System.identityHashCode(artwork)) & 0xffff_ffffL);
+            return value == 0L ? 1L : value;
+        } catch (RuntimeException ignored) {
+            return (((long) System.identityHashCode(artwork)) & 0xffff_ffffL) + 1L;
+        }
+    }
+
     @NonNull
     private ComponentName listenerComponent() {
         return new ComponentName(context, MediaNotificationListener.class);
@@ -700,6 +906,11 @@ public final class LauncherMediaController {
 
     private static boolean samePackage(@NonNull String left, @NonNull String right) {
         return !left.isEmpty() && left.equals(right);
+    }
+
+    private static boolean sameTrack(@NonNull MediaState left, @NonNull MediaState right) {
+        return MediaStateFreshness.sameTrack(left.packageName, left.title, left.artist, left.album,
+                right.packageName, right.title, right.artist, right.album);
     }
 
     @Nullable
@@ -740,6 +951,16 @@ public final class LauncherMediaController {
         try {
             Bundle extras = intent.getExtras();
             return extras != null && extras.containsKey(key);
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    private static boolean hasNonEmptyByteArrayExtra(@NonNull Intent intent,
+                                                     @NonNull String key) {
+        try {
+            Object value = extrasValue(intent, key);
+            return value instanceof byte[] && ((byte[]) value).length > 0;
         } catch (RuntimeException ignored) {
             return false;
         }

@@ -57,6 +57,10 @@
         </intent>
         <intent>
             <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.HOME" />
         </intent>
     </queries>
@@ -126,6 +130,11 @@
 
         <activity
             android:name=".FavoriteRoutesSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".NavigationPanelSettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />
 

@@ -28,7 +28,6 @@ import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -54,12 +53,15 @@ public final class ClimatePanelView extends FrameLayout {
 
     /** Geely integration verifies controls every 30 s; older cache is presentation-only. */
     private static final long STATE_FRESH_MS = 75_000L;
+    /** Longer than the integration deadline; still releases UI if a Binder call never returns. */
+    private static final long COMMAND_WATCHDOG_MS = 7_000L;
     private final CarIntegration integration;
     private final ClimatePanelConfigStore configStore;
     private final Map<String, CarControlDescriptor> catalog = new LinkedHashMap<>();
     private final Map<String, CarControlState> states = new LinkedHashMap<>();
     private final Map<String, ControlBinding> bindings = new LinkedHashMap<>();
     private final Map<String, Long> pending = new LinkedHashMap<>();
+    private final Map<String, Runnable> pendingTimeouts = new LinkedHashMap<>();
     private ClimatePanelConfig config;
     private TextView connectionLabel;
     private boolean editorPreviewMode;
@@ -77,13 +79,18 @@ public final class ClimatePanelView extends FrameLayout {
         applyState(state.controlId);
         updateConnectionLabel();
         CarControlDescriptor descriptor = catalog.get(state.controlId);
-        if (started && state.available
+        boolean newlySupported = state.available
                 && (previous == null || !previous.available)
                 && descriptor != null
-                && descriptor.availability != CarControlDescriptor.Availability.SUPPORTED) {
+                && descriptor.availability != CarControlDescriptor.Availability.SUPPORTED;
+        boolean fanProfileMissing = ClimatePanelConfig.FAN.equals(state.controlId)
+                && state.available && state.known && Double.isFinite(state.value)
+                && descriptor != null && !containsOption(descriptor, state.value);
+        if (started && (newlySupported || fanProfileMissing)) {
             // ECARX may answer UNKNOWN while its Binder service is still booting. Re-probe once
-            // the state stream proves that the function is alive so level controls receive the
-            // vehicle-filtered option list instead of boot-time defaults.
+            // the state stream proves that the function is alive. A newly confirmed AUTO fan
+            // profile also identifies its 2/3-value family, so re-probe to replace a manual-only
+            // bootstrap descriptor before +/- can be pressed.
             requestCatalog(false);
         }
     };
@@ -186,6 +193,9 @@ public final class ClimatePanelView extends FrameLayout {
         catalogGeneration++;
         catalogRefreshPending = false;
         integration.unsubscribeControlStates(stateListener);
+        for (Runnable timeout : pendingTimeouts.values()) removeCallbacks(timeout);
+        pendingTimeouts.clear();
+        pending.clear();
     }
 
     @NonNull
@@ -452,6 +462,14 @@ public final class ClimatePanelView extends FrameLayout {
         return false;
     }
 
+    private static boolean containsOption(@NonNull CarControlDescriptor descriptor,
+                                          double value) {
+        for (CarControlDescriptor.Option option : descriptor.options) {
+            if (Math.abs(option.value - value) < .01d) return true;
+        }
+        return false;
+    }
+
     private void adjust(@NonNull String id, int direction) {
         if (config.hasLevelCycleOrder(id)) {
             cycleManualLevel(id, direction);
@@ -465,16 +483,11 @@ public final class ClimatePanelView extends FrameLayout {
         CarControlDescriptor descriptor = binding.descriptor;
         double target;
         if (!descriptor.options.isEmpty()) {
-            List<CarControlDescriptor.Option> options = new ArrayList<>(descriptor.options);
-            options.sort(Comparator.comparingDouble(value -> value.value));
-            int nearest = 0;
-            double distance = Double.MAX_VALUE;
-            for (int index = 0; index < options.size(); index++) {
-                double candidate = Math.abs(options.get(index).value - state.value);
-                if (candidate < distance) { distance = candidate; nearest = index; }
-            }
-            int next = Math.max(0, Math.min(options.size() - 1, nearest + direction));
-            target = options.get(next).value;
+            boolean includeAuto = ClimatePanelConfig.FAN.equals(id);
+            Double planned = ClimateLevelCyclePlanner.nextStepperTarget(
+                    descriptor.options, state.value, direction, includeAuto);
+            if (planned == null) return;
+            target = planned;
         } else {
             double step = descriptor.step > 0 ? descriptor.step : 1;
             target = Math.max(descriptor.minimum,
@@ -530,12 +543,29 @@ public final class ClimatePanelView extends FrameLayout {
         }
         final long token = ++nextCommandToken;
         pending.put(id, token);
+        Runnable timeout = () -> {
+            Long current = pending.get(id);
+            if (current == null || current.longValue() != token) return;
+            pending.remove(id);
+            pendingTimeouts.remove(id);
+            applyState(id);
+            // Replacing this listener's subscription is the public, non-invasive way to request
+            // a fresh read without guessing whether the timed-out write reached the ECU.
+            if (started) subscribeVisibleControls();
+            Toast.makeText(getContext(),
+                    "Нет ответа от автомобиля. Состояние обновляется",
+                    Toast.LENGTH_LONG).show();
+        };
+        pendingTimeouts.put(id, timeout);
+        postDelayed(timeout, COMMAND_WATCHDOG_MS);
         applyState(id);
         integration.executeControl(new CarControlCommand(id, operation, value),
                 (success, message) -> {
                     Long current = pending.get(id);
-                    if (current == null || current != token) return;
+                    if (current == null || current.longValue() != token) return;
                     pending.remove(id);
+                    Runnable scheduled = pendingTimeouts.remove(id);
+                    if (scheduled != null) removeCallbacks(scheduled);
                     applyState(id);
                     if (!success) {
                         Toast.makeText(getContext(), message == null
@@ -560,8 +590,8 @@ public final class ClimatePanelView extends FrameLayout {
         int inactive = color(config.inactiveColor, Color.LTGRAY);
         int tint = active ? accent : inactive;
         binding.icon.setColorFilter(tint);
-        binding.value.setText(pending.containsKey(id) ? "…" : previewSample
-                ? previewValue(id) : !isFresh(state) ? "…" : state.valueLabel);
+        binding.value.setText(pending.containsKey(id) ? "Ожидание…" : previewSample
+                ? previewValue(id) : displayStateValue(state));
         binding.value.setTextColor(tint);
         // New CarPlay uses a calm translucent glass row and turns the selected action into a
         // bright, soft tile. A real blur would be too expensive (and unavailable) on Android 9,
@@ -592,7 +622,21 @@ public final class ClimatePanelView extends FrameLayout {
         }
         binding.card.setContentDescription(binding.descriptor.label + ", "
                 + (previewSample ? previewValue(id)
-                        : state == null ? "состояние неизвестно" : state.valueLabel));
+                        : displayStateValue(state)));
+    }
+
+    @NonNull
+    private String displayStateValue(@Nullable CarControlState state) {
+        if (!isFresh(state)) return "…";
+        if (!state.available) {
+            String value = state.valueLabel == null ? "" : state.valueLabel.trim();
+            return value.isEmpty() || "—".equals(value) || "-".equals(value)
+                    ? "Недоступно" : value;
+        }
+        if (!state.known) return "Неизвестно";
+        String value = state.valueLabel == null ? "" : state.valueLabel.trim();
+        return value.isEmpty() || "—".equals(value) || "-".equals(value)
+                ? "Неизвестно" : value;
     }
 
     private void updateConnectionLabel() {

@@ -4,6 +4,7 @@ package dezz.status.widget.car;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -11,10 +12,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Test;
+
+import com.ecarx.xui.adaptapi.car.hvac.IHvac;
 
 /** Pure policy checks for the slow ECARX Android 9 climate command path. */
 public final class GeelyClimateControlReliabilityTest {
@@ -25,6 +30,8 @@ public final class GeelyClimateControlReliabilityTest {
         assertTrue(GeelyCarIntegration.shouldSendControlWrite(3));
         assertFalse(GeelyCarIntegration.shouldSendControlWrite(4));
         assertTrue(GeelyCarIntegration.shouldSendControlWrite(6));
+        assertFalse(GeelyCarIntegration.shouldSendControlWrite(8));
+        assertFalse(GeelyCarIntegration.shouldSendControlWrite(9));
         assertFalse(GeelyCarIntegration.shouldSendControlWrite(-1));
     }
 
@@ -37,26 +44,19 @@ public final class GeelyClimateControlReliabilityTest {
                 GeelyCarIntegration.controlCommandKey(duplicate));
     }
 
-    @Test public void duplicateCommandsExecuteOnceAndFanOutOneConfirmedResult() {
-        ControlCommandDeduplicator deduplicator = new ControlCommandDeduplicator();
-        AtomicInteger callbacks = new AtomicInteger();
-        CarIntegration.ControlCommandListener first = (success, message) ->
-                callbacks.incrementAndGet();
-        CarIntegration.ControlCommandListener second = (success, message) ->
-                callbacks.incrementAndGet();
-
-        assertTrue(deduplicator.add("same", first));
-        assertFalse(deduplicator.add("same", second));
-        List<CarIntegration.ControlCommandListener> listeners = deduplicator.take("same");
-        assertEquals(2, listeners.size());
-        for (CarIntegration.ControlCommandListener listener : listeners) {
-            listener.onResult(true, null);
-        }
-        assertEquals(2, callbacks.get());
-        assertTrue(deduplicator.take("same").isEmpty());
+    @Test public void confirmationDelaysDoNotOccupyTheSerialVendorWorker() {
+        assertEquals(140L, GeelyCarIntegration.controlConfirmDelayMillis(0));
+        assertEquals(170L, GeelyCarIntegration.controlConfirmDelayMillis(3));
+        assertEquals(210L, GeelyCarIntegration.controlConfirmDelayMillis(7));
     }
 
-    @Test public void differentTargetsAndOperationsAreNeverDeduplicated() {
+    @Test public void onlyLatestPerControlGenerationMayComplete() {
+        assertTrue(GeelyCarIntegration.isLatestControlCommand(7L, 7L));
+        assertFalse(GeelyCarIntegration.isLatestControlCommand(7L, 6L));
+        assertFalse(GeelyCarIntegration.isLatestControlCommand(0L, 0L));
+    }
+
+    @Test public void differentTargetsAndOperationsHaveDifferentCoalescingKeys() {
         CarControlCommand levelOne = new CarControlCommand("climate.wheel_heat",
                 CarControlCommand.Operation.SET, 1d);
         CarControlCommand levelTwo = new CarControlCommand("climate.wheel_heat",
@@ -76,13 +76,150 @@ public final class GeelyClimateControlReliabilityTest {
         assertFalse(GeelyCarIntegration.isControlCommandConfirmed(1d, 2d));
     }
 
+    @Test public void passiveReadBackContinuesUntilTheFiveSecondDeadline()
+            throws IOException {
+        String source = geelySource();
+        assertTrue(source.contains("CONTROL_COMMAND_TIMEOUT_MS = 5_000L"));
+        assertTrue(source.contains("CONTROL_WRITE_WINDOW_POLLS = 8"));
+        assertFalse(source.contains("if (nextPoll >= CONTROL_CONFIRM_POLLS)"));
+        assertTrue(source.contains("beginControlConfirmationPoll(active, nextPoll)"));
+    }
+
+    @Test public void fanCommandsUseTheVendorFunctionForTheCurrentClimateMode() {
+        assertEquals(IHvac.HVAC_FUNC_FAN_SPEED,
+                GeelyCarIntegration.fanFunctionIdForMode(false));
+        assertEquals(IHvac.HVAC_FUNC_AUTO_FAN_SETTING,
+                GeelyCarIntegration.fanFunctionIdForMode(true));
+    }
+
+    @Test public void transientAutoReadNeverSilentlyFallsBackToManualRouting()
+            throws IOException {
+        assertEquals(Boolean.TRUE,
+                GeelyCarIntegration.conservativeFanAutoMode(null, true, 1_000L));
+        assertEquals(Boolean.FALSE,
+                GeelyCarIntegration.conservativeFanAutoMode(null, false, 1_000L));
+        assertEquals(Boolean.TRUE,
+                GeelyCarIntegration.conservativeFanAutoMode(true, false, Long.MAX_VALUE));
+        assertNull(GeelyCarIntegration.conservativeFanAutoMode(null, null, 0L));
+        assertNull(GeelyCarIntegration.conservativeFanAutoMode(null, true, 75_001L));
+
+        String source = geelySource();
+        String routing = source.substring(source.indexOf("private ControlDefinition "
+                        + "effectiveControlDefinition"),
+                source.indexOf("private static Set<String> selectKnownControlIds"));
+        assertTrue(routing.contains("if (autoActive == null) return null;"));
+        assertFalse(routing.contains("controlAvailability(source, AUTO_FAN_DEFINITION)"));
+        assertTrue(source.contains(
+                "\"Не удалось подтвердить режим AUTO. Команда не отправлена\""));
+    }
+
+    @Test public void autoFanFallbackSelectsOneConfirmedVehicleFamilyOnly() {
+        List<CarControlDescriptor.Option> advertisedSuperset = autoFanOptions(
+                IHvac.AUTO_FAN_SETTING_SILENT,
+                IHvac.AUTO_FAN_SETTING_NORMAL,
+                IHvac.AUTO_FAN_SETTING_HIGH,
+                IHvac.AUTO_FAN_SETTING_QUIETER,
+                IHvac.AUTO_FAN_SETTING_HIGHER);
+
+        assertEquals(Arrays.asList(
+                        IHvac.AUTO_FAN_SETTING_SILENT,
+                        IHvac.AUTO_FAN_SETTING_NORMAL,
+                        IHvac.AUTO_FAN_SETTING_HIGH),
+                values(GeelyCarIntegration.safeAutoFanOptions(advertisedSuperset,
+                        (double) IHvac.AUTO_FAN_SETTING_NORMAL, Collections.emptyList())));
+        assertEquals(Arrays.asList(
+                        IHvac.AUTO_FAN_SETTING_QUIETER,
+                        IHvac.AUTO_FAN_SETTING_HIGHER),
+                values(GeelyCarIntegration.safeAutoFanOptions(advertisedSuperset,
+                        (double) IHvac.AUTO_FAN_SETTING_HIGHER, Collections.emptyList())));
+        assertTrue(GeelyCarIntegration.safeAutoFanOptions(advertisedSuperset,
+                null, Collections.emptyList()).isEmpty());
+    }
+
+    @Test public void autoFanDiscoveryFailureUsesConfirmedFamilyOrExactRuntimeCache() {
+        assertEquals(Arrays.asList(
+                        IHvac.AUTO_FAN_SETTING_SILENT,
+                        IHvac.AUTO_FAN_SETTING_NORMAL,
+                        IHvac.AUTO_FAN_SETTING_HIGH),
+                values(GeelyCarIntegration.safeAutoFanOptions(Collections.emptyList(),
+                        (double) IHvac.AUTO_FAN_SETTING_HIGH, Collections.emptyList())));
+
+        List<CarControlDescriptor.Option> cachedTwoProfile = autoFanOptions(
+                IHvac.AUTO_FAN_SETTING_QUIETER, IHvac.AUTO_FAN_SETTING_HIGHER);
+        assertEquals(Arrays.asList(
+                        IHvac.AUTO_FAN_SETTING_QUIETER,
+                        IHvac.AUTO_FAN_SETTING_HIGHER),
+                values(GeelyCarIntegration.safeAutoFanOptions(Collections.emptyList(),
+                        null, cachedTwoProfile)));
+        assertTrue(GeelyCarIntegration.safeAutoFanOptions(Collections.emptyList(),
+                null, Collections.emptyList()).isEmpty());
+    }
+
     @Test public void controlsHaveDedicatedWorkerAndTransientFailuresKeepConfirmedState()
             throws IOException {
         String source = geelySource();
         assertTrue(source.contains("new Thread(runnable, \"ecarx-controls\")"));
-        assertTrue(source.contains("executeControlTask(() -> executeControlOnWorker"));
-        assertFalse(source.contains("executeTelemetryTask(() -> executeControlOnWorker"));
+        assertTrue(source.contains(
+                "executeControlTask(() -> enqueueControlCommandOnWorker"));
+        assertTrue(source.contains("mainHandler.postDelayed(() -> executeControlTask(() ->"));
+        assertTrue(source.contains("activeControlCommands"));
+        assertFalse(source.contains("pauseControlWorker"));
+        assertFalse(source.contains("Thread.sleep("));
         assertFalse(source.contains("deliverUnavailableControls(demanded"));
+    }
+
+    @Test public void replacementAndWatcherPathsCannotConfirmAnObsoleteTarget()
+            throws IOException {
+        String source = geelySource();
+        assertTrue(source.contains(
+                "cancelActiveControlCommand(previous, \"Команда заменена более новой\")"));
+        assertTrue(source.contains("reserveControlCommandSubmission(command.controlId, key)"));
+        assertTrue(source.contains("isLatestControlCommandSubmission"));
+        assertTrue(source.contains("previous.listeners.add(listener)"));
+        assertTrue(source.contains("if (!isCurrentControlCommand(active)) return;"));
+        assertTrue(source.contains("confirmActiveControlCommandFromState(definition, value)"));
+        assertTrue(source.contains("current == candidate"));
+    }
+
+    @Test public void panelWatchdogReleasesPendingAndRequestsAConfirmedRefresh()
+            throws IOException {
+        String panel = climatePanelSource();
+        assertTrue(panel.contains("COMMAND_WATCHDOG_MS = 7_000L"));
+        assertTrue(panel.contains("pendingTimeouts.put(id, timeout)"));
+        assertTrue(panel.contains("postDelayed(timeout, COMMAND_WATCHDOG_MS)"));
+        assertTrue(panel.contains("pending.remove(id)"));
+        assertTrue(panel.contains("if (started) subscribeVisibleControls()"));
+        assertTrue(panel.contains("Нет ответа от автомобиля. Состояние обновляется"));
+    }
+
+    @Test public void finiteUnknownVendorLevelHasAnExplicitNonDashFallback()
+            throws IOException {
+        String geely = geelySource();
+        String panel = climatePanelSource();
+        assertTrue(geely.contains("isReadableUnknownControlValue(definition, value)"));
+        assertTrue(geely.contains("\"Неизвестно\", false"));
+        assertTrue(panel.contains("if (!state.known) return \"Неизвестно\""));
+        assertTrue(panel.contains("\"—\".equals(value)"));
+    }
+
+    @Test public void autoFanUsesItsSeparateVendorValueDomainEndToEnd()
+            throws IOException {
+        String source = geelySource();
+        String panel = climatePanelSource();
+        assertTrue(source.contains(
+                "CarControlDescriptor.Kind.LEVELS, IHvac.HVAC_FUNC_AUTO_FAN_SETTING"));
+        assertTrue(source.contains(
+                "ControlDefinition effective = effectiveControlDefinition(source, definition)"));
+        assertTrue(source.contains("active.definition = definition"));
+        assertTrue(source.contains(
+                "writeControlValue(source, definition, active.target)"));
+        assertTrue(source.contains("functionIds.add(IHvac.HVAC_FUNC_AUTO_FAN_SETTING)"));
+        assertTrue(source.contains("functionIds.add(IHvac.HVAC_FUNC_AUTO)"));
+        assertFalse(fanOptionsMethod(source).contains("FAN_SPEED_LEVEL_AUTO"));
+        assertTrue(panel.contains(
+                "boolean includeAuto = ClimatePanelConfig.FAN.equals(id)"));
+        assertTrue(panel.contains("boolean fanProfileMissing = ClimatePanelConfig.FAN.equals"));
+        assertTrue(panel.contains("newlySupported || fanProfileMissing"));
     }
 
     @Test public void defrostersAreReadBackControlsNotAcceptedOnlyPulses() throws IOException {
@@ -113,6 +250,28 @@ public final class GeelyClimateControlReliabilityTest {
             index += value.length();
         }
         return result;
+    }
+
+    private static List<CarControlDescriptor.Option> autoFanOptions(int... values) {
+        List<CarControlDescriptor.Option> result = new ArrayList<>();
+        for (int value : values) {
+            result.add(new CarControlDescriptor.Option(value, Integer.toString(value)));
+        }
+        return result;
+    }
+
+    private static List<Integer> values(List<CarControlDescriptor.Option> options) {
+        List<Integer> result = new ArrayList<>();
+        for (CarControlDescriptor.Option option : options) {
+            result.add((int) Math.round(option.value));
+        }
+        return result;
+    }
+
+    private static String fanOptionsMethod(String source) {
+        int start = source.indexOf("private static List<CarControlDescriptor.Option> fanOptions()");
+        int end = source.indexOf("\n    }\n\n    /**", start) + "\n    }".length();
+        return source.substring(start, end);
     }
 
     private static String geelySource() throws IOException {

@@ -6,6 +6,7 @@
 package dezz.status.widget.launcher;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -18,6 +19,7 @@ import java.util.UUID;
 
 import dezz.status.widget.Preferences;
 import dezz.status.widget.car.CarControlCommand;
+import dezz.status.widget.integration.SourceBinding;
 
 /** Versioned, ordered collection of user-created HOME icons. */
 public final class LauncherShortcutStore {
@@ -40,6 +42,8 @@ public final class LauncherShortcutStore {
         @NonNull public String icon = "apps";
         /** False means a connector may refresh the suggested icon; true preserves user choice. */
         public boolean iconCustomized = false;
+        /** Optional raw value address used to render live state for a RULE shortcut. */
+        @Nullable public SourceBinding stateBinding;
         @NonNull public String backgroundColor = "#B5222733";
         /** "none" preserves an app icon; otherwise an Android color string. */
         @NonNull public String iconColor = "#FFFFFFFF";
@@ -72,6 +76,7 @@ public final class LauncherShortcutStore {
             value.commandValue = commandValue;
             value.icon = icon;
             value.iconCustomized = iconCustomized;
+            value.stateBinding = stateBinding;
             value.backgroundColor = backgroundColor;
             value.iconColor = iconColor;
             value.textColor = textColor;
@@ -228,7 +233,7 @@ public final class LauncherShortcutStore {
     }
 
     private static JSONObject toJson(Shortcut value) throws JSONException {
-        return new JSONObject()
+        JSONObject json = new JSONObject()
                 .put("id", value.id).put("title", value.title).put("kind", value.kind.name())
                 .put("target", value.target).put("packageName", value.packageName)
                 .put("command", value.command.name()).put("commandValue", value.commandValue)
@@ -246,6 +251,10 @@ public final class LauncherShortcutStore {
                 .put("iconSizePx", value.iconSizePx).put("columnSpan", value.columnSpan)
                 .put("rowSpan", value.rowSpan).put("showTitle", value.showTitle)
                 .put("enabled", value.enabled);
+        if (value.stateBinding != null && value.stateBinding.isBound()) {
+            json.put("stateBinding", value.stateBinding.toJson());
+        }
+        return json;
     }
 
     private static Shortcut fromJson(JSONObject json) {
@@ -263,6 +272,9 @@ public final class LauncherShortcutStore {
             value.iconCustomized = json.has("iconCustomized")
                     ? json.optBoolean("iconCustomized", false)
                     : value.kind != Kind.RULE || !"devices".equals(value.icon);
+            JSONObject stateBinding = json.optJSONObject("stateBinding");
+            value.stateBinding = stateBinding == null ? null
+                    : SourceBinding.fromJson(stateBinding);
             value.backgroundColor = json.optString("backgroundColor", "#B5222733");
             value.iconColor = json.optString("iconColor", "#FFFFFFFF");
             value.textColor = json.optString("textColor", "#FFFFFFFF");

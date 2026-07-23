@@ -88,9 +88,9 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         settingsScroll.addView(settings, new ScrollView.LayoutParams(match(), wrap()));
 
         addTitle(settings, "Медиапанель");
-        addHint(settings, "Перетаскивайте элементы прямо на живом предпросмотре. Они "
-                + "прилипают к лёгкой сетке и никогда не накладываются друг на друга. "
-                + "Ширина, высота и масштаб содержимого настраиваются отдельно.");
+        addHint(settings, "Расположение и размер элементов удобнее менять прямо на фактической "
+                + "медиапанели HOME: там сетка использует её реальную геометрию. Здесь остаются "
+                + "точные ползунки, состав элементов, оформление и прокрутка текста.");
         MaterialSwitch panelVisible = new MaterialSwitch(this);
         panelVisible.setText("Показывать медиапанель на HOME");
         panelVisible.setTextSize(16);
@@ -102,6 +102,9 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         addButton(settings, "Размер и положение панели на HOME…", v ->
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_MODE, true)));
+        addButton(settings, "Расположение элементов внутри панели на HOME…", v ->
+                startActivity(new Intent(this, LauncherActivity.class)
+                        .putExtra(LauncherActivity.EXTRA_EDIT_MEDIA_CONTENT, true)));
 
         addTitle(settings, "Сетка");
         addHint(settings, "Число столбцов и строк задаёт размер ячейки внутри фактического "
@@ -123,9 +126,9 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
                 });
 
         addTitle(settings, "Элементы");
-        addHint(settings, "Перетаскивание задаёт позицию. Стрелки меняют слой, если элементы "
-                + "оказываются рядом. Ползунки ширины и высоты изменяют занимаемые ячейки, "
-                + "а масштаб — только текст и значок.");
+        addHint(settings, "Перетаскивание и изменение размера выполняются на HOME. Эти ползунки "
+                + "задают точные ширину и высоту в ячейках; масштаб меняет только текст или "
+                + "значок. Стрелки сохраняют порядок элементов.");
         elementList = new LinearLayout(this);
         elementList.setOrientation(LinearLayout.VERTICAL);
         settings.addView(elementList, new LinearLayout.LayoutParams(match(), wrap()));
@@ -181,7 +184,7 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         previewColumn.setOrientation(LinearLayout.VERTICAL);
         previewColumn.setPadding(dp(10), 0, 0, 0);
         TextView previewTitle = new TextView(this);
-        previewTitle.setText("ЖИВОЙ ПРЕДПРОСМОТР");
+        previewTitle.setText("ПРЕДПРОСМОТР · ТОЛЬКО ПРОСМОТР");
         previewTitle.setTextSize(14);
         previewTitle.setTextColor(Color.rgb(105, 165, 255));
         previewTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -195,14 +198,8 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         previewHost.setPadding(dp(14), dp(14), dp(14), dp(14));
         preview = new MediaPanelView(this, store, null);
         preview.setConfig(config);
-        preview.setPreviewContent("Название композиции", "Исполнитель", "Яндекс Музыка", true);
-        preview.setLayoutEditor((updated, movedId, finished) -> {
-            config = updated.copy();
-            for (String id : positionLabels.keySet()) updatePositionLabel(id);
-            // Drag already updates the preview itself. Persist only on release; onStop() is an
-            // additional safety net if Android interrupts the gesture.
-            if (finished) store.save(config);
-        });
+        preview.setPreviewContent("Очень длинное название композиции для проверки прокрутки",
+                "Исполнитель с длинным именем", "Яндекс Музыка", true);
         previewHost.addView(preview, new FrameLayout.LayoutParams(match(), match()));
         previewColumn.addView(previewHost, new LinearLayout.LayoutParams(match(), 0, 1f));
         TextView saved = new TextView(this);
@@ -280,6 +277,18 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
                         return config.element(element.id).scalePercent;
                     },
                     selected -> selected + "%");
+            if (MediaPanelConfig.supportsMarquee(element.id)) {
+                MaterialSwitch marquee = new MaterialSwitch(this);
+                marquee.setText("Прокручивать длинный текст");
+                marquee.setTextSize(13);
+                marquee.setMinHeight(dp(42));
+                marquee.setChecked(element.marqueeEnabled);
+                marquee.setOnCheckedChangeListener((button, checked) -> {
+                    config.setMarqueeEnabled(element.id, checked);
+                    persistAndPreview();
+                });
+                card.addView(marquee, new LinearLayout.LayoutParams(match(), dp(42)));
+            }
 
             GradientDrawable background = new GradientDrawable();
             background.setColor(Color.argb(35, 120, 170, 230));
@@ -307,8 +316,8 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         config.normalize();
         if (preview == null) return;
         preview.setConfig(config);
-        preview.setPreviewContent("Название композиции", "Исполнитель",
-                "Яндекс Музыка", true);
+        preview.setPreviewContent("Очень длинное название композиции для проверки прокрутки",
+                "Исполнитель с длинным именем", "Яндекс Музыка", true);
     }
 
     private void saveNow() {

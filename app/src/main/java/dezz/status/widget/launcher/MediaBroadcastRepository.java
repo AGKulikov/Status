@@ -40,6 +40,10 @@ final class MediaBroadcastRepository {
     private static final String ARTWORK_FILE = "launcher_media_broadcast_artwork.png";
     private static final String PREF_ARTWORK_SIGNATURE = "artworkSignature";
     private static final String PREF_ARTWORK_TRACK_SIGNATURE = "artworkTrackSignature";
+    private static final String PREF_RECEIVED_ELAPSED = "receivedElapsed";
+    private static final String PREF_CONTENT_CHANGED_ELAPSED = "contentChangedElapsed";
+    private static final String PREF_PLAYBACK_CHANGED_ELAPSED = "playbackChangedElapsed";
+    private static final String PREF_ARTWORK_CHANGED_ELAPSED = "artworkChangedElapsed";
     private static final int MAX_TEXT_LENGTH = 500;
     private static final int MAX_ARTWORK_BYTES = 4 * 1024 * 1024;
     // Rich-media broadcasts may arrive every second on low-memory head units. The artwork shown
@@ -206,10 +210,15 @@ final class MediaBroadcastRepository {
         final long timestampWallMs;
         final long observedWallMs;
         final long receivedElapsedMs;
+        final long contentChangedElapsedMs;
+        final long playbackChangedElapsedMs;
+        final long artworkChangedElapsedMs;
 
         State(@NonNull String title, @NonNull String artist, @NonNull String album,
               @NonNull String packageName, @Nullable Bitmap artwork, long durationMs,
-              long positionMs, boolean playing, long timestampWallMs, long receivedElapsedMs) {
+              long positionMs, boolean playing, long timestampWallMs, long receivedElapsedMs,
+              long contentChangedElapsedMs, long playbackChangedElapsedMs,
+              long artworkChangedElapsedMs) {
             this.title = title;
             this.artist = artist;
             this.album = album;
@@ -222,6 +231,9 @@ final class MediaBroadcastRepository {
             this.observedWallMs = System.currentTimeMillis()
                     - Math.max(0L, SystemClock.elapsedRealtime() - receivedElapsedMs);
             this.receivedElapsedMs = receivedElapsedMs;
+            this.contentChangedElapsedMs = contentChangedElapsedMs;
+            this.playbackChangedElapsedMs = playbackChangedElapsedMs;
+            this.artworkChangedElapsedMs = artworkChangedElapsedMs;
         }
     }
 
@@ -417,11 +429,24 @@ final class MediaBroadcastRepository {
         if (prefs.getBoolean("hasArtwork", false) && isArtworkFileValid(image)) {
             artwork = decodeFileBounded(image);
         }
+        long nowElapsed = SystemClock.elapsedRealtime();
+        long reconstructedElapsed = Math.max(0L, nowElapsed - age);
+        long receivedElapsed = prefs.getLong(PREF_RECEIVED_ELAPSED, reconstructedElapsed);
+        if (receivedElapsed <= 0L || receivedElapsed > nowElapsed + 60_000L) {
+            receivedElapsed = reconstructedElapsed;
+        }
+        long contentChangedElapsed = prefs.getLong(
+                PREF_CONTENT_CHANGED_ELAPSED, receivedElapsed);
+        long playbackChangedElapsed = prefs.getLong(
+                PREF_PLAYBACK_CHANGED_ELAPSED, receivedElapsed);
+        long artworkChangedElapsed = prefs.getLong(
+                PREF_ARTWORK_CHANGED_ELAPSED, contentChangedElapsed);
         return new State(prefs.getString("title", ""), prefs.getString("artist", ""),
                 prefs.getString("album", ""), prefs.getString("package", ""), artwork,
                 duration, position,
                 playing, prefs.getLong("timestamp", 0L),
-                Math.max(0L, SystemClock.elapsedRealtime() - age));
+                receivedElapsed, contentChangedElapsed, playbackChangedElapsed,
+                artworkChangedElapsed);
     }
 
     private static void saveNow(@NonNull Context context, @NonNull PendingUpdate update,
@@ -462,16 +487,28 @@ final class MediaBroadcastRepository {
                 break;
         }
 
-        boolean presentationChanged = !preferences.getBoolean("available", false)
+        boolean wasAvailable = preferences.getBoolean("available", false);
+        boolean presentationChanged = !wasAvailable
                 || !update.title.equals(preferences.getString("title", ""))
                 || !update.artist.equals(preferences.getString("artist", ""))
                 || !update.album.equals(preferences.getString("album", ""))
                 || !update.packageName.equals(preferences.getString("package", ""))
-                || update.durationMs != preferences.getLong("duration", 0L)
+                || update.durationMs != preferences.getLong("duration", 0L);
+        boolean playbackChanged = !wasAvailable
                 || update.playing != preferences.getBoolean("playing", false);
         boolean artworkChanged = oldArtworkAdvertised != artworkStored
                 || (artworkStored && (!oldHasArtwork
                 || !oldArtworkSignature.equals(storedArtworkSignature)));
+        long contentChangedElapsed = MediaStateFreshness.changedAt(
+                presentationChanged || artworkChanged, update.receivedElapsedMs,
+                preferences.getLong(PREF_CONTENT_CHANGED_ELAPSED, 0L));
+        long playbackChangedElapsed = MediaStateFreshness.changedAt(
+                playbackChanged, update.receivedElapsedMs,
+                preferences.getLong(PREF_PLAYBACK_CHANGED_ELAPSED, 0L));
+        long artworkChangedElapsed = MediaStateFreshness.changedAt(
+                presentationChanged || artworkChanged || update.artworkDirectivePresent,
+                update.receivedElapsedMs,
+                preferences.getLong(PREF_ARTWORK_CHANGED_ELAPSED, 0L));
 
         SharedPreferences.Editor editor = preferences.edit()
                 .putBoolean("available", true)
@@ -485,6 +522,10 @@ final class MediaBroadcastRepository {
                 .putLong("timestamp", update.timestampWallMs)
                 .putLong("observed", update.observedWallMs)
                 .putLong("bootEpoch", bootEpochMillis())
+                .putLong(PREF_RECEIVED_ELAPSED, update.receivedElapsedMs)
+                .putLong(PREF_CONTENT_CHANGED_ELAPSED, contentChangedElapsed)
+                .putLong(PREF_PLAYBACK_CHANGED_ELAPSED, playbackChangedElapsed)
+                .putLong(PREF_ARTWORK_CHANGED_ELAPSED, artworkChangedElapsed)
                 .putBoolean("hasArtwork", artworkStored);
         if (artworkStored) {
             editor.putString(PREF_ARTWORK_SIGNATURE, storedArtworkSignature)
@@ -499,7 +540,7 @@ final class MediaBroadcastRepository {
         // Position-only packets can arrive every second. The foreground receiver already applies
         // those scalar values immediately and advances them with its ticker; waking the cache
         // reader would decode the same PNG again and cause visible jank on slow head units.
-        if (presentationChanged || artworkChanged) notifyChanged(context);
+        if (presentationChanged || playbackChanged || artworkChanged) notifyChanged(context);
     }
 
     private static boolean replaceArtwork(@NonNull Context context, @NonNull File image,

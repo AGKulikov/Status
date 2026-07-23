@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import dezz.status.widget.HomeAssistantSettingsActivity;
+import dezz.status.widget.Preferences;
 import dezz.status.widget.SprutHubSettingsActivity;
 import dezz.status.widget.WidgetService;
 import dezz.status.widget.automation.AutomationContract;
@@ -40,7 +41,9 @@ import dezz.status.widget.integration.ActionBinding;
 import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.integration.SourceBinding;
+import dezz.status.widget.mqtt.MqttShortcutCatalogStore;
 import dezz.status.widget.sprut.SprutActionValue;
+import dezz.status.widget.sprut.SprutActionability;
 import dezz.status.widget.sprut.SprutCatalog;
 import dezz.status.widget.sprut.SprutHubCatalogStore;
 import dezz.status.widget.sprut.SprutHubController;
@@ -57,13 +60,16 @@ public final class SmartHomeShortcutPicker {
         @NonNull public final String title;
         @NonNull public final String details;
         @NonNull public final String iconKey;
+        @Nullable public final SourceBinding stateBinding;
 
         Selection(@NonNull ActionBinding command, @NonNull String title,
-                  @NonNull String details, @NonNull String iconKey) {
+                  @NonNull String details, @NonNull String iconKey,
+                  @Nullable SourceBinding stateBinding) {
             this.command = command;
             this.title = title;
             this.details = details;
             this.iconKey = iconKey;
+            this.stateBinding = stateBinding;
         }
     }
 
@@ -89,10 +95,40 @@ public final class SmartHomeShortcutPicker {
 
     private void showHomeAssistant() {
         HaApiController active = HaApiController.active();
-        if (active == null || active.catalog().isEmpty()) {
+        if (active == null) {
             missingCatalog("Каталог Home Assistant пуст",
                     "Подключите Home Assistant и дождитесь полного списка сущностей.",
                     HomeAssistantSettingsActivity.class);
+            return;
+        }
+        if (active.catalog().isEmpty()) {
+            AlertDialog loading = new AlertDialog.Builder(activity)
+                    .setTitle("Home Assistant")
+                    .setMessage("Загружаю полный список сущностей…")
+                    .setNegativeButton("Отмена", null)
+                    .create();
+            loading.show();
+            try {
+                active.refreshCatalog().whenComplete((catalog, failure) ->
+                        activity.runOnUiThread(() -> {
+                            if (!loading.isShowing() || activity.isFinishing()
+                                    || activity.isDestroyed()) return;
+                            loading.dismiss();
+                            if (failure == null && catalog != null && !catalog.isEmpty()) {
+                                showHomeAssistant();
+                            } else {
+                                missingCatalog("Каталог Home Assistant пуст",
+                                        "Подключите Home Assistant и дождитесь полного списка "
+                                                + "сущностей.",
+                                        HomeAssistantSettingsActivity.class);
+                            }
+                        }));
+            } catch (RuntimeException failure) {
+                loading.dismiss();
+                missingCatalog("Каталог Home Assistant пуст",
+                        "Не удалось обновить полный список сущностей.",
+                        HomeAssistantSettingsActivity.class);
+            }
             return;
         }
         List<HaEntity> entities = new ArrayList<>(active.catalog().values());
@@ -191,10 +227,33 @@ public final class SmartHomeShortcutPicker {
     }
 
     private void showMqtt() {
+        AlertDialog loading = new AlertDialog.Builder(activity).setTitle("MQTT")
+                .setMessage("Загружаю каталог реально полученных ресурсов…")
+                .setNegativeButton("Отмена", null).create();
+        loading.show();
+        CompletableFuture.supplyAsync(this::loadMqttValues)
+                .whenComplete((values, failure) -> activity.runOnUiThread(() -> {
+                    if (!loading.isShowing() || activity.isFinishing()
+                            || activity.isDestroyed()) return;
+                    loading.dismiss();
+                    if (failure != null || values == null) {
+                        toast("Не удалось прочитать каталог MQTT");
+                        showConnectorPicker();
+                    } else {
+                        showMqttValues(values);
+                    }
+                }));
+    }
+
+    private List<ConnectorValue> loadMqttValues() {
+        Map<String, ConnectorValue> logical = new LinkedHashMap<>();
+        for (ConnectorValue value :
+                new MqttShortcutCatalogStore(activity, new Preferences(activity)).snapshot()) {
+            logical.put(value.resourceId, value);
+        }
         WidgetService running = WidgetService.getInstance();
         List<ConnectorValue> snapshot = running == null
                 ? Collections.emptyList() : running.connectorValueSnapshot();
-        Map<String, ConnectorValue> logical = new LinkedHashMap<>();
         for (ConnectorValue value : snapshot) {
             if (value.connectorType == ConnectorType.MQTT
                     && SourceBinding.DEFAULT_CONNECTOR_ID.equals(value.connectorId)
@@ -205,15 +264,22 @@ public final class SmartHomeShortcutPicker {
         List<ConnectorValue> values = new ArrayList<>(logical.values());
         values.sort(Comparator.comparing(value -> value.resourceId,
                 String.CASE_INSENSITIVE_ORDER));
+        return values;
+    }
+
+    private void showMqttValues(List<ConnectorValue> values) {
         List<BoundedCatalogSearch.Item<ConnectorValue>> choices = new ArrayList<>(values.size());
         for (ConnectorValue value : values) {
+            String state = value.readable
+                    ? "сейчас: " + display(value.rawValue)
+                    + (value.fresh ? "" : "  [неактуально]")
+                    : "сохранённый ресурс  [неактуально]";
             choices.add(new BoundedCatalogSearch.Item<>(value,
-                    value.resourceId + "\nсейчас: " + display(value.rawValue)
-                            + (value.fresh ? "" : "  [неактуально]"),
+                    value.resourceId + "\n" + state,
                     value.resourceId + " " + value.rawValue + " " + value.valueType + " "
                             + value.unit + " " + value.attributes));
         }
-        showSearch("MQTT — полный полученный каталог",
+        showSearch("MQTT — полученный каталог",
                 "Scope, ID, значение или атрибут", choices,
                 "Retained/live устройства ещё не получены. Можно указать команду вручную.",
                 this::showConnectorPicker, choice -> configureMqtt(choice.value),
@@ -230,7 +296,9 @@ public final class SmartHomeShortcutPicker {
         EditText payload = field(form, "Payload", "TOGGLE");
         AlertDialog dialog = new AlertDialog.Builder(activity).setTitle("MQTT — действие")
                 .setMessage("Список сформирован из всех retained/live значений брокера, а не "
-                        + "только из ранее добавленных плиток.")
+                        + "только из ранее добавленных плиток. Сохранённый scope/ID подтверждает "
+                        + "только реально полученное состояние: проверьте предложенный ID команды "
+                        + "или укажите точный command topic — приложение его не придумывает.")
                 .setView(form).setPositiveButton("Выбрать", null)
                 .setNegativeButton("Отмена", null).create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
@@ -246,7 +314,10 @@ public final class SmartHomeShortcutPicker {
                                 value.attributes.get("device_class"));
                         String type = value == null ? "" : value.valueType + " " + value.unit;
                         finish(command, name, "MQTT · " + target,
-                                SmartHomeIconResolver.suggest("", deviceClass, type, name));
+                                SmartHomeIconResolver.suggest("", deviceClass, type, name),
+                                value == null ? null : new SourceBinding(ConnectorType.MQTT,
+                                        SourceBinding.DEFAULT_CONNECTOR_ID, value.resourceId,
+                                        "", SourceBinding.PRESENTATION_AUTO, ""));
                         dialog.dismiss();
                     } catch (RuntimeException error) {
                         toast(message(error));
@@ -287,10 +358,7 @@ public final class SmartHomeShortcutPicker {
     }
 
     private void showSprutAccessories(SprutCatalog catalog) {
-        List<SprutCatalog.Accessory> accessories = new ArrayList<>();
-        for (SprutCatalog.Accessory accessory : catalog.accessories()) {
-            if (hasWritable(accessory)) accessories.add(accessory);
-        }
+        List<SprutCatalog.Accessory> accessories = new ArrayList<>(catalog.accessories());
         accessories.sort(Comparator
                 .comparing((SprutCatalog.Accessory value) -> catalog.roomNameFor(value),
                         String.CASE_INSENSITIVE_ORDER)
@@ -304,54 +372,76 @@ public final class SmartHomeShortcutPicker {
             choices.add(new BoundedCatalogSearch.Item<>(accessory,
                     (room.isEmpty() ? "" : room + " → ") + name
                             + (accessory.online() ? "" : "  [offline]")
+                            + (SprutActionability.canControl(accessory)
+                            ? "" : "  [только чтение]")
                             + (accessory.model().isEmpty() ? "" : "\n" + accessory.model()),
                     room + " " + name + " " + accessory.model() + " "
                             + accessory.manufacturer() + " " + accessory.serial()));
         }
         showSearch("Sprut.hub — устройство",
                 "Комната, название, модель или серийный номер", choices,
-                "Нет устройств с управляемыми характеристиками.", this::showConnectorPicker,
-                choice -> showSprutServices(catalog, choice.value));
+                "В полном каталоге нет устройств.", this::showConnectorPicker, choice -> {
+                    if (SprutActionability.canControl(choice.value)) {
+                        showSprutServices(catalog, choice.value);
+                    } else {
+                        showReadOnlySprut("Устройство «" + accessoryName(choice.value) + "»",
+                                () -> showSprutAccessories(catalog));
+                    }
+                });
     }
 
     private void showSprutServices(SprutCatalog catalog, SprutCatalog.Accessory accessory) {
-        List<SprutCatalog.Service> services = new ArrayList<>();
-        for (SprutCatalog.Service service : accessory.services()) if (hasWritable(service)) {
-            services.add(service);
-        }
+        List<SprutCatalog.Service> services = new ArrayList<>(accessory.services());
         services.sort(Comparator.comparing(SmartHomeShortcutPicker::serviceName,
                 String.CASE_INSENSITIVE_ORDER));
         List<BoundedCatalogSearch.Item<SprutCatalog.Service>> choices = new ArrayList<>();
         for (SprutCatalog.Service service : services) {
             choices.add(new BoundedCatalogSearch.Item<>(service,
-                    serviceName(service) + "\nтип: " + dash(service.type()),
+                    serviceName(service)
+                            + (SprutActionability.canControl(service)
+                            ? "" : "  [только чтение]")
+                            + "\nтип: " + dash(service.type()),
                     serviceName(service) + " " + service.type() + " " + service.id()));
         }
         showSearch(accessoryName(accessory) + " — сервис", "Название или тип", choices,
-                "Нет управляемых сервисов.", () -> showSprutAccessories(catalog),
-                choice -> showSprutCharacteristics(catalog, accessory, choice.value));
+                "У устройства нет сервисов.", () -> showSprutAccessories(catalog), choice -> {
+                    if (SprutActionability.canControl(choice.value)) {
+                        showSprutCharacteristics(catalog, accessory, choice.value);
+                    } else {
+                        showReadOnlySprut("Сервис «" + serviceName(choice.value) + "»",
+                                () -> showSprutServices(catalog, accessory));
+                    }
+                });
     }
 
     private void showSprutCharacteristics(SprutCatalog catalog,
                                           SprutCatalog.Accessory accessory,
                                           SprutCatalog.Service service) {
-        List<SprutCatalog.Characteristic> values = new ArrayList<>();
-        for (SprutCatalog.Characteristic characteristic : service.characteristics()) {
-            if (characteristic.writable()) values.add(characteristic);
-        }
+        List<SprutCatalog.Characteristic> values =
+                new ArrayList<>(service.characteristics());
         List<BoundedCatalogSearch.Item<SprutCatalog.Characteristic>> choices = new ArrayList<>();
         for (SprutCatalog.Characteristic value : values) {
             String name = characteristicName(value);
             choices.add(new BoundedCatalogSearch.Item<>(value,
-                    name + "\nсейчас: " + display(value.currentValue()) + "  •  "
+                    name + (SprutActionability.canControl(value)
+                            ? "" : "  [только чтение]")
+                            + "\nсейчас: " + display(value.currentValue()) + "  •  "
                             + value.path().stableId(),
                     name + " " + value.type() + " " + value.format() + " " + value.unit()
                             + " " + value.currentValue() + " " + value.path().stableId()));
         }
         showSearch(serviceName(service) + " — что менять", "Название, тип или path", choices,
-                "Нет управляемых характеристик.",
-                () -> showSprutServices(catalog, accessory), choice ->
-                        chooseSprutValue(catalog, accessory, service, choice.value));
+                "У сервиса нет характеристик.",
+                () -> showSprutServices(catalog, accessory), choice -> {
+                    if (SprutActionability.canControl(choice.value)) {
+                        chooseSprutValue(catalog, accessory, service, choice.value);
+                    } else {
+                        showReadOnlySprut("Характеристика «"
+                                        + characteristicName(choice.value) + "»",
+                                () -> showSprutCharacteristics(
+                                        catalog, accessory, service));
+                    }
+                });
     }
 
     private void chooseSprutValue(SprutCatalog catalog, SprutCatalog.Accessory accessory,
@@ -510,8 +600,23 @@ public final class SmartHomeShortcutPicker {
                 .setNegativeButton("Назад", (dialog, which) -> showConnectorPicker()).show();
     }
 
+    private void showReadOnlySprut(String title, Runnable back) {
+        new AlertDialog.Builder(activity).setTitle(title)
+                .setMessage("Элемент показан, потому что это полный каталог Sprut.hub, "
+                        + "но у него нет характеристик с правом записи. Его можно просматривать, "
+                        + "но нельзя выбрать как действие HOME.")
+                .setPositiveButton("Понятно", (dialog, which) -> back.run()).show();
+    }
+
     private void finish(ActionBinding command, String title, String details, String icon) {
-        callback.onSelected(new Selection(command, title, details, icon));
+        callback.onSelected(new Selection(command, title, details, icon,
+                new SourceBinding(command.connectorType, command.connectorId,
+                        command.resourceId, "", SourceBinding.PRESENTATION_AUTO, "")));
+    }
+
+    private void finish(ActionBinding command, String title, String details, String icon,
+                        @Nullable SourceBinding stateBinding) {
+        callback.onSelected(new Selection(command, title, details, icon, stateBinding));
     }
 
     private static ActionBinding ha(HaEntity entity, String operation, String payload) {
@@ -529,11 +634,6 @@ public final class SmartHomeShortcutPicker {
                             ActionBinding value) {
         labels.add(label);
         values.add(value);
-    }
-
-    private static boolean hasWritable(SprutCatalog.Accessory value) {
-        for (SprutCatalog.Service service : value.services()) if (hasWritable(service)) return true;
-        return false;
     }
 
     private static boolean supportsStandardHaAction(String domain) {
@@ -554,13 +654,6 @@ public final class SmartHomeShortcutPicker {
             default:
                 return false;
         }
-    }
-
-    private static boolean hasWritable(SprutCatalog.Service value) {
-        for (SprutCatalog.Characteristic characteristic : value.characteristics()) {
-            if (characteristic.writable()) return true;
-        }
-        return false;
     }
 
     private static boolean isLogicalMqttResource(String resource) {
