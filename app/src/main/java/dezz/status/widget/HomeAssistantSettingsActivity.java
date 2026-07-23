@@ -40,6 +40,7 @@ import dezz.status.widget.ha.api.HaWebSocketConnector;
 import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.ActionBinding;
 import dezz.status.widget.integration.SourceBinding;
+import dezz.status.widget.launcher.SmartHomeIconResolver;
 import dezz.status.widget.popup.PopupItemConfig;
 import dezz.status.widget.popup.PopupItemConfigStore;
 import dezz.status.widget.scenario.RuleSet;
@@ -415,18 +416,9 @@ public final class HomeAssistantSettingsActivity extends AppCompatActivity {
     }
 
     private String iconFor(HaEntity entity, String presentation) {
-        if (SourceBinding.PRESENTATION_COVER.equals(presentation)) return "gate";
-        if (SourceBinding.PRESENTATION_TEMPERATURE.equals(presentation)) return "temperature";
-        String domain = entity.domain().toLowerCase(Locale.ROOT);
-        String deviceClass = String.valueOf(entity.attribute("device_class"))
-                .toLowerCase(Locale.ROOT);
-        if ("light".equals(domain)) return "light";
-        if ("lock".equals(domain)) return "lock";
-        if (deviceClass.contains("door") || deviceClass.contains("window")
-                || deviceClass.contains("opening")) return "door";
-        if (deviceClass.contains("water") || deviceClass.contains("moisture")
-                || deviceClass.contains("humidity")) return "water";
-        return "power";
+        return SmartHomeIconResolver.suggest(entity.domain(),
+                String.valueOf(entity.attribute("device_class")), presentation,
+                friendlyName(entity));
     }
 
     private static boolean isActionable(String domain) {

@@ -17,8 +17,11 @@ import java.util.regex.Pattern;
 
 /** Pure-Java parser for route summaries exposed by Yandex navigation applications. */
 public final class NavigationDataParser {
-    private static final int REGEX_FLAGS = Pattern.CASE_INSENSITIVE
-            | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS;
+    // Android 9's java.util.regex implementation rejects UNICODE_CHARACTER_CLASS (flag 256)
+    // with IllegalArgumentException. UNICODE_CASE keeps case-insensitive Cyrillic matching; clean()
+    // normalizes Unicode whitespace before the expressions run, so the unsupported flag is not
+    // needed for route text containing non-breaking or narrow spaces.
+    private static final int REGEX_FLAGS = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE;
 
     private static final Pattern CLOCK = Pattern.compile(
             "(?<!\\d)([01]?\\d|2[0-3]):([0-5]\\d)(?:\\s*([AP]M))?(?!\\d)",
@@ -140,8 +143,20 @@ public final class NavigationDataParser {
 
     private static String clean(String value) {
         if (value == null) return "";
-        return value.replace('\n', ' ').replace('\r', ' ')
-                .replaceAll("\\s+", " ").trim();
+        StringBuilder result = new StringBuilder(value.length());
+        boolean pendingSpace = false;
+        for (int offset = 0; offset < value.length();) {
+            int codePoint = value.codePointAt(offset);
+            offset += Character.charCount(codePoint);
+            if (Character.isWhitespace(codePoint) || Character.isSpaceChar(codePoint)) {
+                pendingSpace = result.length() > 0;
+                continue;
+            }
+            if (pendingSpace) result.append(' ');
+            result.appendCodePoint(codePoint);
+            pendingSpace = false;
+        }
+        return result.toString();
     }
 
     private static String findArrival(List<String> values, boolean hasRouteEvidence) {

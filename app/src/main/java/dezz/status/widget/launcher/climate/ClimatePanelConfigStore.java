@@ -15,6 +15,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -22,7 +23,7 @@ import dezz.status.widget.Preferences;
 
 /** Versioned and defensive persistence for the climate panel's live settings. */
 public final class ClimatePanelConfigStore {
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 4;
     private final Preferences preferences;
 
     public ClimatePanelConfigStore(@NonNull Preferences preferences) {
@@ -57,6 +58,11 @@ public final class ClimatePanelConfigStore {
             value.backgroundColor = root.optString("backgroundColor", value.backgroundColor);
             value.backgroundAlpha = root.optInt("backgroundAlpha", value.backgroundAlpha);
             value.cornerRadiusPx = root.optInt("cornerRadiusPx", value.cornerRadiusPx);
+            value.tileCornerRadiusPx = root.optInt("tileCornerRadiusPx",
+                    value.tileCornerRadiusPx);
+            value.tileSpacingPx = root.optInt("tileSpacingPx", value.tileSpacingPx);
+            value.activeTileAlpha = root.optInt("activeTileAlpha", value.activeTileAlpha);
+            value.inactiveTileAlpha = root.optInt("inactiveTileAlpha", value.inactiveTileAlpha);
             value.accentColor = root.optString("accentColor", value.accentColor);
             value.inactiveColor = root.optString("inactiveColor", value.inactiveColor);
             value.textColor = root.optString("textColor", value.textColor);
@@ -79,6 +85,25 @@ public final class ClimatePanelConfigStore {
                 for (ClimatePanelConfig.Element element : ClimatePanelConfig.ELEMENTS) {
                     value.setElementScalePercent(element.id,
                             scales.optInt(element.id, value.elementScalePercent(element.id)));
+                }
+            }
+            JSONObject widths = root.optJSONObject("elementWidths");
+            JSONObject heights = root.optJSONObject("elementHeights");
+            for (ClimatePanelConfig.Element element : ClimatePanelConfig.ELEMENTS) {
+                // v2 had one size slider. Preserve its visible result while splitting size into
+                // physical width/height and icon/text scale in the CarPlay editor.
+                int legacySize = value.elementScalePercent(element.id);
+                value.setElementWidthPercent(element.id, widths == null
+                        ? legacySize : widths.optInt(element.id, legacySize));
+                value.setElementHeightPercent(element.id, heights == null
+                        ? legacySize : heights.optInt(element.id, legacySize));
+            }
+            JSONObject levelOrders = root.optJSONObject("levelCycleOrders");
+            if (levelOrders != null) {
+                for (String id : ClimatePanelConfig.LEVEL_CYCLE_ELEMENTS) {
+                    Object stored = levelOrders.opt(id);
+                    ClimatePanelConfig.LevelCycleOrder order = decodeLevelCycleOrder(stored);
+                    if (order != null) value.setLevelCycleOrder(id, order);
                 }
             }
             JSONArray order = root.optJSONArray("elementOrder");
@@ -113,6 +138,10 @@ public final class ClimatePanelConfigStore {
         root.put("backgroundColor", value.backgroundColor);
         root.put("backgroundAlpha", value.backgroundAlpha);
         root.put("cornerRadiusPx", value.cornerRadiusPx);
+        root.put("tileCornerRadiusPx", value.tileCornerRadiusPx);
+        root.put("tileSpacingPx", value.tileSpacingPx);
+        root.put("activeTileAlpha", value.activeTileAlpha);
+        root.put("inactiveTileAlpha", value.inactiveTileAlpha);
         root.put("accentColor", value.accentColor);
         root.put("inactiveColor", value.inactiveColor);
         root.put("textColor", value.textColor);
@@ -129,6 +158,22 @@ public final class ClimatePanelConfigStore {
             scales.put(entry.getKey(), entry.getValue());
         }
         root.put("elementScales", scales);
+        JSONObject widths = new JSONObject();
+        for (Map.Entry<String, Integer> entry : value.elementWidths().entrySet()) {
+            widths.put(entry.getKey(), entry.getValue());
+        }
+        root.put("elementWidths", widths);
+        JSONObject heights = new JSONObject();
+        for (Map.Entry<String, Integer> entry : value.elementHeights().entrySet()) {
+            heights.put(entry.getKey(), entry.getValue());
+        }
+        root.put("elementHeights", heights);
+        JSONObject levelOrders = new JSONObject();
+        for (Map.Entry<String, ClimatePanelConfig.LevelCycleOrder> entry
+                : value.levelCycleOrders().entrySet()) {
+            levelOrders.put(entry.getKey(), entry.getValue().name().toLowerCase(Locale.ROOT));
+        }
+        root.put("levelCycleOrders", levelOrders);
         JSONArray order = new JSONArray();
         for (String id : value.elementOrder()) order.put(id);
         root.put("elementOrder", order);
@@ -137,6 +182,28 @@ public final class ClimatePanelConfigStore {
 
     public void reset() {
         preferences.launcherClimateConfigJson.set("");
+    }
+
+    @Nullable
+    private static ClimatePanelConfig.LevelCycleOrder decodeLevelCycleOrder(
+            @Nullable Object stored) {
+        // Accept a transitional boolean form as well: true meant the mSaver-style 3→2→1
+        // direction.  Unknown imported values deliberately fall back to the safe old default.
+        if (stored instanceof Boolean) {
+            return (Boolean) stored ? ClimatePanelConfig.LevelCycleOrder.DESCENDING
+                    : ClimatePanelConfig.LevelCycleOrder.ASCENDING;
+        }
+        if (!(stored instanceof String)) return null;
+        String normalized = ((String) stored).trim().toLowerCase(Locale.ROOT);
+        if ("descending".equals(normalized) || "3-2-1".equals(normalized)
+                || "3→2→1".equals(normalized)) {
+            return ClimatePanelConfig.LevelCycleOrder.DESCENDING;
+        }
+        if ("ascending".equals(normalized) || "1-2-3".equals(normalized)
+                || "1→2→3".equals(normalized)) {
+            return ClimatePanelConfig.LevelCycleOrder.ASCENDING;
+        }
+        return null;
     }
 
     /**

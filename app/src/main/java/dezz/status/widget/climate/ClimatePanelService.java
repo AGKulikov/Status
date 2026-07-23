@@ -14,6 +14,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.IBinder;
+import android.view.Display;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -36,6 +37,7 @@ public final class ClimatePanelService extends Service {
 
     private static volatile String runtimeStatus = "stopped";
     private static volatile String runtimeDetail = "";
+    private static volatile int runtimeDisplayId = Display.DEFAULT_DISPLAY;
 
     @Nullable private ClimatePanelOverlayController controller;
     @Nullable private Preferences preferences;
@@ -68,6 +70,11 @@ public final class ClimatePanelService extends Service {
         return runtimeDetail;
     }
 
+    /** Physical display that currently owns the climate window. */
+    public static int getRuntimeDisplayId() {
+        return runtimeDisplayId;
+    }
+
     private static void startWithAction(@NonNull Context context, @NonNull String action) {
         Intent intent = new Intent(context, ClimatePanelService.class).setAction(action);
         ContextCompat.startForegroundService(context, intent);
@@ -82,8 +89,12 @@ public final class ClimatePanelService extends Service {
         startForeground(NOTIFICATION_ID, createNotification());
         preferences = new Preferences(this);
         updateRuntimeStatus("starting", "Запуск климатической панели");
-        controller = new ClimatePanelOverlayController(this, preferences,
-                ClimatePanelService::updateRuntimeStatus);
+        controller = new ClimatePanelOverlayController(this, preferences, (status, detail) -> {
+            ClimatePanelOverlayController current = controller;
+            runtimeDisplayId = current == null
+                    ? Display.DEFAULT_DISPLAY : current.getAttachedDisplayId();
+            updateRuntimeStatus(status, detail);
+        });
     }
 
     @Override

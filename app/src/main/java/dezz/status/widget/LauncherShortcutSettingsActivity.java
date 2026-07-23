@@ -45,9 +45,13 @@ import java.util.Locale;
 
 import dezz.status.widget.launcher.LauncherIconResolver;
 import dezz.status.widget.launcher.LauncherShortcutStore;
+import dezz.status.widget.launcher.LauncherRuleIdPolicy;
+import dezz.status.widget.launcher.LauncherRuleIconPolicy;
+import dezz.status.widget.launcher.SmartHomeShortcutPicker;
 import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarControlDescriptor;
 import dezz.status.widget.car.CarIntegrations;
+import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.scenario.IntentActionRule;
 import dezz.status.widget.scenario.IntentActionRuleStore;
 
@@ -66,6 +70,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         preferences = new Preferences(this);
         store = new LauncherShortcutStore(preferences);
+        migrateRuleIcons();
         setTitle("Иконки HOME");
         setContentView(buildScreen());
         refresh();
@@ -378,6 +383,20 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
     }
 
     private void chooseRule(@Nullable LauncherShortcutStore.Shortcut existing) {
+        String[] sources = {"Новое действие из полного каталога",
+                "Ранее настроенное Intent-действие"};
+        new AlertDialog.Builder(this).setTitle("Действие устройства / сценарий")
+                .setItems(sources, (dialog, which) -> {
+                    if (which == 0) {
+                        new SmartHomeShortcutPicker(this,
+                                selection -> saveCatalogAction(existing, selection))
+                                .showConnectorPicker();
+                    } else chooseExistingRule(existing);
+                })
+                .setNegativeButton(android.R.string.cancel, null).show();
+    }
+
+    private void chooseExistingRule(@Nullable LauncherShortcutStore.Shortcut existing) {
         final List<IntentActionRule> rules;
         try {
             rules = new IntentActionRuleStore(preferences).loadStrict();
@@ -416,11 +435,121 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
                         value.target = rule.id;
                         value.packageName = "";
                         value.title = labels[which];
-                        value.icon = "devices";
+                        value.stateBinding = stateBindingFor(rule);
+                        if (!value.iconCustomized) {
+                            value.icon = LauncherRuleIconPolicy.suggest(rule);
+                        }
                         value.iconColor = "#FFFFFFFF";
                         editAppearance(value);
                     }
                 }).show();
+    }
+
+    /**
+     * HA1058-era RULE entries had only the generic devices icon and no explicit customization
+     * bit. LauncherShortcutStore already identifies those as non-customized; resolve them against
+     * the saved rule once, while preserving every explicit user icon.
+     */
+    private void migrateRuleIcons() {
+        final List<IntentActionRule> rules;
+        try {
+            rules = new IntentActionRuleStore(preferences).loadStrict();
+        } catch (IllegalArgumentException ignored) {
+            return;
+        }
+        for (LauncherShortcutStore.Shortcut shortcut : store.all()) {
+            if (shortcut.kind != LauncherShortcutStore.Kind.RULE) continue;
+            for (IntentActionRule rule : rules) {
+                if (shortcut.target.equals(rule.id)) {
+                    boolean changed = LauncherRuleIconPolicy.refresh(shortcut, rule);
+                    if (shortcut.stateBinding == null) {
+                        shortcut.stateBinding = stateBindingFor(rule);
+                        changed = true;
+                    }
+                    if (changed) store.upsert(shortcut);
+                    break;
+                }
+            }
+        }
+    }
+
+    private void saveCatalogAction(@Nullable LauncherShortcutStore.Shortcut existing,
+                                   @NonNull SmartHomeShortcutPicker.Selection selection) {
+        try {
+            IntentActionRuleStore ruleStore = new IntentActionRuleStore(preferences);
+            List<IntentActionRule> rules = new ArrayList<>(ruleStore.loadStrict());
+            String reusable = existing == null ? "" : LauncherRuleIdPolicy.reusableId(
+                    editingLongAction,
+                    existing.kind == LauncherShortcutStore.Kind.RULE, existing.target,
+                    existing.hasLongAction,
+                    existing.longKind == LauncherShortcutStore.Kind.RULE, existing.longTarget);
+            String ruleId = reusable.isEmpty() ? nextLauncherRuleId(rules) : reusable;
+            String token = IntentActionRule.newTriggerToken();
+            String actionToken = IntentActionRule.newTriggerToken();
+            String actionPrefix = "dezz.statuswidget.launcher." + ruleId
+                    .replace('-', '_').replace('.', '_');
+            IntentActionRule replacement = new IntentActionRule(ruleId, true,
+                    IntentActionRule.secureIntentAction(actionPrefix, actionToken), token,
+                    selection.command, selection.title, selection.details,
+                    selection.command.resourceId);
+            int replaceAt = -1;
+            for (int index = 0; index < rules.size(); index++) {
+                if (rules.get(index).id.equals(ruleId)) {
+                    replaceAt = index;
+                    break;
+                }
+            }
+            if (replaceAt >= 0) rules.set(replaceAt, replacement);
+            else {
+                if (rules.size() >= IntentActionRuleStore.MAX_RULES) {
+                    throw new IllegalArgumentException("Достигнут лимит действий: "
+                            + IntentActionRuleStore.MAX_RULES);
+                }
+                rules.add(replacement);
+            }
+            ruleStore.save(rules);
+            WidgetService running = WidgetService.getInstance();
+            if (running != null) running.applyPreferences();
+
+            LauncherShortcutStore.Shortcut value = existing == null
+                    ? new LauncherShortcutStore.Shortcut() : existing;
+            if (editingLongAction) {
+                saveLongAction(value, LauncherShortcutStore.Kind.RULE, ruleId, "");
+                return;
+            }
+            value.kind = LauncherShortcutStore.Kind.RULE;
+            value.target = ruleId;
+            value.packageName = "";
+            value.title = selection.title;
+            value.stateBinding = selection.stateBinding;
+            if (!value.iconCustomized) value.icon = selection.iconKey;
+            value.iconColor = "#FFFFFFFF";
+            editAppearance(value);
+        } catch (RuntimeException error) {
+            Toast.makeText(this, "Не удалось сохранить действие: "
+                    + (error.getMessage() == null ? error.getClass().getSimpleName()
+                    : error.getMessage()), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @NonNull
+    private static SourceBinding stateBindingFor(@NonNull IntentActionRule rule) {
+        return new SourceBinding(rule.command.connectorType, rule.command.connectorId,
+                rule.command.resourceId, "", SourceBinding.PRESENTATION_AUTO, "");
+    }
+
+    @NonNull
+    private static String nextLauncherRuleId(@NonNull List<IntentActionRule> rules) {
+        int suffix = 1;
+        while (true) {
+            String candidate = "launcher_" + suffix++;
+            boolean used = false;
+            for (IntentActionRule rule : rules) if (rule.id.equals(candidate)) {
+                used = true;
+                break;
+            }
+            if (!used) return candidate;
+        }
     }
 
     private void chooseApplication(@Nullable LauncherShortcutStore.Shortcut existing) {
@@ -542,6 +671,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         form.addView(iconLabel);
         Spinner icon = new Spinner(this);
         List<LauncherIconResolver.Preset> presets = LauncherIconResolver.presets();
+        String automaticIcon = value.icon;
         icon.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, presets));
         int selectedIcon = 0;
         for (int i = 0; i < presets.size(); i++) if (presets.get(i).key.equals(value.icon)) selectedIcon = i;
@@ -565,10 +695,11 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         MaterialSwitch showState = new MaterialSwitch(this);
         showState.setText("Показывать текущий режим / уровень");
         showState.setChecked(value.showState);
-        if (value.kind == LauncherShortcutStore.Kind.CAR) {
+        if (value.kind == LauncherShortcutStore.Kind.CAR
+                || value.kind == LauncherShortcutStore.Kind.RULE) {
             form.addView(activeBackground);
             form.addView(activeIcon);
-            form.addView(vehicleStateColor);
+            if (value.kind == LauncherShortcutStore.Kind.CAR) form.addView(vehicleStateColor);
             form.addView(showState);
         }
 
@@ -588,16 +719,20 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
                 .setView(scrollDialog(form)).setPositiveButton("Применить", (dialog, which) -> {
                     value.title = title.getText().toString().trim();
                     value.icon = presets.get(icon.getSelectedItemPosition()).key;
+                    if (!value.icon.equals(automaticIcon)) value.iconCustomized = true;
                     value.backgroundColor = validColor(background.getText().toString(), "#B5222733");
                     value.iconColor = "none".equalsIgnoreCase(iconColor.getText().toString().trim())
                             ? "none" : validColor(iconColor.getText().toString(), "#FFFFFFFF");
                     value.textColor = validColor(textColor.getText().toString(), "#FFFFFFFF");
-                    if (value.kind == LauncherShortcutStore.Kind.CAR) {
+                    if (value.kind == LauncherShortcutStore.Kind.CAR
+                            || value.kind == LauncherShortcutStore.Kind.RULE) {
                         value.activeBackgroundColor = validColor(
                                 activeBackground.getText().toString(), "#CC374151");
                         value.activeIconColor = validColor(activeIcon.getText().toString(),
                                 "#FFFFB300");
-                        value.useVehicleStateColor = vehicleStateColor.isChecked();
+                        if (value.kind == LauncherShortcutStore.Kind.CAR) {
+                            value.useVehicleStateColor = vehicleStateColor.isChecked();
+                        }
                         value.showState = showState.isChecked();
                     }
                     value.iconSizePx = iconSize.value;

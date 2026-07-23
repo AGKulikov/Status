@@ -51,6 +51,7 @@ import java.util.concurrent.Executors;
 
 import dezz.status.widget.launcher.apps.FavoriteAppConfig;
 import dezz.status.widget.launcher.apps.FavoriteAppsConfigStore;
+import dezz.status.widget.launcher.panels.PanelEditScheduler;
 
 /** Code-free, autosaving editor for applications shown in the HOME favourites panel. */
 public final class FavoriteAppsSettingsActivity extends AppCompatActivity {
@@ -74,6 +75,7 @@ public final class FavoriteAppsSettingsActivity extends AppCompatActivity {
     private boolean catalogLoaded;
     private boolean destroyed;
     private boolean changeNotificationPending;
+    @Nullable private PanelEditScheduler appearanceEditScheduler;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -88,6 +90,7 @@ public final class FavoriteAppsSettingsActivity extends AppCompatActivity {
 
     @Override
     protected void onStop() {
+        if (appearanceEditScheduler != null) appearanceEditScheduler.flush();
         flushChangeNotification();
         super.onStop();
     }
@@ -95,6 +98,7 @@ public final class FavoriteAppsSettingsActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         destroyed = true;
+        if (appearanceEditScheduler != null) appearanceEditScheduler.cancel();
         mainHandler.removeCallbacks(changedNotifier);
         catalogExecutor.shutdownNow();
         super.onDestroy();
@@ -400,20 +404,21 @@ public final class FavoriteAppsSettingsActivity extends AppCompatActivity {
             previewLabel.setVisibility(config.showLabel ? View.VISIBLE : View.GONE);
         };
         updatePreview.run();
+        PanelEditScheduler dialogScheduler = PanelEditScheduler.onMainThread(updatePreview,
+                () -> saveAppearanceNow(config, saved));
+        appearanceEditScheduler = dialogScheduler;
 
         addSlider(body, "Размер иконки", config.iconSizePx,
                 FavoriteAppConfig.MIN_ICON_SIZE_PX, FavoriteAppConfig.MAX_ICON_SIZE_PX,
                 value -> {
                     config.iconSizePx = value;
-                    saveAppearance(config, saved);
-                    updatePreview.run();
+                    dialogScheduler.request();
                 }, " px");
         addSlider(body, "Размер подписи", config.labelSizeSp,
                 FavoriteAppConfig.MIN_LABEL_SIZE_SP, FavoriteAppConfig.MAX_LABEL_SIZE_SP,
                 value -> {
                     config.labelSizeSp = value;
-                    saveAppearance(config, saved);
-                    updatePreview.run();
+                    dialogScheduler.request();
                 }, " sp");
         MaterialSwitch showLabel = new MaterialSwitch(this);
         showLabel.setText("Показывать название приложения");
@@ -421,8 +426,7 @@ public final class FavoriteAppsSettingsActivity extends AppCompatActivity {
         showLabel.setMinHeight(dp(52));
         showLabel.setOnCheckedChangeListener((button, checked) -> {
             config.showLabel = checked;
-            saveAppearance(config, saved);
-            updatePreview.run();
+            dialogScheduler.request();
         });
         body.addView(showLabel, new LinearLayout.LayoutParams(match(), wrap()));
 
@@ -433,11 +437,17 @@ public final class FavoriteAppsSettingsActivity extends AppCompatActivity {
                 .setView(scroll)
                 .setPositiveButton("Готово", null)
                 .create();
-        dialog.setOnDismissListener(ignored -> refreshRows());
+        dialog.setOnDismissListener(ignored -> {
+            dialogScheduler.flush();
+            dialogScheduler.cancel();
+            if (appearanceEditScheduler == dialogScheduler) appearanceEditScheduler = null;
+            refreshRows();
+        });
         dialog.show();
     }
 
-    private void saveAppearance(@NonNull FavoriteAppConfig config, @NonNull TextView status) {
+    private void saveAppearanceNow(@NonNull FavoriteAppConfig config,
+                                   @NonNull TextView status) {
         store.updateAppearance(config);
         status.setText("✓ Сохранено автоматически");
         markSaved("Оформление обновлено");

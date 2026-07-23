@@ -9,22 +9,36 @@ import java.util.List;
 
 /** Buffers state_changed events while the authoritative get_states snapshot is in flight. */
 final class HaSnapshotSynchronizer {
+    /** Protects a slow/hostile get_states response from retaining an unbounded event backlog. */
+    static final int MAX_BUFFERED_CHANGES = 4_096;
     private final List<HaWebSocketProtocol.StateChange> buffered = new ArrayList<>();
     private boolean snapshotPending;
+    private boolean overflowed;
 
     void beginSnapshot() {
         buffered.clear();
+        overflowed = false;
         snapshotPending = true;
     }
 
     boolean buffer(HaWebSocketProtocol.StateChange change) {
         if (!snapshotPending) return false;
-        buffered.add(change);
+        if (buffered.size() >= MAX_BUFFERED_CHANGES) {
+            overflowed = true;
+        } else {
+            buffered.add(change);
+        }
         return true;
     }
 
     Completion completeSnapshot(JSONArray states) {
         if (!snapshotPending) throw new IllegalStateException("No Home Assistant snapshot pending");
+        if (overflowed) {
+            reset();
+            // Reconnecting is safer than publishing a snapshot after silently dropping a newer
+            // state_changed event. The hard cap also bounds replay cost on weak head units.
+            throw new IllegalStateException("Too many Home Assistant updates during snapshot");
+        }
         HaEntityCatalog catalog = HaEntityCatalog.fromStates(states);
         List<HaEntityCatalog.EntityUpdate> replayed = new ArrayList<>();
         for (HaWebSocketProtocol.StateChange change : buffered) {
@@ -43,6 +57,7 @@ final class HaSnapshotSynchronizer {
 
     void reset() {
         buffered.clear();
+        overflowed = false;
         snapshotPending = false;
     }
 

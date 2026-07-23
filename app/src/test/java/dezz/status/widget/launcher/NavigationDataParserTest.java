@@ -7,12 +7,15 @@ package dezz.status.widget.launcher;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
+
+import dezz.status.widget.launcher.panels.PanelElementConfigStore;
 
 public class NavigationDataParserTest {
     @Test
@@ -97,5 +100,57 @@ public class NavigationDataParserTest {
                 > NavigationDataRepository.notificationPriority("ru.yandex.yandexmaps"));
         assertTrue(NavigationDataRepository.notificationPriority("ru.yandex.yandexmaps")
                 > NavigationDataRepository.notificationPriority("com.yandex.yango"));
+    }
+
+    @Test
+    public void bootCountScopesTransientNavigationToOneAndroidBoot() {
+        assertTrue(NavigationDataRepository.sameBootSession(42, 100_000L,
+                42, 900_000L));
+        assertFalse(NavigationDataRepository.sameBootSession(42, 100_000L,
+                43, 100_000L));
+    }
+
+    @Test
+    public void bootEpochIsSafeFallbackWhenBootCountIsUnavailable() {
+        assertTrue(NavigationDataRepository.sameBootSession(-1, 1_000_000L,
+                -1, 1_120_000L));
+        assertFalse(NavigationDataRepository.sameBootSession(-1, 1_000_000L,
+                -1, 1_360_001L));
+        assertFalse(NavigationDataRepository.sameBootSession(-1, Long.MIN_VALUE,
+                -1, 1_000_000L));
+    }
+
+    @Test
+    public void richNavigationContractUsesExactMhudActions() {
+        assertEquals("plus.monjaro.NAVIGATION_UPDATE",
+                NavigationDataRepository.ACTION_MONJARO_NAVIGATION_UPDATE);
+        assertEquals("plus.monjaro.LANE_SIGN_DIST",
+                NavigationDataRepository.ACTION_MONJARO_LANE_SIGN_DISTANCE);
+        assertEquals("com.yandex.LANES_BITMAP",
+                NavigationDataRepository.ACTION_YANDEX_LANES_BITMAP);
+        assertEquals("com.yandex.JAM_IMAGE",
+                NavigationDataRepository.ACTION_YANDEX_JAM_IMAGE);
+        assertEquals("debug.monjaro.RAINBOW_IMAGE_CLEAR",
+                NavigationDataRepository.ACTION_DEBUG_RAINBOW_IMAGE_CLEAR);
+    }
+
+    @Test
+    public void newGraphicElementsDoNotOverflowExistingLauncherLayouts() {
+        String[] newElements = {
+                PanelElementConfigStore.NAV_MANEUVER_IMAGE,
+                PanelElementConfigStore.NAV_MANEUVER_DISTANCE,
+                PanelElementConfigStore.NAV_TRIP_INFO,
+                PanelElementConfigStore.NAV_COMBINED,
+                PanelElementConfigStore.NAV_LANES_IMAGE,
+                PanelElementConfigStore.NAV_LANE_INFO,
+                PanelElementConfigStore.NAV_JAM_PROGRESS,
+                PanelElementConfigStore.NAV_RAINBOW_IMAGE
+        };
+        for (String id : newElements) {
+            PanelElementConfigStore.Definition definition = PanelElementConfigStore.definition(
+                    LauncherLayoutStore.NAVIGATION, id);
+            assertNotNull(definition);
+            assertFalse(definition.enabledByDefault);
+        }
     }
 }

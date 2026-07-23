@@ -597,23 +597,24 @@ public final class SprutPopupPresetEngine {
             case LIGHT: return "light";
             case GARAGE: return "garage";
             case COVER: return "gate";
-            case LOCK:
-            case SECURITY: return "lock";
+            case LOCK: return "lock";
             case THERMOSTAT:
+                return "thermostat";
             case TEMPERATURE: return "temperature";
-            case HUMIDITY:
+            case HUMIDITY: return "humidity";
             case LEAK:
             case VALVE: return "water";
             case MOTION:
-            case OCCUPANCY:
+            case OCCUPANCY: return "motion";
             case CONTACT: return "door";
-            case SWITCH:
-            case OUTLET:
+            case OUTLET: return "plug";
             case SMOKE:
-            case CARBON_MONOXIDE:
-            case FAN:
+            case CARBON_MONOXIDE: return "smoke";
+            case FAN: return "fan";
+            case BATTERY: return "battery";
+            case SECURITY: return "alarm";
+            case SWITCH:
             case AIR_QUALITY:
-            case BATTERY:
             case GENERIC:
             default: return "power";
         }

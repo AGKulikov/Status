@@ -26,6 +26,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
+import dezz.status.widget.launcher.EmbeddedNavigatorContract;
+
 /** Human-readable HOME setup. Every switch writes immediately; there is no Save button. */
 public final class LauncherSettingsActivity extends AppCompatActivity {
     private Preferences preferences;
@@ -79,20 +81,34 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         addSwitch("Избранные приложения", preferences.launcherAppsVisible);
         addSwitch("Медиапанель", preferences.launcherMediaVisible);
         addSwitch("Часы", preferences.launcherClockVisible);
-        addSwitch("Маршрут", preferences.launcherNavigationVisible);
-        addSwitch("Избранные маршруты", preferences.launcherFavoriteRoutesVisible);
+        addCombinedNavigationSwitch();
         addSwitch("Быстрые действия", preferences.launcherActionsVisible);
         addSwitch("Отдельная климатическая панель", preferences.launcherClimateVisible);
+        addSwitch("Данные автомобиля / HUD", preferences.launcherVehicleInfoVisible);
+        addSwitch("Информация: автомобиль и умный дом",
+                preferences.launcherInformationVisible);
+        if (EmbeddedNavigatorContract.isBundled(this)) {
+            addSwitch("Встроенный Яндекс Навигатор",
+                    preferences.launcherEmbeddedNavigatorVisible);
+            addHint("Живое окно Навигатора является частью единого мода. Его положение и размер "
+                    + "меняются на HOME вместе с остальными панелями.");
+        }
         addButton("Состав, порядок и размеры элементов панелей…", v ->
                 startActivity(new Intent(this, PanelElementSettingsActivity.class)));
         addButton("Настроить избранные приложения…", v ->
                 startActivity(new Intent(this, FavoriteAppsSettingsActivity.class)));
         addButton("Настроить медиапанель…", v ->
                 startActivity(new Intent(this, MediaPanelSettingsActivity.class)));
-        addButton("Настроить избранные маршруты…", v ->
+        addButton("Сетка данных навигации…", v ->
+                startActivity(new Intent(this, NavigationPanelSettingsActivity.class)));
+        addButton("Настроить маршрут и избранное…", v ->
                 startActivity(new Intent(this, FavoriteRoutesSettingsActivity.class)));
         addButton("Настроить климатическую панель…", v ->
                 startActivity(new Intent(this, ClimatePanelSettingsActivity.class)));
+        addButton("Настроить данные автомобиля…", v ->
+                startActivity(new Intent(this, VehicleInfoPanelSettingsActivity.class)));
+        addButton("Настроить панель «Информация»…", v ->
+                startActivity(new Intent(this, InformationPanelSettingsActivity.class)));
         addButton("Иконки, функции и приложения…", v ->
                 startActivity(new Intent(this, LauncherShortcutSettingsActivity.class)));
         addActionsColumnsControl();
@@ -211,6 +227,21 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         control.setMinHeight(dp(56));
         control.setChecked(preference.get());
         control.setOnCheckedChangeListener((button, checked) -> preference.set(checked));
+        content.addView(control, new LinearLayout.LayoutParams(match(), wrap()));
+    }
+
+    private void addCombinedNavigationSwitch() {
+        MaterialSwitch control = new MaterialSwitch(this);
+        control.setText("Маршрут и избранные направления");
+        control.setTextSize(17);
+        control.setMinHeight(dp(56));
+        control.setChecked(preferences.launcherNavigationVisible.get()
+                || preferences.launcherFavoriteRoutesVisible.get());
+        control.setOnCheckedChangeListener((button, checked) -> {
+            // Keep both legacy keys synchronized so an update preserves every existing setup.
+            preferences.launcherNavigationVisible.set(checked);
+            preferences.launcherFavoriteRoutesVisible.set(checked);
+        });
         content.addView(control, new LinearLayout.LayoutParams(match(), wrap()));
     }
 

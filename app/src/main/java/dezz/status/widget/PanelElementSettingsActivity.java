@@ -31,24 +31,54 @@ import java.util.List;
 
 import dezz.status.widget.launcher.LauncherLayoutStore;
 import dezz.status.widget.launcher.panels.PanelElementConfigStore;
+import dezz.status.widget.launcher.panels.PanelEditScheduler;
 
 /** Visual, code-free editor for the functional elements placed inside HOME panels. */
 public final class PanelElementSettingsActivity extends AppCompatActivity {
+    public static final String EXTRA_PANEL_ID =
+            "dezz.status.widget.extra.PANEL_ELEMENT_SETTINGS_ID";
     private Preferences preferences;
     private PanelElementConfigStore store;
     private LinearLayout editor;
     private FrameLayout previewHost;
     @NonNull private String selectedPanel = LauncherLayoutStore.APPS;
     @Nullable private PanelElementConfigStore.Panel current;
+    @Nullable private PanelEditScheduler editScheduler;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         preferences = new Preferences(this);
         store = new PanelElementConfigStore(preferences);
+        editScheduler = PanelEditScheduler.onMainThread(this::renderPreview, () -> {
+            PanelElementConfigStore.Panel panel = current;
+            if (panel != null) store.save(panel);
+        });
+        String requestedPanel = getIntent().getStringExtra(EXTRA_PANEL_ID);
+        if (LauncherLayoutStore.NAVIGATION.equals(requestedPanel)) {
+            startActivity(new Intent(this, NavigationPanelSettingsActivity.class));
+            finish();
+            return;
+        }
+        if (requestedPanel != null
+                && !PanelElementConfigStore.definitions(requestedPanel).isEmpty()) {
+            selectedPanel = requestedPanel;
+        }
         setTitle("Элементы панелей HOME");
         setContentView(buildContent());
         showPanel(selectedPanel);
+    }
+
+    @Override
+    protected void onStop() {
+        if (editScheduler != null) editScheduler.flush();
+        super.onStop();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (editScheduler != null) editScheduler.cancel();
+        super.onDestroy();
     }
 
     @NonNull
@@ -66,11 +96,14 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         addPanelButton(navigation, "Приложения", LauncherLayoutStore.APPS);
         addExternalButton(navigation, "Медиа", MediaPanelSettingsActivity.class);
         addPanelButton(navigation, "Часы", LauncherLayoutStore.CLOCK);
-        addPanelButton(navigation, "Маршрут", LauncherLayoutStore.NAVIGATION);
-        addExternalButton(navigation, "Избранные маршруты",
-                FavoriteRoutesSettingsActivity.class);
+        addExternalButton(navigation, "Маршрут и избранное",
+                NavigationPanelSettingsActivity.class);
         addPanelButton(navigation, "Иконки и действия", LauncherLayoutStore.ACTIONS);
         addExternalButton(navigation, "Климат", ClimatePanelSettingsActivity.class);
+        addExternalButton(navigation, "Данные автомобиля / HUD",
+                VehicleInfoPanelSettingsActivity.class);
+        addExternalButton(navigation, "Информация: автомобиль и умный дом",
+                InformationPanelSettingsActivity.class);
         TextView hint = new TextView(this);
         hint.setText("Размер и положение самой панели меняются в редакторе компоновки HOME. Здесь настраивается её содержимое.");
         hint.setTextSize(13);
@@ -138,6 +171,7 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
     }
 
     private void showPanel(@NonNull String panelId) {
+        if (editScheduler != null) editScheduler.flush();
         selectedPanel = panelId;
         current = store.load(panelId);
         renderEditor();
@@ -149,7 +183,11 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         if (panel == null) return;
         editor.removeAllViews();
         addTitle(editor, panelTitle(panel.id));
-        addHint(editor, "Убирайте ненужные элементы, меняйте их порядок стрелками и размер ползунком. Изменения применятся при возврате на HOME.");
+        if (LauncherLayoutStore.NAVIGATION.equals(panel.id)) {
+            addHint(editor, "Без активного маршрута эта плитка показывает кнопки избранных направлений. Как только маршрут построен, кнопки автоматически скрываются и появляются выбранные ниже навигационные данные.");
+        } else {
+            addHint(editor, "Убирайте ненужные элементы, меняйте их порядок стрелками и размер ползунком. Изменения применятся при возврате на HOME.");
+        }
         if (LauncherLayoutStore.APPS.equals(panel.id)) {
             addColumnsControl(editor, "Столбцов приложений", preferences.launcherAppsColumns, 1, 6);
             MaterialButton favorites = new MaterialButton(this);
@@ -158,6 +196,16 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
             favorites.setOnClickListener(v -> startActivity(
                     new Intent(this, FavoriteAppsSettingsActivity.class)));
             editor.addView(favorites, buttonLp());
+        } else if (LauncherLayoutStore.NAVIGATION.equals(panel.id)) {
+            addColumnsControl(editor, "Столбцов избранного",
+                    preferences.launcherFavoriteRoutesColumns, 1, 6);
+            MaterialButton routes = new MaterialButton(this);
+            routes.setAllCaps(false);
+            routes.setText("Настроить кнопки избранных маршрутов…");
+            routes.setOnClickListener(v -> startActivity(
+                    new Intent(this, FavoriteRoutesSettingsActivity.class)));
+            editor.addView(routes, buttonLp());
+            addHint(editor, "Ниже выбирается только содержимое плитки во время движения по маршруту: манёвр, расстояние до него, нужная полоса, время прибытия и другие данные.");
         } else if (LauncherLayoutStore.ACTIONS.equals(panel.id)) {
             addColumnsControl(editor, "Столбцов плиток", preferences.launcherActionsColumns, 1, 6);
             MaterialButton shortcuts = new MaterialButton(this);
@@ -169,8 +217,11 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         }
 
         List<PanelElementConfigStore.Element> enabled = panel.enabled();
-        if (enabled.isEmpty()) addHint(editor,
-                "Панель сейчас пустая и на HOME будет скрыта полностью.");
+        if (enabled.isEmpty()) {
+            addHint(editor, LauncherLayoutStore.NAVIGATION.equals(panel.id)
+                    ? "Во время активного маршрута плитка будет пустой. Кнопки избранного без маршрута продолжат работать."
+                    : "Панель сейчас пустая и на HOME будет скрыта полностью.");
+        }
         for (PanelElementConfigStore.Element element : enabled) addElementEditor(panel, element);
 
         MaterialButton add = new MaterialButton(this);
@@ -239,8 +290,7 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
                 scaleValue.setText(selected + "%");
                 if (user) {
                     panel.setScale(element.id, selected);
-                    store.save(panel);
-                    renderPreview();
+                    if (editScheduler != null) editScheduler.request();
                 }
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
@@ -381,13 +431,15 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
     private static boolean isPrimary(@NonNull String id) {
         return PanelElementConfigStore.CLOCK_TIME.equals(id)
                 || PanelElementConfigStore.NAV_ARRIVAL.equals(id)
+                || PanelElementConfigStore.NAV_MANEUVER_DISTANCE.equals(id)
+                || PanelElementConfigStore.NAV_SPEED_LIMIT.equals(id)
                 || PanelElementConfigStore.APPS_HEADING.equals(id);
     }
 
     @NonNull private static String panelTitle(@NonNull String id) {
         if (LauncherLayoutStore.APPS.equals(id)) return "Панель приложений";
         if (LauncherLayoutStore.CLOCK.equals(id)) return "Панель часов";
-        if (LauncherLayoutStore.NAVIGATION.equals(id)) return "Панель маршрута";
+        if (LauncherLayoutStore.NAVIGATION.equals(id)) return "Маршрут и избранное";
         return "Панель иконок и действий";
     }
 
@@ -400,9 +452,31 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         if (PanelElementConfigStore.NAV_ARRIVAL.equals(elementId)) return "Время прибытия: 15:28";
         if (PanelElementConfigStore.NAV_DURATION.equals(elementId)) return "Осталось: 24 мин";
         if (PanelElementConfigStore.NAV_DISTANCE.equals(elementId)) return "18 км";
+        if (PanelElementConfigStore.NAV_MANEUVER_IMAGE.equals(elementId)) return "↰";
+        if (PanelElementConfigStore.NAV_MANEUVER_DISTANCE.equals(elementId)) return "500 м";
+        if (PanelElementConfigStore.NAV_MANEUVER.equals(elementId)) {
+            return "Новочерёмушкинская улица";
+        }
+        if (PanelElementConfigStore.NAV_TRIP_INFO.equals(elementId)) {
+            return "1200 км • 10 ч 23 мин • 23:45";
+        }
+        if (PanelElementConfigStore.NAV_COMBINED.equals(elementId)) {
+            return "↰   500 м\nНовочерёмушкинская улица";
+        }
+        if (PanelElementConfigStore.NAV_SPEED_LIMIT.equals(elementId)) return "Ограничение: 60";
+        if (PanelElementConfigStore.NAV_TRAFFIC_LIGHT.equals(elementId)) {
+            return "● Зелёный · 12 с  ● Красный · 8 с";
+        }
+        if (PanelElementConfigStore.NAV_LANES_IMAGE.equals(elementId)) return "↑   ↑   ↗";
+        if (PanelElementConfigStore.NAV_LANE_INFO.equals(elementId)) return "↑ · ↑ · ↗  ·  350 м";
+        if (PanelElementConfigStore.NAV_JAM_PROGRESS.equals(elementId)) return "▰▰▰▱▱  Пробки";
+        if (PanelElementConfigStore.NAV_RAINBOW_IMAGE.equals(elementId)) {
+            return "Навигационная графика Rainbow";
+        }
         if (PanelElementConfigStore.NAV_INACTIVE.equals(elementId)) return "Маршрут не запущен";
         if (PanelElementConfigStore.ACTION_ADD.equals(elementId)) return "＋ Добавить";
-        return "▣   ▣   ▣\nПользовательские действия";
+        return LauncherLayoutStore.ACTIONS.equals(panelId)
+                ? "▣   ▣   ▣\nПользовательские действия" : elementId;
     }
 
     private static float basePreviewSp(@NonNull String panelId, @NonNull String elementId) {
@@ -410,6 +484,11 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         if (PanelElementConfigStore.NAV_ARRIVAL.equals(elementId)) return 23f;
         if (PanelElementConfigStore.NAV_DURATION.equals(elementId)) return 17f;
         if (PanelElementConfigStore.NAV_DISTANCE.equals(elementId)) return 17f;
+        if (PanelElementConfigStore.NAV_MANEUVER_IMAGE.equals(elementId)) return 38f;
+        if (PanelElementConfigStore.NAV_MANEUVER_DISTANCE.equals(elementId)) return 24f;
+        if (PanelElementConfigStore.NAV_TRIP_INFO.equals(elementId)) return 15f;
+        if (PanelElementConfigStore.NAV_COMBINED.equals(elementId)) return 20f;
+        if (PanelElementConfigStore.NAV_LANES_IMAGE.equals(elementId)) return 32f;
         if (PanelElementConfigStore.NAV_INACTIVE.equals(elementId)) return 16f;
         if (PanelElementConfigStore.CLOCK_DATE.equals(elementId)) return 17f;
         return 18f;

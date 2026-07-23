@@ -27,6 +27,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Legacy Bluetooth permissions (granted at install time on targetSdk 28). They are
          sufficient on Android 9-12 for the calls we make: reading adapter state, observing
          ACL connect/disconnect broadcasts, and querying the connected device count. The new
@@ -47,10 +48,16 @@
     <queries>
         <package android:name="ru.yandex.yandexmaps" />
         <package android:name="ru.yandex.yandexnavi" />
+        <package android:name="ru.yandex.music" />
+        <package android:name="com.yandex.music" />
         <package android:name="com.yandex.yango" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
         </intent>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -112,12 +119,27 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".VehicleInfoPanelSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".InformationPanelSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".MediaPanelSettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />
 
         <activity
             android:name=".FavoriteRoutesSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".NavigationPanelSettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />
 
@@ -193,6 +215,23 @@
             </intent-filter>
         </service>
 
+        <!-- mHUD/mSaver-compatible players publish rich media metadata here. Keeping this
+             receiver manifest-declared means the latest state is cached even when HOME and the
+             settings UI are not open. The controller also listens dynamically while HOME is
+             visible for head units that restrict implicit manifest broadcasts. -->
+        <receiver
+            android:name=".launcher.MediaInfoBroadcastReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="plus.monjaro.MEDIA_INFO_UPDATE" />
+                <action android:name="plus.monjaro.MEDIA_INFO_CLEAR" />
+                <action android:name="debug.monjaro.MEDIA_INFO_UPDATE" />
+                <action android:name="debug.monjaro.MEDIA_INFO_CLEAR" />
+            </intent-filter>
+        </receiver>
+
         <!-- Accessibility service for per-display foreground app tracking. Required only on
              multi-display head units (Geely Monjaro et al.); on single-display devices the
              original UsageStatsManager-based detection is sufficient and the user can leave
@@ -232,6 +271,7 @@
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="android.intent.action.USER_UNLOCKED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 
@@ -278,6 +318,35 @@
                 <action android:name="com.yandex.ARRIVAL" />
                 <action android:name="com.yandex.TIME" />
                 <action android:name="com.yandex.DISTANCE" />
+                <action android:name="plus.monjaro.NAVIGATION_UPDATE" />
+                <action android:name="plus.monjaro.NAVIGATION_ENDED" />
+                <action android:name="plus.monjaro.TRAFFIC_LIGHT_UPDATE" />
+                <action android:name="plus.monjaro.LANE_SIGN_DIST" />
+                <action android:name="com.yandex.LANE_SIGN" />
+                <action android:name="com.yandex.LANE_DIST" />
+                <action android:name="com.yandex.LANES_BITMAP" />
+                <action android:name="com.yandex.LANES_BITMAP_CLEAR" />
+                <action android:name="com.yandex.JAM_IMAGE" />
+                <action android:name="com.yandex.JAM_IMAGE_CLEAR" />
+                <action android:name="plus.monjaro.RAINBOW_IMAGE" />
+                <action android:name="plus.monjaro.RAINBOW_IMAGE_CLEAR" />
+                <action android:name="debug.monjaro.NAVIGATION_UPDATE" />
+                <action android:name="debug.monjaro.NAVIGATION_ENDED" />
+                <action android:name="debug.monjaro.TRAFFIC_LIGHT_UPDATE" />
+                <action android:name="debug.monjaro.RAINBOW_IMAGE" />
+                <action android:name="debug.monjaro.RAINBOW_IMAGE_CLEAR" />
+            </intent-filter>
+        </receiver>
+
+        <!-- mHUD/MConfig-compatible Auto Hold state. It must remain manifest-declared so a
+             transition received while HOME is closed or the process is dead is not lost. -->
+        <receiver
+            android:name=".car.AutoHoldStateReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="plus.monjaro.AUTOHOLD" />
             </intent-filter>
         </receiver>
     </application>

@@ -5,12 +5,15 @@
 
 package dezz.status.widget.launcher.climate;
 
+import android.content.ClipData;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.view.Gravity;
+import android.view.DragEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -23,11 +26,8 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.google.android.material.card.MaterialCardView;
-
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -46,22 +46,32 @@ import dezz.status.widget.car.CarIntegration;
  * disabled until the vehicle service confirms them.
  */
 public final class ClimatePanelView extends FrameLayout {
+    /** Receives drag-and-drop changes made directly on the live editor preview. */
+    public interface EditorLayoutListener {
+        void onMoveElement(@NonNull String sourceId, @NonNull String targetId);
+    }
+
     /** Geely integration verifies controls every 30 s; older cache is presentation-only. */
     private static final long STATE_FRESH_MS = 75_000L;
+    /** Longer than the integration deadline; still releases UI if a Binder call never returns. */
+    private static final long COMMAND_WATCHDOG_MS = 7_000L;
     private final CarIntegration integration;
     private final ClimatePanelConfigStore configStore;
     private final Map<String, CarControlDescriptor> catalog = new LinkedHashMap<>();
     private final Map<String, CarControlState> states = new LinkedHashMap<>();
     private final Map<String, ControlBinding> bindings = new LinkedHashMap<>();
     private final Map<String, Long> pending = new LinkedHashMap<>();
+    private final Map<String, Runnable> pendingTimeouts = new LinkedHashMap<>();
     private ClimatePanelConfig config;
     private TextView connectionLabel;
     private boolean editorPreviewMode;
+    @Nullable private EditorLayoutListener editorLayoutListener;
     private boolean started;
+    /** Distinguishes the pre-probe bootstrap catalog from a real empty/unsupported result. */
+    private boolean catalogResolved;
     private int catalogGeneration;
     private boolean catalogRefreshPending;
     private int catalogRetryAttempts;
-    private long sessionStartedAtMillis;
     private long nextCommandToken;
 
     private final CarIntegration.ControlStateListener stateListener = state -> {
@@ -69,13 +79,18 @@ public final class ClimatePanelView extends FrameLayout {
         applyState(state.controlId);
         updateConnectionLabel();
         CarControlDescriptor descriptor = catalog.get(state.controlId);
-        if (started && state.available
+        boolean newlySupported = state.available
                 && (previous == null || !previous.available)
                 && descriptor != null
-                && descriptor.availability != CarControlDescriptor.Availability.SUPPORTED) {
+                && descriptor.availability != CarControlDescriptor.Availability.SUPPORTED;
+        boolean fanProfileMissing = ClimatePanelConfig.FAN.equals(state.controlId)
+                && state.available && state.known && Double.isFinite(state.value)
+                && descriptor != null && !containsOption(descriptor, state.value);
+        if (started && (newlySupported || fanProfileMissing)) {
             // ECARX may answer UNKNOWN while its Binder service is still booting. Re-probe once
-            // the state stream proves that the function is alive so level controls receive the
-            // vehicle-filtered option list instead of boot-time defaults.
+            // the state stream proves that the function is alive. A newly confirmed AUTO fan
+            // profile also identifies its 2/3-value family, so re-probe to replace a manual-only
+            // bootstrap descriptor before +/- can be pressed.
             requestCatalog(false);
         }
     };
@@ -107,12 +122,18 @@ public final class ClimatePanelView extends FrameLayout {
         else rebuildControls();
     }
 
+    public void setEditorLayoutListener(@Nullable EditorLayoutListener listener) {
+        if (editorLayoutListener == listener) return;
+        editorLayoutListener = listener;
+        if (editorPreviewMode && listener != null) rebuildControls();
+    }
+
     /** Used by the editor's live preview; the caller persists the same value separately. */
     public void setConfig(@NonNull ClimatePanelConfig value) {
         Set<String> previousIds = visibleControlIds();
         config = value.copy();
         config.normalize();
-        if (catalog.isEmpty() && !editorPreviewMode) renderLoading();
+        if (!started && !catalogResolved && !editorPreviewMode) renderLoading();
         else rebuildControls();
         if (started && !previousIds.equals(visibleControlIds())) subscribeVisibleControls();
     }
@@ -125,13 +146,12 @@ public final class ClimatePanelView extends FrameLayout {
         }
         started = true;
         catalogRetryAttempts = 0;
-        sessionStartedAtMillis = System.currentTimeMillis();
-        states.clear();
-        if (catalog.isEmpty() && !editorPreviewMode) renderLoading();
-        else {
-            rebuildControls();
-            subscribeVisibleControls();
-        }
+        // Keep a recently confirmed value while the fresh ECARX read is entering its worker.
+        // The timestamp gate below still prevents an old ignition/session value from being used.
+        // Subscribe from configured stable IDs before the comparatively expensive catalog probe;
+        // bootstrap cards remain disabled where their exact option/range metadata is still needed.
+        rebuildControls();
+        subscribeVisibleControls();
         requestCatalog(false);
     }
 
@@ -143,6 +163,7 @@ public final class ClimatePanelView extends FrameLayout {
         integration.requestControlCatalog(controls -> {
             if (!started || generation != catalogGeneration) return;
             catalogRefreshPending = false;
+            catalogResolved = true;
             catalog.clear();
             for (CarControlDescriptor control : controls) {
                 if (isClimateControl(control.id)
@@ -171,9 +192,10 @@ public final class ClimatePanelView extends FrameLayout {
         started = false;
         catalogGeneration++;
         catalogRefreshPending = false;
-        sessionStartedAtMillis = 0;
         integration.unsubscribeControlStates(stateListener);
-        states.clear();
+        for (Runnable timeout : pendingTimeouts.values()) removeCallbacks(timeout);
+        pendingTimeouts.clear();
+        pending.clear();
     }
 
     @NonNull
@@ -209,7 +231,7 @@ public final class ClimatePanelView extends FrameLayout {
         connectionLabel = null;
         applySurface();
 
-        if (catalog.isEmpty() && !editorPreviewMode) {
+        if (catalogResolved && catalog.isEmpty() && !editorPreviewMode) {
             LinearLayout empty = new LinearLayout(getContext());
             empty.setGravity(Gravity.CENTER);
             TextView message = label("Климат автомобиля недоступен", scaledSp(16), true);
@@ -233,7 +255,10 @@ public final class ClimatePanelView extends FrameLayout {
                 ViewGroup.LayoutParams.MATCH_PARENT, scaledDp(50)));
 
         ClimateFlowLayout controls = new ClimateFlowLayout(getContext());
-        controls.setGaps(scaledDp(6), scaledDp(6));
+        // One source of spacing: no child margins are added in flowLp(), so the slider's pixel
+        // value is the actual edge-to-edge distance between adjacent tiles.
+        int gap = config.tileSpacingPx;
+        controls.setGaps(gap, gap);
         for (ClimatePanelConfig.Element element : config.orderedElements()) {
             addConfiguredElement(controls, element.id);
         }
@@ -300,7 +325,7 @@ public final class ClimatePanelView extends FrameLayout {
                                     @NonNull String shortLabel) {
         CarControlDescriptor descriptor = visibleDescriptor(id);
         if (descriptor == null) return;
-        MaterialCardView card = tileCard(id);
+        ClimateTileView card = tileCard(id);
         LinearLayout content = tileContent(id);
         ImageView icon = tileIcon(id);
         TextView title = label(shortLabel, elementScaledSp(id, 12), true);
@@ -311,34 +336,34 @@ public final class ClimatePanelView extends FrameLayout {
                 elementScaledDp(id, 25), elementScaledDp(id, 25)));
         content.addView(title);
         content.addView(value);
-        card.addView(content, new MaterialCardView.LayoutParams(
+        card.addView(content, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         card.setOnClickListener(v -> execute(id, operation, 0));
-        ControlBinding binding = new ControlBinding(descriptor, card, icon, value,
+        ControlBinding binding = new ControlBinding(descriptor, card, icon, title, value,
                 Collections.emptyList());
         bindings.put(id, binding);
-        flow.addView(card, flowLp(id, 126, 76));
+        flow.addView(card, flowLp(id, 126, 88));
     }
 
     private void addStepperIfVisible(@NonNull ClimateFlowLayout flow, @NonNull String id,
                                      @NonNull String shortLabel) {
         CarControlDescriptor descriptor = visibleDescriptor(id);
         if (descriptor == null) return;
-        MaterialCardView card = tileCard(id);
+        ClimateTileView card = tileCard(id);
         LinearLayout content = new LinearLayout(getContext());
         content.setOrientation(LinearLayout.HORIZONTAL);
         content.setGravity(Gravity.CENTER);
         content.setPadding(elementScaledDp(id, 3), elementScaledDp(id, 4),
                 elementScaledDp(id, 3), elementScaledDp(id, 4));
-        TextView minus = stepButton(id, "−");
-        TextView plus = stepButton(id, "+");
+        TextView minus = stepButton(id, "‹");
+        TextView plus = stepButton(id, "›");
         LinearLayout center = new LinearLayout(getContext());
         center.setOrientation(LinearLayout.VERTICAL);
         center.setGravity(Gravity.CENTER);
         ImageView icon = tileIcon(id);
         TextView title = label(shortLabel, elementScaledSp(id, 11), true);
         title.setGravity(Gravity.CENTER);
-        TextView value = label("…", elementScaledSp(id, 17), true);
+        TextView value = label("…", elementScaledSp(id, 22), true);
         value.setGravity(Gravity.CENTER);
         center.addView(icon, new LinearLayout.LayoutParams(
                 elementScaledDp(id, 23), elementScaledDp(id, 23)));
@@ -350,22 +375,22 @@ public final class ClimatePanelView extends FrameLayout {
                 ViewGroup.LayoutParams.MATCH_PARENT, 1f));
         content.addView(plus, new LinearLayout.LayoutParams(elementScaledDp(id, 40),
                 ViewGroup.LayoutParams.MATCH_PARENT));
-        card.addView(content, new MaterialCardView.LayoutParams(
+        card.addView(content, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         minus.setOnClickListener(v -> adjust(id, -1));
         plus.setOnClickListener(v -> adjust(id, 1));
         List<View> interactive = new ArrayList<>();
         interactive.add(minus);
         interactive.add(plus);
-        bindings.put(id, new ControlBinding(descriptor, card, icon, value, interactive));
-        flow.addView(card, flowLp(id, 238, 88));
+        bindings.put(id, new ControlBinding(descriptor, card, icon, title, value, interactive));
+        flow.addView(card, flowLp(id, 238, 96));
     }
 
     private void addCycleIfVisible(@NonNull ClimateFlowLayout flow, @NonNull String id,
                                    @NonNull String shortLabel) {
         CarControlDescriptor descriptor = visibleDescriptor(id);
         if (descriptor == null) return;
-        MaterialCardView card = tileCard(id);
+        ClimateTileView card = tileCard(id);
         LinearLayout content = tileContent(id);
         ImageView icon = tileIcon(id);
         TextView title = label(shortLabel, elementScaledSp(id, 10), true);
@@ -378,23 +403,26 @@ public final class ClimatePanelView extends FrameLayout {
                 elementScaledDp(id, 29), elementScaledDp(id, 29)));
         content.addView(title);
         content.addView(value);
-        card.addView(content, new MaterialCardView.LayoutParams(
+        card.addView(content, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         CarControlCommand.Operation operation = descriptor.kind == CarControlDescriptor.Kind.ACTION
                 ? CarControlCommand.Operation.ACTIVATE : CarControlCommand.Operation.CYCLE;
-        card.setOnClickListener(v -> execute(id, operation, 0));
-        bindings.put(id, new ControlBinding(descriptor, card, icon, value,
+        card.setOnClickListener(v -> {
+            if (config.hasLevelCycleOrder(id)) cycleManualLevel(id, 1);
+            else execute(id, operation, 0);
+        });
+        bindings.put(id, new ControlBinding(descriptor, card, icon, title, value,
                 Collections.emptyList()));
-        flow.addView(card, flowLp(id, 108, 90));
+        flow.addView(card, flowLp(id, 116, 96));
     }
 
     @Nullable
     private CarControlDescriptor visibleDescriptor(@NonNull String id) {
         if (!config.isElementEnabled(id)) return null;
         CarControlDescriptor descriptor = catalog.get(id);
-        // A completely empty catalog cannot drive the editor preview. Once at least one real
-        // descriptor arrived, however, omitted IDs are genuinely unavailable and stay hidden.
-        if (descriptor == null && editorPreviewMode && catalog.isEmpty()) {
+        // Before the single real catalog callback, stable configured IDs seed both subscription
+        // and presentation. Once resolved, omitted IDs are genuinely unavailable and stay hidden.
+        if (descriptor == null && !catalogResolved) {
             return previewDescriptor(id);
         }
         return descriptor != null
@@ -414,8 +442,10 @@ public final class ClimatePanelView extends FrameLayout {
         LinkedHashSet<String> ids = new LinkedHashSet<>();
         for (ClimatePanelConfig.Element element : ClimatePanelConfig.ELEMENTS) {
             CarControlDescriptor descriptor = catalog.get(element.id);
-            if (config.isElementEnabled(element.id) && descriptor != null
-                    && descriptor.availability != CarControlDescriptor.Availability.UNSUPPORTED) {
+            if (config.isElementEnabled(element.id)
+                    && ((!catalogResolved && descriptor == null)
+                    || (descriptor != null && descriptor.availability
+                    != CarControlDescriptor.Availability.UNSUPPORTED))) {
                 ids.add(element.id);
             }
         }
@@ -432,7 +462,19 @@ public final class ClimatePanelView extends FrameLayout {
         return false;
     }
 
+    private static boolean containsOption(@NonNull CarControlDescriptor descriptor,
+                                          double value) {
+        for (CarControlDescriptor.Option option : descriptor.options) {
+            if (Math.abs(option.value - value) < .01d) return true;
+        }
+        return false;
+    }
+
     private void adjust(@NonNull String id, int direction) {
+        if (config.hasLevelCycleOrder(id)) {
+            cycleManualLevel(id, direction);
+            return;
+        }
         ControlBinding binding = bindings.get(id);
         CarControlState state = states.get(id);
         if (binding == null || isEditorPlaceholder(id) || !isFresh(state)
@@ -441,16 +483,11 @@ public final class ClimatePanelView extends FrameLayout {
         CarControlDescriptor descriptor = binding.descriptor;
         double target;
         if (!descriptor.options.isEmpty()) {
-            List<CarControlDescriptor.Option> options = new ArrayList<>(descriptor.options);
-            options.sort(Comparator.comparingDouble(value -> value.value));
-            int nearest = 0;
-            double distance = Double.MAX_VALUE;
-            for (int index = 0; index < options.size(); index++) {
-                double candidate = Math.abs(options.get(index).value - state.value);
-                if (candidate < distance) { distance = candidate; nearest = index; }
-            }
-            int next = Math.max(0, Math.min(options.size() - 1, nearest + direction));
-            target = options.get(next).value;
+            boolean includeAuto = ClimatePanelConfig.FAN.equals(id);
+            Double planned = ClimateLevelCyclePlanner.nextStepperTarget(
+                    descriptor.options, state.value, direction, includeAuto);
+            if (planned == null) return;
+            target = planned;
         } else {
             double step = descriptor.step > 0 ? descriptor.step : 1;
             target = Math.max(descriptor.minimum,
@@ -463,11 +500,42 @@ public final class ClimatePanelView extends FrameLayout {
         execute(id, CarControlCommand.Operation.SET, target);
     }
 
+    /**
+     * Converts a tile press into an explicit SET calculated from the last confirmed vehicle
+     * value. This is intentionally not optimistic: the current card remains unchanged until the
+     * ECARX read-back arrives through {@link #stateListener}.
+     */
+    private void cycleManualLevel(@NonNull String id, int direction) {
+        ControlBinding binding = bindings.get(id);
+        CarControlState state = states.get(id);
+        if (binding == null || pending.containsKey(id) || isEditorPlaceholder(id)) return;
+        if (!isFresh(state) || !state.available || !state.known
+                || !Double.isFinite(state.value)
+                || binding.descriptor.availability
+                != CarControlDescriptor.Availability.SUPPORTED
+                || binding.descriptor.options.isEmpty()) {
+            Toast.makeText(getContext(), "Текущий уровень ещё загружается",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Double target = ClimateLevelCyclePlanner.nextTarget(binding.descriptor.options,
+                state.value, config.levelCycleOrder(id), direction);
+        if (target == null) {
+            Toast.makeText(getContext(), "Для функции нет доступных уровней",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        execute(id, CarControlCommand.Operation.SET, target);
+    }
+
     private void execute(@NonNull String id, @NonNull CarControlCommand.Operation operation,
                          double value) {
         ControlBinding binding = bindings.get(id);
         CarControlState state = states.get(id);
         if (binding == null || pending.containsKey(id)) return;
+        // The editor is a layout surface, never a second climate remote. It uses representative
+        // values so active/inactive styling is visible without touching the vehicle.
+        if (isEditorPlaceholder(id)) return;
         boolean available = !isEditorPlaceholder(id) && isFresh(state) && state.available;
         if (!available) {
             Toast.makeText(getContext(), "Функция пока недоступна", Toast.LENGTH_SHORT).show();
@@ -475,12 +543,29 @@ public final class ClimatePanelView extends FrameLayout {
         }
         final long token = ++nextCommandToken;
         pending.put(id, token);
+        Runnable timeout = () -> {
+            Long current = pending.get(id);
+            if (current == null || current.longValue() != token) return;
+            pending.remove(id);
+            pendingTimeouts.remove(id);
+            applyState(id);
+            // Replacing this listener's subscription is the public, non-invasive way to request
+            // a fresh read without guessing whether the timed-out write reached the ECU.
+            if (started) subscribeVisibleControls();
+            Toast.makeText(getContext(),
+                    "Нет ответа от автомобиля. Состояние обновляется",
+                    Toast.LENGTH_LONG).show();
+        };
+        pendingTimeouts.put(id, timeout);
+        postDelayed(timeout, COMMAND_WATCHDOG_MS);
         applyState(id);
         integration.executeControl(new CarControlCommand(id, operation, value),
                 (success, message) -> {
                     Long current = pending.get(id);
-                    if (current == null || current != token) return;
+                    if (current == null || current.longValue() != token) return;
                     pending.remove(id);
+                    Runnable scheduled = pendingTimeouts.remove(id);
+                    if (scheduled != null) removeCallbacks(scheduled);
                     applyState(id);
                     if (!success) {
                         Toast.makeText(getContext(), message == null
@@ -493,34 +578,65 @@ public final class ClimatePanelView extends FrameLayout {
         ControlBinding binding = bindings.get(id);
         if (binding == null) return;
         CarControlState state = states.get(id);
-        boolean available = !isEditorPlaceholder(id) && isFresh(state) && state.available;
-        boolean known = available && state.known;
-        boolean active = known && state.active;
+        boolean previewSample = isEditorPlaceholder(id);
+        boolean available = previewSample || (isFresh(state) && state.available);
+        boolean known = previewSample || (available && state.known);
+        boolean active = previewSample ? isPreviewActive(id) : known && state.active;
         int accent = color(config.accentColor, Color.CYAN);
-        if (active && config.useVehicleStateColors && state.suggestedColor != null) {
+        if (active && state != null && config.useVehicleStateColors
+                && state.suggestedColor != null) {
             accent = color(state.suggestedColor, accent);
         }
         int inactive = color(config.inactiveColor, Color.LTGRAY);
         int tint = active ? accent : inactive;
         binding.icon.setColorFilter(tint);
-        binding.value.setText(pending.containsKey(id) || isEditorPlaceholder(id)
-                || !isFresh(state) ? "…" : state.valueLabel);
+        binding.value.setText(pending.containsKey(id) ? "Ожидание…" : previewSample
+                ? previewValue(id) : displayStateValue(state));
         binding.value.setTextColor(tint);
-        binding.card.setCardBackgroundColor(active
-                ? withAlpha(accent, 72) : Color.argb(92, 255, 255, 255));
-        binding.card.setStrokeColor(active ? accent : Color.argb(52, 255, 255, 255));
-        binding.card.setStrokeWidth(active ? elementScaledDp(id, 2) : elementScaledDp(id, 1));
+        // New CarPlay uses a calm translucent glass row and turns the selected action into a
+        // bright, soft tile. A real blur would be too expensive (and unavailable) on Android 9,
+        // so the two layered gradients retain the same visual hierarchy at negligible GPU cost.
+        int activeFill = withAlpha(blend(Color.WHITE, accent, .08f), config.activeTileAlpha);
+        int inactiveFill = Color.argb(config.inactiveTileAlpha, 255, 255, 255);
+        binding.card.setCardBackgroundColors(active
+                ? activeFill : inactiveFill,
+                active ? withAlpha(Color.WHITE, Math.min(255, config.activeTileAlpha + 18))
+                        : Color.argb(Math.min(150, config.inactiveTileAlpha + 30), 255, 255, 255));
+        binding.card.setStrokeColor(active ? withAlpha(accent, 216)
+                : Color.argb(Math.min(130, config.inactiveTileAlpha + 24), 255, 255, 255));
+        binding.card.setStrokeWidth(active ? scaledPx(2) : scaledPx(1));
+        binding.title.setTextColor(active
+                ? blend(Color.rgb(18, 20, 27), accent, .12f)
+                : color(config.textColor, Color.WHITE));
         float alpha = pending.containsKey(id) ? .60f : available ? 1f : .42f;
         binding.card.setAlpha(alpha);
-        binding.card.setEnabled(available && !pending.containsKey(id));
-        boolean optionsReady = binding.descriptor.options.isEmpty()
-                || binding.descriptor.availability == CarControlDescriptor.Availability.SUPPORTED;
+        boolean optionsReady = binding.descriptor.availability
+                == CarControlDescriptor.Availability.SUPPORTED;
+        boolean manualLevelReady = !config.hasLevelCycleOrder(id) || (known && optionsReady
+                && !binding.descriptor.options.isEmpty());
+        binding.card.setEnabled(editorPreviewMode
+                || (available && manualLevelReady && !pending.containsKey(id)));
         for (View interactive : binding.interactive) {
             interactive.setEnabled(known && optionsReady && !pending.containsKey(id));
             interactive.setAlpha(known && optionsReady ? 1f : .38f);
         }
         binding.card.setContentDescription(binding.descriptor.label + ", "
-                + (state == null ? "состояние неизвестно" : state.valueLabel));
+                + (previewSample ? previewValue(id)
+                        : displayStateValue(state)));
+    }
+
+    @NonNull
+    private String displayStateValue(@Nullable CarControlState state) {
+        if (!isFresh(state)) return "…";
+        if (!state.available) {
+            String value = state.valueLabel == null ? "" : state.valueLabel.trim();
+            return value.isEmpty() || "—".equals(value) || "-".equals(value)
+                    ? "Недоступно" : value;
+        }
+        if (!state.known) return "Неизвестно";
+        String value = state.valueLabel == null ? "" : state.valueLabel.trim();
+        return value.isEmpty() || "—".equals(value) || "-".equals(value)
+                ? "Неизвестно" : value;
     }
 
     private void updateConnectionLabel() {
@@ -540,24 +656,62 @@ public final class ClimatePanelView extends FrameLayout {
     private void applySurface() {
         int base = color(config.backgroundColor, Color.rgb(20, 26, 36));
         GradientDrawable surface = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{withAlpha(base, config.backgroundAlpha),
-                        withAlpha(blend(base, color(config.accentColor, Color.CYAN), .13f),
+                new int[]{withAlpha(blend(base, Color.WHITE, .10f), config.backgroundAlpha),
+                        withAlpha(base, config.backgroundAlpha),
+                        withAlpha(blend(base, color(config.accentColor, Color.CYAN), .12f),
                                 config.backgroundAlpha)});
         surface.setCornerRadius(config.cornerRadiusPx);
-        surface.setStroke(scaledDp(1), Color.argb(Math.min(150, config.backgroundAlpha),
+        surface.setStroke(1, Color.argb(Math.min(138, config.backgroundAlpha),
                 255, 255, 255));
         setBackground(surface);
+        setElevation(scaledPx(3));
     }
 
     @NonNull
-    private MaterialCardView tileCard(@NonNull String id) {
-        MaterialCardView card = new MaterialCardView(getContext());
-        card.setRadius(elementScaledDp(id, 15));
-        card.setCardElevation(0);
+    private ClimateTileView tileCard(@NonNull String id) {
+        ClimateTileView card = new ClimateTileView(getContext());
+        card.setRadius(config.tileCornerRadiusPx);
+        card.setCardElevation(scaledPx(1));
         card.setClickable(true);
         card.setFocusable(true);
         card.setRippleColor(ColorStateList.valueOf(Color.argb(80, 255, 255, 255)));
+        installEditorDrag(card, id);
         return card;
+    }
+
+    private void installEditorDrag(@NonNull ClimateTileView card, @NonNull String id) {
+        if (!editorPreviewMode || editorLayoutListener == null) return;
+        card.setLongClickable(true);
+        card.setOnLongClickListener(view -> {
+            ClipData data = ClipData.newPlainText("climate-element", id);
+            return view.startDragAndDrop(data, new View.DragShadowBuilder(view), id, 0);
+        });
+        card.setOnDragListener((view, event) -> {
+            Object local = event.getLocalState();
+            if (!(local instanceof String)) return false;
+            String sourceId = (String) local;
+            switch (event.getAction()) {
+                case DragEvent.ACTION_DRAG_STARTED:
+                    return !id.equals(sourceId);
+                case DragEvent.ACTION_DRAG_ENTERED:
+                    view.animate().scaleX(1.045f).scaleY(1.045f).setDuration(80L).start();
+                    return true;
+                case DragEvent.ACTION_DRAG_EXITED:
+                    view.animate().scaleX(1f).scaleY(1f).setDuration(80L).start();
+                    return true;
+                case DragEvent.ACTION_DROP:
+                    view.setScaleX(1f);
+                    view.setScaleY(1f);
+                    editorLayoutListener.onMoveElement(sourceId, id);
+                    return true;
+                case DragEvent.ACTION_DRAG_ENDED:
+                    view.setScaleX(1f);
+                    view.setScaleY(1f);
+                    return true;
+                default:
+                    return true;
+            }
+        });
     }
 
     @NonNull
@@ -589,7 +743,8 @@ public final class ClimatePanelView extends FrameLayout {
         button.setBackground(background);
         button.setClickable(true);
         button.setFocusable(true);
-        button.setContentDescription(symbol.equals("+") ? "Увеличить" : "Уменьшить");
+        button.setContentDescription(symbol.equals("+") || symbol.equals("›")
+                ? "Увеличить" : "Уменьшить");
         button.setPadding(elementScaledDp(id, 6), 0, elementScaledDp(id, 6), 0);
         return button;
     }
@@ -607,9 +762,9 @@ public final class ClimatePanelView extends FrameLayout {
 
     private ViewGroup.MarginLayoutParams flowLp(@NonNull String id, int width, int height) {
         ViewGroup.MarginLayoutParams lp = new ViewGroup.MarginLayoutParams(
-                elementScaledDp(id, width), elementScaledDp(id, height));
-        int margin = scaledDp(2);
-        lp.setMargins(margin, margin, margin, margin);
+                elementSizedDp(id, width, config.elementWidthPercent(id)),
+                elementSizedDp(id, height, config.elementHeightPercent(id)));
+        lp.setMargins(0, 0, 0, 0);
         return lp;
     }
 
@@ -621,6 +776,16 @@ public final class ClimatePanelView extends FrameLayout {
     private int scaledDp(int value) {
         float density = getResources().getDisplayMetrics().density;
         return Math.max(1, Math.round(value * density * config.scalePercent / 100f));
+    }
+
+    /** Configuration dimensions are literal screen pixels, then follow the global scale. */
+    private int scaledPx(int value) {
+        if (value == 0) return 0;
+        return Math.max(1, Math.round(value * config.scalePercent / 100f));
+    }
+
+    private int elementSizedDp(@NonNull String id, int value, int percent) {
+        return Math.max(1, Math.round(scaledDp(value) * percent / 100f));
     }
 
     private float scaledSp(int value) {
@@ -656,6 +821,24 @@ public final class ClimatePanelView extends FrameLayout {
         return editorPreviewMode && catalog.isEmpty() && !catalog.containsKey(id);
     }
 
+    private static boolean isPreviewActive(@NonNull String id) {
+        return id.equals(ClimatePanelConfig.POWER)
+                || id.equals(ClimatePanelConfig.AC)
+                || id.equals(ClimatePanelConfig.SEAT_HEAT_DRIVER)
+                || id.equals(ClimatePanelConfig.WHEEL_HEAT);
+    }
+
+    @NonNull
+    private static String previewValue(@NonNull String id) {
+        if (id.equals(ClimatePanelConfig.TEMP_DRIVER)) return "22°";
+        if (id.equals(ClimatePanelConfig.TEMP_PASSENGER)) return "21°";
+        if (id.equals(ClimatePanelConfig.FAN)) return "3";
+        if (id.contains("seat_heat") || id.contains("seat_vent")) return "2";
+        if (id.equals(ClimatePanelConfig.POWER) || id.equals(ClimatePanelConfig.AC)) return "ВКЛ";
+        if (id.equals(ClimatePanelConfig.AUTO)) return "AUTO";
+        return "ВЫКЛ";
+    }
+
     @NonNull
     private static CarControlDescriptor previewDescriptor(@NonNull String id) {
         CarControlDescriptor.Kind kind = id.equals(ClimatePanelConfig.TEMP_DRIVER)
@@ -664,14 +847,13 @@ public final class ClimatePanelView extends FrameLayout {
                 ? CarControlDescriptor.Kind.RANGE : CarControlDescriptor.Kind.TOGGLE;
         return new CarControlDescriptor(id, shortLabel(id), "Климат", "climate", kind,
                 CarControlDescriptor.Availability.UNKNOWN, Collections.emptyList(),
-                0, 30, 1, "", "#35B7FF");
+                0, 30, 1, "", "#59A9FF");
     }
 
     private boolean isFresh(@Nullable CarControlState state) {
         if (state == null || state.observedAtMillis <= 0) return false;
         long age = System.currentTimeMillis() - state.observedAtMillis;
-        return sessionStartedAtMillis > 0 && state.observedAtMillis >= sessionStartedAtMillis
-                && age >= 0 && age <= STATE_FRESH_MS;
+        return age >= 0 && age <= STATE_FRESH_MS;
     }
 
     private static int iconFor(@NonNull String id) {
@@ -704,19 +886,84 @@ public final class ClimatePanelView extends FrameLayout {
 
     private static final class ControlBinding {
         @NonNull final CarControlDescriptor descriptor;
-        @NonNull final MaterialCardView card;
+        @NonNull final ClimateTileView card;
         @NonNull final ImageView icon;
+        @NonNull final TextView title;
         @NonNull final TextView value;
         @NonNull final List<View> interactive;
 
         ControlBinding(@NonNull CarControlDescriptor descriptor,
-                       @NonNull MaterialCardView card, @NonNull ImageView icon,
-                       @NonNull TextView value, @NonNull List<View> interactive) {
+                       @NonNull ClimateTileView card, @NonNull ImageView icon,
+                       @NonNull TextView title, @NonNull TextView value,
+                       @NonNull List<View> interactive) {
             this.descriptor = descriptor;
             this.card = card;
             this.icon = icon;
+            this.title = title;
             this.value = value;
             this.interactive = interactive;
+        }
+    }
+
+    /**
+     * Theme-independent replacement for MaterialCardView used by the overlay climate panel.
+     *
+     * <p>The overlay can be created from {@code Context#createDisplayContext()}, which deliberately
+     * has no Activity theme. MaterialCardView rejects that perfectly valid window context at
+     * construction time. This lightweight view keeps the same rounded fill, border, elevation and
+     * ripple behaviour without consulting theme attributes, so it is safe in HOME, the editor and
+     * every display/overlay window.</p>
+     */
+    private static final class ClimateTileView extends FrameLayout {
+        private final GradientDrawable shape = new GradientDrawable();
+        private final GradientDrawable rippleMask = new GradientDrawable();
+        private final RippleDrawable ripple;
+        private int strokeColor = Color.TRANSPARENT;
+        private int strokeWidth;
+
+        ClimateTileView(@NonNull Context context) {
+            super(context);
+            shape.setShape(GradientDrawable.RECTANGLE);
+            shape.setColor(Color.TRANSPARENT);
+            rippleMask.setShape(GradientDrawable.RECTANGLE);
+            rippleMask.setColor(Color.WHITE);
+            ripple = new RippleDrawable(ColorStateList.valueOf(
+                    Color.argb(80, 255, 255, 255)), shape, rippleMask);
+            setBackground(ripple);
+            setClipToOutline(true);
+        }
+
+        void setRadius(float radius) {
+            float safeRadius = Math.max(0f, radius);
+            shape.setCornerRadius(safeRadius);
+            rippleMask.setCornerRadius(safeRadius);
+        }
+
+        void setCardElevation(float elevation) {
+            setElevation(Math.max(0f, elevation));
+        }
+
+        void setRippleColor(@NonNull ColorStateList color) {
+            ripple.setColor(color);
+        }
+
+        void setCardBackgroundColor(int color) {
+            shape.setColor(color);
+        }
+
+        void setCardBackgroundColors(int startColor, int endColor) {
+            shape.setOrientation(GradientDrawable.Orientation.TL_BR);
+            shape.setColors(new int[]{startColor, endColor});
+        }
+
+        void setStrokeColor(int color) {
+            strokeColor = color;
+            shape.setStroke(strokeWidth, strokeColor);
+        }
+
+        void setStrokeWidth(int width) {
+            strokeWidth = Math.max(0, width);
+            shape.setStroke(strokeWidth, strokeColor);
         }
     }
 }

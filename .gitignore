@@ -3,6 +3,7 @@ build
 .idea
 local.properties
 *.jks
+deliverables/
 .DS_Store
 **/.DS_Store
 /docs/README.md

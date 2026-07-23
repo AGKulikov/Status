@@ -50,15 +50,38 @@ public final class ScreenReservationControllerTest {
     }
 
     @Test
+    public void defaultDisplayUsesCanonicalLegacyCommandsWithoutDisplayFlag() {
+        ScreenReservationController.Insets value =
+                new ScreenReservationController.Insets(1, 2, 3, 4);
+        assertEquals("wm overscan", ScreenReservationController.queryCommand(0));
+        assertEquals("wm overscan 1,2,3,4",
+                ScreenReservationController.setCommand(0, value));
+        assertEquals("wm overscan reset", ScreenReservationController.resetCommand(0));
+
+        assertEquals("wm overscan -d 3", ScreenReservationController.queryCommand(3));
+        assertEquals("wm overscan 1,2,3,4 -d 3",
+                ScreenReservationController.setCommand(3, value));
+        assertEquals("wm overscan reset -d 3", ScreenReservationController.resetCommand(3));
+    }
+
+    @Test
+    public void legacyOverscanIsNeverSelectedPastAndroidTen() {
+        assertTrue(ScreenReservationController.legacyOverscanSupported(28));
+        assertTrue(ScreenReservationController.legacyOverscanSupported(29));
+        assertFalse(ScreenReservationController.legacyOverscanSupported(30));
+        assertFalse(ScreenReservationController.legacyOverscanSupported(36));
+    }
+
+    @Test
     public void stockWmQueryFallsBackToReadOnlyDisplayDump() {
         MemoryBackend backend = new MemoryBackend();
         ScriptedRunner runner = new ScriptedRunner();
-        runner.respond("wm overscan -d 0", "Error: bad rectangle arg: -d", null);
+        runner.respond("wm overscan", "Error: bad rectangle arg", null);
         runner.respond("dumpsys display",
                 "Display 0:\n  mDisplayInfo=DisplayInfo{main, displayId 0, app 1920 x 1080}",
                 null);
-        runner.respond("wm overscan 0,0,0,50 -d 0", "", null);
-        runner.respond("wm overscan -d 0", "Error: bad rectangle arg: -d", null);
+        runner.respond("wm overscan 0,0,0,50", "", null);
+        runner.respond("wm overscan", "Error: bad rectangle arg", null);
         runner.respond("dumpsys display",
                 "Display 0:\n  mDisplayInfo=DisplayInfo{main, displayId 0, overscan (0,0,0,50)}",
                 null);
@@ -118,15 +141,15 @@ public final class ScreenReservationControllerTest {
     public void reapplyUsesOriginalBaselineInsteadOfAccumulatingExtent() {
         MemoryBackend backend = new MemoryBackend();
         ScriptedRunner first = new ScriptedRunner();
-        first.respond("wm overscan -d 0", "Overscan: 1,2,3,4", null);
-        first.respond("wm overscan 1,22,3,4 -d 0", "", null);
-        first.respond("wm overscan -d 0", "Overscan: 1,22,3,4", null);
+        first.respond("wm overscan", "Overscan: 1,2,3,4", null);
+        first.respond("wm overscan 1,22,3,4", "", null);
+        first.respond("wm overscan", "Overscan: 1,22,3,4", null);
         controller(backend, first).apply(ScreenReservationController.Edge.TOP, 20, 0, ignored -> { });
 
         ScriptedRunner second = new ScriptedRunner();
-        second.respond("wm overscan -d 0", "Overscan: 1,22,3,4", null);
-        second.respond("wm overscan 1,42,3,4 -d 0", "", null);
-        second.respond("wm overscan -d 0", "Overscan: 1,42,3,4", null);
+        second.respond("wm overscan", "Overscan: 1,22,3,4", null);
+        second.respond("wm overscan 1,42,3,4", "", null);
+        second.respond("wm overscan", "Overscan: 1,42,3,4", null);
         Holder result = new Holder();
         controller(backend, second).apply(ScreenReservationController.Edge.TOP, 40, 0, result::set);
 
@@ -143,8 +166,8 @@ public final class ScreenReservationControllerTest {
                 new ScreenReservationController.Insets(7, 8, 9, 10),
                 new ScreenReservationController.Insets(7, 8, 9, 210)));
         ScriptedRunner runner = new ScriptedRunner();
-        runner.respond("wm overscan 7,8,9,10 -d 0", "", null);
-        runner.respond("wm overscan -d 0", "Overscan: 7,8,9,10", null);
+        runner.respond("wm overscan 7,8,9,10", "", null);
+        runner.respond("wm overscan", "Overscan: 7,8,9,10", null);
         Holder result = new Holder();
 
         new ScreenReservationController(stateStore, runner).restore(result::set);
@@ -161,8 +184,8 @@ public final class ScreenReservationControllerTest {
         stateStore.journalBeforeMutation(3, inset(3), inset(30));
         stateStore.journalBeforeMutation(0, inset(0), inset(10));
         ScriptedRunner runner = new ScriptedRunner();
-        runner.respond("wm overscan 0,0,0,0 -d 0", "", null);
-        runner.respond("wm overscan -d 0", "Overscan: 0,0,0,0", null);
+        runner.respond("wm overscan 0,0,0,0", "", null);
+        runner.respond("wm overscan", "Overscan: 0,0,0,0", null);
         runner.respond("wm help",
                 "overscan [reset|LEFT,TOP,RIGHT,BOTTOM] [-d DISPLAY_ID]", null);
         runner.respond("wm overscan 3,3,3,3 -d 3", "", null);
@@ -174,7 +197,7 @@ public final class ScreenReservationControllerTest {
 
         assertTrue(result.value.success);
         assertTrue(stateStore.managedEntries().isEmpty());
-        assertEquals("wm overscan 0,0,0,0 -d 0", runner.commands.get(0));
+        assertEquals("wm overscan 0,0,0,0", runner.commands.get(0));
         assertEquals("wm help", runner.commands.get(2));
         assertEquals("wm overscan 3,3,3,3 -d 3", runner.commands.get(3));
     }
@@ -215,9 +238,9 @@ public final class ScreenReservationControllerTest {
     public void failedVerificationLeavesRecoveryJournalForFutureRestore() {
         MemoryBackend backend = new MemoryBackend();
         ScriptedRunner runner = new ScriptedRunner();
-        runner.respond("wm overscan -d 0", "Overscan: 0,0,0,0", null);
-        runner.respond("wm overscan 0,0,64,0 -d 0", "", null);
-        runner.respond("wm overscan -d 0", "Overscan: 0,0,63,0", null);
+        runner.respond("wm overscan", "Overscan: 0,0,0,0", null);
+        runner.respond("wm overscan 0,0,64,0", "", null);
+        runner.respond("wm overscan", "Overscan: 0,0,63,0", null);
         Holder result = new Holder();
 
         controller(backend, runner).apply(
@@ -253,6 +276,22 @@ public final class ScreenReservationControllerTest {
     }
 
     @Test
+    public void explicitCancellationPreventsOldQueryFromStartingMutation() {
+        MemoryBackend backend = new MemoryBackend();
+        DeferredRunner runner = new DeferredRunner();
+        ScreenReservationController controller = controller(backend, runner);
+        Holder result = new Holder();
+
+        controller.apply(ScreenReservationController.Edge.TOP, 10, 0, result::set);
+        controller.cancelPending();
+        runner.completeFirst("Overscan: 0,0,0,0", null);
+
+        assertNull(result.value);
+        assertEquals(Collections.singletonList("wm overscan"), runner.commands);
+        assertTrue(store(backend).managedEntries().isEmpty());
+    }
+
+    @Test
     public void invalidNewRequestStillSupersedesInFlightMutation() {
         MemoryBackend backend = new MemoryBackend();
         DeferredRunner runner = new DeferredRunner();
@@ -267,7 +306,7 @@ public final class ScreenReservationControllerTest {
         assertNull(oldResult.value);
         assertNotNull(invalidResult.value);
         assertFalse(invalidResult.value.success);
-        assertEquals(Collections.singletonList("wm overscan -d 0"), runner.commands);
+        assertEquals(Collections.singletonList("wm overscan"), runner.commands);
         assertTrue(store(backend).managedEntries().isEmpty());
     }
 
@@ -276,14 +315,14 @@ public final class ScreenReservationControllerTest {
         MemoryBackend backend = new MemoryBackend();
         store(backend).journalBeforeMutation(0, inset(7), inset(9));
         ScriptedRunner runner = new ScriptedRunner();
-        runner.respond("wm overscan reset -d 0", "", null);
-        runner.respond("wm overscan -d 0", "Overscan: 0,0,0,0", null);
+        runner.respond("wm overscan reset", "", null);
+        runner.respond("wm overscan", "Overscan: 0,0,0,0", null);
         Holder result = new Holder();
 
         controller(backend, runner).emergencyReset(0, result::set);
 
         assertTrue(result.value.success);
-        assertEquals("wm overscan reset -d 0", runner.commands.get(0));
+        assertEquals("wm overscan reset", runner.commands.get(0));
         assertNull(store(backend).get(0));
     }
 
@@ -349,7 +388,7 @@ public final class ScreenReservationControllerTest {
 
         @Override
         public void run(String command, ScreenReservationController.CommandResultCallback callback) {
-            if (command.equals("wm overscan -d 0")) {
+            if (command.equals("wm overscan")) {
                 callback.onResult("Overscan: " + current, null);
                 return;
             }

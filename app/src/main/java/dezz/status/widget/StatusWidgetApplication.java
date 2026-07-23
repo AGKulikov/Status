@@ -25,6 +25,10 @@ import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.util.Date;
 
+import dezz.status.widget.launcher.EmbeddedNavigatorRuntime;
+import dezz.status.widget.launcher.EmbeddedNavigatorContract;
+import dezz.status.widget.launcher.MergedResourceInstaller;
+
 /**
  * Installs a process-wide uncaught-exception handler that dumps the stacktrace to the cache
  * directory before letting the default handler (which kills the process) take over. On the next
@@ -37,7 +41,47 @@ public class StatusWidgetApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        installCrashHandler();
+        initializeStatusRuntime(this);
+    }
+
+    /**
+     * Entry point injected into the merged mod's final NaviApplication after its own startup. It
+     * deliberately accepts {@link Application}, so this class need not be the manifest
+     * Application.
+     */
+    public static void initializeStatusRuntime(Application application) {
+        if (EmbeddedNavigatorContract.isBundled(application)) {
+            MergedResourceInstaller.install(application);
+        }
+        EmbeddedNavigatorRuntime.install(application);
+        if (application instanceof StatusWidgetApplication) {
+            ((StatusWidgetApplication) application).installCrashHandler();
+        } else {
+            installMergedCrashHandler(application);
+        }
+    }
+
+    /** The merged Application is a NaviApplication, so it cannot use the instance writer below. */
+    public static void installMergedCrashHandler(Application application) {
+        Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+            try {
+                File file = new File(application.getCacheDir(), CRASH_FILE);
+                try (PrintWriter out = new PrintWriter(new FileWriter(file))) {
+                    out.println("Status Widget + Navigator crash report");
+                    out.println("Time: " + new Date());
+                    out.println("Thread: " + thread.getName());
+                    out.println("Device: " + Build.MANUFACTURER + " " + Build.MODEL);
+                    out.println("Android: " + Build.VERSION.RELEASE
+                            + " (SDK " + Build.VERSION.SDK_INT + ")");
+                    out.println("App version: " + VersionGetter.getAppVersionName(application));
+                    out.println();
+                    throwable.printStackTrace(out);
+                }
+            } catch (Throwable ignored) {
+            }
+            if (previous != null) previous.uncaughtException(thread, throwable);
+        });
     }
 
     private void installCrashHandler() {

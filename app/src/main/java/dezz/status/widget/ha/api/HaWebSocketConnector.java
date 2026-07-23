@@ -59,6 +59,7 @@ public final class HaWebSocketConnector {
     private volatile Config config;
 
     private boolean running;
+    private boolean disposed;
     private long generation;
     private int reconnectAttempt;
     private int nextCommandId;
@@ -86,6 +87,7 @@ public final class HaWebSocketConnector {
     /** Starts immediately. Calling it with a different config performs an atomic reconfigure. */
     public synchronized void start(Config newConfig) {
         Objects.requireNonNull(newConfig, "config");
+        if (disposed) throw new IllegalStateException("Home Assistant connector is closed");
         if (running && newConfig.equals(config)) return;
         running = true;
         config = newConfig;
@@ -96,6 +98,7 @@ public final class HaWebSocketConnector {
     /** Reconnects a running connector or stores the config for the next start. */
     public synchronized void reconfigure(Config newConfig) {
         Objects.requireNonNull(newConfig, "config");
+        if (disposed) throw new IllegalStateException("Home Assistant connector is closed");
         if (newConfig.equals(config)) return;
         config = newConfig;
         reconnectAttempt = 0;
@@ -111,6 +114,19 @@ public final class HaWebSocketConnector {
         synchronizer.reset();
         closeSocketLocked();
         transitionLocked(ConnectionState.STOPPED, "stopped");
+    }
+
+    /** Final lifecycle boundary. Unlike {@link #stop()}, this instance cannot be restarted. */
+    public synchronized void close() {
+        if (disposed) return;
+        if (running || socket != null || state != ConnectionState.STOPPED) stop();
+        disposed = true;
+        scheduler.shutdownNow();
+        // Release the potentially large entity graph and the bearer token as soon as the owning
+        // foreground service is destroyed. OkHttp may be injected/shared, so its pools stay owned
+        // by the caller; the already-closed WebSocket no longer retains this listener.
+        catalog = HaEntityCatalog.empty();
+        config = null;
     }
 
     public ConnectionState connectionState() { return state; }

@@ -3,6 +3,7 @@ package dezz.status.widget.sprut;
 
 import android.content.Context;
 import android.net.wifi.WifiManager;
+import android.os.Process;
 import android.os.PowerManager;
 import android.util.Log;
 
@@ -16,6 +17,7 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Objects;
 import java.util.UUID;
@@ -78,7 +80,11 @@ public final class SprutHubController {
     private final String clientId;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
             runnable -> {
-                Thread thread = new Thread(runnable, "spruthub-controller");
+                Thread thread = new Thread(() -> {
+                    try { Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND); }
+                    catch (RuntimeException ignored) { }
+                    runnable.run();
+                }, "spruthub-controller");
                 thread.setDaemon(true);
                 return thread;
             });
@@ -91,6 +97,8 @@ public final class SprutHubController {
     @Nullable private PowerManager.WakeLock wakeLock;
     @Nullable private WifiManager.WifiLock wifiLock;
     private volatile SprutCatalog catalog = SprutCatalog.empty();
+    private volatile List<HaBrickConfig> configuredMain = Collections.emptyList();
+    private volatile List<PopupItemConfig> configuredPopup = Collections.emptyList();
     private volatile int hubRevision = Integer.MAX_VALUE;
     private volatile boolean stopped;
     private volatile boolean sessionSynced;
@@ -100,6 +108,7 @@ public final class SprutHubController {
     private long loadingSnapshotEpoch;
     private long snapshotEpoch;
     private boolean bufferedEventOverflow;
+    @NonNull private String cachedCatalogLoadSignature = "";
     private int reconnectAttempt;
 
     public SprutHubController(@NonNull Context context, @NonNull Preferences prefs,
@@ -120,7 +129,10 @@ public final class SprutHubController {
         mainConfigs = new HaBrickConfigStore(prefs);
         popupConfigs = new PopupItemConfigStore(prefs);
         catalogStore = new SprutHubCatalogStore(context);
-        loadCachedCatalog();
+        // A large hub cache can be tens of megabytes and contain 500+ accessories. Parsing it in
+        // this constructor used to block WidgetService.onCreate (and the shared HOME main Looper)
+        // before the status row could even be attached. reconfigure() schedules the cache on the
+        // controller executor only after WidgetService has requested its first overlay frame.
     }
 
     public static boolean isSynced() { return lastSynced; }
@@ -135,11 +147,11 @@ public final class SprutHubController {
     public void reapplyCrossSourceBindings() {
         SprutCatalog current = catalog;
         boolean fresh = sessionSynced;
-        for (HaBrickConfig item : mainConfigs.loadMain()) {
+        for (HaBrickConfig item : configuredMain) {
             if (item.displayRules == null || item.displayRules.usesOwnSource()) continue;
             applyMainBinding(item, current, fresh, null);
         }
-        for (PopupItemConfig item : popupConfigs.load()) {
+        for (PopupItemConfig item : configuredPopup) {
             if (item.displayRules == null || item.displayRules.usesOwnSource()) continue;
             applyPopupBinding(item, current, fresh, null);
         }
@@ -148,25 +160,30 @@ public final class SprutHubController {
     /** Re-renders popup presentation from the already loaded catalog without reconnecting or
      * requesting a 500+ accessory snapshot. Used by the live visual editor. */
     public void reapplyPopupBindings() {
+        configuredPopup = popupConfigs.load();
         SprutCatalog current = catalog;
         boolean fresh = sessionSynced;
-        for (PopupItemConfig item : popupConfigs.load()) {
+        for (PopupItemConfig item : configuredPopup) {
             applyPopupBinding(item, current, fresh, null);
         }
     }
 
     /** Main-row counterpart of {@link #reapplyPopupBindings()}. */
     public void reapplyMainBindings() {
+        configuredMain = mainConfigs.loadMain();
         SprutCatalog current = catalog;
         boolean fresh = sessionSynced;
-        for (HaBrickConfig item : mainConfigs.loadMain()) {
+        for (HaBrickConfig item : configuredMain) {
             applyMainBinding(item, current, fresh, null);
         }
     }
 
     /** Applies changed settings without disturbing MQTT or Home Assistant connections. */
     public void reconfigure() {
+        configuredMain = mainConfigs.loadMain();
+        configuredPopup = popupConfigs.load();
         String next = settingsSignature();
+        scheduleCachedCatalogLoad(next);
         synchronized (lock) {
             if (Objects.equals(signature, next) && client != null) {
                 // Config JSON may have changed even when transport settings did not.
@@ -550,7 +567,7 @@ public final class SprutHubController {
 
             CompletableFuture<SprutCatalog> result = rooms
                     .thenCombine(accessories, SnapshotParts::new)
-                    .thenCombine(serviceTypes, (parts, types) -> {
+                    .thenCombineAsync(serviceTypes, (parts, types) -> {
                         if (!isCurrent(current, expectedGeneration)) {
                             throw new CompletionException(
                                     new IOException("Superseded connection"));
@@ -608,7 +625,7 @@ public final class SprutHubController {
                         updateState(State.ONLINE,
                                 parsed.accessories().size() + " devices synchronized");
                         return parsed;
-                    });
+                    }, scheduler);
             snapshotInFlight = result;
             result.whenComplete((ignored, failure) -> {
                 synchronized (lock) {
@@ -669,20 +686,20 @@ public final class SprutHubController {
     }
 
     private void applyAllBindings(@NonNull SprutCatalog source, boolean fresh) {
-        for (HaBrickConfig item : mainConfigs.loadMain()) {
+        for (HaBrickConfig item : configuredMain) {
             applyMainBinding(item, source, fresh, null);
         }
-        for (PopupItemConfig item : popupConfigs.load()) {
+        for (PopupItemConfig item : configuredPopup) {
             applyPopupBinding(item, source, fresh, null);
         }
     }
 
     private void applyBindingsForPath(@NonNull SprutCatalog source, @NonNull SprutPath changed,
                                       boolean fresh) {
-        for (HaBrickConfig item : mainConfigs.loadMain()) {
+        for (HaBrickConfig item : configuredMain) {
             applyMainBinding(item, source, fresh, changed);
         }
-        for (PopupItemConfig item : popupConfigs.load()) {
+        for (PopupItemConfig item : configuredPopup) {
             applyPopupBinding(item, source, fresh, changed);
         }
     }
@@ -772,12 +789,12 @@ public final class SprutHubController {
     }
 
     private void markBoundStatesStale() {
-        for (HaBrickConfig item : mainConfigs.loadMain()) {
+        for (HaBrickConfig item : configuredMain) {
             if (!isSprutFamily(item.sourceBinding)) continue;
             states.markStale(AutomationContract.SCOPE_MAIN, item.id);
             listener.onStateChanged(AutomationContract.SCOPE_MAIN, item.id);
         }
-        for (PopupItemConfig item : popupConfigs.load()) {
+        for (PopupItemConfig item : configuredPopup) {
             if (!isSprutFamily(item.sourceBinding)) continue;
             states.markStale(AutomationContract.SCOPE_POPUP, item.automationId);
             listener.onStateChanged(AutomationContract.SCOPE_POPUP, item.automationId);
@@ -789,19 +806,53 @@ public final class SprutHubController {
         listener.onStateChanged(scope, id);
     }
 
-    private void loadCachedCatalog() {
+    private void loadCachedCatalog(@NonNull String expectedSignature) {
+        long expectedGeneration = generation;
+        String expectedHubSerial = prefs.sprutHubSerial.get().trim();
+        if (stopped || !prefs.sprutEnabled.get()
+                || !expectedSignature.equals(signature)) return;
         JSONObject cached = catalogStore.load();
         if (cached == null) return;
+        String cachedHubSerial = cached.optString("hubSerial", "").trim();
+        if (!expectedHubSerial.isEmpty() && !expectedHubSerial.equals(cachedHubSerial)) return;
         JSONObject rooms = cached.optJSONObject("rooms");
         JSONObject accessories = cached.optJSONObject("accessories");
         if (rooms == null || accessories == null) return;
         try {
-            catalog = SprutProtocolAdapter.parseCatalog(rooms, accessories);
-            hubRevision = cached.optInt("revision", hubRevision);
-            replaceRegistrySnapshot(catalog, false);
-            applyAllBindings(catalog, false);
+            SprutCatalog parsed = SprutProtocolAdapter.parseCatalog(rooms, accessories);
+            synchronized (catalogLock) {
+                // Cache is only an offline device picker. Persisted AutomationState already shows
+                // stale tile text, so publishing thousands of cached characteristic values here
+                // only races the authoritative snapshot and burns CPU. Never overwrite a live or
+                // in-flight snapshot, a changed connector identity, or a selected hub revision.
+                if (stopped || sessionSynced || loadingSnapshotEpoch != 0L
+                        || expectedGeneration != generation
+                        || !expectedSignature.equals(signature)) return;
+                catalog = parsed;
+                if (hubRevision == Integer.MAX_VALUE) {
+                    hubRevision = cached.optInt("revision", hubRevision);
+                }
+            }
         } catch (RuntimeException e) {
             Log.w(TAG, "Ignored incompatible Sprut.hub cache", e);
+        }
+    }
+
+    private void scheduleCachedCatalogLoad(@NonNull String expectedSignature) {
+        // A disabled connector has no renderer or action consumer. Do not spend memory parsing a
+        // 500-device cache merely because the base status widget process was started.
+        if (!prefs.sprutEnabled.get()) return;
+        synchronized (lock) {
+            if (expectedSignature.equals(cachedCatalogLoadSignature)) return;
+            cachedCatalogLoadSignature = expectedSignature;
+        }
+        try {
+            // Let WindowManager render the status row before competing for CPU with a large JSON
+            // parse on low-end head units.
+            scheduler.schedule(() -> loadCachedCatalog(expectedSignature),
+                    1_500L, TimeUnit.MILLISECONDS);
+        } catch (RejectedExecutionException ignored) {
+            // stop() won a race with settings; there is no cache consumer left.
         }
     }
 
