@@ -31,6 +31,7 @@ public final class LauncherLayoutStore {
     public static final String FAVORITE_ROUTES = "favorite_routes";
     public static final String VEHICLE_INFO = "vehicle_info";
     public static final String INFORMATION = "information";
+    public static final String EMBEDDED_NAVIGATOR = "embedded_navigator";
 
     public static final class Geometry {
         public int x;
@@ -199,6 +200,13 @@ public final class LauncherLayoutStore {
                 Math.max(0, (width - informationW) / 2),
                 Math.min(36, Math.max(0, height - informationH)),
                 informationW, informationH));
+
+        int embeddedNavigatorW = Math.min(920, Math.max(520, width / 2));
+        int embeddedNavigatorH = Math.min(620, Math.max(340, height * 2 / 3));
+        result.put(EMBEDDED_NAVIGATOR, new Geometry(
+                Math.max(0, (width - embeddedNavigatorW) / 2),
+                Math.max(0, (height - embeddedNavigatorH) / 2),
+                embeddedNavigatorW, embeddedNavigatorH));
         return result;
     }
 }
