@@ -31,6 +31,8 @@ public final class LauncherElementFrame extends MaterialCardView {
     private final FrameLayout contentHost;
     private final TextView editBadge;
     private final GeometryListener listener;
+    private final int minimumWidthDp;
+    private final int minimumHeightDp;
     private boolean editMode;
     private int snapPx = 20;
     private float downRawX;
@@ -43,9 +45,17 @@ public final class LauncherElementFrame extends MaterialCardView {
 
     public LauncherElementFrame(@NonNull Context context, @NonNull String elementId,
                                 @NonNull String label, @NonNull GeometryListener listener) {
+        this(context, elementId, label, 160, 96, listener);
+    }
+
+    public LauncherElementFrame(@NonNull Context context, @NonNull String elementId,
+                                @NonNull String label, int minimumWidthDp, int minimumHeightDp,
+                                @NonNull GeometryListener listener) {
         super(context);
         this.elementId = elementId;
         this.listener = listener;
+        this.minimumWidthDp = Math.max(1, minimumWidthDp);
+        this.minimumHeightDp = Math.max(1, minimumHeightDp);
 
         setRadius(dp(24));
         setCardElevation(dp(5));
@@ -117,11 +127,11 @@ public final class LauncherElementFrame extends MaterialCardView {
                 if (resizing) {
                     int parentWidth = ((View) getParent()).getWidth();
                     int parentHeight = ((View) getParent()).getHeight();
-                    int maxWidth = Math.max(dp(160), parentWidth - lp.leftMargin);
-                    int maxHeight = Math.max(dp(96), parentHeight - lp.topMargin);
-                    lp.width = Math.min(maxWidth, snap(Math.max(dp(160),
+                    int maxWidth = Math.max(dp(minimumWidthDp), parentWidth - lp.leftMargin);
+                    int maxHeight = Math.max(dp(minimumHeightDp), parentHeight - lp.topMargin);
+                    lp.width = Math.min(maxWidth, snap(Math.max(dp(minimumWidthDp),
                             Math.min(downWidth + dx, maxWidth))));
-                    lp.height = Math.min(maxHeight, snap(Math.max(dp(96),
+                    lp.height = Math.min(maxHeight, snap(Math.max(dp(minimumHeightDp),
                             Math.min(downHeight + dy, maxHeight))));
                 } else {
                     int maxX = Math.max(0, ((View) getParent()).getWidth() - getWidth());
