@@ -52,6 +52,11 @@ public final class YandexWindowLauncher {
 
     public static boolean launch(@NonNull Context context, @NonNull Product product,
                                  boolean forceFullScreen) {
+        if (product == Product.NAVIGATOR && EmbeddedNavigatorContract.isBundled(context)) {
+            return start(context,
+                    EmbeddedNavigatorContract.windowIntent(context, forceFullScreen));
+        }
+
         Target[] targets;
         if (product == Product.MAPS) {
             targets = forceFullScreen ? MAPS_FULL_TARGETS : MAPS_WINDOW_TARGETS;
@@ -84,6 +89,11 @@ public final class YandexWindowLauncher {
     /** Delivers a destination to standalone Navigator, unified Maps, or Yango in that order. */
     public static boolean launchDeepLink(@NonNull Context context, @NonNull Product product,
                                          @NonNull Uri deepLink) {
+        if (product == Product.NAVIGATOR && EmbeddedNavigatorContract.isBundled(context)) {
+            return start(context,
+                    EmbeddedNavigatorContract.windowIntent(context, false, deepLink));
+        }
+
         for (String packageName : packageCandidates(product)) {
             Intent intent = deepLinkIntent(deepLink, packageName);
             if (start(context, intent)) return true;
