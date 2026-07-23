@@ -35,6 +35,14 @@ android {
 
         // Set the output APK name
         setProperty("archivesBaseName", "status-widget-ha-${versionName}")
+
+    }
+
+    // A merged Navigator APK keeps Yandex's original 0x7f resource table at the root.
+    // Build Status resources as a secondary 0x80 package so both tables can coexist.
+    if (project.hasProperty("embeddedNavigatorResources")) {
+        aaptOptions.additionalParameters '--allow-reserved-package-id',
+                '--package-id', '0x80'
     }
 
     // Car-specific builds: each flavor wires in one vendor SDK via <flavor>Implementation and
@@ -102,6 +110,9 @@ dependencies {
     implementation libs.activity
     implementation libs.adblib
     implementation libs.appcompat
+    // ProfileInstaller's background verifier directly resolves ResolvableFuture on Android 9.
+    // Keep it explicit: relying on an optional/transitive edge produced the HA1068 boot crash.
+    implementation libs.concurrent.futures
     implementation libs.core
     implementation libs.constraintlayout
     implementation libs.material
