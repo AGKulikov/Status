@@ -486,6 +486,9 @@ public class Preferences {
     /** Independent read-only HOME panel combining car/system and smart-home statuses. */
     public final Bool launcherInformationVisible = new Bool(this,
             "launcherInformationVisible", false);
+    /** Effective only in the single-package Status + Navigator mod build. */
+    public final Bool launcherEmbeddedNavigatorVisible = new Bool(this,
+            "launcherEmbeddedNavigatorVisible", true);
     public final Str launcherInformationConfigJson = new Str(this,
             "launcherInformationConfigJson", "");
     // Per-panel inner element visibility/order/scale. Kept separate from outer pixel geometry so
