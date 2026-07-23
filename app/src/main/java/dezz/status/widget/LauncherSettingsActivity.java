@@ -26,6 +26,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
+import dezz.status.widget.launcher.EmbeddedNavigatorContract;
+
 /** Human-readable HOME setup. Every switch writes immediately; there is no Save button. */
 public final class LauncherSettingsActivity extends AppCompatActivity {
     private Preferences preferences;
@@ -85,6 +87,12 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         addSwitch("Данные автомобиля / HUD", preferences.launcherVehicleInfoVisible);
         addSwitch("Информация: автомобиль и умный дом",
                 preferences.launcherInformationVisible);
+        if (EmbeddedNavigatorContract.isBundled(this)) {
+            addSwitch("Встроенный Яндекс Навигатор",
+                    preferences.launcherEmbeddedNavigatorVisible);
+            addHint("Живое окно Навигатора является частью единого мода. Его положение и размер "
+                    + "меняются на HOME вместе с остальными панелями.");
+        }
         addButton("Состав, порядок и размеры элементов панелей…", v ->
                 startActivity(new Intent(this, PanelElementSettingsActivity.class)));
         addButton("Настроить избранные приложения…", v ->
