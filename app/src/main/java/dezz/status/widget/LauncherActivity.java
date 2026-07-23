@@ -15,6 +15,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Color;
 import android.graphics.Bitmap;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -68,6 +69,10 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 import dezz.status.widget.launcher.CombinedNavigationPanelPolicy;
+import dezz.status.widget.launcher.EmbeddedNavigatorContract;
+import dezz.status.widget.launcher.EmbeddedNavigatorOverlayControls;
+import dezz.status.widget.launcher.EmbeddedNavigatorPanelView;
+import dezz.status.widget.launcher.EmbeddedNavigatorRuntime;
 import dezz.status.widget.launcher.LauncherElementFrame;
 import dezz.status.widget.launcher.LauncherGridView;
 import dezz.status.widget.launcher.LauncherLayoutStore;
@@ -228,6 +233,8 @@ public final class LauncherActivity extends AppCompatActivity {
     private boolean favoriteRoutesAvailable;
     private VehicleInfoPanelView vehicleInfoPanel;
     private InformationPanelView informationPanel;
+    @Nullable private EmbeddedNavigatorPanelView embeddedNavigatorPanel;
+    private boolean embeddedNavigatorLaunchPending;
     @Nullable private String appliedPanelElementsJson;
     @Nullable private String appliedNavigationConfigJson;
     private int appliedAppsColumns = -1;
@@ -370,6 +377,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 && informationPanel.hasConfiguredItems()) {
             informationPanel.start();
         }
+        if (panelsInitialized) scheduleEmbeddedNavigatorDock();
     }
 
     @Override
@@ -553,12 +561,21 @@ public final class LauncherActivity extends AppCompatActivity {
                 informationPanel.stop();
             }
         }
+        boolean embeddedNavigatorVisible = isEmbeddedNavigatorPanelEnabled();
+        setPanelVisibility(LauncherLayoutStore.EMBEDDED_NAVIGATOR,
+                embeddedNavigatorVisible);
+        if (!embeddedNavigatorVisible) {
+            embeddedNavigatorLaunchPending = false;
+            EmbeddedNavigatorOverlayControls.get(this).hide();
+            EmbeddedNavigatorRuntime.finishNavigatorActivity();
+        }
 
         layoutStore.load(workspace.getWidth(), workspace.getHeight());
         applyStoredPanelGeometry();
         refreshSimplePanelContentsIfNeeded();
         updateNavigation();
         scheduleNavigationRefresh();
+        if (embeddedNavigatorVisible) scheduleEmbeddedNavigatorDock();
     }
 
     /** Applies inner-element edits after returning from the visual panel editor. */
@@ -803,19 +820,25 @@ public final class LauncherActivity extends AppCompatActivity {
                             this::isCombinedNavigationFrameVisible);
                     break;
                 case 4:
+                    addPanelSafely(LauncherLayoutStore.EMBEDDED_NAVIGATOR,
+                            "Яндекс Навигатор", this::buildEmbeddedNavigatorPanel,
+                            this::isEmbeddedNavigatorPanelEnabled);
+                    makePanelTransparent(LauncherLayoutStore.EMBEDDED_NAVIGATOR);
+                    break;
+                case 5:
                     addPanelSafely(LauncherLayoutStore.ACTIONS, "Действия",
                             this::buildActionsPanel,
                             () -> preferences.launcherActionsVisible.get()
                                     && hasSimplePanelContent(LauncherLayoutStore.ACTIONS));
                     break;
-                case 5:
+                case 6:
                     addPanelSafely(LauncherLayoutStore.CLIMATE, "Климат",
                             this::buildClimatePanel,
                             () -> preferences.launcherClimateVisible.get()
                                     && hasClimatePanelContent());
                     makePanelTransparent(LauncherLayoutStore.CLIMATE);
                     break;
-                case 6:
+                case 7:
                     addPanelSafely(LauncherLayoutStore.VEHICLE_INFO, "Данные автомобиля",
                             this::buildVehicleInfoPanel,
                             preferences.launcherVehicleInfoVisible::get);
@@ -829,7 +852,7 @@ public final class LauncherActivity extends AppCompatActivity {
                                 ? View.VISIBLE : View.GONE);
                     }
                     break;
-                case 7:
+                case 8:
                     addPanelSafely(LauncherLayoutStore.INFORMATION, "Информация",
                             this::buildInformationPanel,
                             () -> preferences.launcherInformationVisible.get()
@@ -889,6 +912,8 @@ public final class LauncherActivity extends AppCompatActivity {
             setNavigationContentEditMode(true);
         } else if (getIntent().getBooleanExtra(EXTRA_EDIT_MODE, false)) {
             setEditMode(true);
+        } else {
+            scheduleEmbeddedNavigatorDock();
         }
     }
 
@@ -976,11 +1001,27 @@ public final class LauncherActivity extends AppCompatActivity {
         return informationPanel;
     }
 
+    @NonNull
+    private View buildEmbeddedNavigatorPanel() {
+        embeddedNavigatorPanel = new EmbeddedNavigatorPanelView(
+                this, this::scheduleEmbeddedNavigatorDock);
+        return embeddedNavigatorPanel;
+    }
+
+    private boolean isEmbeddedNavigatorPanelEnabled() {
+        return preferences.launcherEmbeddedNavigatorVisible.get()
+                && EmbeddedNavigatorContract.isBundled(this);
+    }
+
     private void addPanel(@NonNull String id, @NonNull String label, @NonNull View content,
                           boolean visible) {
-        LauncherElementFrame frame = new LauncherElementFrame(this, id, label,
+        boolean embeddedNavigator = LauncherLayoutStore.EMBEDDED_NAVIGATOR.equals(id);
+        LauncherElementFrame.GeometryListener geometryListener =
                 (changedId, x, y, width, height) -> layoutStore.put(changedId,
-                        new LauncherLayoutStore.Geometry(x, y, width, height)));
+                        new LauncherLayoutStore.Geometry(x, y, width, height));
+        LauncherElementFrame frame = embeddedNavigator
+                ? new LauncherElementFrame(this, id, label, 220, 200, geometryListener)
+                : new LauncherElementFrame(this, id, label, geometryListener);
         frame.setContent(content);
         LauncherLayoutStore.Geometry g = layoutStore.get(id);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(g.width, g.height);
@@ -1684,6 +1725,12 @@ public final class LauncherActivity extends AppCompatActivity {
     private void setEditMode(boolean enabled) {
         if (enabled && navigationContentEditMode) setNavigationContentEditMode(false);
         if (enabled && mediaContentEditMode) setMediaContentEditMode(false);
+        boolean changed = editMode != enabled;
+        if (changed && enabled && isEmbeddedNavigatorPanelEnabled()) {
+            embeddedNavigatorLaunchPending = false;
+            EmbeddedNavigatorOverlayControls.get(this).hide();
+            EmbeddedNavigatorRuntime.finishNavigatorActivity();
+        }
         editMode = enabled;
         int snap = Math.max(4, preferences.launcherSnapPx.get());
         editorGrid.setStepPx(snap);
@@ -1703,6 +1750,7 @@ public final class LauncherActivity extends AppCompatActivity {
             setPanelVisibility(LauncherLayoutStore.INFORMATION,
                     enabled || informationPanel.hasConfiguredItems());
         }
+        if (changed && !enabled) scheduleEmbeddedNavigatorDock();
         Toast.makeText(this, enabled
                 ? "Тащите панель; маркер внизу справа изменяет размер"
                 : "Компоновка сохранена", Toast.LENGTH_SHORT).show();
@@ -2096,6 +2144,41 @@ public final class LauncherActivity extends AppCompatActivity {
         if (!YandexWindowLauncher.launch(this, product, full)) {
             Toast.makeText(this, "Яндекс-приложение не найдено", Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void scheduleEmbeddedNavigatorDock() {
+        if (embeddedNavigatorLaunchPending || editMode || !panelsInitialized
+                || !isEmbeddedNavigatorPanelEnabled()) return;
+        LauncherElementFrame frame = panels.get(LauncherLayoutStore.EMBEDDED_NAVIGATOR);
+        if (frame == null || frame.getVisibility() != View.VISIBLE) return;
+        embeddedNavigatorLaunchPending = true;
+        frame.post(() -> {
+            embeddedNavigatorLaunchPending = false;
+            if (editMode || !isEmbeddedNavigatorPanelEnabled()
+                    || frame.getWindowToken() == null) return;
+            Rect bounds = new Rect();
+            if (!frame.getGlobalVisibleRect(bounds) || bounds.width() <= 0
+                    || bounds.height() <= 0) return;
+            EmbeddedNavigatorContract.savePanelBounds(this, bounds);
+            int displayId = frame.getDisplay() == null
+                    ? android.view.Display.DEFAULT_DISPLAY
+                    : frame.getDisplay().getDisplayId();
+            EmbeddedNavigatorOverlayControls controls =
+                    EmbeddedNavigatorOverlayControls.get(this);
+            if (EmbeddedNavigatorRuntime.hasNavigatorActivity()) {
+                controls.showExpand(bounds, displayId);
+                return;
+            }
+            try {
+                startActivity(EmbeddedNavigatorContract.windowIntent(this, false));
+                navigationUiHandler.postDelayed(
+                        () -> controls.showExpand(bounds, displayId), 700L);
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "Bundled Navigator could not be opened", failure);
+                Toast.makeText(this, "Встроенный Навигатор не запустился",
+                        Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void showAllApps() {
