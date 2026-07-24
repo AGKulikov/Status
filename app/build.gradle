@@ -81,7 +81,11 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingConfigs.release
+            // Release-candidate CI may build one explicitly unsigned APK and hand those exact
+            // bytes to the trusted offline signer. Never fall back to Android's debug key.
+            if (System.getenv("ALLOW_UNSIGNED_RELEASE") != "true") {
+                signingConfig signingConfigs.release
+            }
         }
         debug {
             debuggable true
