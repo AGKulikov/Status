@@ -165,6 +165,7 @@
                 android:includeFontPadding="false"
                 android:textColor="@color/text_primary"
                 android:textSize="16sp"
+                android:visibility="gone"
                 tools:text=" 4:56" />
         </LinearLayout>
 
