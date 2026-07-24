@@ -132,6 +132,15 @@ public final class SettingsBackNavigationContractTest {
     }
 
     @Test
+    public void sharedChromeScreensDoNotRenderASecondLegacyBackButton() throws IOException {
+        for (String screen : SHARED_CHROME_DETAILS) {
+            String source = javaSource(screen);
+            assertFalse(screen + " must rely on the one shared Back control",
+                    source.contains("setText(\"←  Назад\")"));
+        }
+    }
+
+    @Test
     public void explicitBackRowsStayBelowTheLiveStatusOverlay() throws IOException {
         for (String screen : EXPLICIT_SAFE_INSET_DETAILS) {
             assertTrue(screen + " must apply the shared safe top inset without another Back button",

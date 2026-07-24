@@ -116,14 +116,6 @@ public final class FavoriteAppsSettingsActivity extends AppCompatActivity {
         content.setPadding(dp(24), dp(18), dp(24), dp(34));
         scroll.addView(content, new ScrollView.LayoutParams(match(), wrap()));
 
-        MaterialButton back = new MaterialButton(this);
-        back.setText("←  Назад");
-        back.setAllCaps(false);
-        back.setOnClickListener(v -> finish());
-        LinearLayout.LayoutParams backLp = new LinearLayout.LayoutParams(dp(190), dp(50));
-        backLp.bottomMargin = dp(8);
-        content.addView(back, backLp);
-
         TextView title = text("Избранные приложения", 26, true);
         content.addView(title);
         TextView hint = text("Добавляйте приложения из установленного списка, меняйте их порядок и настраивайте каждую иконку отдельно. Кнопки «Сохранить» нет — изменения применяются автоматически.", 15, false);
