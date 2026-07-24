@@ -5,7 +5,7 @@
 
 package dezz.status.widget;
 
-import android.ComponentName;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
