@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   build:
@@ -68,7 +70,9 @@ jobs:
           CERTS=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK")
           echo "$CERTS"
           echo "$CERTS" | grep -qi "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
-          unzip -p "$APK" 'classes*.dex' | strings | grep -q 'androidx/concurrent/futures/ResolvableFuture'
+          unzip -p "$APK" 'classes*.dex' > all-classes.dex
+          strings all-classes.dex > all-classes.strings
+          grep -q 'androidx/concurrent/futures/ResolvableFuture' all-classes.strings
           if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml | grep -q 'android:debuggable'; then
             echo "Release APK must not be debuggable" >&2
             exit 1
@@ -85,3 +89,21 @@ jobs:
             app/build/outputs/apk/geely/release/status-widget-ha-v2.8.2-ha1076-stable.apk.sha256
           if-no-files-found: error
           retention-days: 30
+
+      - name: Report stable workflow run
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const state = '${{ job.status }}';
+            const body = [
+              `HA1076 stable workflow: **${state}**`,
+              `Run: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              `Commit: ${context.sha}`
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 7,
+              body
+            });
