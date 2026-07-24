@@ -40,7 +40,9 @@ public final class MqttSettingsActivity extends AppCompatActivity {
     @Override protected void onCreate(@Nullable Bundle state) {
         super.onCreate(state);
         prefs = new Preferences(this);
-        setContentView(buildScreen());
+        View screen = buildScreen();
+        setContentView(screen);
+        dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(this, screen);
     }
 
     private View buildScreen() {

@@ -85,11 +85,16 @@ public class AppSelectionActivity extends AppCompatActivity {
                 v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
                 return windowInsets;
             });
+            dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(
+                    this, binding.contentLayout);
 
             binding.backButton.setOnClickListener(v -> finish());
 
             prefs = new Preferences(this);
             String prefKey = getIntent().getStringExtra(EXTRA_PREF_KEY);
+            if (prefKey != null && !prefs.isHideListKey(prefKey)) {
+                throw new IllegalArgumentException("Недопустимый список приложений: " + prefKey);
+            }
             target = (prefKey != null)
                     ? new Preferences.StringSet(prefs, prefKey)
                     : prefs.hideInPackages;

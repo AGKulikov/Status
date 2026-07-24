@@ -31,6 +31,8 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.widget.NestedScrollView;
 
+import com.google.android.material.button.MaterialButton;
+
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,6 +56,7 @@ import dezz.status.widget.scenario.Result;
 import dezz.status.widget.scenario.Rule;
 import dezz.status.widget.scenario.RuleSet;
 import dezz.status.widget.scenario.ScenarioPresets;
+import dezz.status.widget.settings.AppleColorPickerDialog;
 
 /** Visual, slider-based appearance editor shared by the main row and popup tiles. */
 public final class VisualBrickEditorActivity extends AppCompatActivity {
@@ -118,7 +121,9 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
             finish();
             return;
         }
-        setContentView(buildScreen());
+        View screen = buildScreen();
+        setContentView(screen);
+        dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(this, screen);
         screenReady = true;
     }
 
@@ -365,10 +370,11 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         text.setText(initialText);
         row.addView(text, weighted());
         final String[] color = {initialColor};
-        Button colorButton = button(colorName(initialColor));
+        MaterialButton colorButton = new MaterialButton(this);
+        AppleColorPickerDialog.decorateButton(colorButton, "Цвет", initialColor);
         colorButton.setOnClickListener(v -> chooseColor(color[0], selected -> {
             color[0] = selected;
-            colorButton.setText(colorName(selected));
+            AppleColorPickerDialog.decorateButton(colorButton, "Цвет", selected);
             consumer.accept(text(text), selected);
         }));
         row.addView(colorButton);
@@ -380,11 +386,12 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         LinearLayout row = row();
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.addView(label(title), weighted());
-        Button button = button(colorName(initial));
+        MaterialButton button = new MaterialButton(this);
+        AppleColorPickerDialog.decorateButton(button, "Цвет", initial);
         final String[] current = {initial};
         button.setOnClickListener(v -> chooseColor(current[0], value -> {
             current[0] = value;
-            button.setText(colorName(value));
+            AppleColorPickerDialog.decorateButton(button, "Цвет", value);
             consumer.accept(value);
         }));
         row.addView(button);
@@ -523,10 +530,11 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         form.addView(replacementHint, topMargin(2));
 
         final String[] selectedColor = {existing == null ? null : existing.output.textColor};
-        Button color = button("Цвет: " + colorName(selectedColor[0]));
+        MaterialButton color = new MaterialButton(this);
+        AppleColorPickerDialog.decorateButton(color, "Цвет при совпадении", selectedColor[0]);
         color.setOnClickListener(v -> chooseRuleColor(selectedColor[0], value -> {
             selectedColor[0] = value;
-            color.setText("Цвет: " + colorName(value));
+            AppleColorPickerDialog.decorateButton(color, "Цвет при совпадении", value);
         }));
         form.addView(color, topMargin(8));
 
@@ -766,44 +774,35 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
     }
 
     private void chooseRuleColor(@Nullable String current, NullableColorConsumer consumer) {
-        String[] labels = {"Не менять исходный цвет", "Белый", "Зелёный", "Жёлтый",
-                "Оранжевый", "Красный", "Фиолетовый", "Голубой", "Серый",
-                "Чёрный", "Прозрачный", "Свой цвет…"};
-        String[] colors = {null, "#FFFFFFFF", "#FF4CAF50", "#FFFFC107", "#FFFF9800",
-                "#FFF44336", "#FF9C27B0", "#FF03A9F4", "#FF9E9E9E", "#FF000000",
-                "transparent"};
-        new AlertDialog.Builder(this).setTitle("Цвет при совпадении")
-                .setItems(labels, (d, which) -> {
-                    if (which < colors.length) consumer.accept(colors[which]);
-                    else customColor(current == null ? "#FFFFFFFF" : current, consumer::accept);
-                }).setNegativeButton("Отмена", null).show();
+        AppleColorPickerDialog.show(this, "Цвет при совпадении", current,
+                AppleColorPickerDialog.Options.inheritable(),
+                new AppleColorPickerDialog.Listener() {
+                    @Override public void onPreview(@Nullable String value) {
+                        consumer.accept(value);
+                    }
+
+                    @Override public void onSelected(@Nullable String value) {
+                        consumer.accept(value);
+                    }
+                });
     }
 
     private void chooseColor(String current, ColorConsumer consumer) {
-        String[] labels = {"Белый", "Зелёный", "Оранжевый", "Красный", "Голубой",
-                "Серый", "Чёрный", "Прозрачный", "Свой цвет…"};
-        String[] colors = {"#FFFFFFFF", "#FF4CAF50", "#FFFF9800", "#FFF44336",
-                "#FF03A9F4", "#FF9E9E9E", "#FF000000", "transparent"};
-        new AlertDialog.Builder(this).setTitle("Выберите цвет").setItems(labels, (d, which) -> {
-            if (which < colors.length) consumer.accept(colors[which]);
-            else customColor(current, consumer);
-        }).setNegativeButton("Отмена", null).show();
-    }
-
-    private void customColor(String current, ColorConsumer consumer) {
-        EditText input = new EditText(this);
-        input.setSingleLine(true);
-        input.setText(current);
-        new AlertDialog.Builder(this).setTitle("Цвет #AARRGGBB")
-                .setView(input).setNegativeButton("Отмена", null)
-                .setPositiveButton("Применить", (d, w) -> {
-                    String value = text(input);
-                    try {
-                        if (!"transparent".equalsIgnoreCase(value)) Color.parseColor(value);
-                        consumer.accept(value);
+        AppleColorPickerDialog.show(this, "Выберите цвет", current,
+                AppleColorPickerDialog.Options.standard(),
+                new AppleColorPickerDialog.Listener() {
+                    private void apply(@Nullable String value) {
+                        consumer.accept(value == null ? current : value);
                     }
-                    catch (Exception e) { Toast.makeText(this, "Неверный цвет", Toast.LENGTH_LONG).show(); }
-                }).show();
+
+                    @Override public void onPreview(@Nullable String value) {
+                        apply(value);
+                    }
+
+                    @Override public void onSelected(@Nullable String value) {
+                        apply(value);
+                    }
+                });
     }
 
     private void chooseRulePreset() {

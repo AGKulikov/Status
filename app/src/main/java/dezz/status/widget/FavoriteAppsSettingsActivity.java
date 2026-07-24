@@ -84,7 +84,9 @@ public final class FavoriteAppsSettingsActivity extends AppCompatActivity {
         preferences = new Preferences(this);
         store = new FavoriteAppsConfigStore(preferences);
         setTitle("Избранные приложения HOME");
-        setContentView(buildScreen());
+        View screen = buildScreen();
+        setContentView(screen);
+        dezz.status.widget.settings.SettingsBackNavigation.install(this, screen);
         refreshRows();
         loadCatalog();
     }

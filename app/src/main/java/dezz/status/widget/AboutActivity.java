@@ -89,27 +89,16 @@ public class AboutActivity extends AppCompatActivity {
             v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
             return windowInsets;
         });
+        dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(
+                this, binding.contentLayout);
 
         binding.backButton.setOnClickListener(v -> finish());
 
         binding.appVersionText.setText("Status Widget · версия "
                 + VersionGetter.getAppVersionName(this) + "\n" + getPackageName());
-        binding.haSettingsButton.setOnClickListener(v -> startActivity(
-                new Intent(this, HomeAssistantSettingsActivity.class)));
-        binding.mqttSettingsButton.setOnClickListener(v -> startActivity(
-                new Intent(this, MqttSettingsActivity.class)));
-        binding.sprutSettingsButton.setOnClickListener(v -> startActivity(
-                new Intent(this, SprutHubSettingsActivity.class)));
-        binding.mainBricksButton.setOnClickListener(v -> startActivity(
-                new Intent(this, AutomationSettingsActivity.class)));
-        binding.popupSettingsButton.setOnClickListener(v -> startActivity(
-                new Intent(this, PopupSettingsActivity.class)));
-        binding.climatePanelSettingsButton.setOnClickListener(v -> startActivity(
-                new Intent(this, ClimatePanelSettingsActivity.class)));
-        binding.scenarioSettingsButton.setOnClickListener(v -> startActivity(
-                new Intent(this, ScenarioSettingsActivity.class)));
-        binding.intentSettingsButton.setOnClickListener(v -> startActivity(
-                new Intent(this, IntentScenarioSettingsActivity.class)));
+        binding.allSettingsButton.setOnClickListener(v -> startActivity(
+                SettingsHubActivity.intent(this,
+                        dezz.status.widget.settings.SettingsDestinationCatalog.Group.APP)));
 
         requestCarDiagnostics();
         refreshConnectionStatuses();

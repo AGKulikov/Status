@@ -19,4 +19,19 @@
     <color name="widget_background">#000000</color>
     <color name="text_primary">#FFFFFFFF</color>
     <color name="text_outline">#AA000000</color>
+
+    <color name="settings_accent">#0A84FF</color>
+    <color name="settings_background">#FF000000</color>
+    <color name="settings_sidebar_background">#FF111113</color>
+    <color name="settings_group_background">#FF1C1C1E</color>
+    <color name="settings_search_background">#FF2C2C2E</color>
+    <color name="settings_separator">#FF38383A</color>
+    <color name="settings_secondary_text">#99EBEBF5</color>
+    <color name="settings_tertiary_text">#4DEBEBF5</color>
+    <color name="settings_pressed">#330A84FF</color>
+    <color name="settings_destructive">#FF453A</color>
+    <color name="settings_success">#30D158</color>
+    <color name="settings_warning">#FF9F0A</color>
+    <color name="settings_purple">#BF5AF2</color>
+    <color name="settings_indigo">#5E5CE6</color>
 </resources>

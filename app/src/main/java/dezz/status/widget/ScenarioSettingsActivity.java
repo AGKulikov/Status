@@ -63,6 +63,7 @@ import dezz.status.widget.scenario.Operator;
 import dezz.status.widget.scenario.Scenario;
 import dezz.status.widget.scenario.TargetScope;
 import dezz.status.widget.scenario.ValueReference;
+import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.sprut.SprutCatalog;
 import dezz.status.widget.sprut.SprutHubCatalogStore;
 import dezz.status.widget.sprut.SprutHubController;
@@ -129,7 +130,13 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         super.onCreate(state);
         prefs = new Preferences(this);
         loadEntries();
-        setContentView(buildScreen());
+        showContent();
+    }
+
+    private void showContent() {
+        View screen = buildScreen();
+        setContentView(screen);
+        dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(this, screen);
     }
 
     private View buildScreen() {
@@ -226,7 +233,7 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                         loadEntries();
                         // Rebuild the whole screen so a repaired JSON document also removes the
                         // old error banner and re-enables the Add button immediately.
-                        setContentView(buildScreen());
+                        showContent();
                         Toast.makeText(this, "JSON сценариев сохранён", Toast.LENGTH_SHORT).show();
                     } catch (Exception error) {
                         showValidationError(error);
@@ -1125,42 +1132,24 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                         }).setNegativeButton("Отмена", null).show();
                 return;
             }
-            String[] labels = {"Белый", "Зелёный", "Оранжевый", "Красный", "Голубой",
-                    "Серый", "Чёрный", "Прозрачный", "Свой цвет…"};
-            String[] colors = {"#FFFFFFFF", "#FF4CAF50", "#FFFF9800", "#FFF44336",
-                    "#FF03A9F4", "#FF9E9E9E", "#FF000000", "transparent"};
-            new AlertDialog.Builder(ScenarioSettingsActivity.this).setTitle("Цвет")
-                    .setItems(labels, (d, which) -> {
-                        if (which < colors.length) {
-                            destination.setText(colors[which]);
-                            destinationButton.setText("Выбрано: " + labels[which]);
-                        } else {
-                            chooseCustomActionColor(destination, destinationButton);
+            String current = text(destination).isEmpty() ? "#FFFFFFFF" : text(destination);
+            AppleColorPickerDialog.show(ScenarioSettingsActivity.this, "Цвет", current,
+                    AppleColorPickerDialog.Options.standard(),
+                    new AppleColorPickerDialog.Listener() {
+                        private void apply(@Nullable String selected) {
+                            String value = selected == null ? current : selected;
+                            destination.setText(value);
+                            destinationButton.setText("Выбрано: " + value);
                         }
-                    }).setNegativeButton("Отмена", null).show();
-        }
 
-        private void chooseCustomActionColor(EditText destination, Button destinationButton) {
-            EditText value = new EditText(ScenarioSettingsActivity.this);
-            value.setSingleLine(true);
-            value.setText(text(destination).isEmpty() ? "#FFFFFFFF" : text(destination));
-            new AlertDialog.Builder(ScenarioSettingsActivity.this)
-                    .setTitle("Цвет #AARRGGBB")
-                    .setView(value)
-                    .setNegativeButton("Отмена", null)
-                    .setPositiveButton("Применить", (dialog, which) -> {
-                        String selected = text(value);
-                        try {
-                            if (!"transparent".equalsIgnoreCase(selected)) {
-                                android.graphics.Color.parseColor(selected);
-                            }
-                            destination.setText(selected);
-                            destinationButton.setText("Выбрано: " + selected);
-                        } catch (IllegalArgumentException invalid) {
-                            Toast.makeText(ScenarioSettingsActivity.this,
-                                    "Неверный формат цвета", Toast.LENGTH_LONG).show();
+                        @Override public void onPreview(@Nullable String selected) {
+                            apply(selected);
                         }
-                    }).show();
+
+                        @Override public void onSelected(@Nullable String selected) {
+                            apply(selected);
+                        }
+                    });
         }
 
         private void showTargetPicker() {

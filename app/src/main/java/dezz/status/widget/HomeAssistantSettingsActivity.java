@@ -82,7 +82,9 @@ public final class HomeAssistantSettingsActivity extends AppCompatActivity {
         }
         mainStore = new HaBrickConfigStore(prefs);
         popupStore = new PopupItemConfigStore(prefs);
-        setContentView(buildScreen());
+        View screen = buildScreen();
+        setContentView(screen);
+        dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(this, screen);
         reloadCatalog();
     }
 
@@ -108,6 +110,7 @@ public final class HomeAssistantSettingsActivity extends AppCompatActivity {
         header.setGravity(Gravity.CENTER_VERTICAL);
         Button back = new Button(this);
         back.setText("‹");
+        back.setContentDescription("Назад");
         back.setOnClickListener(view -> finish());
         header.addView(back, new LinearLayout.LayoutParams(dp(60), dp(52)));
         header.addView(heading("Home Assistant — прямое подключение", 24), weighted());

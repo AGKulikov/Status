@@ -75,14 +75,21 @@
         android:theme="@style/Theme.StatusWidget">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".SettingsHubActivity"
             android:exported="true"
-            android:launchMode="singleTask">
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape" />
 
         <activity
             android:name=".LauncherActivity"
@@ -121,6 +128,11 @@
 
         <activity
             android:name=".VehicleInfoPanelSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".InformationPanelSettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />
 

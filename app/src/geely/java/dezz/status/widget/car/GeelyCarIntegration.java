@@ -92,6 +92,13 @@ final class GeelyCarIntegration implements CarIntegration {
      */
     private static final float MIN_PLAUSIBLE_TEMPERATURE_C = -40f;
     private static final float MAX_PLAUSIBLE_TEMPERATURE_C = 85f;
+    /**
+     * The reference mHUD implementation samples temperature no more than once per second and
+     * takes a rolling median. Fifteen samples keep the requested window odd (one exact middle)
+     * while rejecting the short ambient-sensor spikes which made the old brick jump.
+     */
+    private static final int OUTDOOR_TEMPERATURE_WINDOW_SIZE = 15;
+    private static final long OUTDOOR_TEMPERATURE_SAMPLE_INTERVAL_MS = 1_000L;
 
     /** Fast boot probes followed by a low-frequency, unbounded service-recovery probe. */
     private static final long AVAILABILITY_FAST_POLL_INTERVAL_MS = 2_000L;
@@ -143,6 +150,14 @@ final class GeelyCarIntegration implements CarIntegration {
     private final Context appContext;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Map<BrickType, Subscription> subscriptions = new EnumMap<>(BrickType.class);
+    /**
+     * Kept at integration/brick scope rather than listener scope: applyPreferences can replace a
+     * listener without ending the sensor session, and such a harmless rebind must retain history.
+     * Telemetry subscriptions deliberately do not share this state.
+     */
+    private final BoundedRollingMedian outdoorTemperatureFilter = new BoundedRollingMedian(
+            OUTDOOR_TEMPERATURE_WINDOW_SIZE, MIN_PLAUSIBLE_TEMPERATURE_C,
+            MAX_PLAUSIBLE_TEMPERATURE_C, OUTDOOR_TEMPERATURE_SAMPLE_INTERVAL_MS);
     /** Main-thread desired brick subscriptions, including registrations waiting for Binder. */
     private final Set<BrickType> requestedBrickTypes = new HashSet<>();
     private final Object telemetryLock = new Object();
@@ -190,6 +205,22 @@ final class GeelyCarIntegration implements CarIntegration {
 
     @Nullable
     private volatile ISensor sensors;
+    /**
+     * Last successfully registered source for the visible outdoor-temperature brick.
+     *
+     * <p>It intentionally outlives a cache invalidation: a failure while probing another signal
+     * must not reject still-live ambient callbacks before a replacement listener has actually
+     * registered. Once a new source registers, the pointer changes atomically and late callbacks
+     * from the old Binder are rejected.</p>
+     */
+    @Nullable
+    private volatile ISensor outdoorBrickSource;
+    /** One live callback may arrive synchronously from inside registerListener(). */
+    @Nullable
+    private ISensor pendingOutdoorBrickSource;
+    private boolean hasPendingOutdoorSample;
+    private float pendingOutdoorSample;
+    private long pendingOutdoorSampleElapsedMillis;
     @Nullable
     private volatile ICar carApi;
     @Nullable
@@ -275,6 +306,16 @@ final class GeelyCarIntegration implements CarIntegration {
             this.registrationSource = registrationSource;
             this.sensorListener = sensorListener;
             this.cancelled = cancelled;
+        }
+    }
+
+    private static final class OutdoorSourceActivation {
+        final long epoch;
+        final boolean replayedSynchronousSample;
+
+        OutdoorSourceActivation(long epoch, boolean replayedSynchronousSample) {
+            this.epoch = epoch;
+            this.replayedSynchronousSample = replayedSynchronousSample;
         }
     }
 
@@ -905,7 +946,7 @@ final class GeelyCarIntegration implements CarIntegration {
             if (info == null) Log.w(TAG, "eCarX car info manager is not ready; will retry");
             return info;
         } catch (Throwable t) {
-            invalidateCarServices();
+            invalidateCarInfoProxy();
             Log.w(TAG, "eCarX car info manager unavailable; will retry", t);
             return null;
         }
@@ -919,6 +960,15 @@ final class GeelyCarIntegration implements CarIntegration {
     private synchronized void invalidateCarServices() {
         sensors = null;
         carFunctions = null;
+        carApi = null;
+        // Recreating the complete car-service stack is a real sensor-source boundary. Never
+        // blend the first current readings after Binder recovery with the previous proxy's
+        // rolling window.
+        outdoorTemperatureFilter.reset();
+    }
+
+    /** ICarInfo is not cached; replacing its root must not disturb live ISensor subscriptions. */
+    private synchronized void invalidateCarInfoProxy() {
         carApi = null;
     }
 
@@ -934,6 +984,9 @@ final class GeelyCarIntegration implements CarIntegration {
         if (failed == null || sensors == failed) {
             sensors = null;
             carApi = null;
+            // A dead manager is a real source/session boundary. Retaining the previous drive's
+            // ambient samples would make the first readings after recovery misleading.
+            outdoorTemperatureFilter.reset();
         }
     }
 
@@ -1054,7 +1107,7 @@ final class GeelyCarIntegration implements CarIntegration {
             out.add(new CarDiagnosticValue("ICarInfo." + id, label, String.valueOf(status), raw,
                     unitNote + "; info=" + infoType, numeric));
         } catch (Throwable t) {
-            invalidateCarServices();
+            invalidateCarInfoProxy();
             out.add(new CarDiagnosticValue("ICarInfo." + id, label, "error",
                     t.getClass().getSimpleName(), unitNote));
         }
@@ -1085,7 +1138,7 @@ final class GeelyCarIntegration implements CarIntegration {
             return info == null ? null
                     : info.isCarInfoSupported(ICarInfo.FLT_INFO_FUEL_CAPACITY);
         } catch (Throwable t) {
-            invalidateCarServices();
+            invalidateCarInfoProxy();
             Log.w(TAG, "fuel capacity support query failed", t);
             return null;
         }
@@ -1192,7 +1245,11 @@ final class GeelyCarIntegration implements CarIntegration {
         if (slowProbe) {
             // A non-null proxy may belong to a service process which died. Force the slow
             // health probe through newly resolved managers instead of trusting that proxy.
-            invalidateCarServices();
+            if (recoverySensorTypes.isEmpty()) {
+                invalidateCarInfoProxy();
+            } else {
+                invalidateCarServices();
+            }
         }
         if (availabilityPollAttempts < AVAILABILITY_FAST_POLL_ATTEMPTS) {
             availabilityPollAttempts++;
@@ -1287,25 +1344,51 @@ final class GeelyCarIntegration implements CarIntegration {
 
             @Override
             public void onSensorSupportChanged(int changedType, FunctionStatus status) {
+                long expectedOutdoorEpoch = type == BrickType.OUTDOOR_TEMP
+                        ? outdoorTemperatureFilter.epoch() : 0L;
                 if (changedType != sensorType || cancelled.get()) return;
                 if (isSupported(status)) {
                     mainHandler.post(() -> emitInitialBrickValue(
                             s, sensorType, type, listener, cancelled));
-                } else if (status == null || status == FunctionStatus.error) {
-                    requestSensorRecovery(sensorType);
+                } else {
+                    if (type == BrickType.OUTDOOR_TEMP
+                            && status == FunctionStatus.notavailable) {
+                        resetOutdoorTemperatureIfCurrentSource(s, expectedOutdoorEpoch);
+                    }
+                    if (status == null || status == FunctionStatus.error) {
+                        requestSensorRecovery(sensorType);
+                    }
                 }
             }
 
             @Override
             public void onSensorValueChanged(int changedType, float value) {
+                long expectedOutdoorEpoch = type == BrickType.OUTDOOR_TEMP
+                        ? outdoorTemperatureFilter.epoch() : 0L;
                 if (cancelled.get() || changedType != sensorType
                         || !isPlausibleTemperature(value)
-                        || !isSensorCurrentlySupported(s, sensorType)) return;
+                        || !isSensorCurrentlySupported(
+                                s, sensorType, type, expectedOutdoorEpoch)) return;
+                // Capture arrival time on the Binder callback thread. If the HU main thread is
+                // busy, several genuinely one-second-apart readings may be drained together;
+                // timing them inside the posted runnable would falsely collapse that whole batch
+                // into one sample.
+                long observedElapsedMillis = SystemClock.elapsedRealtime();
+                // The filter is integration-scoped and thread-safe. Accept the live sample before
+                // posting UI delivery: applyPreferences may replace/cancel this listener while
+                // the main queue is busy, but that harmless rebind must not discard a genuine
+                // current-session reading from the rolling window.
+                float filteredValue = filterBrickTemperature(
+                        type, value, observedElapsedMillis, expectedOutdoorEpoch, s);
+                if (!Float.isFinite(filteredValue)) return;
                 // AdaptAPI delivers on a binder thread; the contract is main-thread delivery.
                 mainHandler.post(() -> {
-                    if (cancelled.get()) return;
+                    if (cancelled.get()
+                            || (type == BrickType.OUTDOOR_TEMP
+                            && !isOutdoorTemperatureSourceCurrent(
+                                    s, expectedOutdoorEpoch))) return;
                     markSensorRecovered(sensorType);
-                    listener.onValue(type, value);
+                    listener.onValue(type, filteredValue);
                 });
             }
         }, cancelled);
@@ -1313,20 +1396,33 @@ final class GeelyCarIntegration implements CarIntegration {
         // Register the replacement BEFORE dropping the old listener: if the vendor side
         // transiently rejects the registration we keep the previous, still-working
         // subscription instead of silently freezing the brick.
+        if (type == BrickType.OUTDOOR_TEMP) {
+            beginOutdoorTemperatureSourceRegistration(s);
+        }
         try {
             if (!s.registerListener(subscription.sensorListener, sensorType)) {
+                cancelled.set(true);
+                if (type == BrickType.OUTDOOR_TEMP) {
+                    cancelOutdoorTemperatureSourceRegistration(s);
+                }
                 Log.w(TAG, "registerListener rejected for " + type
                         + (previous != null ? " — keeping previous subscription" : ""));
                 requestSensorRecovery(sensorType);
                 return;
             }
         } catch (Throwable t) {
+            cancelled.set(true);
+            if (type == BrickType.OUTDOOR_TEMP) {
+                cancelOutdoorTemperatureSourceRegistration(s);
+            }
             invalidateSensorProxy(s);
             Log.w(TAG, "registerListener failed for " + type
                     + (previous != null ? " — keeping previous subscription" : ""), t);
             requestSensorRecovery(sensorType);
             return;
         }
+        OutdoorSourceActivation outdoorActivation = type == BrickType.OUTDOOR_TEMP
+                ? activateOutdoorTemperatureSource(s) : null;
         if (previous != null) {
             previous.cancelled.set(true);
             try {
@@ -1337,17 +1433,41 @@ final class GeelyCarIntegration implements CarIntegration {
         }
         subscriptions.put(type, subscription);
 
-        // Seed with the latest cached value so the brick shows a temperature immediately
-        // instead of a placeholder until the sensor's next change event (which for slow-moving
-        // ambient temperature can be minutes away).
+        if (outdoorActivation != null && outdoorActivation.replayedSynchronousSample) {
+            // A few AdaptAPI implementations invoke the listener from inside registerListener().
+            // That sample was buffered until registration succeeded; deliver the current median
+            // directly instead of depending on the vendor cache also being valid.
+            mainHandler.post(() -> {
+                if (cancelled.get()) return;
+                float replayed = outdoorTemperatureMedianIfCurrentSource(
+                        s, outdoorActivation.epoch);
+                if (!Float.isFinite(replayed)) return;
+                markSensorRecovered(sensorType);
+                listener.onValue(type, replayed);
+            });
+            return;
+        }
+
+        // Read the vendor cache to recover indoor temperature immediately and to confirm sensor
+        // health. Outdoor smoothing deliberately does not seed a new session from this value:
+        // after HU boot getSensorLatestValue() may still belong to the previous ignition cycle.
         emitInitialBrickValue(s, sensorType, type, listener, cancelled);
     }
 
     private void emitInitialBrickValue(ISensor source, int sensorType, BrickType type,
                                        ValueListener listener, AtomicBoolean cancelled) {
+        long expectedOutdoorEpoch = type == BrickType.OUTDOOR_TEMP
+                ? outdoorTemperatureFilter.epoch() : 0L;
         if (cancelled.get()) return;
         FunctionStatus status = sensorSupportStatus(source, sensorType);
         if (!isSupported(status)) {
+            if (type == BrickType.OUTDOOR_TEMP
+                    && status == FunctionStatus.notavailable) {
+                // Some OEM builds never emit onSensorSupportChanged. A definitive unavailable
+                // result from the synchronous rebind probe is still a real session boundary and
+                // must prevent the previous live window from resurfacing after recovery.
+                resetOutdoorTemperatureIfCurrentSource(source, expectedOutdoorEpoch);
+            }
             if (status == null || status == FunctionStatus.error) {
                 requestSensorRecovery(sensorType);
             }
@@ -1356,10 +1476,34 @@ final class GeelyCarIntegration implements CarIntegration {
         try {
             float latest = source.getSensorLatestValue(sensorType);
             if (isPlausibleTemperature(latest)) {
+                final float initialValue;
+                if (type == BrickType.OUTDOOR_TEMP) {
+                    // An ordinary listener replacement may reuse the already-current live window,
+                    // but an empty window waits for the first new onSensorValueChanged packet.
+                    // Thus startup averages contain exactly the 1..15 fresh samples received in
+                    // this sensor session, never a cached value from the previous drive.
+                    initialValue = outdoorTemperatureMedianIfCurrentSource(
+                            source, expectedOutdoorEpoch);
+                    if (!Float.isFinite(initialValue)) {
+                        mainHandler.post(() -> {
+                            if (!cancelled.get()
+                                    && isOutdoorTemperatureSourceCurrent(
+                                            source, expectedOutdoorEpoch)) {
+                                markSensorRecovered(sensorType);
+                            }
+                        });
+                        return;
+                    }
+                } else {
+                    initialValue = latest;
+                }
                 mainHandler.post(() -> {
-                    if (!cancelled.get()) {
+                    if (!cancelled.get()
+                            && (type != BrickType.OUTDOOR_TEMP
+                            || isOutdoorTemperatureSourceCurrent(
+                                    source, expectedOutdoorEpoch))) {
                         markSensorRecovered(sensorType);
-                        listener.onValue(type, latest);
+                        listener.onValue(type, initialValue);
                     }
                 });
             } else if (isObviousFloatSentinel(latest)) {
@@ -1373,12 +1517,107 @@ final class GeelyCarIntegration implements CarIntegration {
     }
 
     /** Temperature brick events are infrequent; re-check support before exposing a value. */
-    private boolean isSensorCurrentlySupported(ISensor source, int sensorType) {
+    private boolean isSensorCurrentlySupported(ISensor source, int sensorType, BrickType type,
+                                               long expectedOutdoorEpoch) {
         FunctionStatus status = sensorSupportStatus(source, sensorType);
         if (status == null || status == FunctionStatus.error) {
             requestSensorRecovery(sensorType);
+        } else if (type == BrickType.OUTDOOR_TEMP
+                && status == FunctionStatus.notavailable) {
+            resetOutdoorTemperatureIfCurrentSource(source, expectedOutdoorEpoch);
         }
         return isSupported(status);
+    }
+
+    /**
+     * Apply smoothing only to the built-in outside-temperature brick. The independent
+     * {@code ISensor.ambient_temp} telemetry stream intentionally remains raw so its subscribers
+     * cannot add samples to, throttle, or reset the widget's rolling window.
+     */
+    private float filterBrickTemperature(@NonNull BrickType type, float value,
+                                         long observedElapsedMillis, long expectedOutdoorEpoch,
+                                         @NonNull ISensor source) {
+        if (type != BrickType.OUTDOOR_TEMP) return value;
+        return offerOutdoorTemperatureIfCurrentSource(
+                value, observedElapsedMillis, expectedOutdoorEpoch, source);
+    }
+
+    /**
+     * Source identity and filter epoch form one atomic ownership check. Lock order is always this
+     * integration first and the rolling filter second, matching {@link #invalidateSensorProxy}.
+     */
+    private synchronized float offerOutdoorTemperatureIfCurrentSource(
+            float value, long observedElapsedMillis, long expectedEpoch,
+            @NonNull ISensor source) {
+        if (outdoorBrickSource != source) {
+            if (pendingOutdoorBrickSource == source) {
+                pendingOutdoorSample = value;
+                pendingOutdoorSampleElapsedMillis = observedElapsedMillis;
+                hasPendingOutdoorSample = true;
+            }
+            return Float.NaN;
+        }
+        return outdoorTemperatureFilter.offerIfEpoch(
+                value, observedElapsedMillis, expectedEpoch);
+    }
+
+    private synchronized float outdoorTemperatureMedianIfCurrentSource(
+            @NonNull ISensor source, long expectedEpoch) {
+        if (outdoorBrickSource != source
+                || outdoorTemperatureFilter.epoch() != expectedEpoch) {
+            return Float.NaN;
+        }
+        return outdoorTemperatureFilter.median();
+    }
+
+    private synchronized boolean isOutdoorTemperatureSourceCurrent(
+            @NonNull ISensor source, long expectedEpoch) {
+        return outdoorBrickSource == source
+                && outdoorTemperatureFilter.epoch() == expectedEpoch;
+    }
+
+    private synchronized void resetOutdoorTemperatureIfCurrentSource(
+            @NonNull ISensor source, long expectedEpoch) {
+        if (outdoorBrickSource == source) {
+            outdoorTemperatureFilter.resetIfEpoch(expectedEpoch);
+        }
+    }
+
+    @NonNull
+    private synchronized OutdoorSourceActivation activateOutdoorTemperatureSource(
+            @NonNull ISensor source) {
+        if (outdoorBrickSource != source) {
+            outdoorBrickSource = source;
+            outdoorTemperatureFilter.reset();
+        }
+        boolean replayed = false;
+        if (pendingOutdoorBrickSource == source) {
+            if (hasPendingOutdoorSample) {
+                outdoorTemperatureFilter.offer(
+                        pendingOutdoorSample, pendingOutdoorSampleElapsedMillis);
+                replayed = true;
+            }
+            clearPendingOutdoorTemperatureSource();
+        }
+        return new OutdoorSourceActivation(outdoorTemperatureFilter.epoch(), replayed);
+    }
+
+    private synchronized void beginOutdoorTemperatureSourceRegistration(
+            @NonNull ISensor source) {
+        clearPendingOutdoorTemperatureSource();
+        if (outdoorBrickSource != source) pendingOutdoorBrickSource = source;
+    }
+
+    private synchronized void cancelOutdoorTemperatureSourceRegistration(
+            @NonNull ISensor source) {
+        if (pendingOutdoorBrickSource == source) clearPendingOutdoorTemperatureSource();
+    }
+
+    private void clearPendingOutdoorTemperatureSource() {
+        pendingOutdoorBrickSource = null;
+        hasPendingOutdoorSample = false;
+        pendingOutdoorSample = 0f;
+        pendingOutdoorSampleElapsedMillis = 0L;
     }
 
     @Override
@@ -1391,6 +1630,16 @@ final class GeelyCarIntegration implements CarIntegration {
                 subscription.registrationSource.unregisterListener(subscription.sensorListener);
             } catch (Throwable t) {
                 Log.w(TAG, "unregisterListener failed for " + type, t);
+            }
+        }
+        if (type == BrickType.OUTDOOR_TEMP) {
+            synchronized (this) {
+                if (subscription == null
+                        || outdoorBrickSource == subscription.registrationSource) {
+                    outdoorBrickSource = null;
+                }
+                clearPendingOutdoorTemperatureSource();
+                outdoorTemperatureFilter.reset();
             }
         }
         mainHandler.post(this::pruneRecoveryRequests);
@@ -1914,7 +2163,7 @@ final class GeelyCarIntegration implements CarIntegration {
                 requestFuelCapacityRecovery();
             }
         } catch (Throwable t) {
-            invalidateCarServices();
+            invalidateCarInfoProxy();
             Log.w(TAG, "fuel capacity telemetry unavailable", t);
             requestFuelCapacityRecovery();
         }

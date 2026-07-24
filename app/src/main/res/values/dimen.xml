@@ -5,19 +5,26 @@
     <dimen name="optionsTextSizeLabel">24sp</dimen>
     <dimen name="optionsTextSizeFooter">12sp</dimen>
 
-    <dimen name="optionsPaddingHorizontal">24sp</dimen>
-    <dimen name="optionsPaddingVertical">12sp</dimen>
-    <dimen name="optionsMarginBig">20sp</dimen>
-    <dimen name="optionsMargin">16sp</dimen>
-    <dimen name="optionsMarginMedium">12sp</dimen>
-    <dimen name="optionsMarginSmall">8sp</dimen>
-    <dimen name="optionsScrollbarSize">8sp</dimen>
-    <dimen name="optionsLineHeight">48sp</dimen>
-    <dimen name="optionsElevation">2sp</dimen>
+    <!-- Geometry must use dp.  Using sp here made every card, icon and touch target move when the
+         user changed only the font scale. -->
+    <dimen name="optionsPaddingHorizontal">24dp</dimen>
+    <dimen name="optionsPaddingVertical">12dp</dimen>
+    <dimen name="optionsMarginBig">20dp</dimen>
+    <dimen name="optionsMargin">16dp</dimen>
+    <dimen name="optionsMarginMedium">12dp</dimen>
+    <dimen name="optionsMarginSmall">8dp</dimen>
+    <dimen name="optionsScrollbarSize">8dp</dimen>
+    <dimen name="optionsLineHeight">48dp</dimen>
+    <dimen name="optionsElevation">2dp</dimen>
 
-    <dimen name="appSelectionIconSize">48sp</dimen>
+    <dimen name="appSelectionIconSize">48dp</dimen>
 
-    <dimen name="sectionPadding">16sp</dimen>
-    <dimen name="sectionSpacing">12sp</dimen>
-    <dimen name="sectionHeaderIconSize">24sp</dimen>
+    <dimen name="sectionPadding">16dp</dimen>
+    <dimen name="sectionSpacing">12dp</dimen>
+    <dimen name="sectionHeaderIconSize">24dp</dimen>
+
+    <dimen name="settings_group_radius">16dp</dimen>
+    <dimen name="settings_row_min_height">64dp</dimen>
+    <dimen name="settings_icon_size">36dp</dimen>
+    <dimen name="settings_touch_target">48dp</dimen>
 </resources>

@@ -50,7 +50,7 @@ public final class NavigationPanelSettingsActivity extends AppCompatActivity {
         store = new NavigationPanelConfigStore(preferences);
         config = store.load();
         setTitle("Сетка навигации");
-        setContentView(buildContent());
+        showContent();
     }
 
     @Override
@@ -58,9 +58,15 @@ public final class NavigationPanelSettingsActivity extends AppCompatActivity {
         super.onResume();
         if (resumedOnce) {
             config = store.load();
-            setContentView(buildContent());
+            showContent();
         }
         resumedOnce = true;
+    }
+
+    private void showContent() {
+        View screen = buildContent();
+        setContentView(screen);
+        dezz.status.widget.settings.SettingsBackNavigation.install(this, screen);
     }
 
     @Override
@@ -133,7 +139,7 @@ public final class NavigationPanelSettingsActivity extends AppCompatActivity {
                 .setPositiveButton("Сбросить", (dialog, which) -> {
                     store.reset();
                     config = store.load();
-                    setContentView(buildContent());
+                    showContent();
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show());
@@ -254,7 +260,7 @@ public final class NavigationPanelSettingsActivity extends AppCompatActivity {
             @Override public void onStopTrackingTouch(SeekBar bar) {
                 if (!changed) return;
                 bar.post(() -> {
-                    if (rebuildScreen) setContentView(buildContent());
+                    if (rebuildScreen) showContent();
                     else rebuildElementList();
                 });
             }
@@ -280,7 +286,7 @@ public final class NavigationPanelSettingsActivity extends AppCompatActivity {
         TextView title = new TextView(this);
         title.setText(value);
         title.setTextSize(22);
-        title.setTextColor(Color.rgb(105, 165, 255));
+        title.setTextColor(getColor(R.color.settings_accent));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(match(), wrap());
         params.topMargin = dp(20);
         params.bottomMargin = dp(6);

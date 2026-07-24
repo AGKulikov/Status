@@ -7,12 +7,10 @@ package dezz.status.widget;
 
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.ViewGroup;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
@@ -26,18 +24,23 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
+import dezz.status.widget.settings.AppleColorPickerDialog;
+
 /** Human-readable HOME setup. Every switch writes immediately; there is no Save button. */
 public final class LauncherSettingsActivity extends AppCompatActivity {
     private Preferences preferences;
     private LinearLayout content;
     private TextView homeStatus;
+    private MaterialButton backgroundColorButton;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         preferences = new Preferences(this);
         setTitle("Домашний экран");
-        setContentView(buildContent());
+        View screen = buildContent();
+        setContentView(screen);
+        dezz.status.widget.settings.SettingsBackNavigation.install(this, screen);
     }
 
     @Override
@@ -72,34 +75,16 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         addSwitch("Полноэкранный режим", preferences.launcherImmersive);
         addSwitch("Показывать сетку в режиме редактирования", preferences.launcherShowGrid);
         addSnapControl();
-        addButton("Цвет фона…", v -> showBackgroundDialog());
+        backgroundColorButton = addButton("Цвет фона", v -> showBackgroundDialog());
+        AppleColorPickerDialog.decorateButton(backgroundColorButton, "Цвет фона",
+                preferences.launcherBackgroundColor.get());
 
-        addTitle("Панели");
-        addHint("Координаты и размеры хранятся в пикселях. На HOME нажмите «Изменить», перетащите панели и потяните за их правый нижний угол.");
-        addSwitch("Избранные приложения", preferences.launcherAppsVisible);
-        addSwitch("Медиапанель", preferences.launcherMediaVisible);
-        addSwitch("Часы", preferences.launcherClockVisible);
-        addCombinedNavigationSwitch();
-        addSwitch("Быстрые действия", preferences.launcherActionsVisible);
-        addSwitch("Отдельная климатическая панель", preferences.launcherClimateVisible);
-        addSwitch("Данные автомобиля / HUD", preferences.launcherVehicleInfoVisible);
-        addButton("Состав, порядок и размеры элементов панелей…", v ->
-                startActivity(new Intent(this, PanelElementSettingsActivity.class)));
-        addButton("Настроить избранные приложения…", v ->
-                startActivity(new Intent(this, FavoriteAppsSettingsActivity.class)));
-        addButton("Настроить медиапанель…", v ->
-                startActivity(new Intent(this, MediaPanelSettingsActivity.class)));
-        addButton("Сетка данных навигации…", v ->
-                startActivity(new Intent(this, NavigationPanelSettingsActivity.class)));
-        addButton("Настроить маршрут и избранное…", v ->
-                startActivity(new Intent(this, FavoriteRoutesSettingsActivity.class)));
-        addButton("Настроить климатическую панель…", v ->
-                startActivity(new Intent(this, ClimatePanelSettingsActivity.class)));
-        addButton("Настроить данные автомобиля…", v ->
-                startActivity(new Intent(this, VehicleInfoPanelSettingsActivity.class)));
-        addButton("Иконки, функции и приложения…", v ->
-                startActivity(new Intent(this, LauncherShortcutSettingsActivity.class)));
-        addActionsColumnsControl();
+        addTitle("Компоновка");
+        addHint("Размер и положение панелей меняются прямо на HOME. Видимость и содержимое "
+                + "задаются в едином разделе панелей — без дублирующих переключателей.");
+        addButton("Открыть единый раздел панелей…", v ->
+                startActivity(SettingsHubActivity.intent(this,
+                        dezz.status.widget.settings.SettingsDestinationCatalog.Group.PANELS)));
         addButton("Сбросить расположение панелей", v -> new AlertDialog.Builder(this)
                 .setTitle("Сбросить компоновку?")
                 .setMessage("Панели вернутся в исходные позиции. Остальные настройки не изменятся.")
@@ -159,53 +144,24 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         content.addView(row, new LinearLayout.LayoutParams(match(), dp(64)));
     }
 
-    private void addActionsColumnsControl() {
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        TextView label = new TextView(this);
-        label.setTextSize(17);
-        label.setText("Столбцов в панели иконок");
-        SeekBar seek = new SeekBar(this);
-        seek.setMax(5);
-        seek.setProgress(Math.max(0, Math.min(5, preferences.launcherActionsColumns.get() - 1)));
-        TextView value = new TextView(this);
-        value.setMinWidth(dp(60));
-        value.setGravity(Gravity.END);
-        value.setText(String.valueOf(seek.getProgress() + 1));
-        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar bar, int progress, boolean user) {
-                int columns = progress + 1;
-                value.setText(String.valueOf(columns));
-                if (user) preferences.launcherActionsColumns.set(columns);
-            }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
-        row.addView(label, new LinearLayout.LayoutParams(0, wrap(), .45f));
-        row.addView(seek, new LinearLayout.LayoutParams(0, wrap(), .55f));
-        row.addView(value);
-        content.addView(row, new LinearLayout.LayoutParams(match(), dp(64)));
-    }
-
     private void showBackgroundDialog() {
-        EditText input = new EditText(this);
-        input.setSingleLine(true);
-        input.setText(preferences.launcherBackgroundColor.get());
-        input.setHint("#101827");
-        new AlertDialog.Builder(this)
-                .setTitle("Цвет фона")
-                .setMessage("Укажите HEX-цвет. Изменение будет видно при следующем открытии HOME.")
-                .setView(input)
-                .setPositiveButton("Применить", (dialog, which) -> {
-                    String value = input.getText().toString().trim();
-                    try {
-                        Color.parseColor(value);
-                        preferences.launcherBackgroundColor.set(value);
-                    } catch (IllegalArgumentException error) {
-                        Toast.makeText(this, "Неверный цвет", Toast.LENGTH_SHORT).show();
+        String original = preferences.launcherBackgroundColor.get();
+        AppleColorPickerDialog.show(this, "Цвет фона", original,
+                AppleColorPickerDialog.Options.standard(),
+                new AppleColorPickerDialog.Listener() {
+                    @Override
+                    public void onPreview(@Nullable String value) {
+                        AppleColorPickerDialog.decorateButton(backgroundColorButton,
+                                "Цвет фона", value);
                     }
-                })
-                .setNegativeButton(android.R.string.cancel, null).show();
+
+                    @Override
+                    public void onSelected(@Nullable String value) {
+                        if (value != null) preferences.launcherBackgroundColor.set(value);
+                        AppleColorPickerDialog.decorateButton(backgroundColorButton,
+                                "Цвет фона", preferences.launcherBackgroundColor.get());
+                    }
+                });
     }
 
     private void addSwitch(String label, Preferences.Bool preference) {
@@ -218,36 +174,23 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         content.addView(control, new LinearLayout.LayoutParams(match(), wrap()));
     }
 
-    private void addCombinedNavigationSwitch() {
-        MaterialSwitch control = new MaterialSwitch(this);
-        control.setText("Маршрут и избранные направления");
-        control.setTextSize(17);
-        control.setMinHeight(dp(56));
-        control.setChecked(preferences.launcherNavigationVisible.get()
-                || preferences.launcherFavoriteRoutesVisible.get());
-        control.setOnCheckedChangeListener((button, checked) -> {
-            // Keep both legacy keys synchronized so an update preserves every existing setup.
-            preferences.launcherNavigationVisible.set(checked);
-            preferences.launcherFavoriteRoutesVisible.set(checked);
-        });
-        content.addView(control, new LinearLayout.LayoutParams(match(), wrap()));
-    }
-
-    private void addButton(String label, android.view.View.OnClickListener listener) {
+    private MaterialButton addButton(String label, android.view.View.OnClickListener listener) {
         MaterialButton button = new MaterialButton(this);
         button.setText(label);
         button.setAllCaps(false);
+        button.setMinHeight(dp(54));
         button.setOnClickListener(listener);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), dp(54));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), wrap());
         lp.topMargin = dp(7);
         content.addView(button, lp);
+        return button;
     }
 
     private void addTitle(String value) {
         TextView title = new TextView(this);
         title.setText(value);
         title.setTextSize(23);
-        title.setTextColor(Color.rgb(105, 165, 255));
+        title.setTextColor(getColor(R.color.settings_accent));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), wrap());
         lp.topMargin = dp(22);
         lp.bottomMargin = dp(6);

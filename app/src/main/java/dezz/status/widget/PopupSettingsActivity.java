@@ -22,6 +22,8 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.widget.NestedScrollView;
 
+import com.google.android.material.button.MaterialButton;
+
 import org.json.JSONObject;
 
 import java.util.ArrayList;
@@ -39,6 +41,7 @@ import dezz.status.widget.popup.PopupItemConfigStore;
 import dezz.status.widget.popup.PopupOverlayConfig;
 import dezz.status.widget.popup.PopupOverlayConfigStore;
 import dezz.status.widget.scenario.ScenarioPresets;
+import dezz.status.widget.settings.AppleColorPickerDialog;
 
 /** Human-facing catalog and editor for any number of independent floating overlays. */
 public final class PopupSettingsActivity extends AppCompatActivity {
@@ -67,7 +70,7 @@ public final class PopupSettingsActivity extends AppCompatActivity {
         itemStore = new PopupItemConfigStore(prefs);
         selectedOverlayId = getIntent().getStringExtra(EXTRA_OVERLAY_ID);
         reload();
-        setContentView(selectedOverlayId == null ? buildCatalogScreen() : buildEditorScreen());
+        showContent();
     }
 
     @Override protected void onResume() {
@@ -77,7 +80,13 @@ public final class PopupSettingsActivity extends AppCompatActivity {
             return;
         }
         reload();
-        setContentView(selectedOverlayId == null ? buildCatalogScreen() : buildEditorScreen());
+        showContent();
+    }
+
+    private void showContent() {
+        View screen = selectedOverlayId == null ? buildCatalogScreen() : buildEditorScreen();
+        setContentView(screen);
+        dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(this, screen);
     }
 
     private void reload() {
@@ -179,12 +188,29 @@ public final class PopupSettingsActivity extends AppCompatActivity {
                 value -> overlay.backgroundAlpha = value, " / 255");
         addSlider(page, "Скругление окна", 0, 120, overlay.cornerRadius,
                 value -> overlay.cornerRadius = value, " px");
-        Button background = button("Цвет фона: " + colorName(overlay.backgroundColor));
-        background.setOnClickListener(v -> chooseColor(overlay.backgroundColor, value -> {
-            overlay.backgroundColor = value;
-            background.setText("Цвет фона: " + colorName(value));
-            persistOverlay();
-        }));
+        MaterialButton background = new MaterialButton(this);
+        AppleColorPickerDialog.decorateButton(background, "Цвет фона", overlay.backgroundColor);
+        background.setOnClickListener(v -> {
+            String original = overlay.backgroundColor;
+            AppleColorPickerDialog.show(this, "Цвет фона", original,
+                    AppleColorPickerDialog.Options.standard(),
+                    new AppleColorPickerDialog.Listener() {
+                        private void apply(@Nullable String selected) {
+                            overlay.backgroundColor = selected == null ? original : selected;
+                            AppleColorPickerDialog.decorateButton(background, "Цвет фона",
+                                    overlay.backgroundColor);
+                            persistOverlay();
+                        }
+
+                        @Override public void onPreview(@Nullable String selected) {
+                            apply(selected);
+                        }
+
+                        @Override public void onSelected(@Nullable String selected) {
+                            apply(selected);
+                        }
+                    });
+        });
         page.addView(background, topMargin(8));
 
         page.addView(heading("Плитки", 20), topMargin(24));
@@ -512,26 +538,6 @@ public final class PopupSettingsActivity extends AppCompatActivity {
         parent.addView(seek, matchWrap());
     }
 
-    private void chooseColor(String current, ColorConsumer consumer) {
-        String[] labels = {"Белый", "Чёрный", "Серый", "Прозрачный", "Свой цвет…"};
-        String[] values = {"#FFFFFFFF", "#FF000000", "#FF303036", "transparent"};
-        new AlertDialog.Builder(this).setTitle("Цвет фона").setItems(labels, (d, which) -> {
-            if (which < values.length) {
-                consumer.accept(values[which]);
-                return;
-            }
-            EditText custom = new EditText(this);
-            custom.setSingleLine(true);
-            custom.setText(current);
-            new AlertDialog.Builder(this).setTitle("Цвет #AARRGGBB").setView(custom)
-                    .setNegativeButton("Отмена", null)
-                    .setPositiveButton("Применить", (dialog, selected) -> {
-                        String value = value(custom);
-                        if (!value.isEmpty()) consumer.accept(value);
-                    }).show();
-        }).setNegativeButton("Отмена", null).show();
-    }
-
     private void persistOverlay() {
         if (selectedOverlay == null) return;
         try {
@@ -627,12 +633,6 @@ public final class PopupSettingsActivity extends AppCompatActivity {
             case HOME_ASSISTANT: return "Устройства умного дома";
             default: return type.name();
         }
-    }
-
-    private static String colorName(String value) {
-        if (value == null) return "по умолчанию";
-        if ("transparent".equalsIgnoreCase(value)) return "прозрачный";
-        return value;
     }
 
     private void showError(Throwable error) {
@@ -756,5 +756,4 @@ public final class PopupSettingsActivity extends AppCompatActivity {
         return error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
     }
 
-    private interface ColorConsumer { void accept(String value); }
 }

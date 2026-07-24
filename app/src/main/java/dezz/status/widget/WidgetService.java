@@ -1440,7 +1440,10 @@ public class WidgetService extends Service {
             }
             car.subscribe(type, (brickType, value) -> {
                 if (binding == null) return;
-                target.setText(formatTemperature(value));
+                // The rolling ambient filter may intentionally republish its current median
+                // while sub-second raw packets are discarded. Avoid turning those identical
+                // values into needless status-row measure/layout passes.
+                setTextIfChanged(target, formatTemperature(value));
                 schedulePopupRefresh();
             });
         } else {
@@ -1781,12 +1784,7 @@ public class WidgetService extends Service {
         binding.mediaTitleText.setMarqueeEnabled(prefs.media.marqueeEnabled.get());
 
         applyMediaStateIcon(textColor);
-        // Establish the configured row geometry before the first MediaSession callback. The
-        // deferred integration refresh can re-run applyBrickVisibility during boot; leaving the
-        // XML-default source row visible until metadata arrives made a title-only media brick one
-        // line taller at startup and then shrink as soon as the first track was rendered.
-        binding.mediaSourceRow.setVisibility(
-                prefs.media.showSource.get() ? View.VISIBLE : View.GONE);
+        applyMediaLineStructure();
 
         // Duration text — independent font size / alpha / outline so the user can dial it down
         // (typically the duration is rendered smaller and dimmer than the track subtitle).
@@ -1822,13 +1820,31 @@ public class WidgetService extends Service {
         // ever moves it vertically.
         applyMediaChildAlignment(binding.mediaSourceRow, prefs.media.sourceAlignment.get());
         applyMediaChildAlignment(binding.mediaTitleRow, prefs.media.alignment.get());
-        // Vertical gap between the two lines, applied as the title row's top margin.
+    }
+
+    /**
+     * Applies the configured one-line/two-line structure before any MediaSession exists.
+     *
+     * <p>The XML source row is visible by default. Previously it was hidden only from
+     * {@link #updateMediaInfo()} after the first controller callback. With "show source" disabled,
+     * a cold-start widget therefore measured one empty source line too many until playback began,
+     * which made the whole status row temporarily taller. Keep this layout decision independent
+     * of media availability and remove the inter-line gap when there is only one line.</p>
+     */
+    private void applyMediaLineStructure() {
+        boolean showSource = prefs.media.showSource.get();
+        int sourceVisibility = showSource ? View.VISIBLE : View.GONE;
+        if (binding.mediaSourceRow.getVisibility() != sourceVisibility) {
+            binding.mediaSourceRow.setVisibility(sourceVisibility);
+        }
+
         LinearLayout.LayoutParams titleLp =
                 (LinearLayout.LayoutParams) binding.mediaTitleRow.getLayoutParams();
-        // With the source row disabled there is no pair of lines to separate. Keeping the
-        // configured gap on the first/only title row made it an invisible top spacer.
-        titleLp.topMargin = prefs.media.showSource.get() ? prefs.media.lineGap.get() : 0;
-        binding.mediaTitleRow.setLayoutParams(titleLp);
+        int topMargin = showSource ? prefs.media.lineGap.get() : 0;
+        if (titleLp.topMargin != topMargin) {
+            titleLp.topMargin = topMargin;
+            binding.mediaTitleRow.setLayoutParams(titleLp);
+        }
     }
 
     /**
@@ -2502,7 +2518,14 @@ public class WidgetService extends Service {
     }
 
     private void enableMediaTracking() {
-        if (mediaSessionManager != null) return;
+        if (mediaSessionManager != null) {
+            // applyBrickVisibility() runs before this method and may have made the configured
+            // media brick VISIBLE. Reconcile it even when tracking was already registered:
+            // without an active controller the empty container must return to GONE immediately,
+            // rather than occupying a blank row until the first MediaSession callback.
+            updateMediaInfo();
+            return;
+        }
         mediaSessionManager = (MediaSessionManager) getSystemService(MEDIA_SESSION_SERVICE);
         if (mediaSessionManager == null) return;
         ComponentName component = new ComponentName(this, MediaNotificationListener.class);
@@ -2544,10 +2567,14 @@ public class WidgetService extends Service {
 
     private void updateMediaInfo() {
         if (binding == null) return;
-        boolean mainMediaVisible = currentBrickSet().contains(BrickType.MEDIA)
-                && !isBrickHiddenByApp(BrickType.MEDIA) && isRemotelyVisible(BrickType.MEDIA);
+        boolean mainMediaRequested = currentBrickSet().contains(BrickType.MEDIA)
+                && isRemotelyVisible(BrickType.MEDIA);
+        boolean mainMediaHidden = mainMediaRequested && isBrickHiddenByApp(BrickType.MEDIA);
+        boolean mainMediaKeepsSpace = mainMediaHidden
+                && prefs.hideKeepsSpaceFor(BrickType.MEDIA).get();
+        boolean mainMediaVisible = mainMediaRequested && !mainMediaHidden;
         boolean popupMediaRequested = isPopupBuiltinRequested(BrickType.MEDIA);
-        if (!mainMediaVisible && !popupMediaRequested) {
+        if (!mainMediaVisible && !mainMediaKeepsSpace && !popupMediaRequested) {
             binding.mediaContainer.setVisibility(View.GONE);
             stopMediaProgressTicker();
             lastMediaSubtitle = null;
@@ -2597,9 +2624,10 @@ public class WidgetService extends Service {
         binding.mediaStateIcon.setPaused(playbackState != null
                 && playbackState.getState() == PlaybackState.STATE_PAUSED);
         binding.mediaAppText.setMarqueeText(getAppLabel(playing.getPackageName()));
-        // The whole row, not just the label — the indicator rides in it. Nothing is lost when it
-        // goes: applyMediaStateIcon has already moved the icon over to the title row.
-        binding.mediaSourceRow.setVisibility(prefs.media.showSource.get() ? View.VISIBLE : View.GONE);
+        // Reconcile the row structure too: settings may have changed while a controller callback
+        // was queued. The same method already ran during applyPreferences(), so playback starting
+        // cannot be the first event that establishes the configured widget height.
+        applyMediaLineStructure();
         binding.mediaTitleText.setMarqueeText(subtitle);
 
         // Duration: format ms → "M:SS" / "H:MM:SS". Hidden when the user opted out or the
@@ -2643,7 +2671,14 @@ public class WidgetService extends Service {
             binding.mediaProgressBar.setVisibility(View.GONE);
         }
 
-        binding.mediaContainer.setVisibility(mainMediaVisible ? View.VISIBLE : View.GONE);
+        if (mainMediaKeepsSpace && !mainMediaVisible) {
+            // A session can begin while the current foreground app is excluded. In that case
+            // applyBrickVisibility previously saw no active controller and left the view GONE
+            // with normal alpha; establish the keep-space alpha before revealing its layout.
+            binding.mediaContainer.setAlpha(0f);
+        }
+        binding.mediaContainer.setVisibility(
+                mainMediaVisible || mainMediaKeepsSpace ? View.VISIBLE : View.GONE);
 
         updateMediaProgress(playing);
         schedulePopupRefresh();

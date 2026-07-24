@@ -42,6 +42,8 @@ import dezz.status.widget.launcher.routes.FavoriteRouteConfig;
 import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
 import dezz.status.widget.launcher.routes.FavoriteRoutesPanelView;
 import dezz.status.widget.launcher.routes.RouteDestinationParser;
+import dezz.status.widget.settings.AppleColorPickerDialog;
+import dezz.status.widget.settings.SettingsBackNavigation;
 
 /** Visual autosaving editor for the idle state of the combined navigation HOME panel. */
 public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
@@ -54,7 +56,6 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
     private LinearLayout editorHost;
     private FrameLayout previewHost;
     private TextView savedStatus;
-    private MaterialSwitch panelVisibleSwitch;
     @Nullable private FavoriteRouteConfig selected;
     @Nullable private FavoriteRoutesPanelView preview;
     @Nullable private PanelEditScheduler editScheduler;
@@ -71,7 +72,9 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
             rebuildList();
         });
         setTitle("Маршрут и избранное HOME");
-        setContentView(buildScreen());
+        View content = buildScreen();
+        setContentView(content);
+        SettingsBackNavigation.install(this, content);
         rebuildList();
         if (!routes.isEmpty()) select(routes.get(0));
         else showEmptyEditor();
@@ -104,19 +107,8 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
         addTitle(left, "МАРШРУТ И ИЗБРАННОЕ");
         addHint(left, "Пока маршрут не построен, здесь видны кнопки «Домой», «Работа» и другие адреса. После построения маршрута плитка сама переключится на выбранную навигационную информацию.");
 
-        panelVisibleSwitch = new MaterialSwitch(this);
-        panelVisibleSwitch.setText("Показывать объединённую плитку на HOME");
-        panelVisibleSwitch.setChecked(preferences.launcherNavigationVisible.get()
-                || preferences.launcherFavoriteRoutesVisible.get());
-        panelVisibleSwitch.setMinHeight(dp(48));
-        panelVisibleSwitch.setOnCheckedChangeListener((button, checked) -> {
-            preferences.launcherNavigationVisible.set(checked);
-            preferences.launcherFavoriteRoutesVisible.set(checked);
-            markSaved();
-        });
-        left.addView(panelVisibleSwitch, new LinearLayout.LayoutParams(match(), wrap()));
-        addButton(left, "Выбрать данные активного маршрута…", v ->
-                startActivity(new Intent(this, NavigationPanelSettingsActivity.class)));
+        addHint(left, "Видимость и данные активного маршрута настраиваются один раз в разделе "
+                + "«Навигационная панель». Здесь находятся только избранные места и их вид.");
         addSlider(left, "Столбцов в панели", preferences.launcherFavoriteRoutesColumns.get(),
                 1, 6, value -> {
                     preferences.launcherFavoriteRoutesColumns.set(value);
@@ -180,7 +172,6 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
         persist();
         rebuildList();
         select(value);
-        if (panelVisibleSwitch != null) panelVisibleSwitch.setChecked(true);
     }
 
     private void rebuildList() {
@@ -358,14 +349,33 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
 
     private void addColorField(@NonNull LinearLayout parent, @NonNull String title,
                                @NonNull String initial, @NonNull StringChange update) {
-        EditText field = input(title + " (#RRGGBB или #AARRGGBB)", initial);
-        parent.addView(field, fieldLp());
-        watch(field, value -> {
-            if (value.matches("#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?")) {
-                update.set(value);
-                persistWithoutList();
-            }
+        MaterialButton button = new MaterialButton(this);
+        final String[] value = {initial};
+        AppleColorPickerDialog.decorateButton(button, title, value[0]);
+        button.setOnClickListener(v -> {
+            String original = value[0];
+            AppleColorPickerDialog.show(this, title, original,
+                    AppleColorPickerDialog.Options.standard(),
+                    new AppleColorPickerDialog.Listener() {
+                        private void apply(@Nullable String selected) {
+                            value[0] = selected == null ? original : selected;
+                            update.set(value[0]);
+                            AppleColorPickerDialog.decorateButton(button, title, value[0]);
+                            previewAndPersist();
+                        }
+
+                        @Override public void onPreview(@Nullable String selected) {
+                            apply(selected);
+                        }
+
+                        @Override public void onSelected(@Nullable String selected) {
+                            apply(selected);
+                        }
+                    });
         });
+        LinearLayout.LayoutParams lp = fieldLp();
+        lp.height = dp(62);
+        parent.addView(button, lp);
     }
 
     private void persist() {

@@ -12,7 +12,6 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.text.InputType;
 import android.view.Gravity;
 import android.view.DragEvent;
 import android.view.View;
@@ -46,6 +45,8 @@ import dezz.status.widget.launcher.climate.ClimatePanelView;
 import dezz.status.widget.launcher.panels.PanelEditScheduler;
 import dezz.status.widget.climate.ClimatePanelService;
 import dezz.status.widget.climate.ScreenReservationStateStore;
+import dezz.status.widget.settings.AppleColorPickerDialog;
+import dezz.status.widget.settings.SettingsBackNavigation;
 import dezz.status.widget.shell.PrivilegedShell;
 
 /** Code-free, immediate editor for the HOME and always-on climate surfaces. */
@@ -53,15 +54,6 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
     private interface BoolChange { void set(boolean value); }
     private interface IntChange { void set(int value); }
     private interface ColorChange { void set(@NonNull String value); }
-
-    private static final String[] COLOR_VALUES = {
-            "#59A9FF", "#00C853", "#FFB300", "#FF5A5F", "#9C6BFF",
-            "#FFFFFF", "#B7C1CE", "#141A24", "#000000"
-    };
-    private static final String[] COLOR_LABELS = {
-            "Голубой", "Зелёный", "Янтарный", "Красный", "Фиолетовый",
-            "Белый", "Серо-голубой", "Графитовый", "Чёрный"
-    };
 
     private Preferences preferences;
     private ClimatePanelConfigStore store;
@@ -103,7 +95,9 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
             applyClimatePanel();
         });
         setTitle("Климатическая панель");
-        setContentView(buildContent());
+        View content = buildContent();
+        setContentView(content);
+        SettingsBackNavigation.install(this, content);
     }
 
     @Override
@@ -743,69 +737,31 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
     private void addColor(@NonNull LinearLayout parent, @NonNull String title,
                           @NonNull ColorValue current, @NonNull ColorChange listener) {
         MaterialButton button = new MaterialButton(this);
-        button.setAllCaps(false);
-        updateColorButton(button, title, current.get());
-        button.setOnClickListener(v -> showColorChooser(title, current.get(), selected -> {
-            listener.set(selected);
-            persistAndPreview();
-            updateColorButton(button, title, selected);
-        }));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), dp(50));
+        AppleColorPickerDialog.decorateButton(button, title, current.get());
+        button.setOnClickListener(v -> {
+            String original = current.get();
+            AppleColorPickerDialog.show(this, title, original,
+                    AppleColorPickerDialog.Options.standard(),
+                    new AppleColorPickerDialog.Listener() {
+                        private void apply(@Nullable String selected) {
+                            String value = selected == null ? original : selected;
+                            listener.set(value);
+                            persistAndPreview();
+                            AppleColorPickerDialog.decorateButton(button, title, value);
+                        }
+
+                        @Override public void onPreview(@Nullable String selected) {
+                            apply(selected);
+                        }
+
+                        @Override public void onSelected(@Nullable String selected) {
+                            apply(selected);
+                        }
+                    });
+        });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), dp(62));
         lp.topMargin = dp(6);
         parent.addView(button, lp);
-    }
-
-    private void showColorChooser(@NonNull String title, @NonNull String current,
-                                  @NonNull ColorChange listener) {
-        String[] labels = new String[COLOR_LABELS.length + 1];
-        for (int index = 0; index < COLOR_LABELS.length; index++) {
-            labels[index] = COLOR_LABELS[index] + "   " + COLOR_VALUES[index];
-        }
-        labels[labels.length - 1] = "Свой HEX-цвет…";
-        new AlertDialog.Builder(this)
-                .setTitle(title)
-                .setItems(labels, (dialog, which) -> {
-                    if (which < COLOR_VALUES.length) listener.set(COLOR_VALUES[which]);
-                    else showHexDialog(title, current, listener);
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
-    }
-
-    private void showHexDialog(@NonNull String title, @NonNull String current,
-                               @NonNull ColorChange listener) {
-        EditText input = new EditText(this);
-        input.setSingleLine(true);
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
-        input.setText(current);
-        input.setSelection(input.length());
-        new AlertDialog.Builder(this)
-                .setTitle(title + " · HEX")
-                .setMessage("Формат: #RRGGBB")
-                .setView(input)
-                .setPositiveButton("Применить", (dialog, which) -> {
-                    String value = input.getText().toString().trim();
-                    try {
-                        Color.parseColor(value);
-                        if (!value.matches("#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?")) throw new IllegalArgumentException();
-                        listener.set(value.toUpperCase(java.util.Locale.ROOT));
-                    } catch (IllegalArgumentException error) {
-                        Toast.makeText(this, "Неверный HEX-цвет", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
-    }
-
-    private void updateColorButton(@NonNull MaterialButton button, @NonNull String title,
-                                   @NonNull String value) {
-        button.setText(title + "   " + value);
-        try {
-            int color = Color.parseColor(value);
-            button.setIconTint(android.content.res.ColorStateList.valueOf(color));
-            button.setIconResource(R.drawable.ic_popup_light);
-        } catch (IllegalArgumentException ignored) {
-        }
     }
 
     private void addButton(@NonNull LinearLayout parent, @NonNull String label,

@@ -25,6 +25,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.materialswitch.MaterialSwitch;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -65,7 +66,9 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
             selectedPanel = requestedPanel;
         }
         setTitle("Элементы панелей HOME");
-        setContentView(buildContent());
+        View screen = buildContent();
+        setContentView(screen);
+        dezz.status.widget.settings.SettingsBackNavigation.install(this, screen);
         showPanel(selectedPanel);
     }
 
@@ -92,18 +95,14 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         navigation.setOrientation(LinearLayout.VERTICAL);
         navigation.setPadding(0, 0, dp(16), dp(20));
         navigationScroll.addView(navigation, new ScrollView.LayoutParams(match(), wrap()));
-        addSection(navigation, "ПАНЕЛИ HOME");
+        addSection(navigation, "СОСТАВ ПАНЕЛЕЙ");
         addPanelButton(navigation, "Приложения", LauncherLayoutStore.APPS);
-        addExternalButton(navigation, "Медиа", MediaPanelSettingsActivity.class);
         addPanelButton(navigation, "Часы", LauncherLayoutStore.CLOCK);
-        addExternalButton(navigation, "Маршрут и избранное",
-                NavigationPanelSettingsActivity.class);
         addPanelButton(navigation, "Иконки и действия", LauncherLayoutStore.ACTIONS);
-        addExternalButton(navigation, "Климат", ClimatePanelSettingsActivity.class);
-        addExternalButton(navigation, "Данные автомобиля / HUD",
-                VehicleInfoPanelSettingsActivity.class);
         TextView hint = new TextView(this);
-        hint.setText("Размер и положение самой панели меняются в редакторе компоновки HOME. Здесь настраивается её содержимое.");
+        hint.setText("Здесь собраны панели с общим редактором состава. Медиа, навигация, "
+                + "климат, данные автомобиля и панель «Информация» имеют собственный "
+                + "визуальный экран в разделе «Панели» единого центра настроек.");
         hint.setTextSize(13);
         hint.setAlpha(.68f);
         hint.setPadding(dp(8), dp(18), dp(8), 0);
@@ -122,7 +121,7 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         TextView previewTitle = new TextView(this);
         previewTitle.setText("ЖИВОЙ ПРЕДПРОСМОТР");
         previewTitle.setTextSize(14);
-        previewTitle.setTextColor(Color.rgb(105, 165, 255));
+        previewTitle.setTextColor(getColor(R.color.settings_accent));
         previewTitle.setTypeface(android.graphics.Typeface.DEFAULT,
                 android.graphics.Typeface.BOLD);
         previewColumn.addView(previewTitle, new LinearLayout.LayoutParams(match(), dp(38)));
@@ -153,13 +152,6 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         parent.addView(button, buttonLp());
     }
 
-    private void addExternalButton(@NonNull LinearLayout parent, @NonNull String title,
-            @NonNull Class<?> activityClass) {
-        MaterialButton button = panelButton(title + "  ›");
-        button.setOnClickListener(v -> startActivity(new Intent(this, activityClass)));
-        parent.addView(button, buttonLp());
-    }
-
     @NonNull private MaterialButton panelButton(@NonNull String title) {
         MaterialButton button = new MaterialButton(this);
         button.setAllCaps(false);
@@ -186,6 +178,7 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         } else {
             addHint(editor, "Убирайте ненужные элементы, меняйте их порядок стрелками и размер ползунком. Изменения применятся при возврате на HOME.");
         }
+        addPanelVisibilitySwitch(editor, panel.id);
         if (LauncherLayoutStore.APPS.equals(panel.id)) {
             addColumnsControl(editor, "Столбцов приложений", preferences.launcherAppsColumns, 1, 6);
             MaterialButton favorites = new MaterialButton(this);
@@ -241,6 +234,34 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
                 .setNegativeButton(android.R.string.cancel, null)
                 .show());
         editor.addView(reset, buttonLp());
+    }
+
+    private void addPanelVisibilitySwitch(@NonNull LinearLayout parent,
+                                          @NonNull String panelId) {
+        final Preferences.Bool preference;
+        final String title;
+        if (LauncherLayoutStore.APPS.equals(panelId)) {
+            preference = preferences.launcherAppsVisible;
+            title = "Показывать панель приложений на HOME";
+        } else if (LauncherLayoutStore.CLOCK.equals(panelId)) {
+            preference = preferences.launcherClockVisible;
+            title = "Показывать часы на HOME";
+        } else if (LauncherLayoutStore.ACTIONS.equals(panelId)) {
+            preference = preferences.launcherActionsVisible;
+            title = "Показывать панель кнопок на HOME";
+        } else {
+            return;
+        }
+        MaterialSwitch visible = new MaterialSwitch(this);
+        visible.setText(title);
+        visible.setTextSize(16);
+        visible.setMinHeight(dp(52));
+        visible.setChecked(preference.get());
+        visible.setOnCheckedChangeListener((button, checked) -> {
+            preference.set(checked);
+            renderPreview();
+        });
+        parent.addView(visible, new LinearLayout.LayoutParams(match(), wrap()));
     }
 
     private void addElementEditor(@NonNull PanelElementConfigStore.Panel panel,
@@ -505,7 +526,7 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         TextView title = new TextView(this);
         title.setText(value);
         title.setTextSize(14);
-        title.setTextColor(Color.rgb(105, 165, 255));
+        title.setTextColor(getColor(R.color.settings_accent));
         title.setTypeface(android.graphics.Typeface.DEFAULT,
                 android.graphics.Typeface.BOLD);
         title.setPadding(dp(8), 0, dp(8), 0);

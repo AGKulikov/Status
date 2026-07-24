@@ -30,6 +30,7 @@ public final class LauncherLayoutStore {
     public static final String CLIMATE = "climate";
     public static final String FAVORITE_ROUTES = "favorite_routes";
     public static final String VEHICLE_INFO = "vehicle_info";
+    public static final String INFORMATION = "information";
 
     public static final class Geometry {
         public int x;
@@ -131,6 +132,14 @@ public final class LauncherLayoutStore {
 
     @NonNull
     private Geometry clamp(@NonNull Geometry source) {
+        return clamp(source, screenWidth, screenHeight);
+    }
+
+    /** Pure clamp used by persistence and JVM regression tests. */
+    @NonNull
+    static Geometry clamp(@NonNull Geometry source, int rawScreenWidth, int rawScreenHeight) {
+        int screenWidth = Math.max(1, rawScreenWidth);
+        int screenHeight = Math.max(1, rawScreenHeight);
         int minWidth = Math.min(160, screenWidth);
         int minHeight = Math.min(96, screenHeight);
         int width = Math.max(minWidth, Math.min(source.width, screenWidth));
@@ -141,7 +150,7 @@ public final class LauncherLayoutStore {
     }
 
     @NonNull
-    private static Map<String, Geometry> defaults(int width, int height) {
+    static Map<String, Geometry> defaults(int width, int height) {
         LinkedHashMap<String, Geometry> result = new LinkedHashMap<>();
 
         int appsW = Math.min(380, Math.max(240, width / 5));
@@ -183,6 +192,13 @@ public final class LauncherLayoutStore {
         result.put(VEHICLE_INFO, new Geometry(
                 Math.max(0, width - vehicleW - 28),
                 Math.max(0, height - vehicleH - 30), vehicleW, vehicleH));
+
+        int informationW = Math.min(620, Math.max(360, width / 3));
+        int informationH = Math.min(300, Math.max(180, height / 3));
+        result.put(INFORMATION, new Geometry(
+                Math.max(0, (width - informationW) / 2),
+                Math.min(36, Math.max(0, height - informationH)),
+                informationW, informationH));
         return result;
     }
 }
