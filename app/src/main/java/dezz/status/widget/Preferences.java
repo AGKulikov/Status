@@ -19,6 +19,7 @@ package dezz.status.widget;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -34,6 +35,21 @@ import java.util.Map;
 import java.util.Set;
 
 public class Preferences {
+    private static final String TAG = "Preferences";
+    /** New large HOME surfaces must remain opt-in when an existing layout is upgraded. */
+    static final boolean DEFAULT_LAUNCHER_VEHICLE_INFO_VISIBLE = false;
+    /** Secrets and installation identities never leave the device through settings exports or
+     * presets. Keep future connector credentials/identities here as well so adding a transport
+     * cannot accidentally make them exportable or clone one client identity to another device. */
+    private static final Set<String> SECRET_PREFERENCE_KEYS = Collections.unmodifiableSet(
+            new HashSet<>(java.util.Arrays.asList(
+                    "mqttPassword", "sprutPassword", "sprutClientId", "haAccessToken",
+                    // The paired phone is installation-specific and must not be copied into a
+                    // settings backup restored on another head unit.
+                    "phoneDeviceAddress",
+                    // Contains both the full bearer action and fixed-endpoint token. Layout
+                    // presets are routinely shared, so rules must remain device-local too.
+                    "intentActionRulesJson")));
     public static abstract class Preference {
         final Preferences preferences;
         final String key;
@@ -112,6 +128,35 @@ public class Preferences {
 
         public void set(String value) {
             preferences.prefs.edit().putString(key, value).apply();
+        }
+    }
+
+    /** A string encrypted with an app-private Android Keystore key. */
+    public static final class Secret extends Preference {
+        public Secret(Preferences preferences, String key) { super(preferences, key); }
+
+        public String get() {
+            String stored = preferences.prefs.getString(key, "");
+            try {
+                String plain = SecretStore.decrypt(preferences.appContext, stored);
+                // Migrate an old plaintext value immediately after a successful read.
+                if (!stored.isEmpty() && !stored.startsWith("v1:")) set(plain);
+                return plain;
+            } catch (Exception e) {
+                Log.w(TAG, "Secret is unavailable until Android Keystore unlocks", e);
+                return "";
+            }
+        }
+
+        public void set(String value) {
+            try {
+                preferences.prefs.edit().putString(key,
+                        SecretStore.encrypt(preferences.appContext, value == null ? "" : value))
+                        .apply();
+            } catch (Exception e) {
+                Log.e(TAG, "Could not encrypt secret", e);
+                throw new IllegalStateException("Android Keystore is unavailable", e);
+            }
         }
     }
 
@@ -329,6 +374,7 @@ public class Preferences {
     }
 
     private final SharedPreferences prefs;
+    private final Context appContext;
 
     // Global widget settings.
     public final Bool widgetEnabled = new Bool(this, "enabled", false);
@@ -369,6 +415,179 @@ public class Preferences {
     // Car-specific temperature bricks (fed by the flavor's CarIntegration).
     public final TextBrickPrefs indoorTemp = new TextBrickPrefs(this, "indoorTemp", 40);
     public final TextBrickPrefs outdoorTemp = new TextBrickPrefs(this, "outdoorTemp", 40);
+    /** Layout-level settings for the dynamic HA row. Child text styles live in haMainBricksJson. */
+    public final TextBrickPrefs homeAssistant = new TextBrickPrefs(this, "homeAssistant", 40);
+
+    // Home Assistant / automation configuration. JSON arrays are versioned by their model
+    // classes and therefore automatically participate in the existing settings export/import.
+    public final Str haMainBricksJson = new Str(this, "haMainBricksJson", "[]");
+    public final Str popupItemsJson = new Str(this, "popupItemsJson", "[]");
+    /** Independent floating overlay windows. Empty means the legacy popup settings still need
+     * to be projected into the default `popup` overlay by PopupOverlayConfigStore. */
+    public final Str popupOverlaysJson = new Str(this, "popupOverlaysJson", "");
+    /** Ordered connector-neutral local scenarios. Conditions and UI targets are independent. */
+    public final Str localScenariosJson = new Str(this, "localScenariosJson", "[]");
+    /** One-shot, exact Android Intent actions mapped to stored connector commands. */
+    public final Str intentActionRulesJson = new Str(this, "intentActionRulesJson", "[]");
+    /** Per-metric mappings from the vehicle SDK to writable Sprut.hub characteristics. */
+    public final Str carSprutBindingsJson = new Str(this, "carSprutBindingsJson", "[]");
+    public final Bool popupEnabled = new Bool(this, "popupEnabled", true);
+    public final Int popupWidth = new Int(this, "popupWidth", 500);
+    public final Int popupHeight = new Int(this, "popupHeight", 500);
+    public final Int popupRows = new Int(this, "popupRows", 2);
+    public final Int popupColumns = new Int(this, "popupColumns", 2);
+    public final Int popupX = new Int(this, "popupX", 200);
+    public final Int popupY = new Int(this, "popupY", 300);
+    public final Int popupPaddingLeft = new Int(this, "popupPaddingLeft", 12);
+    public final Int popupPaddingTop = new Int(this, "popupPaddingTop", 12);
+    public final Int popupPaddingRight = new Int(this, "popupPaddingRight", 12);
+    public final Int popupPaddingBottom = new Int(this, "popupPaddingBottom", 12);
+    public final Int popupCellGap = new Int(this, "popupCellGap", 8);
+    public final Str popupBackgroundColor = new Str(this, "popupBackgroundColor", "#FF000000");
+    public final Int popupBackgroundAlpha = new Int(this, "popupBackgroundAlpha", 0xCC);
+    public final Int popupCornerRadius = new Int(this, "popupCornerRadius", 28);
+
+    // Optional HOME/launcher surface. These settings deliberately live in the same exported
+    // preference file as the widget and connector configuration, so installing a newer APK keeps
+    // one coherent setup and Import/Export can move the whole dashboard to another head unit.
+    // Geometry is stored as versioned JSON because launcher elements are independent rectangles
+    // (x/y/width/height) and the set will grow as new panels are added.
+    public final Str launcherLayoutJson = new Str(this, "launcherLayoutJson", "");
+    public final Str launcherFavoritePackages = new Str(this, "launcherFavoritePackages", "");
+    /** Per-application HOME icon/label sizes; selection and order remain in the legacy list. */
+    public final Str launcherFavoriteAppsAppearanceJson = new Str(this,
+            "launcherFavoriteAppsAppearanceJson", "");
+    public final Str launcherBackgroundColor = new Str(this, "launcherBackgroundColor", "#101827");
+    public final Bool launcherShowGrid = new Bool(this, "launcherShowGrid", true);
+    public final Int launcherSnapPx = new Int(this, "launcherSnapPx", 20);
+    public final Bool launcherImmersive = new Bool(this, "launcherImmersive", true);
+    public final Bool launcherAppsVisible = new Bool(this, "launcherAppsVisible", true);
+    public final Bool launcherMediaVisible = new Bool(this, "launcherMediaVisible", true);
+    public final Bool launcherClockVisible = new Bool(this, "launcherClockVisible", true);
+    public final Bool launcherNavigationVisible = new Bool(this, "launcherNavigationVisible", true);
+    public final Bool launcherActionsVisible = new Bool(this, "launcherActionsVisible", true);
+    public final Str launcherMediaConfigJson = new Str(this, "launcherMediaConfigJson", "");
+    // User-defined one-tap destinations (Home, Work, etc.). They share one adaptive HOME panel
+    // with current-route information: favorites are the idle state, navigation is the live state.
+    public final Str launcherFavoriteRoutesJson = new Str(this,
+            "launcherFavoriteRoutesJson", "");
+    public final Bool launcherFavoriteRoutesVisible = new Bool(this,
+            "launcherFavoriteRoutesVisible", false);
+    public final Int launcherFavoriteRoutesColumns = new Int(this,
+            "launcherFavoriteRoutesColumns", 2);
+    /** One-shot migration prevents a later partial import/toggle from re-anchoring the panel. */
+    public final Bool launcherCombinedNavigationMigrated = new Bool(this,
+            "launcherCombinedNavigationMigrated", false);
+    // Opt-in on upgrades so a new large panel never covers an existing hand-tuned HOME layout.
+    public final Bool launcherClimateVisible = new Bool(this, "launcherClimateVisible", false);
+    // Independent HOME surface for live eCarX/HUD telemetry.  Content and appearance live in a
+    // versioned JSON document so new metrics can be added without invalidating existing layouts.
+    public final Bool launcherVehicleInfoVisible = new Bool(this,
+            "launcherVehicleInfoVisible", DEFAULT_LAUNCHER_VEHICLE_INFO_VISIBLE);
+    public final Str launcherVehicleInfoConfigJson = new Str(this,
+            "launcherVehicleInfoConfigJson", "");
+    /** Independent read-only HOME panel combining car/system and smart-home statuses. */
+    public final Bool launcherInformationVisible = new Bool(this,
+            "launcherInformationVisible", false);
+    public final Str launcherInformationConfigJson = new Str(this,
+            "launcherInformationConfigJson", "");
+    // Per-panel inner element visibility/order/scale. Kept separate from outer pixel geometry so
+    // older HOME layouts migrate without moving any panel on upgrade.
+    public final Str launcherPanelElementsJson = new Str(this, "launcherPanelElementsJson", "");
+    /** Cell geometry for the WYSIWYG navigation editor; migrated from launcherPanelElementsJson. */
+    public final Str launcherNavigationConfigJson = new Str(this,
+            "launcherNavigationConfigJson", "");
+    public final Str launcherClimateConfigJson = new Str(this, "launcherClimateConfigJson", "");
+    // Optional always-on climate surface. It is deliberately independent from both the HOME
+    // climate panel above and the status widget service: a user may want climate controls while
+    // another application occupies the main display. Defaults are opt-in and preserve every
+    // existing installation's layout on update.
+    public final Bool climatePanelEnabled = new Bool(this, "climatePanelEnabled", false);
+    /** 0 = compact overlay button, 1 = persistent panel with a reserved screen edge. */
+    public final Int climatePanelMode = new Int(this, "climatePanelMode", 0);
+    /** 0 = bottom, 1 = top, 2 = left, 3 = right. */
+    public final Int climatePanelEdge = new Int(this, "climatePanelEdge", 0);
+    public final Int climatePanelExtent = new Int(this, "climatePanelExtent", 180);
+    public final Int climatePanelDisplayId = new Int(this, "climatePanelDisplayId", 0);
+    public final Int climateOverlayWidth = new Int(this, "climateOverlayWidth", 1200);
+    public final Int climateOverlayHeight = new Int(this, "climateOverlayHeight", 360);
+    public final Int climateButtonSize = new Int(this, "climateButtonSize", 84);
+    public final Int climateButtonX = new Int(this, "climateButtonX", 40);
+    public final Int climateButtonY = new Int(this, "climateButtonY", 300);
+    public final Bool climateButtonLocked = new Bool(this, "climateButtonLocked", false);
+    public final Str launcherShortcutsJson = new Str(this, "launcherShortcutsJson", "");
+    // Optional replacement for the old Monjaro driver rail. The stock climate proxy intentionally
+    // has no user coordinates: DriverPanelLayoutPolicy mirrors the reference old-panel centre,
+    // while the proxy button itself may occupy any user-selected slot.
+    public final Bool driverPanelEnabled = new Bool(this, "driverPanelEnabled", false);
+    /** 0 = left/start edge, 1 = right/end edge. */
+    public final Int driverPanelSide = new Int(this, "driverPanelSide", 0);
+    public final Int driverPanelWidthPx = new Int(this, "driverPanelWidthPx", 120);
+    public final Int driverPanelTopPaddingPx = new Int(this, "driverPanelTopPaddingPx", 8);
+    public final Int driverPanelBottomPaddingPx = new Int(this, "driverPanelBottomPaddingPx", 8);
+    public final Int driverPanelItemGapPx = new Int(this, "driverPanelItemGapPx", 6);
+    public final Int driverPanelCornerRadiusPx = new Int(this,
+            "driverPanelCornerRadiusPx", 18);
+    public final Str driverPanelBackgroundColor = new Str(this,
+            "driverPanelBackgroundColor", "#EE13171C");
+    /** Separate ordered collection; never aliases the HOME action grid. */
+    public final Str driverPanelShortcutsJson = new Str(this,
+            "driverPanelShortcutsJson", "");
+    /** Additive cell positions for action/smart-home icons; shortcut actions stay untouched. */
+    public final Str launcherActionsGridJson = new Str(this, "launcherActionsGridJson", "");
+    public final Int launcherAppsColumns = new Int(this, "launcherAppsColumns", 3);
+    public final Int launcherActionsColumns = new Int(this, "launcherActionsColumns", 3);
+
+    public final Bool mqttEnabled = new Bool(this, "mqttEnabled", false);
+    public final Str mqttHost = new Str(this, "mqttHost", "");
+    public final Int mqttPort = new Int(this, "mqttPort", 1883);
+    public final Bool mqttTls = new Bool(this, "mqttTls", false);
+    public final Str mqttUsername = new Str(this, "mqttUsername", "");
+    public final Secret mqttPassword = new Secret(this, "mqttPassword");
+    public final Str mqttClientId = new Str(this, "mqttClientId", "");
+    public final Str mqttDeviceId = new Str(this, "mqttDeviceId", "geely");
+    public final Str mqttBaseTopic = new Str(this, "mqttBaseTopic", "statuswidget/v1");
+    public final Int mqttQos = new Int(this, "mqttQos", 1);
+    public final Int mqttKeepAliveSeconds = new Int(this, "mqttKeepAliveSeconds", 30);
+    public final Bool mqttKeepAwake = new Bool(this, "mqttKeepAwake", true);
+
+    // Paired iPhone connector. The Bluetooth address is deliberately stored as a normal local
+    // preference (the controller needs it before Android Keystore unlock) but is excluded from
+    // settings export above because it identifies one physical phone/head-unit pairing.
+    public final Bool phoneConnectorEnabled = new Bool(this,
+            "phoneConnectorEnabled", false);
+    public final Str phoneDeviceAddress = new Str(this, "phoneDeviceAddress", "");
+    public final Bool phoneNotificationsEnabled = new Bool(this,
+            "phoneNotificationsEnabled", true);
+    public final Bool phoneMessagesEnabled = new Bool(this,
+            "phoneMessagesEnabled", false);
+    public final Bool phoneIncludeNotificationText = new Bool(this,
+            "phoneIncludeNotificationText", false);
+    /** Optional writable Sprut.hub boolean characteristic reflecting phone presence. */
+    public final Bool phoneSprutPresenceEnabled = new Bool(this,
+            "phoneSprutPresenceEnabled", false);
+    public final Str phoneSprutPresencePath = new Str(this,
+            "phoneSprutPresencePath", "");
+
+    // Direct Sprut.hub connector. The token is intentionally kept only in the live connector;
+    // reconnect performs a fresh challenge using the Keystore-protected password.
+    public final Bool sprutEnabled = new Bool(this, "sprutEnabled", false);
+    public final Str sprutWebSocketUrl = new Str(this, "sprutWebSocketUrl",
+            "ws://192.168.1.2/spruthub");
+    public final Str sprutEmail = new Str(this, "sprutEmail", "");
+    public final Secret sprutPassword = new Secret(this, "sprutPassword");
+    /** Stable cloud client identity, equivalent to the official web app's persisted cid. */
+    public final Str sprutClientId = new Str(this, "sprutClientId", "");
+    /** Optional hub serial. Empty means select the only/first hub returned by hub.list. */
+    public final Str sprutHubSerial = new Str(this, "sprutHubSerial", "");
+    public final Bool sprutKeepAwake = new Bool(this, "sprutKeepAwake", true);
+
+    // Direct Home Assistant API/WebSocket connector. Broadcast updates remain supported as a
+    // compatibility ingress, but this connector can obtain an authoritative startup snapshot.
+    public final Bool haApiEnabled = new Bool(this, "haApiEnabled", false);
+    public final Str haBaseUrl = new Str(this, "haBaseUrl", "http://homeassistant.local:8123");
+    public final Secret haAccessToken = new Secret(this, "haAccessToken");
+    public final Bool haKeepAwake = new Bool(this, "haKeepAwake", true);
 
     @Nullable
     public TextBrickPrefs textBrickPrefs(BrickType type) {
@@ -383,6 +602,8 @@ public class Preferences {
                 return indoorTemp;
             case OUTDOOR_TEMP:
                 return outdoorTemp;
+            case HOME_ASSISTANT:
+                return homeAssistant;
             default:
                 return null;
         }
@@ -443,6 +664,19 @@ public class Preferences {
         throw new IllegalArgumentException("Unknown brick type: " + type);
     }
 
+    /** Allowlist for {@link AppSelectionActivity}'s internal preference-key deep link. */
+    public boolean isHideListKey(@Nullable String key) {
+        if (key == null || key.isEmpty()) return false;
+        if (hideInPackages.key.equals(key)) return true;
+        for (BrickType type : BrickType.values()) {
+            TextBrickPrefs text = textBrickPrefs(type);
+            if (text != null && text.hideInPackages.key.equals(key)) return true;
+            IconBrickPrefs icon = iconBrickPrefs(type);
+            if (icon != null && icon.hideInPackages.key.equals(key)) return true;
+        }
+        return false;
+    }
+
     /**
      * Returns the brick whose hide-in-apps list this brick uses. {@code type} itself if the
      * brick has its own list; another type if it inherits.
@@ -457,6 +691,7 @@ public class Preferences {
     }
 
     public Preferences(Context context) {
+        appContext = context.getApplicationContext();
         final Context deviceContext = context.getApplicationContext().createDeviceProtectedStorageContext();
         prefs = deviceContext.getSharedPreferences(context.getPackageName() + "_preferences", Context.MODE_PRIVATE);
         migrateLegacyPrefsIfNeeded();
@@ -470,6 +705,17 @@ public class Preferences {
      */
     public void resetAll() {
         prefs.edit().clear().commit();
+    }
+
+    /** Popup drag can be followed immediately by ignition power-off; persist both coordinates
+     * atomically and synchronously so a half-updated or lost position cannot occur. */
+    public void savePopupPosition(int x, int y) {
+        prefs.edit().putInt(popupX.key, x).putInt(popupY.key, y).commit();
+    }
+
+    /** Multi-overlay geometry may be followed immediately by ignition power-off. */
+    public void savePopupOverlaysJson(@NonNull String json) {
+        prefs.edit().putString(popupOverlaysJson.key, json).commit();
     }
 
     /**
@@ -501,6 +747,7 @@ public class Preferences {
             case BLUETOOTH: return "bluetooth";
             case INDOOR_TEMP: return "indoorTemp";
             case OUTDOOR_TEMP: return "outdoorTemp";
+            case HOME_ASSISTANT: return "homeAssistant";
             default: return null;
         }
     }
@@ -619,6 +866,8 @@ public class Preferences {
     public String exportToJson(@Nullable String presetName) throws JSONException {
         JSONObject preferencesNode = new JSONObject();
         for (Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
+            // Credentials are device-local and never leave the app in an export or preset.
+            if (SECRET_PREFERENCE_KEYS.contains(entry.getKey())) continue;
             Object value = entry.getValue();
             if (value instanceof Set) {
                 JSONArray array = new JSONArray();
@@ -641,6 +890,33 @@ public class Preferences {
     }
 
     public void importFromJson(String json) throws JSONException, InvalidSettingsFileException {
+        applyJson(json, true);
+    }
+
+    /**
+     * Applies only keys explicitly present in a bundled appearance preset.
+     *
+     * <p>Bundled presets intentionally describe a small status-row theme rather than a complete
+     * backup.  Treating one as a normal import used to clear HOME panels, connector configuration,
+     * climate reservation and automation rules.  Full user presets and backups still use
+     * {@link #importFromJson(String)} and retain replace-all semantics.</p>
+     */
+    public void applyPatchFromJson(String json)
+            throws JSONException, InvalidSettingsFileException {
+        applyJson(json, false);
+    }
+
+    private void applyJson(String json, boolean clearExisting)
+            throws JSONException, InvalidSettingsFileException {
+        // Preserve encrypted device-local connector credentials byte-for-byte. Decrypting and
+        // re-encrypting here can fail during Direct Boot before the Keystore is unlocked.
+        Map<String, String> existingSecrets = new java.util.HashMap<>();
+        if (clearExisting) {
+            for (String secretKey : SECRET_PREFERENCE_KEYS) {
+                String stored = prefs.getString(secretKey, null);
+                if (stored != null) existingSecrets.put(secretKey, stored);
+            }
+        }
         JSONObject root = new JSONObject(json);
         if (!EXPORT_FILE_TYPE.equals(root.optString(KEY_FILE_TYPE, null))) {
             throw new InvalidSettingsFileException("Not a Status Widget settings file");
@@ -654,10 +930,11 @@ public class Preferences {
             throw new InvalidSettingsFileException("Missing preferences section");
         }
         SharedPreferences.Editor editor = prefs.edit();
-        editor.clear();
+        if (clearExisting) editor.clear();
         Iterator<String> keys = preferencesNode.keys();
         while (keys.hasNext()) {
             String key = keys.next();
+            if (SECRET_PREFERENCE_KEYS.contains(key)) continue;
             Object value = preferencesNode.get(key);
             if (value instanceof Boolean) {
                 editor.putBoolean(key, (Boolean) value);
@@ -683,7 +960,12 @@ public class Preferences {
                 editor.putString(key, (String) value);
             }
         }
-        editor.apply();
+        if (clearExisting) {
+            for (Map.Entry<String, String> secret : existingSecrets.entrySet()) {
+                editor.putString(secret.getKey(), secret.getValue());
+            }
+        }
+        editor.commit();
         // The file may be from the legacy (pre-brick) schema — re-run migration so it adapts.
         migrateLegacyPrefsIfNeeded();
     }

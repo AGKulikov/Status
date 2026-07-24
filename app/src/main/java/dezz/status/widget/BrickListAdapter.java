@@ -151,6 +151,8 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
                 return R.string.brick_title_indoor_temp;
             case OUTDOOR_TEMP:
                 return R.string.brick_title_outdoor_temp;
+            case HOME_ASSISTANT:
+                return R.string.brick_title_home_assistant;
             default:
                 return 0;
         }
@@ -514,6 +516,13 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
                     showBluetoothBlock(false);
                     showMediaBlock(false);
                     break;
+                case HOME_ASSISTANT:
+                    bindTextBrick(prefs.homeAssistant);
+                    showDateBlock(false);
+                    showGpsBlock(false);
+                    showBluetoothBlock(false);
+                    showMediaBlock(false);
+                    break;
             }
 
             bindHideBlock(type);
@@ -711,6 +720,8 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
                     return activity.getString(R.string.brick_title_indoor_temp);
                 case OUTDOOR_TEMP:
                     return activity.getString(R.string.brick_title_outdoor_temp);
+                case HOME_ASSISTANT:
+                    return activity.getString(R.string.brick_title_home_assistant);
                 default:
                     return "";
             }

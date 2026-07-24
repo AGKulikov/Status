@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ Copyright © 2025-2026 Dezz (https://github.com/DezzK)
+  ~
+  ~ This program is free software: you can redistribute it and/or modify
+  ~ it under the terms of the GNU General Public License as published by
+  ~ the Free Software Foundation, either version 3 of the License, or
+  ~ (at your option) any later version.
+  ~
+  ~ This program is distributed in the hope that it will be useful,
+  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ~ GNU General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU General Public License
+  ~ along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  -->
+
+<resources>
+    <color name="widget_background">#000000</color>
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_outline">#AA000000</color>
+
+    <color name="settings_accent">#0A84FF</color>
+    <color name="settings_background">#FF000000</color>
+    <color name="settings_sidebar_background">#FF111113</color>
+    <color name="settings_group_background">#FF1C1C1E</color>
+    <color name="settings_search_background">#FF2C2C2E</color>
+    <color name="settings_separator">#FF38383A</color>
+    <color name="settings_secondary_text">#99EBEBF5</color>
+    <color name="settings_tertiary_text">#4DEBEBF5</color>
+    <color name="settings_pressed">#330A84FF</color>
+    <color name="settings_destructive">#FF453A</color>
+    <color name="settings_success">#30D158</color>
+    <color name="settings_warning">#FF9F0A</color>
+    <color name="settings_purple">#BF5AF2</color>
+    <color name="settings_indigo">#5E5CE6</color>
+</resources>
