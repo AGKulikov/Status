@@ -1,0 +1,65 @@
+name: Publish HA1079 stable release
+
+on:
+  push:
+    branches:
+      - release/v2.8.2-ha1079
+    paths:
+      - releases/status-widget-ha-v2.8.2-ha1079.apk
+      - releases/status-widget-ha-v2.8.2-ha1079.apk.sha256
+      - .github/workflows/ha1079-publish.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Android build tools 36
+        shell: bash
+        run: |
+          set +o pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
+          set -o pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;36.0.0"
+
+      - name: Verify stable APK
+        shell: bash
+        run: |
+          APK="releases/status-widget-ha-v2.8.2-ha1079.apk"
+          cd releases
+          sha256sum -c status-widget-ha-v2.8.2-ha1079.apk.sha256
+          cd ..
+          BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
+          echo "$BADGING" | grep -q "package: name='ru.natro.statuswidget' versionCode='208021079' versionName='v2.8.2-ha1079'"
+          CERTS=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK")
+          echo "$CERTS"
+          echo "$CERTS" | grep -qi "Verified using v3 scheme (APK Signature Scheme v3): true"
+          echo "$CERTS" | grep -qi "Number of signers: 1"
+          echo "$CERTS" | grep -qi "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 4 "$APK"
+          if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml | grep -q 'android:debuggable'; then
+            echo "Stable APK must not be debuggable" >&2
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.8.2-ha1079
+          target_commitish: ${{ github.sha }}
+          name: Status Widget HA1079
+          body: |
+            Signed HA1079 update for package ru.natro.statuswidget.
+            Keeps the stable HA update certificate and installs over HA1074 and HA1078.
+            See release-manifests/HA1079.md for verification details.
+          fail_on_unmatched_files: true
+          files: |
+            releases/status-widget-ha-v2.8.2-ha1079.apk
+            releases/status-widget-ha-v2.8.2-ha1079.apk.sha256
