@@ -3,6 +3,7 @@ name: Release
 on:
   push:
     tags: ['v*']
+    branches: ['release/v*']
   workflow_dispatch:
     inputs:
       tag:
@@ -31,9 +32,15 @@ jobs:
       run: |
         if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
           VERSION=${{ github.event.inputs.tag }}
+        elif [[ "${GITHUB_REF}" == refs/heads/release/v* ]]; then
+          VERSION=${GITHUB_REF_NAME#release/}
         else
           VERSION=${{ github.ref_name }}
         fi
+        [[ "$VERSION" == v* ]] || {
+          echo "Release version must start with v: $VERSION" >&2
+          exit 1
+        }
         echo "version=${VERSION}" >> $GITHUB_OUTPUT
         echo "version=${VERSION}"
 
