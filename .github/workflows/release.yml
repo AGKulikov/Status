@@ -67,6 +67,16 @@ jobs:
         test -n "$KEY_PASSWORD" || { echo "KEY_PASSWORD is required" >&2; exit 1; }
         ./gradlew assembleGeelyRelease
         APK="app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}-release.apk"
+        BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
+        echo "$BADGING"
+        echo "$BADGING" | grep -F "package: name='ru.natro.statuswidget'"
+        echo "$BADGING" | grep -F "versionName='${VERSION_NAME}'"
+        VERSION_CODE=$(echo "$BADGING" \
+          | sed -n "s/.*versionCode='\\([0-9][0-9]*\\)'.*/\\1/p" \
+          | head -n 1)
+        test -n "$VERSION_CODE"
+        test "$VERSION_CODE" -gt 208021074
+        "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$APK"
         "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/apk-certs.txt
         grep -qi "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75" /tmp/apk-certs.txt
         mv "$APK" "app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}.apk"

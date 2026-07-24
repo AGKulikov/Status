@@ -857,6 +857,11 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
             Toast.makeText(this, "Сначала выберите устройство-источник", Toast.LENGTH_LONG).show();
             return;
         }
+        if (source.connectorType == ConnectorType.PHONE) {
+            Toast.makeText(this, "Телефон — источник только для чтения. Команды недоступны.",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
         if (source.connectorType == ConnectorType.MQTT) {
             configureMqttAction(summary);
             return;
@@ -1162,7 +1167,15 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
 
     private static String sourceLabel(SourceBinding binding) {
         if (binding == null || !binding.isBound()) return "не выбран";
-        return binding.connectorType.jsonName() + " · " + binding.resourceId
+        String connector;
+        switch (binding.connectorType) {
+            case HOME_ASSISTANT: connector = "Home Assistant"; break;
+            case SPRUTHUB: connector = "Sprut.hub"; break;
+            case PHONE: connector = "Телефон"; break;
+            case MQTT: connector = "MQTT"; break;
+            default: connector = binding.connectorType.jsonName(); break;
+        }
+        return connector + " · " + binding.resourceId
                 + (binding.valuePath == null ? "" : " · " + binding.valuePath);
     }
 

@@ -24,6 +24,8 @@ import dezz.status.widget.integration.SourceBinding;
 /** Versioned, ordered collection of user-created HOME icons. */
 public final class LauncherShortcutStore {
     public static final int SCHEMA_VERSION = 1;
+    public static final int MIN_ICON_SIZE_PX = 24;
+    public static final int MAX_ICON_SIZE_PX = 320;
 
     public enum Kind { APP, BUILTIN, RULE, INTENT, CAR }
 
@@ -142,6 +144,8 @@ public final class LauncherShortcutStore {
     }
 
     public void load() {
+        List<Shortcut> previous = new ArrayList<>();
+        for (Shortcut shortcut : shortcuts) previous.add(shortcut.copy());
         shortcuts.clear();
         String raw = preferences.launcherShortcutsJson.get();
         if (raw == null || raw.trim().isEmpty()) {
@@ -155,14 +159,17 @@ public final class LauncherShortcutStore {
             if (root.optInt("version", 0) != SCHEMA_VERSION || items == null) throw new JSONException("schema");
             for (int index = 0; index < items.length(); index++) {
                 JSONObject json = items.optJSONObject(index);
-                if (json == null) continue;
+                if (json == null) throw new JSONException("item");
                 Shortcut value = fromJson(json);
-                if (value != null) shortcuts.add(value);
+                if (value == null) throw new JSONException("item");
+                shortcuts.add(value);
             }
         } catch (JSONException error) {
+            // A partial import or a future schema must never overwrite the user's only copy of
+            // actions, RULE bindings and long-press commands with defaults. Keep the last valid
+            // in-memory set; on a cold start provide usable defaults without persisting them.
             shortcuts.clear();
-            shortcuts.addAll(defaults());
-            save();
+            shortcuts.addAll(previous.isEmpty() ? defaults() : previous);
         }
     }
 
@@ -226,9 +233,12 @@ public final class LauncherShortcutStore {
                 ? "#FFFFB300" : value.activeIconColor.trim();
         if (!Double.isFinite(value.commandValue)) value.commandValue = 0;
         if (!Double.isFinite(value.longCommandValue)) value.longCommandValue = 0;
-        value.iconSizePx = Math.max(24, Math.min(180, value.iconSizePx));
-        value.columnSpan = Math.max(1, Math.min(4, value.columnSpan));
-        value.rowSpan = Math.max(1, Math.min(4, value.rowSpan));
+        value.iconSizePx = Math.max(MIN_ICON_SIZE_PX,
+                Math.min(MAX_ICON_SIZE_PX, value.iconSizePx));
+        value.columnSpan = Math.max(1,
+                Math.min(LauncherActionsGridConfig.MAX_COLUMNS, value.columnSpan));
+        value.rowSpan = Math.max(1,
+                Math.min(LauncherActionsGridConfig.MAX_ROWS, value.rowSpan));
         return value;
     }
 

@@ -716,7 +716,8 @@ public final class SettingsHubActivity extends AppCompatActivity {
                 return new InformationPanelConfigStore(preferences).load().hasEnabledItems()
                         ? "Включена" : "Нет статусов";
             case "panel_actions":
-                return countLabel(jsonCount(preferences.launcherShortcutsJson.get()), "кнопка");
+                return actionsPanelSummary(preferences.launcherActionsVisible.get(),
+                        preferences.launcherShortcutsJson.get());
             case "panel_popup":
                 return enabledLabel(preferences.popupEnabled.get());
             case "connector_ha": {
@@ -731,6 +732,12 @@ public final class SettingsHubActivity extends AppCompatActivity {
                 return preferences.mqttEnabled.get()
                         ? (MqttController.isConnected() ? "Подключено" : "Включено")
                         : "Выключено";
+            case "connector_phone": {
+                if (!preferences.phoneConnectorEnabled.get()) return "Выключено";
+                String address = preferences.phoneDeviceAddress.get().trim();
+                return address.isEmpty() ? "Выберите iPhone"
+                        : "Включено · " + PhoneConnectorSettingsActivity.maskedAddress(address);
+            }
             case "automation_visual":
                 return countLabel(jsonCount(preferences.localScenariosJson.get()), "сценарий");
             case "automation_intent":
@@ -760,6 +767,35 @@ public final class SettingsHubActivity extends AppCompatActivity {
             count++;
         }
         return count;
+    }
+
+    /**
+     * Keeps the actions card honest about both visibility layers: the outer HOME panel can be
+     * hidden while all of its saved shortcuts remain intact, and individual shortcuts can be
+     * disabled without being deleted.
+     */
+    @NonNull
+    static String actionsPanelSummary(boolean panelVisible, @Nullable String raw) {
+        if (!panelVisible) return "Скрыта";
+        int enabled = 0;
+        int total = 0;
+        if (raw != null && !raw.trim().isEmpty()) {
+            try {
+                JSONArray items = new JSONObject(raw).optJSONArray("items");
+                if (items != null) {
+                    for (int index = 0; index < items.length(); index++) {
+                        JSONObject item = items.optJSONObject(index);
+                        if (item == null) continue;
+                        total++;
+                        if (item.optBoolean("enabled", true)) enabled++;
+                    }
+                }
+            } catch (Exception ignored) {
+                // A broken/imported document is reported as an empty set; the shortcut store owns
+                // recovery and must remain the only component allowed to change persisted data.
+            }
+        }
+        return "Включено: " + enabled + " из " + total;
     }
 
     private int missingPermissionCount() {
@@ -945,6 +981,7 @@ public final class SettingsHubActivity extends AppCompatActivity {
             case "ha": return R.drawable.ic_smart_location;
             case "sprut": return R.drawable.ic_smart_motion;
             case "mqtt": return R.drawable.ic_status_wifi_internet;
+            case "phone": return R.drawable.ic_smart_phone;
             case "scenario": return R.drawable.ic_smart_alarm;
             case "intent": return R.drawable.ic_car_wheel_heat;
             case "permissions": return R.drawable.ic_popup_lock;

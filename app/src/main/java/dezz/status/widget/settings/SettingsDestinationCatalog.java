@@ -40,7 +40,7 @@ public final class SettingsDestinationCatalog {
         PANELS("panels", "Панели",
                 "Медиа, навигация, климат, датчики и быстрые действия", "panels"),
         SMART_HOME("smart_home", "Умный дом",
-                "Подключения Home Assistant, Sprut.hub и MQTT", "smart_home"),
+                "Подключения Home Assistant, Sprut.hub, MQTT и iPhone", "smart_home"),
         AUTOMATION("automation", "Автоматизация",
                 "Сценарии и команды с внешних кнопок", "automation"),
         APP("app", "Приложение",
@@ -172,9 +172,12 @@ public final class SettingsDestinationCatalog {
                 "датчики", "статусы", "сетка", "home assistant", "sprut", "mqtt",
                 "информация"));
         values.add(activity("panel_actions", Group.PANELS, "Кнопки и умный дом",
-                "Функции автомобиля, приложения, устройства, иконки и состояния",
+                "Индивидуальная сетка, размеры и позиции кнопок — редактирование на HOME и в настройках",
                 "actions", "dezz.status.widget.LauncherShortcutSettingsActivity",
-                "быстрые действия", "ворота", "свет", "функции", "иконки"));
+                "быстрые действия", "ворота", "свет", "функции", "иконки",
+                "сетка", "размер", "позиция", "расположение", "home", "редактор",
+                "настройки", "редактирование",
+                "столбцы", "ряды", "показывать", "скрыть"));
         values.add(activity("panel_popup", Group.PANELS, "Плавающие панели",
                 "Независимые оверлеи, сетка, размер, положение и плитки",
                 "popup", "dezz.status.widget.PopupSettingsActivity",
@@ -192,6 +195,11 @@ public final class SettingsDestinationCatalog {
                 "Брокер, авторизация, топики, QoS и состояние соединения",
                 "mqtt", "dezz.status.widget.MqttSettingsActivity",
                 "broker", "брокер", "topic", "топик", "qos"));
+        values.add(activity("connector_phone", Group.SMART_HOME, "Телефон",
+                "Конкретный iPhone по Bluetooth: данные, уведомления, сообщения и присутствие",
+                "phone", "dezz.status.widget.PhoneConnectorSettingsActivity",
+                "iphone", "айфон", "телефон", "bluetooth", "ancs", "уведомления",
+                "сообщения", "sms", "присутствие"));
 
         values.add(activity("automation_visual", Group.AUTOMATION, "Визуальные сценарии",
                 "Триггеры, условия и действия между всеми коннекторами",

@@ -95,7 +95,8 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
         TextView title = text("Панель «Информация»", 25, true);
         controls.addView(title);
         TextView hint = text("Объединяет внутренние датчики автомобиля/магнитолы и статусы "
-                + "Home Assistant, MQTT и Sprut.hub. Нажатие ничего не выполняет.", 14, false);
+                + "Home Assistant, MQTT, Sprut.hub и выбранного iPhone. "
+                + "Нажатие ничего не выполняет.", 14, false);
         hint.setAlpha(.7f);
         controls.addView(hint, lp(match(), wrap(), 0, 0, 0, dp(12)));
 

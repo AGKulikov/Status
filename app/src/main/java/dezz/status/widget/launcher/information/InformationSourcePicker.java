@@ -72,7 +72,8 @@ public final class InformationSourcePicker {
                 "Автомобиль и магнитола",
                 "Home Assistant",
                 "MQTT",
-                "Sprut.hub"
+                "Sprut.hub",
+                "Телефон"
         };
         new AlertDialog.Builder(activity)
                 .setTitle("Источник статуса")
@@ -80,7 +81,8 @@ public final class InformationSourcePicker {
                     if (which == 0) showInternal();
                     else if (which == 1) showHomeAssistant();
                     else if (which == 2) showMqtt();
-                    else showSprut();
+                    else if (which == 3) showSprut();
+                    else showPhone();
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
@@ -305,6 +307,67 @@ public final class InformationSourcePicker {
         choices.sort(Comparator.comparing(value -> value.label,
                 String.CASE_INSENSITIVE_ORDER));
         return choices;
+    }
+
+    private void showPhone() {
+        List<Choice> choices = phoneChoices();
+        showSearch("Телефон", "Название, ID, тип или текущее значение", choices,
+                "Выбранный iPhone ещё не передал доступных данных.");
+    }
+
+    @NonNull
+    private List<Choice> phoneChoices() {
+        WidgetService service = WidgetService.getInstance();
+        if (service == null) return Collections.emptyList();
+        List<Choice> choices = new ArrayList<>();
+        for (ConnectorValue value : service.connectorValueSnapshot()) {
+            if (value.connectorType != ConnectorType.PHONE || !value.readable) continue;
+            // diagnostics.device intentionally contains the exact Bluetooth address for the
+            // local transport. It is useful to the connector itself, but must never become a
+            // selectable launcher value whose generic object renderer could expose the full MAC.
+            if ("diagnostics.device".equals(value.resourceId)) continue;
+            String label = first(string(value.attributes.get("friendly_name")),
+                    string(value.attributes.get("name")), phoneLabel(value.resourceId));
+            String hint = value.valueType + " " + value.unit + " iphone phone "
+                    + value.resourceId;
+            SourceBinding binding = new SourceBinding(ConnectorType.PHONE,
+                    value.connectorId, value.resourceId, "",
+                    SourceBinding.PRESENTATION_AUTO, value.unit);
+            InformationPanelConfig.Item item = InformationPanelConfig.Item.connector(
+                    binding, label, value.unit, hint);
+            choices.add(new Choice(item,
+                    label + "\nТелефон · " + value.resourceId
+                            + (value.fresh ? " · сейчас: " + display(value.rawValue)
+                            : " · ожидает актуальное значение"),
+                    label + " " + value.resourceId + " " + hint + " "
+                            + value.rawValue + " " + value.attributes));
+        }
+        choices.sort(Comparator.comparing(value -> value.label,
+                String.CASE_INSENSITIVE_ORDER));
+        return choices;
+    }
+
+    @NonNull
+    private static String phoneLabel(@NonNull String resourceId) {
+        switch (resourceId) {
+            case "connected": return "iPhone подключён";
+            case "battery.level": return "Заряд iPhone";
+            case "battery.charging": return "Зарядка iPhone";
+            case "network.available": return "Сеть iPhone";
+            case "network.operator": return "Оператор iPhone";
+            case "network.type": return "Тип сети iPhone";
+            case "network.signal": return "Сигнал сети iPhone";
+            case "network.roaming": return "Роуминг iPhone";
+            case "notifications.count": return "Количество уведомлений";
+            case "notifications.latest": return "Последнее уведомление";
+            case "notifications.items": return "Уведомления iPhone";
+            case "messages.unread": return "Непрочитанные сообщения";
+            case "messages.latest": return "Последнее сообщение";
+            case "diagnostics.ancs": return "Состояние Apple ANCS";
+            case "diagnostics.sms": return "Состояние SMS/MAP";
+            case "diagnostics.last_error": return "Ошибка подключения iPhone";
+            default: return resourceId;
+        }
     }
 
     private void showSearch(@NonNull String title, @NonNull String hint,

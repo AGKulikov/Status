@@ -43,6 +43,16 @@ public final class MediaPanelSettingsLifecycleContractTest {
         assertTrue(source.contains("saveNow();"));
     }
 
+    @Test
+    public void settingsPreviewIsAlsoADirectGridEditor() throws IOException {
+        String source = source("dezz/status/widget/MediaPanelSettingsActivity.java");
+
+        assertTrue(source.contains("preview.setInPlaceEditMode(true"));
+        assertTrue(source.contains("config = updated.copy();"));
+        assertTrue(source.contains("store.save(config);"));
+        assertTrue(source.contains("ЖИВОЙ РЕДАКТОР"));
+    }
+
     private static String source(String relative) throws IOException {
         Path fromRoot = Paths.get("app", "src", "main", "java").resolve(relative);
         Path fromApp = Paths.get("src", "main", "java").resolve(relative);

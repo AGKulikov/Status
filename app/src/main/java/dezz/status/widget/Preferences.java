@@ -44,6 +44,9 @@ public class Preferences {
     private static final Set<String> SECRET_PREFERENCE_KEYS = Collections.unmodifiableSet(
             new HashSet<>(java.util.Arrays.asList(
                     "mqttPassword", "sprutPassword", "sprutClientId", "haAccessToken",
+                    // The paired phone is installation-specific and must not be copied into a
+                    // settings backup restored on another head unit.
+                    "phoneDeviceAddress",
                     // Contains both the full bearer action and fixed-endpoint token. Layout
                     // presets are routinely shared, so rules must remain device-local too.
                     "intentActionRulesJson")));
@@ -513,6 +516,8 @@ public class Preferences {
     public final Int climateButtonY = new Int(this, "climateButtonY", 300);
     public final Bool climateButtonLocked = new Bool(this, "climateButtonLocked", false);
     public final Str launcherShortcutsJson = new Str(this, "launcherShortcutsJson", "");
+    /** Additive cell positions for action/smart-home icons; shortcut actions stay untouched. */
+    public final Str launcherActionsGridJson = new Str(this, "launcherActionsGridJson", "");
     public final Int launcherAppsColumns = new Int(this, "launcherAppsColumns", 3);
     public final Int launcherActionsColumns = new Int(this, "launcherActionsColumns", 3);
 
@@ -528,6 +533,24 @@ public class Preferences {
     public final Int mqttQos = new Int(this, "mqttQos", 1);
     public final Int mqttKeepAliveSeconds = new Int(this, "mqttKeepAliveSeconds", 30);
     public final Bool mqttKeepAwake = new Bool(this, "mqttKeepAwake", true);
+
+    // Paired iPhone connector. The Bluetooth address is deliberately stored as a normal local
+    // preference (the controller needs it before Android Keystore unlock) but is excluded from
+    // settings export above because it identifies one physical phone/head-unit pairing.
+    public final Bool phoneConnectorEnabled = new Bool(this,
+            "phoneConnectorEnabled", false);
+    public final Str phoneDeviceAddress = new Str(this, "phoneDeviceAddress", "");
+    public final Bool phoneNotificationsEnabled = new Bool(this,
+            "phoneNotificationsEnabled", true);
+    public final Bool phoneMessagesEnabled = new Bool(this,
+            "phoneMessagesEnabled", false);
+    public final Bool phoneIncludeNotificationText = new Bool(this,
+            "phoneIncludeNotificationText", false);
+    /** Optional writable Sprut.hub boolean characteristic reflecting phone presence. */
+    public final Bool phoneSprutPresenceEnabled = new Bool(this,
+            "phoneSprutPresenceEnabled", false);
+    public final Str phoneSprutPresencePath = new Str(this,
+            "phoneSprutPresencePath", "");
 
     // Direct Sprut.hub connector. The token is intentionally kept only in the live connector;
     // reconnect performs a fresh challenge using the Keystore-protected password.

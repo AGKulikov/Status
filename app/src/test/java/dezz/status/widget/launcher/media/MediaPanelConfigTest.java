@@ -97,6 +97,23 @@ public final class MediaPanelConfigTest {
         assertNoEnabledOverlap(config);
     }
 
+    @Test public void leadingEdgeResizeUpdatesPositionAndSpanAtomically() {
+        MediaPanelConfig config = new MediaPanelConfig();
+        for (MediaPanelConfig.Element element : config.orderedElements()) {
+            config.setEnabled(element.id, MediaPanelConfig.ARTWORK.equals(element.id));
+        }
+        assertTrue(config.setGridSize(6, 5));
+
+        assertTrue(config.setPlacement(MediaPanelConfig.ARTWORK, 1, 1, 4, 3));
+
+        MediaPanelConfig.Element artwork = config.element(MediaPanelConfig.ARTWORK);
+        assertEquals(1, artwork.column);
+        assertEquals(1, artwork.row);
+        assertEquals(4, artwork.columnSpan);
+        assertEquals(3, artwork.rowSpan);
+        assertNoEnabledOverlap(config);
+    }
+
     @Test public void enablingElementIsRejectedWhenGridIsCompletelyOccupied() {
         MediaPanelConfig config = new MediaPanelConfig();
         for (MediaPanelConfig.Spec spec : MediaPanelConfig.SPECS) {
