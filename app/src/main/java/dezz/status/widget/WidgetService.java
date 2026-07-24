@@ -2077,6 +2077,7 @@ public class WidgetService extends Service {
         if (mediaTarget.view.getVisibility() != mediaTarget.visibility) {
             visibilityFlips.add(mediaTarget);
             if (mediaTarget.visibility == View.VISIBLE) expanding = true;
+        }
         boolean refreshVisibleMedia = mediaTarget.visibility == View.VISIBLE
                 && !mediaShouldBeGone && !mediaHiddenByApp;
 
