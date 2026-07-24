@@ -25,6 +25,7 @@ public final class SettingsDestinationCatalogTest {
             "dezz.status.widget.AboutActivity",
             "dezz.status.widget.AutomationSettingsActivity",
             "dezz.status.widget.ClimatePanelSettingsActivity",
+            "dezz.status.widget.DriverPanelSettingsActivity",
             "dezz.status.widget.FavoriteAppsSettingsActivity",
             "dezz.status.widget.FavoriteRoutesSettingsActivity",
             "dezz.status.widget.HomeAssistantSettingsActivity",
