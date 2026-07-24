@@ -81,7 +81,12 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingConfigs.release
+            // A release assembled in CI without access to the private update key must remain
+            // unsigned. The trusted local release step signs that exact APK with the historical
+            // HA key; silently falling back to a debug certificate would break in-place updates.
+            if (System.getenv("ALLOW_UNSIGNED_RELEASE") != "true") {
+                signingConfig signingConfigs.release
+            }
         }
         debug {
             debuggable true

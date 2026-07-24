@@ -49,7 +49,7 @@ jobs:
       - name: Decode stable update keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          REQUIRE_STABLE: ${{ github.event_name != 'pull_request' }}
+          REQUIRE_STABLE: ${{ github.event_name != 'pull_request' && github.ref != 'refs/heads/feature/ha1080-actions-phone' }}
         shell: bash
         run: |
           if [[ -n "$KEYSTORE_BASE64" ]]; then
@@ -103,8 +103,9 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  # One-time HA1080 publication path. It is deliberately split in two: untrusted source is built
-  # with a read-only token, while the write-token job only verifies and publishes that artifact.
+  # One-time HA1080 handoff. The repository intentionally has no private update key, so CI builds
+  # an unsigned, source-addressed APK. A trusted local step signs the exact artifact with the
+  # historical HA certificate; publication verifies that certificate independently.
   build-ha1080-release:
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/feature/ha1080-actions-phone' && github.repository == 'AGKulikov/Status'
@@ -137,30 +138,16 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Decode mandatory stable update keystore
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        shell: bash
-        run: |
-          test -n "$KEYSTORE_BASE64" || {
-            echo "Stable KEYSTORE_BASE64 is required for HA1080" >&2
-            exit 1
-          }
-          echo "$KEYSTORE_BASE64" | base64 -d > keystore.jks
-
-      - name: Build and verify exact HA1080 release
+      - name: Build and verify exact unsigned HA1080 release
         env:
           HEAD_SHA: ${{ github.sha }}
           VERSION_NAME: v2.8.2-ha1080
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          VERSION_CODE: '208021080'
+          ALLOW_UNSIGNED_RELEASE: 'true'
         shell: bash
         run: |
           test "$(git rev-parse HEAD)" = "$HEAD_SHA"
-          test -n "$KEY_PASSWORD" || {
-            echo "Stable KEY_PASSWORD is required for HA1080" >&2
-            exit 1
-          }
+          test ! -e keystore.jks
           chmod +x gradlew
           ./gradlew --no-daemon testGeelyDebugUnitTest
           ./gradlew --no-daemon assembleGeelyRelease
@@ -169,81 +156,47 @@ jobs:
           echo "$BADGING"
           echo "$BADGING" | grep -F "package: name='ru.natro.statuswidget'"
           echo "$BADGING" | grep -F "versionName='${VERSION_NAME}'"
+          if echo "$BADGING" | grep -Fq "application-debuggable"; then
+            echo "Exact HA1080 release must not be debuggable" >&2
+            exit 1
+          fi
           VERSION_CODE=$(echo "$BADGING" \
             | sed -n "s/.*versionCode='\([0-9][0-9]*\)'.*/\1/p" \
             | head -n 1)
           test "$VERSION_CODE" -eq 208021080
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$APK"
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" \
-            verify --verbose --print-certs "$APK" | tee /tmp/ha1080-certs.txt
-          grep -qi "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75" \
-            /tmp/ha1080-certs.txt
+          if "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$APK"; then
+            echo "CI handoff unexpectedly contains a signature" >&2
+            exit 1
+          fi
           mkdir -p release-out
-          cp "$APK" "release-out/status-widget-ha-${VERSION_NAME}.apk"
+          cp "$APK" "release-out/status-widget-ha-${VERSION_NAME}-unsigned.apk"
           cd release-out
-          sha256sum "status-widget-ha-${VERSION_NAME}.apk" \
-            > "status-widget-ha-${VERSION_NAME}.apk.sha256"
+          APK_NAME="status-widget-ha-${VERSION_NAME}-unsigned.apk"
+          UNSIGNED_SHA=$(sha256sum "$APK_NAME" | awk '{print $1}')
+          printf '%s  %s\n' "$UNSIGNED_SHA" "$APK_NAME" > "${APK_NAME}.sha256"
+          jq -n \
+            --arg tag "v2.8.2-ha1080" \
+            --arg package "ru.natro.statuswidget" \
+            --arg versionName "$VERSION_NAME" \
+            --arg sourceSha "$HEAD_SHA" \
+            --arg workflowRunId "$GITHUB_RUN_ID" \
+            --arg unsignedSha256 "$UNSIGNED_SHA" \
+            --argjson versionCode 208021080 \
+            '{
+              tag: $tag,
+              package: $package,
+              versionName: $versionName,
+              versionCode: $versionCode,
+              sourceSha: $sourceSha,
+              workflowRunId: $workflowRunId,
+              unsignedSha256: $unsignedSha256
+            }' > manifest.json
 
-      - name: Upload verified HA1080 release
+      - name: Upload verified unsigned HA1080 handoff
         uses: actions/upload-artifact@v4
         with:
-          name: status-widget-ha-v2.8.2-ha1080-release
+          name: status-widget-ha-v2.8.2-ha1080-unsigned
           path: release-out/*
           if-no-files-found: error
           retention-days: 30
-
-  publish-ha1080:
-    needs: build-ha1080-release
-    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/ha1080-actions-phone' && github.repository == 'AGKulikov/Status'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download verified HA1080 release
-        uses: actions/download-artifact@v4
-        with:
-          name: status-widget-ha-v2.8.2-ha1080-release
-          path: release-out
-
-      - name: Publish exact source tag and GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          HEAD_SHA: ${{ github.sha }}
-          RELEASE_TAG: v2.8.2-ha1080
-        shell: bash
-        run: |
-          cd release-out
-          APK_NAME="status-widget-ha-${RELEASE_TAG}.apk"
-          SHA_NAME="${APK_NAME}.sha256"
-          sha256sum -c "$SHA_NAME"
-          TAG_SHA=$(gh api \
-            "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" \
-            --jq '.object.sha' 2>/dev/null || true)
-          if [[ -n "$TAG_SHA" ]]; then
-            test "$TAG_SHA" = "$HEAD_SHA" || {
-              echo "${RELEASE_TAG} points to ${TAG_SHA}, expected ${HEAD_SHA}" >&2
-              exit 1
-            }
-            if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-              gh release upload "$RELEASE_TAG" "$APK_NAME" "$SHA_NAME" --clobber
-            else
-              gh release create "$RELEASE_TAG" "$APK_NAME" "$SHA_NAME" \
-                --verify-tag \
-                --title "Release ${RELEASE_TAG}" \
-                --notes "HA1080: exact-iPhone connector, visual action grids and four-corner panel editing."
-            fi
-          else
-            gh release create "$RELEASE_TAG" "$APK_NAME" "$SHA_NAME" \
-              --target "$HEAD_SHA" \
-              --title "Release ${RELEASE_TAG}" \
-              --notes "HA1080: exact-iPhone connector, visual action grids and four-corner panel editing."
-          fi
-          mkdir -p /tmp/ha1080-published
-          gh release download "$RELEASE_TAG" \
-            --pattern "$APK_NAME" --dir /tmp/ha1080-published --clobber
-          gh release download "$RELEASE_TAG" \
-            --pattern "$SHA_NAME" --dir /tmp/ha1080-published --clobber
-          cmp "$APK_NAME" "/tmp/ha1080-published/${APK_NAME}"
-          cmp "$SHA_NAME" "/tmp/ha1080-published/${SHA_NAME}"
