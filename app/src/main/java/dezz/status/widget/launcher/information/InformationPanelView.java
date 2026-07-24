@@ -48,6 +48,7 @@ import java.util.Set;
 import dezz.status.widget.WidgetService;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarTelemetryDescriptor;
+import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.SourceBinding;
@@ -321,8 +322,9 @@ public final class InformationPanelView extends FrameLayout {
 
         ImageView icon = new ImageView(getContext());
         icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        String resolvedIconKey = resolvedIconKey(item);
         icon.setImageDrawable(LauncherIconResolver.resolvePreset(getContext(),
-                InformationIconPolicy.resolve(item), item.iconColor));
+                resolvedIconKey, item.iconColor));
         icon.setContentDescription(item.displayLabel());
         int iconSize = scaledDp(32, item.scalePercent);
         LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(iconSize, iconSize);
@@ -346,7 +348,8 @@ public final class InformationPanelView extends FrameLayout {
         texts.addView(value, new LinearLayout.LayoutParams(match(), wrap()));
         tile.addView(texts, new LinearLayout.LayoutParams(0, wrap(), 1f));
 
-        itemViews.put(item.id, new ItemViews(tile, icon, label, value, background));
+        itemViews.put(item.id, new ItemViews(tile, icon, label, value, background,
+                resolvedIconKey));
         return tile;
     }
 
@@ -359,6 +362,12 @@ public final class InformationPanelView extends FrameLayout {
             ItemViews views = itemViews.get(item.id);
             if (views == null) continue;
             Value value = resolve(item);
+            String iconKey = resolvedIconKey(item);
+            if (!iconKey.equals(views.resolvedIconKey)) {
+                views.icon.setImageDrawable(LauncherIconResolver.resolvePreset(
+                        getContext(), iconKey, item.iconColor));
+                views.resolvedIconKey = iconKey;
+            }
             views.tile.setVisibility(InformationValuePolicy.isVisible(
                     item.visibility, value.known, value.active) ? View.VISIBLE : View.INVISIBLE);
             views.label.setText(item.displayLabel());
@@ -370,6 +379,42 @@ public final class InformationPanelView extends FrameLayout {
                     : Color.argb(58, 255, 255, 255));
             views.tile.setContentDescription(item.displayLabel() + ": "
                     + (value.known ? value.display : "нет актуальных данных"));
+        }
+    }
+
+    @NonNull
+    private String resolvedIconKey(@NonNull InformationPanelConfig.Item item) {
+        String fallback = InformationIconPolicy.resolve(item);
+        SourceBinding binding = item.binding;
+        if (!"auto".equalsIgnoreCase(item.iconKey) || binding == null
+                || binding.connectorType != ConnectorType.PHONE) {
+            return fallback;
+        }
+        ConnectorValue source = connectorValues.get(connectorKey(binding));
+        if (source == null || !(source.rawValue instanceof Map<?, ?>)) return fallback;
+        Object rawIcon = ((Map<?, ?>) source.rawValue).get("icon");
+        String icon = rawIcon == null ? "" : String.valueOf(rawIcon).trim();
+        if ("notification".equals(icon)) return "phone_notification";
+        if ("phone".equals(icon) || "music".equals(icon) || "work".equals(icon)) {
+            return "phone_app_" + icon;
+        }
+        switch (icon) {
+            case "messages":
+            case "mail":
+            case "calendar":
+            case "chat":
+            case "social":
+            case "photo":
+            case "maps":
+            case "video":
+            case "missed_call":
+            case "voicemail":
+            case "news":
+            case "health":
+            case "finance":
+                return icon;
+            default:
+                return fallback;
         }
     }
 
@@ -573,14 +618,16 @@ public final class InformationPanelView extends FrameLayout {
         final TextView label;
         final TextView value;
         final GradientDrawable background;
+        @NonNull String resolvedIconKey;
 
         ItemViews(View tile, ImageView icon, TextView label, TextView value,
-                  GradientDrawable background) {
+                  GradientDrawable background, @NonNull String resolvedIconKey) {
             this.tile = tile;
             this.icon = icon;
             this.label = label;
             this.value = value;
             this.background = background;
+            this.resolvedIconKey = resolvedIconKey;
         }
     }
 

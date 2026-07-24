@@ -48,6 +48,13 @@ public class PhoneWidgetServiceIntegrationContractTest {
     }
 
     @Test
+    public void settingsCanRequestOneFreshDirectAncsHandshake() throws Exception {
+        String source = readService();
+        assertTrue(source.contains("public void reconnectPhoneForDiagnostics()"));
+        assertTrue(source.contains("controller.reconnectForDiagnostics()"));
+    }
+
+    @Test
     public void phoneSubmitsOffBeforeSprutShutdown() throws Exception {
         String source = readService();
         int destroy = source.indexOf("public void onDestroy()");

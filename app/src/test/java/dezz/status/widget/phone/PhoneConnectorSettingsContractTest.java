@@ -80,6 +80,14 @@ public final class PhoneConnectorSettingsContractTest {
         assertFalse(source.contains("Manifest.permission.READ_SMS"));
         assertFalse(source.contains("requestPermissions("));
         assertTrue(source.contains("\"diagnostics.sms\".equals(value.resourceId)"));
+        assertTrue(source.contains("\"diagnostics.last_app\".equals(value.resourceId)"));
+        assertTrue(source.contains("\"diagnostics.last_error\".equals(value.resourceId)"));
+        assertTrue(source.contains("diagnosticsHandler.postDelayed(diagnosticsPoll, 1_000L)"));
+        assertTrue(source.contains("diagnosticsHandler.removeCallbacks(diagnosticsPoll)"));
+        assertTrue(source.contains("this::testAncsConnection"));
+        assertTrue(source.contains("service.reconnectPhoneForDiagnostics()"));
+        assertTrue(source.contains(
+                "!notificationsEnabled.isChecked() && !messagesEnabled.isChecked()"));
         assertTrue(source.contains("localizedMapStatus(mapStatus)"));
     }
 
@@ -116,11 +124,12 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(picker.contains("\"Sprut.hub\","));
         assertTrue(picker.contains("\"Телефон\""));
         assertTrue(picker.contains("value.connectorType != ConnectorType.PHONE"));
-        assertTrue(picker.contains(
-                "if (\"diagnostics.device\".equals(value.resourceId)) continue;"));
         assertFalse(picker.contains(
                 "case \"diagnostics.device\": return \"Диагностика устройства\";"));
         assertTrue(picker.contains("new SourceBinding(ConnectorType.PHONE"));
+        assertTrue(picker.contains("PhoneInformationSourcePolicy.valuePath(value.resourceId)"));
+        assertTrue(picker.contains("PhoneInformationSourcePolicy.displayValue(value)"));
+        assertTrue(picker.contains("PhoneInformationSourcePolicy.selectable(value.resourceId)"));
         assertTrue(picker.contains("service.connectorValueSnapshot()"));
     }
 
@@ -137,6 +146,11 @@ public final class PhoneConnectorSettingsContractTest {
             assertTrue(source.contains("name=\"phone_privacy_hint\""));
             assertTrue(source.contains("name=\"phone_diag_map_ready\""));
             assertTrue(source.contains("name=\"phone_diag_map_waiting\""));
+            assertTrue(source.contains("name=\"phone_diag_ancs_authorization\""));
+            assertTrue(source.contains("name=\"phone_diag_ancs_ready_degraded\""));
+            assertTrue(source.contains("name=\"phone_diag_last_app\""));
+            assertTrue(source.contains("name=\"phone_test_ancs\""));
+            assertTrue(source.contains("name=\"phone_test_choose_source\""));
             assertFalse(source.contains("name=\"phone_allow_sms\""));
             assertFalse(source.contains("name=\"phone_sms_permission_granted\""));
         }

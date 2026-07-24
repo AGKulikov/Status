@@ -50,6 +50,25 @@ public final class InformationPanelLifecycleContractTest {
         assertFalse(source.contains("execute"));
     }
 
+    @Test public void phoneNotificationIconFollowsTheCurrentAppWithoutRebuilding()
+            throws IOException {
+        String source = source("dezz/status/widget/launcher/information/InformationPanelView.java");
+        String resolver = source("dezz/status/widget/launcher/LauncherIconResolver.java");
+        assertTrue(source.contains("binding.connectorType != ConnectorType.PHONE"));
+        assertTrue(source.contains("((Map<?, ?>) source.rawValue).get(\"icon\")"));
+        assertTrue(source.contains("!iconKey.equals(views.resolvedIconKey)"));
+        assertTrue(source.contains("case \"messages\":"));
+        assertTrue(source.contains("case \"chat\":"));
+        assertTrue(source.contains("case \"mail\":"));
+        assertTrue(source.contains("return \"phone_app_\" + icon"));
+        assertTrue(resolver.contains(
+                "case \"phone_app_phone\": return R.drawable.ic_phone_app_phone;"));
+        assertTrue(resolver.contains(
+                "case \"phone_app_music\": return R.drawable.ic_phone_app_music;"));
+        assertTrue(resolver.contains(
+                "case \"phone_app_work\": return R.drawable.ic_phone_app_work;"));
+    }
+
     @Test public void launcherOwnsIndependentFrameVisibilityAndLifecycle() throws IOException {
         String launcher = source("dezz/status/widget/LauncherActivity.java");
         String layout = source("dezz/status/widget/launcher/LauncherLayoutStore.java");

@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - 'rewrite/**'
+      - 'agent/**'
   pull_request:
 
 # A feature branch with an open PR must produce one build, not an identical push build followed

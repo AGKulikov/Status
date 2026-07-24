@@ -74,6 +74,23 @@ public final class LauncherIconResolver {
             new Preset("weather", "Погода"),
             new Preset("music", "Музыка / колонка"),
             new Preset("phone", "Телефон"),
+            new Preset("messages", "Сообщения"),
+            new Preset("mail", "Почта"),
+            new Preset("calendar", "Календарь"),
+            new Preset("chat", "Чат"),
+            new Preset("social", "Социальные сети"),
+            new Preset("photo", "Фото"),
+            new Preset("maps", "Карты"),
+            new Preset("video", "Видео"),
+            new Preset("phone_app_phone", "Звонок с iPhone"),
+            new Preset("phone_app_music", "Музыкальное приложение"),
+            new Preset("phone_app_work", "Рабочее приложение"),
+            new Preset("missed_call", "Пропущенный звонок"),
+            new Preset("voicemail", "Голосовая почта"),
+            new Preset("news", "Новости"),
+            new Preset("health", "Здоровье"),
+            new Preset("finance", "Финансы"),
+            new Preset("phone_notification", "Уведомление телефона"),
             new Preset("car", "Автомобиль"),
             new Preset("location", "Местоположение"),
             new Preset("devices", "Умный дом"),
@@ -171,6 +188,23 @@ public final class LauncherIconResolver {
             case "weather": return R.drawable.ic_smart_weather;
             case "music": return R.drawable.ic_smart_music;
             case "phone": return R.drawable.ic_smart_phone;
+            case "messages": return R.drawable.ic_phone_app_messages;
+            case "mail": return R.drawable.ic_phone_app_mail;
+            case "calendar": return R.drawable.ic_phone_app_calendar;
+            case "chat": return R.drawable.ic_phone_app_chat;
+            case "social": return R.drawable.ic_phone_app_social;
+            case "photo": return R.drawable.ic_phone_app_photo;
+            case "maps": return R.drawable.ic_phone_app_maps;
+            case "video": return R.drawable.ic_phone_app_video;
+            case "phone_app_phone": return R.drawable.ic_phone_app_phone;
+            case "phone_app_music": return R.drawable.ic_phone_app_music;
+            case "phone_app_work": return R.drawable.ic_phone_app_work;
+            case "missed_call": return R.drawable.ic_phone_app_missed_call;
+            case "voicemail": return R.drawable.ic_phone_app_voicemail;
+            case "news": return R.drawable.ic_phone_app_news;
+            case "health": return R.drawable.ic_phone_app_health;
+            case "finance": return R.drawable.ic_phone_app_finance;
+            case "phone_notification": return R.drawable.ic_phone_app_notification;
             case "car": return R.drawable.ic_smart_car;
             case "location": return R.drawable.ic_smart_location;
             case "devices": return R.drawable.ic_section_widget;

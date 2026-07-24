@@ -5,6 +5,7 @@ import androidx.annotation.NonNull;
 
 import java.util.Locale;
 
+import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.launcher.SmartHomeIconResolver;
 
 /** Semantic icon selection that stays useful before the first live value arrives. */
@@ -17,6 +18,17 @@ public final class InformationIconPolicy {
         if (item.sourceKind == InformationPanelConfig.SourceKind.CONNECTOR) {
             String domain = "";
             if (item.binding != null) {
+                if (item.binding.connectorType == ConnectorType.PHONE) {
+                    String resource = item.binding.resourceId.toLowerCase(Locale.ROOT);
+                    if (resource.startsWith("battery.")) return "battery";
+                    if (resource.startsWith("network.")) return "devices";
+                    if (resource.startsWith("notifications.")
+                            || resource.startsWith("messages.")
+                            || "diagnostics.last_app".equals(resource)) {
+                        return "notification";
+                    }
+                    return "phone";
+                }
                 int dot = item.binding.resourceId.indexOf('.');
                 if (dot > 0) domain = item.binding.resourceId.substring(0, dot);
             }

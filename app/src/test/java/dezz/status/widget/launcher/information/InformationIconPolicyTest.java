@@ -29,4 +29,24 @@ public final class InformationIconPolicyTest {
         item.iconKey = "car";
         assertEquals("car", InformationIconPolicy.resolve(item));
     }
+
+    @Test public void phoneSourcesUsePhoneBatteryAndNotificationIcons() {
+        assertEquals("phone", InformationIconPolicy.resolve(
+                InformationPanelConfig.Item.connector(
+                        phone("connected"), "iPhone подключён", "", "boolean")));
+        assertEquals("battery", InformationIconPolicy.resolve(
+                InformationPanelConfig.Item.connector(
+                        phone("battery.level"), "Заряд iPhone", "%", "number")));
+        assertEquals("devices", InformationIconPolicy.resolve(
+                InformationPanelConfig.Item.connector(
+                        phone("network.type"), "Сеть iPhone", "", "string")));
+        assertEquals("notification", InformationIconPolicy.resolve(
+                InformationPanelConfig.Item.connector(
+                        phone("diagnostics.last_app"), "Последнее приложение", "", "object")));
+    }
+
+    private static SourceBinding phone(String resourceId) {
+        return new SourceBinding(ConnectorType.PHONE, "default", resourceId, "",
+                SourceBinding.PRESENTATION_AUTO, "");
+    }
 }

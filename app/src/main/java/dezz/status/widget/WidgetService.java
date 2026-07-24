@@ -1130,6 +1130,12 @@ public class WidgetService extends Service {
         applyPreferences(true);
     }
 
+    /** Starts a fresh direct handshake for the explicit test button in Phone settings. */
+    public void reconnectPhoneForDiagnostics() {
+        PhoneConnectorController controller = phoneController;
+        if (controller != null) controller.reconnectForDiagnostics();
+    }
+
     @SuppressLint("MissingPermission")
     private void applyPreferences(boolean reconfigureIntegrations) {
         if (destroyed || prefs == null) return;

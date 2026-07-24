@@ -129,6 +129,22 @@ public final class ConnectorValueRegistryTest {
         assertFalse(empty.matches(missing));
     }
 
+    @Test public void valuePrefixSelectsNestedFieldsFromStructuredRawValue() {
+        Map<String, Object> app = new LinkedHashMap<>();
+        app.put("name", "Telegram");
+        app.put("meta", Collections.singletonMap("icon", "chat"));
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        attributes.put("value.name", "legacy attribute");
+        ConnectorValue value = ConnectorValue.current(ConnectorType.PHONE, "default",
+                "diagnostics.last_app", app, true, true, false,
+                "object", "", attributes);
+
+        assertEquals("Telegram", value.resolveValue("@value.name"));
+        assertEquals("chat", value.resolveValue("@state.meta.icon"));
+        assertNull(value.resolveValue("@value.missing"));
+        assertEquals("legacy attribute", value.resolveValue("value.name"));
+    }
+
     private static ConnectorValue value(ConnectorType type, String connectorId, String resourceId,
                                         Object raw) {
         return ConnectorValue.current(type, connectorId, resourceId, raw, true, true, false,

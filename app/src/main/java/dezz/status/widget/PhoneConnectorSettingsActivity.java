@@ -13,6 +13,8 @@ import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
@@ -39,6 +41,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 import dezz.status.widget.integration.ConnectorType;
@@ -70,6 +73,15 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     private TextView selectedDeviceValue;
     private TextView selectedSprutPathValue;
     private TextView diagnostics;
+    private final Handler diagnosticsHandler = new Handler(Looper.getMainLooper());
+    private boolean diagnosticsPolling;
+    private final Runnable diagnosticsPoll = new Runnable() {
+        @Override public void run() {
+            if (!diagnosticsPolling) return;
+            refreshDiagnostics();
+            diagnosticsHandler.postDelayed(this, 1_000L);
+        }
+    };
     @NonNull private String selectedDeviceAddress = "";
     @NonNull private String selectedSprutPath = "";
     @NonNull private SprutCatalog sprutCatalog = SprutCatalog.empty();
@@ -97,6 +109,16 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         refreshDeviceSummary();
         refreshSprutSummary();
         refreshDiagnostics();
+        diagnosticsPolling = true;
+        diagnosticsHandler.removeCallbacks(diagnosticsPoll);
+        diagnosticsHandler.postDelayed(diagnosticsPoll, 1_000L);
+    }
+
+    @Override
+    protected void onPause() {
+        diagnosticsPolling = false;
+        diagnosticsHandler.removeCallbacks(diagnosticsPoll);
+        super.onPause();
     }
 
     @NonNull
@@ -199,6 +221,8 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         LinearLayout diagnosticContent = column();
         diagnosticContent.addView(diagnostics, matchWrap());
         page.addView(card(diagnosticContent), topMargin(7));
+        page.addView(actionButton(getString(R.string.phone_test_ancs),
+                this::testAncsConnection), topMargin(10));
 
         TextView privacy = secondary(getString(R.string.phone_privacy_hint), 13);
         privacy.setPadding(dp(8), 0, dp(8), 0);
@@ -299,6 +323,9 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         boolean phoneConnected = false;
         String ancsStatus = "";
         String mapStatus = "";
+        String lastError = "";
+        String lastAppName = "";
+        long lastAppAt = 0L;
         WidgetService service = WidgetService.getInstance();
         if (service != null) {
             for (ConnectorValue value : service.connectorValueSnapshot()) {
@@ -314,10 +341,25 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 } else if ("diagnostics.sms".equals(value.resourceId)) {
                     mapStatus = clean(value.rawValue == null
                             ? "" : String.valueOf(value.rawValue));
+                } else if ("diagnostics.last_error".equals(value.resourceId)) {
+                    lastError = clean(value.rawValue == null
+                            ? "" : String.valueOf(value.rawValue));
+                } else if ("diagnostics.last_app".equals(value.resourceId)
+                        && value.rawValue instanceof Map) {
+                    Map<?, ?> app = (Map<?, ?>) value.rawValue;
+                    Object name = app.get("name");
+                    Object receivedAt = app.get("received_at");
+                    lastAppName = clean(name == null ? "" : String.valueOf(name));
+                    if (receivedAt instanceof Number) {
+                        lastAppAt = Math.max(0L, ((Number) receivedAt).longValue());
+                    }
                 }
             }
         }
 
+        boolean ancsReceiving = "ready".equals(ancsStatus)
+                || "ready_degraded".equals(ancsStatus);
+        boolean ancsRequested = notificationsEnabled.isChecked() || messagesEnabled.isChecked();
         StringBuilder result = new StringBuilder();
         result.append(line(bluetooth.supported, getString(R.string.phone_diag_adapter),
                 bluetooth.supported
@@ -345,19 +387,41 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                         : "ready".equals(mapStatus)
                         ? getString(R.string.phone_diag_map_ready)
                         : localizedMapStatus(mapStatus)));
-        result.append('\n').append(line(!notificationsEnabled.isChecked()
-                        || "ready".equals(ancsStatus),
+        result.append('\n').append(line(!ancsRequested
+                        || ancsReceiving,
                 getString(R.string.phone_diag_notifications),
-                !notificationsEnabled.isChecked()
+                !ancsRequested
                         ? getString(R.string.phone_diag_not_required)
-                        : "ready".equals(ancsStatus)
-                        ? getString(R.string.phone_diag_ancs_receiving)
+                        : ancsReceiving
+                        ? ("ready_degraded".equals(ancsStatus)
+                                ? getString(R.string.phone_diag_ancs_ready_degraded)
+                                : getString(R.string.phone_diag_ancs_receiving))
                         : getString(R.string.phone_diag_ancs_iphone,
                                 localizedAncsStatus(ancsStatus))));
         result.append('\n').append(line(fresh > 0,
                 getString(R.string.phone_diag_values),
                 getString(R.string.phone_diag_values_format, available, fresh, values)));
+        result.append('\n').append(line(!lastAppName.isEmpty(),
+                getString(R.string.phone_diag_last_app),
+                lastAppName.isEmpty()
+                        ? getString(R.string.phone_diag_no_notifications)
+                        : getString(R.string.phone_diag_last_app_format,
+                                lastAppName, formatAge(lastAppAt))));
+        if (!lastError.isEmpty()) {
+            result.append('\n').append(line(false,
+                    getString(R.string.phone_diag_last_error), lastError));
+        }
         diagnostics.setText(result);
+    }
+
+    @NonNull
+    private String formatAge(long timestamp) {
+        if (timestamp <= 0L) return getString(R.string.phone_diag_just_now);
+        long seconds = Math.max(0L, (System.currentTimeMillis() - timestamp) / 1_000L);
+        if (seconds < 60L) return getString(R.string.phone_diag_seconds_ago, seconds);
+        long minutes = seconds / 60L;
+        if (minutes < 60L) return getString(R.string.phone_diag_minutes_ago, minutes);
+        return getString(R.string.phone_diag_hours_ago, minutes / 60L);
     }
 
     @NonNull
@@ -380,11 +444,17 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
             case "characteristic_unavailable":
                 return getString(R.string.phone_diag_ancs_unavailable);
             case "connecting":
+            case "negotiating":
             case "discovering":
             case "subscribing":
             case "starting":
             case "retrying":
+            case "services_changed":
                 return getString(R.string.phone_diag_ancs_waiting);
+            case "authorization_required":
+                return getString(R.string.phone_diag_ancs_authorization);
+            case "ready_degraded":
+                return getString(R.string.phone_diag_ancs_ready_degraded);
             case "disconnected":
             case "stopped":
                 return getString(R.string.phone_diag_ancs_disconnected);
@@ -581,23 +651,48 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     }
 
     private void save() {
+        persistSettings(true);
+    }
+
+    private void testAncsConnection() {
+        if (!persistSettings(false)) return;
+        if (!connectorEnabled.isChecked()) {
+            Toast.makeText(this, R.string.phone_test_enable_first, Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (!notificationsEnabled.isChecked() && !messagesEnabled.isChecked()) {
+            Toast.makeText(this, R.string.phone_test_choose_source, Toast.LENGTH_LONG).show();
+            return;
+        }
+        WidgetService service = WidgetService.getInstance();
+        if (service == null) {
+            Toast.makeText(this, R.string.phone_test_service_unavailable,
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        service.reconnectPhoneForDiagnostics();
+        Toast.makeText(this, R.string.phone_test_started, Toast.LENGTH_LONG).show();
+        refreshDiagnostics();
+    }
+
+    private boolean persistSettings(boolean showConfirmation) {
         if (connectorEnabled.isChecked() && selectedDeviceAddress.isEmpty()) {
             Toast.makeText(this, R.string.phone_choose_required,
                     Toast.LENGTH_LONG).show();
-            return;
+            return false;
         }
         if (sprutPresenceEnabled.isChecked()) {
             if (selectedSprutPath.isEmpty()) {
                 Toast.makeText(this, R.string.phone_sprut_choose_required,
                         Toast.LENGTH_LONG).show();
-                return;
+                return false;
             }
             try {
                 SprutPath.parse(selectedSprutPath);
             } catch (IllegalArgumentException invalid) {
                 Toast.makeText(this, R.string.phone_sprut_invalid_saved,
                         Toast.LENGTH_LONG).show();
-                return;
+                return false;
             }
         }
 
@@ -612,8 +707,11 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         WidgetService service = WidgetService.getInstance();
         if (service != null) service.applyPreferences();
 
-        Toast.makeText(this, R.string.phone_saved, Toast.LENGTH_LONG).show();
+        if (showConfirmation) {
+            Toast.makeText(this, R.string.phone_saved, Toast.LENGTH_LONG).show();
+        }
         refreshDiagnostics();
+        return true;
     }
 
     @SuppressLint("MissingPermission")

@@ -70,7 +70,10 @@ public final class InformationPanelConfigStore {
                     SourceBinding binding = null;
                     JSONObject bindingJson = encoded.optJSONObject("binding");
                     if (bindingJson != null) {
-                        try { binding = SourceBinding.fromJson(bindingJson); }
+                        try {
+                            binding = PhoneInformationSourcePolicy.migrate(
+                                    SourceBinding.fromJson(bindingJson));
+                        }
                         catch (IllegalArgumentException ignored) { binding = null; }
                     }
                     InformationPanelConfig.Item item =

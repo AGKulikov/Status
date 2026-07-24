@@ -147,4 +147,20 @@ public final class InformationPanelConfigStoreTest {
                 "{\"version\":99,\"items\":[{\"id\":\"x\"}]}");
         assertTrue(future.mutableItems().isEmpty());
     }
+
+    @Test public void ha1080PhoneObjectTileMigratesToReadableScalarPath() {
+        InformationPanelConfig migrated = InformationPanelConfigStore.decode(
+                "{\"version\":1,\"items\":[{"
+                        + "\"id\":\"phone-app\",\"sourceKind\":\"CONNECTOR\","
+                        + "\"sourceLabel\":\"Последнее приложение\","
+                        + "\"binding\":{\"schema\":1,\"connectorType\":\"PHONE\","
+                        + "\"connectorId\":\"default\","
+                        + "\"resourceId\":\"diagnostics.last_app\","
+                        + "\"valuePath\":\"\",\"presentation\":\"AUTO\"}}]}");
+
+        assertEquals(1, migrated.mutableItems().size());
+        SourceBinding binding = migrated.mutableItems().get(0).binding;
+        assertNotNull(binding);
+        assertEquals("@value.name", binding.valuePath);
+    }
 }

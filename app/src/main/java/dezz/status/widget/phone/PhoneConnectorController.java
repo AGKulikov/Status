@@ -23,6 +23,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -63,9 +64,21 @@ public final class PhoneConnectorController {
 
     private static final int MAX_NOTIFICATIONS = 50;
     private static final int MAX_MAP_MESSAGES = 20;
+    private static final int MAX_PENDING_ANCS_REQUESTS = 100;
+    private static final int MAX_APP_DISPLAY_NAMES = 128;
     private static final long ATTRIBUTE_TIMEOUT_MS = 8_000L;
     private static final long GATT_OPERATION_TIMEOUT_MS = 10_000L;
+    private static final long GATT_CONNECT_TIMEOUT_MS = 20_000L;
+    private static final long GATT_MTU_TIMEOUT_MS = 1_500L;
+    private static final long GATT_DISCOVERY_TIMEOUT_MS = 15_000L;
+    private static final long ANCS_AUTHORIZATION_PROBE_MS = 15_000L;
     private static final long DEVICE_RESCAN_MS = 15_000L;
+    private static final int DESIRED_GATT_MTU = 512;
+    private static final int GATT_INSUFFICIENT_AUTHENTICATION = 5;
+    private static final int GATT_INSUFFICIENT_AUTHORIZATION = 8;
+    private static final int GATT_INSUFFICIENT_ENCRYPTION_KEY_SIZE = 12;
+    private static final int GATT_INSUFFICIENT_ENCRYPTION = 15;
+    private static final int ANCS_INVALID_PARAMETER = 0xA2;
 
     private static final String ACTION_HFP_CONNECTION =
             "android.bluetooth.headsetclient.profile.action.CONNECTION_STATE_CHANGED";
@@ -118,6 +131,10 @@ public final class PhoneConnectorController {
             UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb");
     private static final UUID BATTERY_POWER_STATE =
             UUID.fromString("00002a1a-0000-1000-8000-00805f9b34fb");
+    private static final UUID GENERIC_ATTRIBUTE_SERVICE =
+            UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
+    private static final UUID SERVICE_CHANGED =
+            UUID.fromString("00002a05-0000-1000-8000-00805f9b34fb");
 
     private static final String CHANNEL_GROUP_ID = "phone_mirror_group";
     private static final String CHANNEL_ID = "phone_mirror";
@@ -168,6 +185,19 @@ public final class PhoneConnectorController {
     private boolean smsAvailable;
     private boolean hfpBatteryKnown;
     private boolean hfpChargingKnown;
+    private boolean basBatteryKnown;
+    private boolean basChargingKnown;
+    private boolean genericBatteryKnown;
+    @Nullable private Integer hfpBatteryLevel;
+    @Nullable private Integer basBatteryLevel;
+    @Nullable private Integer genericBatteryLevel;
+    @Nullable private Boolean hfpBatteryCharging;
+    @Nullable private Boolean basBatteryCharging;
+    private long hfpBatteryUpdatedAt;
+    private long basBatteryUpdatedAt;
+    private long genericBatteryUpdatedAt;
+    private long hfpChargingUpdatedAt;
+    private long basChargingUpdatedAt;
     @Nullable private Integer batteryLevel;
     @Nullable private Boolean batteryCharging;
     @Nullable private Boolean networkAvailable;
@@ -179,8 +209,20 @@ public final class PhoneConnectorController {
     @Nullable private BluetoothGattCharacteristic ancsControlPoint;
     @Nullable private BluetoothGattCharacteristic ancsDataSource;
     @Nullable private BluetoothGattCharacteristic ancsNotificationSource;
+    @Nullable private BluetoothGattCharacteristic serviceChangedCharacteristic;
     private boolean ancsDataSubscribed;
     private boolean ancsNotificationSubscribed;
+    private boolean ancsNotificationListening;
+    private boolean serviceChangedSubscribed;
+    private boolean ancsAuthorizedThisRun;
+    private boolean forceDirectGatt;
+    private boolean serviceDiscoveryStarted;
+    private boolean mtuPending;
+    @Nullable private Runnable connectWatchdog;
+    @Nullable private Runnable mtuWatchdog;
+    @Nullable private Runnable discoveryWatchdog;
+    @Nullable private Runnable deviceRescanTask;
+    @Nullable private Runnable gattReconnectTask;
     private final ArrayDeque<GattOperation> gattOperations = new ArrayDeque<>();
     @Nullable private GattOperation currentGattOperation;
     @Nullable private Runnable gattOperationTimeout;
@@ -190,8 +232,17 @@ public final class PhoneConnectorController {
     private final Set<Long> queuedAttributeUids = new LinkedHashSet<>();
     private final Set<Long> dirtyAttributeUids = new LinkedHashSet<>();
     private final Set<Long> removedAttributeUids = new LinkedHashSet<>();
+    private final Set<Long> fullTextAttributeUids = new LinkedHashSet<>();
     @Nullable private Long activeAttributeUid;
     @Nullable private AncsProtocol.AttributeAccumulator attributeAccumulator;
+    private boolean activeAttributeIncludesText;
+    private long activeAncsRequestSequence;
+    private long nextAncsRequestSequence;
+    private final ArrayDeque<String> appAttributeRequests = new ArrayDeque<>();
+    private final Set<String> queuedAppIdentifiers = new LinkedHashSet<>();
+    private final Map<String, String> appDisplayNames = new LinkedHashMap<>();
+    @Nullable private String activeAppIdentifier;
+    @Nullable private AncsProtocol.AppAttributeAccumulator appAttributeAccumulator;
     @Nullable private Runnable attributeTimeout;
     private final LinkedHashMap<Long, NotificationRecord> notificationCache =
             new LinkedHashMap<>();
@@ -207,6 +258,10 @@ public final class PhoneConnectorController {
     private final Set<Integer> mirroredNotificationIds = new LinkedHashSet<>();
     private final Map<Long, Integer> mirroredAncsIds = new LinkedHashMap<>();
     private final Map<String, Integer> mirroredSmsIds = new LinkedHashMap<>();
+    private String lastAppIdentifier = "";
+    private String lastAppName = "";
+    private int lastAppCategoryId;
+    private long lastNotificationAt;
 
     public PhoneConnectorController(@NonNull Context context, @NonNull Preferences prefs,
                                     @NonNull ConnectorValueRegistry values) {
@@ -256,6 +311,31 @@ public final class PhoneConnectorController {
         synchronized (lifecycleLock) {
             signature = "";
             stopLocked("stopped");
+        }
+    }
+
+    /** Forces one direct, user-initiated ANCS handshake without changing the selected device. */
+    public void reconnectForDiagnostics() {
+        synchronized (lifecycleLock) {
+            if (!running) return;
+            Handler currentWorker = worker;
+            long token = generation;
+            if (currentWorker == null) return;
+            currentWorker.post(() -> runIfCurrent(token, () -> {
+                BluetoothGatt previous = gatt;
+                gatt = null;
+                cancelGattWatchdogs();
+                cancelGattReconnect();
+                closeGatt(previous);
+                gattConnected = false;
+                clearBasData();
+                resetAncsSession(token, "connecting");
+                forceDirectGatt = true;
+                reconnectAttempt = 0;
+                lastError = "";
+                updateConnected(token);
+                ensureGatt(token);
+            }));
         }
     }
 
@@ -318,6 +398,19 @@ public final class PhoneConnectorController {
         smsAvailable = false;
         hfpBatteryKnown = false;
         hfpChargingKnown = false;
+        basBatteryKnown = false;
+        basChargingKnown = false;
+        genericBatteryKnown = false;
+        hfpBatteryLevel = null;
+        basBatteryLevel = null;
+        genericBatteryLevel = null;
+        hfpBatteryCharging = null;
+        basBatteryCharging = null;
+        hfpBatteryUpdatedAt = 0L;
+        basBatteryUpdatedAt = 0L;
+        genericBatteryUpdatedAt = 0L;
+        hfpChargingUpdatedAt = 0L;
+        basChargingUpdatedAt = 0L;
         batteryLevel = null;
         batteryCharging = null;
         networkAvailable = null;
@@ -325,7 +418,18 @@ public final class PhoneConnectorController {
         networkRoaming = null;
         networkOperator = "";
         networkType = "";
+        ancsAuthorizedThisRun = false;
+        forceDirectGatt = false;
+        serviceDiscoveryStarted = false;
+        mtuPending = false;
+        cancelGattWatchdogs();
+        cancelRetryTasks();
         clearAncsRuntime();
+        appDisplayNames.clear();
+        lastAppIdentifier = "";
+        lastAppName = "";
+        lastAppCategoryId = 0;
+        lastNotificationAt = 0L;
         mapMessageCache.clear();
         smsItems.clear();
         smsUnread = 0;
@@ -403,6 +507,8 @@ public final class PhoneConnectorController {
                     BluetoothDevice.TRANSPORT_AUTO);
             if (transport != BluetoothDevice.TRANSPORT_LE) {
                 hfpConnected = false;
+                clearHfpData();
+                clearGenericBatteryData();
                 if (mapConnected) endMapSession("disconnected");
             }
             updateConnected(token);
@@ -410,6 +516,7 @@ public final class PhoneConnectorController {
             int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE,
                     BluetoothProfile.STATE_DISCONNECTED);
             hfpConnected = state == BluetoothProfile.STATE_CONNECTED;
+            if (!hfpConnected) clearHfpData();
             updateConnected(token);
         } else if (ACTION_MAP_CONNECTION.equals(action)) {
             int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE,
@@ -430,11 +537,13 @@ public final class PhoneConnectorController {
             hfpConnected = true;
             applyHfpEvent(token, intent);
             updateConnected(token);
-        } else if (ACTION_DEVICE_BATTERY_LEVEL_CHANGED.equals(action)
-                && !hfpBatteryKnown) {
+        } else if (ACTION_DEVICE_BATTERY_LEVEL_CHANGED.equals(action)) {
             Integer raw = intExtra(intent, EXTRA_DEVICE_BATTERY_LEVEL, "battery_level");
             if (raw != null && raw >= 0 && raw <= 100) {
-                batteryLevel = raw;
+                genericBatteryKnown = true;
+                genericBatteryLevel = raw;
+                genericBatteryUpdatedAt = SystemClock.elapsedRealtime();
+                refreshBatteryValues();
                 publishSnapshot(token);
             }
         }
@@ -443,11 +552,15 @@ public final class PhoneConnectorController {
     private void invalidateSelectedPhone(long token, @NonNull String status) {
         BluetoothGatt previous = gatt;
         gatt = null;
+        cancelGattWatchdogs();
         closeGatt(previous);
         aclConnected = false;
         hfpConnected = false;
         mapConnected = false;
         gattConnected = false;
+        clearBasData();
+        clearHfpData();
+        clearGenericBatteryData();
         updateConnected(token);
         selectedDevice = null;
         selectedAddress = "";
@@ -486,6 +599,7 @@ public final class PhoneConnectorController {
             return;
         }
         selectedDevice = selected;
+        cancelDeviceRescan();
         selectedAddress = safeAddress(selected);
         selectedName = safeName(selected);
         updateConnected(token);
@@ -576,12 +690,13 @@ public final class PhoneConnectorController {
 
     private void scheduleDeviceRescan(long token) {
         Handler handler = worker;
-        if (handler == null) return;
-        handler.postDelayed(() -> {
-            runIfCurrent(token, () -> {
-                if (selectedDevice == null) selectAndConnect(token);
-            });
-        }, DEVICE_RESCAN_MS);
+        if (handler == null || deviceRescanTask != null) return;
+        Runnable retry = () -> runIfCurrent(token, () -> {
+            deviceRescanTask = null;
+            if (selectedDevice == null) selectAndConnect(token);
+        });
+        deviceRescanTask = retry;
+        handler.postDelayed(retry, DEVICE_RESCAN_MS);
     }
 
     @Nullable
@@ -606,11 +721,13 @@ public final class PhoneConnectorController {
 
     private void ensureGatt(long token) {
         if (!isCurrent(token) || selectedDevice == null || gatt != null) return;
+        cancelGattReconnect();
         Config current = config;
         if (current == null) return;
         if (current.ancsNeeded()) ancsStatus = "connecting";
+        boolean autoConnect = ancsAuthorizedThisRun && !forceDirectGatt;
         try {
-            BluetoothGatt created = selectedDevice.connectGatt(context, false,
+            BluetoothGatt created = selectedDevice.connectGatt(context, autoConnect,
                     new SessionGattCallback(token), BluetoothDevice.TRANSPORT_LE);
             synchronized (lifecycleLock) {
                 if (!isCurrentLocked(token)) {
@@ -619,7 +736,11 @@ public final class PhoneConnectorController {
                 }
                 gatt = created;
             }
-            if (created == null) scheduleGattReconnect(token, "connectGatt returned null");
+            if (created == null) {
+                scheduleGattReconnect(token, "connectGatt returned null");
+            } else {
+                scheduleConnectWatchdog(token, created, autoConnect);
+            }
         } catch (Throwable error) {
             // Some Android 9 vendor images expose a broken/hidden GATT bridge. Never crash the
             // foreground service for an optional phone capability.
@@ -653,7 +774,7 @@ public final class PhoneConnectorController {
             dispatch(() -> {
                 if (callbackGatt == gatt) {
                     finishGattOperation(token, GattKind.DESCRIPTOR,
-                            status == BluetoothGatt.GATT_SUCCESS);
+                            descriptor, null, status);
                 }
             });
         }
@@ -664,7 +785,7 @@ public final class PhoneConnectorController {
             dispatch(() -> {
                 if (callbackGatt == gatt) {
                     finishGattOperation(token, GattKind.CONTROL_WRITE,
-                            status == BluetoothGatt.GATT_SUCCESS);
+                            null, characteristic, status);
                 }
             });
         }
@@ -672,20 +793,33 @@ public final class PhoneConnectorController {
         @Override public void onCharacteristicRead(BluetoothGatt callbackGatt,
                                                    BluetoothGattCharacteristic characteristic,
                                                    int status) {
-            byte[] value = characteristic.getValue();
+            byte[] rawValue = characteristic.getValue();
+            byte[] value = rawValue == null ? null : rawValue.clone();
             dispatch(() -> {
                 if (callbackGatt != gatt) return;
+                if (!matchesGattOperation(GattKind.CHARACTERISTIC_READ,
+                        null, characteristic)) return;
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     applyBatteryCharacteristic(token, characteristic.getUuid(), value);
                 }
                 finishGattOperation(token, GattKind.CHARACTERISTIC_READ,
-                        status == BluetoothGatt.GATT_SUCCESS);
+                        null, characteristic, status);
+            });
+        }
+
+        @Override public void onMtuChanged(BluetoothGatt callbackGatt, int mtu, int status) {
+            dispatch(() -> {
+                if (callbackGatt != gatt || !mtuPending) return;
+                mtuPending = false;
+                cancelMtuWatchdog();
+                startServiceDiscovery(token, callbackGatt);
             });
         }
 
         @Override public void onCharacteristicChanged(BluetoothGatt callbackGatt,
                                                       BluetoothGattCharacteristic characteristic) {
-            byte[] value = characteristic.getValue();
+            byte[] rawValue = characteristic.getValue();
+            byte[] value = rawValue == null ? null : rawValue.clone();
             UUID uuid = characteristic.getUuid();
             dispatch(() -> {
                 if (callbackGatt == gatt) {
@@ -703,46 +837,102 @@ public final class PhoneConnectorController {
         }
         if (status == BluetoothGatt.GATT_SUCCESS
                 && newState == BluetoothProfile.STATE_CONNECTED) {
+            cancelConnectWatchdog();
             gattConnected = true;
-            if (config != null && config.ancsNeeded()) ancsStatus = "discovering";
+            serviceDiscoveryStarted = false;
+            if (config != null && config.ancsNeeded()) ancsStatus = "negotiating";
             else reconnectAttempt = 0;
             updateConnected(token);
-            try {
-                if (!callbackGatt.discoverServices()) {
-                    scheduleGattReconnect(token, "Service discovery did not start");
-                }
-            } catch (RuntimeException error) {
-                scheduleGattReconnect(token, "Service discovery: " + safeMessage(error));
-            }
+            beginMtuNegotiation(token, callbackGatt);
             return;
         }
+        cancelGattWatchdogs();
         gattConnected = false;
+        clearBasData();
         resetAncsSession(token, "disconnected");
         updateConnected(token);
         scheduleGattReconnect(token, "GATT disconnected (" + status + ")");
     }
 
+    private void beginMtuNegotiation(long token, @NonNull BluetoothGatt callbackGatt) {
+        boolean requested = false;
+        try {
+            requested = callbackGatt.requestMtu(DESIRED_GATT_MTU);
+        } catch (RuntimeException ignored) {
+            // MTU enlargement is only an optimisation; fragmented ANCS responses remain valid.
+        }
+        if (!requested) {
+            startServiceDiscovery(token, callbackGatt);
+            return;
+        }
+        mtuPending = true;
+        Handler handler = worker;
+        if (handler == null) {
+            mtuPending = false;
+            startServiceDiscovery(token, callbackGatt);
+            return;
+        }
+        Runnable timeout = () -> runIfCurrent(token, () -> {
+            if (callbackGatt != gatt || !mtuPending) return;
+            mtuPending = false;
+            mtuWatchdog = null;
+            startServiceDiscovery(token, callbackGatt);
+        });
+        mtuWatchdog = timeout;
+        handler.postDelayed(timeout, GATT_MTU_TIMEOUT_MS);
+    }
+
+    private void startServiceDiscovery(long token, @NonNull BluetoothGatt callbackGatt) {
+        if (!isCurrent(token) || callbackGatt != gatt || serviceDiscoveryStarted) return;
+        cancelMtuWatchdog();
+        mtuPending = false;
+        serviceDiscoveryStarted = true;
+        if (config != null && config.ancsNeeded()) ancsStatus = "discovering";
+        try {
+            if (!callbackGatt.discoverServices()) {
+                serviceDiscoveryStarted = false;
+                scheduleGattReconnect(token, "Service discovery did not start");
+                return;
+            }
+            scheduleDiscoveryWatchdog(token, callbackGatt);
+        } catch (RuntimeException error) {
+            serviceDiscoveryStarted = false;
+            scheduleGattReconnect(token, "Service discovery: " + safeMessage(error));
+        }
+    }
+
     private void handleServicesDiscovered(long token, @NonNull BluetoothGatt callbackGatt,
                                           int status) {
-        if (callbackGatt != gatt || status != BluetoothGatt.GATT_SUCCESS) {
+        if (callbackGatt != gatt) {
+            closeGatt(callbackGatt);
+            return;
+        }
+        if (!serviceDiscoveryStarted) return;
+        cancelDiscoveryWatchdog();
+        serviceDiscoveryStarted = false;
+        if (status != BluetoothGatt.GATT_SUCCESS) {
             scheduleGattReconnect(token, "Service discovery failed (" + status + ")");
             return;
         }
         resetGattOperationState();
-        configureBatteryService(callbackGatt);
         if (config == null || !config.ancsNeeded()) {
             ancsStatus = "disabled";
+            configureBatteryService(callbackGatt);
             pumpGattOperations(token);
             publishSnapshot(token);
             return;
         }
+        if (!configureServiceChanged(callbackGatt)) {
+            lastError = "GATT Service Changed subscription is unavailable";
+        }
 
         BluetoothGattService service = callbackGatt.getService(AncsProtocol.SERVICE);
         if (service == null) {
-            ancsStatus = "service_unavailable";
+            ancsStatus = "authorization_required";
+            configureBatteryService(callbackGatt);
             publishSnapshot(token);
-            scheduleServiceRediscovery(token);
             pumpGattOperations(token);
+            scheduleAncsAuthorizationProbe(token, callbackGatt);
             return;
         }
         ancsControlPoint = service.getCharacteristic(AncsProtocol.CONTROL_POINT);
@@ -752,8 +942,7 @@ public final class PhoneConnectorController {
                 || ancsNotificationSource == null) {
             ancsStatus = "characteristic_unavailable";
             publishSnapshot(token);
-            scheduleServiceRediscovery(token);
-            pumpGattOperations(token);
+            scheduleGattReconnect(token, "ANCS characteristics are incomplete");
             return;
         }
         if (!queueNotificationSubscription(callbackGatt, ancsDataSource,
@@ -764,6 +953,7 @@ public final class PhoneConnectorController {
             return;
         }
         ancsStatus = "subscribing";
+        configureBatteryService(callbackGatt);
         publishSnapshot(token);
         pumpGattOperations(token);
     }
@@ -785,6 +975,15 @@ public final class PhoneConnectorController {
         }
     }
 
+    private boolean configureServiceChanged(@NonNull BluetoothGatt callbackGatt) {
+        BluetoothGattService generic = callbackGatt.getService(GENERIC_ATTRIBUTE_SERVICE);
+        if (generic == null) return false;
+        BluetoothGattCharacteristic changed = generic.getCharacteristic(SERVICE_CHANGED);
+        if (changed == null) return false;
+        serviceChangedCharacteristic = changed;
+        return queueIndicationSubscription(callbackGatt, changed, GattTag.SERVICE_CHANGED);
+    }
+
     private boolean queueNotificationSubscription(@NonNull BluetoothGatt callbackGatt,
                                                   @NonNull BluetoothGattCharacteristic item,
                                                   @NonNull GattTag tag) {
@@ -794,11 +993,33 @@ public final class PhoneConnectorController {
         try {
             if (!callbackGatt.setCharacteristicNotification(item, true)) return false;
             gattOperations.add(new GattOperation(GattKind.DESCRIPTOR, tag, descriptor,
-                    null, null));
+                    null, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE));
+            if (tag == GattTag.ANCS_NOTIFICATION) ancsNotificationListening = true;
             return true;
         } catch (RuntimeException error) {
             return false;
         }
+    }
+
+    private boolean queueIndicationSubscription(@NonNull BluetoothGatt callbackGatt,
+                                                @NonNull BluetoothGattCharacteristic item,
+                                                @NonNull GattTag tag) {
+        int properties = item.getProperties();
+        if ((properties & BluetoothGattCharacteristic.PROPERTY_INDICATE) == 0) return false;
+        BluetoothGattDescriptor descriptor =
+                item.getDescriptor(AncsProtocol.CLIENT_CONFIGURATION);
+        if (descriptor == null) return false;
+        try {
+            if (callbackGatt.setCharacteristicNotification(item, true)) {
+                gattOperations.add(new GattOperation(GattKind.DESCRIPTOR, tag, descriptor,
+                        null, BluetoothGattDescriptor.ENABLE_INDICATION_VALUE));
+                return true;
+            }
+        } catch (RuntimeException ignored) {
+            // Service Changed is a resilience feature. ANCS may still remain stable for the
+            // lifetime of this encrypted connection on stacks that hide the indication.
+        }
+        return false;
     }
 
     private void queueOptionalNotificationSubscription(
@@ -812,7 +1033,7 @@ public final class PhoneConnectorController {
         try {
             if (callbackGatt.setCharacteristicNotification(item, true)) {
                 gattOperations.add(new GattOperation(GattKind.DESCRIPTOR, tag, descriptor,
-                        null, null));
+                        null, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE));
             }
         } catch (RuntimeException ignored) {
             // Standard battery service notifications are optional; the initial read still works.
@@ -838,7 +1059,8 @@ public final class PhoneConnectorController {
         boolean started = false;
         try {
             if (operation.kind == GattKind.DESCRIPTOR && operation.descriptor != null) {
-                operation.descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+                operation.descriptor.setValue(operation.payload == null
+                        ? BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE : operation.payload);
                 started = gatt.writeDescriptor(operation.descriptor);
             } else if (operation.kind == GattKind.CHARACTERISTIC_READ
                     && operation.characteristic != null) {
@@ -852,14 +1074,16 @@ public final class PhoneConnectorController {
             lastError = "GATT operation: " + safeMessage(error);
         }
         if (!started) {
-            finishGattOperation(token, operation.kind, false);
+            finishGattOperation(token, operation.kind, operation.descriptor,
+                    operation.characteristic, -1);
             return;
         }
         Handler handler = worker;
         if (handler != null) {
             Runnable timeout = () -> runIfCurrent(token, () -> {
                 if (currentGattOperation == operation) {
-                    finishGattOperation(token, operation.kind, false);
+                    scheduleGattReconnect(token,
+                            "GATT operation timed out: " + operation.tag.name());
                 }
             });
             gattOperationTimeout = timeout;
@@ -868,9 +1092,17 @@ public final class PhoneConnectorController {
     }
 
     private void finishGattOperation(long token, @NonNull GattKind callbackKind,
-                                     boolean success) {
+                                     @Nullable BluetoothGattDescriptor callbackDescriptor,
+                                     @Nullable BluetoothGattCharacteristic callbackCharacteristic,
+                                     int status) {
         GattOperation operation = currentGattOperation;
         if (operation == null || operation.kind != callbackKind) return;
+        if (callbackKind == GattKind.DESCRIPTOR
+                && operation.descriptor != callbackDescriptor) return;
+        if ((callbackKind == GattKind.CHARACTERISTIC_READ
+                || callbackKind == GattKind.CONTROL_WRITE)
+                && operation.characteristic != callbackCharacteristic) return;
+        boolean success = status == BluetoothGatt.GATT_SUCCESS;
         Runnable operationTimeout = gattOperationTimeout;
         if (operationTimeout != null && worker != null) {
             worker.removeCallbacks(operationTimeout);
@@ -881,27 +1113,62 @@ public final class PhoneConnectorController {
             ancsDataSubscribed = success;
         } else if (operation.tag == GattTag.ANCS_NOTIFICATION) {
             ancsNotificationSubscribed = success;
+        } else if (operation.tag == GattTag.SERVICE_CHANGED) {
+            serviceChangedSubscribed = success;
+            if (!success) {
+                lastError = "GATT Service Changed descriptor write failed (" + status + ")";
+                if (isAuthorizationFailure(status)) {
+                    scheduleGattReconnect(token, lastError, "authorization_required");
+                    return;
+                }
+            }
         } else if (operation.tag == GattTag.CONTROL) {
-            if (success) scheduleAttributeTimeout(token, operation.uid);
-            else {
-                scheduleGattReconnect(token, "ANCS control-point write failed");
+            if (operation.requestSequence != activeAncsRequestSequence) {
+                // This exact response already completed before Android delivered the write
+                // callback. A newer request, even for the same UID, must own subsequent state.
+                pumpGattOperations(token);
+                return;
+            }
+            if (success) scheduleAttributeTimeout(token, operation);
+            else if (status == ANCS_INVALID_PARAMETER) {
+                abandonInvalidAncsRequest(token, operation);
+                return;
+            } else {
+                scheduleGattReconnect(token, "ANCS control-point write failed (" + status + ")",
+                        isAuthorizationFailure(status) ? "authorization_required" : "retrying");
                 return;
             }
         }
         if (!success && (operation.tag == GattTag.ANCS_DATA
                 || operation.tag == GattTag.ANCS_NOTIFICATION)) {
-            scheduleGattReconnect(token, "ANCS descriptor write failed");
+            scheduleGattReconnect(token, "ANCS descriptor write failed (" + status + ")",
+                    isAuthorizationFailure(status) ? "authorization_required" : "retrying");
             return;
         }
         maybeFinishAncsSetup(token);
         pumpGattOperations(token);
     }
 
+    private boolean matchesGattOperation(@NonNull GattKind callbackKind,
+                                         @Nullable BluetoothGattDescriptor callbackDescriptor,
+                                         @Nullable BluetoothGattCharacteristic callbackCharacteristic) {
+        GattOperation operation = currentGattOperation;
+        if (operation == null || operation.kind != callbackKind) return false;
+        if (callbackKind == GattKind.DESCRIPTOR) {
+            return operation.descriptor == callbackDescriptor;
+        }
+        return operation.characteristic == callbackCharacteristic;
+    }
+
     private void maybeFinishAncsSetup(long token) {
         if (!ancsReady && ancsDataSubscribed && ancsNotificationSubscribed) {
             ancsReady = true;
+            ancsAuthorizedThisRun = true;
+            forceDirectGatt = false;
             reconnectAttempt = 0;
-            ancsStatus = "ready";
+            ancsStatus = serviceChangedSubscribed ? "ready" : "ready_degraded";
+            if (serviceChangedSubscribed) lastError = "";
+            rebuildMessageSnapshot();
             cancelSmsFallbackNotifications();
             updateMessageAvailability();
             publishSnapshot(token);
@@ -915,49 +1182,109 @@ public final class PhoneConnectorController {
             handleAncsEvent(token, AncsProtocol.parseEvent(payload));
         } else if (AncsProtocol.DATA_SOURCE.equals(uuid)) {
             handleAncsData(token, payload);
+        } else if (SERVICE_CHANGED.equals(uuid)) {
+            handleServiceChanged(token);
         } else if (BATTERY_LEVEL.equals(uuid) || BATTERY_POWER_STATE.equals(uuid)) {
             applyBatteryCharacteristic(token, uuid, payload);
         }
     }
 
     private void handleAncsEvent(long token, @Nullable AncsProtocol.Event event) {
-        if (event == null || !ancsReady) return;
+        Config current = config;
+        if (event == null || current == null || !current.ancsNeeded()
+                || ancsNotificationSource == null || !ancsNotificationListening) return;
         if (event.eventId == AncsProtocol.EVENT_REMOVED) {
             removeAncsNotification(token, event.uid);
             return;
         }
         removedAttributeUids.remove(event.uid);
+        pendingAncsEvents.remove(event.uid);
         pendingAncsEvents.put(event.uid, event);
         if (activeAttributeUid != null && activeAttributeUid == event.uid) {
             dirtyAttributeUids.add(event.uid);
         } else if (queuedAttributeUids.add(event.uid)) {
+            trimPendingNotificationRequests();
             attributeRequests.add(event.uid);
         }
         pumpAttributeRequests(token);
     }
 
-    private void pumpAttributeRequests(long token) {
-        if (!ancsReady || activeAttributeUid != null || ancsControlPoint == null) return;
-        Long uid = attributeRequests.poll();
-        if (uid == null) return;
-        queuedAttributeUids.remove(uid);
-        activeAttributeUid = uid;
-        attributeAccumulator = new AncsProtocol.AttributeAccumulator(uid);
-        byte[] request = AncsProtocol.notificationAttributeRequest(uid,
-                config != null && config.includeNotificationText);
-        gattOperations.add(new GattOperation(GattKind.CONTROL_WRITE, GattTag.CONTROL,
-                null, ancsControlPoint, request, uid));
-        pumpGattOperations(token);
+    private void trimPendingNotificationRequests() {
+        while (attributeRequests.size() >= MAX_PENDING_ANCS_REQUESTS) {
+            Long dropped = attributeRequests.poll();
+            if (dropped == null) break;
+            queuedAttributeUids.remove(dropped);
+            pendingAncsEvents.remove(dropped);
+            dirtyAttributeUids.remove(dropped);
+            fullTextAttributeUids.remove(dropped);
+        }
     }
 
-    private void scheduleAttributeTimeout(long token, long uid) {
+    private void handleServiceChanged(long token) {
+        if (gatt == null || !gattConnected) return;
+        // Android 9 vendor stacks can deliver late callbacks from the old attribute database.
+        // Reopening GATT gives the new database its own callback identity and operation queue.
+        forceDirectGatt = true;
+        scheduleGattReconnect(token, "GATT services changed", "services_changed");
+    }
+
+    private void pumpAttributeRequests(long token) {
+        if (!ancsReady || activeAttributeUid != null || activeAppIdentifier != null
+                || ancsControlPoint == null) return;
+        Long uid = attributeRequests.poll();
+        if (uid != null) {
+            queuedAttributeUids.remove(uid);
+            activeAttributeUid = uid;
+            long requestSequence = ++nextAncsRequestSequence;
+            activeAncsRequestSequence = requestSequence;
+            boolean includeText = config != null && config.includeNotificationText
+                    && (config.notificationsEnabled || fullTextAttributeUids.contains(uid));
+            activeAttributeIncludesText = includeText;
+            attributeAccumulator = new AncsProtocol.AttributeAccumulator(uid, includeText);
+            byte[] request = AncsProtocol.notificationAttributeRequest(uid, includeText);
+            gattOperations.add(new GattOperation(GattKind.CONTROL_WRITE, GattTag.CONTROL,
+                    null, ancsControlPoint, request, uid, requestSequence));
+            pumpGattOperations(token);
+            return;
+        }
+        while (true) {
+            String appIdentifier = appAttributeRequests.poll();
+            if (appIdentifier == null) return;
+            queuedAppIdentifiers.remove(appIdentifier);
+            final AncsProtocol.AppAttributeAccumulator accumulator;
+            final byte[] request;
+            try {
+                accumulator = new AncsProtocol.AppAttributeAccumulator(appIdentifier);
+                request = AncsProtocol.appAttributeRequest(appIdentifier);
+            } catch (IllegalArgumentException invalidIdentifier) {
+                cacheAppDisplayName(appIdentifier,
+                        PhoneAppCatalog.displayNameFallback(appIdentifier));
+                continue;
+            }
+            activeAppIdentifier = appIdentifier;
+            long requestSequence = ++nextAncsRequestSequence;
+            activeAncsRequestSequence = requestSequence;
+            appAttributeAccumulator = accumulator;
+            gattOperations.add(new GattOperation(GattKind.CONTROL_WRITE, GattTag.CONTROL,
+                    null, ancsControlPoint, request, appIdentifier, requestSequence));
+            pumpGattOperations(token);
+            return;
+        }
+    }
+
+    private void scheduleAttributeTimeout(long token, @NonNull GattOperation operation) {
         Handler handler = worker;
         if (handler == null) {
             scheduleGattReconnect(token, "ANCS response worker unavailable");
             return;
         }
+        long expectedSequence = operation.requestSequence;
+        // The Data Source response is allowed to arrive before Android reports completion of the
+        // Control Point write. If that already completed this exact request, there is no response
+        // left to time out and the next serialized request owns any newly queued operation.
+        if (expectedSequence == 0L || activeAncsRequestSequence != expectedSequence) return;
         Runnable timeout = () -> runIfCurrent(token, () -> {
-            if (activeAttributeUid != null && activeAttributeUid.longValue() == uid) {
+            if (activeAncsRequestSequence == expectedSequence) {
                 scheduleGattReconnect(token, "ANCS attribute response timed out");
             }
         });
@@ -966,37 +1293,125 @@ public final class PhoneConnectorController {
     }
 
     private void handleAncsData(long token, @Nullable byte[] payload) {
+        if (payload == null) return;
+        if (activeAttributeUid != null && attributeAccumulator != null) {
+            handleNotificationAttributes(token, payload);
+            return;
+        }
+        if (activeAppIdentifier != null && appAttributeAccumulator != null) {
+            handleAppAttributes(token, payload);
+        }
+    }
+
+    private void handleNotificationAttributes(long token, @NonNull byte[] payload) {
         Long uid = activeAttributeUid;
         AncsProtocol.AttributeAccumulator accumulator = attributeAccumulator;
-        if (uid == null || accumulator == null || payload == null) return;
+        long requestSequence = activeAncsRequestSequence;
+        boolean responseIncludedText = activeAttributeIncludesText;
+        if (uid == null || accumulator == null) return;
         if (!accumulator.append(payload)) {
-            scheduleGattReconnect(token, "ANCS attribute response exceeded its limit");
+            scheduleGattReconnect(token, "ANCS notification response exceeded its limit");
             return;
         }
         AncsProtocol.Notification notification = accumulator.complete();
         if (notification == null) return;
-        if (!removedAttributeUids.contains(uid)) {
+        Config current = config;
+        boolean appleMessage = isAppleMessagesApp(notification.appIdentifier);
+        boolean allowed = current != null && (current.notificationsEnabled
+                || current.messagesEnabled && appleMessage);
+        boolean needsMessageTextFollowUp = allowed && !responseIncludedText
+                && current != null && !current.notificationsEnabled
+                && current.messagesEnabled && current.includeNotificationText
+                && appleMessage;
+        if (needsMessageTextFollowUp && !removedAttributeUids.contains(uid)) {
+            fullTextAttributeUids.add(uid);
+            dirtyAttributeUids.add(uid);
+            completeAttributeRequest(token, uid, requestSequence);
+            return;
+        }
+        if (!allowed) {
+            pendingAncsEvents.remove(uid);
+            dirtyAttributeUids.remove(uid);
+            fullTextAttributeUids.remove(uid);
+        } else if (!removedAttributeUids.contains(uid)) {
             AncsProtocol.Event event = pendingAncsEvents.remove(uid);
             int categoryId = event == null ? 0 : event.categoryId;
-            NotificationRecord record = new NotificationRecord(notification, categoryId);
+            NotificationRecord record = new NotificationRecord(
+                    notification, categoryId, System.currentTimeMillis());
             notificationCache.remove(uid);
             notificationCache.put(uid, record);
             trimNotificationCache();
+            queueAppDisplayName(notification.appIdentifier);
+            lastAppIdentifier = bounded(notification.appIdentifier, 512);
+            lastAppName = displayNameFor(notification.appIdentifier);
+            lastAppCategoryId = categoryId;
+            lastNotificationAt = record.receivedAt;
             upsertAncsMessage(record);
             mirrorAncsNotification(token, record);
         }
-        completeAttributeRequest(token, uid);
+        completeAttributeRequest(token, uid, requestSequence);
     }
 
-    private void completeAttributeRequest(long token, long uid) {
-        Runnable timeout = attributeTimeout;
-        if (timeout != null && worker != null) worker.removeCallbacks(timeout);
-        attributeTimeout = null;
-        if (activeAttributeUid != null && activeAttributeUid == uid) {
-            activeAttributeUid = null;
-            attributeAccumulator = null;
+    private void handleAppAttributes(long token, @NonNull byte[] payload) {
+        String appIdentifier = activeAppIdentifier;
+        AncsProtocol.AppAttributeAccumulator accumulator = appAttributeAccumulator;
+        long requestSequence = activeAncsRequestSequence;
+        if (appIdentifier == null || accumulator == null) return;
+        if (!accumulator.append(payload)) {
+            scheduleGattReconnect(token, "ANCS app response exceeded its limit");
+            return;
         }
-        if (dirtyAttributeUids.remove(uid) && !removedAttributeUids.contains(uid)
+        String displayName = accumulator.complete();
+        if (displayName == null) return;
+        String cleanName = bounded(displayName, 256);
+        cacheAppDisplayName(appIdentifier, cleanName.isEmpty()
+                ? PhoneAppCatalog.displayNameFallback(appIdentifier) : cleanName);
+        if (appIdentifier.equals(lastAppIdentifier)) {
+            lastAppName = displayNameFor(appIdentifier);
+        }
+        for (NotificationRecord record : notificationCache.values()) {
+            if (appIdentifier.equals(record.notification.appIdentifier)) {
+                mirrorAncsNotification(token, record);
+            }
+        }
+        completeAppAttributeRequest(token, appIdentifier, requestSequence);
+    }
+
+    private void queueAppDisplayName(@Nullable String rawAppIdentifier) {
+        String appIdentifier = bounded(rawAppIdentifier, 512);
+        if (appIdentifier.isEmpty() || appDisplayNames.containsKey(appIdentifier)
+                || appIdentifier.equals(activeAppIdentifier)
+                || !queuedAppIdentifiers.add(appIdentifier)) return;
+        while (appAttributeRequests.size() >= MAX_PENDING_ANCS_REQUESTS) {
+            String dropped = appAttributeRequests.poll();
+            if (dropped == null) break;
+            queuedAppIdentifiers.remove(dropped);
+        }
+        appAttributeRequests.add(appIdentifier);
+    }
+
+    private void cacheAppDisplayName(@NonNull String appIdentifier,
+                                     @NonNull String displayName) {
+        appDisplayNames.remove(appIdentifier);
+        appDisplayNames.put(appIdentifier, displayName);
+        while (appDisplayNames.size() > MAX_APP_DISPLAY_NAMES) {
+            Iterator<String> iterator = appDisplayNames.keySet().iterator();
+            if (!iterator.hasNext()) break;
+            iterator.next();
+            iterator.remove();
+        }
+    }
+
+    private void completeAttributeRequest(long token, long uid, long requestSequence) {
+        if (activeAncsRequestSequence != requestSequence
+                || activeAttributeUid == null || activeAttributeUid != uid) return;
+        cancelAttributeTimeout();
+        activeAttributeUid = null;
+        attributeAccumulator = null;
+        activeAttributeIncludesText = false;
+        activeAncsRequestSequence = 0L;
+        boolean removed = removedAttributeUids.remove(uid);
+        if (dirtyAttributeUids.remove(uid) && !removed
                 && queuedAttributeUids.add(uid)) {
             attributeRequests.add(uid);
         }
@@ -1004,10 +1419,63 @@ public final class PhoneConnectorController {
         pumpAttributeRequests(token);
     }
 
+    private void cancelAttributeTimeout() {
+        Runnable timeout = attributeTimeout;
+        if (timeout != null && worker != null) worker.removeCallbacks(timeout);
+        attributeTimeout = null;
+    }
+
+    private void completeAppAttributeRequest(long token, @NonNull String appIdentifier,
+                                             long requestSequence) {
+        if (activeAncsRequestSequence != requestSequence
+                || !appIdentifier.equals(activeAppIdentifier)) return;
+        cancelAttributeTimeout();
+        activeAppIdentifier = null;
+        appAttributeAccumulator = null;
+        activeAncsRequestSequence = 0L;
+        publishSnapshot(token);
+        pumpAttributeRequests(token);
+    }
+
+    /**
+     * A notification may disappear between its Notification Source event and the serialized
+     * Control Point write. Apple reports that normal race as Invalid Parameter (0xA2); dropping
+     * only that request keeps the encrypted ANCS session alive and lets later events continue.
+     */
+    private void abandonInvalidAncsRequest(long token, @NonNull GattOperation operation) {
+        if (operation.requestSequence != activeAncsRequestSequence) {
+            pumpGattOperations(token);
+            return;
+        }
+        if (operation.uid >= 0L && activeAttributeUid != null
+                && activeAttributeUid.longValue() == operation.uid) {
+            pendingAncsEvents.remove(operation.uid);
+            fullTextAttributeUids.remove(operation.uid);
+            completeAttributeRequest(token, operation.uid, operation.requestSequence);
+            return;
+        }
+        String appIdentifier = operation.appIdentifier;
+        if (appIdentifier != null && appIdentifier.equals(activeAppIdentifier)) {
+            cacheAppDisplayName(appIdentifier,
+                    PhoneAppCatalog.displayNameFallback(appIdentifier));
+            if (appIdentifier.equals(lastAppIdentifier)) {
+                lastAppName = displayNameFor(appIdentifier);
+            }
+            completeAppAttributeRequest(token, appIdentifier, operation.requestSequence);
+            return;
+        }
+        pumpGattOperations(token);
+    }
+
     private void removeAncsNotification(long token, long uid) {
-        removedAttributeUids.add(uid);
+        if (activeAttributeUid != null && activeAttributeUid.longValue() == uid) {
+            removedAttributeUids.add(uid);
+        } else {
+            removedAttributeUids.remove(uid);
+        }
         pendingAncsEvents.remove(uid);
         dirtyAttributeUids.remove(uid);
+        fullTextAttributeUids.remove(uid);
         if (queuedAttributeUids.remove(uid)) attributeRequests.remove(uid);
         notificationCache.remove(uid);
         if (ancsMessageCache.remove(uid) != null) rebuildMessageSnapshot();
@@ -1023,6 +1491,7 @@ public final class PhoneConnectorController {
             if (!iterator.hasNext()) break;
             long uid = iterator.next().getKey();
             iterator.remove();
+            fullTextAttributeUids.remove(uid);
             Integer notificationId = mirroredAncsIds.remove(uid);
             if (notificationId != null) cancelMirroredNotification(notificationId);
         }
@@ -1032,11 +1501,19 @@ public final class PhoneConnectorController {
                                             @Nullable byte[] payload) {
         if (payload == null || payload.length == 0) return;
         int raw = payload[0] & 0xff;
-        if (BATTERY_LEVEL.equals(uuid) && !hfpBatteryKnown && raw <= 100) {
-            batteryLevel = raw;
-        } else if (BATTERY_POWER_STATE.equals(uuid) && !hfpChargingKnown) {
-            batteryCharging = PhoneConnectorPolicy.decodeBatteryPowerState(raw);
+        if (BATTERY_LEVEL.equals(uuid) && raw <= 100) {
+            basBatteryKnown = true;
+            basBatteryLevel = raw;
+            basBatteryUpdatedAt = SystemClock.elapsedRealtime();
+        } else if (BATTERY_POWER_STATE.equals(uuid)) {
+            Boolean decoded = PhoneConnectorPolicy.decodeBatteryPowerState(raw);
+            if (decoded != null) {
+                basChargingKnown = true;
+                basBatteryCharging = decoded;
+                basChargingUpdatedAt = SystemClock.elapsedRealtime();
+            }
         }
+        refreshBatteryValues();
         publishSnapshot(token);
     }
 
@@ -1047,7 +1524,8 @@ public final class PhoneConnectorController {
             Integer normalized = PhoneConnectorPolicy.normalizeHfpBattery(rawBattery);
             if (normalized != null) {
                 hfpBatteryKnown = true;
-                batteryLevel = normalized;
+                hfpBatteryLevel = normalized;
+                hfpBatteryUpdatedAt = SystemClock.elapsedRealtime();
             }
         }
         Integer rawSignal = intExtra(intent, EXTRA_HFP_NETWORK_SIGNAL,
@@ -1086,9 +1564,56 @@ public final class PhoneConnectorController {
                 "battery_charging", "batteryCharging", "charging");
         if (charging != null) {
             hfpChargingKnown = true;
-            batteryCharging = charging;
+            hfpBatteryCharging = charging;
+            hfpChargingUpdatedAt = SystemClock.elapsedRealtime();
         }
+        refreshBatteryValues();
         publishSnapshot(token);
+    }
+
+    private void refreshBatteryValues() {
+        if (basBatteryKnown && basBatteryUpdatedAt >= hfpBatteryUpdatedAt
+                && basBatteryUpdatedAt >= genericBatteryUpdatedAt) {
+            batteryLevel = basBatteryLevel;
+        } else if (hfpBatteryKnown && hfpBatteryUpdatedAt >= genericBatteryUpdatedAt) {
+            batteryLevel = hfpBatteryLevel;
+        } else {
+            batteryLevel = genericBatteryKnown ? genericBatteryLevel : null;
+        }
+        batteryCharging = basChargingKnown && basChargingUpdatedAt >= hfpChargingUpdatedAt
+                ? basBatteryCharging : hfpChargingKnown ? hfpBatteryCharging : null;
+    }
+
+    private void clearBasData() {
+        basBatteryKnown = false;
+        basChargingKnown = false;
+        basBatteryLevel = null;
+        basBatteryCharging = null;
+        basBatteryUpdatedAt = 0L;
+        basChargingUpdatedAt = 0L;
+        refreshBatteryValues();
+    }
+
+    private void clearHfpData() {
+        hfpBatteryKnown = false;
+        hfpChargingKnown = false;
+        hfpBatteryLevel = null;
+        hfpBatteryCharging = null;
+        hfpBatteryUpdatedAt = 0L;
+        hfpChargingUpdatedAt = 0L;
+        networkAvailable = null;
+        networkSignal = null;
+        networkRoaming = null;
+        networkOperator = "";
+        networkType = "";
+        refreshBatteryValues();
+    }
+
+    private void clearGenericBatteryData() {
+        genericBatteryKnown = false;
+        genericBatteryLevel = null;
+        genericBatteryUpdatedAt = 0L;
+        refreshBatteryValues();
     }
 
     private void beginMapSession() {
@@ -1115,8 +1640,9 @@ public final class PhoneConnectorController {
         if (!mapConnected || current == null || !current.messagesEnabled) return;
         String handle = bounded(intent.getStringExtra(EXTRA_MAP_MESSAGE_HANDLE), 256);
         String text = bounded(intent.getStringExtra(Intent.EXTRA_TEXT), 4_096);
-        if (handle.isEmpty() || text.isEmpty()) {
-            lastError = "MAP message ignored: missing handle or text";
+        if (handle.isEmpty() || current.includeNotificationText && text.isEmpty()) {
+            lastError = "MAP message ignored: missing handle"
+                    + (current.includeNotificationText ? " or text" : "");
             smsStatus = "invalid_message";
             publishSnapshot(token);
             return;
@@ -1131,8 +1657,16 @@ public final class PhoneConnectorController {
         LinkedHashMap<String, Object> row = new LinkedHashMap<>();
         row.put("id", handle);
         row.put("source", "map");
-        row.put("sender", firstNonEmpty(senderName, senderUri));
-        if (current.includeNotificationText) row.put("body", text);
+        row.put("app_name", "Сообщения");
+        row.put("icon", "messages");
+        if (current.includeNotificationText) {
+            String sender = firstNonEmpty(senderName, senderUri);
+            row.put("sender", sender);
+            row.put("body", text);
+            row.put("display", firstNonEmpty(sender, "Сообщения"));
+        } else {
+            row.put("display", "Сообщения");
+        }
         row.put("date", timestamp);
         row.put("read", read);
         mapMessageCache.remove(handle);
@@ -1190,11 +1724,18 @@ public final class PhoneConnectorController {
         LinkedHashMap<String, Object> row = new LinkedHashMap<>();
         row.put("id", "ancs:" + record.notification.uid);
         row.put("source", "ancs");
-        row.put("sender", firstNonEmpty(record.notification.title,
-                record.notification.subtitle));
+        row.put("app_name", displayNameFor(record.notification.appIdentifier));
+        row.put("icon", PhoneAppCatalog.iconKey(
+                record.notification.appIdentifier, record.categoryId));
         if (current.includeNotificationText) {
+            String sender = firstNonEmpty(record.notification.title,
+                    record.notification.subtitle);
+            row.put("sender", sender);
             row.put("body", firstNonEmpty(record.notification.message,
                     record.notification.subtitle));
+            row.put("display", firstNonEmpty(sender, "Сообщения"));
+        } else {
+            row.put("display", "Сообщения");
         }
         row.put("date", System.currentTimeMillis());
         row.put("read", false);
@@ -1212,7 +1753,8 @@ public final class PhoneConnectorController {
 
     private void rebuildMessageSnapshot() {
         smsItems.clear();
-        List<Map<String, Object>> ordered = new ArrayList<>(mapMessageCache.values());
+        List<Map<String, Object>> ordered = new ArrayList<>();
+        if (!ancsReady) ordered.addAll(mapMessageCache.values());
         ordered.addAll(ancsMessageCache.values());
         ordered.sort((left, right) -> Long.compare(messageDate(right), messageDate(left)));
         LinkedHashSet<String> fingerprints = new LinkedHashSet<>();
@@ -1261,15 +1803,11 @@ public final class PhoneConnectorController {
     }
 
     private void clearDisconnectedData(long token) {
+        clearBasData();
+        clearHfpData();
+        clearGenericBatteryData();
         batteryLevel = null;
         batteryCharging = null;
-        hfpBatteryKnown = false;
-        hfpChargingKnown = false;
-        networkAvailable = null;
-        networkSignal = null;
-        networkRoaming = null;
-        networkOperator = "";
-        networkType = "";
         resetAncsSession(token, "disconnected");
         endMapSession("disconnected");
         cancelAllMirroredNotifications();
@@ -1291,21 +1829,34 @@ public final class PhoneConnectorController {
         ancsControlPoint = null;
         ancsDataSource = null;
         ancsNotificationSource = null;
+        serviceChangedCharacteristic = null;
         ancsDataSubscribed = false;
         ancsNotificationSubscribed = false;
+        ancsNotificationListening = false;
+        serviceChangedSubscribed = false;
         resetGattOperationState();
         pendingAncsEvents.clear();
         attributeRequests.clear();
         queuedAttributeUids.clear();
         dirtyAttributeUids.clear();
         removedAttributeUids.clear();
+        fullTextAttributeUids.clear();
+        appAttributeRequests.clear();
+        queuedAppIdentifiers.clear();
         activeAttributeUid = null;
         attributeAccumulator = null;
-        Runnable timeout = attributeTimeout;
-        if (timeout != null && worker != null) worker.removeCallbacks(timeout);
-        attributeTimeout = null;
+        activeAttributeIncludesText = false;
+        activeAppIdentifier = null;
+        appAttributeAccumulator = null;
+        activeAncsRequestSequence = 0L;
+        cancelAttributeTimeout();
         notificationCache.clear();
         ancsMessageCache.clear();
+        appDisplayNames.clear();
+        lastAppIdentifier = "";
+        lastAppName = "";
+        lastAppCategoryId = 0;
+        lastNotificationAt = 0L;
         rebuildMessageSnapshot();
     }
 
@@ -1318,9 +1869,19 @@ public final class PhoneConnectorController {
     }
 
     private void scheduleGattReconnect(long token, @NonNull String detail) {
+        scheduleGattReconnect(token, detail, "retrying");
+    }
+
+    private void scheduleGattReconnect(long token, @NonNull String detail,
+                                       @NonNull String visibleStatus) {
         if (!isCurrent(token)) return;
         lastError = bounded(detail, 512);
-        ancsStatus = "retrying";
+        ancsStatus = visibleStatus;
+        if (gattReconnectTask != null) {
+            publishSnapshot(token);
+            return;
+        }
+        cancelGattWatchdogs();
         BluetoothGatt previous;
         synchronized (lifecycleLock) {
             previous = gatt;
@@ -1328,34 +1889,113 @@ public final class PhoneConnectorController {
         }
         closeGatt(previous);
         gattConnected = false;
-        resetAncsSession(token, "retrying");
+        clearBasData();
+        resetAncsSession(token, visibleStatus);
         updateConnected(token);
         long delay = PhoneConnectorPolicy.reconnectDelayMillis(reconnectAttempt++);
         Handler handler = worker;
-        if (handler != null) handler.postDelayed(() -> {
-            runIfCurrent(token, () -> ensureGatt(token));
-        }, delay);
+        if (handler == null) return;
+        Runnable retry = () -> runIfCurrent(token, () -> {
+            gattReconnectTask = null;
+            ensureGatt(token);
+        });
+        gattReconnectTask = retry;
+        handler.postDelayed(retry, delay);
     }
 
-    private void scheduleServiceRediscovery(long token) {
-        long delay = PhoneConnectorPolicy.reconnectDelayMillis(reconnectAttempt++);
+    private void scheduleConnectWatchdog(long token, @NonNull BluetoothGatt expected,
+                                         boolean autoConnect) {
+        cancelConnectWatchdog();
         Handler handler = worker;
-        BluetoothGatt expected = gatt;
         if (handler == null) return;
-        handler.postDelayed(() -> {
-            runIfCurrent(token, () -> {
-                BluetoothGatt current = gatt;
-                if (current == null || current != expected) return;
-                try {
-                    if (!current.discoverServices()) {
-                        scheduleGattReconnect(token, "ANCS rediscovery did not start");
-                    }
-                } catch (RuntimeException error) {
-                    scheduleGattReconnect(token, "ANCS rediscovery: "
-                            + safeMessage(error));
-                }
-            });
-        }, delay);
+        Runnable timeout = () -> runIfCurrent(token, () -> {
+            if (gatt != expected || gattConnected) return;
+            connectWatchdog = null;
+            if (autoConnect) forceDirectGatt = true;
+            scheduleGattReconnect(token, autoConnect
+                    ? "Background GATT connection timed out; retrying directly"
+                    : "Direct GATT connection timed out");
+        });
+        connectWatchdog = timeout;
+        handler.postDelayed(timeout, GATT_CONNECT_TIMEOUT_MS);
+    }
+
+    private void scheduleDiscoveryWatchdog(long token, @NonNull BluetoothGatt expected) {
+        cancelDiscoveryWatchdog();
+        Handler handler = worker;
+        if (handler == null) return;
+        Runnable timeout = () -> runIfCurrent(token, () -> {
+            if (gatt != expected || !serviceDiscoveryStarted) return;
+            discoveryWatchdog = null;
+            serviceDiscoveryStarted = false;
+            scheduleGattReconnect(token, "GATT service discovery timed out");
+        });
+        discoveryWatchdog = timeout;
+        handler.postDelayed(timeout, GATT_DISCOVERY_TIMEOUT_MS);
+    }
+
+    private void scheduleAncsAuthorizationProbe(long token,
+                                                @NonNull BluetoothGatt expected) {
+        Handler handler = worker;
+        if (handler == null) return;
+        handler.postDelayed(() -> runIfCurrent(token, () -> {
+            if (gatt != expected || !gattConnected
+                    || !"authorization_required".equals(ancsStatus)) return;
+            forceDirectGatt = true;
+            scheduleGattReconnect(token,
+                    "ANCS service is not published by the selected iPhone",
+                    "authorization_required");
+        }), ANCS_AUTHORIZATION_PROBE_MS);
+    }
+
+    private void cancelGattWatchdogs() {
+        cancelConnectWatchdog();
+        cancelMtuWatchdog();
+        cancelDiscoveryWatchdog();
+        mtuPending = false;
+        serviceDiscoveryStarted = false;
+    }
+
+    private void cancelRetryTasks() {
+        cancelDeviceRescan();
+        cancelGattReconnect();
+    }
+
+    private void cancelDeviceRescan() {
+        Runnable retry = deviceRescanTask;
+        if (retry != null && worker != null) worker.removeCallbacks(retry);
+        deviceRescanTask = null;
+    }
+
+    private void cancelGattReconnect() {
+        Runnable retry = gattReconnectTask;
+        if (retry != null && worker != null) worker.removeCallbacks(retry);
+        gattReconnectTask = null;
+    }
+
+    private void cancelConnectWatchdog() {
+        Runnable timeout = connectWatchdog;
+        if (timeout != null && worker != null) worker.removeCallbacks(timeout);
+        connectWatchdog = null;
+    }
+
+    private void cancelMtuWatchdog() {
+        Runnable timeout = mtuWatchdog;
+        if (timeout != null && worker != null) worker.removeCallbacks(timeout);
+        mtuWatchdog = null;
+    }
+
+    private void cancelDiscoveryWatchdog() {
+        Runnable timeout = discoveryWatchdog;
+        if (timeout != null && worker != null) worker.removeCallbacks(timeout);
+        discoveryWatchdog = null;
+    }
+
+    private static boolean isAuthorizationFailure(int status) {
+        return status == GATT_INSUFFICIENT_AUTHENTICATION
+                || status == GATT_INSUFFICIENT_AUTHORIZATION
+                || status == GATT_INSUFFICIENT_ENCRYPTION_KEY_SIZE
+                || status == GATT_INSUFFICIENT_ENCRYPTION;
     }
 
     private void mirrorAncsNotification(long token, @NonNull NotificationRecord record) {
@@ -1365,20 +2005,23 @@ public final class PhoneConnectorController {
                 || current.messagesEnabled && appleMessage);
         if (!isCurrent(token) || !allowed) return;
         int notificationId = ancsNotificationId(record.notification.uid);
+        String appName = displayNameFor(record.notification.appIdentifier);
         Notification.Builder builder = baseNotificationBuilder()
-                .setSubText(record.notification.appIdentifier)
+                .setSmallIcon(PhoneAppCatalog.iconResource(
+                        record.notification.appIdentifier, record.categoryId))
+                .setSubText(appName)
                 .setCategory(appleMessage
                         ? Notification.CATEGORY_MESSAGE : Notification.CATEGORY_STATUS);
         if (current.includeNotificationText) {
             String title = firstNonEmpty(record.notification.title,
-                    AncsProtocol.categoryLabel(record.categoryId));
+                    appName);
             String message = firstNonEmpty(record.notification.message,
                     record.notification.subtitle);
             builder.setContentTitle(title).setContentText(message)
                     .setStyle(new Notification.BigTextStyle().bigText(message));
         } else {
-            builder.setContentTitle(AncsProtocol.categoryLabel(record.categoryId))
-                    .setContentText(record.notification.appIdentifier);
+            builder.setContentTitle(appName)
+                    .setContentText(AncsProtocol.categoryLabel(record.categoryId));
         }
         if (notifySafely(notificationId, builder.build())) {
             mirroredAncsIds.put(record.notification.uid, notificationId);
@@ -1537,6 +2180,8 @@ public final class PhoneConnectorController {
         snapshot.add(value("messages.latest", null, false, "object", "", now));
         snapshot.add(value("diagnostics.device", Collections.emptyMap(), true,
                 "object", "", now));
+        snapshot.add(value("diagnostics.last_app", Collections.emptyMap(), true,
+                "object", "", now));
         snapshot.add(value("diagnostics.ancs", reason, true, "string", "", now));
         snapshot.add(value("diagnostics.sms", reason, true, "string", "", now));
         snapshot.add(value("diagnostics.last_error", "", true, "string", "", now));
@@ -1590,6 +2235,17 @@ public final class PhoneConnectorController {
         device.put("name", selectedName);
         snapshot.add(value("diagnostics.device", device, !selectedAddress.isEmpty(),
                 "object", "", now));
+        LinkedHashMap<String, Object> lastApp = new LinkedHashMap<>();
+        if (!lastAppIdentifier.isEmpty()) {
+            lastApp.put("id", lastAppIdentifier);
+            lastApp.put("name", firstNonEmpty(lastAppName,
+                    PhoneAppCatalog.displayNameFallback(lastAppIdentifier)));
+            lastApp.put("icon", PhoneAppCatalog.iconKey(
+                    lastAppIdentifier, lastAppCategoryId));
+            lastApp.put("received_at", lastNotificationAt);
+        }
+        snapshot.add(value("diagnostics.last_app", lastApp, !lastApp.isEmpty(),
+                "object", "", now));
         snapshot.add(value("diagnostics.ancs", ancsStatus, true,
                 "string", "", now));
         snapshot.add(value("diagnostics.sms", smsStatus, true,
@@ -1607,8 +2263,13 @@ public final class PhoneConnectorController {
             LinkedHashMap<String, Object> value = new LinkedHashMap<>();
             value.put("uid", item.notification.uid);
             value.put("app", item.notification.appIdentifier);
+            value.put("app_id", item.notification.appIdentifier);
+            value.put("app_name", displayNameFor(item.notification.appIdentifier));
+            value.put("icon", PhoneAppCatalog.iconKey(
+                    item.notification.appIdentifier, item.categoryId));
             value.put("category", AncsProtocol.categoryLabel(item.categoryId));
             value.put("date", item.notification.date);
+            value.put("received_at", item.receivedAt);
             if (includeText) {
                 value.put("title", item.notification.title);
                 value.put("subtitle", item.notification.subtitle);
@@ -1805,7 +2466,17 @@ public final class PhoneConnectorController {
         String normalized = appIdentifier == null ? ""
                 : appIdentifier.trim().toLowerCase(Locale.ROOT);
         return "com.apple.mobilesms".equals(normalized)
-                || normalized.startsWith("com.apple.mobilesms.");
+                || normalized.startsWith("com.apple.mobilesms.")
+                || "com.apple.messages".equals(normalized)
+                || normalized.startsWith("com.apple.messages.");
+    }
+
+    @NonNull
+    private String displayNameFor(@Nullable String rawAppIdentifier) {
+        String appIdentifier = bounded(rawAppIdentifier, 512);
+        String resolved = appDisplayNames.get(appIdentifier);
+        if (resolved != null && !resolved.trim().isEmpty()) return resolved.trim();
+        return PhoneAppCatalog.displayNameFallback(appIdentifier);
     }
 
     private static long messageDate(@NonNull Map<String, Object> message) {
@@ -1815,7 +2486,9 @@ public final class PhoneConnectorController {
 
     @NonNull
     private static String messageFingerprint(@NonNull Map<String, Object> message) {
-        String sender = String.valueOf(message.get("sender")).trim().toLowerCase(Locale.ROOT);
+        Object senderValue = message.get("sender");
+        String sender = senderValue == null ? ""
+                : String.valueOf(senderValue).trim().toLowerCase(Locale.ROOT);
         Object bodyValue = message.get("body");
         String body = bodyValue == null ? "" : String.valueOf(bodyValue).trim();
         if (!sender.isEmpty() || !body.isEmpty()) {
@@ -1860,6 +2533,7 @@ public final class PhoneConnectorController {
     }
 
     private enum GattTag {
+        SERVICE_CHANGED,
         ANCS_DATA,
         ANCS_NOTIFICATION,
         BATTERY_LEVEL_READ,
@@ -1876,6 +2550,8 @@ public final class PhoneConnectorController {
         @Nullable final BluetoothGattCharacteristic characteristic;
         @Nullable final byte[] payload;
         final long uid;
+        @Nullable final String appIdentifier;
+        final long requestSequence;
 
         GattOperation(@NonNull GattKind kind, @NonNull GattTag tag,
                       @Nullable BluetoothGattDescriptor descriptor,
@@ -1894,16 +2570,50 @@ public final class PhoneConnectorController {
             this.characteristic = characteristic;
             this.payload = payload == null ? null : payload.clone();
             this.uid = uid;
+            this.appIdentifier = null;
+            this.requestSequence = 0L;
+        }
+
+        GattOperation(@NonNull GattKind kind, @NonNull GattTag tag,
+                      @Nullable BluetoothGattDescriptor descriptor,
+                      @Nullable BluetoothGattCharacteristic characteristic,
+                      @Nullable byte[] payload, long uid, long requestSequence) {
+            this.kind = kind;
+            this.tag = tag;
+            this.descriptor = descriptor;
+            this.characteristic = characteristic;
+            this.payload = payload == null ? null : payload.clone();
+            this.uid = uid;
+            this.appIdentifier = null;
+            this.requestSequence = requestSequence;
+        }
+
+        GattOperation(@NonNull GattKind kind, @NonNull GattTag tag,
+                      @Nullable BluetoothGattDescriptor descriptor,
+                      @Nullable BluetoothGattCharacteristic characteristic,
+                      @Nullable byte[] payload, @NonNull String appIdentifier,
+                      long requestSequence) {
+            this.kind = kind;
+            this.tag = tag;
+            this.descriptor = descriptor;
+            this.characteristic = characteristic;
+            this.payload = payload == null ? null : payload.clone();
+            this.uid = -1L;
+            this.appIdentifier = appIdentifier;
+            this.requestSequence = requestSequence;
         }
     }
 
     private static final class NotificationRecord {
         @NonNull final AncsProtocol.Notification notification;
         final int categoryId;
+        final long receivedAt;
 
-        NotificationRecord(@NonNull AncsProtocol.Notification notification, int categoryId) {
+        NotificationRecord(@NonNull AncsProtocol.Notification notification, int categoryId,
+                           long receivedAt) {
             this.notification = notification;
             this.categoryId = categoryId;
+            this.receivedAt = receivedAt;
         }
     }
 

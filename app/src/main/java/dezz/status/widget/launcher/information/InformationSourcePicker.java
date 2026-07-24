@@ -322,25 +322,25 @@ public final class InformationSourcePicker {
         List<Choice> choices = new ArrayList<>();
         for (ConnectorValue value : service.connectorValueSnapshot()) {
             if (value.connectorType != ConnectorType.PHONE || !value.readable) continue;
-            // diagnostics.device intentionally contains the exact Bluetooth address for the
-            // local transport. It is useful to the connector itself, but must never become a
-            // selectable launcher value whose generic object renderer could expose the full MAC.
-            if ("diagnostics.device".equals(value.resourceId)) continue;
+            // Transport identity and collection values are intentionally not one-line tiles.
+            if (!PhoneInformationSourcePolicy.selectable(value.resourceId)) continue;
             String label = first(string(value.attributes.get("friendly_name")),
                     string(value.attributes.get("name")), phoneLabel(value.resourceId));
             String hint = value.valueType + " " + value.unit + " iphone phone "
                     + value.resourceId;
             SourceBinding binding = new SourceBinding(ConnectorType.PHONE,
-                    value.connectorId, value.resourceId, "",
+                    value.connectorId, value.resourceId,
+                    PhoneInformationSourcePolicy.valuePath(value.resourceId),
                     SourceBinding.PRESENTATION_AUTO, value.unit);
             InformationPanelConfig.Item item = InformationPanelConfig.Item.connector(
                     binding, label, value.unit, hint);
+            Object displayValue = PhoneInformationSourcePolicy.displayValue(value);
             choices.add(new Choice(item,
                     label + "\nТелефон · " + value.resourceId
-                            + (value.fresh ? " · сейчас: " + display(value.rawValue)
+                            + (value.fresh ? " · сейчас: " + display(displayValue)
                             : " · ожидает актуальное значение"),
                     label + " " + value.resourceId + " " + hint + " "
-                            + value.rawValue + " " + value.attributes));
+                            + displayValue + " " + value.attributes));
         }
         choices.sort(Comparator.comparing(value -> value.label,
                 String.CASE_INSENSITIVE_ORDER));
@@ -363,6 +363,7 @@ public final class InformationSourcePicker {
             case "notifications.items": return "Уведомления iPhone";
             case "messages.unread": return "Непрочитанные сообщения";
             case "messages.latest": return "Последнее сообщение";
+            case "diagnostics.last_app": return "Приложение последнего уведомления";
             case "diagnostics.ancs": return "Состояние Apple ANCS";
             case "diagnostics.sms": return "Состояние SMS/MAP";
             case "diagnostics.last_error": return "Ошибка подключения iPhone";

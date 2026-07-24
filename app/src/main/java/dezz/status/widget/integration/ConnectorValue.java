@@ -91,8 +91,10 @@ public final class ConnectorValue {
 
     /**
      * Selects a nested value without executing expressions. Empty, {@code value}, and
-     * {@code state} address the connector's primary value. Other paths walk attributes/maps and
-     * may use numeric list indices; a literal dotted attribute key wins over path splitting.
+     * {@code state} address the connector's primary value; the reserved
+     * {@code @value.*}/{@code @state.*} prefixes walk a structured primary value. Other paths
+     * retain the legacy behavior of walking attributes/maps and may use numeric list indices; a
+     * literal dotted map key wins over path splitting.
      */
     @Nullable
     public Object resolveValue(@Nullable String valuePath) {
@@ -104,6 +106,15 @@ public final class ConnectorValue {
         String path = valuePath == null ? "" : valuePath.trim();
         if (path.isEmpty() || "value".equals(path) || "state".equals(path)) {
             return ResolvedValue.found(rawValue);
+        }
+        if ("@value".equals(path) || "@state".equals(path)) {
+            return ResolvedValue.found(rawValue);
+        }
+        if (path.startsWith("@value.")) {
+            return walk(rawValue, path.substring("@value.".length()));
+        }
+        if (path.startsWith("@state.")) {
+            return walk(rawValue, path.substring("@state.".length()));
         }
         if ("attributes".equals(path)) return ResolvedValue.found(attributes);
         if (path.startsWith("attributes.")) path = path.substring("attributes.".length());

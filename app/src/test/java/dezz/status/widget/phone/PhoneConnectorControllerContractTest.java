@@ -49,9 +49,58 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("ANCS_DATA"));
         assertTrue(source.contains("ANCS_NOTIFICATION"));
         assertTrue(source.contains("ATTRIBUTE_TIMEOUT_MS"));
+        assertTrue(source.contains("activeAncsRequestSequence"));
+        assertTrue(source.contains("operation.requestSequence"));
         assertTrue(source.contains("MAX_NOTIFICATIONS = 50"));
         assertTrue(source.contains("clearAncsRuntime()"));
         assertTrue(count(source, "callbackGatt == gatt") >= 3);
+        assertTrue(source.contains("operation.descriptor != callbackDescriptor"));
+        assertTrue(source.contains("operation.characteristic != callbackCharacteristic"));
+        assertTrue(source.contains("GATT operation timed out:"));
+    }
+
+    @Test public void ancsHandshakeHandlesImmediateEventsAndChangingGattServices()
+            throws IOException {
+        String source = controller();
+        String eventHandler = between(source, "private void handleAncsEvent",
+                "private void handleServiceChanged");
+        assertTrue(source.contains("requestMtu(DESIRED_GATT_MTU)"));
+        assertTrue(source.contains("callbackGatt != gatt || !mtuPending"));
+        assertTrue(source.contains("if (!serviceDiscoveryStarted) return;"));
+        assertTrue(source.contains("DESIRED_GATT_MTU = 512"));
+        assertTrue(source.contains("GENERIC_ATTRIBUTE_SERVICE"));
+        assertTrue(source.contains("SERVICE_CHANGED"));
+        assertTrue(source.contains("ENABLE_INDICATION_VALUE"));
+        assertTrue(source.contains("ancsNotificationListening = true"));
+        assertTrue(eventHandler.contains("!ancsNotificationListening"));
+        assertFalse(eventHandler.contains("!ancsReady"));
+        assertTrue(source.contains("boolean autoConnect = ancsAuthorizedThisRun"));
+        assertTrue(source.contains("forceDirectGatt = true"));
+        assertTrue(source.contains("deviceRescanTask != null"));
+        assertTrue(source.contains("gattReconnectTask != null"));
+        assertTrue(source.contains("serviceChangedSubscribed ? \"ready\" : \"ready_degraded\""));
+    }
+
+    @Test public void privacyModeAndAppPresentationRemainSourceOnly() throws IOException {
+        String source = controller();
+        assertTrue(source.contains("notificationAttributeRequest(uid, includeText)"));
+        assertTrue(source.contains("fullTextAttributeUids.contains(uid)"));
+        assertTrue(source.contains("needsMessageTextFollowUp"));
+        assertTrue(source.contains("current.notificationsEnabled\n"
+                + "                || current.messagesEnabled && appleMessage"));
+        assertTrue(source.contains("queueAppDisplayName(notification.appIdentifier)"));
+        assertTrue(source.contains("new AncsProtocol.AppAttributeAccumulator(appIdentifier)"));
+        assertTrue(source.contains("PhoneAppCatalog.iconResource("));
+        assertTrue(source.contains("PhoneAppCatalog.iconKey("));
+        assertTrue(source.contains("value.put(\"app_id\""));
+        assertTrue(source.contains("value.put(\"app_name\""));
+        assertTrue(source.contains("value.put(\"received_at\""));
+        assertTrue(source.contains("\"diagnostics.last_app\""));
+        assertTrue(source.contains("ANCS_INVALID_PARAMETER = 0xA2"));
+        assertTrue(source.contains("basBatteryUpdatedAt >= hfpBatteryUpdatedAt"));
+        assertTrue(source.contains("genericBatteryUpdatedAt"));
+        assertTrue(source.contains("SystemClock.elapsedRealtime()"));
+        assertTrue(source.contains("clearGenericBatteryData()"));
     }
 
     @Test public void batteryNetworkSmsAndNotificationFallbacksFailClosed() throws IOException {
@@ -64,6 +113,9 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("handleMapMessage(token, intent)"));
         assertTrue(source.contains("newMessage && !ancsReady"));
         assertTrue(source.contains("isAppleMessagesApp"));
+        assertTrue(source.contains("\"com.apple.messages\".equals(normalized)"));
+        assertTrue(source.contains("current.includeNotificationText && text.isEmpty()"));
+        assertTrue(source.contains("if (!ancsReady) ordered.addAll(mapMessageCache.values())"));
         assertFalse(source.contains("Manifest.permission.READ_SMS"));
         assertFalse(source.contains("ContentResolver"));
         assertTrue(source.contains("NotificationManager.IMPORTANCE_LOW"));
@@ -80,7 +132,7 @@ public final class PhoneConnectorControllerContractTest {
                 "network.signal", "network.roaming", "notifications.count",
                 "notifications.latest", "notifications.items", "messages.unread",
                 "messages.latest", "diagnostics.device", "diagnostics.ancs",
-                "diagnostics.sms", "diagnostics.last_error"
+                "diagnostics.sms", "diagnostics.last_app", "diagnostics.last_error"
         }) {
             assertTrue("Missing resource " + resource,
                     source.contains("\"" + resource + "\""));
@@ -120,6 +172,14 @@ public final class PhoneConnectorControllerContractTest {
             offset += needle.length();
         }
         return result;
+    }
+
+    private static String between(String source, String startNeedle, String endNeedle) {
+        int start = source.indexOf(startNeedle);
+        int end = source.indexOf(endNeedle, start + startNeedle.length());
+        assertTrue("Missing method start: " + startNeedle, start >= 0);
+        assertTrue("Missing method end: " + endNeedle, end > start);
+        return source.substring(start, end);
     }
 
     private static String controller() throws IOException {
