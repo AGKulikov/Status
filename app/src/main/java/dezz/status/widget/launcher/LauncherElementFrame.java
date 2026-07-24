@@ -11,15 +11,19 @@ package dezz.status.widget.launcher;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 
 import com.google.android.material.card.MaterialCardView;
+
+import dezz.status.widget.R;
 
 /** A HOME panel that can be moved and resized directly on the dashboard while edit mode is on. */
 public final class LauncherElementFrame extends MaterialCardView {
@@ -28,8 +32,10 @@ public final class LauncherElementFrame extends MaterialCardView {
     }
 
     private final String elementId;
+    private final FrameLayout rootHost;
     private final FrameLayout contentHost;
     private final TextView editBadge;
+    private final ImageView[] resizeHandles = new ImageView[4];
     private final GeometryListener listener;
     private boolean editMode;
     private int snapPx = 20;
@@ -39,7 +45,8 @@ public final class LauncherElementFrame extends MaterialCardView {
     private int downY;
     private int downWidth;
     private int downHeight;
-    private boolean resizing;
+    private LauncherPanelResizeMath.Corner resizeCorner =
+            LauncherPanelResizeMath.Corner.NONE;
 
     public LauncherElementFrame(@NonNull Context context, @NonNull String elementId,
                                 @NonNull String label, @NonNull GeometryListener listener) {
@@ -53,28 +60,41 @@ public final class LauncherElementFrame extends MaterialCardView {
         setUseCompatPadding(false);
         setPreventCornerOverlap(true);
 
+        rootHost = new FrameLayout(context);
+        super.addView(rootHost, new LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+
         contentHost = new FrameLayout(context);
-        super.addView(contentHost, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        rootHost.addView(contentHost, new FrameLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
         editBadge = new TextView(context);
-        editBadge.setText(label + "   ✥   ↘");
+        editBadge.setText(label + "   ✥");
         editBadge.setTextColor(Color.WHITE);
         editBadge.setTextSize(13);
-        editBadge.setGravity(Gravity.CENTER_VERTICAL);
+        editBadge.setGravity(Gravity.CENTER);
         editBadge.setPadding(dp(10), 0, dp(10), 0);
         editBadge.setBackgroundColor(Color.argb(210, 30, 110, 220));
         FrameLayout.LayoutParams badgeParams = new FrameLayout.LayoutParams(
-                LayoutParams.WRAP_CONTENT, dp(36), Gravity.TOP | Gravity.START);
-        contentHost.addView(editBadge, badgeParams);
+                LayoutParams.WRAP_CONTENT, dp(36), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        rootHost.addView(editBadge, badgeParams);
         editBadge.setVisibility(GONE);
+
+        addResizeHandle(LauncherPanelResizeMath.Corner.TOP_LEFT,
+                Gravity.TOP | Gravity.START, 180f, 0);
+        addResizeHandle(LauncherPanelResizeMath.Corner.TOP_RIGHT,
+                Gravity.TOP | Gravity.END, 270f, 1);
+        addResizeHandle(LauncherPanelResizeMath.Corner.BOTTOM_LEFT,
+                Gravity.BOTTOM | Gravity.START, 90f, 2);
+        addResizeHandle(LauncherPanelResizeMath.Corner.BOTTOM_RIGHT,
+                Gravity.BOTTOM | Gravity.END, 0f, 3);
     }
 
     public void setContent(@NonNull View view) {
-        // The launcher applies inner-panel edits when returning from the visual editor. Replace
-        // the old content while preserving the edit badge instead of stacking another view over
-        // it on every resume.
-        while (contentHost.getChildCount() > 1) contentHost.removeViewAt(0);
-        contentHost.addView(view, 0, new FrameLayout.LayoutParams(
+        // Editor chrome lives in rootHost, so replacing live panel content can never remove or
+        // duplicate the four resize handles.
+        contentHost.removeAllViews();
+        contentHost.addView(view, new FrameLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
     }
 
@@ -82,6 +102,9 @@ public final class LauncherElementFrame extends MaterialCardView {
         editMode = enabled;
         this.snapPx = Math.max(1, snapPx);
         editBadge.setVisibility(enabled ? VISIBLE : GONE);
+        for (ImageView handle : resizeHandles) {
+            if (handle != null) handle.setVisibility(enabled ? VISIBLE : GONE);
+        }
         setStrokeWidth(enabled ? dp(3) : 0);
         setStrokeColor(Color.rgb(55, 135, 245));
         setCardElevation(enabled ? dp(10) : dp(5));
@@ -106,23 +129,25 @@ public final class LauncherElementFrame extends MaterialCardView {
                 downY = lp.topMargin;
                 downWidth = getWidth();
                 downHeight = getHeight();
-                int resizeZone = dp(72);
-                resizing = event.getX() >= Math.max(0, getWidth() - resizeZone)
-                        && event.getY() >= Math.max(0, getHeight() - resizeZone);
+                resizeCorner = LauncherPanelResizeMath.cornerAt(
+                        event.getX(), event.getY(), getWidth(), getHeight(), dp(64));
                 if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
                 return true;
             case MotionEvent.ACTION_MOVE:
                 int dx = Math.round(event.getRawX() - downRawX);
                 int dy = Math.round(event.getRawY() - downRawY);
-                if (resizing) {
-                    int parentWidth = ((View) getParent()).getWidth();
-                    int parentHeight = ((View) getParent()).getHeight();
-                    int maxWidth = Math.max(dp(160), parentWidth - lp.leftMargin);
-                    int maxHeight = Math.max(dp(96), parentHeight - lp.topMargin);
-                    lp.width = Math.min(maxWidth, snap(Math.max(dp(160),
-                            Math.min(downWidth + dx, maxWidth))));
-                    lp.height = Math.min(maxHeight, snap(Math.max(dp(96),
-                            Math.min(downHeight + dy, maxHeight))));
+                if (resizeCorner != LauncherPanelResizeMath.Corner.NONE) {
+                    View parent = (View) getParent();
+                    LauncherPanelResizeMath.Rect resized = LauncherPanelResizeMath.resize(
+                            resizeCorner,
+                            new LauncherPanelResizeMath.Rect(
+                                    downX, downY, downX + downWidth, downY + downHeight),
+                            dx, dy, parent.getWidth(), parent.getHeight(),
+                            dp(160), dp(96), snapPx);
+                    lp.leftMargin = resized.left;
+                    lp.topMargin = resized.top;
+                    lp.width = resized.width();
+                    lp.height = resized.height();
                 } else {
                     int maxX = Math.max(0, ((View) getParent()).getWidth() - getWidth());
                     int maxY = Math.max(0, ((View) getParent()).getHeight() - getHeight());
@@ -136,6 +161,7 @@ public final class LauncherElementFrame extends MaterialCardView {
                 if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(false);
                 listener.onGeometryChanged(elementId, lp.leftMargin, lp.topMargin,
                         Math.max(1, lp.width), Math.max(1, lp.height));
+                resizeCorner = LauncherPanelResizeMath.Corner.NONE;
                 performClick();
                 return true;
             default:
@@ -151,6 +177,42 @@ public final class LauncherElementFrame extends MaterialCardView {
 
     private int snap(int value) {
         return Math.round(value / (float) snapPx) * snapPx;
+    }
+
+    private void addResizeHandle(@NonNull LauncherPanelResizeMath.Corner corner,
+                                 int gravity, float rotation, int index) {
+        ImageView handle = new ImageView(getContext());
+        handle.setImageResource(R.drawable.ic_resize_corner);
+        handle.setRotation(rotation);
+        handle.setPadding(dp(8), dp(8), dp(8), dp(8));
+        handle.setBackground(resizeHandleBackground());
+        handle.setContentDescription(resizeHandleDescription(corner));
+        handle.setVisibility(GONE);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                dp(42), dp(42), gravity);
+        params.setMargins(dp(4), dp(4), dp(4), dp(4));
+        rootHost.addView(handle, params);
+        resizeHandles[index] = handle;
+    }
+
+    @NonNull
+    private GradientDrawable resizeHandleBackground() {
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.OVAL);
+        background.setColor(Color.rgb(30, 110, 220));
+        background.setStroke(dp(2), Color.WHITE);
+        return background;
+    }
+
+    @NonNull
+    private String resizeHandleDescription(@NonNull LauncherPanelResizeMath.Corner corner) {
+        switch (corner) {
+            case TOP_LEFT: return "Изменить размер за левый верхний угол";
+            case TOP_RIGHT: return "Изменить размер за правый верхний угол";
+            case BOTTOM_LEFT: return "Изменить размер за левый нижний угол";
+            case BOTTOM_RIGHT: return "Изменить размер за правый нижний угол";
+            default: return "Изменить размер панели";
+        }
     }
 
     private int dp(int value) {

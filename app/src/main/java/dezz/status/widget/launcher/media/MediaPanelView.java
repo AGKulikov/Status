@@ -87,6 +87,15 @@ public final class MediaPanelView extends FrameLayout {
     private TextView volumeLabel;
     private ImageButton playPause;
     @Nullable private android.graphics.Bitmap artworkBitmap;
+    @Nullable private android.graphics.Bitmap observedArtworkBitmap;
+    private long observedArtworkFingerprint;
+    @Nullable private android.graphics.Bitmap renderedArtworkBitmap;
+    private long renderedArtworkFingerprint;
+    private boolean renderedArtworkOwned;
+    private boolean artworkRenderInitialized;
+    private boolean playPauseRenderInitialized;
+    private boolean renderedPlaying;
+    private int renderedPlayPauseTint;
     @NonNull private String titleValue = "Музыка не воспроизводится";
     @NonNull private String artistValue = "";
     @NonNull private String albumValue = "";
@@ -95,7 +104,6 @@ public final class MediaPanelView extends FrameLayout {
     private long positionMs;
     private int volumePercent;
     private boolean playing;
-    private boolean restartTextMarquee;
 
     public MediaPanelView(@NonNull Context context, @NonNull MediaPanelConfigStore store,
                           @Nullable Controls controls) {
@@ -149,10 +157,6 @@ public final class MediaPanelView extends FrameLayout {
 
     /** Existing Android MediaSession state remains owned by LauncherMediaController. */
     public void setSnapshot(@NonNull LauncherMediaController.Snapshot state) {
-        restartTextMarquee |= !titleValue.equals(state.title)
-                || !artistValue.equals(state.artist)
-                || !albumValue.equals(state.album)
-                || !applicationValue.equals(state.application);
         titleValue = state.title;
         artistValue = state.artist;
         albumValue = state.album;
@@ -169,10 +173,6 @@ public final class MediaPanelView extends FrameLayout {
     public void setPreviewContent(@NonNull String title, @NonNull String artist,
                                   @NonNull String application, boolean playing) {
         String previewAlbum = "Очень длинное название альбома для проверки прокрутки";
-        restartTextMarquee |= !titleValue.equals(title)
-                || !artistValue.equals(artist)
-                || !albumValue.equals(previewAlbum)
-                || !applicationValue.equals(application);
         titleValue = title;
         artistValue = artist;
         albumValue = previewAlbum;
@@ -186,6 +186,7 @@ public final class MediaPanelView extends FrameLayout {
     }
 
     private void rebuild() {
+        releaseRenderedArtwork();
         removeAllViews();
         elementViews.clear();
         artwork = null;
@@ -198,6 +199,14 @@ public final class MediaPanelView extends FrameLayout {
         volume = null;
         volumeLabel = null;
         playPause = null;
+        observedArtworkBitmap = null;
+        observedArtworkFingerprint = 0L;
+        renderedArtworkBitmap = null;
+        renderedArtworkFingerprint = 0L;
+        renderedArtworkOwned = false;
+        artworkRenderInitialized = false;
+        playPauseRenderInitialized = false;
+        renderedPlayPauseTint = 0;
         applySurface();
         configurePanelClick();
 
@@ -321,7 +330,7 @@ public final class MediaPanelView extends FrameLayout {
         volume.setThumbTintList(ColorStateList.valueOf(color(config.controlColor, Color.WHITE)));
         volume.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
-                if (volumeLabel != null) volumeLabel.setText(value + "%");
+                if (volumeLabel != null) setTextIfChanged(volumeLabel, value + "%");
                 if (fromUser && controls != null && layoutEditor == null) setSystemVolume(value);
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
@@ -377,8 +386,10 @@ public final class MediaPanelView extends FrameLayout {
     }
 
     private void updateVolumeUi() {
-        if (volume != null && !volume.isPressed()) volume.setProgress(volumePercent);
-        if (volumeLabel != null) volumeLabel.setText(volumePercent + "%");
+        if (volume != null && !volume.isPressed() && volume.getProgress() != volumePercent) {
+            volume.setProgress(volumePercent);
+        }
+        if (volumeLabel != null) setTextIfChanged(volumeLabel, volumePercent + "%");
     }
 
     private void configurePanelClick() {
@@ -439,73 +450,219 @@ public final class MediaPanelView extends FrameLayout {
     private void applySnapshot() {
         if (title != null) {
             applyMediaText(title, titleValue,
-                    config.element(MediaPanelConfig.TITLE).marqueeEnabled,
-                    restartTextMarquee);
+                    config.element(MediaPanelConfig.TITLE).marqueeEnabled);
         }
         if (artist != null) {
             applyMediaText(artist, artistValue,
-                    config.element(MediaPanelConfig.ARTIST).marqueeEnabled,
-                    restartTextMarquee);
-            artist.setVisibility(artistValue.isEmpty() ? View.GONE : View.VISIBLE);
+                    config.element(MediaPanelConfig.ARTIST).marqueeEnabled);
+            setVisibilityIfChanged(artist, artistValue.isEmpty() ? View.GONE : View.VISIBLE);
         }
         if (album != null) {
             applyMediaText(album, albumValue,
-                    config.element(MediaPanelConfig.ALBUM).marqueeEnabled,
-                    restartTextMarquee);
-            album.setVisibility(albumValue.isEmpty() ? View.GONE : View.VISIBLE);
+                    config.element(MediaPanelConfig.ALBUM).marqueeEnabled);
+            setVisibilityIfChanged(album, albumValue.isEmpty() ? View.GONE : View.VISIBLE);
         }
         if (application != null) {
-            application.setText(applicationValue);
-            application.setVisibility(applicationValue.isEmpty() ? View.GONE : View.VISIBLE);
+            setTextIfChanged(application, applicationValue);
+            setVisibilityIfChanged(application,
+                    applicationValue.isEmpty() ? View.GONE : View.VISIBLE);
         }
         if (artwork != null) {
-            if (artworkBitmap == null) {
-                // Clear both the previous track bitmap and its backing shape. Missing artwork is
-                // deliberately an empty transparent grid cell, never a media-icon placeholder.
-                artwork.setImageDrawable(null);
-                artwork.setBackground(null);
-                artwork.clearColorFilter();
-            } else {
-                artwork.setBackground(glassBackground(false, config.cornerRadiusPx / 2));
-                artwork.setImageBitmap(artworkBitmap);
-                artwork.clearColorFilter();
-            }
+            applyArtwork();
         }
         if (playPause != null) {
-            playPause.setImageResource(playing
-                    ? R.drawable.ic_media_pause : R.drawable.ic_media_play);
-            playPause.setColorFilter(color(playing ? config.accentColor : config.controlColor,
-                    Color.WHITE));
+            applyPlayPause();
         }
         if (timeline != null) {
-            timeline.setText(MediaTimeline.format(positionMs) + " / "
+            setTextIfChanged(timeline, MediaTimeline.format(positionMs) + " / "
                     + MediaTimeline.format(durationMs));
         }
         if (progress != null) {
-            progress.setProgress(MediaTimeline.progress(positionMs, durationMs, 1_000));
+            int nextProgress = MediaTimeline.progress(positionMs, durationMs, 1_000);
+            if (progress.getProgress() != nextProgress) progress.setProgress(nextProgress);
             View progressRoot = elementViews.get(MediaPanelConfig.PROGRESS);
-            if (progressRoot != null) progressRoot.setVisibility(
-                    durationMs > 0L ? View.VISIBLE : View.GONE);
+            if (progressRoot != null) {
+                setVisibilityIfChanged(progressRoot,
+                        durationMs > 0L ? View.VISIBLE : View.GONE);
+            }
         }
         updateVolumeUi();
-        restartTextMarquee = false;
     }
 
     /**
-     * Toggling selected around a changed value resets Android's marquee immediately, so a new
-     * track can never continue scrolling pixels/text from the previous one. Android itself starts
-     * marquee only when the laid-out line overflows, therefore short strings remain stationary.
+     * Resets only the line whose value or marquee mode actually changed. Position ticks must not
+     * restart all long-title animations because Android treats setText/setEllipsize/setSelected as
+     * a new marquee even when the resulting visual value is identical.
      */
     private static void applyMediaText(@NonNull TextView view, @NonNull String value,
-                                       boolean marqueeEnabled, boolean forceRestart) {
-        boolean changed = !TextUtils.equals(view.getText(), value);
-        if (changed || forceRestart) view.setSelected(false);
-        view.setSingleLine(true);
-        view.setEllipsize(marqueeEnabled
-                ? TextUtils.TruncateAt.MARQUEE : TextUtils.TruncateAt.END);
-        view.setMarqueeRepeatLimit(-1);
-        if (changed || forceRestart) view.setText(value);
-        view.setSelected(marqueeEnabled && !value.isEmpty());
+                                       boolean marqueeEnabled) {
+        boolean textChanged = !TextUtils.equals(view.getText(), value);
+        TextUtils.TruncateAt nextEllipsize = marqueeEnabled
+                ? TextUtils.TruncateAt.MARQUEE : TextUtils.TruncateAt.END;
+        boolean modeChanged = view.getEllipsize() != nextEllipsize;
+        if ((textChanged || modeChanged) && view.isSelected()) view.setSelected(false);
+        if (modeChanged) {
+            view.setEllipsize(nextEllipsize);
+            view.setMarqueeRepeatLimit(-1);
+        }
+        if (textChanged) view.setText(value);
+        boolean selected = marqueeEnabled && !value.isEmpty();
+        if (view.isSelected() != selected) view.setSelected(selected);
+    }
+
+    /** Applies an expensive bitmap/background change only when the rendered pixels changed. */
+    private void applyArtwork() {
+        // Cache identity by the immutable metadata wrapper as well as by sampled pixels. The
+        // controller can publish the same wrapper on every one-second position tick.
+        long fingerprint;
+        if (artworkBitmap == observedArtworkBitmap) {
+            fingerprint = observedArtworkFingerprint;
+        } else {
+            fingerprint = artworkFingerprint(artworkBitmap);
+            observedArtworkBitmap = artworkBitmap;
+            observedArtworkFingerprint = fingerprint;
+        }
+        boolean same = artworkRenderInitialized
+                && sameArtwork(artworkBitmap, fingerprint,
+                renderedArtworkBitmap, renderedArtworkFingerprint);
+        if (same && (renderedArtworkOwned || artworkBitmap == renderedArtworkBitmap)) return;
+
+        boolean hadArtwork = artworkRenderInitialized && renderedArtworkBitmap != null;
+        boolean hasArtwork = artworkBitmap != null;
+        if (!hasArtwork) {
+            // Clear both the previous track bitmap and its backing shape. Missing artwork is
+            // deliberately an empty transparent grid cell, never a media-icon placeholder.
+            artwork.setImageDrawable(null);
+            if (hadArtwork || !artworkRenderInitialized) artwork.setBackground(null);
+            artwork.clearColorFilter();
+            renderedArtworkBitmap = null;
+            renderedArtworkOwned = false;
+        } else {
+            if (!hadArtwork) {
+                artwork.setBackground(glassBackground(false, config.cornerRadiusPx / 2));
+            }
+            android.graphics.Bitmap displayBitmap = copyArtworkForDisplay(artworkBitmap);
+            if (displayBitmap == null) {
+                // Allocation can fail on very large or vendor hardware-backed bitmaps. In that
+                // rare fallback, bind every new wrapper even when its pixels match: the controller
+                // owns it and may recycle the previously published wrapper after replacement.
+                displayBitmap = artworkBitmap;
+                renderedArtworkOwned = false;
+            } else {
+                renderedArtworkOwned = true;
+            }
+            artwork.setImageBitmap(displayBitmap);
+            artwork.clearColorFilter();
+            renderedArtworkBitmap = displayBitmap;
+        }
+        renderedArtworkFingerprint = fingerprint;
+        artworkRenderInitialized = true;
+    }
+
+    /**
+     * The controller owns Snapshot artwork and recycles obsolete broadcast bitmaps. Keep a private
+     * immutable copy in ImageView so skipping a pixel-equivalent replacement can never leave the
+     * UI pointing at the controller's subsequently recycled wrapper.
+     */
+    @Nullable
+    private static android.graphics.Bitmap copyArtworkForDisplay(
+            @NonNull android.graphics.Bitmap source) {
+        try {
+            if (source.isRecycled()) return null;
+            return source.copy(android.graphics.Bitmap.Config.ARGB_8888, false);
+        } catch (RuntimeException | OutOfMemoryError ignored) {
+            return null;
+        }
+    }
+
+    private void releaseRenderedArtwork() {
+        if (artwork != null && renderedArtworkBitmap != null) {
+            artwork.setImageDrawable(null);
+        }
+        renderedArtworkBitmap = null;
+        renderedArtworkFingerprint = 0L;
+        renderedArtworkOwned = false;
+        artworkRenderInitialized = false;
+    }
+
+    /** Keeps vector decoding and tint invalidation out of the once-a-second position tick. */
+    private void applyPlayPause() {
+        int tint = color(playing ? config.accentColor : config.controlColor, Color.WHITE);
+        if (!playPauseRenderInitialized || renderedPlaying != playing) {
+            playPause.setImageResource(playing
+                    ? R.drawable.ic_media_pause : R.drawable.ic_media_play);
+            renderedPlaying = playing;
+        }
+        if (!playPauseRenderInitialized || renderedPlayPauseTint != tint) {
+            playPause.setColorFilter(tint);
+            renderedPlayPauseTint = tint;
+        }
+        playPauseRenderInitialized = true;
+    }
+
+    private static boolean sameArtwork(@Nullable android.graphics.Bitmap first,
+                                       long firstFingerprint,
+                                       @Nullable android.graphics.Bitmap second,
+                                       long secondFingerprint) {
+        if (first == null || second == null) return first == second;
+        try {
+            if (first.isRecycled() || second.isRecycled()) return false;
+        } catch (RuntimeException ignored) {
+            return first == second;
+        }
+        if (firstFingerprint != 0L && secondFingerprint != 0L) {
+            return firstFingerprint == secondFingerprint;
+        }
+        return first == second;
+    }
+
+    /**
+     * Binder may return a fresh Bitmap wrapper for unchanged cover pixels. A bounded sample keeps
+     * UI identity stable without comparing/allocating the full artwork on the weak head unit.
+     */
+    private static long artworkFingerprint(@Nullable android.graphics.Bitmap bitmap) {
+        if (bitmap == null) return 0L;
+        try {
+            int width = bitmap.getWidth();
+            int height = bitmap.getHeight();
+            if (width <= 0 || height <= 0 || bitmap.isRecycled()) return 0L;
+            long value = 0xcbf29ce484222325L;
+            value = mixArtworkFingerprint(value, width);
+            value = mixArtworkFingerprint(value, height);
+            int columns = Math.min(9, width);
+            int rows = Math.min(9, height);
+            for (int row = 0; row < rows; row++) {
+                int y = rows == 1 ? 0
+                        : (int) ((long) row * (height - 1) / (rows - 1));
+                for (int column = 0; column < columns; column++) {
+                    int x = columns == 1 ? 0
+                            : (int) ((long) column * (width - 1) / (columns - 1));
+                    value = mixArtworkFingerprint(value, bitmap.getPixel(x, y));
+                }
+            }
+            return value == 0L ? 1L : value;
+        } catch (RuntimeException ignored) {
+            try {
+                long value = ((long) bitmap.getGenerationId()) & 0xffff_ffffL;
+                value = value * 31L + bitmap.getWidth();
+                value = value * 31L + bitmap.getHeight();
+                return value == 0L ? 1L : value;
+            } catch (RuntimeException invalid) {
+                return 0L;
+            }
+        }
+    }
+
+    private static long mixArtworkFingerprint(long value, int sample) {
+        return (value ^ (((long) sample) & 0xffff_ffffL)) * 0x100000001b3L;
+    }
+
+    private static void setTextIfChanged(@NonNull TextView view, @NonNull String value) {
+        if (!TextUtils.equals(view.getText(), value)) view.setText(value);
+    }
+
+    private static void setVisibilityIfChanged(@NonNull View view, int visibility) {
+        if (view.getVisibility() != visibility) view.setVisibility(visibility);
     }
 
     private void applySurface() {

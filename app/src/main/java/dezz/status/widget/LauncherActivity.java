@@ -1657,7 +1657,7 @@ public final class LauncherActivity extends AppCompatActivity {
                     enabled || vehicleInfoPanel.hasDisplayableSample());
         }
         Toast.makeText(this, enabled
-                ? "Тащите панель; маркер внизу справа изменяет размер"
+                ? "Тащите панель; размер меняется за любой из четырёх углов"
                 : "Компоновка сохранена", Toast.LENGTH_SHORT).show();
     }
 

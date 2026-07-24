@@ -49,8 +49,8 @@ public final class MediaPanelInteractionContractTest {
 
     @Test public void missingArtworkClearsOldBitmapWithoutPlaceholder() throws IOException {
         String source = source("dezz/status/widget/launcher/media/MediaPanelView.java");
-        int start = source.indexOf("if (artwork != null)");
-        int end = source.indexOf("if (playPause != null)", start);
+        int start = source.indexOf("private void applyArtwork()");
+        int end = source.indexOf("private void applyPlayPause()", start);
         String artwork = source.substring(start, end);
         assertTrue(artwork.contains("artwork.setImageDrawable(null)"));
         assertTrue(artwork.contains("artwork.setBackground(null)"));
@@ -85,7 +85,7 @@ public final class MediaPanelInteractionContractTest {
         assertTrue(source.contains("if (!sameTrack(content, playback)) playback = content"));
         assertTrue(source.contains("if (!sameTrack(content, artwork)) artwork = content"));
         assertTrue(source.contains(
-                "MediaState sessionArtwork = sameTrack(content, session) ? session : content"));
+                "MediaState sessionArtwork = sameCorrelatedTrack(content, session)"));
         assertTrue(source.indexOf("replaceBroadcastState(state)")
                 < source.indexOf("MediaBroadcastRepository.processAsync(context, intent, null)",
                 source.indexOf("private void receiveBroadcast")));
@@ -102,11 +102,75 @@ public final class MediaPanelInteractionContractTest {
         String source = source("dezz/status/widget/launcher/media/MediaPanelView.java");
         assertTrue(source.contains("TextUtils.TruncateAt.MARQUEE"));
         assertTrue(source.contains("view.setMarqueeRepeatLimit(-1)"));
-        assertTrue(source.contains("if (changed || forceRestart) view.setSelected(false)"));
-        assertTrue(source.contains("view.setSelected(marqueeEnabled && !value.isEmpty())"));
+        assertTrue(source.contains(
+                "if ((textChanged || modeChanged) && view.isSelected()) view.setSelected(false)"));
+        assertTrue(source.contains("if (textChanged) view.setText(value)"));
+        assertTrue(source.contains(
+                "if (view.isSelected() != selected) view.setSelected(selected)"));
+        assertFalse(source.contains("restartTextMarquee"));
+        assertFalse(source.contains("forceRestart"));
         String settings = source("dezz/status/widget/MediaPanelSettingsActivity.java");
         assertTrue(settings.contains("Прокручивать длинный текст"));
         assertTrue(settings.contains("config.setMarqueeEnabled(element.id, checked)"));
+    }
+
+    @Test public void positionTicksDoNotRebindStableArtworkOrPlaybackIcon()
+            throws IOException {
+        String source = source("dezz/status/widget/launcher/media/MediaPanelView.java");
+        int artworkStart = source.indexOf("private void applyArtwork()");
+        int artworkEnd = source.indexOf("private void applyPlayPause()", artworkStart);
+        String artwork = source.substring(artworkStart, artworkEnd);
+        assertTrue(artwork.contains(
+                "if (same && (renderedArtworkOwned || artworkBitmap == renderedArtworkBitmap))"));
+        assertTrue(artwork.contains("sameArtwork(artworkBitmap, fingerprint,"));
+        assertTrue(artwork.contains("artwork.setImageBitmap(displayBitmap)"));
+
+        int playbackStart = artworkEnd;
+        int playbackEnd = source.indexOf("private static boolean sameArtwork", playbackStart);
+        String playback = source.substring(playbackStart, playbackEnd);
+        assertTrue(playback.contains(
+                "if (!playPauseRenderInitialized || renderedPlaying != playing)"));
+        assertTrue(playback.contains(
+                "if (!playPauseRenderInitialized || renderedPlayPauseTint != tint)"));
+        assertFalse(playback.contains("playPause.setImageResource(playing\n"
+                + "                    ? R.drawable.ic_media_pause : R.drawable.ic_media_play);\n"
+                + "        playPause.setColorFilter"));
+    }
+
+    @Test public void artworkViewOwnsStableCopyOrRebindsEveryExternalReplacement()
+            throws IOException {
+        String source = source("dezz/status/widget/launcher/media/MediaPanelView.java");
+        int artworkStart = source.indexOf("private void applyArtwork()");
+        int playbackStart = source.indexOf("private void applyPlayPause()", artworkStart);
+        String artwork = source.substring(artworkStart, playbackStart);
+        assertTrue(artwork.contains("copyArtworkForDisplay(artworkBitmap)"));
+        assertTrue(artwork.contains("renderedArtworkOwned = true"));
+        assertTrue(artwork.contains("renderedArtworkOwned = false"));
+        assertTrue(artwork.contains(
+                "renderedArtworkOwned || artworkBitmap == renderedArtworkBitmap"));
+        assertTrue(artwork.contains("renderedArtworkBitmap = displayBitmap"));
+        assertFalse(artwork.contains("if (same) return;"));
+
+        int copyStart = source.indexOf("private static android.graphics.Bitmap "
+                + "copyArtworkForDisplay(");
+        int releaseStart = source.indexOf("private void releaseRenderedArtwork()", copyStart);
+        String ownership = source.substring(copyStart, releaseStart);
+        assertTrue(ownership.contains(
+                "source.copy(android.graphics.Bitmap.Config.ARGB_8888, false)"));
+        assertTrue(ownership.contains("if (source.isRecycled()) return null"));
+    }
+
+    @Test public void stableAuxiliaryValuesSkipTextProgressAndVisibilityWrites()
+            throws IOException {
+        String source = source("dezz/status/widget/launcher/media/MediaPanelView.java");
+        assertTrue(source.contains(
+                "if (!TextUtils.equals(view.getText(), value)) view.setText(value)"));
+        assertTrue(source.contains(
+                "if (view.getVisibility() != visibility) view.setVisibility(visibility)"));
+        assertTrue(source.contains(
+                "if (progress.getProgress() != nextProgress) progress.setProgress(nextProgress)"));
+        assertTrue(source.contains(
+                "volume.getProgress() != volumePercent"));
     }
 
     @Test public void homePanelExposesSameGridForMoveAndResizeEditing() throws IOException {
