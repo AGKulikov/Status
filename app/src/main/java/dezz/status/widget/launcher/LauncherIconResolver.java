@@ -7,7 +7,6 @@ package dezz.status.widget.launcher;
 
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 
@@ -99,11 +98,8 @@ public final class LauncherIconResolver {
                                    @Nullable String colorOverride) {
         Drawable source = null;
         if ("app".equals(shortcut.icon) && shortcut.kind == LauncherShortcutStore.Kind.APP) {
-            try {
-                ComponentName component = ComponentName.unflattenFromString(shortcut.target);
-                if (component != null) source = context.getPackageManager().getActivityIcon(component);
-            } catch (PackageManager.NameNotFoundException ignored) {
-            }
+            ComponentName component = ComponentName.unflattenFromString(shortcut.target);
+            if (component != null) source = HighResolutionAppIconLoader.load(context, component);
         }
         if (source == null) source = ContextCompat.getDrawable(context, drawable(shortcut.icon));
         if (source == null) return null;
@@ -133,12 +129,12 @@ public final class LauncherIconResolver {
 
     private static int drawable(String key) {
         switch (key) {
-            case "navigation": return android.R.drawable.ic_menu_mylocation;
-            case "home": return android.R.drawable.ic_menu_myplaces;
-            case "work": return android.R.drawable.ic_menu_agenda;
-            case "media": return android.R.drawable.ic_media_play;
-            case "media_previous": return android.R.drawable.ic_media_previous;
-            case "media_next": return android.R.drawable.ic_media_next;
+            case "navigation": return R.drawable.ic_launcher_navigation;
+            case "home": return R.drawable.ic_launcher_home;
+            case "work": return R.drawable.ic_launcher_work;
+            case "media": return R.drawable.ic_media_play;
+            case "media_previous": return R.drawable.ic_media_previous;
+            case "media_next": return R.drawable.ic_media_next;
             case "garage": return R.drawable.ic_popup_garage;
             case "gate": return R.drawable.ic_popup_gate;
             case "door": return R.drawable.ic_popup_door;
@@ -182,8 +178,9 @@ public final class LauncherIconResolver {
             case "edit": return R.drawable.ic_drag_handle;
             case "settings": return R.drawable.ic_settings;
             case "notification": return R.drawable.ic_info;
+            case "app":
             case "apps":
-            default: return android.R.drawable.ic_dialog_dialer;
+            default: return R.drawable.ic_launcher_apps;
         }
     }
 }

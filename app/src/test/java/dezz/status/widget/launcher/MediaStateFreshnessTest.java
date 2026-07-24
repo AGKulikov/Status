@@ -51,6 +51,39 @@ public final class MediaStateFreshnessTest {
         assertTrue(MediaStateFreshness.artworkChanged(true, 101L, 101L));
     }
 
+    @Test public void unchangedSessionArtworkIsHiddenAcrossTrackBoundary() {
+        assertFalse(MediaStateFreshness.shouldDisplaySessionArtwork(
+                true, true, 101L, true, 101L));
+        // Repeated session polling must not resurrect the rejected previous-track bitmap.
+        assertFalse(MediaStateFreshness.shouldDisplaySessionArtwork(
+                true, false, 101L, false, 101L));
+        assertTrue(MediaStateFreshness.shouldDisplaySessionArtwork(
+                true, false, 101L, false, 102L));
+    }
+
+    @Test public void missingArtworkAlwaysClearsAndFirstRealArtworkIsVisible() {
+        assertFalse(MediaStateFreshness.shouldDisplaySessionArtwork(
+                true, true, 101L, true, 0L));
+        assertTrue(MediaStateFreshness.shouldDisplaySessionArtwork(
+                false, true, 0L, false, 101L));
+    }
+
+    @Test public void sameTrackScalarRefreshKeepsItsArtworkVisible() {
+        assertTrue(MediaStateFreshness.shouldDisplaySessionArtwork(
+                true, false, 101L, true, 101L));
+    }
+
+    @Test public void matchingTrackPrefersDecodedArtworkOverNewerTemporaryEmptyState() {
+        assertTrue(MediaStateFreshness.incomingArtworkWins(
+                true, 100L, false, 200L));
+        assertFalse(MediaStateFreshness.incomingArtworkWins(
+                false, 300L, true, 100L));
+        assertTrue(MediaStateFreshness.incomingArtworkWins(
+                true, 300L, true, 200L));
+        assertFalse(MediaStateFreshness.incomingArtworkWins(
+                true, 100L, true, 200L));
+    }
+
     @Test public void sessionRefreshIsBoundedToConfiguredInterval() {
         assertFalse(MediaStateFreshness.shouldRefreshSession(
                 false, 10_000L, 1_000L, 2_500L));

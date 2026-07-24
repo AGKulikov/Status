@@ -84,11 +84,16 @@ public final class MediaPanelInteractionContractTest {
         assertTrue(source.contains("artworkChangedElapsedMs"));
         assertTrue(source.contains("if (!sameTrack(content, playback)) playback = content"));
         assertTrue(source.contains("if (!sameTrack(content, artwork)) artwork = content"));
+        assertTrue(source.contains(
+                "MediaState sessionArtwork = sameTrack(content, session) ? session : content"));
         assertTrue(source.indexOf("replaceBroadcastState(state)")
                 < source.indexOf("MediaBroadcastRepository.processAsync(context, intent, null)",
                 source.indexOf("private void receiveBroadcast")));
         assertTrue(source.contains("boolean artworkChanged = previous == null"));
         assertTrue(source.contains("MediaStateFreshness.artworkChanged("));
+        assertTrue(source.contains("MediaStateFreshness.shouldDisplaySessionArtwork("));
+        assertTrue(source.contains("MediaStateFreshness.incomingArtworkWins("));
+        assertTrue(source.contains("mixArtworkFingerprint"));
         assertTrue(source.contains(
                 "MediaStateFreshness.changedAt(artworkChanged, receivedElapsed"));
     }

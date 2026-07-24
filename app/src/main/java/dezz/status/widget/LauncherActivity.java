@@ -68,6 +68,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 import dezz.status.widget.launcher.CombinedNavigationPanelPolicy;
+import dezz.status.widget.launcher.HighResolutionAppIconLoader;
 import dezz.status.widget.launcher.LauncherElementFrame;
 import dezz.status.widget.launcher.LauncherGridView;
 import dezz.status.widget.launcher.LauncherLayoutStore;
@@ -1365,7 +1366,7 @@ public final class LauncherActivity extends AppCompatActivity {
         content.setPadding(dp(6), dp(6), dp(6), dp(6));
         ImageView icon = new ImageView(this);
         if (addButton) {
-            icon.setImageResource(android.R.drawable.ic_input_add);
+            icon.setImageResource(R.drawable.ic_add);
             icon.setColorFilter(Color.WHITE);
         } else {
             icon.setImageDrawable(LauncherIconResolver.resolve(this, shortcut));
@@ -2181,11 +2182,9 @@ public final class LauncherActivity extends AppCompatActivity {
         Drawable icon(Context context, boolean cache) {
             Drawable value = cache ? cachedIcon : null;
             if (value != null) return value;
-            try {
-                value = context.getPackageManager().getActivityIcon(component);
-            } catch (PackageManager.NameNotFoundException ignored) {
-                value = context.getPackageManager().getDefaultActivityIcon();
-            }
+            value = HighResolutionAppIconLoader.load(context, component);
+            if (value == null) value = ContextCompat.getDrawable(
+                    context, R.drawable.ic_launcher_apps);
             if (cache) cachedIcon = value;
             return value;
         }

@@ -116,13 +116,26 @@ public final class LauncherMediaController {
                    long positionTimestampWallMs, long receivedElapsedMs,
                    long contentChangedElapsedMs, long playbackChangedElapsedMs,
                    long artworkChangedElapsedMs) {
+            this(title, artist, album, packageName, application, artwork,
+                    artworkIdentity(artwork), durationMs, positionMs, playing,
+                    positionTimestampWallMs, receivedElapsedMs, contentChangedElapsedMs,
+                    playbackChangedElapsedMs, artworkChangedElapsedMs);
+        }
+
+        MediaState(@NonNull String title, @NonNull String artist, @NonNull String album,
+                   @NonNull String packageName, @NonNull String application,
+                   @Nullable Bitmap artwork, long observedArtworkIdentity,
+                   long durationMs, long positionMs, boolean playing,
+                   long positionTimestampWallMs, long receivedElapsedMs,
+                   long contentChangedElapsedMs, long playbackChangedElapsedMs,
+                   long artworkChangedElapsedMs) {
             this.title = title;
             this.artist = artist;
             this.album = album;
             this.packageName = packageName;
             this.application = application;
             this.artwork = artwork;
-            this.artworkIdentity = artworkIdentity(artwork);
+            this.artworkIdentity = observedArtworkIdentity;
             this.durationMs = Math.max(0L, durationMs);
             this.positionMs = Math.max(0L, positionMs);
             this.playing = playing;
@@ -697,10 +710,10 @@ public final class LauncherMediaController {
                     MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE);
             String album = metadata == null ? "" : cleanText(
                     metadata.getString(MediaMetadata.METADATA_KEY_ALBUM));
-            Bitmap artwork = metadata == null ? null
+            Bitmap metadataArtwork = metadata == null ? null
                     : metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
-            if (artwork == null && metadata != null) {
-                artwork = metadata.getBitmap(MediaMetadata.METADATA_KEY_ART);
+            if (metadataArtwork == null && metadata != null) {
+                metadataArtwork = metadata.getBitmap(MediaMetadata.METADATA_KEY_ART);
             }
             String packageName = cleanText(controller.getPackageName());
             long duration = metadata == null ? 0L
@@ -718,12 +731,22 @@ public final class LauncherMediaController {
             boolean contentChanged = previous == null || !MediaStateFreshness.sameContent(
                     previous.packageName, previous.title, previous.artist, previous.album,
                     previous.durationMs, packageName, title, artist, album, duration);
+            boolean trackChanged = previous == null || !MediaStateFreshness.sameTrack(
+                    previous.packageName, previous.title, previous.artist, previous.album,
+                    packageName, title, artist, album);
             boolean playbackChanged = previous == null || previous.playing != playing;
-            long incomingArtworkIdentity = artworkIdentity(artwork);
+            long incomingArtworkIdentity = artworkIdentity(metadataArtwork);
+            boolean displayArtwork = MediaStateFreshness.shouldDisplaySessionArtwork(
+                    previous != null, trackChanged,
+                    previous == null ? 0L : previous.artworkIdentity,
+                    previous != null && previous.artwork != null, incomingArtworkIdentity);
+            Bitmap artwork = displayArtwork ? metadataArtwork : null;
             boolean artworkChanged = previous == null || MediaStateFreshness.artworkChanged(
-                    contentChanged, previous.artworkIdentity, incomingArtworkIdentity);
+                    contentChanged, previous.artworkIdentity, incomingArtworkIdentity)
+                    || (previous.artwork != null) != displayArtwork;
             sessionState = new MediaState(title, artist, album, packageName,
-                    applicationLabel(packageName), artwork, duration, position, playing,
+                    applicationLabel(packageName), artwork, incomingArtworkIdentity,
+                    duration, position, playing,
                     updateWall, receivedElapsed,
                     MediaStateFreshness.changedAt(contentChanged, receivedElapsed,
                             previous == null ? 0L : previous.contentChangedElapsedMs),
@@ -761,12 +784,15 @@ public final class LauncherMediaController {
             MediaState supplement = content == broadcast ? session : broadcast;
             MediaState playback = broadcast.playbackChangedElapsedMs
                     > session.playbackChangedElapsedMs ? broadcast : session;
-            MediaState artwork = broadcast.artworkChangedElapsedMs
-                    > session.artworkChangedElapsedMs ? broadcast : session;
+            MediaState sessionArtwork = sameTrack(content, session) ? session : content;
+            MediaState broadcastArtwork = sameTrack(content, broadcast) ? broadcast : content;
+            MediaState artwork = MediaStateFreshness.incomingArtworkWins(
+                    broadcastArtwork.artwork != null, broadcastArtwork.artworkChangedElapsedMs,
+                    sessionArtwork.artwork != null, sessionArtwork.artworkChangedElapsedMs)
+                    ? broadcastArtwork : sessionArtwork;
             MediaState timeline = broadcast.receivedElapsedMs
                     > session.receivedElapsedMs ? broadcast : session;
             if (!sameTrack(content, playback)) playback = content;
-            if (!sameTrack(content, artwork)) artwork = content;
             if (!sameTrack(content, timeline)) timeline = content;
             if (!sameTrack(content, supplement)) supplement = null;
             publish(content, supplement, playback, artwork, timeline, volume);
@@ -865,15 +891,44 @@ public final class LauncherMediaController {
     private static long artworkIdentity(@Nullable Bitmap artwork) {
         if (artwork == null) return 0L;
         try {
-            long value = ((long) artwork.getGenerationId()) & 0xffff_ffffL;
-            value = value * 31L + artwork.getWidth();
-            value = value * 31L + artwork.getHeight();
-            value = value * 31L
-                    + (((long) System.identityHashCode(artwork)) & 0xffff_ffffL);
+            int width = artwork.getWidth();
+            int height = artwork.getHeight();
+            if (width <= 0 || height <= 0 || artwork.isRecycled()) return 0L;
+            // MediaMetadata may unparcel a fresh Bitmap object on every Binder read. Object
+            // identity and generationId therefore make unchanged pixels look "new" every 2.5 s
+            // and let a stale MediaSession cover permanently outrank the rich-media broadcast.
+            // A bounded pixel fingerprint stays stable across those equivalent Bitmap instances.
+            long value = 0xcbf29ce484222325L;
+            value = mixArtworkFingerprint(value, width);
+            value = mixArtworkFingerprint(value, height);
+            int columns = Math.min(9, width);
+            int rows = Math.min(9, height);
+            for (int row = 0; row < rows; row++) {
+                int y = rows == 1 ? 0
+                        : (int) ((long) row * (height - 1) / (rows - 1));
+                for (int column = 0; column < columns; column++) {
+                    int x = columns == 1 ? 0
+                            : (int) ((long) column * (width - 1) / (columns - 1));
+                    value = mixArtworkFingerprint(value, artwork.getPixel(x, y));
+                }
+            }
             return value == 0L ? 1L : value;
         } catch (RuntimeException ignored) {
-            return (((long) System.identityHashCode(artwork)) & 0xffff_ffffL) + 1L;
+            // Some hardware-backed vendor bitmaps forbid getPixel(). generationId is less stable
+            // than the sampled fingerprint but still avoids depending on Java wrapper identity.
+            try {
+                long value = ((long) artwork.getGenerationId()) & 0xffff_ffffL;
+                value = value * 31L + artwork.getWidth();
+                value = value * 31L + artwork.getHeight();
+                return value == 0L ? 1L : value;
+            } catch (RuntimeException invalid) {
+                return 0L;
+            }
         }
+    }
+
+    private static long mixArtworkFingerprint(long value, int sample) {
+        return (value ^ (((long) sample) & 0xffff_ffffL)) * 0x100000001b3L;
     }
 
     @NonNull

@@ -533,7 +533,7 @@ public class MainActivity extends AppCompatActivity {
             Chip chip = new Chip(this);
             chip.setText(brickTitle(type));
             chip.setCheckable(false);
-            chip.setChipIcon(ContextCompat.getDrawable(this, android.R.drawable.ic_input_add));
+            chip.setChipIcon(ContextCompat.getDrawable(this, R.drawable.ic_add));
             chip.setOnClickListener(v -> brickAdapter.addBrick(type));
             chipGroup.addView(chip);
         }

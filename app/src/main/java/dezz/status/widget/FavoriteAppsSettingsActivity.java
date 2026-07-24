@@ -49,6 +49,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import dezz.status.widget.launcher.HighResolutionAppIconLoader;
 import dezz.status.widget.launcher.apps.FavoriteAppConfig;
 import dezz.status.widget.launcher.apps.FavoriteAppsConfigStore;
 import dezz.status.widget.launcher.panels.PanelEditScheduler;
@@ -186,7 +187,7 @@ public final class FavoriteAppsSettingsActivity extends AppCompatActivity {
                 Drawable icon;
                 try { label = String.valueOf(info.loadLabel(manager)); }
                 catch (RuntimeException ignored) { label = info.activityInfo.packageName; }
-                try { icon = info.loadIcon(manager); }
+                try { icon = HighResolutionAppIconLoader.load(this, info.activityInfo); }
                 catch (RuntimeException ignored) { icon = null; }
                 result.add(new AppChoice(label, info.activityInfo.packageName, icon));
             }
@@ -504,7 +505,7 @@ public final class FavoriteAppsSettingsActivity extends AppCompatActivity {
     private void setAppIcon(@NonNull ImageView view, @Nullable AppChoice app) {
         view.setScaleType(ImageView.ScaleType.FIT_CENTER);
         if (app != null && app.icon != null) view.setImageDrawable(app.icon);
-        else view.setImageResource(android.R.drawable.sym_def_app_icon);
+        else view.setImageResource(R.drawable.ic_launcher_apps);
     }
 
     @NonNull

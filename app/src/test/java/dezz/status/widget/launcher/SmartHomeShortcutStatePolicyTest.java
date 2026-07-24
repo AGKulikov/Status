@@ -47,6 +47,121 @@ public final class SmartHomeShortcutStatePolicyTest {
         assertFalse(off.active);
     }
 
+    @Test public void homeAssistantGateIsUnlitOnlyWhenFullyClosed() {
+        LauncherShortcutStore.Shortcut shortcut = shortcut("gate_rule");
+        shortcut.stateBinding = source(ConnectorType.HOME_ASSISTANT, "cover.driveway_gate");
+        IntentActionRule rule = rule("gate_rule", ConnectorType.HOME_ASSISTANT,
+                "cover.driveway_gate", "Въезд", "Ворота");
+        Map<String, Object> attributes =
+                Collections.singletonMap("device_class", "garage_door");
+
+        SmartHomeShortcutStatePolicy.State closed = SmartHomeShortcutStatePolicy.resolve(
+                shortcut, rule, Collections.singletonList(value(
+                        ConnectorType.HOME_ASSISTANT, "cover.driveway_gate", "closed",
+                        true, true, "String", "", attributes)));
+        assertEquals("garage", closed.iconKey);
+        assertEquals("Закрыто", closed.valueLabel);
+        assertTrue(closed.activeKnown);
+        assertFalse(closed.active);
+
+        SmartHomeShortcutStatePolicy.State open = SmartHomeShortcutStatePolicy.resolve(
+                shortcut, rule, Collections.singletonList(value(
+                        ConnectorType.HOME_ASSISTANT, "cover.driveway_gate", "open",
+                        true, true, "String", "", attributes)));
+        assertEquals("garage", open.iconKey);
+        assertEquals("Открыто", open.valueLabel);
+        assertTrue(open.activeKnown);
+        assertTrue(open.active);
+
+        SmartHomeShortcutStatePolicy.State opening = SmartHomeShortcutStatePolicy.resolve(
+                shortcut, rule, Collections.singletonList(value(
+                        ConnectorType.HOME_ASSISTANT, "cover.driveway_gate", "opening",
+                        true, true, "String", "", attributes)));
+        SmartHomeShortcutStatePolicy.State closing = SmartHomeShortcutStatePolicy.resolve(
+                shortcut, rule, Collections.singletonList(value(
+                        ConnectorType.HOME_ASSISTANT, "cover.driveway_gate", "closing",
+                        true, true, "String", "", attributes)));
+        SmartHomeShortcutStatePolicy.State stopped = SmartHomeShortcutStatePolicy.resolve(
+                shortcut, rule, Collections.singletonList(value(
+                        ConnectorType.HOME_ASSISTANT, "cover.driveway_gate", "stopped",
+                        true, true, "String", "", attributes)));
+        assertEquals("Открывается", opening.valueLabel);
+        assertTrue(opening.activeKnown);
+        assertTrue(opening.active);
+        assertEquals("Закрывается", closing.valueLabel);
+        assertTrue(closing.active);
+        assertEquals("Остановлено", stopped.valueLabel);
+        assertTrue(stopped.active);
+    }
+
+    @Test public void sprutCurrentDoorStateDoesNotUseReversedBooleanNumberMeaning() {
+        LauncherShortcutStore.Shortcut shortcut = shortcut("sprut_gate");
+        shortcut.stateBinding = new SourceBinding(ConnectorType.SPRUTHUB, "default", "42/7/12",
+                "", SourceBinding.PRESENTATION_COVER, "");
+        IntentActionRule rule = rule("sprut_gate", ConnectorType.SPRUTHUB,
+                "42/7/13", "Въезд", "GarageDoorOpener");
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        attributes.put("service_type", "GarageDoorOpener");
+        attributes.put("characteristic_type", "CurrentDoorState");
+
+        SmartHomeShortcutStatePolicy.State open = SmartHomeShortcutStatePolicy.resolve(
+                shortcut, rule, Collections.singletonList(value(
+                        ConnectorType.SPRUTHUB, "42/7/12", 0,
+                        true, true, "INTEGER", "", attributes)));
+        SmartHomeShortcutStatePolicy.State closed = SmartHomeShortcutStatePolicy.resolve(
+                shortcut, rule, Collections.singletonList(value(
+                        ConnectorType.SPRUTHUB, "42/7/12", 1,
+                        true, true, "INTEGER", "", attributes)));
+        SmartHomeShortcutStatePolicy.State opening = SmartHomeShortcutStatePolicy.resolve(
+                shortcut, rule, Collections.singletonList(value(
+                        ConnectorType.SPRUTHUB, "42/7/12", 2,
+                        true, true, "INTEGER", "", attributes)));
+        SmartHomeShortcutStatePolicy.State closing = SmartHomeShortcutStatePolicy.resolve(
+                shortcut, rule, Collections.singletonList(value(
+                        ConnectorType.SPRUTHUB, "42/7/12", 3,
+                        true, true, "INTEGER", "", attributes)));
+        SmartHomeShortcutStatePolicy.State stopped = SmartHomeShortcutStatePolicy.resolve(
+                shortcut, rule, Collections.singletonList(value(
+                        ConnectorType.SPRUTHUB, "42/7/12", 4,
+                        true, true, "INTEGER", "", attributes)));
+
+        assertEquals("Открыто", open.valueLabel);
+        assertTrue(open.activeKnown);
+        assertTrue(open.active);
+        assertEquals("Закрыто", closed.valueLabel);
+        assertTrue(closed.activeKnown);
+        assertFalse(closed.active);
+        assertEquals("Открывается", opening.valueLabel);
+        assertTrue(opening.active);
+        assertEquals("Закрывается", closing.valueLabel);
+        assertTrue(closing.active);
+        assertEquals("Остановлено", stopped.valueLabel);
+        assertTrue(stopped.active);
+    }
+
+    @Test public void legacySprutGateCommandFallbackAlsoUsesDoorEnumPolarity() {
+        LauncherShortcutStore.Shortcut shortcut = shortcut("legacy_sprut_gate");
+        IntentActionRule rule = rule("legacy_sprut_gate", ConnectorType.SPRUTHUB,
+                "42/7/13", "Въезд", "GarageDoorOpener");
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        attributes.put("service_type", "GarageDoorOpener");
+        attributes.put("characteristic_type", "TargetDoorState");
+
+        SmartHomeShortcutStatePolicy.State open = SmartHomeShortcutStatePolicy.resolve(
+                shortcut, rule, Collections.singletonList(value(
+                        ConnectorType.SPRUTHUB, "42/7/13", 0,
+                        true, true, "INTEGER", "", attributes)));
+        SmartHomeShortcutStatePolicy.State closed = SmartHomeShortcutStatePolicy.resolve(
+                shortcut, rule, Collections.singletonList(value(
+                        ConnectorType.SPRUTHUB, "42/7/13", 1,
+                        true, true, "INTEGER", "", attributes)));
+
+        assertEquals("Открыто", open.valueLabel);
+        assertTrue(open.active);
+        assertEquals("Закрыто", closed.valueLabel);
+        assertFalse(closed.active);
+    }
+
     @Test public void explicitMqttStateBindingDoesNotInventACommandTopic() {
         LauncherShortcutStore.Shortcut shortcut = shortcut("gate_rule");
         shortcut.stateBinding = source(ConnectorType.MQTT, "main/gate");
