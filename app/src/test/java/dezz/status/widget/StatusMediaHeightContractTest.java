@@ -73,12 +73,21 @@ public final class StatusMediaHeightContractTest {
     @Test public void sourceRowGeometryIsAppliedBeforeMediaMetadata() throws IOException {
         String source = widgetService();
         int start = source.indexOf("private void applyMediaBrickSettings()");
-        int end = source.indexOf("private void applyMediaStateIcon(", start);
+        int end = source.indexOf("private void applyMediaLineStructure()", start);
         String settings = source.substring(start, end);
 
-        assertTrue(settings.contains("binding.mediaSourceRow.setVisibility("));
-        assertTrue(settings.contains(
-                "prefs.media.showSource.get() ? View.VISIBLE : View.GONE"));
+        int lineStructure = settings.indexOf("applyMediaLineStructure();");
+        int durationGeometry = settings.indexOf("binding.mediaDurationText.setTypeface(");
+        assertTrue(lineStructure >= 0);
+        assertTrue(durationGeometry > lineStructure);
+
+        int structureStart = source.indexOf("private void applyMediaLineStructure()");
+        int structureEnd = source.indexOf("private void applyMediaStateIcon(", structureStart);
+        String structure = source.substring(structureStart, structureEnd);
+        assertTrue(structure.contains("boolean showSource = prefs.media.showSource.get()"));
+        assertTrue(structure.contains(
+                "int sourceVisibility = showSource ? View.VISIBLE : View.GONE"));
+        assertTrue(structure.contains("binding.mediaSourceRow.setVisibility(sourceVisibility)"));
     }
 
     @Test public void emptyDurationCannotInflateBootstrapRow() throws IOException {
