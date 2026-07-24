@@ -517,9 +517,14 @@ public final class SmartHomeShortcutPicker {
         String name = accessoryName(accessory);
         String details = "Sprut.hub · " + (room.isEmpty() ? "" : room + " → ") + name
                 + " → " + serviceName(service) + " → " + characteristicName(characteristic);
+        SourceBinding commandState = new SourceBinding(ConnectorType.SPRUTHUB,
+                command.connectorId, command.resourceId, "",
+                SourceBinding.PRESENTATION_AUTO, "");
+        SourceBinding liveState = SmartHomeShortcutStateBindingPolicy.preferSprutPrimary(
+                command, commandState, catalog);
         finish(command, name, details, SmartHomeIconResolver.suggest("", "",
                 service.type() + " " + characteristic.type() + " " + characteristic.format(),
-                name + " " + service.name() + " " + characteristic.name()));
+                name + " " + service.name() + " " + characteristic.name()), liveState);
     }
 
     private <T> void showSearch(String title, String hint,
