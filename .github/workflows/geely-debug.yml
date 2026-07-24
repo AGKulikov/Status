@@ -161,6 +161,7 @@ jobs:
             exit 1
           }
           chmod +x gradlew
+          ./gradlew --no-daemon testGeelyDebugUnitTest
           ./gradlew --no-daemon assembleGeelyRelease
           APK="app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}-release.apk"
           BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
@@ -207,12 +208,15 @@ jobs:
       - name: Publish exact source tag and GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           RELEASE_TAG: v2.8.2-ha1080
         shell: bash
         run: |
           cd release-out
-          sha256sum -c "status-widget-ha-${RELEASE_TAG}.apk.sha256"
+          APK_NAME="status-widget-ha-${RELEASE_TAG}.apk"
+          SHA_NAME="${APK_NAME}.sha256"
+          sha256sum -c "$SHA_NAME"
           TAG_SHA=$(gh api \
             "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" \
             --jq '.object.sha' 2>/dev/null || true)
@@ -221,13 +225,24 @@ jobs:
               echo "${RELEASE_TAG} points to ${TAG_SHA}, expected ${HEAD_SHA}" >&2
               exit 1
             }
-            gh release view "$RELEASE_TAG" >/dev/null
-            echo "${RELEASE_TAG} is already published from the verified source"
-            exit 0
+            if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+              gh release upload "$RELEASE_TAG" "$APK_NAME" "$SHA_NAME" --clobber
+            else
+              gh release create "$RELEASE_TAG" "$APK_NAME" "$SHA_NAME" \
+                --verify-tag \
+                --title "Release ${RELEASE_TAG}" \
+                --notes "HA1080: exact-iPhone connector, visual action grids and four-corner panel editing."
+            fi
+          else
+            gh release create "$RELEASE_TAG" "$APK_NAME" "$SHA_NAME" \
+              --target "$HEAD_SHA" \
+              --title "Release ${RELEASE_TAG}" \
+              --notes "HA1080: exact-iPhone connector, visual action grids and four-corner panel editing."
           fi
-          gh release create "$RELEASE_TAG" \
-            "status-widget-ha-${RELEASE_TAG}.apk" \
-            "status-widget-ha-${RELEASE_TAG}.apk.sha256" \
-            --target "$HEAD_SHA" \
-            --title "Release ${RELEASE_TAG}" \
-            --notes "HA1080: exact-iPhone connector, visual action grids and four-corner panel editing."
+          mkdir -p /tmp/ha1080-published
+          gh release download "$RELEASE_TAG" \
+            --pattern "$APK_NAME" --dir /tmp/ha1080-published --clobber
+          gh release download "$RELEASE_TAG" \
+            --pattern "$SHA_NAME" --dir /tmp/ha1080-published --clobber
+          cmp "$APK_NAME" "/tmp/ha1080-published/${APK_NAME}"
+          cmp "$SHA_NAME" "/tmp/ha1080-published/${SHA_NAME}"
