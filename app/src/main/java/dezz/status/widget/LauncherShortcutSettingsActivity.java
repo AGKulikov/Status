@@ -43,6 +43,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
+import dezz.status.widget.launcher.HighResolutionAppIconLoader;
 import dezz.status.widget.launcher.LauncherIconResolver;
 import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.launcher.LauncherRuleIdPolicy;
@@ -762,7 +763,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
             if (info.activityInfo == null) continue;
             values.add(new AppChoice(String.valueOf(info.loadLabel(manager)),
                     new ComponentName(info.activityInfo.packageName, info.activityInfo.name),
-                    info.loadIcon(manager)));
+                    HighResolutionAppIconLoader.load(this, info.activityInfo)));
         }
         values.sort(Comparator.comparing(value -> value.label.toLowerCase(Locale.ROOT)));
         return values;

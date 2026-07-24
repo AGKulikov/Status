@@ -1734,6 +1734,12 @@ public class WidgetService extends Service {
         binding.mediaTitleText.setMarqueeEnabled(prefs.media.marqueeEnabled.get());
 
         applyMediaStateIcon(textColor);
+        // Establish the configured row geometry before the first MediaSession callback. The
+        // deferred integration refresh can re-run applyBrickVisibility during boot; leaving the
+        // XML-default source row visible until metadata arrives made a title-only media brick one
+        // line taller at startup and then shrink as soon as the first track was rendered.
+        binding.mediaSourceRow.setVisibility(
+                prefs.media.showSource.get() ? View.VISIBLE : View.GONE);
 
         // Duration text — independent font size / alpha / outline so the user can dial it down
         // (typically the duration is rendered smaller and dimmer than the track subtitle).
@@ -1970,9 +1976,12 @@ public class WidgetService extends Service {
                         binding.homeAssistantContainer, prefs.homeAssistant.contentAlpha.get()),
         };
 
-        // Media has the extra session gate, so we build its BrickTarget here.
+        // Media has the extra session gate, so we build its BrickTarget here. In particular, the
+        // deferred post-boot integration refresh must not make an empty mediaContainer visible
+        // after enableMediaTracking already hid it: only real active media may occupy the row.
+        boolean mediaSessionActive = pickActiveMediaController() != null;
         boolean mediaShouldBeGone = !bricksSet.contains(BrickType.MEDIA)
-                || !isRemotelyVisible(BrickType.MEDIA);
+                || !isRemotelyVisible(BrickType.MEDIA) || !mediaSessionActive;
         boolean mediaHiddenByApp = !mediaShouldBeGone && isBrickHiddenByApp(BrickType.MEDIA);
         BrickTarget mediaTarget;
         if (mediaShouldBeGone) {

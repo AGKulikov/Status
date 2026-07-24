@@ -83,9 +83,14 @@ public final class SmartHomeShortcutStatePolicy {
         }
         Object raw = value.resolveValue(binding == null ? "" : binding.valuePath);
         boolean available = value.available && value.readable;
-        String label = available ? display(raw, value.unit) : "Недоступно";
+        CoverState cover = coverState(raw, binding, value);
+        String label = available
+                ? cover == null ? display(raw, value.unit) : cover.label
+                : "Недоступно";
         if (available && !value.fresh) label = "⟳ " + label;
-        Active active = active(raw, binding, value);
+        Active active = cover == null
+                ? active(raw, binding, value)
+                : new Active(true, cover.active);
         return new State(icon, bounded(label), true, value.fresh, available,
                 active.known, active.value);
     }
@@ -134,6 +139,80 @@ public final class SmartHomeShortcutStatePolicy {
         if ("devices".equals(suggested) && !"devices".equals(shortcut.icon)
                 && !"apps".equals(shortcut.icon)) return shortcut.icon;
         return suggested;
+    }
+
+    /**
+     * Home Assistant publishes textual cover states, while Sprut/HomeKit exposes
+     * {@code CurrentDoorState} as an enum where {@code 0=open} and {@code 1=closed}.
+     * Treating that enum as a generic boolean reverses the gate indicator, so cover semantics
+     * must be resolved before the generic numeric active-state rule.
+     */
+    @Nullable
+    private static CoverState coverState(@Nullable Object raw,
+                                         @Nullable SourceBinding binding,
+                                         ConnectorValue value) {
+        String domain = "";
+        if (binding != null && binding.connectorType == ConnectorType.HOME_ASSISTANT) {
+            int dot = binding.resourceId.indexOf('.');
+            if (dot > 0) domain = binding.resourceId.substring(0, dot);
+        }
+        String characteristicType = first(
+                value.attributes.get("characteristic_type"),
+                value.attributes.get("characteristicType")).toLowerCase(Locale.ROOT);
+        String serviceType = first(
+                value.attributes.get("service_type"),
+                value.attributes.get("serviceType")).toLowerCase(Locale.ROOT);
+        boolean cover = "cover".equals(domain)
+                || (binding != null
+                    && SourceBinding.PRESENTATION_COVER.equals(binding.presentation))
+                || characteristicType.contains("currentdoorstate")
+                || characteristicType.contains("doorstate")
+                || serviceType.contains("garagedoor");
+        if (!cover) return null;
+
+        if (raw instanceof Number) {
+            // Position and obstruction characteristics use different numeric domains.
+            // CurrentDoorState uses 0..4 and TargetDoorState uses its compatible 0..1 subset.
+            boolean stateCharacteristic =
+                    !contains(characteristicType, "position", "obstruction");
+            boolean doorState = stateCharacteristic && ("cover".equals(domain)
+                    || characteristicType.contains("currentdoorstate")
+                    || characteristicType.contains("doorstate")
+                    || serviceType.contains("garagedoor"));
+            if (!doorState) return null;
+            double numeric = ((Number) raw).doubleValue();
+            if (!Double.isFinite(numeric) || numeric != Math.rint(numeric)) return null;
+            switch ((int) numeric) {
+                case 0: return new CoverState("Открыто", true);
+                case 1: return new CoverState("Закрыто", false);
+                case 2: return new CoverState("Открывается", true);
+                case 3: return new CoverState("Закрывается", true);
+                case 4: return new CoverState("Остановлено", true);
+                default: return null;
+            }
+        }
+
+        String state = raw == null ? "" : String.valueOf(raw).trim().toLowerCase(Locale.ROOT);
+        switch (state) {
+            case "open":
+            case "opened":
+            case "открыто":
+                return new CoverState("Открыто", true);
+            case "opening":
+            case "открывается":
+                return new CoverState("Открывается", true);
+            case "closed":
+            case "закрыто":
+                return new CoverState("Закрыто", false);
+            case "closing":
+            case "закрывается":
+                return new CoverState("Закрывается", true);
+            case "stopped":
+            case "остановлено":
+                return new CoverState("Остановлено", true);
+            default:
+                return null;
+        }
     }
 
     @NonNull
@@ -235,6 +314,16 @@ public final class SmartHomeShortcutStatePolicy {
     private static boolean containsExact(String value, String... expected) {
         for (String item : expected) if (item.equals(value)) return true;
         return false;
+    }
+
+    private static final class CoverState {
+        @NonNull final String label;
+        final boolean active;
+
+        CoverState(@NonNull String label, boolean active) {
+            this.label = label;
+            this.active = active;
+        }
     }
 
     private static final class Active {

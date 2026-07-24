@@ -30,6 +30,38 @@ final class MediaStateFreshness {
         return contentChanged || previousArtworkIdentity != incomingArtworkIdentity;
     }
 
+    /**
+     * MediaSession publishers sometimes update the title before replacing their artwork bitmap.
+     * Treating that still-identical bitmap as the new track's cover makes the old cover stick
+     * indefinitely on players that keep returning it from {@code getMetadata()}.
+     *
+     * <p>Once an unchanged bitmap has been hidden for a new track, keep it hidden until the
+     * publisher exposes genuinely different pixels. A missing bitmap is always an empty artwork
+     * cell, never permission to retain the previous track's image.</p>
+     */
+    static boolean shouldDisplaySessionArtwork(boolean hasPrevious, boolean trackChanged,
+                                               long previousObservedArtworkIdentity,
+                                               boolean previousArtworkDisplayed,
+                                               long incomingArtworkIdentity) {
+        if (incomingArtworkIdentity == 0L) return false;
+        if (!hasPrevious) return true;
+        if (incomingArtworkIdentity != previousObservedArtworkIdentity) return true;
+        if (trackChanged) return false;
+        return previousArtworkDisplayed;
+    }
+
+    /**
+     * A decoded cover that is known to belong to the selected track is more useful than a newer
+     * source which is temporarily empty while its asynchronous artwork update is pending.
+     */
+    static boolean incomingArtworkWins(boolean incomingHasArtwork,
+                                       long incomingChangedElapsedMs,
+                                       boolean currentHasArtwork,
+                                       long currentChangedElapsedMs) {
+        if (incomingHasArtwork != currentHasArtwork) return incomingHasArtwork;
+        return incomingWins(incomingChangedElapsedMs, currentChangedElapsedMs);
+    }
+
     static boolean shouldRefreshSession(boolean hasController,
                                         long nowElapsedMs, long lastRefreshElapsedMs,
                                         long intervalMs) {

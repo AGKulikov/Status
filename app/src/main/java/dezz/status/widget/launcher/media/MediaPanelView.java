@@ -256,16 +256,16 @@ public final class MediaPanelView extends FrameLayout {
             case MediaPanelConfig.PROGRESS:
                 return progressElement(element.scalePercent);
             case MediaPanelConfig.PREVIOUS:
-                return button(android.R.drawable.ic_media_previous, "Предыдущий трек",
+                return button(R.drawable.ic_media_previous, "Предыдущий трек",
                         controls == null || layoutEditor != null
                                 ? null : v -> controls.previous(), element.scalePercent);
             case MediaPanelConfig.PLAY_PAUSE:
-                playPause = button(android.R.drawable.ic_media_play, "Играть или поставить на паузу",
+                playPause = button(R.drawable.ic_media_play, "Играть или поставить на паузу",
                         controls == null || layoutEditor != null
                                 ? null : v -> controls.playPause(), element.scalePercent);
                 return playPause;
             case MediaPanelConfig.NEXT:
-                return button(android.R.drawable.ic_media_next, "Следующий трек",
+                return button(R.drawable.ic_media_next, "Следующий трек",
                         controls == null || layoutEditor != null
                                 ? null : v -> controls.next(), element.scalePercent);
             case MediaPanelConfig.VOLUME:
@@ -309,7 +309,7 @@ public final class MediaPanelView extends FrameLayout {
         root.setPadding(dp(8), 0, dp(8), 0);
         root.setBackground(glassBackground(false, Math.max(dp(10), config.cornerRadiusPx / 2)));
         ImageView icon = new ImageView(getContext());
-        icon.setImageResource(android.R.drawable.ic_lock_silent_mode_off);
+        icon.setImageResource(R.drawable.ic_media_volume);
         icon.setColorFilter(color(config.controlColor, Color.WHITE));
         int iconSize = Math.max(dp(22), dp(30) * scalePercent / 100);
         root.addView(icon, new LinearLayout.LayoutParams(iconSize, iconSize));
@@ -472,7 +472,7 @@ public final class MediaPanelView extends FrameLayout {
         }
         if (playPause != null) {
             playPause.setImageResource(playing
-                    ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
+                    ? R.drawable.ic_media_pause : R.drawable.ic_media_play);
             playPause.setColorFilter(color(playing ? config.accentColor : config.controlColor,
                     Color.WHITE));
         }

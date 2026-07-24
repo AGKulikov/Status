@@ -41,6 +41,17 @@ public final class SmartHomeShortcutLiveContractTest {
         assertTrue(picker.contains("Загружаю полный список сущностей"));
     }
 
+    @Test public void resolvedActiveStateDrivesIconTintBackgroundAndStatusText()
+            throws IOException {
+        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        assertTrue(launcher.contains("state.activeKnown && state.active"));
+        assertTrue(launcher.contains(
+                "? shortcut.activeBackgroundColor : shortcut.backgroundColor"));
+        assertTrue(launcher.contains(
+                "active ? shortcut.activeIconColor : shortcut.iconColor"));
+        assertTrue(launcher.contains("binding.stateLabel.setText(state.valueLabel)"));
+    }
+
     private static String source(String relative) throws IOException {
         Path fromRoot = Paths.get("app", "src", "main", "java").resolve(relative);
         Path fromApp = Paths.get("src", "main", "java").resolve(relative);
