@@ -52,6 +52,11 @@ public final class NavigationPanelEditorContractTest {
         String settings = source("dezz/status/widget/NavigationPanelSettingsActivity.java");
         assertTrue(settings.contains("Редактировать прямо на HOME"));
         assertTrue(settings.contains("EXTRA_EDIT_NAVIGATION_CONTENT"));
+        assertTrue(settings.contains("previewGrid = new PanelGridLayout(this)"));
+        assertTrue(settings.contains("previewOverlay = new PanelContentEditOverlay(this)"));
+        assertTrue(settings.contains("previewOverlay.setEditing(true)"));
+        assertTrue(settings.contains("config.setPlacement(id, column, row, columnSpan, rowSpan)"));
+        assertTrue(settings.contains("store.save(config)"));
         assertTrue(settings.contains("\"Столбец\""));
         assertTrue(settings.contains("\"Ширина\""));
         assertTrue(settings.contains("\"Высота\""));

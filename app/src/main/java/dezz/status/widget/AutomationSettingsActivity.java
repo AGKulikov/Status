@@ -240,7 +240,9 @@ public final class AutomationSettingsActivity extends AppCompatActivity {
         switch (value.connectorType) {
             case HOME_ASSISTANT: connector = "Home Assistant"; break;
             case SPRUTHUB: connector = "Sprut.hub"; break;
-            default: connector = "MQTT"; break;
+            case PHONE: connector = "Телефон"; break;
+            case MQTT: connector = "MQTT"; break;
+            default: connector = value.connectorType.jsonName(); break;
         }
         return connector + " · " + value.resourceId
                 + (value.valuePath.isEmpty() ? "" : " · " + value.valuePath);

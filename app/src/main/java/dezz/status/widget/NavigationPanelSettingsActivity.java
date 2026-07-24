@@ -12,6 +12,7 @@ import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
@@ -26,8 +27,13 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import dezz.status.widget.launcher.navigation.NavigationPanelConfig;
 import dezz.status.widget.launcher.navigation.NavigationPanelConfigStore;
+import dezz.status.widget.launcher.panels.PanelContentEditOverlay;
+import dezz.status.widget.launcher.panels.PanelGridLayout;
 
 /**
  * Precise companion controls for the primary, full-size WYSIWYG navigation editor on HOME.
@@ -41,6 +47,9 @@ public final class NavigationPanelSettingsActivity extends AppCompatActivity {
     private NavigationPanelConfigStore store;
     private NavigationPanelConfig config;
     private LinearLayout elementHost;
+    private PanelGridLayout previewGrid;
+    private PanelContentEditOverlay previewOverlay;
+    private FrameLayout previewHost;
     private boolean resumedOnce;
 
     @Override
@@ -77,16 +86,21 @@ public final class NavigationPanelSettingsActivity extends AppCompatActivity {
 
     @NonNull
     private View buildContent() {
+        LinearLayout screen = new LinearLayout(this);
+        screen.setOrientation(LinearLayout.HORIZONTAL);
+        screen.setPadding(dp(18), dp(14), dp(18), dp(14));
+
         ScrollView scroll = new ScrollView(this);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(28), dp(20), dp(28), dp(36));
+        root.setPadding(dp(10), 0, dp(22), dp(36));
         scroll.addView(root, new ScrollView.LayoutParams(match(), wrap()));
+        screen.addView(scroll, new LinearLayout.LayoutParams(0, match(), 1.04f));
 
         addTitle(root, "Элементы навигации");
-        addHint(root, "Основной редактор открывается прямо на реальном HOME: размеры ячеек "
-                + "совпадают с фактическим прямоугольником панели. Перетаскивайте элемент, "
-                + "а его выделенный правый нижний угол меняет ширину и высоту.");
+        addHint(root, "Редактируйте сетку прямо в предпросмотре справа или на реальном HOME. "
+                + "Перетаскивайте элемент, а любой из четырёх выделенных углов меняет ширину "
+                + "и высоту. Оба редактора сохраняют одну и ту же сетку.");
         addButton(root, "Редактировать прямо на HOME", v ->
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_NAVIGATION_CONTENT, true)));
@@ -143,7 +157,152 @@ public final class NavigationPanelSettingsActivity extends AppCompatActivity {
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show());
-        return scroll;
+
+        LinearLayout previewColumn = new LinearLayout(this);
+        previewColumn.setOrientation(LinearLayout.VERTICAL);
+        previewColumn.setPadding(dp(10), 0, 0, dp(24));
+        TextView previewTitle = new TextView(this);
+        previewTitle.setText("ЖИВОЙ РЕДАКТОР СЕТКИ");
+        previewTitle.setTextSize(14);
+        previewTitle.setTextColor(getColor(R.color.settings_accent));
+        previewTitle.setTypeface(android.graphics.Typeface.DEFAULT,
+                android.graphics.Typeface.BOLD);
+        previewColumn.addView(previewTitle, new LinearLayout.LayoutParams(match(), dp(38)));
+
+        TextView previewHint = new TextView(this);
+        previewHint.setText("Тащите элементы. Потяните выбранный элемент за любой "
+                + "из четырёх углов, чтобы изменить его размер.");
+        previewHint.setTextSize(14);
+        previewHint.setAlpha(.75f);
+        LinearLayout.LayoutParams previewHintParams =
+                new LinearLayout.LayoutParams(match(), wrap());
+        previewHintParams.bottomMargin = dp(10);
+        previewColumn.addView(previewHint, previewHintParams);
+
+        previewHost = new FrameLayout(this);
+        GradientDrawable previewBackground = new GradientDrawable();
+        previewBackground.setColor(Color.rgb(8, 12, 18));
+        previewBackground.setCornerRadius(dp(22));
+        previewHost.setBackground(previewBackground);
+        previewHost.setPadding(dp(10), dp(10), dp(10), dp(10));
+        previewGrid = new PanelGridLayout(this);
+        previewHost.addView(previewGrid, new FrameLayout.LayoutParams(match(), match()));
+        previewOverlay = new PanelContentEditOverlay(this);
+        previewOverlay.setModel(previewModel(), previewListener());
+        previewOverlay.setEditing(true);
+        previewHost.addView(previewOverlay, new FrameLayout.LayoutParams(match(), match()));
+        previewColumn.addView(previewHost, new LinearLayout.LayoutParams(match(), 0, 1f));
+
+        TextView saved = new TextView(this);
+        saved.setText("✓ Изменения сохраняются автоматически");
+        saved.setTextSize(13);
+        saved.setGravity(Gravity.CENTER);
+        saved.setAlpha(.72f);
+        previewColumn.addView(saved, new LinearLayout.LayoutParams(match(), dp(42)));
+        screen.addView(previewColumn, new LinearLayout.LayoutParams(0, match(), .96f));
+        renderPreview();
+        return screen;
+    }
+
+    @NonNull
+    private PanelContentEditOverlay.Model previewModel() {
+        return new PanelContentEditOverlay.Model() {
+            @Override public int columns() {
+                return config.gridColumns;
+            }
+
+            @Override public int rows() {
+                return config.gridRows;
+            }
+
+            @NonNull
+            @Override public List<PanelContentEditOverlay.Item> items() {
+                List<PanelContentEditOverlay.Item> result = new ArrayList<>();
+                for (NavigationPanelConfig.Element element : config.enabledElements()) {
+                    NavigationPanelConfig.Spec spec = NavigationPanelConfig.spec(element.id);
+                    result.add(new PanelContentEditOverlay.Item(element.id,
+                            spec == null ? element.id : spec.label,
+                            element.column, element.row,
+                            element.columnSpan, element.rowSpan));
+                }
+                return result;
+            }
+
+            @Override public boolean setPlacement(@NonNull String id, int column, int row,
+                                                  int columnSpan, int rowSpan) {
+                return config.setPlacement(id, column, row, columnSpan, rowSpan);
+            }
+        };
+    }
+
+    @NonNull
+    private PanelContentEditOverlay.Listener previewListener() {
+        return (id, finished) -> {
+            applyPreviewPlacements();
+            if (!finished) return;
+            store.save(config);
+            rebuildElementList();
+        };
+    }
+
+    private void renderPreview() {
+        if (previewGrid == null) return;
+        previewGrid.removeAllViews();
+        previewGrid.setGridSize(config.gridColumns, config.gridRows);
+        previewGrid.setCellGapPx(dp(5));
+        for (NavigationPanelConfig.Element element : config.enabledElements()) {
+            TextView sample = new TextView(this);
+            sample.setText(previewText(element.id));
+            sample.setTextColor(Color.WHITE);
+            sample.setTextSize(Math.max(10f,
+                    Math.min(25f, 15f * element.scalePercent / 100f)));
+            sample.setGravity(Gravity.CENTER);
+            sample.setMaxLines(3);
+            sample.setPadding(dp(5), dp(5), dp(5), dp(5));
+            GradientDrawable background = new GradientDrawable();
+            background.setColor(Color.argb(105, 42, 59, 82));
+            background.setCornerRadius(dp(12));
+            sample.setBackground(background);
+            sample.setTag(element.id);
+            previewGrid.addView(sample, new PanelGridLayout.LayoutParams(
+                    element.column, element.row, element.columnSpan, element.rowSpan));
+        }
+        if (previewOverlay != null) {
+            previewOverlay.setEditing(true);
+            previewOverlay.invalidate();
+        }
+    }
+
+    private void applyPreviewPlacements() {
+        if (previewGrid == null) return;
+        previewGrid.setGridSize(config.gridColumns, config.gridRows);
+        for (NavigationPanelConfig.Element element : config.enabledElements()) {
+            previewGrid.updatePlacement(element.id, element.column, element.row,
+                    element.columnSpan, element.rowSpan);
+        }
+        if (previewOverlay != null) previewOverlay.invalidate();
+    }
+
+    @NonNull
+    private static String previewText(@NonNull String id) {
+        if (NavigationPanelConfig.ARRIVAL.equals(id)) return "12:45\nПрибытие";
+        if (NavigationPanelConfig.DURATION.equals(id)) return "24 мин";
+        if (NavigationPanelConfig.DISTANCE.equals(id)) return "18 км";
+        if (NavigationPanelConfig.MANEUVER_IMAGE.equals(id)) return "↱";
+        if (NavigationPanelConfig.MANEUVER_DISTANCE.equals(id)) return "350 м";
+        if (NavigationPanelConfig.MANEUVER.equals(id)) return "Поверните направо";
+        if (NavigationPanelConfig.TRIP_INFO.equals(id)) return "18 км · 24 мин";
+        if (NavigationPanelConfig.COMBINED.equals(id)) {
+            return "↱  350 м\nПоверните направо";
+        }
+        if (NavigationPanelConfig.SPEED_LIMIT.equals(id)) return "60";
+        if (NavigationPanelConfig.TRAFFIC_LIGHT.equals(id)) return "●  ●  ●";
+        if (NavigationPanelConfig.LANES_IMAGE.equals(id)) return "↑  ↑  ↗";
+        if (NavigationPanelConfig.LANE_INFO.equals(id)) return "Держитесь правее";
+        if (NavigationPanelConfig.JAM_PROGRESS.equals(id)) return "Пробки · 3";
+        if (NavigationPanelConfig.RAINBOW_IMAGE.equals(id)) return "Маршрут";
+        if (NavigationPanelConfig.INACTIVE.equals(id)) return "Избранные места";
+        return id;
     }
 
     private void rebuildElementList() {
@@ -178,6 +337,7 @@ public final class NavigationPanelSettingsActivity extends AppCompatActivity {
             }
             store.save(config);
             rebuildElementList();
+            renderPreview();
         });
         card.addView(enabled, new LinearLayout.LayoutParams(match(), wrap()));
 
@@ -250,6 +410,7 @@ public final class NavigationPanelSettingsActivity extends AppCompatActivity {
                 }
                 changed = true;
                 store.save(config);
+                renderPreview();
                 value.setText(formatter.format(clamp(read.get(), minimum, safeMaximum)));
             }
 

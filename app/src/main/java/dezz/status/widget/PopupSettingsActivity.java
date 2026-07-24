@@ -614,8 +614,14 @@ public final class PopupSettingsActivity extends AppCompatActivity {
         }
         SourceBinding source = item.sourceBinding;
         if (source == null || !source.isBound()) return "Без источника";
-        String connector = source.connectorType == ConnectorType.HOME_ASSISTANT ? "Home Assistant"
-                : source.connectorType == ConnectorType.SPRUTHUB ? "Sprut.hub" : "MQTT";
+        String connector;
+        switch (source.connectorType) {
+            case HOME_ASSISTANT: connector = "Home Assistant"; break;
+            case SPRUTHUB: connector = "Sprut.hub"; break;
+            case PHONE: connector = "Телефон"; break;
+            case MQTT: connector = "MQTT"; break;
+            default: connector = source.connectorType.jsonName(); break;
+        }
         return connector + " · " + source.resourceId
                 + (source.valuePath.isEmpty() ? "" : " · " + source.valuePath);
     }

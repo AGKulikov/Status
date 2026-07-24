@@ -184,25 +184,28 @@ public final class MediaPanelConfig {
     public boolean setPosition(@NonNull String id, int column, int row) {
         Element value = elements.get(id);
         if (value == null) return false;
-        LinkedHashMap<String, Element> snapshot = snapshotElements();
-        int preferredColumn = value.column;
-        int preferredRow = value.row;
-        value.column = column;
-        value.row = row;
-        normalizePlacement(value);
-        if (!displaceCollisions(value, preferredColumn, preferredRow)) {
-            restoreElements(snapshot);
-            return false;
-        }
-        return true;
+        return setPlacement(id, column, row, value.columnSpan, value.rowSpan);
     }
 
     public boolean setSpan(@NonNull String id, int columnSpan, int rowSpan) {
         Element value = elements.get(id);
         if (value == null) return false;
+        return setPlacement(id, value.column, value.row, columnSpan, rowSpan);
+    }
+
+    /**
+     * Applies position and span as one transaction. Leading-edge resize handles change both;
+     * two separate mutations could otherwise displace a neighbour after only half the gesture.
+     */
+    public boolean setPlacement(@NonNull String id, int column, int row,
+                                int columnSpan, int rowSpan) {
+        Element value = elements.get(id);
+        if (value == null) return false;
         LinkedHashMap<String, Element> snapshot = snapshotElements();
         int preferredColumn = value.column;
         int preferredRow = value.row;
+        value.column = column;
+        value.row = row;
         value.columnSpan = columnSpan;
         value.rowSpan = rowSpan;
         normalizePlacement(value);

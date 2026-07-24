@@ -42,6 +42,7 @@ import java.util.Map;
 import dezz.status.widget.R;
 import dezz.status.widget.launcher.LauncherMediaController;
 import dezz.status.widget.launcher.MediaTimeline;
+import dezz.status.widget.launcher.panels.PanelContentResizeMath;
 
 /** Responsive HOME media surface whose contents are fully driven by {@link MediaPanelConfig}. */
 public final class MediaPanelView extends FrameLayout {
@@ -135,7 +136,7 @@ public final class MediaPanelView extends FrameLayout {
 
     /**
      * Uses this exact rendered panel as the editor, so grid placement cannot differ from HOME.
-     * A drag moves an element; dragging its bottom-right 30dp corner resizes its cell span.
+     * A drag moves an element; dragging any of its four 30dp corners resizes its cell rectangle.
      */
     public void setInPlaceEditMode(boolean enabled) {
         setInPlaceEditMode(enabled, enabled
@@ -697,16 +698,33 @@ public final class MediaPanelView extends FrameLayout {
         child.setOnTouchListener(new OnTouchListener() {
             private float touchOffsetX;
             private float touchOffsetY;
-            private boolean resizing;
+            private float downRawX;
+            private float downRawY;
+            private int startColumn;
+            private int startRow;
+            private int startColumnSpan;
+            private int startRowSpan;
+            @NonNull private PanelContentResizeMath.Corner resizeCorner =
+                    PanelContentResizeMath.Corner.NONE;
 
             @Override public boolean onTouch(View view, MotionEvent event) {
                 switch (event.getActionMasked()) {
                     case MotionEvent.ACTION_DOWN:
                         touchOffsetX = event.getX();
                         touchOffsetY = event.getY();
+                        downRawX = event.getRawX();
+                        downRawY = event.getRawY();
+                        MediaElementGridLayout.ElementLayoutParams start =
+                                (MediaElementGridLayout.ElementLayoutParams)
+                                        view.getLayoutParams();
+                        startColumn = start.column;
+                        startRow = start.row;
+                        startColumnSpan = start.columnSpan;
+                        startRowSpan = start.rowSpan;
                         int handle = dp(30);
-                        resizing = event.getX() >= view.getWidth() - handle
-                                && event.getY() >= view.getHeight() - handle;
+                        resizeCorner = PanelContentResizeMath.hitCorner(
+                                event.getX(), event.getY(), 0f, 0f,
+                                view.getWidth(), view.getHeight(), handle);
                         if (view.getParent() != null) {
                             view.getParent().requestDisallowInterceptTouchEvent(true);
                         }
@@ -719,14 +737,29 @@ public final class MediaPanelView extends FrameLayout {
                         return true;
                     case MotionEvent.ACTION_MOVE:
                         grid.getLocationOnScreen(dragGridLocation);
-                        if (resizing) {
-                            int right = Math.round(event.getRawX() - dragGridLocation[0]);
-                            int bottom = Math.round(event.getRawY() - dragGridLocation[1]);
-                            if (grid.resizeToPixel(view, right, bottom)) {
-                                MediaElementGridLayout.ElementLayoutParams lp =
-                                        (MediaElementGridLayout.ElementLayoutParams)
-                                                view.getLayoutParams();
-                                config.setSpan(id, lp.columnSpan, lp.rowSpan);
+                        if (resizeCorner != PanelContentResizeMath.Corner.NONE) {
+                            float cellWidth = grid.getWidth()
+                                    / (float) Math.max(1, config.gridColumns);
+                            float cellHeight = grid.getHeight()
+                                    / (float) Math.max(1, config.gridRows);
+                            int deltaColumn = Math.round(
+                                    (event.getRawX() - downRawX) / Math.max(1f, cellWidth));
+                            int deltaRow = Math.round(
+                                    (event.getRawY() - downRawY) / Math.max(1f, cellHeight));
+                            PanelContentResizeMath.Result result =
+                                    PanelContentResizeMath.resize(resizeCorner,
+                                            startColumn, startRow,
+                                            startColumnSpan, startRowSpan,
+                                            deltaColumn, deltaRow,
+                                            config.gridColumns, config.gridRows);
+                            MediaPanelConfig.Element current = config.element(id);
+                            boolean changed = current.column != result.column
+                                    || current.row != result.row
+                                    || current.columnSpan != result.columnSpan
+                                    || current.rowSpan != result.rowSpan;
+                            if (changed && config.setPlacement(id,
+                                    result.column, result.row,
+                                    result.columnSpan, result.rowSpan)) {
                                 syncGridPlacements();
                                 LayoutEditor editor = layoutEditor;
                                 if (editor != null) {
@@ -740,10 +773,14 @@ public final class MediaPanelView extends FrameLayout {
                         if (grid.moveToPixel(view, left, top)) {
                             MediaElementGridLayout.ElementLayoutParams lp =
                                     (MediaElementGridLayout.ElementLayoutParams) view.getLayoutParams();
-                            config.setPosition(id, lp.column, lp.row);
+                            boolean accepted = config.setPosition(id, lp.column, lp.row);
+                            // Config owns collision resolution. Always reapply it so a rejected
+                            // drag or a displaced neighbour cannot diverge from the saved grid.
                             syncGridPlacements();
                             LayoutEditor editor = layoutEditor;
-                            if (editor != null) editor.onLayoutChanged(config.copy(), id, false);
+                            if (accepted && editor != null) {
+                                editor.onLayoutChanged(config.copy(), id, false);
+                            }
                         }
                         return true;
                     case MotionEvent.ACTION_UP:
@@ -756,6 +793,7 @@ public final class MediaPanelView extends FrameLayout {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                             view.setElevation(0f);
                         }
+                        resizeCorner = PanelContentResizeMath.Corner.NONE;
                         LayoutEditor editor = layoutEditor;
                         if (editor != null) editor.onLayoutChanged(config.copy(), id, true);
                         view.performClick();
