@@ -30,10 +30,10 @@ final class DriverPanelWindowTypePolicy {
         for (String field : VENDOR_FIELDS) {
             try {
                 int value = WindowManager.LayoutParams.class.getField(field).getInt(null);
-                if (value >= WindowManager.LayoutParams.FIRST_SYSTEM_WINDOW
-                        && value <= WindowManager.LayoutParams.LAST_SYSTEM_WINDOW) {
-                    values.add(value);
-                }
+                // ECARX vendor codes are authoritative even when they sit outside AOSP's public
+                // system-window interval. MonjaroPanel accepts every non-zero reflected
+                // value and lets WindowManager reject unsupported types during the ordered retry.
+                if (value != 0) values.add(value);
             } catch (ReflectiveOperationException | RuntimeException ignored) {
             }
         }

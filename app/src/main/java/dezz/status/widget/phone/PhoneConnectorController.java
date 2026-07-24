@@ -68,10 +68,14 @@ public final class PhoneConnectorController {
     private static final int MAX_APP_DISPLAY_NAMES = 128;
     private static final long ATTRIBUTE_TIMEOUT_MS = 8_000L;
     private static final long GATT_OPERATION_TIMEOUT_MS = 10_000L;
+    // Android's GATT client upgrades security after an ANCS CCCD rejects an unauthenticated
+    // write. The iPhone prompt is user-driven, so the normal ten-second transport watchdog is
+    // far too short for this first subscription.
+    private static final long ANCS_AUTHORIZATION_OPERATION_TIMEOUT_MS = 90_000L;
+    private static final long ANCS_SERVICE_PUBLICATION_RETRY_MS = 95_000L;
     private static final long GATT_CONNECT_TIMEOUT_MS = 20_000L;
     private static final long GATT_MTU_TIMEOUT_MS = 1_500L;
     private static final long GATT_DISCOVERY_TIMEOUT_MS = 15_000L;
-    private static final long ANCS_AUTHORIZATION_PROBE_MS = 15_000L;
     private static final long DEVICE_RESCAN_MS = 15_000L;
     private static final int DESIRED_GATT_MTU = 512;
     private static final int GATT_INSUFFICIENT_AUTHENTICATION = 5;
@@ -223,6 +227,8 @@ public final class PhoneConnectorController {
     @Nullable private Runnable discoveryWatchdog;
     @Nullable private Runnable deviceRescanTask;
     @Nullable private Runnable gattReconnectTask;
+    @Nullable private Runnable ancsPublicationRetryTask;
+    private int ancsPublicationRetryCount;
     private final ArrayDeque<GattOperation> gattOperations = new ArrayDeque<>();
     @Nullable private GattOperation currentGattOperation;
     @Nullable private Runnable gattOperationTimeout;
@@ -314,28 +320,37 @@ public final class PhoneConnectorController {
         }
     }
 
-    /** Forces one direct, user-initiated ANCS handshake without changing the selected device. */
-    public void reconnectForDiagnostics() {
+    /**
+     * Queues one direct, user-initiated ANCS handshake without changing the selected device.
+     *
+     * @return {@code true} only when a live controller accepted the request
+     */
+    public boolean reconnectForDiagnostics() {
         synchronized (lifecycleLock) {
-            if (!running) return;
+            if (!running || config == null || config.deviceAddress.isEmpty()) return false;
             Handler currentWorker = worker;
             long token = generation;
-            if (currentWorker == null) return;
+            if (currentWorker == null) return false;
             currentWorker.post(() -> runIfCurrent(token, () -> {
+                PhoneOemConnectionBridge.requestStockConnection(context,
+                        config == null ? "" : config.deviceAddress);
                 BluetoothGatt previous = gatt;
                 gatt = null;
                 cancelGattWatchdogs();
                 cancelGattReconnect();
+                cancelAncsPublicationRetry();
                 closeGatt(previous);
                 gattConnected = false;
                 clearBasData();
                 resetAncsSession(token, "connecting");
                 forceDirectGatt = true;
                 reconnectAttempt = 0;
+                ancsPublicationRetryCount = 0;
                 lastError = "";
                 updateConnected(token);
                 ensureGatt(token);
             }));
+            return true;
         }
     }
 
@@ -391,6 +406,7 @@ public final class PhoneConnectorController {
         gattConnected = false;
         connected = false;
         reconnectAttempt = 0;
+        ancsPublicationRetryCount = 0;
         lastError = "";
         ancsStatus = diagnostic;
         smsStatus = diagnostic;
@@ -488,8 +504,15 @@ public final class PhoneConnectorController {
             if (!matchesConfiguredAddress(changed)) return;
             int state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE,
                     BluetoothDevice.BOND_NONE);
-            if (state == BluetoothDevice.BOND_BONDED) selectAndConnect(token);
-            else if (state == BluetoothDevice.BOND_NONE) {
+            if (state == BluetoothDevice.BOND_BONDED) {
+                if (gattConnected && gatt != null
+                        && ("authorization_required".equals(ancsStatus)
+                        || "service_not_published".equals(ancsStatus))) {
+                    restartAncsAfterBond(token, gatt);
+                } else {
+                    selectAndConnect(token);
+                }
+            } else if (state == BluetoothDevice.BOND_NONE) {
                 invalidateSelectedPhone(token, "not_bonded");
                 scheduleDeviceRescan(token);
             }
@@ -602,6 +625,7 @@ public final class PhoneConnectorController {
         cancelDeviceRescan();
         selectedAddress = safeAddress(selected);
         selectedName = safeName(selected);
+        PhoneOemConnectionBridge.requestStockConnection(context, selectedAddress);
         updateConnected(token);
         queryInitialProfileState(token, adapter, BluetoothProfile.A2DP);
         queryInitialProfileState(token, adapter, PROFILE_HEADSET_CLIENT);
@@ -922,19 +946,23 @@ public final class PhoneConnectorController {
             publishSnapshot(token);
             return;
         }
-        if (!configureServiceChanged(callbackGatt)) {
-            lastError = "GATT Service Changed subscription is unavailable";
-        }
-
         BluetoothGattService service = callbackGatt.getService(AncsProtocol.SERVICE);
         if (service == null) {
-            ancsStatus = "authorization_required";
+            // No protected ANCS characteristic exists to provoke an authorization prompt in this
+            // state. Stay connected and let Service Changed publish ANCS after stock pairing or
+            // after the user enables notification sharing on the iPhone.
+            ancsStatus = "service_not_published";
+            if (!configureServiceChanged(callbackGatt)) {
+                lastError = "ANCS is not published and GATT Service Changed is unavailable";
+            }
             configureBatteryService(callbackGatt);
             publishSnapshot(token);
             pumpGattOperations(token);
-            scheduleAncsAuthorizationProbe(token, callbackGatt);
+            scheduleAncsPublicationRetry(token, callbackGatt);
             return;
         }
+        cancelAncsPublicationRetry();
+        ancsPublicationRetryCount = 0;
         ancsControlPoint = service.getCharacteristic(AncsProtocol.CONTROL_POINT);
         ancsDataSource = service.getCharacteristic(AncsProtocol.DATA_SOURCE);
         ancsNotificationSource = service.getCharacteristic(AncsProtocol.NOTIFICATION_SOURCE);
@@ -951,6 +979,12 @@ public final class PhoneConnectorController {
                 GattTag.ANCS_NOTIFICATION)) {
             scheduleGattReconnect(token, "ANCS subscription is unsupported");
             return;
+        }
+        // Service Changed is a resilience subscription, not part of the ANCS authorization
+        // handshake. Queue it only after the protected ANCS descriptors so an OEM Android 9
+        // failure cannot prevent the iPhone permission request.
+        if (!configureServiceChanged(callbackGatt)) {
+            lastError = "GATT Service Changed subscription is unavailable";
         }
         ancsStatus = "subscribing";
         configureBatteryService(callbackGatt);
@@ -1082,13 +1116,31 @@ public final class PhoneConnectorController {
         if (handler != null) {
             Runnable timeout = () -> runIfCurrent(token, () -> {
                 if (currentGattOperation == operation) {
-                    scheduleGattReconnect(token,
-                            "GATT operation timed out: " + operation.tag.name());
+                    if (operation.tag == GattTag.SERVICE_CHANGED) {
+                        // Service Changed is optional. Completing its stuck write as a failure
+                        // lets the bounded ANCS-publication recovery own the one allowed reconnect
+                        // instead of creating a fresh unbounded 90-second reconnect loop.
+                        finishGattOperation(token, operation.kind, operation.descriptor,
+                                operation.characteristic, -1);
+                    } else {
+                        scheduleGattReconnect(token,
+                                "GATT operation timed out: " + operation.tag.name());
+                    }
                 }
             });
             gattOperationTimeout = timeout;
-            handler.postDelayed(timeout, GATT_OPERATION_TIMEOUT_MS);
+            handler.postDelayed(timeout, gattOperationTimeoutMillis(operation));
         }
+    }
+
+    private long gattOperationTimeoutMillis(@NonNull GattOperation operation) {
+        if (!ancsAuthorizedThisRun && operation.kind == GattKind.DESCRIPTOR
+                && (operation.tag == GattTag.ANCS_DATA
+                || operation.tag == GattTag.ANCS_NOTIFICATION
+                || operation.tag == GattTag.SERVICE_CHANGED)) {
+            return ANCS_AUTHORIZATION_OPERATION_TIMEOUT_MS;
+        }
+        return GATT_OPERATION_TIMEOUT_MS;
     }
 
     private void finishGattOperation(long token, @NonNull GattKind callbackKind,
@@ -1115,12 +1167,12 @@ public final class PhoneConnectorController {
             ancsNotificationSubscribed = success;
         } else if (operation.tag == GattTag.SERVICE_CHANGED) {
             serviceChangedSubscribed = success;
-            if (!success) {
+            if (success && ancsReady) {
+                ancsStatus = "ready";
+                lastError = "";
+                publishSnapshot(token);
+            } else if (!success) {
                 lastError = "GATT Service Changed descriptor write failed (" + status + ")";
-                if (isAuthorizationFailure(status)) {
-                    scheduleGattReconnect(token, lastError, "authorization_required");
-                    return;
-                }
             }
         } else if (operation.tag == GattTag.CONTROL) {
             if (operation.requestSequence != activeAncsRequestSequence) {
@@ -1141,8 +1193,19 @@ public final class PhoneConnectorController {
         }
         if (!success && (operation.tag == GattTag.ANCS_DATA
                 || operation.tag == GattTag.ANCS_NOTIFICATION)) {
+            if (isAuthorizationFailure(status)) {
+                // Do not tear down the LE link while Android/iOS may still be completing their
+                // user-driven security flow. Continue to the other descriptor and the optional
+                // Service Changed subscription; a bond completion, service change or explicit
+                // test can then retry the full ANCS setup on this exact device.
+                lastError = "ANCS authorization is required (" + status + ")";
+                ancsStatus = "authorization_required";
+                publishSnapshot(token);
+                pumpGattOperations(token);
+                return;
+            }
             scheduleGattReconnect(token, "ANCS descriptor write failed (" + status + ")",
-                    isAuthorizationFailure(status) ? "authorization_required" : "retrying");
+                    "retrying");
             return;
         }
         maybeFinishAncsSetup(token);
@@ -1226,6 +1289,18 @@ public final class PhoneConnectorController {
         // Reopening GATT gives the new database its own callback identity and operation queue.
         forceDirectGatt = true;
         scheduleGattReconnect(token, "GATT services changed", "services_changed");
+    }
+
+    private void restartAncsAfterBond(long token, @NonNull BluetoothGatt expected) {
+        Handler handler = worker;
+        if (handler == null) return;
+        handler.postDelayed(() -> runIfCurrent(token, () -> {
+            if (gatt != expected || !gattConnected) return;
+            // Never overlap service discovery with a descriptor write that Android's security
+            // manager may still be completing. Reopen one clean client after the bond settles.
+            forceDirectGatt = true;
+            scheduleGattReconnect(token, "Bluetooth LE bond completed", "negotiating");
+        }), 750L);
     }
 
     private void pumpAttributeRequests(long token) {
@@ -1877,6 +1952,7 @@ public final class PhoneConnectorController {
         if (!isCurrent(token)) return;
         lastError = bounded(detail, 512);
         ancsStatus = visibleStatus;
+        cancelAncsPublicationRetry();
         if (gattReconnectTask != null) {
             publishSnapshot(token);
             return;
@@ -1934,20 +2010,6 @@ public final class PhoneConnectorController {
         handler.postDelayed(timeout, GATT_DISCOVERY_TIMEOUT_MS);
     }
 
-    private void scheduleAncsAuthorizationProbe(long token,
-                                                @NonNull BluetoothGatt expected) {
-        Handler handler = worker;
-        if (handler == null) return;
-        handler.postDelayed(() -> runIfCurrent(token, () -> {
-            if (gatt != expected || !gattConnected
-                    || !"authorization_required".equals(ancsStatus)) return;
-            forceDirectGatt = true;
-            scheduleGattReconnect(token,
-                    "ANCS service is not published by the selected iPhone",
-                    "authorization_required");
-        }), ANCS_AUTHORIZATION_PROBE_MS);
-    }
-
     private void cancelGattWatchdogs() {
         cancelConnectWatchdog();
         cancelMtuWatchdog();
@@ -1959,6 +2021,7 @@ public final class PhoneConnectorController {
     private void cancelRetryTasks() {
         cancelDeviceRescan();
         cancelGattReconnect();
+        cancelAncsPublicationRetry();
     }
 
     private void cancelDeviceRescan() {
@@ -1971,6 +2034,43 @@ public final class PhoneConnectorController {
         Runnable retry = gattReconnectTask;
         if (retry != null && worker != null) worker.removeCallbacks(retry);
         gattReconnectTask = null;
+    }
+
+    private void scheduleAncsPublicationRetry(long token,
+                                              @NonNull BluetoothGatt expected) {
+        cancelAncsPublicationRetry();
+        Handler handler = worker;
+        if (handler == null) return;
+        Runnable retry = () -> runIfCurrent(token, () -> {
+            ancsPublicationRetryTask = null;
+            if (gatt != expected || !gattConnected
+                    || !"service_not_published".equals(ancsStatus)) return;
+            if (serviceChangedSubscribed) {
+                // The iPhone can now publish ANCS without connection churn; its indication owns
+                // the next transition.
+                publishSnapshot(token);
+                return;
+            }
+            if (ancsPublicationRetryCount >= 1) {
+                ancsStatus = "service_unavailable";
+                lastError = "ANCS was not published and Service Changed is unavailable";
+                publishSnapshot(token);
+                return;
+            }
+            ancsPublicationRetryCount++;
+            forceDirectGatt = true;
+            scheduleGattReconnect(token,
+                    "ANCS was not published; retrying one clean GATT session",
+                    "service_not_published");
+        });
+        ancsPublicationRetryTask = retry;
+        handler.postDelayed(retry, ANCS_SERVICE_PUBLICATION_RETRY_MS);
+    }
+
+    private void cancelAncsPublicationRetry() {
+        Runnable retry = ancsPublicationRetryTask;
+        if (retry != null && worker != null) worker.removeCallbacks(retry);
+        ancsPublicationRetryTask = null;
     }
 
     private void cancelConnectWatchdog() {

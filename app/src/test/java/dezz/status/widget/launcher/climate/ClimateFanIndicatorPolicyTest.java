@@ -23,13 +23,33 @@ public class ClimateFanIndicatorPolicyTest {
     }
 
     @Test
-    public void automaticModeUsesFiveSegmentIntensityScale() {
-        assertAutoProfile("AUTO · тихо", 0, 1);
+    public void automaticModeMapsEveryRussianFivePositionLabel() {
+        assertAutoProfile("AUTO · тише", 3, 1);
+        assertAutoProfile("AUTO · тихо", 0, 2);
         assertAutoProfile("AUTO · обычно", 1, 3);
-        assertAutoProfile("AUTO · интенсивно", 2, 5);
-        assertAutoProfile("AUTO · тише", 0, 1);
-        assertAutoProfile("AUTO · выше", 1, 5);
+        assertAutoProfile("AUTO · интенсивно", 2, 4);
+        assertAutoProfile("AUTO · выше", 4, 5);
         assertTrue(ClimateFanIndicatorPolicy.isAutomaticLabel("AUTO · обычно"));
+    }
+
+    @Test
+    public void automaticModeMapsEveryEnglishFivePositionLabel() {
+        // These two pairs also prove that the longer comparative tokens win over substrings.
+        assertAutoProfile("AUTO · quieter", 3, 1);
+        assertAutoProfile("AUTO · quiet", 0, 2);
+        assertAutoProfile("AUTO · silent", 0, 2);
+        assertAutoProfile("AUTO · normal", 1, 3);
+        assertAutoProfile("AUTO · high", 2, 4);
+        assertAutoProfile("AUTO · higher", 4, 5);
+    }
+
+    @Test
+    public void automaticUnknownLabelFallsBackToClampedOrdinal() {
+        assertAutoProfile("AUTO", -1, 1);
+        assertAutoProfile("AUTO", 0, 1);
+        assertAutoProfile("AUTO", 2, 3);
+        assertAutoProfile("AUTO", 4, 5);
+        assertAutoProfile("AUTO", 99, 5);
     }
 
     private static void assertAutoProfile(String label, int index, int expected) {

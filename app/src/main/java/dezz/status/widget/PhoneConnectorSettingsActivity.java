@@ -6,6 +6,8 @@
 package dezz.status.widget;
 
 import android.annotation.SuppressLint;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
@@ -64,6 +66,8 @@ import dezz.status.widget.sprut.SprutProtocolAdapter;
  * because vendor Android 9 Bluetooth stacks frequently throw while starting up.</p>
  */
 public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
+    private static final String PHONE_MIRROR_CHANNEL_ID = "phone_mirror";
+
     private Preferences preferences;
     private MaterialSwitch connectorEnabled;
     private MaterialSwitch notificationsEnabled;
@@ -223,6 +227,8 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         page.addView(card(diagnosticContent), topMargin(7));
         page.addView(actionButton(getString(R.string.phone_test_ancs),
                 this::testAncsConnection), topMargin(10));
+        page.addView(actionButton(getString(R.string.phone_notification_settings),
+                this::openPhoneNotificationSettings), topMargin(8));
 
         TextView privacy = secondary(getString(R.string.phone_privacy_hint), 13);
         privacy.setPadding(dp(8), 0, dp(8), 0);
@@ -304,6 +310,29 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         safeStart(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
     }
 
+    private void openPhoneNotificationSettings() {
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        try {
+            if (manager == null
+                    || manager.getNotificationChannel(PHONE_MIRROR_CHANNEL_ID) == null) {
+                safeStart(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
+                return;
+            }
+        } catch (RuntimeException ignored) {
+            // Fall through to the channel intent; safeStart below still handles broken Settings.
+        }
+        Intent channel = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())
+                .putExtra(Settings.EXTRA_CHANNEL_ID, PHONE_MIRROR_CHANNEL_ID);
+        try {
+            startActivity(channel);
+        } catch (RuntimeException unavailable) {
+            safeStart(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
+        }
+    }
+
     private void safeStart(@NonNull Intent intent) {
         try {
             startActivity(intent);
@@ -360,6 +389,7 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         boolean ancsReceiving = "ready".equals(ancsStatus)
                 || "ready_degraded".equals(ancsStatus);
         boolean ancsRequested = notificationsEnabled.isChecked() || messagesEnabled.isChecked();
+        boolean notificationDelivery = notificationDeliveryEnabled();
         StringBuilder result = new StringBuilder();
         result.append(line(bluetooth.supported, getString(R.string.phone_diag_adapter),
                 bluetooth.supported
@@ -398,6 +428,13 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                                 : getString(R.string.phone_diag_ancs_receiving))
                         : getString(R.string.phone_diag_ancs_iphone,
                                 localizedAncsStatus(ancsStatus))));
+        result.append('\n').append(line(!ancsRequested || notificationDelivery,
+                getString(R.string.phone_diag_android_notifications),
+                !ancsRequested
+                        ? getString(R.string.phone_diag_not_required)
+                        : notificationDelivery
+                        ? getString(R.string.phone_diag_android_notifications_enabled)
+                        : getString(R.string.phone_diag_android_notifications_blocked)));
         result.append('\n').append(line(fresh > 0,
                 getString(R.string.phone_diag_values),
                 getString(R.string.phone_diag_values_format, available, fresh, values)));
@@ -443,6 +480,8 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
             case "service_unavailable":
             case "characteristic_unavailable":
                 return getString(R.string.phone_diag_ancs_unavailable);
+            case "service_not_published":
+                return getString(R.string.phone_diag_ancs_not_published);
             case "connecting":
             case "negotiating":
             case "discovering":
@@ -664,15 +703,55 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
             Toast.makeText(this, R.string.phone_test_choose_source, Toast.LENGTH_LONG).show();
             return;
         }
+        BluetoothState bluetooth = bluetoothState();
+        if (!bluetooth.supported || !bluetooth.enabled) {
+            new AlertDialog.Builder(this)
+                    .setTitle(R.string.phone_test_pairing_required_title)
+                    .setMessage(R.string.phone_test_bluetooth_required)
+                    .setPositiveButton(R.string.phone_open_bluetooth,
+                            (dialog, which) -> openBluetoothSettings())
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+            return;
+        }
+        if (selectedBondedPhone() == null) {
+            new AlertDialog.Builder(this)
+                    .setTitle(R.string.phone_test_pairing_required_title)
+                    .setMessage(R.string.phone_test_pairing_required)
+                    .setPositiveButton(R.string.phone_open_bluetooth,
+                            (dialog, which) -> openBluetoothSettings())
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+            return;
+        }
         WidgetService service = WidgetService.getInstance();
-        if (service == null) {
+        if (service == null || !service.reconnectPhoneForDiagnostics()) {
             Toast.makeText(this, R.string.phone_test_service_unavailable,
                     Toast.LENGTH_LONG).show();
             return;
         }
-        service.reconnectPhoneForDiagnostics();
-        Toast.makeText(this, R.string.phone_test_started, Toast.LENGTH_LONG).show();
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.phone_test_started_title)
+                .setMessage(R.string.phone_test_started)
+                .setPositiveButton(android.R.string.ok, null)
+                .setNeutralButton(R.string.phone_open_bluetooth,
+                        (dialog, which) -> openBluetoothSettings())
+                .show();
         refreshDiagnostics();
+    }
+
+    private boolean notificationDeliveryEnabled() {
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        if (manager == null) return false;
+        try {
+            if (!manager.areNotificationsEnabled()) return false;
+            NotificationChannel channel =
+                    manager.getNotificationChannel(PHONE_MIRROR_CHANNEL_ID);
+            return channel == null
+                    || channel.getImportance() != NotificationManager.IMPORTANCE_NONE;
+        } catch (RuntimeException unavailable) {
+            return false;
+        }
     }
 
     private boolean persistSettings(boolean showConfirmation) {

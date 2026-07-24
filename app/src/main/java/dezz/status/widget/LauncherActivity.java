@@ -11,8 +11,6 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.graphics.Color;
 import android.graphics.Bitmap;
 import android.graphics.Typeface;
@@ -52,7 +50,6 @@ import com.google.android.material.card.MaterialCardView;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -70,6 +67,8 @@ import dezz.status.widget.launcher.CombinedNavigationPanelPolicy;
 import dezz.status.widget.launcher.HighResolutionAppIconLoader;
 import dezz.status.widget.launcher.LauncherActionsGridConfig;
 import dezz.status.widget.launcher.LauncherActionsGridConfigStore;
+import dezz.status.widget.launcher.LauncherAppCatalog;
+import dezz.status.widget.launcher.LauncherAppTileRenderer;
 import dezz.status.widget.launcher.LauncherElementFrame;
 import dezz.status.widget.launcher.LauncherGridView;
 import dezz.status.widget.launcher.LauncherLayoutStore;
@@ -2503,32 +2502,13 @@ public final class LauncherActivity extends AppCompatActivity {
 
         @Override
         public View getView(int position, View reusable, ViewGroup parent) {
-            LinearLayout cell = reusable instanceof LinearLayout
-                    ? (LinearLayout) reusable : new LinearLayout(LauncherActivity.this);
-            cell.removeAllViews();
-            cell.setOrientation(LinearLayout.VERTICAL);
-            cell.setGravity(Gravity.CENTER);
-            cell.setPadding(dp(4), dp(5), dp(4), dp(5));
             AppEntry entry = getItem(position);
             FavoriteAppConfig appearance = appearances.get(entry.packageName);
             if (appearance == null) appearance = new FavoriteAppConfig(entry.packageName);
-            ImageView icon = new ImageView(LauncherActivity.this);
-            icon.setImageDrawable(entry.icon(LauncherActivity.this, cacheIcons));
-            icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            // iconSizePx is intentionally stored in physical pixels for head-unit layouts.
-            int iconSize = Math.max(24,
-                    appearance.iconSizePx * appsGridScalePercent / 100);
-            cell.addView(icon, new LinearLayout.LayoutParams(iconSize, iconSize));
-            if (appearance.showLabel) {
-                TextView label = text(appearance.labelSizeSp * appsGridScalePercent / 100f,
-                        Color.WHITE, false);
-                label.setGravity(Gravity.CENTER);
-                label.setText(entry.label);
-                label.setMaxLines(1);
-                cell.addView(label, new LinearLayout.LayoutParams(matchWidth(),
-                        Math.max(dp(18), dp(25) * appsGridScalePercent / 100)));
-            }
-            return cell;
+            return LauncherAppTileRenderer.render(
+                    LauncherActivity.this, reusable, entry.label,
+                    entry.icon(LauncherActivity.this, cacheIcons),
+                    appearance, appsGridScalePercent);
         }
     }
 
@@ -2539,19 +2519,9 @@ public final class LauncherActivity extends AppCompatActivity {
 
         void reload() {
             apps.clear();
-            PackageManager manager = context.getPackageManager();
-            Intent query = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
-            List<ResolveInfo> resolved = manager.queryIntentActivities(query, 0);
-            Set<String> components = new LinkedHashSet<>();
-            for (ResolveInfo info : resolved) {
-                if (info.activityInfo == null) continue;
-                ComponentName component = new ComponentName(info.activityInfo.packageName,
-                        info.activityInfo.name);
-                if (!components.add(component.flattenToString())) continue;
-                apps.add(new AppEntry(String.valueOf(info.loadLabel(manager)),
-                        info.activityInfo.packageName, component));
+            for (LauncherAppCatalog.App app : LauncherAppCatalog.load(context)) {
+                apps.add(new AppEntry(app.label, app.packageName, app.component));
             }
-            apps.sort(Comparator.comparing(value -> value.label.toLowerCase(Locale.ROOT)));
             ensureDefaultFavorites();
             // Preload only the handful of icons shown on HOME. The full application list keeps
             // lazy icons so dozens of adaptive drawables do not remain resident permanently.

@@ -50,8 +50,9 @@ public class PhoneWidgetServiceIntegrationContractTest {
     @Test
     public void settingsCanRequestOneFreshDirectAncsHandshake() throws Exception {
         String source = readService();
-        assertTrue(source.contains("public void reconnectPhoneForDiagnostics()"));
-        assertTrue(source.contains("controller.reconnectForDiagnostics()"));
+        assertTrue(source.contains("public boolean reconnectPhoneForDiagnostics()"));
+        assertTrue(source.contains(
+                "return controller != null && controller.reconnectForDiagnostics()"));
     }
 
     @Test

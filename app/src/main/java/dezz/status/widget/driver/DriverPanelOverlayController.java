@@ -38,6 +38,7 @@ import androidx.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -46,13 +47,18 @@ import dezz.status.widget.R;
 import dezz.status.widget.WidgetAccessibilityService;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.launcher.HighResolutionAppIconLoader;
-import dezz.status.widget.launcher.InstalledAppCatalog;
+import dezz.status.widget.launcher.LauncherAppCatalog;
+import dezz.status.widget.launcher.LauncherAppTileRenderer;
 import dezz.status.widget.launcher.LauncherIconResolver;
+import dezz.status.widget.launcher.LauncherLayoutStore;
 import dezz.status.widget.launcher.LauncherShortcutStore;
+import dezz.status.widget.launcher.apps.FavoriteAppConfig;
+import dezz.status.widget.launcher.apps.FavoriteAppsConfigStore;
+import dezz.status.widget.launcher.panels.PanelElementConfigStore;
 import dezz.status.widget.shell.PrivilegedShell;
 
 /**
- * Owns the old-style driver rail and the overlay all-apps drawer.
+ * Owns the selected Monjaro driver rail and the overlay all-apps drawer.
  *
  * <p>The rail is always one continuous window. Its movable climate shortcut uses the already
  * normalized live climate state and temporarily removes the whole rail from input hit-testing
@@ -65,6 +71,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
     private static final String TAG = "DriverPanelOverlay";
     private static final int DISPLAY_ID = Display.DEFAULT_DISPLAY;
+    private static final long PROXY_TAP_SETTLE_MS = 70L;
+    private static final long PROXY_TAP_WATCHDOG_MS = 15_000L;
 
     private final Context appContext;
     private final Preferences preferences;
@@ -122,7 +130,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         }
         DisplayMetrics metrics = new DisplayMetrics();
         display.getRealMetrics(metrics);
-        LauncherShortcutStore store = LauncherShortcutStore.forDriverPanel(preferences);
+        Preferences.DriverPanelProfile profile = preferences.activeDriverPanelProfile();
+        LauncherShortcutStore store = LauncherShortcutStore.forDriverPanel(preferences, profile);
         List<LauncherShortcutStore.Shortcut> enabled = new ArrayList<>();
         for (LauncherShortcutStore.Shortcut shortcut : store.all()) {
             if (shortcut.enabled && enabled.size() < DriverPanelLayoutPolicy.MAX_BUTTONS) {
@@ -131,8 +140,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         }
         DriverPanelLayoutPolicy.Layout geometry = DriverPanelLayoutPolicy.calculate(
                 metrics.heightPixels,
-                preferences.driverPanelTopPaddingPx.get(),
-                preferences.driverPanelBottomPaddingPx.get(),
+                profile.topPaddingPx.get(),
+                profile.bottomPaddingPx.get(),
                 enabled.size(),
                 false);
 
@@ -140,13 +149,16 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         for (int type : DriverPanelWindowTypePolicy.candidates()) {
             if (generation != applyGeneration) return;
             try {
-                attachForType(display, type, enabled, geometry);
+                attachForType(display, type, enabled, geometry,
+                        metrics.widthPixels, metrics.heightPixels, profile);
                 attachedType = type;
                 String mode = type == WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                         ? "обычный overlay" : "системный ECARX";
                 String pocket = "кнопки используют всю высоту; климат открывается прокси-кнопкой";
+                String style = profile.style == Preferences.DriverPanelStyle.NEW
+                        ? "Новая панель" : "Старая панель";
                 statusListener.onStatus("active",
-                        "Старая панель · " + enabled.size() + " кнопок · "
+                        style + " · " + enabled.size() + " кнопок · "
                                 + mode + " · " + pocket);
                 return;
             } catch (RuntimeException error) {
@@ -199,15 +211,27 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
         FrameLayout root = new FrameLayout(context);
         root.setBackgroundColor(Color.argb(247, 10, 13, 18));
-        int railInset = Math.max(100, preferences.driverPanelWidthPx.get()) + 24;
-        if (preferences.driverPanelSide.get() == 0) {
+        DisplayMetrics metrics = new DisplayMetrics();
+        display.getRealMetrics(metrics);
+        Preferences.DriverPanelProfile profile = preferences.activeDriverPanelProfile();
+        int minimumReferenceWidth = DriverPanelLayoutPolicy.referencePanelWidth(
+                profile.style == Preferences.DriverPanelStyle.NEW);
+        int referenceWidth = Math.max(minimumReferenceWidth,
+                Math.min(320, profile.widthPx.get()));
+        int physicalWidth = DriverPanelLayoutPolicy.scaleReferenceWidth(
+                metrics.widthPixels, referenceWidth);
+        int appsGridScalePercent = new PanelElementConfigStore(preferences)
+                .load(LauncherLayoutStore.APPS)
+                .scale(PanelElementConfigStore.APPS_GRID);
+        int railInset = Math.max(100, physicalWidth) + 24;
+        if (profile.side.get() == 0) {
             root.setPadding(railInset, 24, 24, 24);
         } else {
             root.setPadding(24, 24, railInset, 24);
         }
 
         TextView title = new TextView(context);
-        title.setText("Все приложения · включая системные");
+        title.setText("Все приложения");
         title.setTextColor(Color.WHITE);
         title.setTextSize(24);
         title.setGravity(Gravity.CENTER_VERTICAL);
@@ -227,13 +251,12 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
         GridView grid = new GridView(context);
         grid.setNumColumns(5);
-        grid.setHorizontalSpacing(12);
-        grid.setVerticalSpacing(12);
+        grid.setVerticalSpacing(dp(context, 8));
         grid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
-        grid.setClipToPadding(false);
-        grid.setPadding(0, 12, 0, 24);
+        grid.setPadding(dp(context, 16), dp(context, 16),
+                dp(context, 16), dp(context, 16));
         grid.setAdapter(new AppsAdapter(context, Collections.emptyList(),
-                this::dismissAllApps));
+                preferences, appsGridScalePercent, this::dismissAllApps));
         FrameLayout.LayoutParams gridParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         gridParams.topMargin = 84;
@@ -253,12 +276,12 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
         final int generation = ++applyGeneration;
         catalogExecutor.execute(() -> {
-            List<InstalledAppCatalog.App> apps = InstalledAppCatalog.load(appContext);
+            List<LauncherAppCatalog.App> apps = LauncherAppCatalog.load(appContext);
             mainHandler.post(() -> {
                 if (drawerGrid == null || drawerWindow == null
                         || generation != applyGeneration) return;
                 drawerGrid.setAdapter(new AppsAdapter(drawerGrid.getContext(), apps,
-                        this::dismissAllApps));
+                        preferences, appsGridScalePercent, this::dismissAllApps));
             });
         });
     }
@@ -274,10 +297,12 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         if (display == null) return;
         DisplayMetrics metrics = new DisplayMetrics();
         display.getRealMetrics(metrics);
+        Preferences.DriverPanelProfile profile = preferences.activeDriverPanelProfile();
         DriverPanelLayoutPolicy.TapTarget target =
                 DriverPanelLayoutPolicy.stockClimateTapTarget(
                         metrics.widthPixels, metrics.heightPixels,
-                        preferences.driverPanelSide.get() == 1);
+                        profile.side.get() == 1,
+                        profile.style == Preferences.DriverPanelStyle.NEW);
         int generation = ++proxyTapGeneration;
 
         // Keep the panel visually stable but remove it from input hit-testing for the duration of
@@ -289,30 +314,36 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         }, 90L);
         mainHandler.postDelayed(() -> {
             if (generation == proxyTapGeneration) setPanelTouchable(true);
-        }, 1_200L);
-        if (WidgetAccessibilityService.performTap(target.x, target.y, success -> {
+        }, PROXY_TAP_WATCHDOG_MS);
+        // updateViewLayout() is asynchronous on Android. Wait for one short WindowManager
+        // relayout before injecting the gesture, otherwise the still-interactive rail can consume
+        // the synthetic tap even though its opaque pixels never left the screen.
+        mainHandler.postDelayed(() -> {
             if (generation != proxyTapGeneration) return;
-            if (success) restore.run();
-            else fallbackStockClimateTap(target, generation);
-        })) return;
-        fallbackStockClimateTap(target, generation);
+            if (WidgetAccessibilityService.performTap(target.x, target.y, success -> {
+                if (generation != proxyTapGeneration) return;
+                if (success) restore.run();
+                else fallbackStockClimateTap(target, generation);
+            })) return;
+            fallbackStockClimateTap(target, generation);
+        }, PROXY_TAP_SETTLE_MS);
     }
 
     private void fallbackStockClimateTap(@NonNull DriverPanelLayoutPolicy.TapTarget target,
                                          int generation) {
-        // Rare fallback for head units where accessibility was disabled. Removing the window is
-        // preferable to dispatching into our own overlay while privileged-shell discovery runs.
-        detachPanel();
+        // The shared settle delay above already made the opaque rail input-transparent. The shell
+        // fallback therefore injects immediately without detaching or visually exposing OEM UI.
         PrivilegedShell.get(appContext).runCommand(
-                "input tap " + target.x + " " + target.y, (output, error) -> {
-                    if (generation != proxyTapGeneration) return;
-                    applyPreferences();
-                    if (error != null) {
-                        Toast.makeText(appContext,
-                                "Включите спецвозможности для кнопки штатного климата",
-                                Toast.LENGTH_LONG).show();
-                    }
-                });
+                "input tap " + target.x + " " + target.y, (output, error) ->
+                        mainHandler.post(() -> {
+                            if (generation != proxyTapGeneration) return;
+                            setPanelTouchable(true);
+                            if (error != null) {
+                                Toast.makeText(appContext,
+                                        "Включите спецвозможности для кнопки штатного климата",
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        }));
     }
 
     private void dismissAllApps() {
@@ -325,24 +356,33 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
     private void attachForType(@NonNull Display display, int type,
                                @NonNull List<LauncherShortcutStore.Shortcut> shortcuts,
-                               @NonNull DriverPanelLayoutPolicy.Layout geometry) {
+                               @NonNull DriverPanelLayoutPolicy.Layout geometry,
+                               int screenWidth,
+                               int screenHeight,
+                               @NonNull Preferences.DriverPanelProfile profile) {
         Context context = windowContext(display, type);
         WindowManager manager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         if (manager == null) throw new IllegalStateException("WindowManager unavailable");
-        attachSegment(context, manager, type, geometry.contentTop,
-                geometry.contentBottom - geometry.contentTop, shortcuts);
+        attachSegment(context, manager, type, screenWidth, screenHeight,
+                geometry, shortcuts, profile);
     }
 
     private void attachSegment(@NonNull Context context, @NonNull WindowManager manager,
-                               int type, int y, int height,
-                               @NonNull List<LauncherShortcutStore.Shortcut> shortcuts) {
+                               int type, int screenWidth, int screenHeight,
+                               @NonNull DriverPanelLayoutPolicy.Layout geometry,
+                               @NonNull List<LauncherShortcutStore.Shortcut> shortcuts,
+                               @NonNull Preferences.DriverPanelProfile profile) {
         LinearLayout root = new LinearLayout(context);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER);
         root.setClipChildren(false);
         root.setClipToPadding(false);
-        root.setBackground(panelBackground());
-        int gap = Math.max(0, preferences.driverPanelItemGapPx.get());
+        root.setBackground(panelBackground(context, profile));
+        // The window and its backdrop always cover the complete OEM rail. User top/bottom values
+        // constrain only the button content; they must never create transparent stock-panel gaps.
+        root.setPadding(0, geometry.contentTop, 0,
+                Math.max(0, screenHeight - geometry.contentBottom));
+        int gap = Math.max(0, profile.itemGapPx.get());
         for (LauncherShortcutStore.Shortcut shortcut : shortcuts) {
             View button = shortcutButton(context, shortcut);
             LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(
@@ -350,8 +390,12 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             itemParams.setMargins(4, gap / 2, 4, gap - gap / 2);
             root.addView(button, itemParams);
         }
-        WindowManager.LayoutParams params = segmentParams(type, y, height);
+        WindowManager.LayoutParams params = segmentParams(
+                type, screenHeight, screenWidth, profile);
         manager.addView(root, params);
+        Log.d(TAG, "Attached " + profile.style.key + " driver panel type=" + type
+                + " screenWidth=" + screenWidth + " width=" + params.width
+                + " x=" + params.x + " side=" + profile.side.get());
         panelWindows.add(new AttachedWindow(root, params, manager));
     }
 
@@ -417,28 +461,40 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     }
 
     @NonNull
-    private GradientDrawable panelBackground() {
+    private GradientDrawable panelBackground(
+            @NonNull Context context,
+            @NonNull Preferences.DriverPanelProfile profile) {
         GradientDrawable background = new GradientDrawable();
-        background.setColor(safeColor(preferences.driverPanelBackgroundColor.get(),
-                Color.argb(238, 19, 23, 28)));
-        background.setCornerRadius(Math.max(0,
-                preferences.driverPanelCornerRadiusPx.get()));
+        background.setColor(safeOpaqueColor(profile.backgroundColor.get(),
+                Color.rgb(19, 23, 28)));
+        float radius = Math.max(dp(context, 20), profile.cornerRadiusPx.get());
+        background.setCornerRadii(panelCornerRadii(radius, profile.side.get() == 1));
         return background;
     }
 
     @NonNull
-    private WindowManager.LayoutParams segmentParams(int type, int y, int height) {
-        int width = Math.max(80, Math.min(320, preferences.driverPanelWidthPx.get()));
+    private WindowManager.LayoutParams segmentParams(
+            int type, int screenHeight, int screenWidth,
+            @NonNull Preferences.DriverPanelProfile profile) {
+        int minimumReferenceWidth = DriverPanelLayoutPolicy.referencePanelWidth(
+                profile.style == Preferences.DriverPanelStyle.NEW);
+        int referenceWidth = Math.max(minimumReferenceWidth,
+                Math.min(320, profile.widthPx.get()));
+        int width = DriverPanelLayoutPolicy.scaleReferenceWidth(
+                screenWidth, referenceWidth);
         int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                 | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                 | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
+                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                width, Math.max(1, height), type, flags, PixelFormat.TRANSLUCENT);
-        params.gravity = Gravity.TOP | (preferences.driverPanelSide.get() == 0
-                ? Gravity.LEFT : Gravity.RIGHT);
-        params.x = 0;
-        params.y = Math.max(0, y);
+                width, Math.max(1, screenHeight), type, flags, PixelFormat.TRANSLUCENT);
+        // ECARX lays x=0 out after its stock left rail. MonjaroPanel always anchors TOP|LEFT and
+        // crosses that reserved frame with a scaled negative 160/1920 inset.
+        params.gravity = Gravity.TOP | Gravity.LEFT;
+        params.x = DriverPanelLayoutPolicy.panelWindowX(
+                screenWidth, width, profile.side.get() == 1);
+        params.y = 0;
         params.setTitle("Status Widget driver panel");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             params.layoutInDisplayCutoutMode =
@@ -519,6 +575,18 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         }
     }
 
+    private static int safeOpaqueColor(@Nullable String raw, int fallback) {
+        return safeColor(raw, fallback) | 0xFF000000;
+    }
+
+    private static float[] panelCornerRadii(float radius, boolean panelOnRight) {
+        float r = Math.max(0f, radius);
+        // MonjaroPanel keeps the physical screen edge square and rounds only the inner edge.
+        return panelOnRight
+                ? new float[]{r, r, 0f, 0f, 0f, 0f, r, r}
+                : new float[]{0f, 0f, r, r, r, r, 0f, 0f};
+    }
+
     @NonNull
     private static Drawable rippleBackground(int color, int radius) {
         GradientDrawable content = new GradientDrawable();
@@ -528,7 +596,11 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         mask.setColor(Color.WHITE);
         mask.setCornerRadius(radius);
         return new RippleDrawable(ColorStateList.valueOf(
-                Color.argb(75, 255, 255, 255)), content, mask);
+                Color.argb(0x33, 255, 255, 255)), content, mask);
+    }
+
+    private static int dp(@NonNull Context context, int value) {
+        return Math.round(value * context.getResources().getDisplayMetrics().density);
     }
 
     private static final class AttachedWindow {
@@ -552,12 +624,17 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
     private static final class AppsAdapter extends BaseAdapter {
         private final Context context;
-        private final List<InstalledAppCatalog.App> apps;
+        private final List<LauncherAppCatalog.App> apps;
+        private final Map<String, FavoriteAppConfig> appearances;
+        private final int scalePercent;
         private final Runnable close;
 
-        AppsAdapter(Context context, List<InstalledAppCatalog.App> apps, Runnable close) {
+        AppsAdapter(Context context, List<LauncherAppCatalog.App> apps,
+                    Preferences preferences, int scalePercent, Runnable close) {
             this.context = context;
             this.apps = apps;
+            this.appearances = new FavoriteAppsConfigStore(preferences).appearanceSnapshot();
+            this.scalePercent = scalePercent;
             this.close = close;
         }
 
@@ -567,42 +644,18 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
-            InstalledAppCatalog.App app = apps.get(position);
-            LinearLayout tile = new LinearLayout(context);
-            tile.setOrientation(LinearLayout.VERTICAL);
-            tile.setGravity(Gravity.CENTER);
-            tile.setPadding(8, 10, 8, 10);
-            tile.setMinimumHeight(126);
-            tile.setAlpha(app.launchable() ? 1f : .45f);
-            tile.setBackground(rippleBackground(Color.argb(50, 255, 255, 255), 16));
-
-            ImageView icon = new ImageView(context);
-            Drawable drawable = InstalledAppCatalog.loadIcon(context, app);
-            if (drawable != null) icon.setImageDrawable(drawable);
-            tile.addView(icon, new LinearLayout.LayoutParams(58, 58));
-
-            TextView label = new TextView(context);
-            label.setText(app.label);
-            label.setTextColor(Color.WHITE);
-            label.setTextSize(13);
-            label.setGravity(Gravity.CENTER);
-            label.setMaxLines(2);
-            label.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT);
-            labelParams.topMargin = 6;
-            tile.addView(label, labelParams);
-            tile.setContentDescription(app.label + ". " + app.secondaryLabel());
+            LauncherAppCatalog.App app = apps.get(position);
+            FavoriteAppConfig appearance = appearances.get(app.packageName);
+            if (appearance == null) appearance = new FavoriteAppConfig(app.packageName);
+            LinearLayout tile = LauncherAppTileRenderer.render(
+                    context, convertView, app.label,
+                    LauncherAppCatalog.loadIcon(context, app),
+                    appearance, scalePercent);
+            tile.setContentDescription(app.label);
             tile.setOnClickListener(view -> {
-                if (!app.launchable()) {
-                    Toast.makeText(context, "У приложения нет доступного экрана",
-                            Toast.LENGTH_SHORT).show();
-                    return;
-                }
                 try {
                     close.run();
-                    context.startActivity(InstalledAppCatalog.launchIntent(app));
+                    context.startActivity(LauncherAppCatalog.launchIntent(app));
                 } catch (RuntimeException error) {
                     Toast.makeText(context, "Не удалось открыть " + app.label,
                             Toast.LENGTH_SHORT).show();

@@ -373,6 +373,58 @@ public class Preferences {
         }
     }
 
+    /** Stock Monjaro driver-panel generation selected by the user. */
+    public enum DriverPanelStyle {
+        OLD("old"),
+        NEW("new");
+
+        @NonNull public final String key;
+
+        DriverPanelStyle(@NonNull String key) {
+            this.key = key;
+        }
+
+        @NonNull
+        public static DriverPanelStyle fromKey(@Nullable String key) {
+            return NEW.key.equalsIgnoreCase(key == null ? "" : key) ? NEW : OLD;
+        }
+    }
+
+    /**
+     * One complete, independently persisted driver-panel profile.
+     *
+     * <p>The old profile deliberately keeps every HA1082 storage key unchanged. The new profile
+     * uses the additive {@code driverPanelNew*} namespace, so selecting another generation never
+     * overwrites the user's dimensions, appearance or ordered buttons.</p>
+     */
+    public static final class DriverPanelProfile {
+        @NonNull public final DriverPanelStyle style;
+        public final Int side;
+        public final Int widthPx;
+        public final Int topPaddingPx;
+        public final Int bottomPaddingPx;
+        public final Int itemGapPx;
+        public final Int cornerRadiusPx;
+        public final Str backgroundColor;
+        public final Str shortcutsJson;
+
+        private DriverPanelProfile(@NonNull Preferences preferences,
+                                   @NonNull DriverPanelStyle style,
+                                   @NonNull String prefix,
+                                   int defaultWidthPx) {
+            this.style = style;
+            side = new Int(preferences, prefix + "Side", 0);
+            widthPx = new Int(preferences, prefix + "WidthPx", defaultWidthPx);
+            topPaddingPx = new Int(preferences, prefix + "TopPaddingPx", 8);
+            bottomPaddingPx = new Int(preferences, prefix + "BottomPaddingPx", 8);
+            itemGapPx = new Int(preferences, prefix + "ItemGapPx", 10);
+            // Driver mode in the reference applies a minimum 20 px radius over the 16 px resource.
+            cornerRadiusPx = new Int(preferences, prefix + "CornerRadiusPx", 20);
+            backgroundColor = new Str(preferences, prefix + "BackgroundColor", "#FF13171C");
+            shortcutsJson = new Str(preferences, prefix + "ShortcutsJson", "");
+        }
+    }
+
     private final SharedPreferences prefs;
     private final Context appContext;
 
@@ -516,23 +568,28 @@ public class Preferences {
     public final Int climateButtonY = new Int(this, "climateButtonY", 300);
     public final Bool climateButtonLocked = new Bool(this, "climateButtonLocked", false);
     public final Str launcherShortcutsJson = new Str(this, "launcherShortcutsJson", "");
-    // Optional replacement for the old Monjaro driver rail. The stock climate proxy intentionally
-    // has no user coordinates: DriverPanelLayoutPolicy mirrors the reference old-panel centre,
-    // while the proxy button itself may occupy any user-selected slot.
+    // Optional replacement for either generation of the Monjaro driver rail. Enabled state and
+    // selected style are global; every dimension, appearance value and button collection below is
+    // profile-local. Missing driverPanelStyle intentionally resolves to OLD so an HA1082 upgrade
+    // continues using the existing driverPanel* values without a destructive copy migration.
     public final Bool driverPanelEnabled = new Bool(this, "driverPanelEnabled", false);
+    public final Str driverPanelStyle = new Str(this, "driverPanelStyle",
+            DriverPanelStyle.OLD.key);
+    public final DriverPanelProfile driverPanelOld = new DriverPanelProfile(
+            this, DriverPanelStyle.OLD, "driverPanel", 120);
+    public final DriverPanelProfile driverPanelNew = new DriverPanelProfile(
+            this, DriverPanelStyle.NEW, "driverPanelNew", 150);
+    // Source-compatible aliases for the original HA1082 profile and its exact on-disk keys.
     /** 0 = left/start edge, 1 = right/end edge. */
-    public final Int driverPanelSide = new Int(this, "driverPanelSide", 0);
-    public final Int driverPanelWidthPx = new Int(this, "driverPanelWidthPx", 120);
-    public final Int driverPanelTopPaddingPx = new Int(this, "driverPanelTopPaddingPx", 8);
-    public final Int driverPanelBottomPaddingPx = new Int(this, "driverPanelBottomPaddingPx", 8);
-    public final Int driverPanelItemGapPx = new Int(this, "driverPanelItemGapPx", 6);
-    public final Int driverPanelCornerRadiusPx = new Int(this,
-            "driverPanelCornerRadiusPx", 18);
-    public final Str driverPanelBackgroundColor = new Str(this,
-            "driverPanelBackgroundColor", "#EE13171C");
-    /** Separate ordered collection; never aliases the HOME action grid. */
-    public final Str driverPanelShortcutsJson = new Str(this,
-            "driverPanelShortcutsJson", "");
+    public final Int driverPanelSide = driverPanelOld.side;
+    public final Int driverPanelWidthPx = driverPanelOld.widthPx;
+    public final Int driverPanelTopPaddingPx = driverPanelOld.topPaddingPx;
+    public final Int driverPanelBottomPaddingPx = driverPanelOld.bottomPaddingPx;
+    public final Int driverPanelItemGapPx = driverPanelOld.itemGapPx;
+    public final Int driverPanelCornerRadiusPx = driverPanelOld.cornerRadiusPx;
+    public final Str driverPanelBackgroundColor = driverPanelOld.backgroundColor;
+    /** Separate ordered OLD-profile collection; never aliases the HOME action grid. */
+    public final Str driverPanelShortcutsJson = driverPanelOld.shortcutsJson;
     /** Additive cell positions for action/smart-home icons; shortcut actions stay untouched. */
     public final Str launcherActionsGridJson = new Str(this, "launcherActionsGridJson", "");
     public final Int launcherAppsColumns = new Int(this, "launcherAppsColumns", 3);
@@ -695,6 +752,17 @@ public class Preferences {
         final Context deviceContext = context.getApplicationContext().createDeviceProtectedStorageContext();
         prefs = deviceContext.getSharedPreferences(context.getPackageName() + "_preferences", Context.MODE_PRIVATE);
         migrateLegacyPrefsIfNeeded();
+    }
+
+    @NonNull
+    public DriverPanelStyle activeDriverPanelStyle() {
+        return DriverPanelStyle.fromKey(driverPanelStyle.get());
+    }
+
+    @NonNull
+    public DriverPanelProfile activeDriverPanelProfile() {
+        return activeDriverPanelStyle() == DriverPanelStyle.NEW
+                ? driverPanelNew : driverPanelOld;
     }
 
     /**

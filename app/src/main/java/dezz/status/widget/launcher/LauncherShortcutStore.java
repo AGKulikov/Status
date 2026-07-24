@@ -159,8 +159,14 @@ public final class LauncherShortcutStore {
 
     @NonNull
     public static LauncherShortcutStore forDriverPanel(@NonNull Preferences preferences) {
-        return new LauncherShortcutStore(preferences,
-                preferences.driverPanelShortcutsJson, true);
+        return forDriverPanel(preferences, preferences.activeDriverPanelProfile());
+    }
+
+    @NonNull
+    public static LauncherShortcutStore forDriverPanel(
+            @NonNull Preferences preferences,
+            @NonNull Preferences.DriverPanelProfile profile) {
+        return new LauncherShortcutStore(preferences, profile.shortcutsJson, true);
     }
 
     public void load() {
@@ -359,6 +365,8 @@ public final class LauncherShortcutStore {
         value.showTitle = false;
         value.iconSizePx = 54;
         value.backgroundColor = "#00000000";
+        // Night driver-mode tint from MonjaroPanel. Persisted shortcuts remain untouched.
+        value.iconColor = "#FFE0E5F3";
         return value;
     }
 

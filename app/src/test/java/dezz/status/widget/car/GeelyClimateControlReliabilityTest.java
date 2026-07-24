@@ -113,44 +113,54 @@ public final class GeelyClimateControlReliabilityTest {
                 "\"Не удалось подтвердить режим AUTO. Команда не отправлена\""));
     }
 
-    @Test public void autoFanFallbackSelectsOneConfirmedVehicleFamilyOnly() {
+    @Test public void autoFanProfilesStayInOneCanonicalFivePositionDomain() {
         List<CarControlDescriptor.Option> advertisedSuperset = autoFanOptions(
-                IHvac.AUTO_FAN_SETTING_SILENT,
-                IHvac.AUTO_FAN_SETTING_NORMAL,
                 IHvac.AUTO_FAN_SETTING_HIGH,
-                IHvac.AUTO_FAN_SETTING_QUIETER,
-                IHvac.AUTO_FAN_SETTING_HIGHER);
+                IHvac.AUTO_FAN_SETTING_SILENT,
+                IHvac.AUTO_FAN_SETTING_HIGHER,
+                IHvac.AUTO_FAN_SETTING_NORMAL,
+                IHvac.AUTO_FAN_SETTING_QUIETER);
 
-        assertEquals(Arrays.asList(
+        List<Integer> expectedValues = Arrays.asList(
+                        IHvac.AUTO_FAN_SETTING_QUIETER,
                         IHvac.AUTO_FAN_SETTING_SILENT,
                         IHvac.AUTO_FAN_SETTING_NORMAL,
-                        IHvac.AUTO_FAN_SETTING_HIGH),
+                        IHvac.AUTO_FAN_SETTING_HIGH,
+                        IHvac.AUTO_FAN_SETTING_HIGHER);
+        List<String> expectedLabels = Arrays.asList(
+                "AUTO · тише", "AUTO · тихо", "AUTO · обычно",
+                "AUTO · интенсивно", "AUTO · выше");
+
+        List<CarControlDescriptor.Option> withoutConfirmed =
+                GeelyCarIntegration.safeAutoFanOptions(advertisedSuperset,
+                        null, Collections.emptyList());
+        assertEquals(expectedValues, values(withoutConfirmed));
+        assertEquals(expectedLabels, labels(withoutConfirmed));
+        assertEquals(expectedValues,
                 values(GeelyCarIntegration.safeAutoFanOptions(advertisedSuperset,
                         (double) IHvac.AUTO_FAN_SETTING_NORMAL, Collections.emptyList())));
-        assertEquals(Arrays.asList(
-                        IHvac.AUTO_FAN_SETTING_QUIETER,
-                        IHvac.AUTO_FAN_SETTING_HIGHER),
+        assertEquals(expectedValues,
                 values(GeelyCarIntegration.safeAutoFanOptions(advertisedSuperset,
                         (double) IHvac.AUTO_FAN_SETTING_HIGHER, Collections.emptyList())));
-        assertTrue(GeelyCarIntegration.safeAutoFanOptions(advertisedSuperset,
-                null, Collections.emptyList()).isEmpty());
     }
 
-    @Test public void autoFanDiscoveryFailureUsesConfirmedFamilyOrExactRuntimeCache() {
+    @Test public void autoFanDiscoveryFailureUsesConfirmedDomainOrExactRuntimeCache() {
         assertEquals(Arrays.asList(
+                        IHvac.AUTO_FAN_SETTING_QUIETER,
                         IHvac.AUTO_FAN_SETTING_SILENT,
                         IHvac.AUTO_FAN_SETTING_NORMAL,
-                        IHvac.AUTO_FAN_SETTING_HIGH),
+                        IHvac.AUTO_FAN_SETTING_HIGH,
+                        IHvac.AUTO_FAN_SETTING_HIGHER),
                 values(GeelyCarIntegration.safeAutoFanOptions(Collections.emptyList(),
                         (double) IHvac.AUTO_FAN_SETTING_HIGH, Collections.emptyList())));
 
-        List<CarControlDescriptor.Option> cachedTwoProfile = autoFanOptions(
-                IHvac.AUTO_FAN_SETTING_QUIETER, IHvac.AUTO_FAN_SETTING_HIGHER);
+        List<CarControlDescriptor.Option> cachedSubset = autoFanOptions(
+                IHvac.AUTO_FAN_SETTING_HIGHER, IHvac.AUTO_FAN_SETTING_SILENT);
         assertEquals(Arrays.asList(
-                        IHvac.AUTO_FAN_SETTING_QUIETER,
+                        IHvac.AUTO_FAN_SETTING_SILENT,
                         IHvac.AUTO_FAN_SETTING_HIGHER),
                 values(GeelyCarIntegration.safeAutoFanOptions(Collections.emptyList(),
-                        null, cachedTwoProfile)));
+                        null, cachedSubset)));
         assertTrue(GeelyCarIntegration.safeAutoFanOptions(Collections.emptyList(),
                 null, Collections.emptyList()).isEmpty());
     }
@@ -264,6 +274,14 @@ public final class GeelyClimateControlReliabilityTest {
         List<Integer> result = new ArrayList<>();
         for (CarControlDescriptor.Option option : options) {
             result.add((int) Math.round(option.value));
+        }
+        return result;
+    }
+
+    private static List<String> labels(List<CarControlDescriptor.Option> options) {
+        List<String> result = new ArrayList<>();
+        for (CarControlDescriptor.Option option : options) {
+            result.add(option.label);
         }
         return result;
     }

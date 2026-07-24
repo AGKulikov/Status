@@ -29,6 +29,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
@@ -48,11 +49,12 @@ import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
-/** Visual editor for the old-style Monjaro driver panel. */
+/** Visual editor for both independently configured Monjaro driver-panel generations. */
 public final class DriverPanelSettingsActivity extends AppCompatActivity {
     private interface IntSetter { void set(int value); }
 
     private Preferences preferences;
+    private Preferences.DriverPanelProfile profile;
     private LauncherShortcutStore store;
     private LinearLayout buttonsHost;
     private FrameLayout preview;
@@ -81,8 +83,9 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         preferences = new Preferences(this);
-        store = LauncherShortcutStore.forDriverPanel(preferences);
-        setTitle("Панель водителя");
+        profile = preferences.activeDriverPanelProfile();
+        store = LauncherShortcutStore.forDriverPanel(preferences, profile);
+        setTitle("Панель водителя · " + styleName(profile.style));
         View content = buildContent();
         setContentView(content);
         SettingsBackNavigation.install(this, content);
@@ -126,7 +129,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         settings.setPadding(dp(10), 0, dp(22), dp(28));
         scroll.addView(settings, new ScrollView.LayoutParams(match(), wrap()));
 
-        title(settings, "Панель водителя · старая");
+        title(settings, "Панель водителя · " + styleNameLower(profile.style));
         hint(settings, "До 10 кнопок поверх любых приложений. Домой, Назад и полный список "
                 + "приложений уже добавлены по умолчанию.");
 
@@ -135,9 +138,10 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                     preferences.driverPanelEnabled.set(value);
                     applyPanel();
                 });
+        addStyleSelector(settings);
         addSwitch(settings, "Показывать справа",
-                preferences.driverPanelSide.get() == 1, value -> {
-                    preferences.driverPanelSide.set(value ? 1 : 0);
+                profile.side.get() == 1, value -> {
+                    profile.side.set(value ? 1 : 0);
                     refreshPreview();
                     applyPanel();
                 });
@@ -146,54 +150,58 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 + "перестаёт перехватывать касания и имитирует тап в исходном центре кнопки "
                 + "на 37,5% высоты экрана.");
 
-        slider(settings, "Ширина панели", 80, 260,
-                preferences.driverPanelWidthPx.get(), " px", value -> {
-                    preferences.driverPanelWidthPx.set(value);
+        int minimumPanelWidth = DriverPanelLayoutPolicy.referencePanelWidth(
+                profile.style == Preferences.DriverPanelStyle.NEW);
+        slider(settings, "Ширина панели", minimumPanelWidth, 260,
+                Math.max(minimumPanelWidth, profile.widthPx.get()), " px", value -> {
+                    profile.widthPx.set(value);
                     refreshPreview();
                     applyPanel();
                 });
         slider(settings, "Верхний отступ", 0, 100,
-                preferences.driverPanelTopPaddingPx.get(), " px", value -> {
-                    preferences.driverPanelTopPaddingPx.set(value);
+                profile.topPaddingPx.get(), " px", value -> {
+                    profile.topPaddingPx.set(value);
                     refreshPreview();
                     applyPanel();
                 });
         slider(settings, "Нижний отступ", 0, 100,
-                preferences.driverPanelBottomPaddingPx.get(), " px", value -> {
-                    preferences.driverPanelBottomPaddingPx.set(value);
+                profile.bottomPaddingPx.get(), " px", value -> {
+                    profile.bottomPaddingPx.set(value);
                     refreshPreview();
                     applyPanel();
                 });
         slider(settings, "Расстояние между кнопками", 0, 30,
-                preferences.driverPanelItemGapPx.get(), " px", value -> {
-                    preferences.driverPanelItemGapPx.set(value);
+                profile.itemGapPx.get(), " px", value -> {
+                    profile.itemGapPx.set(value);
                     refreshPreview();
                     applyPanel();
                 });
-        slider(settings, "Скругление панели", 0, 60,
-                preferences.driverPanelCornerRadiusPx.get(), " px", value -> {
-                    preferences.driverPanelCornerRadiusPx.set(value);
+        int minimumDriverRadius = dp(20);
+        slider(settings, "Скругление панели", minimumDriverRadius,
+                Math.max(60, minimumDriverRadius),
+                Math.max(minimumDriverRadius, profile.cornerRadiusPx.get()), " px", value -> {
+                    profile.cornerRadiusPx.set(value);
                     refreshPreview();
                     applyPanel();
                 });
 
-        MaterialButton background = button("Цвет и прозрачность панели");
-        AppleColorPickerDialog.decorateButton(background, "Цвет и прозрачность панели",
-                preferences.driverPanelBackgroundColor.get());
+        MaterialButton background = button("Цвет панели");
+        AppleColorPickerDialog.decorateButton(background, "Цвет панели",
+                profile.backgroundColor.get());
         background.setOnClickListener(view -> AppleColorPickerDialog.show(this,
-                "Фон панели", preferences.driverPanelBackgroundColor.get(),
-                AppleColorPickerDialog.Options.standard(),
+                "Фон панели", profile.backgroundColor.get(),
+                AppleColorPickerDialog.Options.opaque(),
                 new AppleColorPickerDialog.Listener() {
                     @Override public void onPreview(@Nullable String value) {
                         if (value == null) return;
-                        preferences.driverPanelBackgroundColor.set(value);
+                        profile.backgroundColor.set(value);
                         AppleColorPickerDialog.decorateButton(background,
-                                "Цвет и прозрачность панели", value);
+                                "Цвет панели", value);
                         refreshPreview();
                     }
 
                     @Override public void onSelected(@Nullable String value) {
-                        if (value != null) preferences.driverPanelBackgroundColor.set(value);
+                        if (value != null) profile.backgroundColor.set(value);
                         applyPanel();
                     }
                 }));
@@ -571,31 +579,36 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 enabled.add(value);
             }
         }
+        int minimumPanelWidth = DriverPanelLayoutPolicy.referencePanelWidth(
+                profile.style == Preferences.DriverPanelStyle.NEW);
         int railWidth = Math.max(dp(52), Math.min(dp(100),
-                Math.round(preferences.driverPanelWidthPx.get() * .62f)));
-        int side = preferences.driverPanelSide.get();
-        int scaledTop = Math.round(preferences.driverPanelTopPaddingPx.get()
+                Math.round(Math.max(minimumPanelWidth, profile.widthPx.get()) * .62f)));
+        int side = profile.side.get();
+        int scaledTop = Math.round(profile.topPaddingPx.get()
                 * height / 1080f);
-        int scaledBottom = Math.round(preferences.driverPanelBottomPaddingPx.get()
+        int scaledBottom = Math.round(profile.bottomPaddingPx.get()
                 * height / 1080f);
         DriverPanelLayoutPolicy.Layout layout = DriverPanelLayoutPolicy.calculate(
                 height, scaledTop, scaledBottom, enabled.size(),
                 false);
-        addPreviewSegment(enabled, railWidth, layout.contentTop,
-                layout.contentBottom - layout.contentTop, side);
+        addPreviewSegment(enabled, railWidth, height, layout, side);
     }
 
     private void addPreviewSegment(List<LauncherShortcutStore.Shortcut> values, int width,
-                                   int top, int height, int side) {
-        if (height <= 0) return;
+                                   int screenHeight,
+                                   @NonNull DriverPanelLayoutPolicy.Layout layout,
+                                   int side) {
+        if (screenHeight <= 0) return;
         LinearLayout rail = new LinearLayout(this);
         rail.setOrientation(LinearLayout.VERTICAL);
         rail.setGravity(Gravity.CENTER);
+        rail.setPadding(0, layout.contentTop, 0,
+                Math.max(0, screenHeight - layout.contentBottom));
         GradientDrawable background = new GradientDrawable();
-        background.setColor(parseColor(preferences.driverPanelBackgroundColor.get(),
-                0xEE13171C));
-        background.setCornerRadius(Math.max(0,
-                preferences.driverPanelCornerRadiusPx.get() * .62f));
+        background.setColor(parseColor(profile.backgroundColor.get(),
+                0xFF13171C) | 0xFF000000);
+        float radius = Math.max(dp(20), profile.cornerRadiusPx.get()) * .62f;
+        background.setCornerRadii(panelCornerRadii(radius, side == 1));
         rail.setBackground(background);
         for (LauncherShortcutStore.Shortcut value : values) {
             View icon;
@@ -618,9 +631,8 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                     Gravity.CENTER));
             rail.addView(cell, new LinearLayout.LayoutParams(match(), 0, 1f));
         }
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, height,
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, screenHeight,
                 Gravity.TOP | (side == 0 ? Gravity.LEFT : Gravity.RIGHT));
-        params.topMargin = top;
         preview.addView(rail, params);
     }
 
@@ -658,6 +670,16 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 && LauncherShortcutStore.Builtin.STOCK_CLIMATE.key.equals(shortcut.target);
     }
 
+    @NonNull
+    private static String styleName(@NonNull Preferences.DriverPanelStyle style) {
+        return style == Preferences.DriverPanelStyle.NEW ? "Новая" : "Старая";
+    }
+
+    @NonNull
+    private static String styleNameLower(@NonNull Preferences.DriverPanelStyle style) {
+        return style == Preferences.DriverPanelStyle.NEW ? "новая" : "старая";
+    }
+
     private void applyPanel() {
         if (preferences.driverPanelEnabled.get()) {
             if (!Settings.canDrawOverlays(this)) {
@@ -670,6 +692,37 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         } else {
             DriverPanelService.stop(this);
         }
+    }
+
+    private void addStyleSelector(@NonNull LinearLayout host) {
+        TextView label = text("Тип штатной панели", 15, 0xFFC7C7CC);
+        host.addView(label, rowParams());
+
+        MaterialButtonToggleGroup group = new MaterialButtonToggleGroup(this);
+        group.setOrientation(LinearLayout.HORIZONTAL);
+        group.setSingleSelection(true);
+        group.setSelectionRequired(true);
+
+        MaterialButton oldPanel = compactButton("Старая");
+        oldPanel.setId(View.generateViewId());
+        oldPanel.setCheckable(true);
+        MaterialButton newPanel = compactButton("Новая");
+        newPanel.setId(View.generateViewId());
+        newPanel.setCheckable(true);
+        group.addView(oldPanel, new LinearLayout.LayoutParams(0, dp(52), 1f));
+        group.addView(newPanel, new LinearLayout.LayoutParams(0, dp(52), 1f));
+        group.check(profile.style == Preferences.DriverPanelStyle.NEW
+                ? newPanel.getId() : oldPanel.getId());
+        group.addOnButtonCheckedListener((value, checkedId, isChecked) -> {
+            if (!isChecked) return;
+            Preferences.DriverPanelStyle selected = checkedId == newPanel.getId()
+                    ? Preferences.DriverPanelStyle.NEW : Preferences.DriverPanelStyle.OLD;
+            if (selected == profile.style) return;
+            preferences.driverPanelStyle.set(selected.key);
+            applyPanel();
+            recreate();
+        });
+        host.addView(group, rowParams());
     }
 
     private void limitToast() {
@@ -769,6 +822,13 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
     private int parseColor(String value, int fallback) {
         try { return Color.parseColor(value); }
         catch (IllegalArgumentException | NullPointerException ignored) { return fallback; }
+    }
+
+    private static float[] panelCornerRadii(float radius, boolean panelOnRight) {
+        float r = Math.max(0f, radius);
+        return panelOnRight
+                ? new float[]{r, r, 0f, 0f, 0f, 0f, r, r}
+                : new float[]{0f, 0f, r, r, r, r, 0f, 0f};
     }
 
     private int dp(int value) {

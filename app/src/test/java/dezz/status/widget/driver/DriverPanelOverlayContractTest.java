@@ -30,12 +30,169 @@ public class DriverPanelOverlayContractTest {
         assertFalse(source.contains("shortcuts.subList"));
         assertTrue(source.contains("windowContext(display, attachedType)"));
         assertTrue(source.contains("fullScreenParams(attachedType)"));
+        assertTrue(source.contains("root.setPadding(0, geometry.contentTop, 0,"));
+        assertTrue(source.contains("screenHeight - geometry.contentBottom"));
+        assertTrue(source.contains("width, Math.max(1, screenHeight), type"));
+        assertTrue(source.contains("params.gravity = Gravity.TOP | Gravity.LEFT;"));
+        assertTrue(source.contains("DriverPanelLayoutPolicy.panelWindowX("));
+        assertTrue(source.contains("params.y = 0;"));
+        assertTrue(source.contains("safeOpaqueColor(profile.backgroundColor.get()"));
+        assertTrue(source.contains("safeColor(raw, fallback) | 0xFF000000"));
+        assertTrue(source.contains("Color.argb(0x33, 255, 255, 255)"));
+        assertTrue(source.contains("background.setCornerRadii(panelCornerRadii("));
+        assertTrue(source.contains("Math.max(dp(context, 20), profile.cornerRadiusPx.get())"));
+        assertTrue(source.contains("DriverPanelLayoutPolicy.referencePanelWidth("));
+        assertFalse(source.contains("geometry.contentBottom - geometry.contentTop"));
+        int fallbackStart = source.indexOf("private void fallbackStockClimateTap");
+        int fallbackEnd = source.indexOf("private void dismissAllApps", fallbackStart);
+        assertTrue(fallbackStart >= 0);
+        assertTrue(fallbackEnd > fallbackStart);
+        String fallbackSource = source.substring(fallbackStart, fallbackEnd);
+        assertTrue(fallbackSource.contains("setPanelTouchable(true)"));
+        assertFalse(fallbackSource.contains("detachPanel()"));
+        assertFalse(fallbackSource.contains("applyPreferences()"));
+        assertTrue(source.contains("PROXY_TAP_SETTLE_MS = 70L"));
+        assertTrue(source.contains("}, PROXY_TAP_SETTLE_MS);"));
+        assertTrue(source.contains("PROXY_TAP_WATCHDOG_MS = 15_000L"));
+        assertTrue(source.contains(
+                "WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED"));
+
+        Path executor = controller.resolveSibling("DriverPanelActionExecutor.java");
+        String executorSource = read(executor);
+        assertTrue(executorSource.contains("case STOCK_CLIMATE:"));
+        assertTrue(executorSource.contains("host.triggerStockClimate();"));
+        assertFalse(executorSource.contains("ClimatePanelService"));
 
         Path climateView = controller.resolveSibling("DriverClimateShortcutView.java");
         String climateSource = read(climateView);
         assertTrue(climateSource.contains("fanKnown && fanActive"));
         assertTrue(climateSource.contains("if (!showFan) return;"));
         assertFalse(climateSource.contains("drawText(\"AUTO\""));
+    }
+
+    @Test
+    public void vendorWindowTypesFollowMonjaroOrderWithoutAospRangeFilter()
+            throws Exception {
+        String root = System.getProperty("user.dir");
+        Path policy = Paths.get(root, "src/main/java/dezz/status/widget/driver/"
+                + "DriverPanelWindowTypePolicy.java");
+        if (!Files.exists(policy)) {
+            policy = Paths.get(root, "app/src/main/java/dezz/status/widget/driver/"
+                    + "DriverPanelWindowTypePolicy.java");
+        }
+        String source = read(policy);
+        int codeNavigation = source.indexOf("\"TYPE_CODE_NAVIGATION_BAR\"");
+        int navigation = source.indexOf("\"TYPE_NAVIGATION_BAR\"");
+        int codeStatus = source.indexOf("\"TYPE_CODE_STATUS_BAR\"");
+        int fallback = source.indexOf("values.add("
+                + "WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)");
+        assertTrue(codeNavigation >= 0);
+        assertTrue(codeNavigation < navigation);
+        assertTrue(navigation < codeStatus);
+        assertTrue(codeStatus < fallback);
+        assertTrue(source.contains("if (value != 0) values.add(value);"));
+        assertFalse(source.contains("FIRST_SYSTEM_WINDOW"));
+        assertFalse(source.contains("LAST_SYSTEM_WINDOW"));
+    }
+
+    @Test
+    public void oldAndNewPanelProfilesRemainIndependent() throws Exception {
+        String root = System.getProperty("user.dir");
+        Path preferences = Paths.get(root, "src/main/java/dezz/status/widget/Preferences.java");
+        if (!Files.exists(preferences)) {
+            preferences = Paths.get(root,
+                    "app/src/main/java/dezz/status/widget/Preferences.java");
+        }
+        String preferencesSource = read(preferences);
+        assertTrue(preferencesSource.contains("\"driverPanelStyle\""));
+        assertTrue(preferencesSource.contains("DriverPanelStyle.OLD.key"));
+        assertTrue(preferencesSource.contains(
+                "this, DriverPanelStyle.OLD, \"driverPanel\", 120"));
+        assertTrue(preferencesSource.contains(
+                "this, DriverPanelStyle.NEW, \"driverPanelNew\", 150"));
+        assertTrue(preferencesSource.contains(
+                "prefix + \"ItemGapPx\", 10"));
+        assertTrue(preferencesSource.contains(
+                "prefix + \"CornerRadiusPx\", 20"));
+        assertTrue(preferencesSource.contains(
+                "prefix + \"BackgroundColor\", \"#FF13171C\""));
+        assertTrue(preferencesSource.contains(
+                "public final Int driverPanelSide = driverPanelOld.side;"));
+        assertTrue(preferencesSource.contains(
+                "public final Str driverPanelShortcutsJson = driverPanelOld.shortcutsJson;"));
+        assertTrue(preferencesSource.contains(
+                "? driverPanelNew : driverPanelOld;"));
+
+        Path settings = preferences.resolveSibling("DriverPanelSettingsActivity.java");
+        String settingsSource = read(settings);
+        assertTrue(settingsSource.contains("MaterialButtonToggleGroup"));
+        assertTrue(settingsSource.contains("compactButton(\"Старая\")"));
+        assertTrue(settingsSource.contains("compactButton(\"Новая\")"));
+        assertTrue(settingsSource.contains(
+                "preferences.driverPanelStyle.set(selected.key);"));
+        assertTrue(settingsSource.contains("AppleColorPickerDialog.Options.opaque()"));
+        assertFalse(settingsSource.contains("\"Цвет и прозрачность панели\""));
+        assertTrue(settingsSource.contains(
+                "profile.backgroundColor.get(),"));
+        assertTrue(settingsSource.contains(
+                "0xFF13171C) | 0xFF000000"));
+        assertTrue(settingsSource.contains("int minimumDriverRadius = dp(20);"));
+        assertTrue(settingsSource.contains(
+                "Math.max(minimumDriverRadius, profile.cornerRadiusPx.get())"));
+
+        Path store = preferences.resolve("launcher/LauncherShortcutStore.java");
+        if (!Files.exists(store)) {
+            store = preferences.getParent().resolve(
+                    "launcher/LauncherShortcutStore.java");
+        }
+        String storeSource = read(store);
+        assertTrue(storeSource.contains(
+                "preferences.activeDriverPanelProfile()"));
+        assertTrue(storeSource.contains(
+                "profile.shortcutsJson"));
+        assertTrue(storeSource.contains(
+                "value.iconColor = \"#FFE0E5F3\";"));
+    }
+
+    @Test
+    public void runtimeDrawerSharesLauncherCatalogAndTileRenderer() throws Exception {
+        String root = System.getProperty("user.dir");
+        Path widget = Paths.get(root, "src/main/java/dezz/status/widget");
+        if (!Files.exists(widget)) {
+            widget = Paths.get(root, "app/src/main/java/dezz/status/widget");
+        }
+        String controller = read(widget.resolve(
+                "driver/DriverPanelOverlayController.java"));
+        String launcher = read(widget.resolve("LauncherActivity.java"));
+        String catalog = read(widget.resolve(
+                "launcher/LauncherAppCatalog.java"));
+        String renderer = read(widget.resolve(
+                "launcher/LauncherAppTileRenderer.java"));
+        String settings = read(widget.resolve(
+                "DriverPanelSettingsActivity.java"));
+
+        assertTrue(controller.contains("LauncherAppCatalog.load(appContext)"));
+        assertTrue(controller.contains("LauncherAppTileRenderer.render("));
+        assertFalse(controller.contains("InstalledAppCatalog"));
+        assertTrue(controller.contains("grid.setNumColumns(5)"));
+        assertTrue(controller.contains("grid.setVerticalSpacing(dp(context, 8))"));
+        assertTrue(controller.contains("grid.setPadding(dp(context, 16), dp(context, 16),"));
+        assertTrue(controller.contains("title.setText(\"Все приложения\")"));
+        assertTrue(controller.contains("FavoriteAppsConfigStore"));
+        assertTrue(controller.contains("PanelElementConfigStore.APPS_GRID"));
+
+        assertTrue(launcher.contains("LauncherAppCatalog.load(context)"));
+        assertTrue(launcher.contains("LauncherAppTileRenderer.render("));
+        assertTrue(catalog.contains("Intent.CATEGORY_LAUNCHER"));
+        assertTrue(catalog.contains("queryIntentActivities(query, 0)"));
+        assertTrue(catalog.contains("new LinkedHashSet<>()"));
+        assertTrue(catalog.contains("toLowerCase(Locale.ROOT)"));
+        assertTrue(renderer.contains("appearance.iconSizePx * scale / 100"));
+        assertTrue(renderer.contains("appearance.labelSizeSp * scale / 100f"));
+
+        // The editor intentionally retains the broad catalog so system/non-launcher activities
+        // remain assignable even though they never appear in a runtime all-apps surface.
+        assertTrue(settings.contains("InstalledAppCatalog.load(this)"));
     }
 
     @Test

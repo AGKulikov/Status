@@ -28,7 +28,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * One catalog for the driver rail, its all-apps drawer and application pickers.
+ * Broad application catalog for settings pickers.
  *
  * <p>Launcher-only queries hide many useful OEM activities. This catalog first indexes every
  * installed application (including system and disabled packages), then enriches it with

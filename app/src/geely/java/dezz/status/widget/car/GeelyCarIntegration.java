@@ -129,10 +129,6 @@ final class GeelyCarIntegration implements CarIntegration {
      * routed at all.
      */
     private static final long FAN_MODE_CACHE_MAX_AGE_MS = 75_000L;
-    private static final int AUTO_FAN_FAMILY_UNKNOWN = 0;
-    private static final int AUTO_FAN_FAMILY_THREE_PROFILE = 3;
-    private static final int AUTO_FAN_FAMILY_TWO_PROFILE = 2;
-
     /** Geely extension signals used by the instrument cluster but absent from this SDK's stubs. */
     private static final int SENSOR_TYPE_AVERAGE_CONSUMPTION = 4_194_560;
     private static final int SENSOR_TYPE_INSTANT_CONSUMPTION = 4_194_816;
@@ -635,27 +631,17 @@ final class GeelyCarIntegration implements CarIntegration {
 
     /**
      * AUTO fan intensity is a separate AdaptAPI function, not FAN_SPEED_LEVEL_AUTO. The ECARX
-     * implementation maps these values to raw PA fan levels 10..14 while manual fan speed owns
-     * raw 0..9. A vehicle normally exposes either the three named profiles or the two relative
-     * profiles; runtime discovery filters this superset.
+     * implementation maps QUIETER/SILENT/NORMAL/HIGH/HIGHER to raw PA fan levels 10/11/12/13/14
+     * while manual fan speed owns raw 0..9. The public constant IDs are not numerically ordered,
+     * so keep this semantic order. Runtime discovery may filter the domain, but it must not split
+     * the five positions into unrelated profile families.
      */
     private static List<CarControlDescriptor.Option> autoFanOptions() {
-        List<CarControlDescriptor.Option> result = new ArrayList<>();
-        result.addAll(autoFanThreeProfileOptions());
-        result.addAll(autoFanTwoProfileOptions());
-        return Collections.unmodifiableList(result);
-    }
-
-    private static List<CarControlDescriptor.Option> autoFanThreeProfileOptions() {
-        return Arrays.asList(
-                option(IHvac.AUTO_FAN_SETTING_SILENT, "AUTO · тихо"),
-                option(IHvac.AUTO_FAN_SETTING_NORMAL, "AUTO · обычно"),
-                option(IHvac.AUTO_FAN_SETTING_HIGH, "AUTO · интенсивно"));
-    }
-
-    private static List<CarControlDescriptor.Option> autoFanTwoProfileOptions() {
         return Arrays.asList(
                 option(IHvac.AUTO_FAN_SETTING_QUIETER, "AUTO · тише"),
+                option(IHvac.AUTO_FAN_SETTING_SILENT, "AUTO · тихо"),
+                option(IHvac.AUTO_FAN_SETTING_NORMAL, "AUTO · обычно"),
+                option(IHvac.AUTO_FAN_SETTING_HIGH, "AUTO · интенсивно"),
                 option(IHvac.AUTO_FAN_SETTING_HIGHER, "AUTO · выше"));
     }
 
@@ -2357,77 +2343,23 @@ final class GeelyCarIntegration implements CarIntegration {
             @NonNull List<CarControlDescriptor.Option> discovered,
             @Nullable Double confirmedProfile,
             @NonNull List<CarControlDescriptor.Option> lastConfirmedRuntimeOptions) {
-        int confirmedFamily = confirmedProfile == null ? AUTO_FAN_FAMILY_UNKNOWN
-                : autoFanProfileFamily(confirmedProfile);
-        int discoveredFamily = autoFanFamily(discovered);
-        int cachedFamily = autoFanFamily(lastConfirmedRuntimeOptions);
-        int selectedFamily = confirmedFamily != AUTO_FAN_FAMILY_UNKNOWN
-                ? confirmedFamily : discoveredFamily != AUTO_FAN_FAMILY_UNKNOWN
-                ? discoveredFamily : cachedFamily;
-        if (selectedFamily == AUTO_FAN_FAMILY_UNKNOWN) return Collections.emptyList();
+        List<CarControlDescriptor.Option> canonical = autoFanOptions();
+        boolean confirmedKnown = confirmedProfile != null
+                && containsOptionValue(canonical, confirmedProfile);
+        List<CarControlDescriptor.Option> source = !discovered.isEmpty()
+                ? discovered : !lastConfirmedRuntimeOptions.isEmpty()
+                ? lastConfirmedRuntimeOptions : confirmedKnown
+                ? canonical : Collections.emptyList();
+        if (source.isEmpty()) return Collections.emptyList();
 
-        List<CarControlDescriptor.Option> source;
-        if (discoveredFamily == selectedFamily) {
-            source = discovered;
-        } else if (confirmedFamily == selectedFamily
-                && containsAutoFanFamily(discovered, selectedFamily)) {
-            // AdaptAPI 1.0 advertises all five constants on some builds. A confirmed current
-            // profile selects the actual two- or three-profile vehicle family.
-            source = discovered;
-        } else if (cachedFamily == selectedFamily) {
-            source = lastConfirmedRuntimeOptions;
-        } else {
-            source = Collections.emptyList();
-        }
-
-        List<CarControlDescriptor.Option> canonical =
-                autoFanOptionsForFamily(selectedFamily);
-        boolean familyFallback = source.isEmpty()
-                && confirmedFamily == selectedFamily;
         List<CarControlDescriptor.Option> result = new ArrayList<>();
         for (CarControlDescriptor.Option option : canonical) {
-            if (familyFallback || containsOptionValue(source, option.value)
-                    || (confirmedProfile != null
-                    && sameValue(option.value, confirmedProfile))) {
+            if (containsOptionValue(source, option.value)
+                    || (confirmedKnown && sameValue(option.value, confirmedProfile))) {
                 result.add(option);
             }
         }
         return result;
-    }
-
-    static int autoFanProfileFamily(double value) {
-        if (sameValue(value, IHvac.AUTO_FAN_SETTING_SILENT)
-                || sameValue(value, IHvac.AUTO_FAN_SETTING_NORMAL)
-                || sameValue(value, IHvac.AUTO_FAN_SETTING_HIGH)) {
-            return AUTO_FAN_FAMILY_THREE_PROFILE;
-        }
-        if (sameValue(value, IHvac.AUTO_FAN_SETTING_QUIETER)
-                || sameValue(value, IHvac.AUTO_FAN_SETTING_HIGHER)) {
-            return AUTO_FAN_FAMILY_TWO_PROFILE;
-        }
-        return AUTO_FAN_FAMILY_UNKNOWN;
-    }
-
-    private static int autoFanFamily(
-            @NonNull List<CarControlDescriptor.Option> options) {
-        int family = AUTO_FAN_FAMILY_UNKNOWN;
-        for (CarControlDescriptor.Option option : options) {
-            int optionFamily = autoFanProfileFamily(option.value);
-            if (optionFamily == AUTO_FAN_FAMILY_UNKNOWN) continue;
-            if (family != AUTO_FAN_FAMILY_UNKNOWN && family != optionFamily) {
-                return AUTO_FAN_FAMILY_UNKNOWN;
-            }
-            family = optionFamily;
-        }
-        return family;
-    }
-
-    private static boolean containsAutoFanFamily(
-            @NonNull List<CarControlDescriptor.Option> options, int family) {
-        for (CarControlDescriptor.Option option : options) {
-            if (autoFanProfileFamily(option.value) == family) return true;
-        }
-        return false;
     }
 
     private static boolean containsOptionValue(
@@ -2438,17 +2370,6 @@ final class GeelyCarIntegration implements CarIntegration {
         return false;
     }
 
-    @NonNull
-    private static List<CarControlDescriptor.Option> autoFanOptionsForFamily(int family) {
-        if (family == AUTO_FAN_FAMILY_THREE_PROFILE) {
-            return autoFanThreeProfileOptions();
-        }
-        if (family == AUTO_FAN_FAMILY_TWO_PROFILE) {
-            return autoFanTwoProfileOptions();
-        }
-        return Collections.emptyList();
-    }
-
     private void rememberConfirmedRuntimeValue(@NonNull ControlDefinition definition,
                                                double value) {
         if (definition.functionId == IHvac.HVAC_FUNC_AUTO) {
@@ -2457,21 +2378,15 @@ final class GeelyCarIntegration implements CarIntegration {
             return;
         }
         if (!isAutoFanDefinition(definition)
-                || autoFanProfileFamily(value) == AUTO_FAN_FAMILY_UNKNOWN) {
+                || !containsOptionValue(autoFanOptions(), value)) {
             return;
         }
         lastConfirmedAutoFanProfile = value;
-        int cachedFamily = autoFanFamily(lastConfirmedAutoFanRuntimeOptions);
-        int observedFamily = autoFanProfileFamily(value);
-        if (cachedFamily != AUTO_FAN_FAMILY_UNKNOWN && cachedFamily != observedFamily) {
-            lastConfirmedAutoFanRuntimeOptions = Collections.emptyList();
-        }
     }
 
     private void rememberAutoFanRuntimeOptions(
             @NonNull List<CarControlDescriptor.Option> options) {
-        if (options.isEmpty()
-                || autoFanFamily(options) == AUTO_FAN_FAMILY_UNKNOWN) return;
+        if (options.isEmpty()) return;
         lastConfirmedAutoFanRuntimeOptions =
                 Collections.unmodifiableList(new ArrayList<>(options));
     }
@@ -2487,8 +2402,7 @@ final class GeelyCarIntegration implements CarIntegration {
         }
         Boolean autoActive = readConfirmedClimateAutoMode(source);
         if (Boolean.TRUE.equals(autoActive)) {
-            // A current profile is stronger evidence than AdaptAPI's five-value superset and
-            // identifies whether this vehicle implements the 3-profile or 2-profile family.
+            // Preserve the current position even if a transient discovery result omits it.
             readControlValue(source, AUTO_FAN_DEFINITION);
         }
         result.addAll(supportedOptions(source, FAN_DEFINITION));

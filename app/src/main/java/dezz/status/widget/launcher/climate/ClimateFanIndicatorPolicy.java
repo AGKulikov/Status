@@ -54,13 +54,15 @@ public final class ClimateFanIndicatorPolicy {
     private static int automaticSegments(@Nullable String valueLabel, int profileIndex) {
         String normalized = valueLabel == null
                 ? "" : valueLabel.trim().toLowerCase(Locale.ROOT);
-        if (containsAny(normalized, "тихо", "тише", "silent", "quiet", "quieter")) return 1;
+        // Check the more specific comparative labels before their shared quiet/high substrings.
+        if (containsAny(normalized, "тише", "quieter")) return 1;
+        if (containsAny(normalized, "тихо", "silent", "quiet")) return 2;
         if (containsAny(normalized, "обычно", "normal")) return 3;
-        if (containsAny(normalized, "интенсив", "выше", "high", "higher")) return 5;
+        if (containsAny(normalized, "выше", "higher")) return 5;
+        if (containsAny(normalized, "интенсив", "high")) return 4;
 
-        // Unknown labels retain the three-profile 1/3/5 visual convention. Known two-profile
-        // labels are handled above, so their upper profile still lights all five segments.
-        return clamp(profileIndex * 2 + 1, 1, AUTO_SEGMENTS);
+        // Unknown future labels retain a deterministic zero-based ordinal fallback.
+        return clamp(profileIndex + 1, 1, AUTO_SEGMENTS);
     }
 
     private static boolean containsAny(@NonNull String value, @NonNull String... needles) {

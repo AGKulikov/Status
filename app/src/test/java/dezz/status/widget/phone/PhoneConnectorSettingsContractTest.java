@@ -85,10 +85,15 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("diagnosticsHandler.postDelayed(diagnosticsPoll, 1_000L)"));
         assertTrue(source.contains("diagnosticsHandler.removeCallbacks(diagnosticsPoll)"));
         assertTrue(source.contains("this::testAncsConnection"));
-        assertTrue(source.contains("service.reconnectPhoneForDiagnostics()"));
+        assertTrue(source.contains("!service.reconnectPhoneForDiagnostics()"));
         assertTrue(source.contains(
                 "!notificationsEnabled.isChecked() && !messagesEnabled.isChecked()"));
         assertTrue(source.contains("localizedMapStatus(mapStatus)"));
+        assertTrue(source.contains("selectedBondedPhone() == null"));
+        assertTrue(source.contains("Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS"));
+        assertTrue(source.contains("manager.areNotificationsEnabled()"));
+        assertTrue(source.contains("NotificationManager.IMPORTANCE_NONE"));
+        assertTrue(source.contains("line(!ancsRequested || notificationDelivery"));
     }
 
     @Test

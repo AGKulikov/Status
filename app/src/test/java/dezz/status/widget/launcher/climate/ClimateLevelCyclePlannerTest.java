@@ -21,9 +21,12 @@ public final class ClimateLevelCyclePlannerTest {
     private static final double LEVEL_2 = 268_763_650d;
     private static final double LEVEL_3 = 268_763_651d;
     private static final double AUTO = 268_763_663d;
+    // ECARX maps these non-monotonic public IDs to raw PA fan positions 10..14 in this order.
+    private static final double AUTO_QUIETER = 268_567_044d;
     private static final double AUTO_SILENT = 268_567_041d;
     private static final double AUTO_NORMAL = 268_567_042d;
     private static final double AUTO_HIGH = 268_567_043d;
+    private static final double AUTO_HIGHER = 268_567_045d;
 
     private static final List<CarControlDescriptor.Option> OPTIONS = Arrays.asList(
             option(LEVEL_2, "2"), option(OFF, "Выкл"), option(AUTO, "Auto"),
@@ -58,19 +61,27 @@ public final class ClimateLevelCyclePlannerTest {
     }
 
     @Test
-    public void fanPolicyWalksAutoProfilesWithoutFallingIntoManualLevels() {
+    public void fanPolicyWalksAllFiveAutoProfilesInRawIntensityOrder() {
         List<CarControlDescriptor.Option> fan = Arrays.asList(
                 option(OFF, "Выкл"), option(LEVEL_1, "1"), option(LEVEL_2, "2"),
+                option(AUTO_QUIETER, "AUTO · тише"),
                 option(AUTO_SILENT, "AUTO · тихо"),
                 option(AUTO_NORMAL, "AUTO · обычно"),
-                option(AUTO_HIGH, "AUTO · интенсивно"));
+                option(AUTO_HIGH, "AUTO · интенсивно"),
+                option(AUTO_HIGHER, "AUTO · выше"));
 
+        assertTarget(AUTO_SILENT, ClimateLevelCyclePlanner.nextStepperTarget(
+                fan, AUTO_QUIETER, 1, true));
         assertTarget(AUTO_NORMAL, ClimateLevelCyclePlanner.nextStepperTarget(
                 fan, AUTO_SILENT, 1, true));
-        assertTarget(AUTO_SILENT, ClimateLevelCyclePlanner.nextStepperTarget(
-                fan, AUTO_NORMAL, -1, true));
-        assertTarget(AUTO_SILENT, ClimateLevelCyclePlanner.nextStepperTarget(
+        assertTarget(AUTO_HIGH, ClimateLevelCyclePlanner.nextStepperTarget(
+                fan, AUTO_NORMAL, 1, true));
+        assertTarget(AUTO_HIGHER, ClimateLevelCyclePlanner.nextStepperTarget(
                 fan, AUTO_HIGH, 1, true));
+        assertTarget(AUTO_QUIETER, ClimateLevelCyclePlanner.nextStepperTarget(
+                fan, AUTO_HIGHER, 1, true));
+        assertTarget(AUTO_HIGHER, ClimateLevelCyclePlanner.nextStepperTarget(
+                fan, AUTO_QUIETER, -1, true));
     }
 
     @Test

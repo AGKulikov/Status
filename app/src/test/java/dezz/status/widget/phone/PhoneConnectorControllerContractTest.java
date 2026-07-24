@@ -81,6 +81,50 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("serviceChangedSubscribed ? \"ready\" : \"ready_degraded\""));
     }
 
+    @Test public void protectedAncsSubscriptionsPrecedeOptionalServiceChangedAndWaitForUser()
+            throws IOException {
+        String source = controller();
+        String setup = between(source, "ancsControlPoint = service.getCharacteristic",
+                "ancsStatus = \"subscribing\"");
+        int data = setup.indexOf("GattTag.ANCS_DATA");
+        int notification = setup.indexOf("GattTag.ANCS_NOTIFICATION");
+        int serviceChanged = setup.indexOf("configureServiceChanged(callbackGatt)");
+        assertTrue(data >= 0);
+        assertTrue(notification > data);
+        assertTrue(serviceChanged > notification);
+        assertTrue(source.contains(
+                "ANCS_AUTHORIZATION_OPERATION_TIMEOUT_MS = 90_000L"));
+        assertTrue(source.contains(
+                "ANCS_SERVICE_PUBLICATION_RETRY_MS = 95_000L"));
+        assertTrue(source.contains("gattOperationTimeoutMillis(operation)"));
+        assertTrue(source.contains("ancsStatus = \"service_not_published\""));
+        assertTrue(source.contains("ancsPublicationRetryCount >= 1"));
+        assertTrue(source.contains(
+                "if (operation.tag == GattTag.SERVICE_CHANGED)"));
+        assertTrue(source.contains(
+                "finishGattOperation(token, operation.kind, operation.descriptor,"));
+
+        String serviceChangedResult = between(source,
+                "} else if (operation.tag == GattTag.SERVICE_CHANGED)",
+                "} else if (operation.tag == GattTag.CONTROL)");
+        assertFalse(serviceChangedResult.contains("scheduleGattReconnect("));
+
+        String bondRestart = between(source, "private void restartAncsAfterBond",
+                "private void pumpAttributeRequests");
+        assertTrue(bondRestart.contains("scheduleGattReconnect("));
+        assertFalse(bondRestart.contains("startServiceDiscovery("));
+    }
+
+    @Test public void stockEcarxConnectionIsBestEffortAndNeverUnpairs() throws IOException {
+        String source = javaSource("PhoneOemConnectionBridge.java");
+        assertTrue(source.contains(
+                "\"com.ecarx.xui.adaptapi.device.Device\""));
+        assertTrue(source.contains("getMethod(\"reqBtPair\", String.class)"));
+        assertFalse(source.contains("reqBtUnpair"));
+        assertTrue(controller().contains(
+                "PhoneOemConnectionBridge.requestStockConnection(context, selectedAddress)"));
+    }
+
     @Test public void privacyModeAndAppPresentationRemainSourceOnly() throws IOException {
         String source = controller();
         assertTrue(source.contains("notificationAttributeRequest(uid, includeText)"));
@@ -183,10 +227,14 @@ public final class PhoneConnectorControllerContractTest {
     }
 
     private static String controller() throws IOException {
+        return javaSource("PhoneConnectorController.java");
+    }
+
+    private static String javaSource(String name) throws IOException {
         Path fromRoot = Paths.get("app", "src", "main", "java", "dezz", "status",
-                "widget", "phone", "PhoneConnectorController.java");
+                "widget", "phone", name);
         Path fromApp = Paths.get("src", "main", "java", "dezz", "status",
-                "widget", "phone", "PhoneConnectorController.java");
+                "widget", "phone", name);
         Path file = Files.isRegularFile(fromRoot) ? fromRoot : fromApp;
         return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
     }

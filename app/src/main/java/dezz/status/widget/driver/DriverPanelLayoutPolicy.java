@@ -10,7 +10,7 @@ import androidx.annotation.NonNull;
 /**
  * Geometry shared by the real overlay, settings preview and stock-climate tap proxy.
  *
- * <p>The old Monjaro panel divides the display into four vertical slots. Its stock climate
+ * <p>The Monjaro driver panels divide the display into four vertical slots. Their stock climate
  * control is centred at one and a half slots (37.5% of the screen). We deliberately preserve
  * that coordinate instead of exposing a misleading slider. The production rail is continuous;
  * its movable climate proxy temporarily makes the rail input-transparent and taps this point.</p>
@@ -20,8 +20,11 @@ public final class DriverPanelLayoutPolicy {
     public static final float STOCK_CLIMATE_CENTER_FRACTION = 0.375f;
     public static final float STOCK_CLIMATE_SLOT_HEIGHT_FRACTION = 0.55f;
     public static final int STOCK_CLIMATE_MIN_HEIGHT_PX = 88;
-    private static final int REFERENCE_SCREEN_WIDTH = 1920;
-    private static final int REFERENCE_OLD_PANEL_WIDTH = 120;
+    public static final int REFERENCE_SCREEN_WIDTH = 1920;
+    public static final int REFERENCE_STOCK_NAVIGATION_INSET = 160;
+    public static final int REFERENCE_OLD_PANEL_WIDTH = 120;
+    public static final int REFERENCE_NEW_PANEL_WIDTH = 150;
+    public static final int MIN_SCALED_WIDTH_PX = 80;
 
     public static final class TapTarget {
         public final int x;
@@ -67,6 +70,35 @@ public final class DriverPanelLayoutPolicy {
     private DriverPanelLayoutPolicy() {
     }
 
+    /** Exact width conversion used by MonjaroPanel for its 1920 px reference geometry. */
+    public static int scaleReferenceWidth(int screenWidth, int referenceWidth) {
+        int width = Math.max(1, screenWidth);
+        return Math.max(Math.round(Math.max(1, referenceWidth)
+                * width / (float) REFERENCE_SCREEN_WIDTH), MIN_SCALED_WIDTH_PX);
+    }
+
+    public static int referencePanelWidth(boolean newPanel) {
+        return newPanel ? REFERENCE_NEW_PANEL_WIDTH : REFERENCE_OLD_PANEL_WIDTH;
+    }
+
+    /** Reserved left-side ECARX frame that must be crossed to cover the stock driver rail. */
+    public static int stockNavigationInset(int screenWidth) {
+        return scaleReferenceWidth(screenWidth, REFERENCE_STOCK_NAVIGATION_INSET);
+    }
+
+    /**
+     * Window X in the same TOP|LEFT coordinate model as MonjaroPanel.
+     *
+     * <p>On ECARX the left system-window frame begins after the stock navigation rail, hence the
+     * negative inset. The right edge uses an absolute left-origin coordinate and never switches
+     * the WindowManager gravity to RIGHT.</p>
+     */
+    public static int panelWindowX(int screenWidth, int panelWidth, boolean panelOnRight) {
+        int width = Math.max(1, screenWidth);
+        int railWidth = Math.max(1, panelWidth);
+        return panelOnRight ? width - railWidth : -stockNavigationInset(width);
+    }
+
     /**
      * Centre of the covered OEM climate button in the old driver panel.
      * Horizontal sizing follows the reference panel's 120/1920 scale with its 80 px minimum.
@@ -74,11 +106,18 @@ public final class DriverPanelLayoutPolicy {
     @NonNull
     public static TapTarget stockClimateTapTarget(int screenWidth, int screenHeight,
                                                   boolean panelOnRight) {
+        return stockClimateTapTarget(screenWidth, screenHeight, panelOnRight, false);
+    }
+
+    /** Centre of the covered OEM climate button for the selected stock-panel generation. */
+    @NonNull
+    public static TapTarget stockClimateTapTarget(int screenWidth, int screenHeight,
+                                                  boolean panelOnRight,
+                                                  boolean newPanel) {
         int width = Math.max(1, screenWidth);
         int height = Math.max(1, screenHeight);
-        int oldPanelWidth = Math.max(Math.round(REFERENCE_OLD_PANEL_WIDTH
-                * width / (float) REFERENCE_SCREEN_WIDTH), 80);
-        int x = panelOnRight ? width - oldPanelWidth / 2 : oldPanelWidth / 2;
+        int stockPanelWidth = scaleReferenceWidth(width, referencePanelWidth(newPanel));
+        int x = panelOnRight ? width - stockPanelWidth / 2 : stockPanelWidth / 2;
         int quarter = Math.max(height / 4, 1);
         int y = quarter / 2 + quarter;
         return new TapTarget(clamp(x, 0, width - 1), clamp(y, 0, height - 1));
