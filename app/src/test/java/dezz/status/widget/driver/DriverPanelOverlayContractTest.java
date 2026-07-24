@@ -8,18 +8,19 @@ import org.junit.Test;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 public class DriverPanelOverlayContractTest {
     @Test
     public void productionRailIsContinuousAndClimateTapPassesThroughInput() throws Exception {
         String root = System.getProperty("user.dir");
-        Path controller = Path.of(root, "src/main/java/dezz/status/widget/driver/"
+        Path controller = Paths.get(root, "src/main/java/dezz/status/widget/driver/"
                 + "DriverPanelOverlayController.java");
         if (!Files.exists(controller)) {
-            controller = Path.of(root, "app/src/main/java/dezz/status/widget/driver/"
+            controller = Paths.get(root, "app/src/main/java/dezz/status/widget/driver/"
                     + "DriverPanelOverlayController.java");
         }
-        String source = Files.readString(controller, StandardCharsets.UTF_8);
+        String source = read(controller);
         assertTrue(source.contains("enabled.size(),"));
         assertTrue(source.contains("false);"));
         assertTrue(source.contains("setPanelTouchable(false)"));
@@ -31,7 +32,7 @@ public class DriverPanelOverlayContractTest {
         assertTrue(source.contains("fullScreenParams(attachedType)"));
 
         Path climateView = controller.resolveSibling("DriverClimateShortcutView.java");
-        String climateSource = Files.readString(climateView, StandardCharsets.UTF_8);
+        String climateSource = read(climateView);
         assertTrue(climateSource.contains("fanKnown && fanActive"));
         assertTrue(climateSource.contains("if (!showFan) return;"));
         assertFalse(climateSource.contains("drawText(\"AUTO\""));
@@ -40,17 +41,21 @@ public class DriverPanelOverlayContractTest {
     @Test
     public void appCatalogEnumeratesSystemAndNonLauncherPackages() throws Exception {
         String root = System.getProperty("user.dir");
-        Path catalog = Path.of(root, "src/main/java/dezz/status/widget/launcher/"
+        Path catalog = Paths.get(root, "src/main/java/dezz/status/widget/launcher/"
                 + "InstalledAppCatalog.java");
         if (!Files.exists(catalog)) {
-            catalog = Path.of(root, "app/src/main/java/dezz/status/widget/launcher/"
+            catalog = Paths.get(root, "app/src/main/java/dezz/status/widget/launcher/"
                     + "InstalledAppCatalog.java");
         }
-        String source = Files.readString(catalog, StandardCharsets.UTF_8);
+        String source = read(catalog);
         assertTrue(source.contains("getInstalledApplications"));
         assertTrue(source.contains("FLAG_SYSTEM"));
         assertTrue(source.contains("CATEGORY_LEANBACK_LAUNCHER"));
         assertTrue(source.contains("CATEGORY_HOME"));
         assertFalse(source.contains("queryIntentActivities(query, 0)"));
+    }
+
+    private static String read(Path path) throws Exception {
+        return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
     }
 }
