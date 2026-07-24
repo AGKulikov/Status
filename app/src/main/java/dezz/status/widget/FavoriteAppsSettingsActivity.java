@@ -84,7 +84,9 @@ public final class FavoriteAppsSettingsActivity extends AppCompatActivity {
         preferences = new Preferences(this);
         store = new FavoriteAppsConfigStore(preferences);
         setTitle("Избранные приложения HOME");
-        setContentView(buildScreen());
+        View screen = buildScreen();
+        setContentView(screen);
+        dezz.status.widget.settings.SettingsBackNavigation.install(this, screen);
         refreshRows();
         loadCatalog();
     }
@@ -113,14 +115,6 @@ public final class FavoriteAppsSettingsActivity extends AppCompatActivity {
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(24), dp(18), dp(24), dp(34));
         scroll.addView(content, new ScrollView.LayoutParams(match(), wrap()));
-
-        MaterialButton back = new MaterialButton(this);
-        back.setText("←  Назад");
-        back.setAllCaps(false);
-        back.setOnClickListener(v -> finish());
-        LinearLayout.LayoutParams backLp = new LinearLayout.LayoutParams(dp(190), dp(50));
-        backLp.bottomMargin = dp(8);
-        content.addView(back, backLp);
 
         TextView title = text("Избранные приложения", 26, true);
         content.addView(title);

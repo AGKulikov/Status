@@ -18,6 +18,7 @@
             style="?attr/materialIconButtonStyle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:contentDescription="Назад"
             app:icon="@drawable/ic_arrow_back" />
 
         <TextView
@@ -25,7 +26,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:layout_weight="1"
-            android:text="О приложении и настройки"
+            android:text="Диагностика и о приложении"
             android:textAppearance="?attr/textAppearanceHeadlineSmall" />
     </LinearLayout>
 
@@ -49,6 +50,15 @@
                 android:textAppearance="?attr/textAppearanceBodyMedium"
                 android:textColor="?attr/colorOnSurfaceVariant" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/allSettingsButton"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Открыть единый центр настроек"
+                app:icon="@drawable/ic_settings" />
+
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -70,9 +80,6 @@
                     <TextView android:id="@+id/haStatusText" android:layout_width="match_parent"
                         android:layout_height="wrap_content" android:layout_marginTop="4dp"
                         android:textAppearance="?attr/textAppearanceBodyMedium" />
-                    <com.google.android.material.button.MaterialButton android:id="@+id/haSettingsButton"
-                        android:layout_width="match_parent" android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp" android:text="Настроить подключение" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -90,9 +97,6 @@
                     <TextView android:id="@+id/mqttStatusText" android:layout_width="match_parent"
                         android:layout_height="wrap_content" android:layout_marginTop="4dp"
                         android:textAppearance="?attr/textAppearanceBodyMedium" />
-                    <com.google.android.material.button.MaterialButton android:id="@+id/mqttSettingsButton"
-                        android:layout_width="match_parent" android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp" android:text="Настроить подключение" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -110,58 +114,8 @@
                     <TextView android:id="@+id/sprutStatusText" android:layout_width="match_parent"
                         android:layout_height="wrap_content" android:layout_marginTop="4dp"
                         android:textAppearance="?attr/textAppearanceBodyMedium" />
-                    <com.google.android.material.button.MaterialButton android:id="@+id/sprutSettingsButton"
-                        android:layout_width="match_parent" android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp" android:text="Настроить подключение и устройства" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:text="Интерфейс и автоматизация"
-                android:textAppearance="?attr/textAppearanceTitleLarge" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/mainBricksButton"
-                style="?attr/materialButtonOutlinedStyle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="Элементы основной строки" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/popupSettingsButton"
-                style="?attr/materialButtonOutlinedStyle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Плавающий оверлей и его плитки" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/climatePanelSettingsButton"
-                style="?attr/materialButtonOutlinedStyle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Постоянная климатическая панель" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/scenarioSettingsButton"
-                style="?attr/materialButtonOutlinedStyle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Визуальные сценарии" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/intentSettingsButton"
-                style="?attr/materialButtonOutlinedStyle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Команды с кнопок руля" />
 
             <TextView
                 android:layout_width="match_parent"

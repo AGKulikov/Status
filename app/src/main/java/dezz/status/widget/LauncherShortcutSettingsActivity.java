@@ -55,6 +55,7 @@ import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.scenario.IntentActionRule;
 import dezz.status.widget.scenario.IntentActionRuleStore;
+import dezz.status.widget.settings.AppleColorPickerDialog;
 
 /** Visual, code-free editor for arbitrary HOME icons. */
 public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
@@ -73,7 +74,9 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         store = new LauncherShortcutStore(preferences);
         migrateRuleIcons();
         setTitle("Иконки HOME");
-        setContentView(buildScreen());
+        View screen = buildScreen();
+        setContentView(screen);
+        dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(this, screen);
         refresh();
         if (savedInstanceState != null) addHandled = savedInstanceState.getBoolean("addHandled");
         if (!addHandled && getIntent().getBooleanExtra(EXTRA_ADD_NEW, false)) {
@@ -97,7 +100,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         scroll.addView(content, new ScrollView.LayoutParams(match(), wrap()));
 
         MaterialButton back = new MaterialButton(this);
-        back.setText("←  Назад к HOME");
+        back.setText("←  Назад");
         back.setAllCaps(false);
         back.setOnClickListener(v -> finish());
         LinearLayout.LayoutParams backLp = new LinearLayout.LayoutParams(dp(230), dp(52));
@@ -679,17 +682,17 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         icon.setSelection(selectedIcon);
         form.addView(icon, new LinearLayout.LayoutParams(match(), dp(54)));
 
-        EditText background = field("Цвет плитки (#AARRGGBB)", value.backgroundColor);
-        EditText iconColor = field("Цвет иконки (#AARRGGBB или none)", value.iconColor);
-        EditText textColor = field("Цвет названия (#AARRGGBB)", value.textColor);
-        form.addView(background);
-        form.addView(iconColor);
-        form.addView(textColor);
+        ColorSelection background = colorSelection(form, "Цвет плитки",
+                value.backgroundColor, AppleColorPickerDialog.Options.standard());
+        ColorSelection iconColor = colorSelection(form, "Цвет иконки",
+                value.iconColor, AppleColorPickerDialog.Options.noTint());
+        ColorSelection textColor = colorSelection(form, "Цвет названия",
+                value.textColor, AppleColorPickerDialog.Options.standard());
 
-        EditText activeBackground = field("Цвет активной плитки (#AARRGGBB)",
-                value.activeBackgroundColor);
-        EditText activeIcon = field("Цвет активной иконки (#AARRGGBB)",
-                value.activeIconColor);
+        ColorSelection activeBackground = colorSelection(null, "Цвет активной плитки",
+                value.activeBackgroundColor, AppleColorPickerDialog.Options.standard());
+        ColorSelection activeIcon = colorSelection(null, "Цвет активной иконки",
+                value.activeIconColor, AppleColorPickerDialog.Options.standard());
         MaterialSwitch vehicleStateColor = new MaterialSwitch(this);
         vehicleStateColor.setText("Цвет уровня задаёт автомобиль");
         vehicleStateColor.setChecked(value.useVehicleStateColor);
@@ -698,8 +701,8 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         showState.setChecked(value.showState);
         if (value.kind == LauncherShortcutStore.Kind.CAR
                 || value.kind == LauncherShortcutStore.Kind.RULE) {
-            form.addView(activeBackground);
-            form.addView(activeIcon);
+            form.addView(activeBackground.button);
+            form.addView(activeIcon.button);
             if (value.kind == LauncherShortcutStore.Kind.CAR) form.addView(vehicleStateColor);
             form.addView(showState);
         }
@@ -721,16 +724,13 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
                     value.title = title.getText().toString().trim();
                     value.icon = presets.get(icon.getSelectedItemPosition()).key;
                     if (!value.icon.equals(automaticIcon)) value.iconCustomized = true;
-                    value.backgroundColor = validColor(background.getText().toString(), "#B5222733");
-                    value.iconColor = "none".equalsIgnoreCase(iconColor.getText().toString().trim())
-                            ? "none" : validColor(iconColor.getText().toString(), "#FFFFFFFF");
-                    value.textColor = validColor(textColor.getText().toString(), "#FFFFFFFF");
+                    value.backgroundColor = background.value;
+                    value.iconColor = iconColor.value;
+                    value.textColor = textColor.value;
                     if (value.kind == LauncherShortcutStore.Kind.CAR
                             || value.kind == LauncherShortcutStore.Kind.RULE) {
-                        value.activeBackgroundColor = validColor(
-                                activeBackground.getText().toString(), "#CC374151");
-                        value.activeIconColor = validColor(activeIcon.getText().toString(),
-                                "#FFFFB300");
+                        value.activeBackgroundColor = activeBackground.value;
+                        value.activeIconColor = activeIcon.value;
                         if (value.kind == LauncherShortcutStore.Kind.CAR) {
                             value.useVehicleStateColor = vehicleStateColor.isChecked();
                         }
@@ -797,13 +797,36 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         return value.hasLongAction ? base + "  ·  долгое нажатие настроено" : base;
     }
 
-    private String validColor(String candidate, String fallback) {
-        String value = candidate.trim();
-        try { Color.parseColor(value); return value; }
-        catch (IllegalArgumentException ignored) {
-            Toast.makeText(this, "Неверный цвет заменён на " + fallback, Toast.LENGTH_SHORT).show();
-            return fallback;
-        }
+    @NonNull
+    private ColorSelection colorSelection(@Nullable LinearLayout parent, @NonNull String title,
+                                          @NonNull String initial,
+                                          @NonNull AppleColorPickerDialog.Options options) {
+        MaterialButton button = new MaterialButton(this);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), dp(62));
+        lp.topMargin = dp(5);
+        button.setLayoutParams(lp);
+        ColorSelection selection = new ColorSelection(initial, button);
+        AppleColorPickerDialog.decorateButton(button, title, initial);
+        button.setOnClickListener(v -> {
+            String original = selection.value;
+            AppleColorPickerDialog.show(this, title, original, options,
+                    new AppleColorPickerDialog.Listener() {
+                        private void apply(@Nullable String selected) {
+                            selection.value = selected == null ? original : selected;
+                            AppleColorPickerDialog.decorateButton(button, title, selection.value);
+                        }
+
+                        @Override public void onPreview(@Nullable String selected) {
+                            apply(selected);
+                        }
+
+                        @Override public void onSelected(@Nullable String selected) {
+                            apply(selected);
+                        }
+                    });
+        });
+        if (parent != null) parent.addView(button);
+        return selection;
     }
 
     private SeekValue seek(LinearLayout parent, String label, int min, int max, int current, String suffix) {
@@ -903,6 +926,16 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         final android.graphics.drawable.Drawable icon;
         AppChoice(String label, ComponentName component, android.graphics.drawable.Drawable icon) {
             this.label = label; this.component = component; this.icon = icon;
+        }
+    }
+
+    private static final class ColorSelection {
+        @NonNull String value;
+        @NonNull final MaterialButton button;
+
+        ColorSelection(@NonNull String value, @NonNull MaterialButton button) {
+            this.value = value;
+            this.button = button;
         }
     }
 

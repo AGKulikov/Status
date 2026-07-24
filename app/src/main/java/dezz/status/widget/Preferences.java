@@ -483,6 +483,11 @@ public class Preferences {
             "launcherVehicleInfoVisible", DEFAULT_LAUNCHER_VEHICLE_INFO_VISIBLE);
     public final Str launcherVehicleInfoConfigJson = new Str(this,
             "launcherVehicleInfoConfigJson", "");
+    /** Independent read-only HOME panel combining car/system and smart-home statuses. */
+    public final Bool launcherInformationVisible = new Bool(this,
+            "launcherInformationVisible", false);
+    public final Str launcherInformationConfigJson = new Str(this,
+            "launcherInformationConfigJson", "");
     // Per-panel inner element visibility/order/scale. Kept separate from outer pixel geometry so
     // older HOME layouts migrate without moving any panel on upgrade.
     public final Str launcherPanelElementsJson = new Str(this, "launcherPanelElementsJson", "");
@@ -617,6 +622,19 @@ public class Preferences {
         IconBrickPrefs i = iconBrickPrefs(type);
         if (i != null) return i.hideInPackagesKey();
         throw new IllegalArgumentException("Unknown brick type: " + type);
+    }
+
+    /** Allowlist for {@link AppSelectionActivity}'s internal preference-key deep link. */
+    public boolean isHideListKey(@Nullable String key) {
+        if (key == null || key.isEmpty()) return false;
+        if (hideInPackages.key.equals(key)) return true;
+        for (BrickType type : BrickType.values()) {
+            TextBrickPrefs text = textBrickPrefs(type);
+            if (text != null && text.hideInPackages.key.equals(key)) return true;
+            IconBrickPrefs icon = iconBrickPrefs(type);
+            if (icon != null && icon.hideInPackages.key.equals(key)) return true;
+        }
+        return false;
     }
 
     /**
@@ -832,12 +850,32 @@ public class Preferences {
     }
 
     public void importFromJson(String json) throws JSONException, InvalidSettingsFileException {
+        applyJson(json, true);
+    }
+
+    /**
+     * Applies only keys explicitly present in a bundled appearance preset.
+     *
+     * <p>Bundled presets intentionally describe a small status-row theme rather than a complete
+     * backup.  Treating one as a normal import used to clear HOME panels, connector configuration,
+     * climate reservation and automation rules.  Full user presets and backups still use
+     * {@link #importFromJson(String)} and retain replace-all semantics.</p>
+     */
+    public void applyPatchFromJson(String json)
+            throws JSONException, InvalidSettingsFileException {
+        applyJson(json, false);
+    }
+
+    private void applyJson(String json, boolean clearExisting)
+            throws JSONException, InvalidSettingsFileException {
         // Preserve encrypted device-local connector credentials byte-for-byte. Decrypting and
         // re-encrypting here can fail during Direct Boot before the Keystore is unlocked.
         Map<String, String> existingSecrets = new java.util.HashMap<>();
-        for (String secretKey : SECRET_PREFERENCE_KEYS) {
-            String stored = prefs.getString(secretKey, null);
-            if (stored != null) existingSecrets.put(secretKey, stored);
+        if (clearExisting) {
+            for (String secretKey : SECRET_PREFERENCE_KEYS) {
+                String stored = prefs.getString(secretKey, null);
+                if (stored != null) existingSecrets.put(secretKey, stored);
+            }
         }
         JSONObject root = new JSONObject(json);
         if (!EXPORT_FILE_TYPE.equals(root.optString(KEY_FILE_TYPE, null))) {
@@ -852,7 +890,7 @@ public class Preferences {
             throw new InvalidSettingsFileException("Missing preferences section");
         }
         SharedPreferences.Editor editor = prefs.edit();
-        editor.clear();
+        if (clearExisting) editor.clear();
         Iterator<String> keys = preferencesNode.keys();
         while (keys.hasNext()) {
             String key = keys.next();
@@ -882,8 +920,10 @@ public class Preferences {
                 editor.putString(key, (String) value);
             }
         }
-        for (Map.Entry<String, String> secret : existingSecrets.entrySet()) {
-            editor.putString(secret.getKey(), secret.getValue());
+        if (clearExisting) {
+            for (Map.Entry<String, String> secret : existingSecrets.entrySet()) {
+                editor.putString(secret.getKey(), secret.getValue());
+            }
         }
         editor.commit();
         // The file may be from the legacy (pre-brick) schema — re-run migration so it adapts.

@@ -10,7 +10,6 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
-import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -37,6 +36,8 @@ import dezz.status.widget.launcher.media.MediaPanelConfig;
 import dezz.status.widget.launcher.media.MediaPanelConfigStore;
 import dezz.status.widget.launcher.media.MediaPanelView;
 import dezz.status.widget.launcher.panels.PanelEditScheduler;
+import dezz.status.widget.settings.AppleColorPickerDialog;
+import dezz.status.widget.settings.SettingsBackNavigation;
 
 /** Visual, immediate editor for every element inside the HOME media panel. */
 public final class MediaPanelSettingsActivity extends AppCompatActivity {
@@ -46,21 +47,13 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
     private interface ColorValue { String get(); }
     private interface ValueLabel { String format(int value); }
 
-    private static final String[] COLOR_VALUES = {
-            "#FFFFFF", "#C7D0DD", "#35B7FF", "#00C853", "#FFB300",
-            "#FF5A5F", "#9C6BFF", "#121923", "#000000"
-    };
-    private static final String[] COLOR_LABELS = {
-            "Белый", "Серо-голубой", "Голубой", "Зелёный", "Янтарный",
-            "Красный", "Фиолетовый", "Графитовый", "Чёрный"
-    };
-
     private Preferences preferences;
     private MediaPanelConfigStore store;
     private MediaPanelConfig config;
     private MediaPanelView preview;
     private LinearLayout elementList;
     private PanelEditScheduler editScheduler;
+    private boolean resumedOnce;
     private final Map<String, TextView> positionLabels = new LinkedHashMap<>();
 
     @Override
@@ -71,7 +64,27 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         config = store.load();
         editScheduler = PanelEditScheduler.onMainThread(this::updatePreviewNow, this::saveNow);
         setTitle("Медиапанель");
-        setContentView(buildContent());
+        installContent();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (resumedOnce) {
+            // The real-HOME editor writes through the same store while this Activity is stopped.
+            // Reload before rebuilding controls so a later onStop cannot overwrite those edits
+            // with the stale in-memory object that existed before LauncherActivity was opened.
+            config = store.load();
+            installContent();
+            updatePreviewNow();
+        }
+        resumedOnce = true;
+    }
+
+    private void installContent() {
+        View content = buildContent();
+        setContentView(content);
+        SettingsBackNavigation.install(this, content);
     }
 
     @NonNull
@@ -454,63 +467,31 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
     private void addColor(@NonNull LinearLayout parent, @NonNull String title,
                           @NonNull ColorValue current, @NonNull ColorChange listener) {
         MaterialButton button = new MaterialButton(this);
-        button.setAllCaps(false);
-        updateColorButton(button, title, current.get());
-        button.setOnClickListener(v -> showColorChooser(title, current.get(), selected -> {
-            listener.set(selected);
-            persistAndPreview();
-            updateColorButton(button, title, selected);
-        }));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), dp(50));
+        AppleColorPickerDialog.decorateButton(button, title, current.get());
+        button.setOnClickListener(v -> {
+            String original = current.get();
+            AppleColorPickerDialog.show(this, title, original,
+                    AppleColorPickerDialog.Options.standard(),
+                    new AppleColorPickerDialog.Listener() {
+                        private void apply(@Nullable String selected) {
+                            String value = selected == null ? original : selected;
+                            listener.set(value);
+                            persistAndPreview();
+                            AppleColorPickerDialog.decorateButton(button, title, value);
+                        }
+
+                        @Override public void onPreview(@Nullable String selected) {
+                            apply(selected);
+                        }
+
+                        @Override public void onSelected(@Nullable String selected) {
+                            apply(selected);
+                        }
+                    });
+        });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), dp(62));
         lp.topMargin = dp(6);
         parent.addView(button, lp);
-    }
-
-    private void showColorChooser(@NonNull String title, @NonNull String current,
-                                  @NonNull ColorChange listener) {
-        String[] labels = new String[COLOR_LABELS.length + 1];
-        for (int index = 0; index < COLOR_LABELS.length; index++) {
-            labels[index] = COLOR_LABELS[index] + "   " + COLOR_VALUES[index];
-        }
-        labels[labels.length - 1] = "Свой HEX-цвет…";
-        new AlertDialog.Builder(this)
-                .setTitle(title)
-                .setItems(labels, (dialog, which) -> {
-                    if (which < COLOR_VALUES.length) listener.set(COLOR_VALUES[which]);
-                    else showHexDialog(title, current, listener);
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
-    }
-
-    private void showHexDialog(@NonNull String title, @NonNull String current,
-                               @NonNull ColorChange listener) {
-        EditText input = new EditText(this);
-        input.setSingleLine(true);
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
-        input.setText(current);
-        input.setSelection(input.length());
-        new AlertDialog.Builder(this)
-                .setTitle(title + " · HEX")
-                .setMessage("Формат: #RRGGBB")
-                .setView(input)
-                .setPositiveButton("Применить", (dialog, which) -> {
-                    String selected = input.getText().toString().trim();
-                    try {
-                        Color.parseColor(selected);
-                        listener.set(selected);
-                    } catch (IllegalArgumentException ignored) {
-                        new AlertDialog.Builder(this).setMessage("Неверный HEX-цвет")
-                                .setPositiveButton(android.R.string.ok, null).show();
-                    }
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
-    }
-
-    private void updateColorButton(@NonNull MaterialButton button, @NonNull String title,
-                                   @NonNull String value) {
-        button.setText(title + " · " + value.toUpperCase());
     }
 
     @NonNull

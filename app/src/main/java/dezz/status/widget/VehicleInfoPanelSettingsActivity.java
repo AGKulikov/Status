@@ -6,7 +6,6 @@
 package dezz.status.widget;
 
 import android.content.Intent;
-import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -23,7 +22,6 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -43,6 +41,8 @@ import dezz.status.widget.launcher.vehicle.VehicleInfoPanelConfigStore;
 import dezz.status.widget.launcher.vehicle.VehicleInfoPanelView;
 import dezz.status.widget.launcher.vehicle.VehicleDerivedMetrics;
 import dezz.status.widget.launcher.panels.PanelEditScheduler;
+import dezz.status.widget.settings.AppleColorPickerDialog;
+import dezz.status.widget.settings.SettingsBackNavigation;
 
 /** Human-friendly, immediate visual editor for the HOME vehicle-information panel. */
 public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
@@ -50,15 +50,6 @@ public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
     private interface TextChange { void set(@NonNull String value); }
     private interface TextValue { String get(); }
     private interface ValueLabel { String format(int value); }
-
-    private static final String[] COLOR_VALUES = {
-            "#FFFFFF", "#C7D0DD", "#35B7FF", "#00C853", "#FFB300",
-            "#FF5A5F", "#9C6BFF", "#121923", "#000000"
-    };
-    private static final String[] COLOR_LABELS = {
-            "Белый", "Серо-голубой", "Голубой", "Зелёный", "Янтарный",
-            "Красный", "Фиолетовый", "Графитовый", "Чёрный"
-    };
 
     private Preferences preferences;
     private VehicleInfoPanelConfigStore store;
@@ -83,7 +74,9 @@ public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
                 },
                 () -> store.save(config));
         setTitle("Данные автомобиля");
-        setContentView(buildContent());
+        View content = buildContent();
+        setContentView(content);
+        SettingsBackNavigation.install(this, content);
     }
 
     @Override
@@ -497,64 +490,31 @@ public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
     private void addColor(@NonNull LinearLayout parent, @NonNull String title,
                           @NonNull TextValue current, @NonNull TextChange change) {
         MaterialButton button = new MaterialButton(this);
-        button.setAllCaps(false);
-        updateColorButton(button, title, current.get());
-        button.setOnClickListener(v -> showColorChooser(title, current.get(), selected -> {
-            change.set(selected);
-            persistAndPreview();
-            updateColorButton(button, title, selected);
-        }));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), dp(50));
+        AppleColorPickerDialog.decorateButton(button, title, current.get());
+        button.setOnClickListener(v -> {
+            String original = current.get();
+            AppleColorPickerDialog.show(this, title, original,
+                    AppleColorPickerDialog.Options.standard(),
+                    new AppleColorPickerDialog.Listener() {
+                        private void apply(@Nullable String selected) {
+                            String value = selected == null ? original : selected;
+                            change.set(value);
+                            persistAndPreview();
+                            AppleColorPickerDialog.decorateButton(button, title, value);
+                        }
+
+                        @Override public void onPreview(@Nullable String selected) {
+                            apply(selected);
+                        }
+
+                        @Override public void onSelected(@Nullable String selected) {
+                            apply(selected);
+                        }
+                    });
+        });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), dp(62));
         lp.topMargin = dp(5);
         parent.addView(button, lp);
-    }
-
-    private void showColorChooser(@NonNull String title, @NonNull String current,
-                                  @NonNull TextChange selected) {
-        String[] labels = new String[COLOR_LABELS.length + 1];
-        for (int index = 0; index < COLOR_LABELS.length; index++) {
-            labels[index] = COLOR_LABELS[index] + "   " + COLOR_VALUES[index];
-        }
-        labels[labels.length - 1] = "Свой HEX-цвет…";
-        new AlertDialog.Builder(this)
-                .setTitle(title)
-                .setItems(labels, (dialog, which) -> {
-                    if (which < COLOR_VALUES.length) selected.set(COLOR_VALUES[which]);
-                    else showHexDialog(title, current, selected);
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
-    }
-
-    private void showHexDialog(@NonNull String title, @NonNull String current,
-                               @NonNull TextChange selected) {
-        EditText input = new EditText(this);
-        input.setSingleLine(true);
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
-        input.setText(current);
-        input.setSelection(input.length());
-        new AlertDialog.Builder(this)
-                .setTitle(title + " · HEX")
-                .setMessage("Формат: #RRGGBB")
-                .setView(input)
-                .setPositiveButton("Применить", (dialog, which) -> {
-                    String value = input.getText().toString().trim().toUpperCase(Locale.ROOT);
-                    if (value.matches("#[0-9A-F]{6}")) selected.set(value);
-                    else Toast.makeText(this, "Неверный HEX-цвет", Toast.LENGTH_SHORT).show();
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
-    }
-
-    private void updateColorButton(@NonNull MaterialButton button, @NonNull String title,
-                                   @NonNull String value) {
-        button.setText(title + " · " + value.toUpperCase(Locale.ROOT));
-        try {
-            button.setStrokeWidth(dp(2));
-            button.setStrokeColor(ColorStateList.valueOf(Color.parseColor(value)));
-        } catch (IllegalArgumentException ignored) {
-            button.setStrokeWidth(0);
-        }
     }
 
     @NonNull

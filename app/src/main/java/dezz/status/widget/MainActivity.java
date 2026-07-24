@@ -18,31 +18,25 @@
 package dezz.status.widget;
 
 import android.Manifest;
-import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
-import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.CompoundButton;
-import android.widget.PopupMenu;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.core.content.FileProvider;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -55,23 +49,12 @@ import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.slider.Slider;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
-import dezz.status.widget.automation.AutomationStateStore;
-import dezz.status.widget.climate.ClimatePanelService;
-import dezz.status.widget.climate.ScreenReservationStateStore;
 import dezz.status.widget.databinding.ActivityMainBinding;
-import dezz.status.widget.shell.PrivilegedShell;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
@@ -81,21 +64,10 @@ public class MainActivity extends AppCompatActivity {
     public static final int BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE = 1003;
     public static final int BACKGROUND_LOCATION_SETTINGS_REQUEST_CODE = 1004;
 
-    private static final String EXPORT_FILE_NAME_PREFIX = "status-widget-settings-";
-    private static final String EXPORT_FILE_NAME_EXT = ".json";
-    private static final String EXPORT_MIME_TYPE = "application/json";
-
     private Preferences prefs;
+    private int systemTopInset;
 
     ActivityMainBinding binding;
-
-    private final ActivityResultLauncher<String[]> importLauncher = registerForActivityResult(
-            new ActivityResultContracts.OpenDocument(),
-            uri -> {
-                if (uri != null) {
-                    importSettings(uri);
-                }
-            });
 
     private final CompoundButton.OnCheckedChangeListener enableWidgetSwitchListener =
             (buttonView, isChecked) -> {
@@ -130,11 +102,10 @@ public class MainActivity extends AppCompatActivity {
 
         binding.sectionGeneral.aboutButton.setOnClickListener(v ->
                 startActivity(new Intent(this, AboutActivity.class)));
-        binding.sectionGeneral.automationSettingsButton.setOnClickListener(v ->
-                startActivity(new Intent(this, AutomationSettingsActivity.class)));
-        binding.sectionGeneral.launcherSettingsButton.setOnClickListener(v ->
-                startActivity(new Intent(this, LauncherSettingsActivity.class)));
-        binding.sectionGeneral.settingsButton.setOnClickListener(this::showSettingsMenu);
+        binding.sectionGeneral.detailBackButton.setOnClickListener(v -> finish());
+        binding.sectionGeneral.settingsButton.setOnClickListener(v ->
+                startActivity(SettingsHubActivity.intent(this,
+                        dezz.status.widget.settings.SettingsDestinationCatalog.Group.STATUS)));
 
         final String appVersion = VersionGetter.getAppVersionName(this);
         if (appVersion != null) {
@@ -145,256 +116,17 @@ public class MainActivity extends AppCompatActivity {
 
         initializeViews();
 
-        if (prefs.widgetEnabled.get() && Permissions.allPermissionsGranted(this)) {
-            startWidgetService();
-        }
-
-        // A screen reservation is global WindowManager state, not process-local UI. Reconcile it
-        // whenever the application is opened, even if normal preferences were cleared after a
-        // crash/force-stop. The dedicated journal lets the service restore the exact old inset.
-        if (prefs.climatePanelEnabled.get()
-                || new ScreenReservationStateStore(this).hasManagedReservation()) {
-            ClimatePanelService.apply(this);
-        }
-
-        maybeShowCrashReport();
-        tryAutoGrantViaPrivilegedShell();
-    }
-
-    /**
-     * Some car head units (notably Geely Monjaro / QUALCOMM KX11) ship a stripped-down
-     * Settings package that doesn't expose Usage Access / Notification Listener UIs at all,
-     * so the user has no way to grant those permissions manually. As a workaround we try to
-     * speak ADB or Telnet to the head unit itself — those listeners are exposed by the
-     * factory ROM on the loopback interface — and run {@code appops}/{@code cmd notification}
-     * over that channel with shell-uid privileges. Silent no-op when permissions are already
-     * granted or no privileged channel is reachable.
-     */
-    private void tryAutoGrantViaPrivilegedShell() {
-        PrivilegedShell.Request.Builder rb = PrivilegedShell.Request.forPackage(getPackageName());
-        boolean any = false;
-
-        if (!Permissions.checkOverlayPermission(this)) {
-            rb.withOverlay();
-            any = true;
-        }
-        if (!Permissions.checkForMissingForegroundPermissions(this).isEmpty()) {
-            rb.withForegroundLocation();
-            any = true;
-        }
-        if (!Permissions.isBackgroundLocationGranted(this)) {
-            rb.withBackgroundLocation();
-            any = true;
-        }
-        if (!Permissions.isUsageAccessGranted(this)) {
-            rb.withUsageAccess();
-            any = true;
-        }
-        // Notification Listener is only useful when the media brick is in the current layout;
-        // gating on it avoids granting (and toasting about) a permission the user doesn't need.
-        boolean mediaPresent = BrickType.parseOrder(prefs.brickOrder.get()).contains(BrickType.MEDIA);
-        if (mediaPresent && !Permissions.isNotificationAccessGranted(this)) {
-            rb.withNotificationListener(PrivilegedShell.notificationListenerComponent(
-                    getPackageName(), MediaNotificationListener.class));
-            any = true;
-        }
-        // Accessibility service powers per-display foreground detection on multi-display
-        // head units. Single-display devices work fine without it (UsageStatsManager-based
-        // fallback), but turning it on doesn't hurt them either, so we always try.
-        String a11yComponent = PrivilegedShell.accessibilityServiceComponent(
-                getPackageName(), WidgetAccessibilityService.class);
-        if (!Permissions.isAccessibilityServiceEnabled(this, a11yComponent)) {
-            rb.withAccessibility(a11yComponent);
-            any = true;
-        }
-        if (!any) {
-            return;
-        }
-
-        // Capture the application context, NOT this Activity. Discovery can take 10+ s and
-        // the activity may already be destroyed (rotation, finish) by the time the callback
-        // fires; using `this` for Toast/getString would either leak the Activity through the
-        // pending lambda or post a Toast against a destroyed context.
-        final Context appCtx = getApplicationContext();
-        PrivilegedShell.get(this).ensurePrivileges(rb.build(), result -> {
-            if (!result.transportAvailable) {
-                // No reachable ADB/Telnet — silently fall back to the manual settings path
-                // (which the user will hit when they tap "Enable widget" or "Hide in apps…").
-                return;
-            }
-            if (result.anyGranted()) {
-                Toast.makeText(appCtx,
-                        appCtx.getString(R.string.privileged_grant_success,
-                                joinPermissionLabels(appCtx, result.grantedKinds)),
-                        Toast.LENGTH_LONG).show();
-                // If the user already had the widget enabled before and we were only blocked
-                // on permissions, autostart the service now — saves them having to toggle it.
-                if (prefs.widgetEnabled.get() && Permissions.allPermissionsGranted(this)
-                        && !WidgetService.isRunning()) {
-                    startWidgetService();
-                }
-            }
-            if (result.anyFailed()) {
-                Toast.makeText(appCtx,
-                        appCtx.getString(R.string.privileged_grant_failed,
-                                joinPermissionLabels(appCtx, result.failedKinds)),
-                        Toast.LENGTH_LONG).show();
-            }
-        });
-    }
-
-    /** Localised, comma-separated permission labels for a {@link PrivilegedShell.GrantResult}. */
-    private static String joinPermissionLabels(Context ctx,
-                                               java.util.List<PrivilegedShell.PermissionKind> kinds) {
-        java.util.List<String> labels = new java.util.ArrayList<>(kinds.size());
-        for (PrivilegedShell.PermissionKind k : kinds) {
-            labels.add(ctx.getString(permissionLabelRes(k)));
-        }
-        return TextUtils.join(", ", labels);
-    }
-
-    private static int permissionLabelRes(PrivilegedShell.PermissionKind kind) {
-        switch (kind) {
-            case OVERLAY:             return R.string.permission_label_overlay;
-            case FOREGROUND_LOCATION: return R.string.permission_label_foreground_location;
-            case BACKGROUND_LOCATION: return R.string.permission_label_background_location;
-            case USAGE_ACCESS:        return R.string.permission_label_usage_access;
-            case NOTIFICATION:        return R.string.permission_label_notification;
-            case ACCESSIBILITY:       return R.string.permission_label_accessibility;
-            default: throw new IllegalArgumentException("Unknown kind " + kind);
-        }
-    }
-
-    private void maybeShowCrashReport() {
-        File crashFile = new File(getCacheDir(), StatusWidgetApplication.CRASH_FILE);
-        if (!crashFile.exists() || !crashFile.canRead()) {
-            return;
-        }
-        String content;
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                new java.io.FileInputStream(crashFile), StandardCharsets.UTF_8))) {
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line).append('\n');
-            }
-            content = sb.toString();
-        } catch (IOException e) {
-            // Unreadable — best we can do is delete and bail.
-            //noinspection ResultOfMethodCallIgnored
-            crashFile.delete();
-            return;
-        }
-        // Consume the report as soon as it is held in memory: deleting the file up front (rather
-        // than only in the button callbacks) makes it show exactly once. Dismissing the dialog via
-        // Back or a tap outside no longer leaves the file behind to re-appear on every launch.
-        //noinspection ResultOfMethodCallIgnored
-        crashFile.delete();
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle(R.string.crash_report_title)
-                .setMessage(content)
-                .setNeutralButton(R.string.crash_report_copy, (d, w) -> {
-                    android.content.ClipboardManager cm =
-                            (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                    if (cm != null) {
-                        cm.setPrimaryClip(android.content.ClipData.newPlainText(
-                                "Status Widget crash", content));
-                    }
-                    Toast.makeText(this, R.string.crash_report_copied, Toast.LENGTH_SHORT).show();
-                })
-                .setPositiveButton(R.string.crash_report_share, (d, w) -> shareCrashReport(content))
-                .setNegativeButton(R.string.crash_report_dismiss, null)
-                .show();
-    }
-
-    private void shareCrashReport(String content) {
-        try {
-            // Share the report text directly — the backing file is already deleted (show-once), so
-            // there's nothing to attach via FileProvider.
-            Intent send = new Intent(Intent.ACTION_SEND);
-            send.setType("text/plain");
-            send.putExtra(Intent.EXTRA_SUBJECT, "Status Widget crash");
-            send.putExtra(Intent.EXTRA_TEXT, content);
-            startActivity(Intent.createChooser(send, getString(R.string.crash_report_chooser)));
-        } catch (Throwable t) {
-            Log.w(TAG, "Failed to share crash report", t);
-        }
+        AppRuntimeBootstrap.run(this, prefs);
     }
 
     private void applyWindowInsets() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.scrollView, (v, windowInsets) -> {
             Insets bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars()
                     | WindowInsetsCompat.Type.displayCutout());
+            systemTopInset = Math.max(0, bars.top);
             v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
             return windowInsets;
         });
-    }
-
-    private void exportSettings() {
-        try {
-            String json = prefs.exportToJson();
-            File exportsDir = new File(getCacheDir(), "exports");
-            if (!exportsDir.exists() && !exportsDir.mkdirs()) {
-                Toast.makeText(this, R.string.export_failed_toast, Toast.LENGTH_LONG).show();
-                return;
-            }
-            String fileName = EXPORT_FILE_NAME_PREFIX
-                    + new java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US)
-                            .format(new java.util.Date())
-                    + EXPORT_FILE_NAME_EXT;
-            File file = new File(exportsDir, fileName);
-            try (FileOutputStream out = new FileOutputStream(file)) {
-                out.write(json.getBytes(StandardCharsets.UTF_8));
-            }
-            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
-            Intent send = new Intent(Intent.ACTION_SEND);
-            send.setType(EXPORT_MIME_TYPE);
-            send.putExtra(Intent.EXTRA_STREAM, uri);
-            send.putExtra(Intent.EXTRA_SUBJECT, fileName);
-            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(Intent.createChooser(send, getString(R.string.export_chooser_title)));
-        } catch (Exception e) {
-            Log.e(TAG, "Export failed", e);
-            Toast.makeText(this, R.string.export_failed_toast, Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private void importSettings(Uri uri) {
-        StringBuilder builder = new StringBuilder();
-        try (InputStream in = getContentResolver().openInputStream(uri)) {
-            if (in == null) {
-                throw new IOException("Could not open input stream");
-            }
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(in, StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    builder.append(line).append('\n');
-                }
-            }
-            prefs.importFromJson(builder.toString());
-        } catch (Preferences.InvalidSettingsFileException e) {
-            Log.w(TAG, "Invalid settings file", e);
-            Toast.makeText(this, R.string.import_invalid_file_toast, Toast.LENGTH_LONG).show();
-            return;
-        } catch (Exception e) {
-            Log.e(TAG, "Import failed", e);
-            Toast.makeText(this, R.string.import_failed_toast, Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        boolean wasRunning = WidgetService.isRunning();
-        if (wasRunning) {
-            stopService(new Intent(this, WidgetService.class));
-        }
-        Toast.makeText(this, R.string.import_success_toast, Toast.LENGTH_SHORT).show();
-        if (prefs.widgetEnabled.get() && Permissions.allPermissionsGranted(this)) {
-            startForegroundService(new Intent(this, WidgetService.class));
-        }
-        // Import may switch between reserved/compact/off. Always reconcile so an imported
-        // disabled state also restores any reservation from the previous configuration.
-        ClimatePanelService.apply(this);
-        recreate();
     }
 
     private BrickListAdapter brickAdapter;
@@ -645,7 +377,8 @@ public class MainActivity extends AppCompatActivity {
         View child = binding.scrollView.getChildAt(0);
         if (child == null) return;
         int basePaddingTop = getResources().getDimensionPixelSize(R.dimen.sectionSpacing);
-        int extra = (prefs.widgetMode.get() == 1) ? widgetHeight : 0;
+        int extra = prefs.widgetMode.get() == 1
+                ? Math.max(0, widgetHeight - systemTopInset) : 0;
         child.setPadding(
                 child.getPaddingLeft(),
                 basePaddingTop + extra,
@@ -685,75 +418,6 @@ public class MainActivity extends AppCompatActivity {
     private void stopWidgetService() {
         prefs.widgetEnabled.set(false);
         stopService(new Intent(this, WidgetService.class));
-    }
-
-    private void showSettingsMenu(View anchor) {
-        PopupMenu menu = new PopupMenu(this, anchor);
-        menu.getMenuInflater().inflate(R.menu.settings_actions, menu.getMenu());
-        // Show icons next to titles. PopupMenu hides them by default; this reaches into the
-        // private menu helper to force-show, which Material's PopupMenu supports.
-        try {
-            java.lang.reflect.Field f = menu.getClass().getDeclaredField("mPopup");
-            f.setAccessible(true);
-            Object popup = f.get(menu);
-            popup.getClass()
-                    .getDeclaredMethod("setForceShowIcon", boolean.class)
-                    .invoke(popup, true);
-        } catch (Exception ignored) {
-        }
-        menu.setOnMenuItemClickListener(item -> {
-            int id = item.getItemId();
-            if (id == R.id.menu_presets) {
-                startActivity(new Intent(this, PresetsActivity.class));
-                return true;
-            }
-            if (id == R.id.menu_export) {
-                exportSettings();
-                return true;
-            }
-            if (id == R.id.menu_import) {
-                importLauncher.launch(new String[]{EXPORT_MIME_TYPE, "*/*"});
-                return true;
-            }
-            if (id == R.id.menu_reset) {
-                confirmResetSettings();
-                return true;
-            }
-            return false;
-        });
-        menu.show();
-    }
-
-    private void confirmResetSettings() {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.reset_settings_title)
-                .setMessage(R.string.reset_settings_message)
-                .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton(R.string.reset_settings_confirm, (d, w) -> resetAllSettings())
-                .show();
-    }
-
-    private void resetAllSettings() {
-        if (WidgetService.isRunning()) {
-            stopService(new Intent(this, WidgetService.class));
-        }
-        boolean climateNeedsCleanup = prefs.climatePanelEnabled.get()
-                || new ScreenReservationStateStore(this).hasManagedReservation();
-        if (climateNeedsCleanup) {
-            // Queue an explicit exact restore before clearing ordinary preferences. Recovery data
-            // is held in a separate crash-safe journal and therefore remains available here.
-            ClimatePanelService.stopAndRestore(this);
-        }
-        prefs.resetAll();
-        new AutomationStateStore(this).clearAll();
-        // Start a fresh MainActivity instead of recreate(): recreate() restores the View
-        // hierarchy state after our initializeViews(), and the CompoundButton listeners we
-        // attached then fire on setChecked(...) from restoreInstanceState — writing the
-        // pre-reset values straight back into the prefs we just cleared.
-        Intent restart = new Intent(this, MainActivity.class);
-        restart.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
-        startActivity(restart);
-        finish();
     }
 
     private void requestPermissions() {

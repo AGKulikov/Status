@@ -38,6 +38,7 @@ import java.util.Locale;
 
 import dezz.status.widget.integration.ActionBinding;
 import dezz.status.widget.integration.ConnectorType;
+import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.scenario.IntentActionRule;
 import dezz.status.widget.scenario.IntentActionRuleStore;
 import dezz.status.widget.sprut.SprutActionValue;
@@ -65,7 +66,9 @@ public final class IntentScenarioSettingsActivity extends AppCompatActivity {
         store = new IntentActionRuleStore(prefs);
         loadCatalog();
         loadRules();
-        setContentView(buildScreen());
+        View screen = buildScreen();
+        setContentView(screen);
+        dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(this, screen);
     }
 
     @Override
@@ -269,11 +272,22 @@ public final class IntentScenarioSettingsActivity extends AppCompatActivity {
     }
 
     private void confirmDelete(IntentActionRule rule) {
+        List<LauncherShortcutStore.Shortcut> references = referencingHomeShortcuts(rule.id);
+        if (!references.isEmpty()) {
+            showReferencedRuleDialog(rule, references);
+            return;
+        }
         new AlertDialog.Builder(this)
                 .setTitle("Удалить правило?")
                 .setMessage(rule.intentAction)
                 .setNegativeButton("Отмена", null)
                 .setPositiveButton("Удалить", (dialog, which) -> {
+                    List<LauncherShortcutStore.Shortcut> currentReferences =
+                            referencingHomeShortcuts(rule.id);
+                    if (!currentReferences.isEmpty()) {
+                        showReferencedRuleDialog(rule, currentReferences);
+                        return;
+                    }
                     List<IntentActionRule> candidate = new ArrayList<>(rules);
                     candidate.remove(rule);
                     if (persist(candidate, true)) renderRules();
@@ -287,6 +301,10 @@ public final class IntentScenarioSettingsActivity extends AppCompatActivity {
             return;
         }
         IntentActionRule source = index >= 0 && index < rules.size() ? rules.get(index) : null;
+        if (source != null && source.command.connectorType != ConnectorType.SPRUTHUB) {
+            showUnsupportedConnectorDialog(source);
+            return;
+        }
         EditorViews views = new EditorViews(source);
         ScrollView scroll = new ScrollView(this);
         scroll.addView(views.root, matchWrap());
@@ -318,6 +336,71 @@ public final class IntentScenarioSettingsActivity extends AppCompatActivity {
                     }
                 }));
         dialog.show();
+    }
+
+    private void showUnsupportedConnectorDialog(@NonNull IntentActionRule rule) {
+        new AlertDialog.Builder(this)
+                .setTitle("Действие создано в кнопках HOME")
+                .setMessage("Это правило использует " + connectorLabel(rule.command.connectorType)
+                        + ". Текущий редактор поддерживает только Sprut.hub, поэтому правило "
+                        + "оставлено без изменений.")
+                .setNegativeButton("Закрыть", null)
+                .setPositiveButton("Открыть кнопки HOME", (dialog, which) ->
+                        openHomeShortcutSettings())
+                .show();
+    }
+
+    private void showReferencedRuleDialog(@NonNull IntentActionRule rule,
+                                          @NonNull List<LauncherShortcutStore.Shortcut> references) {
+        StringBuilder names = new StringBuilder();
+        int shown = Math.min(3, references.size());
+        for (int index = 0; index < shown; index++) {
+            if (names.length() > 0) names.append(", ");
+            names.append('«').append(references.get(index).title).append('»');
+        }
+        if (references.size() > shown) names.append(" и ещё ").append(references.size() - shown);
+        new AlertDialog.Builder(this)
+                .setTitle("Правило используется на HOME")
+                .setMessage("Сначала измените или удалите "
+                        + (references.size() == 1 ? "кнопку " : "кнопки ")
+                        + names + ". Правило «" + rule.id
+                        + "» не удалено, чтобы кнопки HOME не перестали работать.")
+                .setNegativeButton("Закрыть", null)
+                .setPositiveButton("Открыть кнопки HOME", (dialog, which) ->
+                        openHomeShortcutSettings())
+                .show();
+    }
+
+    @NonNull
+    private List<LauncherShortcutStore.Shortcut> referencingHomeShortcuts(
+            @NonNull String ruleId) {
+        List<LauncherShortcutStore.Shortcut> references = new ArrayList<>();
+        for (LauncherShortcutStore.Shortcut shortcut : new LauncherShortcutStore(prefs).all()) {
+            boolean primary = shortcut.kind == LauncherShortcutStore.Kind.RULE
+                    && ruleId.equals(shortcut.target);
+            boolean longPress = shortcut.hasLongAction
+                    && shortcut.longKind == LauncherShortcutStore.Kind.RULE
+                    && ruleId.equals(shortcut.longTarget);
+            if (primary || longPress) references.add(shortcut);
+        }
+        return references;
+    }
+
+    private void openHomeShortcutSettings() {
+        startActivity(new Intent(this, LauncherShortcutSettingsActivity.class));
+    }
+
+    @NonNull
+    private static String connectorLabel(@NonNull ConnectorType connectorType) {
+        switch (connectorType) {
+            case HOME_ASSISTANT:
+                return "Home Assistant";
+            case MQTT:
+                return "MQTT";
+            case SPRUTHUB:
+            default:
+                return "Sprut.hub";
+        }
     }
 
     private boolean persist(List<IntentActionRule> candidate, boolean successToast) {
@@ -378,6 +461,12 @@ public final class IntentScenarioSettingsActivity extends AppCompatActivity {
             root.addView(enabled, matchWrap());
             id = field(root, "Уникальный ID правила",
                     source == null ? nextRuleId() : source.id);
+            if (source != null) {
+                // HOME shortcuts address a rule by this stable id. Renaming would be equivalent
+                // to deleting a referenced rule while leaving a dead button behind.
+                id.setEnabled(false);
+                id.setAlpha(.7f);
+            }
             intentAction = field(root, "Понятный префикс Android Intent action",
                     source == null ? "sh.car.parkovka"
                             : IntentActionRule.intentActionPrefix(source.intentAction));

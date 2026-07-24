@@ -40,7 +40,9 @@ public final class AutomationSettingsActivity extends AppCompatActivity {
         super.onCreate(state);
         prefs = new Preferences(this);
         store = new HaBrickConfigStore(prefs);
-        setContentView(buildScreen());
+        View screen = buildScreen();
+        setContentView(screen);
+        dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(this, screen);
     }
 
     @Override protected void onResume() {

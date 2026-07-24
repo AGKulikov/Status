@@ -36,6 +36,15 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/detailBackButton"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:layout_marginEnd="@dimen/optionsMarginSmall"
+                android:text="Назад"
+                app:icon="@drawable/ic_arrow_back" />
+
             <ImageView
                 android:layout_width="@dimen/sectionHeaderIconSize"
                 android:layout_height="@dimen/sectionHeaderIconSize"
@@ -68,22 +77,6 @@
                 android:text="@string/menu_settings"
                 app:icon="@drawable/ic_settings" />
         </LinearLayout>
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/automationSettingsButton"
-            style="?attr/materialButtonOutlinedStyle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginVertical="@dimen/optionsMarginSmall"
-            android:text="@string/automation_settings_button" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/launcherSettingsButton"
-            style="?attr/materialButtonOutlinedStyle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginVertical="@dimen/optionsMarginSmall"
-            android:text="@string/launcher_settings_button" />
 
         <com.google.android.material.materialswitch.MaterialSwitch
             android:id="@+id/enableWidgetSwitch"
