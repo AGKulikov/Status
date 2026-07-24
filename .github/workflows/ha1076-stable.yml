@@ -1,4 +1,4 @@
-name: Build HA1076 stable
+name: Build HA1076 release candidate
 
 on:
   push:
@@ -37,67 +37,68 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Decode stable update keystore
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      - name: Generate disposable candidate signer
         shell: bash
         run: |
-          test -n "$KEYSTORE_BASE64" || { echo "KEYSTORE_BASE64 is required" >&2; exit 1; }
-          echo "$KEYSTORE_BASE64" | base64 -d > keystore.jks
+          keytool -genkeypair -noprompt \
+            -storetype PKCS12 \
+            -keystore "$RUNNER_TEMP/ha1076-candidate.jks" \
+            -storepass candidate-only \
+            -keypass candidate-only \
+            -alias candidate-only \
+            -keyalg RSA -keysize 2048 -validity 2 \
+            -dname "CN=Disposable HA1076 Candidate"
 
-      - name: Test and build stable release
+      - name: Test and build non-debuggable release candidate
         env:
           VERSION_NAME: v2.8.2-ha1076
           VERSION_CODE: '208021076'
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEYSTORE_FILE: ${{ runner.temp }}/ha1076-candidate.jks
+          KEY_PASSWORD: candidate-only
+          KEY_ALIAS: candidate-only
         run: |
-          test -n "$KEY_PASSWORD" || { echo "KEY_PASSWORD is required" >&2; exit 1; }
           ./gradlew --no-daemon clean
           ./gradlew --no-daemon testGeelyDebugUnitTest
           ./gradlew --no-daemon assembleGeelyRelease
 
-      - name: Verify package, update signer and APK
+      - name: Verify release candidate
         shell: bash
         run: |
           APK="app/build/outputs/apk/geely/release/status-widget-ha-v2.8.2-ha1076-release.apk"
-          FINAL="app/build/outputs/apk/geely/release/status-widget-ha-v2.8.2-ha1076-stable.apk"
+          FINAL="app/build/outputs/apk/geely/release/status-widget-ha-v2.8.2-ha1076-candidate.apk"
           test -f "$APK"
           BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
           echo "$BADGING"
           echo "$BADGING" | grep -q "package: name='ru.natro.statuswidget' versionCode='208021076' versionName='v2.8.2-ha1076'"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$APK"
-          CERTS=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK")
-          echo "$CERTS"
-          echo "$CERTS" | grep -qi "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
           unzip -p "$APK" 'classes*.dex' > all-classes.dex
           strings all-classes.dex > all-classes.strings
           grep -q 'androidx/concurrent/futures/ResolvableFuture' all-classes.strings
           if "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml | grep -q 'android:debuggable'; then
-            echo "Release APK must not be debuggable" >&2
+            echo "Release candidate must not be debuggable" >&2
             exit 1
           fi
           mv "$APK" "$FINAL"
           sha256sum "$FINAL" | tee "$FINAL.sha256"
 
-      - name: Upload stable APK
+      - name: Upload release candidate
         uses: actions/upload-artifact@v4
         with:
-          name: status-widget-ha-v2.8.2-ha1076-stable
+          name: status-widget-ha-v2.8.2-ha1076-release-candidate
           path: |
-            app/build/outputs/apk/geely/release/status-widget-ha-v2.8.2-ha1076-stable.apk
-            app/build/outputs/apk/geely/release/status-widget-ha-v2.8.2-ha1076-stable.apk.sha256
+            app/build/outputs/apk/geely/release/status-widget-ha-v2.8.2-ha1076-candidate.apk
+            app/build/outputs/apk/geely/release/status-widget-ha-v2.8.2-ha1076-candidate.apk.sha256
           if-no-files-found: error
           retention-days: 30
 
-      - name: Report stable workflow run
+      - name: Report candidate workflow run
         if: always()
         uses: actions/github-script@v7
         with:
           script: |
             const state = '${{ job.status }}';
             const body = [
-              `HA1076 stable workflow: **${state}**`,
+              `HA1076 release-candidate workflow: **${state}**`,
               `Run: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
               `Commit: ${context.sha}`
             ].join('\n');
