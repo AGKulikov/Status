@@ -48,7 +48,7 @@ public final class ClimateLevelCyclePlanner {
                 if (off == null) off = option;
                 continue;
             }
-            if (normalized.contains("auto") || normalized.contains("авто")) {
+            if (ClimateFanIndicatorPolicy.isAutomaticLabel(label)) {
                 if (auto == null) auto = option;
                 continue;
             }
@@ -111,7 +111,7 @@ public final class ClimateLevelCyclePlanner {
             if (isOff(normalized, option.value)) {
                 if (off == null) off = option;
                 manual.add(option);
-            } else if (normalized.contains("auto") || normalized.contains("авто")) {
+            } else if (ClimateFanIndicatorPolicy.isAutomaticLabel(label)) {
                 automatic.add(option);
             } else {
                 manual.add(option);

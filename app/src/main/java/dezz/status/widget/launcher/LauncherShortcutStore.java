@@ -26,6 +26,7 @@ public final class LauncherShortcutStore {
     public static final int SCHEMA_VERSION = 1;
     public static final int MIN_ICON_SIZE_PX = 24;
     public static final int MAX_ICON_SIZE_PX = 320;
+    public static final int MAX_DRIVER_PANEL_SHORTCUTS = 10;
 
     public enum Kind { APP, BUILTIN, RULE, INTENT, CAR }
 
@@ -102,6 +103,9 @@ public final class LauncherShortcutStore {
     }
 
     public enum Builtin {
+        HOME("home", "Домой", "home"),
+        BACK("back", "Назад", "back"),
+        STOCK_CLIMATE("stock_climate", "Штатный климат", "climate"),
         ALL_APPS("all_apps", "Все приложения", "apps"),
         MAPS_WINDOW("maps_window", "Карты в окне", "navigation"),
         MAPS_FULL("maps_full", "Карты на весь экран", "navigation"),
@@ -136,18 +140,34 @@ public final class LauncherShortcutStore {
     }
 
     private final Preferences preferences;
+    private final Preferences.Str storage;
+    private final boolean driverPanel;
     private final List<Shortcut> shortcuts = new ArrayList<>();
 
     public LauncherShortcutStore(@NonNull Preferences preferences) {
+        this(preferences, preferences.launcherShortcutsJson, false);
+    }
+
+    private LauncherShortcutStore(@NonNull Preferences preferences,
+                                  @NonNull Preferences.Str storage,
+                                  boolean driverPanel) {
         this.preferences = preferences;
+        this.storage = storage;
+        this.driverPanel = driverPanel;
         load();
+    }
+
+    @NonNull
+    public static LauncherShortcutStore forDriverPanel(@NonNull Preferences preferences) {
+        return new LauncherShortcutStore(preferences,
+                preferences.driverPanelShortcutsJson, true);
     }
 
     public void load() {
         List<Shortcut> previous = new ArrayList<>();
         for (Shortcut shortcut : shortcuts) previous.add(shortcut.copy());
         shortcuts.clear();
-        String raw = preferences.launcherShortcutsJson.get();
+        String raw = storage.get();
         if (raw == null || raw.trim().isEmpty()) {
             shortcuts.addAll(defaults());
             save();
@@ -188,6 +208,7 @@ public final class LauncherShortcutStore {
                 return;
             }
         }
+        if (driverPanel && shortcuts.size() >= MAX_DRIVER_PANEL_SHORTCUTS) return;
         shortcuts.add(sanitize(value.copy()));
         save();
     }
@@ -213,7 +234,7 @@ public final class LauncherShortcutStore {
             JSONArray items = new JSONArray();
             for (Shortcut value : shortcuts) items.put(toJson(value));
             root.put("items", items);
-            preferences.launcherShortcutsJson.set(root.toString());
+            storage.set(root.toString());
         } catch (JSONException ignored) {
         }
     }
@@ -311,7 +332,17 @@ public final class LauncherShortcutStore {
     }
 
     @NonNull
-    private static List<Shortcut> defaults() {
+    private List<Shortcut> defaults() {
+        if (driverPanel) {
+            List<Shortcut> values = new ArrayList<>();
+            values.add(driverBuiltin(Builtin.HOME, "Домой"));
+            values.add(driverBuiltin(Builtin.BACK, "Назад"));
+            Shortcut climate = driverBuiltin(Builtin.STOCK_CLIMATE, "Климат");
+            climate.iconSizePx = 76;
+            values.add(climate);
+            values.add(driverBuiltin(Builtin.ALL_APPS, "Приложения"));
+            return values;
+        }
         List<Shortcut> values = new ArrayList<>();
         values.add(builtin(Builtin.MAPS_WINDOW, "Карты"));
         values.add(builtin(Builtin.NAVIGATOR_WINDOW, "Навигатор"));
@@ -320,6 +351,15 @@ public final class LauncherShortcutStore {
         values.add(builtin(Builtin.EDIT_HOME, "Компоновка"));
         values.add(builtin(Builtin.HOME_SETTINGS, "Настройки"));
         return values;
+    }
+
+    @NonNull
+    private static Shortcut driverBuiltin(@NonNull Builtin action, @NonNull String title) {
+        Shortcut value = builtin(action, title);
+        value.showTitle = false;
+        value.iconSizePx = 54;
+        value.backgroundColor = "#00000000";
+        return value;
     }
 
     @NonNull

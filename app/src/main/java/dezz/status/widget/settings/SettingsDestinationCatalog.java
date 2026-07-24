@@ -178,6 +178,11 @@ public final class SettingsDestinationCatalog {
                 "сетка", "размер", "позиция", "расположение", "home", "редактор",
                 "настройки", "редактирование",
                 "столбцы", "ряды", "показывать", "скрыть"));
+        values.add(activity("driver_panel", Group.PANELS, "Панель водителя",
+                "Старая боковая панель поверх приложений: до 10 кнопок, Домой, Назад и штатный климат",
+                "apps", "dezz.status.widget.DriverPanelSettingsActivity",
+                "панель водителя", "старая панель", "системные приложения", "домой",
+                "назад", "климат", "оверлей", "10 кнопок", "размер иконок"));
         values.add(activity("panel_popup", Group.PANELS, "Плавающие панели",
                 "Независимые оверлеи, сетка, размер, положение и плитки",
                 "popup", "dezz.status.widget.PopupSettingsActivity",

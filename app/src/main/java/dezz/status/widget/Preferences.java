@@ -516,6 +516,23 @@ public class Preferences {
     public final Int climateButtonY = new Int(this, "climateButtonY", 300);
     public final Bool climateButtonLocked = new Bool(this, "climateButtonLocked", false);
     public final Str launcherShortcutsJson = new Str(this, "launcherShortcutsJson", "");
+    // Optional replacement for the old Monjaro driver rail. The stock climate proxy intentionally
+    // has no user coordinates: DriverPanelLayoutPolicy mirrors the reference old-panel centre,
+    // while the proxy button itself may occupy any user-selected slot.
+    public final Bool driverPanelEnabled = new Bool(this, "driverPanelEnabled", false);
+    /** 0 = left/start edge, 1 = right/end edge. */
+    public final Int driverPanelSide = new Int(this, "driverPanelSide", 0);
+    public final Int driverPanelWidthPx = new Int(this, "driverPanelWidthPx", 120);
+    public final Int driverPanelTopPaddingPx = new Int(this, "driverPanelTopPaddingPx", 8);
+    public final Int driverPanelBottomPaddingPx = new Int(this, "driverPanelBottomPaddingPx", 8);
+    public final Int driverPanelItemGapPx = new Int(this, "driverPanelItemGapPx", 6);
+    public final Int driverPanelCornerRadiusPx = new Int(this,
+            "driverPanelCornerRadiusPx", 18);
+    public final Str driverPanelBackgroundColor = new Str(this,
+            "driverPanelBackgroundColor", "#EE13171C");
+    /** Separate ordered collection; never aliases the HOME action grid. */
+    public final Str driverPanelShortcutsJson = new Str(this,
+            "driverPanelShortcutsJson", "");
     /** Additive cell positions for action/smart-home icons; shortcut actions stay untouched. */
     public final Str launcherActionsGridJson = new Str(this, "launcherActionsGridJson", "");
     public final Int launcherAppsColumns = new Int(this, "launcherAppsColumns", 3);

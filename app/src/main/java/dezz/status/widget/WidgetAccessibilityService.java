@@ -19,9 +19,12 @@ package dezz.status.widget;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
+import android.accessibilityservice.GestureDescription;
+import android.graphics.Path;
 import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.Looper;
 import android.os.Process;
 import android.os.SystemClock;
 import android.util.Log;
@@ -29,6 +32,7 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
@@ -131,6 +135,59 @@ public class WidgetAccessibilityService extends AccessibilityService {
     @Nullable
     public static WidgetAccessibilityService getInstance() {
         return instance;
+    }
+
+    /**
+     * Performs Android's global Back action for the driver-panel button.
+     *
+     * @return {@code true} when the enabled accessibility service accepted the request.
+     */
+    public static boolean performGlobalBack() {
+        WidgetAccessibilityService current = instance;
+        if (current == null) return false;
+        new Handler(Looper.getMainLooper()).post(
+                () -> current.performGlobalAction(GLOBAL_ACTION_BACK));
+        return true;
+    }
+
+    /**
+     * Injects one short screen tap. The driver panel temporarily marks its own windows
+     * NOT_TOUCHABLE before calling this method, so input is delivered to the covered OEM button
+     * instead of recursively activating our proxy icon.
+     */
+    public interface TapCallback {
+        void onFinished(boolean success);
+    }
+
+    public static boolean performTap(int x, int y, @NonNull TapCallback callback) {
+        WidgetAccessibilityService current = instance;
+        if (current == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return false;
+        Handler main = new Handler(Looper.getMainLooper());
+        main.post(() -> {
+            try {
+                Path path = new Path();
+                path.moveTo(Math.max(0, x), Math.max(0, y));
+                GestureDescription gesture = new GestureDescription.Builder()
+                        .addStroke(new GestureDescription.StrokeDescription(path, 0L, 80L))
+                        .build();
+                boolean accepted = current.dispatchGesture(gesture,
+                        new GestureResultCallback() {
+                            @Override public void onCompleted(
+                                    GestureDescription gestureDescription) {
+                                callback.onFinished(true);
+                            }
+
+                            @Override public void onCancelled(
+                                    GestureDescription gestureDescription) {
+                                callback.onFinished(false);
+                            }
+                        }, main);
+                if (!accepted) callback.onFinished(false);
+            } catch (RuntimeException error) {
+                callback.onFinished(false);
+            }
+        });
+        return true;
     }
 
     /**

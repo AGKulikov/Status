@@ -24,6 +24,7 @@ import android.util.Log;
 
 import dezz.status.widget.climate.ClimatePanelService;
 import dezz.status.widget.climate.ScreenReservationStateStore;
+import dezz.status.widget.driver.DriverPanelService;
 
 public class BootReceiver extends BroadcastReceiver {
     private static final String TAG = "BootReceiver";
@@ -42,6 +43,7 @@ public class BootReceiver extends BroadcastReceiver {
             // Keystore-backed MQTT credentials can become readable only after unlock on some
             // OEM ROMs. This reconfigure is independent from status-window attachment.
             restoreStatusWidget(context, true);
+            restoreDriverPanelSafely(context);
             restoreClimateSafely(context);
             return;
         }
@@ -55,7 +57,20 @@ public class BootReceiver extends BroadcastReceiver {
             // Restore independently. A transient OEM rejection of the climate foreground service
             // must never prevent the status row from being started (or vice versa).
             restoreStatusWidget(context, false);
+            restoreDriverPanelSafely(context);
             restoreClimateSafely(context);
+        }
+    }
+
+    private static void restoreDriverPanelSafely(Context context) {
+        try {
+            Preferences prefs = new Preferences(context);
+            if (prefs.driverPanelEnabled.get()) {
+                Log.i(TAG, "Restoring driver panel before climate reservation");
+                DriverPanelService.apply(context);
+            }
+        } catch (RuntimeException failure) {
+            Log.e(TAG, "Could not restore driver panel", failure);
         }
     }
 

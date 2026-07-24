@@ -34,6 +34,7 @@ public final class LauncherIconResolver {
             new Preset("apps", "Приложения"),
             new Preset("navigation", "Навигация"),
             new Preset("home", "Домой"),
+            new Preset("back", "Назад"),
             new Preset("work", "Работа"),
             new Preset("media", "Медиа"),
             new Preset("media_previous", "Предыдущий трек"),
@@ -148,6 +149,7 @@ public final class LauncherIconResolver {
         switch (key) {
             case "navigation": return R.drawable.ic_launcher_navigation;
             case "home": return R.drawable.ic_launcher_home;
+            case "back": return R.drawable.ic_launcher_back;
             case "work": return R.drawable.ic_launcher_work;
             case "media": return R.drawable.ic_media_play;
             case "media_previous": return R.drawable.ic_media_previous;

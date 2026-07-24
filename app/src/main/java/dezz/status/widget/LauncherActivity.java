@@ -1830,6 +1830,17 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private void executeBuiltin(@NonNull LauncherShortcutStore.Builtin action) {
         switch (action) {
+            case HOME:
+                startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                                | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
+                break;
+            case BACK:
+                if (!WidgetAccessibilityService.performGlobalBack()) onBackPressed();
+                break;
+            case STOCK_CLIMATE:
+                dezz.status.widget.driver.DriverPanelService.triggerStockClimate(this);
+                break;
             case MAPS_WINDOW: launchYandex(YandexWindowLauncher.Product.MAPS, false); break;
             case MAPS_FULL: launchYandex(YandexWindowLauncher.Product.MAPS, true); break;
             case NAVIGATOR_WINDOW: launchYandex(YandexWindowLauncher.Product.NAVIGATOR, false); break;

@@ -28,6 +28,7 @@ import java.util.List;
 
 import dezz.status.widget.climate.ClimatePanelService;
 import dezz.status.widget.climate.ScreenReservationStateStore;
+import dezz.status.widget.driver.DriverPanelService;
 import dezz.status.widget.shell.PrivilegedShell;
 
 /**
@@ -71,6 +72,17 @@ public final class AppRuntimeBootstrap {
                         new Intent(appContext, WidgetService.class));
             } catch (RuntimeException error) {
                 Log.w(TAG, "Could not start enabled widget service", error);
+            }
+        }
+
+        // The driver rail owns the ECARX navigation-bar layer when both surfaces are enabled.
+        // Restore it first so the climate reservation can detect occupancy and select its safe
+        // fallback instead of replacing the user's primary side panel.
+        if (preferences.driverPanelEnabled.get()) {
+            try {
+                DriverPanelService.apply(appContext);
+            } catch (RuntimeException error) {
+                Log.w(TAG, "Could not reconcile driver panel service", error);
             }
         }
 
