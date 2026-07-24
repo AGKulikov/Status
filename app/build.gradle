@@ -81,11 +81,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            // Recovery/publication jobs may build an explicitly unsigned APK, then hand that
-            // exact artifact to the trusted offline signer. Never fall back to the debug key.
-            if (System.getenv("ALLOW_UNSIGNED_RELEASE") != "true") {
-                signingConfig signingConfigs.release
-            }
+            signingConfig signingConfigs.release
         }
         debug {
             debuggable true

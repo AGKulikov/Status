@@ -6,7 +6,6 @@ on:
     branches:
       - main
       - 'rewrite/**'
-      - 'agent/**'
   pull_request:
 
 # A feature branch with an open PR must produce one build, not an identical push build followed
@@ -49,7 +48,7 @@ jobs:
       - name: Decode stable update keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          REQUIRE_STABLE: ${{ github.event_name != 'pull_request' && github.ref != 'refs/heads/agent/ha1081-phone-ancs' }}
+          REQUIRE_STABLE: ${{ github.event_name != 'pull_request' }}
         shell: bash
         run: |
           if [[ -n "$KEYSTORE_BASE64" ]]; then
@@ -100,102 +99,5 @@ jobs:
           path: |
             app/build/outputs/apk/geely/debug/*.apk
             app/build/outputs/apk/geely/debug/*.sha256
-          if-no-files-found: error
-          retention-days: 30
-
-  # The historical update key deliberately stays outside GitHub. Build one exact unsigned
-  # HA1081 release in CI, then sign and verify that immutable artifact in the trusted workspace.
-  build-ha1081-release:
-    needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/agent/ha1081-phone-ancs' && github.repository == 'AGKulikov/Status'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout exact HA1081 source
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-
-      - name: Set up Java 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Set up Gradle cache
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Install Android SDK 36
-        shell: bash
-        run: |
-          set +o pipefail
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
-          set -o pipefail
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
-            "platforms;android-36" "build-tools;36.0.0"
-
-      - name: Build and verify exact unsigned HA1081 release
-        env:
-          HEAD_SHA: ${{ github.sha }}
-          VERSION_NAME: v2.8.2-ha1081
-          VERSION_CODE: '208021081'
-          ALLOW_UNSIGNED_RELEASE: 'true'
-        shell: bash
-        run: |
-          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
-          test ! -e keystore.jks
-          chmod +x gradlew
-          ./gradlew --no-daemon testGeelyDebugUnitTest
-          ./gradlew --no-daemon assembleGeelyRelease
-          APK="app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}-release.apk"
-          BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
-          echo "$BADGING"
-          echo "$BADGING" | grep -F "package: name='ru.natro.statuswidget'"
-          echo "$BADGING" | grep -F "versionName='${VERSION_NAME}'"
-          if echo "$BADGING" | grep -Fq "application-debuggable"; then
-            echo "Exact HA1081 release must not be debuggable" >&2
-            exit 1
-          fi
-          ACTUAL_VERSION_CODE=$(echo "$BADGING" \
-            | sed -n "s/.*versionCode='\([0-9][0-9]*\)'.*/\1/p" \
-            | head -n 1)
-          test "$ACTUAL_VERSION_CODE" -eq "$VERSION_CODE"
-          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$APK"
-          if "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$APK"; then
-            echo "CI handoff unexpectedly contains a signature" >&2
-            exit 1
-          fi
-          mkdir -p release-out
-          cp "$APK" "release-out/status-widget-ha-${VERSION_NAME}-unsigned.apk"
-          cd release-out
-          APK_NAME="status-widget-ha-${VERSION_NAME}-unsigned.apk"
-          UNSIGNED_SHA=$(sha256sum "$APK_NAME" | awk '{print $1}')
-          printf '%s  %s\n' "$UNSIGNED_SHA" "$APK_NAME" > "${APK_NAME}.sha256"
-          jq -n \
-            --arg tag "$VERSION_NAME" \
-            --arg package "ru.natro.statuswidget" \
-            --arg versionName "$VERSION_NAME" \
-            --arg sourceSha "$HEAD_SHA" \
-            --arg workflowRunId "$GITHUB_RUN_ID" \
-            --arg unsignedSha256 "$UNSIGNED_SHA" \
-            --argjson versionCode "$VERSION_CODE" \
-            '{
-              tag: $tag,
-              package: $package,
-              versionName: $versionName,
-              versionCode: $versionCode,
-              sourceSha: $sourceSha,
-              workflowRunId: $workflowRunId,
-              unsignedSha256: $unsignedSha256
-            }' > manifest.json
-
-      - name: Upload verified unsigned HA1081 handoff
-        uses: actions/upload-artifact@v4
-        with:
-          name: status-widget-ha-v2.8.2-ha1081-unsigned
-          path: release-out/*
           if-no-files-found: error
           retention-days: 30
