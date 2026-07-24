@@ -16,7 +16,8 @@ public final class ValueReference {
     private static final Pattern SAFE_CONNECTOR_TYPE =
             Pattern.compile("[A-Za-z][A-Za-z0-9_.-]{0,63}");
 
-    /** Stable provider kind, for example {@code HOME_ASSISTANT}, {@code MQTT}, or {@code SPRUTHUB}. */
+    /** Stable provider kind, for example {@code HOME_ASSISTANT}, {@code MQTT},
+     * {@code SPRUTHUB}, or read-only {@code PHONE}. */
     public final String connectorType;
     /** Optional user-facing profile name. It is metadata and is not used as a registry key. */
     public final String connectorName;

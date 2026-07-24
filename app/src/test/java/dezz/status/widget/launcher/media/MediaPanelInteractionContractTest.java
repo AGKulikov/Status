@@ -173,23 +173,29 @@ public final class MediaPanelInteractionContractTest {
                 "volume.getProgress() != volumePercent"));
     }
 
-    @Test public void homePanelExposesSameGridForMoveAndResizeEditing() throws IOException {
+    @Test public void homePanelExposesSameGridForMoveAndFourCornerResizeEditing()
+            throws IOException {
         String source = source("dezz/status/widget/launcher/media/MediaPanelView.java");
         assertTrue(source.contains("public void setInPlaceEditMode("));
         assertTrue(source.contains("grid.setGridSize(config.gridColumns, config.gridRows)"));
         assertTrue(source.contains("grid.moveToPixel(view, left, top)"));
-        assertTrue(source.contains("grid.resizeToPixel(view, right, bottom)"));
-        assertTrue(source.contains("config.setSpan(id, lp.columnSpan, lp.rowSpan)"));
+        assertTrue(source.contains("PanelContentResizeMath.hitCorner("));
+        assertTrue(source.contains("PanelContentResizeMath.resize(resizeCorner,"));
+        assertTrue(source.contains("config.setPlacement(id,"));
+        assertTrue(source.contains("boolean accepted = config.setPosition("));
+        assertTrue(source.contains("if (accepted && editor != null)"));
+        assertFalse(source.contains("private boolean resizing;"));
     }
 
-    @Test public void settingsOpenHomeContentEditorAndKeepPreviewReadOnly() throws IOException {
+    @Test public void settingsOpenHomeContentEditorAndOfferSynchronizedLiveEditor()
+            throws IOException {
         String settings = source("dezz/status/widget/MediaPanelSettingsActivity.java");
         String launcher = source("dezz/status/widget/LauncherActivity.java");
         assertTrue(settings.contains("LauncherActivity.EXTRA_EDIT_MODE"));
         assertTrue(settings.contains("LauncherActivity.EXTRA_EDIT_MEDIA_CONTENT"));
         assertTrue(settings.contains("Расположение элементов внутри панели на HOME"));
-        assertTrue(settings.contains("ПРЕДПРОСМОТР · ТОЛЬКО ПРОСМОТР"));
-        assertFalse(settings.contains("preview.setLayoutEditor"));
+        assertTrue(settings.contains("ЖИВОЙ РЕДАКТОР · ТАЩИТЕ ЭЛЕМЕНТЫ"));
+        assertTrue(settings.contains("preview.setInPlaceEditMode(true"));
         assertTrue(launcher.contains("private void setMediaContentEditMode(boolean enabled)"));
         assertTrue(launcher.contains("mediaPanel.setInPlaceEditMode(enabled)"));
         assertTrue(launcher.contains("if (enabled && editMode) setEditMode(false)"));

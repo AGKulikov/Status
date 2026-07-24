@@ -101,9 +101,9 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         settingsScroll.addView(settings, new ScrollView.LayoutParams(match(), wrap()));
 
         addTitle(settings, "Медиапанель");
-        addHint(settings, "Расположение и размер элементов удобнее менять прямо на фактической "
-                + "медиапанели HOME: там сетка использует её реальную геометрию. Здесь остаются "
-                + "точные ползунки, состав элементов, оформление и прокрутка текста.");
+        addHint(settings, "Расположение и размер элементов можно менять и здесь, в живом "
+                + "предпросмотре справа, и прямо на фактической панели HOME. Точные ползунки, "
+                + "состав элементов, оформление и прокрутка текста остаются синхронизированы.");
         MaterialSwitch panelVisible = new MaterialSwitch(this);
         panelVisible.setText("Показывать медиапанель на HOME");
         panelVisible.setTextSize(16);
@@ -139,9 +139,9 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
                 });
 
         addTitle(settings, "Элементы");
-        addHint(settings, "Перетаскивание и изменение размера выполняются на HOME. Эти ползунки "
-                + "задают точные ширину и высоту в ячейках; масштаб меняет только текст или "
-                + "значок. Стрелки сохраняют порядок элементов.");
+        addHint(settings, "Перетаскивайте элементы в предпросмотре справа; потяните за любой "
+                + "из четырёх углов, чтобы изменить размер. Эти ползунки задают точные значения в "
+                + "ячейках, а масштаб меняет только текст или значок.");
         elementList = new LinearLayout(this);
         elementList.setOrientation(LinearLayout.VERTICAL);
         settings.addView(elementList, new LinearLayout.LayoutParams(match(), wrap()));
@@ -197,7 +197,7 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         previewColumn.setOrientation(LinearLayout.VERTICAL);
         previewColumn.setPadding(dp(10), 0, 0, 0);
         TextView previewTitle = new TextView(this);
-        previewTitle.setText("ПРЕДПРОСМОТР · ТОЛЬКО ПРОСМОТР");
+        previewTitle.setText("ЖИВОЙ РЕДАКТОР · ТАЩИТЕ ЭЛЕМЕНТЫ");
         previewTitle.setTextSize(14);
         previewTitle.setTextColor(Color.rgb(105, 165, 255));
         previewTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -213,6 +213,13 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         preview.setConfig(config);
         preview.setPreviewContent("Очень длинное название композиции для проверки прокрутки",
                 "Исполнитель с длинным именем", "Яндекс Музыка", true);
+        preview.setInPlaceEditMode(true, (updated, movedId, finished) -> {
+            config = updated.copy();
+            for (String id : positionLabels.keySet()) updatePositionLabel(id);
+            if (!finished) return;
+            store.save(config);
+            rebuildElementControls();
+        });
         previewHost.addView(preview, new FrameLayout.LayoutParams(match(), match()));
         previewColumn.addView(previewHost, new LinearLayout.LayoutParams(match(), 0, 1f));
         TextView saved = new TextView(this);

@@ -57,6 +57,10 @@ public final class PanelContentEditOverlay extends View {
     public interface Listener {
         /** {@code finished} is true on ACTION_UP, suitable for a final persistence flush. */
         void onPlacementChanged(@NonNull String id, boolean finished);
+
+        /** A tap without moving/resizing may open precise per-item controls. */
+        default void onItemClicked(@NonNull String id) {
+        }
     }
 
     private final Paint gridPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -75,7 +79,8 @@ public final class PanelContentEditOverlay extends View {
     private int startRow;
     private int startColumnSpan;
     private int startRowSpan;
-    private boolean resizing;
+    @NonNull private PanelContentResizeMath.Corner resizeCorner =
+            PanelContentResizeMath.Corner.NONE;
     private boolean changedDuringGesture;
 
     public PanelContentEditOverlay(@NonNull Context context) {
@@ -104,11 +109,13 @@ public final class PanelContentEditOverlay extends View {
         this.model = model;
         this.listener = listener;
         selectedId = null;
+        resizeCorner = PanelContentResizeMath.Corner.NONE;
         invalidate();
     }
 
     public void setEditing(boolean editing) {
         selectedId = null;
+        resizeCorner = PanelContentResizeMath.Corner.NONE;
         setVisibility(editing ? VISIBLE : GONE);
         setEnabled(editing);
         invalidate();
@@ -140,9 +147,7 @@ public final class PanelContentEditOverlay extends View {
             canvas.drawText(item.label, labelX, labelY, labelPaint);
             canvas.restore();
             if (item.id.equals(selectedId)) {
-                canvas.drawRect(Math.max(scratch.left, scratch.right - handlePx),
-                        Math.max(scratch.top, scratch.bottom - handlePx),
-                        scratch.right, scratch.bottom, selectedPaint);
+                drawResizeHandles(canvas, scratch);
             }
         }
     }
@@ -156,6 +161,7 @@ public final class PanelContentEditOverlay extends View {
                 Item hit = findHit(current, event.getX(), event.getY());
                 if (hit == null) {
                     selectedId = null;
+                    resizeCorner = PanelContentResizeMath.Corner.NONE;
                     invalidate();
                     return true;
                 }
@@ -167,8 +173,8 @@ public final class PanelContentEditOverlay extends View {
                 startColumnSpan = hit.columnSpan;
                 startRowSpan = hit.rowSpan;
                 itemRect(hit, current, scratch);
-                resizing = event.getX() >= scratch.right - handlePx
-                        && event.getY() >= scratch.bottom - handlePx;
+                resizeCorner = PanelContentResizeMath.hitCorner(event.getX(), event.getY(),
+                        scratch.left, scratch.top, scratch.right, scratch.bottom, handlePx);
                 changedDuringGesture = false;
                 if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
                 invalidate();
@@ -181,12 +187,26 @@ public final class PanelContentEditOverlay extends View {
                         / Math.max(1f, cellWidth));
                 int deltaRow = Math.round((event.getY() - downY)
                         / Math.max(1f, cellHeight));
-                int column = resizing ? startColumn : startColumn + deltaColumn;
-                int row = resizing ? startRow : startRow + deltaRow;
-                int columnSpan = resizing
-                        ? Math.max(1, startColumnSpan + deltaColumn) : startColumnSpan;
-                int rowSpan = resizing
-                        ? Math.max(1, startRowSpan + deltaRow) : startRowSpan;
+                int column;
+                int row;
+                int columnSpan;
+                int rowSpan;
+                if (resizeCorner == PanelContentResizeMath.Corner.NONE) {
+                    // Preserve the established drag/collision path byte-for-byte in behavior.
+                    column = startColumn + deltaColumn;
+                    row = startRow + deltaRow;
+                    columnSpan = startColumnSpan;
+                    rowSpan = startRowSpan;
+                } else {
+                    PanelContentResizeMath.Result resized = PanelContentResizeMath.resize(
+                            resizeCorner, startColumn, startRow,
+                            startColumnSpan, startRowSpan, deltaColumn, deltaRow,
+                            current.columns(), current.rows());
+                    column = resized.column;
+                    row = resized.row;
+                    columnSpan = resized.columnSpan;
+                    rowSpan = resized.rowSpan;
+                }
                 if (current.setPlacement(selectedId, column, row, columnSpan, rowSpan)) {
                     changedDuringGesture = true;
                     Listener callback = listener;
@@ -200,7 +220,12 @@ public final class PanelContentEditOverlay extends View {
                 if (selectedId != null && changedDuringGesture) {
                     Listener callback = listener;
                     if (callback != null) callback.onPlacementChanged(selectedId, true);
+                } else if (event.getActionMasked() == MotionEvent.ACTION_UP
+                        && selectedId != null) {
+                    Listener callback = listener;
+                    if (callback != null) callback.onItemClicked(selectedId);
                 }
+                resizeCorner = PanelContentResizeMath.Corner.NONE;
                 performClick();
                 return true;
             default:
@@ -234,6 +259,20 @@ public final class PanelContentEditOverlay extends View {
                 item.row * getHeight() / (float) rows,
                 (item.column + item.columnSpan) * getWidth() / (float) columns,
                 (item.row + item.rowSpan) * getHeight() / (float) rows);
+    }
+
+    private void drawResizeHandles(@NonNull Canvas canvas, @NonNull RectF bounds) {
+        float handleWidth = PanelContentResizeMath.handleExtent(bounds.width(), handlePx);
+        float handleHeight = PanelContentResizeMath.handleExtent(bounds.height(), handlePx);
+        if (handleWidth <= 0f || handleHeight <= 0f) return;
+        canvas.drawRect(bounds.left, bounds.top,
+                bounds.left + handleWidth, bounds.top + handleHeight, selectedPaint);
+        canvas.drawRect(bounds.right - handleWidth, bounds.top,
+                bounds.right, bounds.top + handleHeight, selectedPaint);
+        canvas.drawRect(bounds.left, bounds.bottom - handleHeight,
+                bounds.left + handleWidth, bounds.bottom, selectedPaint);
+        canvas.drawRect(bounds.right - handleWidth, bounds.bottom - handleHeight,
+                bounds.right, bounds.bottom, selectedPaint);
     }
 
     @NonNull

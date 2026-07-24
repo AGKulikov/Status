@@ -37,6 +37,7 @@ public final class SettingsDestinationCatalogTest {
             "dezz.status.widget.MqttSettingsActivity",
             "dezz.status.widget.NavigationPanelSettingsActivity",
             "dezz.status.widget.PanelElementSettingsActivity",
+            "dezz.status.widget.PhoneConnectorSettingsActivity",
             "dezz.status.widget.PopupSettingsActivity",
             "dezz.status.widget.PresetsActivity",
             "dezz.status.widget.ScenarioSettingsActivity",
@@ -99,10 +100,28 @@ public final class SettingsDestinationCatalogTest {
         assertSearchContains("  РЕЗЕРВНАЯ   КОПИЯ ", "app_export");
         assertSearchContains("backup", "app_export");
         assertSearchContains("HOME ASSISTANT", "connector_ha");
+        assertSearchContains("iphone", "connector_phone");
+        assertSearchContains("sms", "connector_phone");
         assertSearchContains("android intent", "automation_intent");
+        assertSearchContains("индивидуальная сетка", "panel_actions");
+        assertSearchContains("размеры", "panel_actions");
+        assertSearchContains("позиции кнопок", "panel_actions");
+        assertSearchContains("столбцы", "panel_actions");
         assertEquals(SettingsDestinationCatalog.all().size(),
                 SettingsDestinationCatalog.search("  ").size());
         assertTrue(SettingsDestinationCatalog.search("несуществующий-запрос").isEmpty());
+    }
+
+    @Test
+    public void actionsMetadataAdvertisesVisualHomeEditing() {
+        SettingsDestinationCatalog.Destination actions =
+                SettingsDestinationCatalog.byId("panel_actions");
+        assertNotNull(actions);
+        assertTrue(actions.subtitle.contains("Индивидуальная сетка"));
+        assertTrue(actions.subtitle.contains("размеры"));
+        assertTrue(actions.subtitle.contains("позиции"));
+        assertTrue(actions.subtitle.contains("HOME"));
+        assertTrue(actions.subtitle.contains("настройках"));
     }
 
     private static void assertSearchContains(String query, String expectedId) {

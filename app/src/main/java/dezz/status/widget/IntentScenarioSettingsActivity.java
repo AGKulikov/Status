@@ -398,8 +398,11 @@ public final class IntentScenarioSettingsActivity extends AppCompatActivity {
             case MQTT:
                 return "MQTT";
             case SPRUTHUB:
-            default:
                 return "Sprut.hub";
+            case PHONE:
+                return "Телефон";
+            default:
+                return connectorType.jsonName();
         }
     }
 

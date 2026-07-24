@@ -80,10 +80,10 @@ import dezz.status.widget.sprut.SprutProtocolAdapter;
 public final class ScenarioSettingsActivity extends AppCompatActivity {
     private static final String DEFAULT_CONNECTOR_ID = "default";
     private static final String[] CONNECTORS = {
-            "HOME_ASSISTANT", "MQTT", "SPRUTHUB"
+            "HOME_ASSISTANT", "MQTT", "SPRUTHUB", "PHONE"
     };
     private static final String[] CONNECTOR_LABELS = {
-            "Home Assistant", "MQTT", "Sprut.hub"
+            "Home Assistant", "MQTT", "Sprut.hub", "Телефон"
     };
     /** Views remain bounded even when a connector exposes hundreds of devices. */
     private static final int MAX_SOURCE_RESULTS = 100;
@@ -807,6 +807,9 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                             case "SPRUTHUB":
                                 showSprutSourcePicker();
                                 break;
+                            case "PHONE":
+                                showPhoneSourcePicker();
+                                break;
                             case "MQTT":
                             default:
                                 showMqttSourcePicker();
@@ -1050,6 +1053,65 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                             : " · " + choice.value.valuePath)));
         }
 
+        private void showPhoneSourcePicker() {
+            WidgetService running = WidgetService.getInstance();
+            List<ConnectorValue> snapshot = running == null
+                    ? Collections.emptyList() : running.connectorValueSnapshot();
+            LinkedHashMap<String, ConnectorValue> observed = new LinkedHashMap<>();
+            for (ConnectorValue value : snapshot) {
+                if (value.connectorType == ConnectorType.PHONE) {
+                    String key = value.connectorId.length() + ":" + value.connectorId
+                            + value.resourceId;
+                    observed.put(key, value);
+                }
+            }
+            List<ConnectorValue> values = new ArrayList<>(observed.values());
+            values.sort(Comparator
+                    .comparing((ConnectorValue value) -> value.resourceId,
+                            String.CASE_INSENSITIVE_ORDER)
+                    .thenComparing(value -> value.connectorId,
+                            String.CASE_INSENSITIVE_ORDER));
+            List<SearchChoice<ConnectorValue>> choices = new ArrayList<>(values.size());
+            for (ConnectorValue value : values) {
+                choices.add(new SearchChoice<>(value,
+                        value.resourceId + "\nсейчас: "
+                                + displayCatalogValue(value.rawValue)
+                                + (value.unit.isEmpty() ? "" : " " + value.unit)
+                                + (value.available ? "" : "  [недоступно]")
+                                + (value.fresh ? "" : "  [устарело]"),
+                        value.resourceId + " " + value.rawValue + " " + value.valueType
+                                + " " + value.unit + " " + value.attributes));
+            }
+            showSearchPicker("2. Данные телефона",
+                    "Поиск по показателю, значению или атрибутам", choices,
+                    "Телефон ещё не передал доступные показатели. Проверьте подключение iPhone.",
+                    this::showSourcePicker, null, null,
+                    choice -> showPhoneValuePicker(choice.value));
+        }
+
+        private void showPhoneValuePicker(ConnectorValue value) {
+            List<SearchChoice<SourceBinding>> choices = new ArrayList<>();
+            SourceBinding primary = sourceBinding(ConnectorType.PHONE, value.connectorId,
+                    value.resourceId, "");
+            choices.add(new SearchChoice<>(primary,
+                    "Основное значение\nсейчас: " + displayCatalogValue(value.rawValue)
+                            + (value.unit.isEmpty() ? "" : " " + value.unit),
+                    "value state основное " + value.rawValue + " " + value.unit));
+            List<Map.Entry<String, Object>> attributes =
+                    new ArrayList<>(value.attributes.entrySet());
+            attributes.sort(Map.Entry.comparingByKey(String.CASE_INSENSITIVE_ORDER));
+            for (Map.Entry<String, Object> attribute : attributes) {
+                appendAttributeChoices(choices, ConnectorType.PHONE, value.connectorId,
+                        value.resourceId, attribute.getKey(), attribute.getValue(), 0);
+            }
+            showSearchPicker(value.resourceId + " — значение", "Поиск по атрибутам", choices,
+                    "Нет доступных значений.", this::showPhoneSourcePicker,
+                    null, null, choice -> applySource(choice.value,
+                            "Телефон · " + value.resourceId
+                                    + (choice.value.valuePath.isEmpty() ? ""
+                                    : " · " + choice.value.valuePath)));
+        }
+
         private void showManualMqttSourcePicker() {
             LinearLayout form = column();
             form.setPadding(dp(16), dp(4), dp(16), dp(4));
@@ -1088,25 +1150,37 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
 
         private void appendAttributeChoices(List<SearchChoice<SourceBinding>> choices,
                 ConnectorType type, String resource, String path, Object value, int depth) {
+            appendAttributeChoices(choices, type, SourceBinding.DEFAULT_CONNECTOR_ID,
+                    resource, path, value, depth);
+        }
+
+        private void appendAttributeChoices(List<SearchChoice<SourceBinding>> choices,
+                ConnectorType type, String selectedConnectorId, String resource, String path,
+                Object value, int depth) {
             if (depth < 6 && value instanceof Map<?, ?> && !((Map<?, ?>) value).isEmpty()) {
                 List<Map.Entry<?, ?>> nested = new ArrayList<>(((Map<?, ?>) value).entrySet());
                 nested.sort(Comparator.comparing(item -> String.valueOf(item.getKey()),
                         String.CASE_INSENSITIVE_ORDER));
                 for (Map.Entry<?, ?> item : nested) {
-                    appendAttributeChoices(choices, type, resource,
+                    appendAttributeChoices(choices, type, selectedConnectorId, resource,
                             path + "." + item.getKey(), item.getValue(), depth + 1);
                 }
                 return;
             }
             String valuePath = "attributes." + path;
-            SourceBinding binding = sourceBinding(type, resource, valuePath);
+            SourceBinding binding = sourceBinding(type, selectedConnectorId, resource, valuePath);
             choices.add(new SearchChoice<>(binding,
                     "Атрибут: " + path + "\nсейчас: " + displayCatalogValue(value),
                     path + " " + valuePath + " " + value));
         }
 
         private SourceBinding sourceBinding(ConnectorType type, String resource, String path) {
-            return new SourceBinding(type, SourceBinding.DEFAULT_CONNECTOR_ID,
+            return sourceBinding(type, SourceBinding.DEFAULT_CONNECTOR_ID, resource, path);
+        }
+
+        private SourceBinding sourceBinding(ConnectorType type, String selectedConnectorId,
+                                            String resource, String path) {
+            return new SourceBinding(type, selectedConnectorId,
                     resource, path, SourceBinding.PRESENTATION_AUTO, "");
         }
 
@@ -1388,10 +1462,17 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
     }
 
     private static String sourceLabel(ValueReference reference) {
-        String connector = "HOME_ASSISTANT".equals(reference.connectorType) ? "Home Assistant"
-                : "SPRUTHUB".equals(reference.connectorType) ? "Sprut.hub" : "MQTT";
+        String connector;
+        switch (reference.connectorType) {
+            case "HOME_ASSISTANT": connector = "Home Assistant"; break;
+            case "SPRUTHUB": connector = "Sprut.hub"; break;
+            case "PHONE": connector = "Телефон"; break;
+            case "MQTT": connector = "MQTT"; break;
+            default: connector = reference.connectorType; break;
+        }
         return connector + " · " + reference.resourceId
-                + (reference.valuePath == null ? "" : " · " + reference.valuePath);
+                + (reference.valuePath == null || reference.valuePath.isEmpty()
+                ? "" : " · " + reference.valuePath);
     }
 
     private String targetLabel(TargetScope scope, String id) {

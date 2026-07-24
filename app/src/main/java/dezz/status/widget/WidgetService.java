@@ -114,6 +114,8 @@ import dezz.status.widget.ha.api.HaApiController;
 import dezz.status.widget.ha.api.HaEntityCatalog;
 import dezz.status.widget.ha.api.HaWebSocketConnector;
 import dezz.status.widget.mqtt.MqttController;
+import dezz.status.widget.phone.PhoneConnectorController;
+import dezz.status.widget.phone.PhoneSprutPresenceExporter;
 import dezz.status.widget.popup.PopupOverlayController;
 import dezz.status.widget.popup.PopupOverlayManager;
 import dezz.status.widget.popup.PopupOverlayConfig;
@@ -244,6 +246,8 @@ public class WidgetService extends Service {
     private HaApiController haApiController;
     private MqttController mqttController;
     private SprutHubController sprutController;
+    private PhoneConnectorController phoneController;
+    private PhoneSprutPresenceExporter phonePresenceExporter;
     private CarTelemetryExporter carTelemetryExporter;
     private PopupOverlayManager popupOverlay;
     /** Parsed only when settings change; connector packets must never reparse the JSON document. */
@@ -672,6 +676,9 @@ public class WidgetService extends Service {
                         if (carTelemetryExporter != null) {
                             carTelemetryExporter.onSprutConnectionChanged(state);
                         }
+                        if (phonePresenceExporter != null) {
+                            phonePresenceExporter.onSprutConnectionChanged(state);
+                        }
                     }
 
                     @Override public void onCatalogChanged(@NonNull SprutCatalog catalog) {
@@ -681,6 +688,9 @@ public class WidgetService extends Service {
                         if (carTelemetryExporter != null) {
                             carTelemetryExporter.onSprutCatalogChanged();
                         }
+                        if (phonePresenceExporter != null) {
+                            phonePresenceExporter.onSprutCatalogChanged();
+                        }
                     }
 
                     @Override public void onCharacteristicChanged(
@@ -688,7 +698,17 @@ public class WidgetService extends Service {
                         if (carTelemetryExporter != null) {
                             carTelemetryExporter.onSprutCharacteristicChanged(path);
                         }
+                        if (phonePresenceExporter != null) {
+                            phonePresenceExporter.onSprutCharacteristicChanged(path);
+                        }
                     }
+                });
+        phonePresenceExporter = new PhoneSprutPresenceExporter(
+                prefs, sprutController, mainHandler);
+        phoneController = new PhoneConnectorController(this, prefs, connectorValues,
+                connected -> {
+                    PhoneSprutPresenceExporter exporter = phonePresenceExporter;
+                    if (exporter != null) exporter.onPhoneConnectionChanged(connected);
                 });
         carTelemetryExporter = new CarTelemetryExporter(prefs, CarIntegrations.get(this),
                 sprutController, mainHandler);
@@ -795,6 +815,14 @@ public class WidgetService extends Service {
     private void reconfigureIntegrationControllers() {
         runIntegrationStep("MQTT", () -> {
             if (mqttController != null) mqttController.reconfigure();
+        });
+        // Load the exact selected-address boundary before the phone transport can emit its
+        // current state. A device change therefore clears the old Sprut switch first.
+        runIntegrationStep("phone presence", () -> {
+            if (phonePresenceExporter != null) phonePresenceExporter.reconfigure();
+        });
+        runIntegrationStep("phone", () -> {
+            if (phoneController != null) phoneController.reconfigure();
         });
         runIntegrationStep("car telemetry", () -> {
             if (carTelemetryExporter != null) carTelemetryExporter.reconfigure();
@@ -3559,6 +3587,16 @@ public class WidgetService extends Service {
         scenarioController = null;
         if (popupOverlay != null) runCleanupStep("popup overlays", popupOverlay::destroy);
         popupOverlay = null;
+        // Keep Sprut alive until both the exact-device disconnect callback and the exporter's
+        // final compensating OFF have been submitted.
+        if (phoneController != null) {
+            runCleanupStep("phone", phoneController::stop);
+        }
+        phoneController = null;
+        if (phonePresenceExporter != null) {
+            runCleanupStep("phone presence", phonePresenceExporter::stop);
+        }
+        phonePresenceExporter = null;
         if (carTelemetryExporter != null) {
             runCleanupStep("car telemetry", carTelemetryExporter::stop);
         }

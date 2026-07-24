@@ -33,11 +33,10 @@ import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.widget.BaseAdapter;
 import android.widget.FrameLayout;
-import android.widget.GridLayout;
 import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.TextClock;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -69,6 +68,8 @@ import java.util.function.Supplier;
 
 import dezz.status.widget.launcher.CombinedNavigationPanelPolicy;
 import dezz.status.widget.launcher.HighResolutionAppIconLoader;
+import dezz.status.widget.launcher.LauncherActionsGridConfig;
+import dezz.status.widget.launcher.LauncherActionsGridConfigStore;
 import dezz.status.widget.launcher.LauncherElementFrame;
 import dezz.status.widget.launcher.LauncherGridView;
 import dezz.status.widget.launcher.LauncherLayoutStore;
@@ -121,6 +122,8 @@ public final class LauncherActivity extends AppCompatActivity {
             "dezz.status.widget.extra.EDIT_NAVIGATION_CONTENT";
     public static final String EXTRA_EDIT_MEDIA_CONTENT =
             "dezz.status.widget.extra.EDIT_MEDIA_CONTENT";
+    public static final String EXTRA_EDIT_ACTIONS_CONTENT =
+            "dezz.status.widget.extra.EDIT_ACTIONS_CONTENT";
     private static final long NAVIGATION_UI_REFRESH_MS = 30_000L;
     private static final long NAVIGATION_DYNAMIC_REFRESH_MS = 5_000L;
     private static final long SAFE_AREA_REFRESH_MS = 500L;
@@ -157,6 +160,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private Preferences preferences;
     private LauncherLayoutStore layoutStore;
     private PanelElementConfigStore panelElementStore;
+    private LauncherActionsGridConfigStore actionsGridConfigStore;
     private NavigationPanelConfigStore navigationPanelConfigStore;
     private FavoriteAppsConfigStore favoriteAppsConfigStore;
     private FavoriteRoutesConfigStore favoriteRoutesConfigStore;
@@ -168,6 +172,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private boolean editMode;
     private boolean navigationContentEditMode;
     private boolean mediaContentEditMode;
+    private boolean actionsContentEditMode;
     private int systemLeftInset;
     private int systemTopInset;
     private int systemRightInset;
@@ -215,8 +220,9 @@ public final class LauncherActivity extends AppCompatActivity {
     private boolean appCatalogLoadInFlight;
     private long lastAppCatalogLoadElapsed;
     private LauncherShortcutStore shortcutStore;
-    private GridLayout shortcutGrid;
-    private ScrollView shortcutScroll;
+    @Nullable private PanelGridLayout shortcutGrid;
+    @Nullable private PanelContentEditOverlay actionsContentEditOverlay;
+    @Nullable private LauncherActionsGridConfig actionsGridConfig;
     private CarIntegration carIntegration;
     private final Map<String, CarControlState> carControlStates = new HashMap<>();
     private final Map<String, ShortcutTileBinding> carShortcutBindings = new HashMap<>();
@@ -233,6 +239,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private InformationPanelView informationPanel;
     @Nullable private String appliedPanelElementsJson;
     @Nullable private String appliedNavigationConfigJson;
+    @Nullable private String appliedActionsGridJson;
     private int appliedAppsColumns = -1;
     private int appliedActionsColumns = -1;
     private int appsGridScalePercent = 100;
@@ -288,6 +295,7 @@ public final class LauncherActivity extends AppCompatActivity {
         carIntegration = CarIntegrations.get(this);
         layoutStore = new LauncherLayoutStore(preferences);
         panelElementStore = new PanelElementConfigStore(preferences);
+        actionsGridConfigStore = new LauncherActionsGridConfigStore(preferences);
         navigationPanelConfigStore = new NavigationPanelConfigStore(preferences);
         favoriteAppsConfigStore = new FavoriteAppsConfigStore(preferences);
         favoriteRoutesConfigStore = new FavoriteRoutesConfigStore(preferences);
@@ -329,6 +337,8 @@ public final class LauncherActivity extends AppCompatActivity {
                 setMediaContentEditMode(true);
             } else if (intent.getBooleanExtra(EXTRA_EDIT_NAVIGATION_CONTENT, false)) {
                 setNavigationContentEditMode(true);
+            } else if (intent.getBooleanExtra(EXTRA_EDIT_ACTIONS_CONTENT, false)) {
+                setActionsContentEditMode(true);
             } else if (intent.getBooleanExtra(EXTRA_EDIT_MODE, false)) {
                 setEditMode(true);
             }
@@ -432,10 +442,10 @@ public final class LauncherActivity extends AppCompatActivity {
         }
         getWindow().getDecorView().requestApplyInsets();
         updateLauncherSafeArea();
+        if (shortcutStore != null) shortcutStore.load();
         applyLauncherPreferences();
         if (appCatalog != null) reloadAppCatalogAsync(false);
         if (shortcutStore != null) {
-            shortcutStore.load();
             refreshShortcutGrid();
         }
     }
@@ -526,8 +536,9 @@ public final class LauncherActivity extends AppCompatActivity {
             favoriteRoutesAvailable = favoriteRoutesPanel.hasEnabledRoutes();
         }
         updateCombinedNavigationFrameVisibility();
-        setPanelVisibility(LauncherLayoutStore.ACTIONS, preferences.launcherActionsVisible.get()
-                && hasSimplePanelContent(LauncherLayoutStore.ACTIONS));
+        setPanelVisibility(LauncherLayoutStore.ACTIONS, actionsContentEditMode
+                || (preferences.launcherActionsVisible.get()
+                && hasSimplePanelContent(LauncherLayoutStore.ACTIONS)));
         boolean climateVisible = preferences.launcherClimateVisible.get()
                 && hasClimatePanelContent();
         setPanelVisibility(LauncherLayoutStore.CLIMATE, climateVisible);
@@ -568,13 +579,15 @@ public final class LauncherActivity extends AppCompatActivity {
     private void refreshSimplePanelContentsIfNeeded() {
         String raw = preferences.launcherPanelElementsJson.get();
         String navigationRaw = preferences.launcherNavigationConfigJson.get();
+        String actionsGridRaw = preferences.launcherActionsGridJson.get();
         int appsColumns = preferences.launcherAppsColumns.get();
         int actionsColumns = preferences.launcherActionsColumns.get();
         boolean simpleChanged = !Objects.equals(appliedPanelElementsJson, raw)
                 || appliedAppsColumns != appsColumns
                 || appliedActionsColumns != actionsColumns;
         boolean navigationChanged = !Objects.equals(appliedNavigationConfigJson, navigationRaw);
-        if (!simpleChanged && !navigationChanged) return;
+        boolean actionsGridChanged = !Objects.equals(appliedActionsGridJson, actionsGridRaw);
+        if (!simpleChanged && !navigationChanged && !actionsGridChanged) return;
         if (simpleChanged) {
             appliedPanelElementsJson = raw;
             appliedAppsColumns = appsColumns;
@@ -587,6 +600,10 @@ public final class LauncherActivity extends AppCompatActivity {
             appliedNavigationConfigJson = navigationRaw;
             replacePanelContent(LauncherLayoutStore.NAVIGATION,
                     buildCombinedNavigationPanel());
+        }
+        if (actionsGridChanged) {
+            appliedActionsGridJson = actionsGridRaw;
+            refreshShortcutGrid();
         }
         refreshFavorites();
         updateNavigation();
@@ -633,6 +650,8 @@ public final class LauncherActivity extends AppCompatActivity {
             setMediaContentEditMode(false);
         } else if (navigationContentEditMode) {
             setNavigationContentEditMode(false);
+        } else if (actionsContentEditMode) {
+            setActionsContentEditMode(false);
         } else if (editMode) {
             setEditMode(false);
         } else {
@@ -672,7 +691,8 @@ public final class LauncherActivity extends AppCompatActivity {
         workspace.setClipChildren(false);
         workspace.setLongClickable(true);
         workspace.setOnLongClickListener(v -> {
-            if (!navigationContentEditMode && !mediaContentEditMode) setEditMode(true);
+            if (!navigationContentEditMode && !mediaContentEditMode
+                    && !actionsContentEditMode) setEditMode(true);
             return true;
         });
         root.addView(workspace, match());
@@ -744,6 +764,8 @@ public final class LauncherActivity extends AppCompatActivity {
             setMediaContentEditMode(false);
         } else if (navigationContentEditMode) {
             setNavigationContentEditMode(false);
+        } else if (actionsContentEditMode) {
+            setActionsContentEditMode(false);
         } else {
             setEditMode(false);
         }
@@ -808,7 +830,8 @@ public final class LauncherActivity extends AppCompatActivity {
                 case 4:
                     addPanelSafely(LauncherLayoutStore.ACTIONS, "Действия",
                             this::buildActionsPanel,
-                            () -> preferences.launcherActionsVisible.get()
+                            () -> actionsContentEditMode
+                                    || preferences.launcherActionsVisible.get()
                                     && hasSimplePanelContent(LauncherLayoutStore.ACTIONS));
                     break;
                 case 5:
@@ -884,12 +907,15 @@ public final class LauncherActivity extends AppCompatActivity {
         }
         appliedPanelElementsJson = preferences.launcherPanelElementsJson.get();
         appliedNavigationConfigJson = preferences.launcherNavigationConfigJson.get();
+        appliedActionsGridJson = preferences.launcherActionsGridJson.get();
         appliedAppsColumns = preferences.launcherAppsColumns.get();
         appliedActionsColumns = preferences.launcherActionsColumns.get();
         if (getIntent().getBooleanExtra(EXTRA_EDIT_MEDIA_CONTENT, false)) {
             setMediaContentEditMode(true);
         } else if (getIntent().getBooleanExtra(EXTRA_EDIT_NAVIGATION_CONTENT, false)) {
             setNavigationContentEditMode(true);
+        } else if (getIntent().getBooleanExtra(EXTRA_EDIT_ACTIONS_CONTENT, false)) {
+            setActionsContentEditMode(true);
         } else if (getIntent().getBooleanExtra(EXTRA_EDIT_MODE, false)) {
             setEditMode(true);
         }
@@ -1290,15 +1316,84 @@ public final class LauncherActivity extends AppCompatActivity {
         showActionAdd = config.isEnabled(PanelElementConfigStore.ACTION_ADD);
         actionsTileScalePercent = config.scale(PanelElementConfigStore.ACTION_TILES);
         actionsAddScalePercent = config.scale(PanelElementConfigStore.ACTION_ADD);
-        shortcutScroll = new ScrollView(this);
-        shortcutScroll.setFillViewport(true);
-        shortcutScroll.setVerticalScrollBarEnabled(false);
-        shortcutGrid = new GridLayout(this);
-        shortcutGrid.setPadding(dp(7), dp(7), dp(7), dp(7));
-        shortcutScroll.addView(shortcutGrid, new ScrollView.LayoutParams(
-                matchWidth(), wrapContent()));
+
+        FrameLayout host = new FrameLayout(this);
+        host.setPadding(dp(7), dp(7), dp(7), dp(7));
+        shortcutGrid = new PanelGridLayout(this);
+        host.addView(shortcutGrid, match());
+
+        actionsContentEditOverlay = new PanelContentEditOverlay(this);
+        actionsContentEditOverlay.setModel(new PanelContentEditOverlay.Model() {
+            @Override public int columns() {
+                LauncherActionsGridConfig value = actionsGridConfig;
+                return value == null ? LauncherActionsGridConfig.DEFAULT_COLUMNS : value.columns;
+            }
+
+            @Override public int rows() {
+                LauncherActionsGridConfig value = actionsGridConfig;
+                return value == null ? LauncherActionsGridConfig.MIN_ROWS : value.rows;
+            }
+
+            @NonNull
+            @Override public List<PanelContentEditOverlay.Item> items() {
+                List<PanelContentEditOverlay.Item> result = new ArrayList<>();
+                LauncherActionsGridConfig value = actionsGridConfig;
+                if (value == null || shortcutStore == null) return result;
+                if (showActionTiles) {
+                    for (LauncherShortcutStore.Shortcut shortcut : shortcutStore.all()) {
+                        if (!shortcut.enabled) continue;
+                        LauncherActionsGridConfig.Placement placement =
+                                value.placement(shortcut.id);
+                        if (placement == null) continue;
+                        result.add(new PanelContentEditOverlay.Item(shortcut.id,
+                                shortcut.title + " · " + shortcut.iconSizePx + " px",
+                                placement.column, placement.row,
+                                placement.columnSpan, placement.rowSpan));
+                    }
+                }
+                if (showActionAdd) {
+                    LauncherActionsGridConfig.Placement placement =
+                            value.placement(LauncherActionsGridConfig.ADD_TILE_ID);
+                    if (placement != null) {
+                        result.add(new PanelContentEditOverlay.Item(
+                                LauncherActionsGridConfig.ADD_TILE_ID, "Добавить",
+                                placement.column, placement.row,
+                                placement.columnSpan, placement.rowSpan));
+                    }
+                }
+                return result;
+            }
+
+            @Override public boolean setPlacement(@NonNull String id, int column, int row,
+                                                  int columnSpan, int rowSpan) {
+                LauncherActionsGridConfig value = actionsGridConfig;
+                return value != null && value.setPlacement(id, column, row,
+                        columnSpan, rowSpan);
+            }
+        }, new PanelContentEditOverlay.Listener() {
+            @Override public void onPlacementChanged(@NonNull String id, boolean finished) {
+                applyActionsGridPlacements();
+                if (finished && actionsGridConfig != null) {
+                    actionsGridConfigStore.save(actionsGridConfig);
+                    mirrorActionSpansToLegacyShortcut(id);
+                    appliedActionsGridJson = preferences.launcherActionsGridJson.get();
+                }
+            }
+
+            @Override public void onItemClicked(@NonNull String id) {
+                if (LauncherActionsGridConfig.ADD_TILE_ID.equals(id)) {
+                    startActivity(new Intent(LauncherActivity.this,
+                            LauncherShortcutSettingsActivity.class)
+                            .putExtra(LauncherShortcutSettingsActivity.EXTRA_ADD_NEW, true));
+                } else {
+                    showShortcutIconSizeEditor(id);
+                }
+            }
+        });
+        host.addView(actionsContentEditOverlay, match());
+        actionsContentEditOverlay.setEditing(actionsContentEditMode);
         shortcutGrid.post(this::refreshShortcutGrid);
-        return shortcutScroll;
+        return host;
     }
 
     @NonNull
@@ -1314,48 +1409,137 @@ public final class LauncherActivity extends AppCompatActivity {
         carShortcutBindings.clear();
         smartHomeShortcutBindings.clear();
         smartHomeRules = loadSmartHomeRules();
-        int columns = Math.max(1, Math.min(6, preferences.launcherActionsColumns.get()));
-        List<ShortcutPlacement> placements = new ArrayList<>();
-        List<boolean[]> occupied = new ArrayList<>();
+        List<LauncherShortcutStore.Shortcut> shortcuts = shortcutStore.all();
+        actionsGridConfig = actionsGridConfigStore.load(shortcuts);
+        LauncherActionsGridConfig gridConfig = actionsGridConfig;
+        shortcutGrid.setGridSize(gridConfig.columns, gridConfig.rows);
+        shortcutGrid.setCellGapPx(gridConfig.gapPx);
         if (showActionTiles) {
-            for (LauncherShortcutStore.Shortcut shortcut : shortcutStore.all()) {
+            for (LauncherShortcutStore.Shortcut shortcut : shortcuts) {
                 if (!shortcut.enabled) continue;
-                placements.add(place(shortcut, columns, occupied));
+                LauncherActionsGridConfig.Placement placement =
+                        gridConfig.placement(shortcut.id);
+                if (placement == null) continue;
+                View tile = buildShortcutTile(shortcut, false);
+                tile.setTag(shortcut.id);
+                shortcutGrid.addView(tile, new PanelGridLayout.LayoutParams(
+                        placement.column, placement.row,
+                        placement.columnSpan, placement.rowSpan));
             }
         }
         if (showActionAdd) {
             LauncherShortcutStore.Shortcut add = new LauncherShortcutStore.Shortcut();
+            add.id = LauncherActionsGridConfig.ADD_TILE_ID;
             add.title = "Добавить";
             add.icon = "apps";
             add.backgroundColor = "#553A465B";
-            placements.add(place(add, columns, occupied));
+            LauncherActionsGridConfig.Placement placement =
+                    gridConfig.placement(LauncherActionsGridConfig.ADD_TILE_ID);
+            if (placement != null) {
+                View tile = buildShortcutTile(add, true);
+                tile.setTag(LauncherActionsGridConfig.ADD_TILE_ID);
+                shortcutGrid.addView(tile, new PanelGridLayout.LayoutParams(
+                        placement.column, placement.row,
+                        placement.columnSpan, placement.rowSpan));
+            }
         }
-
-        int rows = Math.max(1, occupied.size());
-        shortcutGrid.setColumnCount(columns);
-        shortcutGrid.setRowCount(rows);
-        int availableWidth = shortcutGrid.getWidth();
-        if (availableWidth <= dp(20) && shortcutScroll != null) {
-            availableWidth = shortcutScroll.getWidth();
-        }
-        int cellWidth = Math.max(dp(72), (Math.max(dp(72), availableWidth) - dp(14)) / columns);
-        int groupScale = showActionTiles ? actionsTileScalePercent : actionsAddScalePercent;
-        int cellHeight = Math.max(dp(56), cellWidth * groupScale / 100);
-        shortcutGrid.setMinimumHeight(rows * cellHeight + dp(14));
-        for (int index = 0; index < placements.size(); index++) {
-            ShortcutPlacement placement = placements.get(index);
-            boolean addButton = showActionAdd && index == placements.size() - 1;
-            View tile = buildShortcutTile(placement.shortcut, addButton);
-            GridLayout.LayoutParams lp = new GridLayout.LayoutParams();
-            lp.width = cellWidth * placement.columnSpan - dp(8);
-            lp.height = cellHeight * placement.rowSpan - dp(8);
-            lp.columnSpec = GridLayout.spec(placement.column, placement.columnSpan);
-            lp.rowSpec = GridLayout.spec(placement.row, placement.rowSpan);
-            lp.setMargins(dp(4), dp(4), dp(4), dp(4));
-            shortcutGrid.addView(tile, lp);
-        }
+        if (actionsContentEditOverlay != null) actionsContentEditOverlay.invalidate();
+        appliedActionsGridJson = preferences.launcherActionsGridJson.get();
+        appliedActionsColumns = gridConfig.columns;
         resubscribeCarControls();
         applySmartHomeStates();
+    }
+
+    private void applyActionsGridPlacements() {
+        PanelGridLayout grid = shortcutGrid;
+        LauncherActionsGridConfig config = actionsGridConfig;
+        if (grid == null || config == null) return;
+        grid.setGridSize(config.columns, config.rows);
+        grid.setCellGapPx(config.gapPx);
+        for (LauncherActionsGridConfig.Placement placement : config.placements()) {
+            grid.updatePlacement(placement.id, placement.column, placement.row,
+                    placement.columnSpan, placement.rowSpan);
+        }
+        if (actionsContentEditOverlay != null) actionsContentEditOverlay.invalidate();
+    }
+
+    /** Mirrors only legacy spans so HA1079 rollback keeps the closest possible tile sizes. */
+    private void mirrorActionSpansToLegacyShortcut(@NonNull String id) {
+        if (shortcutStore == null || actionsGridConfig == null
+                || LauncherActionsGridConfig.ADD_TILE_ID.equals(id)) return;
+        LauncherActionsGridConfig.Placement placement = actionsGridConfig.placement(id);
+        if (placement == null) return;
+        for (LauncherShortcutStore.Shortcut shortcut : shortcutStore.all()) {
+            if (!shortcut.id.equals(id)) continue;
+            if (shortcut.columnSpan == placement.columnSpan
+                    && shortcut.rowSpan == placement.rowSpan) return;
+            shortcut.columnSpan = placement.columnSpan;
+            shortcut.rowSpan = placement.rowSpan;
+            shortcutStore.upsert(shortcut);
+            return;
+        }
+    }
+
+    /** Precise per-icon control opened by tapping an item in the real HOME grid editor. */
+    private void showShortcutIconSizeEditor(@NonNull String id) {
+        if (shortcutStore == null) return;
+        LauncherShortcutStore.Shortcut selected = null;
+        for (LauncherShortcutStore.Shortcut shortcut : shortcutStore.all()) {
+            if (shortcut.id.equals(id)) {
+                selected = shortcut;
+                break;
+            }
+        }
+        if (selected == null) return;
+        LauncherShortcutStore.Shortcut shortcut = selected;
+
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(24), dp(8), dp(24), dp(10));
+        TextView hint = text(14, Color.LTGRAY, false);
+        hint.setText("Размер меняет только сам значок. Размер плитки меняется "
+                + "перетаскиванием любого из четырёх углов по сетке.");
+        form.addView(hint, new LinearLayout.LayoutParams(matchWidth(), wrapContent()));
+        TextView value = text(16, Color.WHITE, true);
+        value.setText("Размер иконки: " + shortcut.iconSizePx + " px");
+        value.setPadding(0, dp(14), 0, 0);
+        form.addView(value);
+        ImageView preview = new ImageView(this);
+        preview.setImageDrawable(LauncherIconResolver.resolve(this, shortcut));
+        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(
+                shortcut.iconSizePx, shortcut.iconSizePx);
+        previewParams.gravity = Gravity.CENTER_HORIZONTAL;
+        previewParams.topMargin = dp(8);
+        form.addView(preview, previewParams);
+        SeekBar size = new SeekBar(this);
+        size.setMax(LauncherShortcutStore.MAX_ICON_SIZE_PX
+                - LauncherShortcutStore.MIN_ICON_SIZE_PX);
+        size.setProgress(shortcut.iconSizePx - LauncherShortcutStore.MIN_ICON_SIZE_PX);
+        final int[] selectedSize = {shortcut.iconSizePx};
+        size.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                                                    boolean fromUser) {
+                selectedSize[0] = LauncherShortcutStore.MIN_ICON_SIZE_PX + progress;
+                value.setText("Размер иконки: " + selectedSize[0] + " px");
+                ViewGroup.LayoutParams params = preview.getLayoutParams();
+                params.width = selectedSize[0];
+                params.height = selectedSize[0];
+                preview.setLayoutParams(params);
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        form.addView(size, new LinearLayout.LayoutParams(matchWidth(), dp(52)));
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(shortcut.title)
+                .setView(form)
+                .setPositiveButton("Применить", (dialog, which) -> {
+                    shortcut.iconSizePx = selectedSize[0];
+                    shortcutStore.upsert(shortcut);
+                    refreshShortcutGrid();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     @NonNull
@@ -1369,29 +1553,6 @@ public final class LauncherActivity extends AppCompatActivity {
         } catch (IllegalArgumentException invalid) {
             Log.w(TAG, "Could not load smart-home rules for live HOME state", invalid);
             return Collections.emptyMap();
-        }
-    }
-
-    @NonNull
-    private ShortcutPlacement place(@NonNull LauncherShortcutStore.Shortcut shortcut, int columns,
-                                    @NonNull List<boolean[]> occupied) {
-        int width = Math.max(1, Math.min(columns, shortcut.columnSpan));
-        int height = Math.max(1, Math.min(4, shortcut.rowSpan));
-        for (int row = 0; ; row++) {
-            while (occupied.size() < row + height) occupied.add(new boolean[columns]);
-            for (int column = 0; column <= columns - width; column++) {
-                boolean fits = true;
-                for (int y = row; y < row + height && fits; y++) {
-                    for (int x = column; x < column + width; x++) {
-                        if (occupied.get(y)[x]) { fits = false; break; }
-                    }
-                }
-                if (!fits) continue;
-                for (int y = row; y < row + height; y++) {
-                    for (int x = column; x < column + width; x++) occupied.get(y)[x] = true;
-                }
-                return new ShortcutPlacement(shortcut, row, column, width, height);
-            }
         }
     }
 
@@ -1418,7 +1579,12 @@ public final class LauncherActivity extends AppCompatActivity {
             icon.setImageDrawable(LauncherIconResolver.resolve(this, shortcut));
         }
         int contentScale = addButton ? actionsAddScalePercent : actionsTileScalePercent;
-        int iconSize = Math.max(24, shortcut.iconSizePx) * contentScale / 100;
+        // Per-icon size is exact and independent. The legacy group scale still controls labels
+        // (and the synthetic Add icon) but can no longer make every user icon grow together.
+        int iconSize = addButton
+                ? Math.max(LauncherShortcutStore.MIN_ICON_SIZE_PX,
+                shortcut.iconSizePx * contentScale / 100)
+                : Math.max(LauncherShortcutStore.MIN_ICON_SIZE_PX, shortcut.iconSizePx);
         content.addView(icon, new LinearLayout.LayoutParams(iconSize, iconSize));
         if (shortcut.showTitle || addButton) {
             TextView label = text(12f * contentScale / 100f, Color.WHITE, true);
@@ -1704,6 +1870,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private void setEditMode(boolean enabled) {
         if (enabled && navigationContentEditMode) setNavigationContentEditMode(false);
         if (enabled && mediaContentEditMode) setMediaContentEditMode(false);
+        if (enabled && actionsContentEditMode) setActionsContentEditMode(false);
         editMode = enabled;
         int snap = Math.max(4, preferences.launcherSnapPx.get());
         editorGrid.setStepPx(snap);
@@ -1711,7 +1878,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 ? View.VISIBLE : View.GONE);
         doneButton.setText("Готово · закрепить компоновку");
         doneButton.setVisibility(enabled || navigationContentEditMode || mediaContentEditMode
-                ? View.VISIBLE : View.GONE);
+                || actionsContentEditMode ? View.VISIBLE : View.GONE);
         for (LauncherElementFrame frame : panels.values()) frame.setEditMode(enabled, snap);
         updateLauncherSafeArea();
         updateNavigation();
@@ -1731,6 +1898,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private void setNavigationContentEditMode(boolean enabled) {
         if (enabled && editMode) setEditMode(false);
         if (enabled && mediaContentEditMode) setMediaContentEditMode(false);
+        if (enabled && actionsContentEditMode) setActionsContentEditMode(false);
         navigationContentEditMode = enabled;
         if (navigationContentEditOverlay != null) {
             navigationContentEditOverlay.setEditing(enabled);
@@ -1740,7 +1908,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 ? "Готово · сохранить элементы навигации"
                 : "Готово · закрепить компоновку");
         doneButton.setVisibility(enabled || editMode || mediaContentEditMode
-                ? View.VISIBLE : View.GONE);
+                || actionsContentEditMode ? View.VISIBLE : View.GONE);
         updateLauncherSafeArea();
         if (enabled) {
             setPanelVisibility(LauncherLayoutStore.NAVIGATION, true);
@@ -1753,7 +1921,7 @@ public final class LauncherActivity extends AppCompatActivity {
         if (snapshot != null) renderNavigation(snapshot); else updateNavigation();
         if (!enabled) updateCombinedNavigationFrameVisibility();
         Toast.makeText(this, enabled
-                ? "Тащите элементы; потяните выделенный правый нижний угол для размера"
+                ? "Тащите элементы; потяните любой выделенный угол для размера"
                 : "Сетка навигации сохранена", Toast.LENGTH_SHORT).show();
     }
 
@@ -1765,6 +1933,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private void setMediaContentEditMode(boolean enabled) {
         if (enabled && editMode) setEditMode(false);
         if (enabled && navigationContentEditMode) setNavigationContentEditMode(false);
+        if (enabled && actionsContentEditMode) setActionsContentEditMode(false);
         mediaContentEditMode = enabled;
         if (mediaPanel != null) {
             if (enabled) mediaPanel.reloadConfig();
@@ -1775,7 +1944,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 ? "Готово · сохранить элементы медиапанели"
                 : "Готово · закрепить компоновку");
         doneButton.setVisibility(enabled || editMode || navigationContentEditMode
-                ? View.VISIBLE : View.GONE);
+                || actionsContentEditMode ? View.VISIBLE : View.GONE);
         if (enabled) {
             setPanelVisibility(LauncherLayoutStore.MEDIA, true);
         } else {
@@ -1785,8 +1954,41 @@ public final class LauncherActivity extends AppCompatActivity {
         reconcileMediaController();
         updateLauncherSafeArea();
         Toast.makeText(this, enabled
-                ? "Тащите элементы; правый нижний угол изменяет размер"
+                ? "Тащите элементы; любой из четырёх углов изменяет размер"
                 : "Сетка медиапанели сохранена", Toast.LENGTH_SHORT).show();
+    }
+
+    /** Edits the actual mixed buttons/smart-home grid without touching the outer panel rectangle. */
+    private void setActionsContentEditMode(boolean enabled) {
+        if (enabled && editMode) setEditMode(false);
+        if (enabled && navigationContentEditMode) setNavigationContentEditMode(false);
+        if (enabled && mediaContentEditMode) setMediaContentEditMode(false);
+        actionsContentEditMode = enabled;
+        if (enabled && shortcutStore != null) {
+            shortcutStore.load();
+            refreshShortcutGrid();
+        }
+        if (actionsContentEditOverlay != null) {
+            actionsContentEditOverlay.setEditing(enabled);
+        }
+        editorGrid.setVisibility(View.GONE);
+        doneButton.setText(enabled
+                ? "Готово · сохранить сетку кнопок"
+                : "Готово · закрепить компоновку");
+        doneButton.setVisibility(enabled || editMode || navigationContentEditMode
+                || mediaContentEditMode ? View.VISIBLE : View.GONE);
+        if (enabled) {
+            setPanelVisibility(LauncherLayoutStore.ACTIONS, true);
+        } else {
+            setPanelVisibility(LauncherLayoutStore.ACTIONS,
+                    preferences.launcherActionsVisible.get()
+                            && hasSimplePanelContent(LauncherLayoutStore.ACTIONS));
+        }
+        updateLauncherSafeArea();
+        Toast.makeText(this, enabled
+                ? "Тащите плитки по сетке; потяните любой из четырёх углов. "
+                + "Нажатие на плитку меняет размер её иконки."
+                : "Сетка кнопок сохранена", Toast.LENGTH_SHORT).show();
     }
 
     private void updateMedia(@NonNull LauncherMediaController.Snapshot state) {
@@ -2257,23 +2459,6 @@ public final class LauncherActivity extends AppCompatActivity {
         }
 
         void clearIcon() { cachedIcon = null; }
-    }
-
-    private static final class ShortcutPlacement {
-        final LauncherShortcutStore.Shortcut shortcut;
-        final int row;
-        final int column;
-        final int columnSpan;
-        final int rowSpan;
-
-        ShortcutPlacement(LauncherShortcutStore.Shortcut shortcut, int row, int column,
-                          int columnSpan, int rowSpan) {
-            this.shortcut = shortcut;
-            this.row = row;
-            this.column = column;
-            this.columnSpan = columnSpan;
-            this.rowSpan = rowSpan;
-        }
     }
 
     private static final class ShortcutTileBinding {

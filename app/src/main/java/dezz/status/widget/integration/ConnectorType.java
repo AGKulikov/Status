@@ -9,7 +9,8 @@ import java.util.Locale;
 public enum ConnectorType {
     HOME_ASSISTANT,
     MQTT,
-    SPRUTHUB;
+    SPRUTHUB,
+    PHONE;
 
     /** Parses the stable JSON name. Blank values use the supplied migration fallback. */
     @NonNull

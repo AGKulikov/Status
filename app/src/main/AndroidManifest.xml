@@ -173,6 +173,11 @@
             android:exported="false" />
 
         <activity
+            android:name=".PhoneConnectorSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".VisualBrickEditorActivity"
             android:exported="false" />
 

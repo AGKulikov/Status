@@ -19,6 +19,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -44,11 +45,17 @@ import java.util.List;
 import java.util.Locale;
 
 import dezz.status.widget.launcher.HighResolutionAppIconLoader;
+import dezz.status.widget.launcher.LauncherActionsGridConfig;
+import dezz.status.widget.launcher.LauncherActionsGridConfigStore;
 import dezz.status.widget.launcher.LauncherIconResolver;
+import dezz.status.widget.launcher.LauncherLayoutStore;
 import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.launcher.LauncherRuleIdPolicy;
 import dezz.status.widget.launcher.LauncherRuleIconPolicy;
 import dezz.status.widget.launcher.SmartHomeShortcutPicker;
+import dezz.status.widget.launcher.panels.PanelContentEditOverlay;
+import dezz.status.widget.launcher.panels.PanelElementConfigStore;
+import dezz.status.widget.launcher.panels.PanelGridLayout;
 import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarControlDescriptor;
 import dezz.status.widget.car.CarIntegrations;
@@ -63,16 +70,37 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
 
     private Preferences preferences;
     private LauncherShortcutStore store;
+    private LauncherActionsGridConfigStore gridStore;
+    private PanelElementConfigStore panelElementStore;
+    @Nullable private LauncherActionsGridConfig gridConfig;
+    @Nullable private PanelElementConfigStore.Panel panelElements;
     private LinearLayout itemsHost;
+    private MaterialSwitch panelVisible;
+    private MaterialSwitch tilesVisible;
+    private MaterialSwitch addTileVisible;
+    private PanelGridLayout previewGrid;
+    private PanelContentEditOverlay previewOverlay;
+    private FrameLayout previewHost;
+    private GridSlider columnsSlider;
+    private GridSlider rowsSlider;
+    private GridSlider gapSlider;
+    private GridSlider labelsScaleSlider;
+    private GridSlider addScaleSlider;
     private boolean addHandled;
     private boolean editingLongAction;
+    private boolean syncingControls;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         preferences = new Preferences(this);
         store = new LauncherShortcutStore(preferences);
+        gridStore = new LauncherActionsGridConfigStore(preferences);
+        panelElementStore = new PanelElementConfigStore(preferences);
+        panelElements = panelElementStore.load(LauncherLayoutStore.ACTIONS);
         migrateRuleIcons();
+        store.load();
+        gridConfig = gridStore.load(store.all());
         setTitle("Иконки HOME");
         View screen = buildScreen();
         setContentView(screen);
@@ -86,6 +114,15 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        // LauncherActivity edits and saves the same grid while this screen is stopped. Always
+        // reload before touching controls: saving the object kept before HOME was opened would
+        // silently restore stale positions and spans.
+        refresh();
+    }
+
+    @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         outState.putBoolean("addHandled", addHandled);
         super.onSaveInstanceState(outState);
@@ -93,11 +130,17 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
 
     @NonNull
     private View buildScreen() {
-        ScrollView scroll = new ScrollView(this);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.HORIZONTAL);
+        root.setPadding(dp(18), dp(14), dp(18), dp(18));
+
+        ScrollView settingsScroll = new ScrollView(this);
+        settingsScroll.setFillViewport(true);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(24), dp(18), dp(24), dp(30));
-        scroll.addView(content, new ScrollView.LayoutParams(match(), wrap()));
+        content.setPadding(dp(10), 0, dp(22), dp(30));
+        settingsScroll.addView(content, new ScrollView.LayoutParams(match(), wrap()));
+        root.addView(settingsScroll, new LinearLayout.LayoutParams(0, match(), 1.04f));
 
         MaterialButton back = new MaterialButton(this);
         back.setText("←  Назад");
@@ -108,15 +151,94 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         content.addView(back, backLp);
 
         TextView title = text(25, true);
-        title.setText("Иконки, функции и приложения");
+        title.setText("Кнопки и умный дом");
         content.addView(title);
         TextView hint = text(15, false);
-        hint.setText("Нажатие на всю плитку выполняет действие. Долгое нажатие на HOME открывает её настройку. Порядок можно изменить стрелками.");
+        hint.setText("Все настройки этой панели собраны здесь. Справа показана та же ячеистая "
+                + "компоновка, которую использует HOME: перетаскивайте плитки и тяните за угол, "
+                + "чтобы изменить их размер.");
         hint.setAlpha(.75f);
         LinearLayout.LayoutParams hintLp = new LinearLayout.LayoutParams(match(), wrap());
         hintLp.bottomMargin = dp(12);
         content.addView(hint, hintLp);
 
+        panelVisible = new MaterialSwitch(this);
+        panelVisible.setText("Показывать панель кнопок и умного дома на HOME");
+        panelVisible.setTextSize(16);
+        panelVisible.setMinHeight(dp(52));
+        panelVisible.setChecked(preferences.launcherActionsVisible.get());
+        panelVisible.setOnCheckedChangeListener((button, checked) -> {
+            if (!syncingControls) preferences.launcherActionsVisible.set(checked);
+        });
+        content.addView(panelVisible, new LinearLayout.LayoutParams(match(), wrap()));
+
+        tilesVisible = new MaterialSwitch(this);
+        tilesVisible.setText("Показывать кнопки и устройства в панели");
+        tilesVisible.setTextSize(16);
+        tilesVisible.setMinHeight(dp(50));
+        tilesVisible.setChecked(showActionTiles());
+        tilesVisible.setOnCheckedChangeListener((button, checked) -> {
+            if (syncingControls) return;
+            PanelElementConfigStore.Panel elements = requirePanelElements();
+            elements.setEnabled(PanelElementConfigStore.ACTION_TILES, checked);
+            panelElementStore.save(elements);
+            renderPreview();
+        });
+        content.addView(tilesVisible, new LinearLayout.LayoutParams(match(), wrap()));
+
+        addTileVisible = new MaterialSwitch(this);
+        addTileVisible.setText("Показывать плитку «Добавить»");
+        addTileVisible.setTextSize(16);
+        addTileVisible.setMinHeight(dp(50));
+        addTileVisible.setChecked(showActionAdd());
+        addTileVisible.setOnCheckedChangeListener((button, checked) -> {
+            if (syncingControls) return;
+            PanelElementConfigStore.Panel elements = requirePanelElements();
+            elements.setEnabled(PanelElementConfigStore.ACTION_ADD, checked);
+            panelElementStore.save(elements);
+            renderPreview();
+        });
+        content.addView(addTileVisible, new LinearLayout.LayoutParams(match(), wrap()));
+
+        labelsScaleSlider = addGridSlider(content, "Подписи",
+                PanelElementConfigStore.MIN_SCALE, PanelElementConfigStore.MAX_SCALE,
+                requirePanelElements().scale(PanelElementConfigStore.ACTION_TILES), "%",
+                selected -> changeActionElementScale(
+                        PanelElementConfigStore.ACTION_TILES, selected));
+        addScaleSlider = addGridSlider(content, "Плитка «+»",
+                PanelElementConfigStore.MIN_SCALE, PanelElementConfigStore.MAX_SCALE,
+                requirePanelElements().scale(PanelElementConfigStore.ACTION_ADD), "%",
+                selected -> changeActionElementScale(
+                        PanelElementConfigStore.ACTION_ADD, selected));
+
+        addPageButton(content, "Размер и положение всей панели на HOME…", view ->
+                startActivity(new Intent(this, LauncherActivity.class)
+                        .putExtra(LauncherActivity.EXTRA_EDIT_MODE, true)));
+        addPageButton(content, "Расположение плиток внутри панели на HOME…", view ->
+                startActivity(new Intent(this, LauncherActivity.class)
+                        .putExtra(LauncherActivity.EXTRA_EDIT_ACTIONS_CONTENT, true)));
+
+        addSectionTitle(content, "Сетка");
+        TextView gridHint = text(14, false);
+        gridHint.setText("Столбцы и строки задают точность размещения. Интервал меняет только "
+                + "расстояние между плитками. Если выбранный размер не вмещает все элементы, "
+                + "останется последняя корректная сетка.");
+        gridHint.setAlpha(.72f);
+        content.addView(gridHint);
+        LauncherActionsGridConfig initial = requireGridConfig();
+        columnsSlider = addGridSlider(content, "Столбцы",
+                LauncherActionsGridConfig.MIN_COLUMNS,
+                LauncherActionsGridConfig.MAX_COLUMNS, initial.columns, "",
+                this::changeGridColumns);
+        rowsSlider = addGridSlider(content, "Строки",
+                LauncherActionsGridConfig.MIN_ROWS,
+                LauncherActionsGridConfig.MAX_ROWS, initial.rows, "",
+                this::changeGridRows);
+        gapSlider = addGridSlider(content, "Интервал", 0,
+                LauncherActionsGridConfig.MAX_GAP_PX, initial.gapPx, " px",
+                this::changeGridGap);
+
+        addSectionTitle(content, "Плитки");
         MaterialButton add = new MaterialButton(this);
         add.setText("+  Добавить иконку");
         add.setAllCaps(false);
@@ -128,11 +250,47 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         LinearLayout.LayoutParams hostLp = new LinearLayout.LayoutParams(match(), wrap());
         hostLp.topMargin = dp(12);
         content.addView(itemsHost, hostLp);
-        return scroll;
+
+        ScrollView previewScroll = new ScrollView(this);
+        previewScroll.setFillViewport(true);
+        LinearLayout previewColumn = new LinearLayout(this);
+        previewColumn.setOrientation(LinearLayout.VERTICAL);
+        previewColumn.setPadding(dp(20), dp(2), dp(8), dp(24));
+        previewScroll.addView(previewColumn, new ScrollView.LayoutParams(match(), wrap()));
+        root.addView(previewScroll, new LinearLayout.LayoutParams(0, match(), .96f));
+
+        TextView previewTitle = text(23, true);
+        previewTitle.setText("Предпросмотр сетки");
+        previewTitle.setTextColor(Color.rgb(105, 165, 255));
+        previewColumn.addView(previewTitle);
+        TextView previewHint = text(14, false);
+        previewHint.setText("Это редактируемая схема реальной панели. Нажмите плитку для её "
+                + "настройки. Плитку «Добавить» тоже можно перемещать и растягивать.");
+        previewHint.setAlpha(.72f);
+        LinearLayout.LayoutParams previewHintLp =
+                new LinearLayout.LayoutParams(match(), wrap());
+        previewHintLp.bottomMargin = dp(10);
+        previewColumn.addView(previewHint, previewHintLp);
+
+        previewHost = new FrameLayout(this);
+        previewHost.setPadding(dp(7), dp(7), dp(7), dp(7));
+        previewGrid = new PanelGridLayout(this);
+        previewHost.addView(previewGrid, new FrameLayout.LayoutParams(match(), match()));
+        previewOverlay = new PanelContentEditOverlay(this);
+        previewOverlay.setModel(previewModel(), previewListener());
+        previewOverlay.setEditing(true);
+        previewHost.addView(previewOverlay, new FrameLayout.LayoutParams(match(), match()));
+        previewColumn.addView(previewHost,
+                new LinearLayout.LayoutParams(match(), previewHeight(initial.rows)));
+        return root;
     }
 
     private void refresh() {
         store.load();
+        gridConfig = gridStore.load(store.all());
+        panelElements = panelElementStore.load(LauncherLayoutStore.ACTIONS);
+        syncGlobalControls();
+        renderPreview();
         itemsHost.removeAllViews();
         List<LauncherShortcutStore.Shortcut> values = store.all();
         if (values.isEmpty()) {
@@ -152,9 +310,11 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         card.setClickable(true);
         card.setOnClickListener(v -> showItemMenu(shortcut));
 
+        LinearLayout block = new LinearLayout(this);
+        block.setOrientation(LinearLayout.VERTICAL);
+        block.setPadding(dp(14), dp(10), dp(10), dp(10));
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(14), dp(10), dp(8), dp(10));
         ImageView icon = new ImageView(this);
         icon.setImageDrawable(LauncherIconResolver.resolve(this, shortcut));
         row.addView(icon, new LinearLayout.LayoutParams(dp(50), dp(50)));
@@ -166,25 +326,477 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         name.setText(shortcut.title);
         TextView type = text(13, false);
         type.setAlpha(.7f);
-        type.setText(typeLabel(shortcut));
+        type.setText(typeLabel(shortcut) + "\n" + placementLabel(shortcut.id));
+        type.setMaxLines(3);
         labels.addView(name);
         labels.addView(type);
         row.addView(labels, new LinearLayout.LayoutParams(0, wrap(), 1f));
 
-        MaterialButton up = compactButton("↑");
-        up.setOnClickListener(v -> { store.move(shortcut.id, -1); refresh(); });
-        MaterialButton down = compactButton("↓");
-        down.setOnClickListener(v -> { store.move(shortcut.id, 1); refresh(); });
+        MaterialSwitch visible = new MaterialSwitch(this);
+        visible.setText("На HOME");
+        visible.setContentDescription("Показывать «" + shortcut.title + "»");
+        visible.setChecked(shortcut.enabled);
+        visible.setOnCheckedChangeListener((button, checked) ->
+                setShortcutVisible(shortcut.id, checked));
         MaterialButton edit = compactButton("✎");
         edit.setOnClickListener(v -> showItemMenu(shortcut));
-        row.addView(up);
-        row.addView(down);
+        row.addView(visible, new LinearLayout.LayoutParams(dp(124), dp(52)));
         row.addView(edit);
-        card.addView(row, new MaterialCardView.LayoutParams(match(), wrap()));
+        block.addView(row, new LinearLayout.LayoutParams(match(), wrap()));
+
+        LinearLayout sizeHeading = new LinearLayout(this);
+        sizeHeading.setGravity(Gravity.CENTER_VERTICAL);
+        TextView sizeTitle = text(14, false);
+        sizeTitle.setText("Размер иконки");
+        TextView sizeValue = text(14, true);
+        sizeValue.setGravity(Gravity.END);
+        sizeValue.setText(shortcut.iconSizePx + " px");
+        sizeHeading.addView(sizeTitle, new LinearLayout.LayoutParams(0, wrap(), 1f));
+        sizeHeading.addView(sizeValue, new LinearLayout.LayoutParams(dp(90), wrap()));
+        block.addView(sizeHeading, new LinearLayout.LayoutParams(match(), wrap()));
+        SeekBar iconSize = new SeekBar(this);
+        iconSize.setMax(LauncherShortcutStore.MAX_ICON_SIZE_PX
+                - LauncherShortcutStore.MIN_ICON_SIZE_PX);
+        iconSize.setProgress(Math.max(0,
+                Math.min(LauncherShortcutStore.MAX_ICON_SIZE_PX
+                                - LauncherShortcutStore.MIN_ICON_SIZE_PX,
+                        shortcut.iconSizePx - LauncherShortcutStore.MIN_ICON_SIZE_PX)));
+        iconSize.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            private int selected = shortcut.iconSizePx;
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                selected = LauncherShortcutStore.MIN_ICON_SIZE_PX + progress;
+                sizeValue.setText(selected + " px");
+                if (fromUser) {
+                    ViewGroup.LayoutParams params = icon.getLayoutParams();
+                    params.width = Math.max(dp(36), Math.min(dp(72), selected));
+                    params.height = params.width;
+                    icon.setLayoutParams(params);
+                    updatePreviewIconSize(shortcut.id, selected);
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                setShortcutIconSize(shortcut.id, selected);
+            }
+        });
+        block.addView(iconSize, new LinearLayout.LayoutParams(match(), dp(42)));
+        card.addView(block, new MaterialCardView.LayoutParams(match(), wrap()));
         LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(match(), wrap());
         cardLp.bottomMargin = dp(9);
         card.setLayoutParams(cardLp);
         return card;
+    }
+
+    @NonNull
+    private LauncherActionsGridConfig requireGridConfig() {
+        LauncherActionsGridConfig current = gridConfig;
+        if (current != null) return current;
+        store.load();
+        current = gridStore.load(store.all());
+        gridConfig = current;
+        return current;
+    }
+
+    @NonNull
+    private PanelElementConfigStore.Panel requirePanelElements() {
+        PanelElementConfigStore.Panel current = panelElements;
+        if (current != null) return current;
+        current = panelElementStore.load(LauncherLayoutStore.ACTIONS);
+        panelElements = current;
+        return current;
+    }
+
+    private boolean showActionTiles() {
+        return requirePanelElements().isEnabled(PanelElementConfigStore.ACTION_TILES);
+    }
+
+    private boolean showActionAdd() {
+        return requirePanelElements().isEnabled(PanelElementConfigStore.ACTION_ADD);
+    }
+
+    private void syncGlobalControls() {
+        syncingControls = true;
+        try {
+            if (panelVisible != null) {
+                panelVisible.setChecked(preferences.launcherActionsVisible.get());
+            }
+            if (tilesVisible != null) tilesVisible.setChecked(showActionTiles());
+            if (addTileVisible != null) addTileVisible.setChecked(showActionAdd());
+            if (labelsScaleSlider != null) {
+                labelsScaleSlider.setValue(requirePanelElements().scale(
+                        PanelElementConfigStore.ACTION_TILES));
+            }
+            if (addScaleSlider != null) {
+                addScaleSlider.setValue(requirePanelElements().scale(
+                        PanelElementConfigStore.ACTION_ADD));
+            }
+            LauncherActionsGridConfig current = requireGridConfig();
+            if (columnsSlider != null) columnsSlider.setValue(current.columns);
+            if (rowsSlider != null) rowsSlider.setValue(current.rows);
+            if (gapSlider != null) gapSlider.setValue(current.gapPx);
+        } finally {
+            syncingControls = false;
+        }
+    }
+
+    private int changeGridColumns(int selected) {
+        LauncherActionsGridConfig current = requireGridConfig();
+        if (!current.setGridSize(selected, current.rows)) return current.columns;
+        persistGridAndRefresh(true);
+        return current.columns;
+    }
+
+    private int changeGridRows(int selected) {
+        LauncherActionsGridConfig current = requireGridConfig();
+        if (!current.setGridSize(current.columns, selected)) return current.rows;
+        persistGridAndRefresh(true);
+        return current.rows;
+    }
+
+    private int changeGridGap(int selected) {
+        LauncherActionsGridConfig current = requireGridConfig();
+        current.gapPx = Math.max(0,
+                Math.min(LauncherActionsGridConfig.MAX_GAP_PX, selected));
+        persistGridAndRefresh(false);
+        return current.gapPx;
+    }
+
+    private int changeActionElementScale(@NonNull String id, int selected) {
+        PanelElementConfigStore.Panel elements = requirePanelElements();
+        elements.setScale(id, selected);
+        panelElementStore.save(elements);
+        renderPreview();
+        return elements.scale(id);
+    }
+
+    private void persistGridAndRefresh(boolean mirrorAllSpans) {
+        LauncherActionsGridConfig current = requireGridConfig();
+        gridStore.save(current);
+        if (mirrorAllSpans) mirrorAllGridSpansToLegacy();
+        renderPreview();
+        if (itemsHost != null) renderRows();
+    }
+
+    @NonNull
+    private PanelContentEditOverlay.Model previewModel() {
+        return new PanelContentEditOverlay.Model() {
+            @Override public int columns() {
+                return requireGridConfig().columns;
+            }
+
+            @Override public int rows() {
+                return requireGridConfig().rows;
+            }
+
+            @NonNull
+            @Override public List<PanelContentEditOverlay.Item> items() {
+                List<PanelContentEditOverlay.Item> result = new ArrayList<>();
+                LauncherActionsGridConfig current = requireGridConfig();
+                if (showActionTiles()) {
+                    for (LauncherShortcutStore.Shortcut shortcut : store.all()) {
+                        if (!shortcut.enabled) continue;
+                        LauncherActionsGridConfig.Placement placement =
+                                current.placement(shortcut.id);
+                        if (placement == null) continue;
+                        result.add(new PanelContentEditOverlay.Item(shortcut.id,
+                                shortcut.title + " · " + shortcut.iconSizePx + " px",
+                                placement.column, placement.row,
+                                placement.columnSpan, placement.rowSpan));
+                    }
+                }
+                LauncherActionsGridConfig.Placement add =
+                        current.placement(LauncherActionsGridConfig.ADD_TILE_ID);
+                if (showActionAdd() && add != null) {
+                    result.add(new PanelContentEditOverlay.Item(
+                            LauncherActionsGridConfig.ADD_TILE_ID, "Добавить",
+                            add.column, add.row, add.columnSpan, add.rowSpan));
+                }
+                return result;
+            }
+
+            @Override public boolean setPlacement(@NonNull String id, int column, int row,
+                                                  int columnSpan, int rowSpan) {
+                return requireGridConfig().setPlacement(id, column, row, columnSpan, rowSpan);
+            }
+        };
+    }
+
+    @NonNull
+    private PanelContentEditOverlay.Listener previewListener() {
+        return new PanelContentEditOverlay.Listener() {
+            @Override public void onPlacementChanged(@NonNull String id, boolean finished) {
+                applyPreviewPlacements();
+                if (!finished) return;
+                gridStore.save(requireGridConfig());
+                mirrorGridSpanToLegacy(id);
+                renderRows();
+            }
+
+            @Override public void onItemClicked(@NonNull String id) {
+                if (LauncherActionsGridConfig.ADD_TILE_ID.equals(id)) {
+                    chooseKindForNew();
+                    return;
+                }
+                LauncherShortcutStore.Shortcut shortcut = findShortcut(id);
+                if (shortcut != null) showItemMenu(shortcut);
+            }
+        };
+    }
+
+    private void renderPreview() {
+        if (previewGrid == null || previewHost == null) return;
+        LauncherActionsGridConfig current = requireGridConfig();
+        previewGrid.removeAllViews();
+        previewGrid.setGridSize(current.columns, current.rows);
+        previewGrid.setCellGapPx(current.gapPx);
+        if (showActionTiles()) {
+            for (LauncherShortcutStore.Shortcut shortcut : store.all()) {
+                if (!shortcut.enabled) continue;
+                LauncherActionsGridConfig.Placement placement = current.placement(shortcut.id);
+                if (placement == null) continue;
+                View tile = buildPreviewTile(shortcut, false);
+                tile.setTag(shortcut.id);
+                previewGrid.addView(tile, new PanelGridLayout.LayoutParams(
+                        placement.column, placement.row,
+                        placement.columnSpan, placement.rowSpan));
+            }
+        }
+        LauncherActionsGridConfig.Placement addPlacement =
+                current.placement(LauncherActionsGridConfig.ADD_TILE_ID);
+        if (showActionAdd() && addPlacement != null) {
+            LauncherShortcutStore.Shortcut add = new LauncherShortcutStore.Shortcut();
+            add.id = LauncherActionsGridConfig.ADD_TILE_ID;
+            add.title = "Добавить";
+            add.icon = "apps";
+            add.backgroundColor = "#553A465B";
+            View tile = buildPreviewTile(add, true);
+            tile.setTag(LauncherActionsGridConfig.ADD_TILE_ID);
+            previewGrid.addView(tile, new PanelGridLayout.LayoutParams(
+                    addPlacement.column, addPlacement.row,
+                    addPlacement.columnSpan, addPlacement.rowSpan));
+        }
+        ViewGroup.LayoutParams raw = previewHost.getLayoutParams();
+        if (raw != null) {
+            raw.height = previewHeight(current.rows);
+            previewHost.setLayoutParams(raw);
+        }
+        if (previewOverlay != null) {
+            previewOverlay.setEditing(true);
+            previewOverlay.invalidate();
+        }
+    }
+
+    @NonNull
+    private View buildPreviewTile(@NonNull LauncherShortcutStore.Shortcut shortcut,
+                                  boolean addTile) {
+        MaterialCardView card = new MaterialCardView(this);
+        card.setRadius(dp(16));
+        card.setCardElevation(0);
+        try {
+            card.setCardBackgroundColor(Color.parseColor(shortcut.backgroundColor));
+        } catch (IllegalArgumentException ignored) {
+            card.setCardBackgroundColor(Color.argb(180, 34, 39, 51));
+        }
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setGravity(Gravity.CENTER);
+        content.setPadding(dp(5), dp(5), dp(5), dp(5));
+        ImageView icon = new ImageView(this);
+        if (addTile) {
+            icon.setImageResource(R.drawable.ic_add);
+            icon.setColorFilter(Color.WHITE);
+        } else {
+            icon.setImageDrawable(LauncherIconResolver.resolve(this, shortcut));
+        }
+        int contentScale = requirePanelElements().scale(addTile
+                ? PanelElementConfigStore.ACTION_ADD
+                : PanelElementConfigStore.ACTION_TILES);
+        int iconSize = addTile
+                ? Math.max(LauncherShortcutStore.MIN_ICON_SIZE_PX,
+                shortcut.iconSizePx * contentScale / 100)
+                : Math.max(LauncherShortcutStore.MIN_ICON_SIZE_PX,
+                Math.min(LauncherShortcutStore.MAX_ICON_SIZE_PX, shortcut.iconSizePx));
+        content.addView(icon, new LinearLayout.LayoutParams(iconSize, iconSize));
+        if (shortcut.showTitle || addTile) {
+            TextView title = text(12f * contentScale / 100f, true);
+            title.setText(addTile ? "+  Добавить" : shortcut.title);
+            title.setGravity(Gravity.CENTER);
+            title.setMaxLines(2);
+            try {
+                title.setTextColor(Color.parseColor(shortcut.textColor));
+            } catch (IllegalArgumentException ignored) {
+                title.setTextColor(Color.WHITE);
+            }
+            content.addView(title, new LinearLayout.LayoutParams(match(), wrap()));
+        }
+        card.addView(content, new MaterialCardView.LayoutParams(match(), match()));
+        return card;
+    }
+
+    private void applyPreviewPlacements() {
+        if (previewGrid == null) return;
+        LauncherActionsGridConfig current = requireGridConfig();
+        previewGrid.setGridSize(current.columns, current.rows);
+        previewGrid.setCellGapPx(current.gapPx);
+        for (LauncherActionsGridConfig.Placement placement : current.placements()) {
+            previewGrid.updatePlacement(placement.id, placement.column, placement.row,
+                    placement.columnSpan, placement.rowSpan);
+        }
+        if (previewOverlay != null) previewOverlay.invalidate();
+    }
+
+    private void setShortcutVisible(@NonNull String id, boolean visible) {
+        LauncherShortcutStore.Shortcut latest = findShortcut(id);
+        if (latest == null || latest.enabled == visible) return;
+        latest.enabled = visible;
+        store.upsert(latest);
+        refresh();
+    }
+
+    private void setShortcutIconSize(@NonNull String id, int requestedSize) {
+        LauncherShortcutStore.Shortcut latest = findShortcut(id);
+        if (latest == null) return;
+        int size = Math.max(LauncherShortcutStore.MIN_ICON_SIZE_PX,
+                Math.min(LauncherShortcutStore.MAX_ICON_SIZE_PX, requestedSize));
+        if (latest.iconSizePx == size) return;
+        latest.iconSizePx = size;
+        store.upsert(latest);
+        refresh();
+    }
+
+    private void updatePreviewIconSize(@NonNull String id, int requestedSize) {
+        if (previewGrid == null) return;
+        View tile = previewGrid.findViewWithTag(id);
+        if (!(tile instanceof ViewGroup) || ((ViewGroup) tile).getChildCount() == 0) return;
+        View content = ((ViewGroup) tile).getChildAt(0);
+        if (!(content instanceof ViewGroup) || ((ViewGroup) content).getChildCount() == 0) return;
+        View icon = ((ViewGroup) content).getChildAt(0);
+        ViewGroup.LayoutParams params = icon.getLayoutParams();
+        int size = Math.max(LauncherShortcutStore.MIN_ICON_SIZE_PX,
+                Math.min(LauncherShortcutStore.MAX_ICON_SIZE_PX, requestedSize));
+        params.width = size;
+        params.height = size;
+        icon.setLayoutParams(params);
+    }
+
+    @Nullable
+    private LauncherShortcutStore.Shortcut findShortcut(@NonNull String id) {
+        store.load();
+        for (LauncherShortcutStore.Shortcut shortcut : store.all()) {
+            if (shortcut.id.equals(id)) return shortcut;
+        }
+        return null;
+    }
+
+    private void mirrorGridSpanToLegacy(@NonNull String id) {
+        if (LauncherActionsGridConfig.ADD_TILE_ID.equals(id)) return;
+        LauncherActionsGridConfig.Placement placement = requireGridConfig().placement(id);
+        if (placement == null) return;
+        LauncherShortcutStore.Shortcut latest = findShortcut(id);
+        if (latest == null || latest.columnSpan == placement.columnSpan
+                && latest.rowSpan == placement.rowSpan) return;
+        latest.columnSpan = placement.columnSpan;
+        latest.rowSpan = placement.rowSpan;
+        store.upsert(latest);
+    }
+
+    private void mirrorAllGridSpansToLegacy() {
+        LauncherActionsGridConfig current = requireGridConfig();
+        store.load();
+        for (LauncherShortcutStore.Shortcut shortcut : store.all()) {
+            LauncherActionsGridConfig.Placement placement = current.placement(shortcut.id);
+            if (placement == null || shortcut.columnSpan == placement.columnSpan
+                    && shortcut.rowSpan == placement.rowSpan) continue;
+            shortcut.columnSpan = placement.columnSpan;
+            shortcut.rowSpan = placement.rowSpan;
+            store.upsert(shortcut);
+        }
+    }
+
+    private void renderRows() {
+        if (itemsHost == null) return;
+        itemsHost.removeAllViews();
+        List<LauncherShortcutStore.Shortcut> values = store.all();
+        if (values.isEmpty()) {
+            TextView empty = text(17, false);
+            empty.setText("Иконок пока нет. Нажмите «+», чтобы добавить первую.");
+            itemsHost.addView(empty);
+            return;
+        }
+        for (LauncherShortcutStore.Shortcut value : values) {
+            itemsHost.addView(buildRow(value));
+        }
+    }
+
+    @NonNull
+    private String placementLabel(@NonNull String id) {
+        LauncherActionsGridConfig.Placement placement = requireGridConfig().placement(id);
+        if (placement == null) return "Положение ещё не назначено";
+        return "Ячейка " + (placement.column + 1) + " × " + (placement.row + 1)
+                + " · размер " + placement.columnSpan + " × " + placement.rowSpan;
+    }
+
+    private int previewHeight(int rows) {
+        return Math.max(dp(300), Math.min(dp(1000), dp(76) * Math.max(1, rows)));
+    }
+
+    private void addPageButton(@NonNull LinearLayout parent, @NonNull String label,
+                               @NonNull View.OnClickListener listener) {
+        MaterialButton button = new MaterialButton(this);
+        button.setText(label);
+        button.setAllCaps(false);
+        button.setOnClickListener(listener);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), dp(52));
+        lp.topMargin = dp(7);
+        parent.addView(button, lp);
+    }
+
+    private void addSectionTitle(@NonNull LinearLayout parent, @NonNull String value) {
+        TextView title = text(22, true);
+        title.setText(value);
+        title.setTextColor(Color.rgb(105, 165, 255));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), wrap());
+        lp.topMargin = dp(20);
+        lp.bottomMargin = dp(6);
+        parent.addView(title, lp);
+    }
+
+    @NonNull
+    private GridSlider addGridSlider(@NonNull LinearLayout parent, @NonNull String title,
+                                     int minimum, int maximum, int initial,
+                                     @NonNull String suffix,
+                                     @NonNull IntSelection selection) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView label = text(15, false);
+        label.setText(title);
+        SeekBar seek = new SeekBar(this);
+        seek.setMax(maximum - minimum);
+        TextView value = text(14, true);
+        value.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        GridSlider result = new GridSlider(seek, value, minimum, maximum, suffix);
+        seek.setProgress(Math.max(0, Math.min(maximum - minimum, initial - minimum)));
+        value.setText(initial + suffix);
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress,
+                                                    boolean fromUser) {
+                int selected = minimum + progress;
+                value.setText(selected + suffix);
+                if (!fromUser || syncingControls) return;
+                int actual = selection.select(selected);
+                if (actual != selected) {
+                    result.setValue(actual);
+                    value.setText(actual + suffix + " · нет места");
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        row.addView(label, new LinearLayout.LayoutParams(dp(105), dp(44)));
+        row.addView(seek, new LinearLayout.LayoutParams(0, dp(44), 1f));
+        row.addView(value, new LinearLayout.LayoutParams(dp(112), dp(44)));
+        parent.addView(row, new LinearLayout.LayoutParams(match(), dp(44)));
+        return result;
     }
 
     private void chooseKindForNew() {
@@ -670,6 +1282,9 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         LinearLayout form = dialogForm();
         EditText title = field("Название", value.title);
         form.addView(title);
+        LauncherActionsGridConfig openedGrid = requireGridConfig();
+        LauncherActionsGridConfig.Placement openedPlacement =
+                openedGrid.placement(value.id);
 
         TextView iconLabel = formLabel("Иконка");
         form.addView(iconLabel);
@@ -707,9 +1322,17 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
             form.addView(showState);
         }
 
-        SeekValue iconSize = seek(form, "Размер иконки", 24, 180, value.iconSizePx, " px");
-        SeekValue width = seek(form, "Ширина плитки", 1, 4, value.columnSpan, " яч.");
-        SeekValue height = seek(form, "Высота плитки", 1, 4, value.rowSpan, " яч.");
+        SeekValue iconSize = seek(form, "Размер иконки",
+                LauncherShortcutStore.MIN_ICON_SIZE_PX,
+                LauncherShortcutStore.MAX_ICON_SIZE_PX, value.iconSizePx, " px");
+        int initialWidth = openedPlacement == null
+                ? value.columnSpan : openedPlacement.columnSpan;
+        int initialHeight = openedPlacement == null
+                ? value.rowSpan : openedPlacement.rowSpan;
+        SeekValue width = seek(form, "Ширина плитки", 1, openedGrid.columns,
+                initialWidth, " яч.");
+        SeekValue height = seek(form, "Высота плитки", 1, openedGrid.rows,
+                initialHeight, " яч.");
         MaterialSwitch showTitle = new MaterialSwitch(this);
         showTitle.setText("Показывать название");
         showTitle.setChecked(value.showTitle);
@@ -737,12 +1360,44 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
                         value.showState = showState.isChecked();
                     }
                     value.iconSizePx = iconSize.value;
-                    value.columnSpan = width.value;
-                    value.rowSpan = height.value;
                     value.showTitle = showTitle.isChecked();
                     value.enabled = enabled.isChecked();
+
+                    // Re-read the grid at commit time. The actual HOME editor may have changed
+                    // position while this Activity was stopped, and an old dialog object must
+                    // never write those coordinates back.
+                    store.load();
+                    LauncherActionsGridConfig latestGrid = gridStore.load(store.all());
+                    LauncherActionsGridConfig.Placement latestPlacement =
+                            latestGrid.placement(value.id);
+                    boolean spanAccepted = true;
+                    if (latestPlacement == null) {
+                        // A brand-new shortcut is reconciled immediately after its definition is
+                        // saved; these legacy fields seed that first stable placement.
+                        value.columnSpan = width.value;
+                        value.rowSpan = height.value;
+                    } else {
+                        boolean unchanged = latestPlacement.columnSpan == width.value
+                                && latestPlacement.rowSpan == height.value;
+                        spanAccepted = unchanged || latestGrid.setPlacement(value.id,
+                                latestPlacement.column, latestPlacement.row,
+                                width.value, height.value);
+                        LauncherActionsGridConfig.Placement actual =
+                                latestGrid.placement(value.id);
+                        value.columnSpan = actual == null
+                                ? latestPlacement.columnSpan : actual.columnSpan;
+                        value.rowSpan = actual == null
+                                ? latestPlacement.rowSpan : actual.rowSpan;
+                        gridStore.save(latestGrid);
+                        gridConfig = latestGrid;
+                    }
                     store.upsert(value);
                     refresh();
+                    if (!spanAccepted) {
+                        Toast.makeText(this,
+                                "Для такого размера нет свободного места — сохранён прежний",
+                                Toast.LENGTH_LONG).show();
+                    }
                 }).setNegativeButton(android.R.string.cancel, null).show();
     }
 
@@ -936,6 +1591,33 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         ColorSelection(@NonNull String value, @NonNull MaterialButton button) {
             this.value = value;
             this.button = button;
+        }
+    }
+
+    private interface IntSelection {
+        int select(int value);
+    }
+
+    private static final class GridSlider {
+        @NonNull final SeekBar seek;
+        @NonNull final TextView value;
+        final int minimum;
+        final int maximum;
+        @NonNull final String suffix;
+
+        GridSlider(@NonNull SeekBar seek, @NonNull TextView value,
+                   int minimum, int maximum, @NonNull String suffix) {
+            this.seek = seek;
+            this.value = value;
+            this.minimum = minimum;
+            this.maximum = maximum;
+            this.suffix = suffix;
+        }
+
+        void setValue(int selected) {
+            int actual = Math.max(minimum, Math.min(maximum, selected));
+            seek.setProgress(actual - minimum);
+            value.setText(actual + suffix);
         }
     }
 
