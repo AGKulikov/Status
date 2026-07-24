@@ -24,6 +24,82 @@ public final class MediaStateFreshnessTest {
         assertFalse(MediaStateFreshness.incomingWins(899L, 900L));
     }
 
+    @Test public void correlatedBroadcastTrackCannotBeRolledBackByLaterStaleSessionPoll() {
+        // Broadcast has advanced A -> B at t=200. The OEM MediaSession briefly reported B and
+        // then regressed to A at t=300. Its later observation time must not resurrect A.
+        assertTrue(MediaStateFreshness.broadcastContentWins(
+                false, true, 10_000L, 2_000L, 200L, 300L));
+        // A disk snapshot seen before the sources ever agreed is not granted sticky authority.
+        assertFalse(MediaStateFreshness.broadcastContentWins(
+                false, false, 10_000L, 2_000L, 200L, 300L));
+    }
+
+    @Test public void staleCorrelatedBroadcastReleasesNewerSessionTrackAfterGrace() {
+        assertFalse(MediaStateFreshness.broadcastContentWins(
+                false, true, 10_001L, 2_000L, 200L, 300L));
+        // A genuinely newer broadcast content event still wins by its normal change clock.
+        assertTrue(MediaStateFreshness.broadcastContentWins(
+                false, true, 20_000L, 2_000L, 400L, 300L));
+    }
+
+    @Test public void matchingSourcesStillUseTheirRealContentChangeClocks() {
+        assertTrue(MediaStateFreshness.broadcastContentWins(
+                true, true, 10_000L, 10_000L, 300L, 200L));
+        assertFalse(MediaStateFreshness.broadcastContentWins(
+                true, true, 10_000L, 10_000L, 200L, 300L));
+        assertFalse(MediaStateFreshness.broadcastContentWins(
+                true, true, 10_000L, 10_000L, 300L, 300L));
+    }
+
+    @Test public void packageMismatchCanCorrelateFromStrongMatchingMetadata() {
+        assertTrue(MediaStateFreshness.sameTrackMetadata(
+                "Track", "Artist", "Album", "Track", "Artist", "Album"));
+        assertTrue(MediaStateFreshness.hasSharedTrackEvidence(
+                "Track", "", "", "Track", "Artist", "Album"));
+        assertTrue(MediaStateFreshness.hasSharedTrackEvidence(
+                "", "Artist", "Album", "", "Artist", "Album"));
+    }
+
+    @Test public void emptyOrWeakMetadataCannotCorrelateUnrelatedSessions() {
+        assertFalse(MediaStateFreshness.hasSharedTrackEvidence(
+                "", "", "", "", "", ""));
+        assertFalse(MediaStateFreshness.hasSharedTrackEvidence(
+                "", "Artist", "", "", "Artist", ""));
+        assertFalse(MediaStateFreshness.sameTrackMetadata(
+                "Track A", "Artist", "Album", "Track B", "Artist", "Album"));
+    }
+
+    @Test public void broadcastCorrelationEndsOnClearExpiryOrPublisherChange() {
+        assertTrue(MediaStateFreshness.shouldResetBroadcastCorrelation(
+                true, "publisher.a", false, ""));
+        assertTrue(MediaStateFreshness.shouldResetBroadcastCorrelation(
+                true, "publisher.a", true, "publisher.b"));
+        assertTrue(MediaStateFreshness.shouldResetBroadcastCorrelation(
+                false, "", true, "publisher.a"));
+        assertFalse(MediaStateFreshness.shouldResetBroadcastCorrelation(
+                true, "publisher.a", true, "publisher.a"));
+    }
+
+    @Test public void equivalentSameTrackArtworkKeepsPublishedWrapper() {
+        assertTrue(MediaStateFreshness.shouldReuseBroadcastArtwork(
+                true, true, 101L, true, 101L));
+        assertFalse(MediaStateFreshness.shouldReuseBroadcastArtwork(
+                false, true, 101L, true, 101L));
+        assertFalse(MediaStateFreshness.shouldReuseBroadcastArtwork(
+                true, true, 101L, true, 102L));
+        assertFalse(MediaStateFreshness.shouldReuseBroadcastArtwork(
+                true, true, 0L, true, 0L));
+        assertFalse(MediaStateFreshness.shouldReuseBroadcastArtwork(
+                true, false, 101L, true, 101L));
+    }
+
+    @Test public void activeCurrentMediaSessionSurvivesVendorListReordering() {
+        assertTrue(MediaStateFreshness.shouldKeepCurrentSession(true, true, true));
+        assertTrue(MediaStateFreshness.shouldKeepCurrentSession(true, false, false));
+        assertFalse(MediaStateFreshness.shouldKeepCurrentSession(true, false, true));
+        assertFalse(MediaStateFreshness.shouldKeepCurrentSession(false, false, true));
+    }
+
     @Test public void missingOptionalMetadataCanSupplementOnlyTheSameTitle() {
         assertTrue(MediaStateFreshness.sameTrack(
                 "ru.yandex.music", "Track", "", "",

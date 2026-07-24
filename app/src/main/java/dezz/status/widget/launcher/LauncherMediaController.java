@@ -163,6 +163,11 @@ public final class LauncherMediaController {
     @Nullable private MediaController current;
     @Nullable private MediaState sessionState;
     @Nullable private MediaState broadcastState;
+    /**
+     * True after the current MediaSession and mHUD stream have described the same player.
+     * Kept across track transitions so a lagging OEM session cannot pull the panel backwards.
+     */
+    private boolean sessionBroadcastCorrelated;
     private boolean started;
     private boolean receiverRegistered;
     private boolean sessionsListenerRegistered;
@@ -623,9 +628,40 @@ public final class LauncherMediaController {
 
     private void replaceBroadcastState(@Nullable MediaState next) {
         MediaState previous = broadcastState;
+        boolean resetCorrelation = MediaStateFreshness.shouldResetBroadcastCorrelation(
+                previous != null, previous == null ? "" : previous.packageName,
+                next != null, next == null ? "" : next.packageName);
+        if (resetCorrelation) sessionBroadcastCorrelated = false;
+
+        Bitmap previousArtwork = previous == null ? null : previous.artwork;
+        Bitmap incomingArtwork = next == null ? null : next.artwork;
+        Bitmap duplicateArtwork = null;
+        if (!resetCorrelation && previous != null && next != null
+                && incomingArtwork != previousArtwork
+                && MediaStateFreshness.shouldReuseBroadcastArtwork(
+                        sameTrack(previous, next),
+                        previousArtwork != null && !previousArtwork.isRecycled(),
+                        previous.artworkIdentity,
+                        incomingArtwork != null && !incomingArtwork.isRecycled(),
+                        next.artworkIdentity)) {
+            duplicateArtwork = incomingArtwork;
+            // Keep the wrapper already owned by the visible snapshot. A one-second cache decode
+            // can produce a different Bitmap object with identical pixels; swapping wrappers and
+            // recycling the old one would invalidate a UI that correctly skipped the no-op bind.
+            next = new MediaState(next.title, next.artist, next.album,
+                    next.packageName, next.application, previousArtwork,
+                    previous.artworkIdentity, next.durationMs, next.positionMs, next.playing,
+                    next.positionTimestampWallMs, next.receivedElapsedMs,
+                    next.contentChangedElapsedMs, next.playbackChangedElapsedMs,
+                    next.artworkChangedElapsedMs);
+        }
+
         broadcastState = next;
         scheduleBroadcastExpiry();
-        Bitmap obsolete = previous == null ? null : previous.artwork;
+        if (duplicateArtwork != null && !duplicateArtwork.isRecycled()) {
+            duplicateArtwork.recycle();
+        }
+        Bitmap obsolete = previousArtwork;
         if (obsolete == null || (next != null && obsolete == next.artwork)
                 || obsolete.isRecycled()) return;
         // Publish replaces the ImageView bitmap in the same main-loop turn. Recycling one turn
@@ -638,7 +674,10 @@ public final class LauncherMediaController {
     }
 
     private void select(@NonNull List<MediaController> controllers) {
-        MediaController selected = null;
+        MediaController first = null;
+        MediaController firstPlaying = null;
+        MediaController retained = null;
+        boolean retainedPlaying = false;
         try {
             for (MediaController candidate : controllers) {
                 if (candidate == null) continue;
@@ -648,15 +687,22 @@ public final class LauncherMediaController {
                 } catch (RuntimeException ignored) {
                     continue;
                 }
-                if (playback != null && playback.getState() == PlaybackState.STATE_PLAYING) {
-                    selected = candidate;
-                    break;
+                if (first == null) first = candidate;
+                boolean playing = playback != null
+                        && playback.getState() == PlaybackState.STATE_PLAYING;
+                if (playing && firstPlaying == null) firstPlaying = candidate;
+                if (sameSession(current, candidate)) {
+                    retained = candidate;
+                    retainedPlaying = playing;
                 }
-                if (selected == null) selected = candidate;
             }
         } catch (RuntimeException ignored) {
             // Keep the best controller found before an OEM list/binder failed.
         }
+        boolean keepCurrent = MediaStateFreshness.shouldKeepCurrentSession(
+                retained != null, retainedPlaying, firstPlaying != null);
+        MediaController selected = keepCurrent ? retained
+                : firstPlaying != null ? firstPlaying : first;
         replace(selected);
         publishSession();
     }
@@ -670,6 +716,10 @@ public final class LauncherMediaController {
         // Publish callbacks can be dispatched synchronously by vendor implementations. Expose the
         // new controller before registering so such a callback never reads the old session.
         current = next;
+        // Yandex may rotate between several tokens owned by the same package during a track
+        // handoff. Preserve the proven broadcast relationship across that rotation, but never
+        // leak it to a genuinely different player.
+        if (!sameControllerPackage(previous, next)) sessionBroadcastCorrelated = false;
         if (previous != null) {
             try { previous.unregisterCallback(mediaCallback); }
             catch (RuntimeException ignored) {}
@@ -686,6 +736,17 @@ public final class LauncherMediaController {
         if (left == null || right == null) return false;
         try {
             return left.getSessionToken().equals(right.getSessionToken());
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    private static boolean sameControllerPackage(@Nullable MediaController left,
+                                                 @Nullable MediaController right) {
+        if (left == null || right == null) return false;
+        try {
+            return samePackage(cleanText(left.getPackageName()),
+                    cleanText(right.getPackageName()));
         } catch (RuntimeException ignored) {
             return false;
         }
@@ -778,23 +839,41 @@ public final class LauncherMediaController {
         } else if (broadcast == null) {
             publish(session, null, session, session, session, volume);
             return;
-        } else if (samePackage(session.packageName, broadcast.packageName)) {
-            MediaState content = broadcast.contentChangedElapsedMs
-                    > session.contentChangedElapsedMs ? broadcast : session;
+        }
+
+        boolean packageMatches = samePackage(session.packageName, broadcast.packageName);
+        boolean metadataMatches = MediaStateFreshness.sameTrackMetadata(
+                session.title, session.artist, session.album,
+                broadcast.title, broadcast.artist, broadcast.album);
+        boolean sharedTrackEvidence = MediaStateFreshness.hasSharedTrackEvidence(
+                session.title, session.artist, session.album,
+                broadcast.title, broadcast.artist, broadcast.album);
+        if (metadataMatches && sharedTrackEvidence) {
+            sessionBroadcastCorrelated = true;
+        }
+        if (packageMatches || sessionBroadcastCorrelated) {
+            boolean tracksMatch = sameCorrelatedTrack(session, broadcast);
+            MediaState content = MediaStateFreshness.broadcastContentWins(
+                    tracksMatch, sessionBroadcastCorrelated,
+                    SystemClock.elapsedRealtime(), broadcast.receivedElapsedMs,
+                    broadcast.contentChangedElapsedMs,
+                    session.contentChangedElapsedMs) ? broadcast : session;
             MediaState supplement = content == broadcast ? session : broadcast;
             MediaState playback = broadcast.playbackChangedElapsedMs
                     > session.playbackChangedElapsedMs ? broadcast : session;
-            MediaState sessionArtwork = sameTrack(content, session) ? session : content;
-            MediaState broadcastArtwork = sameTrack(content, broadcast) ? broadcast : content;
+            MediaState sessionArtwork = sameCorrelatedTrack(content, session)
+                    ? session : content;
+            MediaState broadcastArtwork = sameCorrelatedTrack(content, broadcast)
+                    ? broadcast : content;
             MediaState artwork = MediaStateFreshness.incomingArtworkWins(
                     broadcastArtwork.artwork != null, broadcastArtwork.artworkChangedElapsedMs,
                     sessionArtwork.artwork != null, sessionArtwork.artworkChangedElapsedMs)
                     ? broadcastArtwork : sessionArtwork;
             MediaState timeline = broadcast.receivedElapsedMs
                     > session.receivedElapsedMs ? broadcast : session;
-            if (!sameTrack(content, playback)) playback = content;
-            if (!sameTrack(content, timeline)) timeline = content;
-            if (!sameTrack(content, supplement)) supplement = null;
+            if (!sameCorrelatedTrack(content, playback)) playback = content;
+            if (!sameCorrelatedTrack(content, timeline)) timeline = content;
+            if (!sameCorrelatedTrack(content, supplement)) supplement = null;
             publish(content, supplement, playback, artwork, timeline, volume);
             return;
         }
@@ -966,6 +1045,12 @@ public final class LauncherMediaController {
     private static boolean sameTrack(@NonNull MediaState left, @NonNull MediaState right) {
         return MediaStateFreshness.sameTrack(left.packageName, left.title, left.artist, left.album,
                 right.packageName, right.title, right.artist, right.album);
+    }
+
+    private boolean sameCorrelatedTrack(@NonNull MediaState left, @NonNull MediaState right) {
+        if (samePackage(left.packageName, right.packageName)) return sameTrack(left, right);
+        return sessionBroadcastCorrelated && MediaStateFreshness.sameTrackMetadata(
+                left.title, left.artist, left.album, right.title, right.artist, right.album);
     }
 
     @Nullable
