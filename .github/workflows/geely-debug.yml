@@ -6,12 +6,13 @@ on:
     branches:
       - main
       - 'rewrite/**'
+      - 'feature/ha1080-actions-phone'
   pull_request:
 
-# A feature branch with an open PR must produce one build, not an identical push build followed
-# by a pull-request build. A newer revision supersedes a queued/running revision of that branch.
+# Keep each event's newer revision authoritative. Event isolation prevents the one-time HA1080
+# push release from being cancelled by the simultaneous pull-request verification.
 concurrency:
-  group: geely-debug-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  group: geely-debug-${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -106,7 +107,7 @@ jobs:
   # with a read-only token, while the write-token job only verifies and publishes that artifact.
   build-ha1080-release:
     needs: build
-    if: github.event_name == 'pull_request' && github.head_ref == 'feature/ha1080-actions-phone' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/ha1080-actions-phone' && github.repository == 'AGKulikov/Status'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -116,7 +117,7 @@ jobs:
       - name: Checkout exact HA1080 source
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
 
       - name: Set up Java 21
         uses: actions/setup-java@v4
@@ -149,7 +150,7 @@ jobs:
 
       - name: Build and verify exact HA1080 release
         env:
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ github.sha }}
           VERSION_NAME: v2.8.2-ha1080
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -193,7 +194,7 @@ jobs:
 
   publish-ha1080:
     needs: build-ha1080-release
-    if: github.event_name == 'pull_request' && github.head_ref == 'feature/ha1080-actions-phone' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/ha1080-actions-phone' && github.repository == 'AGKulikov/Status'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -209,7 +210,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ github.sha }}
           RELEASE_TAG: v2.8.2-ha1080
         shell: bash
         run: |
