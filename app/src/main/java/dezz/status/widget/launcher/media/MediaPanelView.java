@@ -39,6 +39,7 @@ import androidx.core.content.ContextCompat;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import dezz.status.widget.R;
 import dezz.status.widget.launcher.LauncherMediaController;
 import dezz.status.widget.launcher.MediaTimeline;
 
