@@ -86,6 +86,18 @@ public final class SettingsBackNavigationContractTest {
             "VisualBrickEditorActivity.java"
     };
 
+    private static final String[][] PROGRAMMATIC_BACK_LABELS = {
+            {"AutomationSettingsActivity.java", "Button back = button(\"‹\")"},
+            {"HomeAssistantSettingsActivity.java", "back.setText(\"‹\")"},
+            {"IntentScenarioSettingsActivity.java", "back.setText(\"‹\")"},
+            {"LauncherShortcutSettingsActivity.java", "back.setText(\"←  Назад\")"},
+            {"MqttSettingsActivity.java", "back.setText(\"‹\")"},
+            {"PopupSettingsActivity.java", "Button back = button(\"‹\")"},
+            {"ScenarioSettingsActivity.java", "back.setText(\"‹\")"},
+            {"SprutHubSettingsActivity.java", "back.setText(\"‹\")"},
+            {"VisualBrickEditorActivity.java", "Button back = button(\"‹\")"}
+    };
+
     @Test
     public void everyProgrammaticDetailHasSharedOrExplicitBackControl() throws IOException {
         for (String screen : SHARED_CHROME_DETAILS) {
@@ -137,6 +149,14 @@ public final class SettingsBackNavigationContractTest {
             String source = javaSource(screen);
             assertFalse(screen + " must rely on the one shared Back control",
                     source.contains("setText(\"←  Назад\")"));
+        }
+    }
+
+    @Test
+    public void programmaticBackControlsAlwaysHaveAVisibleLabel() throws IOException {
+        for (String[] contract : PROGRAMMATIC_BACK_LABELS) {
+            assertTrue(contract[0] + " must render a visible Back glyph or label",
+                    javaSource(contract[0]).contains(contract[1]));
         }
     }
 
