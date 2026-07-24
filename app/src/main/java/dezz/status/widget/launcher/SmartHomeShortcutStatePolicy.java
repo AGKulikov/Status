@@ -68,15 +68,20 @@ public final class SmartHomeShortcutStatePolicy {
                                      @Nullable IntentActionRule rule,
                                      @Nullable ConnectorValue value) {
         SourceBinding binding = bindingFor(shortcut, rule);
-        if (!matches(binding, value)) value = null;
         return resolveValue(shortcut, rule, binding, value);
     }
 
+    /**
+     * Resolves a value against an already selected display binding. Callers that have access to
+     * the full Sprut catalog use this overload so a cover command can target TargetDoorState
+     * while its icon continues to display CurrentDoorState.
+     */
     @NonNull
-    private static State resolveValue(LauncherShortcutStore.Shortcut shortcut,
-                                      @Nullable IntentActionRule rule,
-                                      @Nullable SourceBinding binding,
-                                      @Nullable ConnectorValue value) {
+    public static State resolveValue(@NonNull LauncherShortcutStore.Shortcut shortcut,
+                                     @Nullable IntentActionRule rule,
+                                     @Nullable SourceBinding binding,
+                                     @Nullable ConnectorValue value) {
+        if (!matches(binding, value)) value = null;
         String icon = semanticIcon(shortcut, rule, binding, value);
         if (value == null) {
             return new State(icon, "…", false, false, false, false, false);

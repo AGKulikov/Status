@@ -79,6 +79,7 @@ import dezz.status.widget.launcher.LauncherSafeAreaPolicy;
 import dezz.status.widget.launcher.LauncherSafeAreaResolver;
 import dezz.status.widget.launcher.NavigationDataRepository;
 import dezz.status.widget.launcher.SingleFlightRefresh;
+import dezz.status.widget.launcher.SmartHomeShortcutStateBindingPolicy;
 import dezz.status.widget.launcher.SmartHomeShortcutStatePolicy;
 import dezz.status.widget.launcher.YandexWindowLauncher;
 import dezz.status.widget.launcher.apps.FavoriteAppConfig;
@@ -108,6 +109,7 @@ import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.scenario.IntentActionRule;
 import dezz.status.widget.scenario.IntentActionRuleStore;
+import dezz.status.widget.sprut.SprutHubController;
 
 /** Full HOME implementation that coexists with the original Status Widget settings activity. */
 public final class LauncherActivity extends AppCompatActivity {
@@ -1556,11 +1558,13 @@ public final class LauncherActivity extends AppCompatActivity {
     private void applySmartHomeState(@NonNull ShortcutTileBinding binding) {
         LauncherShortcutStore.Shortcut shortcut = binding.shortcut;
         IntentActionRule rule = smartHomeRules.get(shortcut.target);
-        SourceBinding source = SmartHomeShortcutStatePolicy.bindingFor(shortcut, rule);
+        SprutHubController sprut = SprutHubController.active();
+        SourceBinding source = SmartHomeShortcutStateBindingPolicy.resolve(shortcut, rule,
+                sprut == null ? null : sprut.catalog());
         ConnectorValue value = source == null ? null
                 : smartHomeValueIndex.get(smartHomeValueKey(source));
         SmartHomeShortcutStatePolicy.State state =
-                SmartHomeShortcutStatePolicy.resolveValue(shortcut, rule, value);
+                SmartHomeShortcutStatePolicy.resolveValue(shortcut, rule, source, value);
         boolean active = state.present && state.fresh && state.available
                 && state.activeKnown && state.active;
         String background = active

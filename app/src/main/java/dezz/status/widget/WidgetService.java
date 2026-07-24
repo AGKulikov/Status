@@ -951,12 +951,13 @@ public class WidgetService extends Service {
         // before addView since the listener captures touches once attached).
         setupDragListener();
 
-        // Initialize params and addView BEFORE applyPreferences. The first applyPreferences()
-        // call inside this method walks through applyBrickVisibility / beginVisibilityTransition
-        // which expects to expand the window via WindowManager.updateViewLayout — that requires
-        // params and the view to be attached. Doing applyPreferences before addView used to
-        // leave pendingBufferedTransitions stuck at 1 forever, which suppressed every later
-        // shrink-side buffer pre-empt and made content-shrink animations clip their right edge.
+        // Build the WindowManager params, then normalize every layout-affecting preference before
+        // addView. The XML intentionally uses conspicuous 100sp preview sizes for time and status
+        // icons; attaching that raw tree lets some Android 9 vendor WindowManagers retain the
+        // oversized first measurement until a later MediaSession requestLayout. That is why the
+        // row used to look tall after boot and suddenly become normal when the first song arrived.
+        // applyBrickVisibility/applyBrickTarget explicitly suppress transitions while detached,
+        // so this preflight cannot strand the buffered-transition counter.
         boolean statusBar = prefs.widgetMode.get() == WIDGET_MODE_STATUS_BAR;
         params = new WindowManager.LayoutParams(
                 statusBar
@@ -976,6 +977,7 @@ public class WidgetService extends Service {
         params.windowAnimations = 0;
 
         overlayAttached = false;
+        prepareOverlayGeometryBeforeAttach();
         try {
             windowManager.addView(binding.getRoot(), params);
         } catch (Exception e) {
@@ -1011,6 +1013,51 @@ public class WidgetService extends Service {
                 .setDuration(OVERLAY_FADE_DURATION_MS)
                 .start();
         scheduleInitialIntegrationStartupAfterFrame();
+    }
+
+    /**
+     * Applies only values that can affect the overlay's first measurement.
+     *
+     * <p>This deliberately runs before {@link WindowManager#addView(View,
+     * ViewGroup.LayoutParams)} and does not start listeners/integrations. The normal
+     * {@link #applyPreferences(boolean)} pass still runs immediately after attach and remains the
+     * single owner of those lifecycle side effects.</p>
+     */
+    private void prepareOverlayGeometryBeforeAttach() {
+        // HA tiles contribute to the configured height floor too. Load their lightweight
+        // persisted descriptors now so even an OEM WindowManager that measures synchronously
+        // inside addView() sees the same tree as the normal post-attach preference pass.
+        if (haConfigs != null) configuredMainBricks = haConfigs.loadMain();
+        updateThemedContext();
+        updateDateTime();
+
+        List<BrickType> bricks = BrickType.parseOrder(prefs.brickOrder.get());
+        Set<BrickType> bricksSet = EnumSet.noneOf(BrickType.class);
+        bricksSet.addAll(bricks);
+
+        // No child transition may start against a tree that WindowManager does not own yet.
+        binding.overlayContainer.setLayoutTransition(null);
+        reorderBricks(bricks);
+        applyTimeBrickSettings();
+        applyDateBrickSettings();
+        applyMediaBrickSettings();
+        applyWifiBrickSettings();
+        applyGpsBrickSettings();
+        applyBluetoothBrickSettings();
+        applyIndoorTempBrickSettings();
+        applyOutdoorTempBrickSettings();
+        renderHomeAssistantBricks(true);
+        applyBrickVisibility(bricksSet);
+
+        binding.overlayContainer.setPadding(
+                prefs.paddingLeft.get(),
+                prefs.paddingTop.get(),
+                prefs.paddingRight.get(),
+                prefs.paddingBottom.get());
+        int verticalPadding = binding.overlayContainer.getPaddingTop()
+                + binding.overlayContainer.getPaddingBottom();
+        binding.overlayContainer.setMinimumHeight(
+                computeMinWidgetHeight(bricksSet) + verticalPadding);
     }
 
     private void removeStatusOverlaySafely(@NonNull String reason) {
@@ -1749,6 +1796,19 @@ public class WidgetService extends Service {
         binding.mediaDurationText.setOutlineColor(textOutlineColor(prefs.media.durationOutlineAlpha.get()));
         binding.mediaDurationText.setOutlineWidth(prefs.media.durationOutlineWidth.get());
         binding.mediaDurationText.setAlpha(prefs.media.durationContentAlpha.get() / 255f);
+        // An empty TextView still contributes its font line-box to the title row even though it
+        // draws no characters. Before the first MediaSession callback that made the status row
+        // measure against the (often larger) duration font, then shrink as soon as
+        // updateMediaInfo() finally honoured "show duration = off". Keep an empty field gone;
+        // an active track with a known duration is left alone and updateMediaInfo() remains the
+        // sole place that promotes the field back to VISIBLE.
+        if (!prefs.media.showDuration.get()
+                || TextUtils.isEmpty(binding.mediaDurationText.getText())) {
+            binding.mediaDurationText.setVisibility(View.GONE);
+        }
+        if (!prefs.media.progressBarEnabled.get() || lastMediaSubtitle == null) {
+            binding.mediaProgressBar.setVisibility(View.GONE);
+        }
 
         applyHorizontalMargins(binding.mediaContainer, prefs.media.marginStart.get(), prefs.media.marginEnd.get());
         binding.mediaContainer.setTranslationY(prefs.media.adjustY.get());
@@ -1765,7 +1825,9 @@ public class WidgetService extends Service {
         // Vertical gap between the two lines, applied as the title row's top margin.
         LinearLayout.LayoutParams titleLp =
                 (LinearLayout.LayoutParams) binding.mediaTitleRow.getLayoutParams();
-        titleLp.topMargin = prefs.media.lineGap.get();
+        // With the source row disabled there is no pair of lines to separate. Keeping the
+        // configured gap on the first/only title row made it an invisible top spacer.
+        titleLp.topMargin = prefs.media.showSource.get() ? prefs.media.lineGap.get() : 0;
         binding.mediaTitleRow.setLayoutParams(titleLp);
     }
 
@@ -2015,14 +2077,11 @@ public class WidgetService extends Service {
         if (mediaTarget.view.getVisibility() != mediaTarget.visibility) {
             visibilityFlips.add(mediaTarget);
             if (mediaTarget.visibility == View.VISIBLE) expanding = true;
-        } else if (mediaTarget.visibility == View.VISIBLE && !mediaShouldBeGone
-                && !mediaHiddenByApp) {
-            // media stays visible — just bring metadata up to date (also might tweak its
-            // alpha via the brick target below).
-            updateMediaInfo();
         }
+        boolean refreshVisibleMedia = mediaTarget.visibility == View.VISIBLE
+                && !mediaShouldBeGone && !mediaHiddenByApp;
 
-        if (!visibilityFlips.isEmpty()) {
+        if (!visibilityFlips.isEmpty() && overlayAttached) {
             // Scene root for TransitionManager is the INNER container — the outer FrameLayout
             // gets resized to a screen-width buffer via WindowManager, and we want the
             // transition to play inside the stable inner LinearLayout, not chase the buffer.
@@ -2032,9 +2091,18 @@ public class WidgetService extends Service {
         // Apply all targets. For visibility flips Fade transition handles the alpha animation;
         // for alpha-only ones we run an explicit ViewPropertyAnimator.
         for (BrickTarget t : targets) {
-            applyBrickTarget(t, visibilityFlips.contains(t));
+            applyBrickTarget(t, overlayAttached && visibilityFlips.contains(t));
         }
-        applyBrickTarget(mediaTarget, visibilityFlips.contains(mediaTarget));
+        applyBrickTarget(mediaTarget,
+                overlayAttached && visibilityFlips.contains(mediaTarget));
+        // Populate the media rows on the very frame in which the brick becomes visible. The old
+        // path refreshed only VISIBLE→VISIBLE; GONE→VISIBLE exposed the XML bootstrap state
+        // (state icon plus an empty-but-measurable duration TextView) until the next player
+        // callback. Depending on when Yandex Music published metadata, that could last seconds
+        // after boot and then visibly change the status-row height.
+        if (refreshVisibleMedia) {
+            updateMediaInfo();
+        }
 
         // Per-brick alpha not covered by the Fade transition (keep-space VISIBLE→VISIBLE).
         // The bricks in alphaOnly might still want a visible-alpha update if contentAlpha
@@ -2155,6 +2223,16 @@ public class WidgetService extends Service {
      * we animate alpha explicitly.
      */
     private void applyBrickTarget(BrickTarget target, boolean handledByTransition) {
+        if (!overlayAttached) {
+            // Pre-addView geometry normalization must be synchronous and final: animators on a
+            // detached tree can preserve the XML alpha/visibility into its first attached frame.
+            target.view.animate().cancel();
+            target.view.setVisibility(target.visibility);
+            if (target.visibility == View.VISIBLE) {
+                target.view.setAlpha(target.visibleAlpha);
+            }
+            return;
+        }
         if (target.visibility == View.GONE) {
             target.view.animate().cancel();
             target.view.setVisibility(View.GONE);
@@ -2306,14 +2384,31 @@ public class WidgetService extends Service {
             h = Math.max(h, textLineHeight(binding.dateText, prefs.date.fontSize.get()) * lines);
         }
         if (bricks.contains(BrickType.MEDIA)) {
-            // Source and title can have different font sizes now, so sum them up properly when
-            // both lines are shown; otherwise just the title line.
+            // Reserve the complete configured media geometry even before the first track
+            // arrives. Duration and progress are metadata-dependent children: if they are not
+            // included in this floor, the WindowManager's WRAP_CONTENT status window can change
+            // height when the first MediaSession snapshot populates them.
             int titleHeight = textLineHeight(binding.mediaTitleText, prefs.media.fontSize.get());
-            int mediaHeight = titleHeight;
+            int titleRowHeight = titleHeight;
+            if (prefs.media.showDuration.get()) {
+                titleRowHeight = Math.max(titleRowHeight, textLineHeight(
+                        binding.mediaDurationText, prefs.media.durationFontSize.get()));
+            }
+            int mediaHeight = titleRowHeight;
             if (prefs.media.showSource.get()) {
                 int sourceHeight = textLineHeight(binding.mediaAppText,
                         prefs.media.sourceFontSize.get());
-                mediaHeight = sourceHeight + titleHeight + prefs.media.lineGap.get();
+                mediaHeight = sourceHeight + titleRowHeight + prefs.media.lineGap.get();
+            }
+            if (prefs.media.progressBarEnabled.get()) {
+                ViewGroup.LayoutParams raw = binding.mediaProgressBar.getLayoutParams();
+                int progressHeight = Math.max(0, raw.height);
+                if (raw instanceof ViewGroup.MarginLayoutParams) {
+                    ViewGroup.MarginLayoutParams margins = (ViewGroup.MarginLayoutParams) raw;
+                    progressHeight += Math.max(0, margins.topMargin)
+                            + Math.max(0, margins.bottomMargin);
+                }
+                mediaHeight += progressHeight;
             }
             h = Math.max(h, mediaHeight);
         }
