@@ -514,8 +514,8 @@ public class AboutActivity extends AppCompatActivity {
         WidgetService running = WidgetService.getInstance();
         if (running != null) {
             running.applyPreferences();
-        } else if (prefs.widgetEnabled.get() && Permissions.allPermissionsGranted(this)) {
-            startForegroundService(new Intent(this, WidgetService.class));
+        } else {
+            WidgetServiceStarter.startIfNeeded(this);
         }
     }
 
