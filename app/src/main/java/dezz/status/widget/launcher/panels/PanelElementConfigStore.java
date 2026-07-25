@@ -25,7 +25,7 @@ import dezz.status.widget.Preferences;
 import dezz.status.widget.launcher.LauncherLayoutStore;
 
 /**
- * Versioned configuration for functional elements inside the simple HOME panels. Outer panel
+ * Versioned configuration for functional elements inside simple HOME blocks. Outer block
  * rectangles remain in {@link LauncherLayoutStore}; media and climate keep their richer stores.
  */
 public final class PanelElementConfigStore {

@@ -72,7 +72,7 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
         carIntegration = CarIntegrations.get(this);
         setTitle(driverPanelMode
                 ? "Информационные плитки панели водителя"
-                : "Панель «Информация»");
+                : "Блок «Информация»");
         View screen = buildScreen();
         setContentView(screen);
         SettingsBackNavigation.install(this, screen);
@@ -105,7 +105,7 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
         controlsScroll.addView(controls, new ScrollView.LayoutParams(match(), wrap()));
         TextView title = text(driverPanelMode
                 ? "Информационные плитки"
-                : "Панель «Информация»", 25, true);
+                : "Блок «Информация»", 25, true);
         controls.addView(title);
         TextView hint = text(driverPanelMode
                 ? "Неограниченные плитки часов, Bluetooth, Wi‑Fi, автомобиля и умного дома. "
@@ -118,7 +118,7 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
 
         if (!driverPanelMode) {
             MaterialSwitch visible = new MaterialSwitch(this);
-            visible.setText("Показывать панель на HOME");
+            visible.setText("Показывать блок на HOME");
             visible.setTextSize(16);
             visible.setChecked(preferences.launcherInformationVisible.get());
             visible.setOnCheckedChangeListener((button, checked) ->
@@ -165,7 +165,8 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
         add.setOnClickListener(v -> new InformationSourcePicker(this, carIntegration,
                 this::addSource).show());
         controls.addView(add, lp(match(), dp(56), 0, dp(10), 0, 0));
-        MaterialButton reset = button("Сбросить панель");
+        MaterialButton reset = button(driverPanelMode
+                ? "Сбросить информационные плитки" : "Сбросить блок");
         reset.setOnClickListener(v -> confirmReset());
         controls.addView(reset, lp(match(), dp(50), 0, dp(8), 0, 0));
 
@@ -452,7 +453,8 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
 
     private void editBackgroundColor(@NonNull MaterialButton button) {
         String original = config.backgroundColor;
-        AppleColorPickerDialog.show(this, "Цвет фона панели", original,
+        AppleColorPickerDialog.show(this, driverPanelMode
+                        ? "Цвет фона информационных плиток" : "Цвет фона блока", original,
                 AppleColorPickerDialog.Options.opaque(),
                 new AppleColorPickerDialog.Listener() {
                     private void apply(@Nullable String selected) {
@@ -517,7 +519,9 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
 
     private void confirmReset() {
         new AlertDialog.Builder(this)
-                .setTitle("Сбросить информационную панель?")
+                .setTitle(driverPanelMode
+                        ? "Сбросить информационные плитки?"
+                        : "Сбросить информационный блок?")
                 .setMessage("Все выбранные статусы и их расположение будут удалены.")
                 .setPositiveButton("Сбросить", (dialog, which) -> {
                     store.reset();

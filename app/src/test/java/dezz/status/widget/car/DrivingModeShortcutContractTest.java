@@ -81,6 +81,6 @@ public final class DrivingModeShortcutContractTest {
     }
 
     private static String source(String path) throws IOException {
-        return Files.readString(Paths.get(path), StandardCharsets.UTF_8);
+        return new String(Files.readAllBytes(Paths.get(path)), StandardCharsets.UTF_8);
     }
 }

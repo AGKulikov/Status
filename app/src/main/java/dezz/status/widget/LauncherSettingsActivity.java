@@ -57,163 +57,15 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         content.setPadding(dp(28), dp(22), dp(28), dp(32));
         scroll.addView(content, new ScrollView.LayoutParams(match(), wrap()));
 
-        addTitle("Ð”Ð¾Ð¼Ð°ÑˆÐ½Ð¸Ð¹ ÑÐºÑ€Ð°Ð½ Status Widget");
-        addHint("ÐÐ¾Ð²Ñ‹Ð¹ HOME Ñ€Ð°Ð±Ð¾Ñ‚Ð°ÐµÑ‚ Ð²Ð½ÑƒÑ‚Ñ€Ð¸ Ñ‚Ð¾Ð³Ð¾ Ð¶Ðµ Ð¿Ð°ÐºÐµÑ‚Ð° Ð¸ ÑÐ¾Ñ…Ñ€Ð°Ð½ÑÐµÑ‚ Ð²ÑÐµ Ñ‚ÐµÐºÑƒÑ‰Ð¸Ðµ ÐºÐ¸Ñ€Ð¿Ð¸Ñ‡Ð¸ÐºÐ¸, ÐºÐ¾Ð½Ð½ÐµÐºÑ‚Ð¾Ñ€Ñ‹ Ð¸ ÑÑ†ÐµÐ½Ð°Ñ€Ð¸Ð¸.");
-        homeStatus = addHint("");
-        addButton("ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ Ð¸ Ð¿Ñ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ HOME", v ->
-                startActivity(new Intent(this, LauncherActivity.class)));
-        addButton("ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ Ñ€ÐµÐ´Ð°ÐºÑ‚Ð¾Ñ€ ÐºÐ¾Ð¼Ð¿Ð¾Ð½Ð¾Ð²ÐºÐ¸", v ->
-                startActivity(new Intent(this, LauncherActivity.class)
-                        .putExtra(LauncherActivity.EXTRA_EDIT_MODE, true)));
-        addButton("Ð’Ñ‹Ð±Ñ€Ð°Ñ‚ÑŒ Ð´Ð¾Ð¼Ð°ÑˆÐ½Ð¸Ð¹ ÑÐºÑ€Ð°Ð½ Ð¿Ð¾ ÑƒÐ¼Ð¾Ð»Ñ‡Ð°Ð½Ð¸ÑŽ", v -> {
-            try { startActivity(new Intent(Settings.ACTION_HOME_SETTINGS)); }
-            catch (RuntimeException ignored) {
-                startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME));
-            }
-        });
-
-        addTitle("Ð’Ð¸Ð´ Ð¸ Ð¿Ð¾Ð²ÐµÐ´ÐµÐ½Ð¸Ðµ");
-        addSwitch("ÐŸÐ¾Ð»Ð½Ð¾ÑÐºÑ€Ð°Ð½Ð½Ñ‹Ð¹ Ñ€ÐµÐ¶Ð¸Ð¼", preferences.launcherImmersive);
-        addSwitch("ÐŸÐ¾ÐºÐ°Ð·Ñ‹Ð²Ð°Ñ‚ÑŒ ÑÐµÑ‚ÐºÑƒ Ð² Ñ€ÐµÐ¶Ð¸Ð¼Ðµ Ñ€ÐµÐ´Ð°ÐºÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ð½Ð¸Ñ", preferences.launcherShowGrid);
-        addSwitch("ÐŸÑ€Ð¸ Ð½Ð°Ð¶Ð°Ñ‚Ð¸Ð¸ HOME Ð¾Ñ‚ÐºÑ€Ñ‹Ð²Ð°Ñ‚ÑŒ ÐÐ°Ð²Ð¸Ð³Ð°Ñ‚Ð¾Ñ€ Ð¾ÐºÐ½Ð¾Ð¼ Ð¿Ð¾Ð²ÐµÑ€Ñ… Ð»Ð°ÑƒÐ½Ñ‡ÐµÑ€Ð°",
-                preferences.launcherAutoWindowedNavigatorOnHome);
-        addHint("Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° Ð¿Ð¾Ð´Ð½Ð¸Ð¼Ð°ÐµÑ‚ÑÑ Ð´Ð¾Ð¼Ð°ÑˆÐ½Ð¸Ð¹ ÑÐºÑ€Ð°Ð½ Status Widget, Ð·Ð°Ñ‚ÐµÐ¼ Ð¿Ð¾Ð²ÐµÑ€Ñ… Ð½ÐµÐ³Ð¾ "
-                + "Ð¾Ñ‚ÐºÑ€Ñ‹Ð²Ð°ÐµÑ‚ÑÑ Ð¾ÐºÐ¾Ð½Ð½Ñ‹Ð¹ Ð¯Ð½Ð´ÐµÐºÑ ÐÐ°Ð²Ð¸Ð³Ð°Ñ‚Ð¾Ñ€.");
-        addSnapControl();
-        backgroundColorButton = addButton("Ð¦Ð²ÐµÑ‚ Ñ„Ð¾Ð½Ð°", v -> showBackgroundDialog());
-        AppleColorPickerDialog.decorateButton(backgroundColorButton, "Ð¦Ð²ÐµÑ‚ Ñ„Ð¾Ð½Ð°",
-                preferences.launcherBackgroundColor.get());
-
-        addTitle("ÐšÐ¾Ð¼Ð¿Ð¾Ð½Ð¾Ð²ÐºÐ°");
-        addHint("Ð Ð°Ð·Ð¼ÐµÑ€ Ð¸ Ð¿Ð¾Ð»Ð¾Ð¶ÐµÐ½Ð¸Ðµ Ð¿Ð°Ð½ÐµÐ»ÐµÐ¹ Ð¼ÐµÐ½ÑÑŽÑ‚ÑÑ Ð¿Ñ€ÑÐ¼Ð¾ Ð½Ð° HOME. Ð’Ð¸Ð´Ð¸Ð¼Ð¾ÑÑ‚ÑŒ Ð¸ ÑÐ¾Ð´ÐµÑ€Ð¶Ð¸Ð¼Ð¾Ðµ "
-                + "Ð·Ð°Ð´Ð°ÑŽÑ‚ÑÑ Ð² ÐµÐ´Ð¸Ð½Ð¾Ð¼ Ñ€Ð°Ð·Ð´ÐµÐ»Ðµ Ð¿Ð°Ð½ÐµÐ»ÐµÐ¹ â€” Ð±ÐµÐ· Ð´ÑƒÐ±Ð»Ð¸Ñ€ÑƒÑŽÑ‰Ð¸Ñ… Ð¿ÐµÑ€ÐµÐºÐ»ÑŽÑ‡Ð°Ñ‚ÐµÐ»ÐµÐ¹.");
-        addButton("ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ ÐµÐ´Ð¸Ð½Ñ‹Ð¹ Ñ€Ð°Ð·Ð´ÐµÐ» Ð¿Ð°Ð½ÐµÐ»ÐµÐ¹â€¦", v ->
-                startActivity(SettingsHubActivity.intent(this,
-                        dezz.status.widget.settings.SettingsDestinationCatalog.Group.PANELS)));
-        addButton("Ð¡Ð±Ñ€Ð¾ÑÐ¸Ñ‚ÑŒ Ñ€Ð°ÑÐ¿Ð¾Ð»Ð¾Ð¶ÐµÐ½Ð¸Ðµ Ð¿Ð°Ð½ÐµÐ»ÐµÐ¹", v -> new AlertDialog.Builder(this)
-                .setTitle("Ð¡Ð±Ñ€Ð¾ÑÐ¸Ñ‚ÑŒ ÐºÐ¾Ð¼Ð¿Ð¾Ð½Ð¾Ð²ÐºÑƒ?")
-                .setMessage("ÐŸÐ°Ð½ÐµÐ»Ð¸ Ð²ÐµÑ€Ð½ÑƒÑ‚ÑÑ Ð² Ð¸ÑÑ…Ð¾Ð´Ð½Ñ‹Ðµ Ð¿Ð¾Ð·Ð¸Ñ†Ð¸Ð¸. ÐžÑÑ‚Ð°Ð»ÑŒÐ½Ñ‹Ðµ Ð½Ð°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸ Ð½Ðµ Ð¸Ð·Ð¼ÐµÐ½ÑÑ‚ÑÑ.")
-                .setPositiveButton("Ð¡Ð±Ñ€Ð¾ÑÐ¸Ñ‚ÑŒ", (dialog, which) -> {
-                    preferences.launcherLayoutJson.set("");
-                    Toast.makeText(this, "ÐšÐ¾Ð¼Ð¿Ð¾Ð½Ð¾Ð²ÐºÐ° ÑÐ±Ñ€Ð¾ÑˆÐµÐ½Ð°", Toast.LENGTH_SHORT).show();
-                })
-                .setNegativeButton(android.R.string.cancel, null).show());
-
-        addTitle("Ð”Ð¾ÑÑ‚ÑƒÐ¿Ñ‹");
-        addHint("Ð”Ð¾ÑÑ‚ÑƒÐ¿ Ðº ÑƒÐ²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸ÑÐ¼ Ð½ÑƒÐ¶ÐµÐ½ Ð´Ð»Ñ Ð¼ÐµÐ´Ð¸Ð°ÑÐµÑÑÐ¸Ð¹ Ð¸ Ð´Ð»Ñ Ð²Ñ€ÐµÐ¼ÐµÐ½Ð¸ Ð¿Ñ€Ð¸Ð±Ñ‹Ñ‚Ð¸Ñ/Ð¾ÑÑ‚Ð°Ð²ÑˆÐµÐ³Ð¾ÑÑ Ð¿ÑƒÑ‚Ð¸ Ð¸Ð· Ð¯Ð½Ð´ÐµÐºÑ ÐšÐ°Ñ€Ñ‚ Ð¸ ÐÐ°Ð²Ð¸Ð³Ð°Ñ‚Ð¾Ñ€Ð°.");
-        addButton("ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ Ð´Ð¾ÑÑ‚ÑƒÐ¿ Ðº ÑƒÐ²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸ÑÐ¼", v ->
-                startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
-        return scroll;
-    }
-
-    private void updateHomeStatus() {
-        if (homeStatus == null) return;
-        Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
-        String selected = "";
-        try {
-            if (getPackageManager().resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY) != null) {
-                selected = getPackageManager().resolveActivity(home,
-                        PackageManager.MATCH_DEFAULT_ONLY).activityInfo.packageName;
-            }
-        } catch (RuntimeException ignored) {}
-        homeStatus.setText(getPackageName().equals(selected)
-                ? "Ð¡ÐµÐ¹Ñ‡Ð°Ñ Status Widget Ð²Ñ‹Ð±Ñ€Ð°Ð½ ÐºÐ°Ðº HOME."
-                : "Ð¡ÐµÐ¹Ñ‡Ð°Ñ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÑ‚ÑÑ Ð´Ñ€ÑƒÐ³Ð¾Ð¹ HOME. ÐœÐ¾Ð¶Ð½Ð¾ ÑÐ½Ð°Ñ‡Ð°Ð»Ð° Ð¾Ñ‚ÐºÑ€Ñ‹Ñ‚ÑŒ Ð¿Ñ€ÐµÐ´Ð¿Ñ€Ð¾ÑÐ¼Ð¾Ñ‚Ñ€.");
-    }
-
-    private void addSnapControl() {
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        TextView label = new TextView(this);
-        label.setTextSize(17);
-        SeekBar seek = new SeekBar(this);
-        seek.setMax(96);
-        seek.setProgress(Math.max(0, preferences.launcherSnapPx.get() - 4));
-        TextView value = new TextView(this);
-        value.setMinWidth(dp(80));
-        value.setGravity(Gravity.END);
-        value.setText((seek.getProgress() + 4) + " px");
-        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar bar, int progress, boolean user) {
-                int pixels = progress + 4;
-                value.setText(pixels + " px");
-                if (user) preferences.launcherSnapPx.set(pixels);
-            }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
-        });
-        label.setText("Ð¨Ð°Ð³ ÑÐµÑ‚ÐºÐ¸");
-        row.addView(label, new LinearLayout.LayoutParams(0, wrap(), .35f));
-        row.addView(seek, new LinearLayout.LayoutParams(0, wrap(), .65f));
-        row.addView(value);
-        content.addView(row, new LinearLayout.LayoutParams(match(), dp(64)));
-    }
-
-    private void showBackgroundDialog() {
-        String original = preferences.launcherBackgroundColor.get();
-        AppleColorPickerDialog.show(this, "Ð¦Ð²ÐµÑ‚ Ñ„Ð¾Ð½Ð°", original,
-                AppleColorPickerDialog.Options.standard(),
-                new AppleColorPickerDialog.Listener() {
-                    @Override
-                    public void onPreview(@Nullable String value) {
-                        AppleColorPickerDialog.decorateButton(backgroundColorButton,
-                                "Ð¦Ð²ÐµÑ‚ Ñ„Ð¾Ð½Ð°", value);
-                    }
-
-                    @Override
-                    public void onSelected(@Nullable String value) {
-                        if (value != null) preferences.launcherBackgroundColor.set(value);
-                        AppleColorPickerDialog.decorateButton(backgroundColorButton,
-                                "Ð¦Ð²ÐµÑ‚ Ñ„Ð¾Ð½Ð°", preferences.launcherBackgroundColor.get());
-                    }
-                });
-    }
-
-    private void addSwitch(String label, Preferences.Bool preference) {
-        MaterialSwitch control = new MaterialSwitch(this);
-        control.setText(label);
-        control.setTextSize(17);
-        control.setMinHeight(dp(56));
-        control.setChecked(preference.get());
-        control.setOnCheckedChangeListener((button, checked) -> preference.set(checked));
-        content.addView(control, new LinearLayout.LayoutParams(match(), wrap()));
-    }
-
-    private MaterialButton addButton(String label, android.view.View.OnClickListener listener) {
-        MaterialButton button = new MaterialButton(this);
-        button.setText(label);
-        button.setAllCaps(false);
-        button.setMinHeight(dp(54));
-        button.setOnClickListener(listener);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), wrap());
-        lp.topMargin = dp(7);
-        content.addView(button, lp);
-        return button;
-    }
-
-    private void addTitle(String value) {
-        TextView title = new TextView(this);
-        title.setText(value);
-        title.setTextSize(23);
-        title.setTextColor(getColor(R.color.settings_accent));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), wrap());
-        lp.topMargin = dp(22);
-        lp.bottomMargin = dp(6);
-        content.addView(title, lp);
-    }
-
-    private TextView addHint(String value) {
-        TextView hint = new TextView(this);
-        hint.setText(value);
-        hint.setTextSize(15);
-        hint.setAlpha(.78f);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), wrap());
-        lp.bottomMargin = dp(8);
-        content.addView(hint, lp);
-        return hint;
-    }
-
-    private static int match() { return ViewGroup.LayoutParams.MATCH_PARENT; }
-    private static int wrap() { return ViewGroup.LayoutParams.WRAP_CONTENT; }
-    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
-}
+        addTitle("Ð”Ð¾Ð¼ÓÍ8÷«h‘éì¶»§q«^vWr‡6—¦UF—FÆRÂæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2†Gƒc"’Âw&‚’’“°¢6V6öæBæFEf–Wr‡66ÆRÂæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2ƒÂGƒC’Âb’“°¢6V6öæBæFEf–Wr‡66ÆUfÇVRÂæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2†GƒS‚’Âw&‚’’“°¢6V6öæBæFEf–Wr†FWF–Ç2ÂæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2†Gƒb’ÂGƒC"’’“°¢6&BæFEf–Wr‡6V6öæBÂæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2†ÖF6‚‚’Âw&‚’’“° ¢FW‡Ef–Wr7VÖÖ'’ÒæWrFW‡Ef–Wr‡F†—2“°¢7VÖÖ'’ç6WEFW‡B†ÖWG&–57VÖÖ'’†ÖWG&–2’“°¢7VÖÖ'’ç6WEFW‡E6—¦Rƒ"“°¢7VÖÖ'’ç6WDÇ†‚ãcFb“°¢7VÖÖ'’ç6WE6–ævÆTÆ–æR‡G'VR“°¢6&BæFEf–Wr‡7VÖÖ'’ÂæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2†ÖF6‚‚’Âw&‚’’“°¢&WGW&â6&C°¢Ð ¢&—fFRfö–BÖ÷fTÖWG&–2„æöäçVÆÂ7G&–ær–BÂ–çBF—&V7F–öâ’°¢–b‚6öæf–ræÖ÷fTÖWG&–2†–BÂF—&V7F–öâ’’&WGW&ã°¢W'6—7DæE&Wf–Wr‚“°¢&V'V–ÆDÖWG&–46öçG&öÇ2‚“°¢Ð ¢&—fFRfö–B6†÷tÖWG&–4F–Æör„æöäçVÆÂfV†–6ÆT–æfõæVÄ6öæf–räÖWG&–2ÖWG&–2’°¢67&öÆÅf–Wr67&öÆÂÒæWr67&öÆÅf–Wr‡F†—2“°¢Æ–æV$Æ–÷WB&öG’ÒæWrÆ–æV$Æ–÷WB‡F†—2“°¢&öG’ç6WD÷&–VçFF–öâ„Æ–æV$Æ–÷WBådU%D”4Â“°¢&öG’ç6WEFF–ær†Gƒ#"’ÂGƒB’ÂGƒ#"’ÂGƒ‚’“°¢67&öÆÂæFEf–Wr†&öG’ÂæWr67&öÆÅf–WräÆ–÷WE&×2†ÖF6‚‚’Âw&‚’’“° ¢FD†–çB†&öG’Â-	í--Í-Rýí½Rý=-½ÂÂ}-í²ýí½Í}í--ÂÝ}-ÝR½‚]MÝm2Â ¢²-­í-í½Ríí]"--íÍí½Ââ"“°¢VF—EFW‡BF—FÆRÒFD–çWB†&öG’Â-	Ý}-ÝRÝýÝ]½‚"ÂÖWG&–2æÆ&VÄ÷fW'&–FRÀ¢–çWEG—RåE•Uô4Ä55õDU…BÂ–çWEG—RåE•UõDU…EôdÄuô4õ4TåDTä4U2“°¢VF—EFW‡BVæ—BÒFD–çWB†&öG’Â-	]MÝm}Í]]Ýò"ÂÖWG&–2çVæ—D÷fW'&–FRÀ¢–çWEG—RåE•Uô4Ä55õDU…B“°¢vF6‚‡F—FÆRÂfÇVRÓâÖWG&–2æÆ&VÄ÷fW'&–FRÒfÇVR“°¢vF6‚‡Væ—BÂfÇVRÓâÖWG&–2çVæ—D÷fW'&–FRÒfÇVR“° ¢FE6V7F–öâ†&öG’Â-
+m-]-"“°¢FD6öÆ÷"†&öG’Â-	}Ý}]ÝR"Â‚’ÓâÖWG&–2çfÇVT6öÆ÷"À¢fÇVRÓâÖWG&–2çfÇVT6öÆ÷"ÒfÇVR“°¢FD6öÆ÷"†&öG’Â-	Ý}-ÝR"Â‚’ÓâÖWG&–2æÆ&VÄ6öÆ÷"À¢fÇVRÓâÖWG&–2æÆ&VÄ6öÆ÷"ÒfÇVR“° ¢–b…fV†–6ÆTFW&—fVDÖWG&–72å$Td”ÄÅôeTTÅô”BæWVÇ2†ÖWG&–2æ–B’’°¢FE6V7F–öâ†&öG’Â-
+}"Mí}ý-­‚"“°¢FD†–çB†&öG’Â-	í--í¢ý]íM"r--íÍí½òâ	"--íÍ-}]­íÂ]mÍRí­Â­ ¢²-]-òrFD’Â]½‚ýí-­]=âÝRíí]"(	Býí½Í}=]-ò ¢²-]}]-ÝíR}Ý}]ÝRcB²â"“°¢FE7v—F6‚†&öG’Â-	ýí­}½--Â-í½Í­âÝý]]M}R"ÂÖWG&–2ç&Vf–ÆÄöæÇ”–å&²À¢6†V6¶VBÓâ°¢ÖWG&–2ç&Vf–ÆÄöæÇ”–å&²Ò6†V6¶VC°¢W'6—7DæE&Wf–Wr‚“°¢Ò“°¢FE7v—F6‚†&öG’Â-	ýí½=}-Âí­Â­r--íÍí½ò]}]"cB²’"À¢ÖWG&–2ç&Vf–ÆÄWFöÖF–466—G’Â6†V6¶VBÓâ°¢ÖWG&–2ç&Vf–ÆÄWFöÖF–466—G’Ò6†V6¶VC°¢W'6—7DæE&Wf–Wr‚“°¢Ò“°¢VF—EFW‡BFæ²ÒFD–çWB†&öG’Â-
+=}Ýí’í­Â­Â²"À¢Æ–äçVÖ&W"†ÖWG&–2ç&Vf–ÆÄÖçVÄ66—G”Æ—G&W2’À¢–çWEG—RåE•Uô4Ä55ôåTÔ$U"Â–çWEG—RåE•UôåTÔ$U%ôdÄuôDT4”ÔÂ“°¢vF6„çVÖ&W"‡Fæ²ÂfÇVRÓâ°¢–b‡fÇVRãÒBbbfÇVRÃÒ#SB’ÖWG&–2ç&Vf–ÆÄÖçVÄ66—G”Æ—G&W2ÒfÇVS°¢Ò“°¢ÒVÇ6R–b…fV†–6ÆTFW&—fVDÖWG&–72å5TTEôÄ”Ô•Eõt$ä”äuô”BæWVÇ2†ÖWG&–2æ–B’’°¢FE6V7F–öâ†&öG’Â-	ý]M=ý]mM]ÝRâ­íí-‚"“°¢FD†–çB†&öG’Â-
+-]­=ò­íí-Âý]íM"rT4%‚Â½Í"(	Br­--Ýí’ ¢²-Ý-=m‚â	ýíí2Mí-½ý]-ò¢½Í-2ÂÝýÍ]c²­Âýrâ"“°¢FE6Æ–FW"†&öG’Â-	Míý=¢-]R½Í-"ÂÖWG&–2ç7VVDÆ–Ö—EF‡&W6†öÆD¶Ö‚ÂÂ#À¢fÇVRÓâÖWG&–2ç7VVDÆ–Ö—EF‡&W6†öÆD¶Ö‚ÒfÇVRÀ¢fÇVRÓâ"²"²fÇVR²"­Âýr"“°¢FE7v—F6‚†&öG’Â-
+-í½Í­âý‚­--ÝíÂÍ=-R"À¢ÖWG&–2ç7VVDÆ–Ö—DöæÇ”7F—fU&÷WFRÂ6†V6¶VBÓâ°¢ÖWG&–2ç7VVDÆ–Ö—DöæÇ”7F—fU&÷WFRÒ6†V6¶VC°¢W'6—7DæE&Wf–Wr‚“°¢Ò“°¢FE7v—F6‚†&öG’Â-	Í=-Âý‚ý]-½]Ý‚"ÂÖWG&–2ç7VVDÆ–Ö—D&Æ–æ²Â6†V6¶VBÓâ°¢ÖWG&–2ç7VVDÆ–Ö—D&Æ–æ²Ò6†V6¶VC°¢W'6—7DæE&Wf–Wr‚“°¢Ò“°¢FE7v—F6‚†&öG’Â-	]½½’MíÒý‚ý]-½]Ý‚"À¢ÖWG&–2ç7VVDÆ–Ö—Ev†—FT&6¶w&÷VæBÂ6†V6¶VBÓâ°¢ÖWG&–2ç7VVDÆ–Ö—Ev†—FT&6¶w&÷VæBÒ6†V6¶VC°¢W'6—7DæE&Wf–Wr‚“°¢Ò“°¢FD6öÆ÷"†&öG’Â-
+m-]"ý]-½]Ýò"Â‚’ÓâÖWG&–2çv&æ–æt6öÆ÷"À¢fÇVRÓâÖWG&–2çv&æ–æt6öÆ÷"ÒfÇVR“°¢ÒVÇ6R–b…fV†–6ÆTFW&—fVDÖWG&–72åEU$åõ4”täÅ5ô”BæWVÇ2†ÖWG&–2æ–B’’°¢FE6V7F–öâ†&öG’Â-	­íÍÝí-ÝÝ½’ÝM­-í"“°¢FD†–çB†&öG’Â.(i½]-½’+r(i"ý-½’+r(iB-Ýò=Ý½}mòâ
+-ÍÝòM} ¢²-Í=Ýò--íÍ-}]­‚=½m-]-òâ"“°¢ÒVÇ6R–b…fV†–6ÆTFW&—fVDÖWG&–72äUDõô„ôÄEô”BæWVÇ2†ÖWG&–2æ–B’’°¢FE6V7F–öâ†&öG’Â-	-í}Ý¢WFò†öÆB"“°¢FD†–çB†&öG’Â-	ýÝÍ]-òí-Í]-Í½’'&öF67BÇW2æÖöæ¦&òäUDô„ôÄBâ ¢²-
+í-íýÝRí]Ýý]-ò-í½Í­âM½ò-]­=]’}==}­‚Í=Ý-í½²â"“°¢Ð ¢FE6V7F–öâ†&öG’Â-	Míýí½Ý-]½ÍÝâ"“°¢FD†–çB†&öG’Â-
+MíÍ=½í-ím]Ýó¢}Ý}]ÝR9rÍÝím-]½Â²Í]]ÝRâ ¢²-	í½}ÝâÝ-‚ýí½òÍ]Ýý-ÂÝRÝ=mÝââ"“°¢FE6Æ–FW"†&öG’Â-	}Ý­í"ýí½R}ýý-í’"ÂÖWG&–2æFV6–ÖÇ2ÂÂBÀ¢fÇVRÓâÖWG&–2æFV6–ÖÇ2ÒfÇVRÂ7G&–æs£§fÇVTöb“°¢VF—EFW‡B×VÇF—Æ–W"ÒFD–çWB†&öG’Â-	ÍÝím-]½Â"ÂÆ–äçVÖ&W"†ÖWG&–2æ×VÇF—Æ–W"’À¢–çWEG—RåE•Uô4Ä55ôåTÔ$U"Â–çWEG—RåE•UôåTÔ$U%ôdÄuôDT4”ÔÀ¢Â–çWEG—RåE•UôåTÔ$U%ôdÄuõ4”täTB“°¢VF—EFW‡Böfg6WBÒFD–çWB†&öG’Â-
+Í]]ÝR"ÂÆ–äçVÖ&W"†ÖWG&–2æöfg6WB’À¢–çWEG—RåE•Uô4Ä55ôåTÔ$U"Â–çWEG—RåE•UôåTÔ$U%ôdÄuôDT4”ÔÀ¢Â–çWEG—RåE•UôåTÔ$U%ôdÄuõ4”täTB“°¢vF6„çVÖ&W"†×VÇF—Æ–W"ÂfÇVRÓâÖWG&–2æ×VÇF—Æ–W"ÒfÇVR“°¢vF6„çVÖ&W"†öfg6WBÂfÇVRÓâÖWG&–2æöfg6WBÒfÇVR“° ¢ÆW'DF–ÆörF–ÆörÒæWrÆW'DF–Æörä'V–ÆFW"‡F†—2¢ç6WEF—FÆR†F—7Æ”æÖR†ÖWG&–2’¢ç6WEf–Wr‡67&öÆÂ¢ç6WE÷6—F—fT'WGFöâ‚-	=í-í-â"ÂçVÆÂ¢ç6WDæWWG&Ä'WGFöâ‚-
+í-ÂíMíÍ½]ÝR"ÂçVÆÂ¢æ7&VFR‚“°¢F–Æörç6WDöå6†÷tÆ—7FVæW"†–væ÷&VBÓâF–ÆörævWD'WGFöâ„ÆW'DF–Æörä%UEDôåôäUUE$Â¢ç6WDöä6Æ–6´Æ—7FVæW"‡bÓâ°¢ÖWG&–2æÆ&VÄ÷fW'&–FRÒ"#°¢ÖWG&–2çVæ—D÷fW'&–FRÒ"#°¢ÖWG&–2æ×VÇF—Æ–W"ÒC°¢ÖWG&–2æöfg6WBÒC°¢ÖWG&–2æFV6–ÖÇ2Ò7VvvW7FVDFV6–ÖÇ2†ÖWG&–2æfÆÆ&6µVæ—B“°¢ÖWG&–2çfÇVT6öÆ÷"Ò"4dddddb#°¢ÖWG&–2æÆ&VÄ6öÆ÷"Ò"4T#”3‚#°¢ÖWG&–2çv&æ–æt6öÆ÷"Ò"4dc4#3#°¢W'6—7DæE&Wf–Wr‚“°¢F–ÆöræF—6Ö—72‚“°¢&V'V–ÆDÖWG&–46öçG&öÇ2‚“°¢6†÷tÖWG&–4F–Æör†ÖWG&–2“°¢Ò’“°¢F–Æörç6WDöäF—6Ö—74Æ—7FVæW"†–væ÷&VBÓâ&V'V–ÆDÖWG&–46öçG&öÇ2‚’“°¢F–Æörç6†÷r‚“°¢Ð ¢&—fFRfö–BW'6—7DæE&Wf–Wr‚’°¢VF—E66†VGVÆW"ç&WVW7B‚“°¢Ð ¢æöäçVÆÀ¢&—fFRÖFW&–Å7v—F6‚FE7v—F6‚„æöäçVÆÂÆ–æV$Æ–÷WB&VçBÂæöäçVÆÂ7G&–ærF—FÆRÀ¢&ööÆVâ–æ—F–ÂÂæöäçVÆÂ&ööÄ6†ævR6†ævR’°¢ÖFW&–Å7v—F6‚fÇVRÒæWrÖFW&–Å7v—F6‚‡F†—2“°¢fÇVRç6WEFW‡B‡F—FÆR“°¢fÇVRç6WEFW‡E6—¦Rƒb“°¢fÇVRç6WDÖ–ä†V–v‡B†GƒC‚’“°¢fÇVRç6WD6†V6¶VB†–æ—F–Â“°¢fÇVRç6WDöä6†V6¶VD6†ævTÆ—7FVæW"‚†'WGFöâÂ6†V6¶VB’Óâ6†ævRç6WB†6†V6¶VB’“°¢&VçBæFEf–Wr‡fÇVRÂæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2†ÖF6‚‚’Âw&‚’’“°¢&WGW&âfÇVS°¢Ð ¢&—fFR–çFW&f6R&ööÄ6†ævR²fö–B6WB†&ööÆVâfÇVR“²Ð ¢&—fFRfö–BFE6Æ–FW"„æöäçVÆÂÆ–æV$Æ–÷WB&VçBÂæöäçVÆÂ7G&–ærF—FÆRÂ–çB–æ—F–ÂÀ¢–çBÖ–æ–×VÒÂ–çBÖ†–×VÒÂæöäçVÆÂ–çD6†ævR6†ævRÀ¢æöäçVÆÂfÇVTÆ&VÂf÷&ÖGFW"’°¢Æ–æV$Æ–÷WB&Æö6²ÒæWrÆ–æV$Æ–÷WB‡F†—2“°¢&Æö6²ç6WD÷&–VçFF–öâ„Æ–æV$Æ–÷WBådU%D”4Â“°¢Æ–æV$Æ–÷WB†VF–ærÒæWrÆ–æV$Æ–÷WB‡F†—2“°¢†VF–ærç6WDw&f—G’„w&f—G’ä4TåDU%õdU%D”4Â“°¢FW‡Ef–WrÆ&VÂÒæWrFW‡Ef–Wr‡F†—2“°¢Æ&VÂç6WEFW‡B‡F—FÆR“°¢Æ&VÂç6WEFW‡E6—¦Rƒb“°¢FW‡Ef–WrfÇVRÒæWrFW‡Ef–Wr‡F†—2“°¢fÇVRç6WEFW‡B†f÷&ÖGFW"æf÷&ÖB†–æ—F–Â’“°¢fÇVRç6WDw&f—G’„w&f—G’äTäB“°¢†VF–æræFEf–Wr†Æ&VÂÂæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2ƒÂw&‚’Âb’“°¢†VF–æræFEf–Wr‡fÇVRÂæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2†GƒB’Âw&‚’’“°¢6VV´&"6VV²ÒæWr6VV´&"‡F†—2“°¢6VV²ç6WDÖ‚†Ö†–×VÒÒÖ–æ–×VÒ“°¢6VV²ç6WE&öw&W72„ÖF‚æÖ‚ƒÂÖF‚æÖ–â†Ö†–×VÒÒÖ–æ–×VÒÂ–æ—F–ÂÒÖ–æ–×VÒ’’“°¢6VV²ç6WDöå6VV´&$6†ævTÆ—7FVæW"†æWr6VV´&"äöå6VV´&$6†ævTÆ—7FVæW"‚’°¢÷fW'&–FRV&Æ–2fö–Böå&öw&W746†ævVB…6VV´&"&"Â–çB&öw&W72Â&ööÆVâW6W"’°¢–çB6VÆV7FVBÒ&öw&W72²Ö–æ–×VÓ°¢fÇVRç6WEFW‡B†f÷&ÖGFW"æf÷&ÖB‡6VÆV7FVB’“°¢–b‡W6W"’°¢6†ævRç6WB‡6VÆV7FVB“°¢W'6—7DæE&Wf–Wr‚“°¢Ð¢Ð¢÷fW'&–FRV&Æ–2fö–Böå7F'EG&6¶–æuF÷V6‚…6VV´&"6VV´&"’·Ð¢÷fW'&–FRV&Æ–2fö–Böå7F÷G&6¶–æuF÷V6‚…6VV´&"6VV´&"’·Ð¢Ò“°¢&Æö6²æFEf–Wr††VF–ær“°¢&Æö6²æFEf–Wr‡6VV²ÂæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2†ÖF6‚‚’ÂGƒ3‚’’“°¢Æ–æV$Æ–÷WBäÆ–÷WE&×2ÇÒæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2†ÖF6‚‚’Âw&‚’“°¢ÇçF÷Ö&v–âÒGƒb“°¢&VçBæFEf–Wr†&Æö6²ÂÇ“°¢Ð ¢&—fFRfö–BFD6öÆ÷"„æöäçVÆÂÆ–æV$Æ–÷WB&VçBÂæöäçVÆÂ7G&–ærF—FÆRÀ¢æöäçVÆÂFW‡EfÇVR7W'&VçBÂæöäçVÆÂFW‡D6†ævR6†ævR’°¢ÖFW&–Ä'WGFöâ'WGFöâÒæWrÖFW&–Ä'WGFöâ‡F†—2“°¢ÆT6öÆ÷%–6¶W$F–ÆöræFV6÷&FT'WGFöâ†'WGFöâÂF—FÆRÂ7W'&VçBævWB‚’“°¢'WGFöâç6WDöä6Æ–6´Æ—7FVæW"‡bÓâ°¢7G&–ær÷&–v–æÂÒ7W'&VçBævWB‚“°¢ÆT6öÆ÷%–6¶W$F–Æörç6†÷r‡F†—2ÂF—FÆRÂ÷&–v–æÂÀ¢ÆT6öÆ÷%–6¶W$F–Æörä÷F–öç2ç7FæF&B‚’À¢æWrÆT6öÆ÷%–6¶W$F–ÆöräÆ—7FVæW"‚’°¢&—fFRfö–BÇ’„çVÆÆ&ÆR7G&–ær6VÆV7FVB’°¢7G&–ærfÇVRÒ6VÆV7FVBÓÒçVÆÂò÷&–v–æÂ¢6VÆV7FVC°¢6†ævRç6WB‡fÇVR“°¢W'6—7DæE&Wf–Wr‚“°¢ÆT6öÆ÷%–6¶W$F–ÆöræFV6÷&FT'WGFöâ†'WGFöâÂF—FÆRÂfÇVR“°¢Ð ¢÷fW'&–FRV&Æ–2fö–Böå&Wf–Wr„çVÆÆ&ÆR7G&–ær6VÆV7FVB’°¢Ç’‡6VÆV7FVB“°¢Ð ¢÷fW'&–FRV&Æ–2fö–Böå6VÆV7FVB„çVÆÆ&ÆR7G&–ær6VÆV7FVB’°¢Ç’‡6VÆV7FVB“°¢Ð¢Ò“°¢Ò“°¢Æ–æV$Æ–÷WBäÆ–÷WE&×2ÇÒæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2†ÖF6‚‚’ÂGƒc"’“°¢ÇçF÷Ö&v–âÒGƒR“°¢&VçBæFEf–Wr†'WGFöâÂÇ“°¢Ð ¢æöäçVÆÀ¢&—fFRVF—EFW‡BFD–çWB„æöäçVÆÂÆ–æV$Æ–÷WB&VçBÂæöäçVÆÂ7G&–ær†–çBÀ¢æöäçVÆÂ7G&–ær–æ—F–ÂÂ–çB–çWEG—R’°¢VF—EFW‡B–çWBÒæWrVF—EFW‡B‡F†—2“°¢–çWBç6WD†–çB††–çB“°¢–çWBç6WE6–ævÆTÆ–æR‡G'VR“°¢–çWBç6WEFW‡B†–æ—F–Â“°¢–çWBç6WD–çWEG—R†–çWEG—R“°¢Æ–æV$Æ–÷WBäÆ–÷WE&×2ÇÒæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2†ÖF6‚‚’ÂGƒSB’“°¢ÇçF÷Ö&v–âÒGƒR“°¢&VçBæFEf–Wr†–çWBÂÇ“°¢&WGW&â–çWC°¢Ð ¢&—fFRfö–BvF6‚„æöäçVÆÂVF—EFW‡B–çWBÂæöäçVÆÂFW‡D6†ævR6†ævR’°¢–çWBæFEFW‡D6†ævVDÆ—7FVæW"†æWr6–×ÆUFW‡EvF6†W"‚’°¢÷fW'&–FRV&Æ–2fö–BgFW%FW‡D6†ævVB„VF—F&ÆRfÇVR’°¢6†ævRç6WB‡fÇVRçFõ7G&–ær‚’“°¢W'6—7DæE&Wf–Wr‚“°¢Ð¢Ò“°¢Ð ¢&—fFRfö–BvF6„çVÖ&W"„æöäçVÆÂVF—EFW‡B–çWBÂæöäçVÆÂF÷V&ÆT6†ævR6†ævR’°¢–çWBæFEFW‡D6†ævVDÆ—7FVæW"†æWr6–×ÆUFW‡EvF6†W"‚’°¢÷fW'&–FRV&Æ–2fö–BgFW%FW‡D6†ævVB„VF—F&ÆRfÇVR’°¢G'’°¢F÷V&ÆR'6VBÒF÷V&ÆRç'6TF÷V&ÆR‡fÇVRçFõ7G&–ær‚’ç&WÆ6R‚rÂrÂrâr’“°¢–b‚F÷V&ÆRæ—4f–æ—FR‡'6VB’’&WGW&ã°¢6†ævRç6WB‡'6VB“°¢W'6—7DæE&Wf–Wr‚“°¢Ò6F6‚„çVÖ&W$f÷&ÖDW†6WF–öâ–væ÷&VB’°¢òò–çFW&ÖVF–FRfÇVW27V6‚2âV×G’f–VÆB÷"§W7BrÒr&VÖ–âVF—F&ÆRà¢Ð¢Ð¢Ò“°¢Ð ¢&—fFR–çFW&f6RF÷V&ÆT6†ævR²fö–B6WB†F÷V&ÆRfÇVR“²Ð ¢&—fFR'7G&7B7FF–26Æ726–×ÆUFW‡EvF6†W"–×ÆVÖVçG2FW‡EvF6†W"°¢÷fW'&–FRV&Æ–2fö–B&Vf÷&UFW‡D6†ævVB„6†%6WVVæ6R2Â–çB7F'BÂ–çB6÷VçBÂ–çBgFW"’·Ð¢÷fW'&–FRV&Æ–2fö–BöåFW‡D6†ævVB„6†%6WVVæ6R2Â–çB7F'BÂ–çB&Vf÷&RÂ–çB6÷VçB’·Ð¢Ð ¢æöäçVÆÀ¢&—fFRÖFW&–Ä'WGFöâ6ö×7D'WGFöâ„æöäçVÆÂ7G&–ærFW‡B’°¢ÖFW&–Ä'WGFöâ'WGFöâÒæWrÖFW&–Ä'WGFöâ‡F†—2“°¢'WGFöâç6WEFW‡B‡FW‡B“°¢'WGFöâç6WEFW‡E6—¦Rƒ#“°¢'WGFöâç6WDÖ–åv–GF‚ƒ“°¢'WGFöâç6WD–ç6WEF÷ƒ“°¢'WGFöâç6WD–ç6WD&÷GFöÒƒ“°¢'WGFöâç6WEFF–ærƒÂÂÂ“°¢&WGW&â'WGFöã°¢Ð ¢&—fFRfö–BFD'WGFöâ„æöäçVÆÂÆ–æV$Æ–÷WB&VçBÂæöäçVÆÂ7G&–ærÆ&VÂÀ¢æöäçVÆÂf–Wräöä6Æ–6´Æ—7FVæW"Æ—7FVæW"’°¢ÖFW&–Ä'WGFöâ'WGFöâÒæWrÖFW&–Ä'WGFöâ‡F†—2“°¢'WGFöâç6WEFW‡B†Æ&VÂ“°¢'WGFöâç6WDÆÄ62†fÇ6R“°¢'WGFöâç6WDöä6Æ–6´Æ—7FVæW"†Æ—7FVæW"“°¢Æ–æV$Æ–÷WBäÆ–÷WE&×2ÇÒæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2†ÖF6‚‚’ÂGƒS’“°¢ÇçF÷Ö&v–âÒGƒb“°¢&VçBæFEf–Wr†'WGFöâÂÇ“°¢Ð ¢&—fFRfö–BFEF—FÆR„æöäçVÆÂÆ–æV$Æ–÷WB&VçBÂæöäçVÆÂ7G&–ærfÇVR’°¢FW‡Ef–WrF—FÆRÒæWrFW‡Ef–Wr‡F†—2“°¢F—FÆRç6WEFW‡B‡fÇVR“°¢F—FÆRç6WEFW‡E6—¦Rƒ#2“°¢F—FÆRç6WEFW‡D6öÆ÷"„6öÆ÷"ç&v"ƒRÂcRÂ#SR’“°¢Æ–æV$Æ–÷WBäÆ–÷WE&×2ÇÒæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2†ÖF6‚‚’Âw&‚’“°¢ÇçF÷Ö&v–âÒGƒ#“°¢Çæ&÷GFöÔÖ&v–âÒGƒR“°¢&VçBæFEf–Wr‡F—FÆRÂÇ“°¢Ð ¢&—fFRfö–BFE6V7F–öâ„æöäçVÆÂÆ–æV$Æ–÷WB&VçBÂæöäçVÆÂ7G&–ærfÇVR’°¢FW‡Ef–WrF—FÆRÒæWrFW‡Ef–Wr‡F†—2“°¢F—FÆRç6WEFW‡B‡fÇVR“°¢F—FÆRç6WEFW‡E6—¦Rƒ‚“°¢F—FÆRç6WEG—Vf6R…G—Vf6RäDTdTÅBÂG—Vf6Rä$ôÄB“°¢Æ–æV$Æ–÷WBäÆ–÷WE&×2ÇÒæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2†ÖF6‚‚’Âw&‚’“°¢ÇçF÷Ö&v–âÒGƒr“°¢Çæ&÷GFöÔÖ&v–âÒGƒ2“°¢&VçBæFEf–Wr‡F—FÆRÂÇ“°¢Ð ¢&—fFRfö–BFD†–çB„æöäçVÆÂÆ–æV$Æ–÷WB&VçBÂæöäçVÆÂ7G&–ærfÇVR’°¢FW‡Ef–Wr†–çBÒæWrFW‡Ef–Wr‡F†—2“°¢†–çBç6WEFW‡B‡fÇVR“°¢†–çBç6WEFW‡E6—¦RƒB“°¢†–çBç6WDÇ†‚ãsfb“°¢Æ–æV$Æ–÷WBäÆ–÷WE&×2ÇÒæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2†ÖF6‚‚’Âw&‚’“°¢Çæ&÷GFöÔÖ&v–âÒGƒr“°¢&VçBæFEf–Wr††–çBÂÇ“°¢Ð ¢æöäçVÆÀ¢&—fFRÆ–æV$Æ–÷WBäÆ–÷WE&×26&DÆ–÷WE&×2‚’°¢Æ–æV$Æ–÷WBäÆ–÷WE&×2ÇÒæWrÆ–æV$Æ–÷WBäÆ–÷WE&×2†ÖF6‚‚’Âw&‚’“°¢ÇçF÷Ö&v–âÒGƒb“°¢&WGW&âÇ°¢Ð ¢æöäçVÆÀ¢&—fFR7FF–27G&–ærF—7Æ”æÖR„æöäçVÆÂfV†–6ÆT–æfõæVÄ6öæf–räÖWG&–2ÖWG&–2’°¢&WGW&âÖWG&–2æÆ&VÄ÷fW'&–FRçG&–Ò‚’æ—4V×G’‚¢òÖWG&–2æfÆÆ&6´Æ&VÂ¢ÖWG&–2æÆ&VÄ÷fW'&–FRçG&–Ò‚“°¢Ð ¢æöäçVÆÀ¢&—fFR7FF–27G&–ærÖWG&–57VÖÖ'’„æöäçVÆÂfV†–6ÆT–æfõæVÄ6öæf–räÖWG&–2ÖWG&–2’°¢–b…fV†–6ÆTFW&—fVDÖWG&–72å$Td”ÄÅôeTTÅô”BæWVÇ2†ÖWG&–2æ–B’’°¢7G&–ær66—G’ÒÖWG&–2ç&Vf–ÆÄWFöÖF–466—G¢ò-í­Â­r--âÂ]}]"cB² ¢¢-¢"²Æ–äçVÖ&W"†ÖWG&–2ç&Vf–ÆÄÖçVÄ66—G”Æ—G&W2’²"²#°¢&WGW&â66—G’²†ÖWG&–2ç&Vf–ÆÄöæÇ”–å&²ò"+r-í½Í­â"¢""“°¢Ð¢–b…fV†–6ÆTFW&—fVDÖWG&–72å5TTEôÄ”Ô•Eõt$ä”äuô”BæWVÇ2†ÖWG&–2æ–B’’°¢&WGW&â-	Míý=£¢²"²ÖWG&–2ç7VVDÆ–Ö—EF‡&W6†öÆD¶Ö‚²"­Âýr ¢²†ÖWG&–2ç7VVDÆ–Ö—D&Æ–æ²ò"+rÍ=ÝR"¢""“°¢Ð¢–b…fV†–6ÆTFW&—fVDÖWG&–72åEU$åõ4”täÅ5ô”BæWVÇ2†ÖWG&–2æ–B’’°¢&WGW&â-	½]-½’+rý-½’+r-Ýò=Ý½}mò#°¢Ð¢–b…fV†–6ÆTFW&—fVDÖWG&–72äUDõô„ôÄEô”BæWVÇ2†ÖWG&–2æ–B’’°¢&WGW&â$'&öF67BÇW2æÖöæ¦&òäUDô„ôÄB#°¢Ð¢7G&–ærVæ—BÒÖWG&–2çVæ—D÷fW'&–FRçG&–Ò‚’æ—4V×G’‚¢òÖWG&–2æfÆÆ&6µVæ—B¢ÖWG&–2çVæ—D÷fW'&–FRçG&–Ò‚“°¢&WGW&âVæ—Bæ—4V×G’‚’ò-	]r]MÝm²}Í]]Ýò"¢-	]MÝm¢"²Væ—C°¢Ð ¢æöäçVÆÀ¢&—fFR7FF–27G&–ærÆ–äçVÖ&W"†F÷V&ÆRfÇVR’°¢–b‡fÇVRÓÒÖF‚ç&–çB‡fÇVR’’&WGW&âÆöærçFõ7G&–ær„ÖF‚ç&÷VæB‡fÇVR’“°¢&WGW&âF÷V&ÆRçFõ7G&–ær‡fÇVR“°¢Ð ¢&—fFR7FF–2–çB7VvvW7FVDFV6–ÖÇ2„çVÆÆ&ÆR7G&–ærVæ—B’°¢7G&–ærfÇVRÒVæ—BÓÒçVÆÂò""¢Væ—BçFôÆ÷vW$66R„Æö6ÆRå$ôõB“°¢&WGW&âfÇVRæ6öçF–ç2‚,+"’ÇÂfÇVRæ6öçF–ç2‚&&""’ÇÂfÇVRæ6öçF–ç2‚-"’ò¢°¢Ð ¢&—fFR7FF–2–çBÖF6‚‚’²&WGW&âf–Wtw&÷WäÆ–÷WE&×2äÔD4…õ$TåC²Ð¢&—fFR7FF–2–çBw&‚’²&WGW&âf–Wtw&÷WäÆ–÷WE&×2åu$ô4ôåDTåC²Ð¢&—fFR–çBG†–çBfÇVR’°¢&WGW&âÖF‚ç&÷VæB‡fÇVR¢vWE&W6÷W&6W2‚’ævWDF—7Æ”ÖWG&–72‚’æFVç6—G’“°¢Ð§Ð

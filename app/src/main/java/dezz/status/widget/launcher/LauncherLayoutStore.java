@@ -19,7 +19,7 @@ import java.util.Map;
 
 import dezz.status.widget.Preferences;
 
-/** Persists the exact pixel rectangle of every independent HOME panel. */
+/** Persists the exact pixel rectangle of every independent HOME block. */
 public final class LauncherLayoutStore {
     public static final int SCHEMA_VERSION = 1;
     public static final String APPS = "apps";

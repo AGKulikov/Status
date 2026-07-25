@@ -25,7 +25,7 @@ import com.google.android.material.card.MaterialCardView;
 
 import dezz.status.widget.R;
 
-/** A HOME panel that can be moved and resized directly on the dashboard while edit mode is on. */
+/** A HOME block that can be moved and resized anywhere while edit mode is on. */
 public final class LauncherElementFrame extends MaterialCardView {
     public interface GeometryListener {
         void onGeometryChanged(@NonNull String id, int x, int y, int width, int height);
@@ -211,7 +211,7 @@ public final class LauncherElementFrame extends MaterialCardView {
             case TOP_RIGHT: return "Изменить размер за правый верхний угол";
             case BOTTOM_LEFT: return "Изменить размер за левый нижний угол";
             case BOTTOM_RIGHT: return "Изменить размер за правый нижний угол";
-            default: return "Изменить размер панели";
+            default: return "Изменить размер блока";
         }
     }
 
