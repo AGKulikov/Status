@@ -64,14 +64,21 @@ public final class AppRuntimeBootstrap {
     static void reconcileServices(@NonNull Context context,
                                   @NonNull Preferences preferences) {
         Context appContext = context.getApplicationContext();
-        if (preferences.widgetEnabled.get()
-                && Permissions.allPermissionsGranted(appContext)
-                && !WidgetService.isRunning()) {
-            try {
-                ContextCompat.startForegroundService(appContext,
-                        new Intent(appContext, WidgetService.class));
-            } catch (RuntimeException error) {
-                Log.w(TAG, "Could not start enabled widget service", error);
+        boolean integrationHostRequired = preferences.widgetEnabled.get()
+                || preferences.driverPanelEnabled.get();
+        WidgetService runningHost = WidgetService.getInstance();
+        if (integrationHostRequired) {
+            if (runningHost != null) {
+                // In particular, wake live smart-home/scenario state when the driver rail is
+                // enabled while the status surface is already waiting in WindowManager backoff.
+                runningHost.ensureEnabledRuntime();
+            } else if (Permissions.allPermissionsGranted(appContext)) {
+                try {
+                    ContextCompat.startForegroundService(appContext,
+                            new Intent(appContext, WidgetService.class));
+                } catch (RuntimeException error) {
+                    Log.w(TAG, "Could not start widget/driver integration host", error);
+                }
             }
         }
 
