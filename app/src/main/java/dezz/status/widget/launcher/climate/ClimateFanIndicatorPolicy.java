@@ -14,12 +14,12 @@ import java.util.Locale;
  * Shared presentation policy for the confirmed fan state used by every climate surface.
  *
  * <p>{@code climate.fan} is already routed by the Geely integration to the correct vendor
- * function for the confirmed climate mode. Manual speed is normalized to five visible positions,
- * while AUTO arrives as one of the vehicle's named intensity profiles. Consumers must not
+ * function for the confirmed climate mode. Manual speed keeps all nine vehicle positions,
+ * while AUTO arrives as one of the vehicle's five named intensity profiles. Consumers must not
  * read or infer a second fan mode independently.</p>
  */
 public final class ClimateFanIndicatorPolicy {
-    public static final int MANUAL_SEGMENTS = 5;
+    public static final int MANUAL_SEGMENTS = 9;
     public static final int AUTO_SEGMENTS = 5;
 
     public static final class Indicator {

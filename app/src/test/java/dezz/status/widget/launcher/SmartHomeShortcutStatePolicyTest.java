@@ -216,6 +216,22 @@ public final class SmartHomeShortcutStatePolicyTest {
         assertFalse(unavailable.available);
     }
 
+    @Test public void longSmartDeviceStateIsKeptInFull() {
+        LauncherShortcutStore.Shortcut shortcut = shortcut("status_rule");
+        shortcut.stateBinding = source(ConnectorType.MQTT, "device/full_status");
+        IntentActionRule rule = rule("status_rule", ConnectorType.MQTT,
+                "device/set", "Устройство", "Статус");
+        String full = "Режим: автоматический; состояние: выполняется; "
+                + "следующий этап: длительная проверка всех подключённых контуров";
+
+        SmartHomeShortcutStatePolicy.State state = SmartHomeShortcutStatePolicy.resolve(
+                shortcut, rule, Collections.singletonList(value(ConnectorType.MQTT,
+                        "device/full_status", full, true, true, "string", "",
+                        Collections.emptyMap())));
+
+        assertEquals(full, state.valueLabel);
+    }
+
     @Test public void numericMqttSwitchUsesResourceSemanticsForLiveActiveState() {
         LauncherShortcutStore.Shortcut shortcut = shortcut("mqtt_switch");
         shortcut.stateBinding = source(ConnectorType.MQTT, "garage/light/switch");

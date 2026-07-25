@@ -92,6 +92,16 @@ public final class LauncherPanelResizeMathTest {
                 LauncherPanelResizeMath.Corner.BOTTOM_RIGHT, 9_000, 9_000));
     }
 
+    @Test public void lockedResizePreservesWidgetRatioWithoutMovingTheOppositeCorner() {
+        LauncherPanelResizeMath.Rect result =
+                LauncherPanelResizeMath.resizeKeepingAspect(
+                        LauncherPanelResizeMath.Corner.BOTTOM_RIGHT,
+                        START, 200, 0, 1_000, 800,
+                        36, 28, 20, 4f / 3f);
+
+        assertRect(100, 80, 700, 530, result);
+    }
+
     @Test public void homeEditorWiresFourVisibleHandlesAndPersistsFinalRectangle()
             throws IOException {
         String source = source("dezz/status/widget/launcher/LauncherElementFrame.java");

@@ -176,6 +176,7 @@ public final class LocalScenarioController implements ConnectorValueRegistry.Lis
             case BUILTIN: stateScope = AutomationContract.SCOPE_BUILTIN; break;
             case OVERLAY: stateScope = AutomationContract.SCOPE_OVERLAY; break;
             case DRIVER: stateScope = AutomationContract.SCOPE_DRIVER; break;
+            case HUD: stateScope = AutomationContract.SCOPE_HUD; break;
             default: throw new IllegalArgumentException("Unsupported target scope");
         }
         return stateScope + "|" + AutomationContract.requireSafeId(id);
@@ -184,6 +185,7 @@ public final class LocalScenarioController implements ConnectorValueRegistry.Lis
     private static String fieldName(LocalField field) {
         switch (field) {
             case VISIBLE: return "visible";
+            case TEXT: return "text";
             case TEXT_COLOR: return "color";
             case ICON: return "icon";
             case BACKGROUND_COLOR: return "background_color";

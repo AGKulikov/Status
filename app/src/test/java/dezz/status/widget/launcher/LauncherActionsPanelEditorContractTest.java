@@ -18,13 +18,15 @@ import java.nio.file.Paths;
 
 /** Source-level guard for the shared runtime/settings actions-grid contract. */
 public final class LauncherActionsPanelEditorContractTest {
-    @Test public void homeUsesPersistedExactCellGridAndDedicatedEditor() throws IOException {
+    @Test public void homeUsesPersistedExactCellGridAndSharedScreenEditor() throws IOException {
         String launcher = source("dezz/status/widget/LauncherActivity.java");
 
         assertTrue(launcher.contains("EXTRA_EDIT_ACTIONS_CONTENT"));
         assertTrue(launcher.contains("shortcutGrid = new PanelGridLayout(this)"));
         assertTrue(launcher.contains("actionsContentEditOverlay = new PanelContentEditOverlay"));
-        assertTrue(launcher.contains("setActionsContentEditMode(true)"));
+        assertTrue(launcher.contains("requestsAnyHomeEditor(intent)"));
+        assertTrue(launcher.contains("activateGlobalElements()"));
+        assertTrue(launcher.contains("if (requestsAnyHomeEditor(intent)) setEditMode(true)"));
         assertTrue(launcher.contains("actionsGridConfigStore.save(actionsGridConfig)"));
         assertTrue(launcher.contains("preferences.launcherActionsVisible.get()"));
     }

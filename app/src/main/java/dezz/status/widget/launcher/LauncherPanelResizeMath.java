@@ -105,6 +105,57 @@ final class LauncherPanelResizeMath {
         return new Rect(left, top, right, bottom);
     }
 
+    /**
+     * Resizes from the same fixed opposite corner while preserving the supplied width/height
+     * ratio. The gesture axis with the larger relative change leads, so diagonal handles feel
+     * natural on both very wide media artwork and narrow buttons.
+     */
+    static Rect resizeKeepingAspect(Corner corner, Rect start,
+                                    int rawDx, int rawDy,
+                                    int parentWidth, int parentHeight,
+                                    int minWidth, int minHeight, int snapPx,
+                                    float aspectRatio) {
+        if (corner == Corner.NONE) return start;
+        float ratio = Float.isFinite(aspectRatio) && aspectRatio > 0f
+                ? aspectRatio
+                : start.width() / (float) Math.max(1, start.height());
+        Rect free = resize(corner, start, rawDx, rawDy,
+                parentWidth, parentHeight, minWidth, minHeight, snapPx);
+        int maxWidth = corner == Corner.TOP_LEFT || corner == Corner.BOTTOM_LEFT
+                ? Math.max(1, start.right)
+                : Math.max(1, parentWidth - start.left);
+        int maxHeight = corner == Corner.TOP_LEFT || corner == Corner.TOP_RIGHT
+                ? Math.max(1, start.bottom)
+                : Math.max(1, parentHeight - start.top);
+        int minimumWidth = Math.max(Math.max(1, minWidth),
+                (int) Math.ceil(Math.max(1, minHeight) * ratio));
+        int maximumWidth = Math.max(1,
+                Math.min(maxWidth, (int) Math.floor(maxHeight * ratio)));
+        if (minimumWidth > maximumWidth) minimumWidth = maximumWidth;
+
+        float relativeWidthChange = Math.abs(free.width() - start.width())
+                / (float) Math.max(1, start.width());
+        float relativeHeightChange = Math.abs(free.height() - start.height())
+                / (float) Math.max(1, start.height());
+        int targetWidth = relativeWidthChange >= relativeHeightChange
+                ? free.width() : Math.round(free.height() * ratio);
+        int width = clamp(targetWidth, minimumWidth, maximumWidth);
+        int height = Math.max(1, Math.round(width / ratio));
+        if (height > maxHeight) {
+            height = maxHeight;
+            width = Math.max(1, Math.min(maxWidth, Math.round(height * ratio)));
+        }
+
+        boolean fromLeft = corner == Corner.TOP_LEFT || corner == Corner.BOTTOM_LEFT;
+        boolean fromTop = corner == Corner.TOP_LEFT || corner == Corner.TOP_RIGHT;
+        int left = fromLeft ? start.right - width : start.left;
+        int right = fromLeft ? start.right : start.left + width;
+        int top = fromTop ? start.bottom - height : start.top;
+        int bottom = fromTop ? start.bottom : start.top + height;
+        return new Rect(Math.max(0, left), Math.max(0, top),
+                Math.min(parentWidth, right), Math.min(parentHeight, bottom));
+    }
+
     static int snapDelta(int delta, int snapPx) {
         int step = Math.max(1, snapPx);
         return Math.round(delta / (float) step) * step;

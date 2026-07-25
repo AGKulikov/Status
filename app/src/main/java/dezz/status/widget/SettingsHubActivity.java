@@ -870,7 +870,7 @@ public final class SettingsHubActivity extends AppCompatActivity {
                 return "Внешний вид каждого элемента настраивается визуально. "
                         + "Старые значения и порядок полностью сохраняются.";
             case HOME:
-                return "Размер и положение панелей меняются на самом HOME, поэтому "
+                return "Размер и положение блоков меняются на самом HOME, поэтому "
                         + "результат редактора совпадает с реальным экраном.";
             case PANELS:
                 return "Для медиа, навигации, климата и данных автомобиля доступны "
@@ -883,7 +883,7 @@ public final class SettingsHubActivity extends AppCompatActivity {
                         + "Секретные команды и ключи остаются только на устройстве.";
             case APP:
             default:
-                return "Экспорт включает интерфейс, HOME, панели и обычные сценарии. "
+                return "Экспорт включает интерфейс, HOME, блоки, панели и обычные сценарии. "
                         + "Пароли, токены и секретные команды не покидают устройство.";
         }
     }
@@ -978,6 +978,7 @@ public final class SettingsHubActivity extends AppCompatActivity {
             case "routes": return R.drawable.ic_launcher_work;
             case "climate": return R.drawable.ic_car_climate;
             case "vehicle": return R.drawable.ic_smart_car;
+            case "hud": return R.drawable.ic_smart_car;
             case "information": return R.drawable.ic_info;
             case "actions": return R.drawable.ic_popup_power;
             case "popup": return R.drawable.ic_popup_light;

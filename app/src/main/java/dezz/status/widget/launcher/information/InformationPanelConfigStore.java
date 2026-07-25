@@ -106,6 +106,20 @@ public final class InformationPanelConfigStore {
                     item.scalePercent = encoded.optInt("scalePercent", 100);
                     item.decimals = encoded.optInt("decimals", item.decimals);
                     item.unitOverride = encoded.optString("unitOverride", "");
+                    item.labelTextSizeSp = encoded.optInt("labelTextSizeSp", 11);
+                    item.valueTextSizeSp = encoded.optInt("valueTextSizeSp", 20);
+                    item.fontFamily = encoded.optString(
+                            "fontFamily", item.fontFamily);
+                    item.textBold = encoded.optBoolean("textBold", true);
+                    item.textItalic = encoded.optBoolean("textItalic", false);
+                    item.horizontalAlignment =
+                            encoded.optInt("horizontalAlignment", 0);
+                    item.verticalAlignment =
+                            encoded.optInt("verticalAlignment", 1);
+                    item.paddingLeftPx = encoded.optInt("paddingLeftPx", 10);
+                    item.paddingTopPx = encoded.optInt("paddingTopPx", 7);
+                    item.paddingRightPx = encoded.optInt("paddingRightPx", 10);
+                    item.paddingBottomPx = encoded.optInt("paddingBottomPx", 7);
                     result.mutableItems().add(item);
                 }
             }
@@ -155,6 +169,17 @@ public final class InformationPanelConfigStore {
             encoded.put("scalePercent", item.scalePercent);
             encoded.put("decimals", item.decimals);
             encoded.put("unitOverride", item.unitOverride);
+            encoded.put("labelTextSizeSp", item.labelTextSizeSp);
+            encoded.put("valueTextSizeSp", item.valueTextSizeSp);
+            encoded.put("fontFamily", item.fontFamily);
+            encoded.put("textBold", item.textBold);
+            encoded.put("textItalic", item.textItalic);
+            encoded.put("horizontalAlignment", item.horizontalAlignment);
+            encoded.put("verticalAlignment", item.verticalAlignment);
+            encoded.put("paddingLeftPx", item.paddingLeftPx);
+            encoded.put("paddingTopPx", item.paddingTopPx);
+            encoded.put("paddingRightPx", item.paddingRightPx);
+            encoded.put("paddingBottomPx", item.paddingBottomPx);
             items.put(encoded);
         }
         root.put("items", items);

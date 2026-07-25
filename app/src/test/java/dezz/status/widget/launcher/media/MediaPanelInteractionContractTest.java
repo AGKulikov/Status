@@ -29,6 +29,18 @@ public final class MediaPanelInteractionContractTest {
         assertFalse(button.contains("MediaAppLauncher.launchYandexMusic"));
     }
 
+    @Test public void mediaButtonScaleChangesTheGlyphInsideTheCell() throws IOException {
+        String source = source("dezz/status/widget/launcher/media/MediaPanelView.java");
+        int buttonStart = source.indexOf("private ImageButton button(");
+        int buttonEnd = source.indexOf("private void applySnapshot()", buttonStart);
+        String button = source.substring(buttonStart, buttonEnd);
+
+        assertTrue(button.contains("int scalePercent"));
+        assertTrue(button.contains("Math.round(dp(16) * 100f / Math.max(45, scalePercent))"));
+        assertTrue(button.contains("value.setPadding(padding, padding, padding, padding)"));
+        assertFalse(button.contains("value.setPadding(dp(16), dp(16), dp(16), dp(16))"));
+    }
+
     @Test public void volumeWritesMusicStreamAndListensForSystemChanges() throws IOException {
         String source = source("dezz/status/widget/launcher/media/MediaPanelView.java");
         assertTrue(source.contains("manager.setStreamVolume(AudioManager.STREAM_MUSIC"));
@@ -193,7 +205,7 @@ public final class MediaPanelInteractionContractTest {
         String launcher = source("dezz/status/widget/LauncherActivity.java");
         assertTrue(settings.contains("LauncherActivity.EXTRA_EDIT_MODE"));
         assertTrue(settings.contains("LauncherActivity.EXTRA_EDIT_MEDIA_CONTENT"));
-        assertTrue(settings.contains("Расположение элементов внутри панели на HOME"));
+        assertTrue(settings.contains("Расположение элементов внутри блока на HOME"));
         assertTrue(settings.contains("ЖИВОЙ РЕДАКТОР · ТАЩИТЕ ЭЛЕМЕНТЫ"));
         assertTrue(settings.contains("preview.setInPlaceEditMode(true"));
         assertTrue(launcher.contains("private void setMediaContentEditMode(boolean enabled)"));

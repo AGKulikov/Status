@@ -29,7 +29,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import dezz.status.widget.launcher.LauncherGlobalElementTag;
 import dezz.status.widget.launcher.LauncherIconResolver;
+import dezz.status.widget.launcher.LauncherLayoutStore;
 
 /**
  * Responsive grid of user-defined Yandex routes.
@@ -164,6 +166,9 @@ public final class FavoriteRoutesPanelView extends FrameLayout {
     @NonNull
     private View buildTile(@NonNull FavoriteRouteConfig route) {
         LinearLayout tile = new LinearLayout(getContext());
+        LauncherGlobalElementTag.attach(tile, LauncherLayoutStore.NAVIGATION,
+                "favorite_route_" + route.id,
+                route.title == null ? "Маршрут" : route.title);
         tile.setOrientation(LinearLayout.VERTICAL);
         tile.setGravity(Gravity.CENTER);
         int padding = dp(TILE_PADDING_DP);

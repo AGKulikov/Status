@@ -44,6 +44,9 @@ import java.util.concurrent.CompletableFuture;
 
 import dezz.status.widget.automation.AutomationContract;
 import dezz.status.widget.driver.DriverPanelService;
+import dezz.status.widget.hud.HudElementConfig;
+import dezz.status.widget.hud.HudPanelStore;
+import dezz.status.widget.hud.HudPresentationService;
 import dezz.status.widget.ha.HaBrickConfig;
 import dezz.status.widget.ha.HaBrickConfigStore;
 import dezz.status.widget.ha.api.HaApiController;
@@ -106,17 +109,19 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             "актуально", "устарело", "всегда"
     };
     private static final String[] TARGET_VALUES = {
-            "MAIN", "POPUP", "BUILTIN", "OVERLAY", "DRIVER"
+            "MAIN", "POPUP", "BUILTIN", "OVERLAY", "DRIVER", "HUD"
     };
     private static final String[] TARGET_LABELS = {
             "Элемент основной строки", "Плитка плавающего оверлея",
-            "Штатный элемент", "Весь плавающий оверлей", "Кнопка панели водителя"
+            "Штатный элемент", "Весь плавающий оверлей", "Кнопка панели водителя",
+            "Элемент отдельного HUD-дисплея"
     };
     private static final String[] FIELD_VALUES = {
-            "VISIBLE", "TEXT_COLOR", "BACKGROUND_COLOR", "ICON", "ACTION_ENABLED"
+            "VISIBLE", "TEXT", "TEXT_COLOR", "BACKGROUND_COLOR", "ICON", "ACTION_ENABLED"
     };
     private static final String[] FIELD_LABELS = {
-            "Показать или скрыть", "Изменить цвет текста", "Изменить цвет фона",
+            "Показать или скрыть", "Задать отображаемый текст", "Изменить цвет текста",
+            "Изменить цвет фона",
             "Изменить иконку", "Разрешить или запретить нажатие"
     };
     private static final String[] BOOLEAN_BRANCH_LABELS = {
@@ -526,6 +531,7 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 WidgetServiceStarter.startIfNeeded(this);
             }
             DriverPanelService.apply(this);
+            HudPresentationService.notifyAutomationChanged(this);
             if (showSuccess) {
                 Toast.makeText(this, "Сценарии сохранены", Toast.LENGTH_SHORT).show();
             }
@@ -777,14 +783,24 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 field = LocalField.VISIBLE;
             }
             boolean bool = isBooleanField(field);
+            boolean directText = field == LocalField.TEXT;
+            trueStyleEnabled.setText(directText
+                    ? "Если условие выполняется — задать текст"
+                    : "Если условие выполняется — изменить оформление");
+            falseStyleEnabled.setText(directText
+                    ? "Если условие НЕ выполняется — задать текст"
+                    : "Если условие НЕ выполняется — изменить оформление");
             trueBooleanChoice.setVisibility(bool ? View.VISIBLE : View.GONE);
             falseBooleanChoice.setVisibility(bool ? View.VISIBLE : View.GONE);
             trueStyleEnabled.setVisibility(bool ? View.GONE : View.VISIBLE);
             falseStyleEnabled.setVisibility(bool ? View.GONE : View.VISIBLE);
-            stringValue.setVisibility(View.GONE);
-            falseStringValue.setVisibility(View.GONE);
-            chooseStyleValue.setVisibility(bool ? View.GONE : View.VISIBLE);
-            chooseFalseStyleValue.setVisibility(bool ? View.GONE : View.VISIBLE);
+            stringValue.setHint("Текст при выполненном условии");
+            falseStringValue.setHint("Текст при невыполненном условии");
+            stringValue.setVisibility(directText ? View.VISIBLE : View.GONE);
+            falseStringValue.setVisibility(directText ? View.VISIBLE : View.GONE);
+            chooseStyleValue.setVisibility(!bool && !directText ? View.VISIBLE : View.GONE);
+            chooseFalseStyleValue.setVisibility(
+                    !bool && !directText ? View.VISIBLE : View.GONE);
         }
 
         /** Visibility of popup UI belongs to the independent window, not to a child tile.
@@ -1320,12 +1336,25 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 }
                 break;
             case DRIVER:
-                addDriverTargets(result, prefs.driverPanelOld, "Старая панель");
-                addDriverTargets(result, prefs.driverPanelNew, "Новая панель");
-                for (LauncherShortcutStore.Shortcut shortcut :
-                        LauncherShortcutStore.forDriverFavorites(prefs).all()) {
-                    result.add(new TargetOption(shortcut.id,
-                            "Избранное · " + shortcut.title + " [" + shortcut.id + "]"));
+                addDriverTargets(result, prefs.activeDriverPanelProfile(),
+                        "Панель водителя");
+                for (dezz.status.widget.driver.DriverFavoritesPanelConfig panel :
+                        new dezz.status.widget.driver.DriverFavoritesPanelStore(prefs).load()) {
+                    result.add(new TargetOption(panel.id,
+                            "Панель избранного · " + panel.title
+                                    + " [" + panel.id + "]"));
+                    for (LauncherShortcutStore.Shortcut shortcut :
+                            LauncherShortcutStore.forDriverFavorites(prefs, panel.id).all()) {
+                        result.add(new TargetOption(shortcut.id,
+                                panel.title + " · " + shortcut.title
+                                        + " [" + shortcut.id + "]"));
+                    }
+                }
+                break;
+            case HUD:
+                for (HudElementConfig item : new HudPanelStore(prefs).load().elements) {
+                    result.add(new TargetOption(item.automationId,
+                            "HUD · " + item.title + " [" + item.automationId + "]"));
                 }
                 break;
             default:

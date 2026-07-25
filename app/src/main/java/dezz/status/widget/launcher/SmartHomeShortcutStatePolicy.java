@@ -96,7 +96,7 @@ public final class SmartHomeShortcutStatePolicy {
         Active active = cover == null
                 ? active(raw, binding, value)
                 : new Active(true, cover.active);
-        return new State(icon, bounded(label), true, value.fresh, available,
+        return new State(icon, complete(label), true, value.fresh, available,
                 active.known, active.value);
     }
 
@@ -273,7 +273,7 @@ public final class SmartHomeShortcutStatePolicy {
             try {
                 value = new BigDecimal(String.valueOf(raw)).stripTrailingZeros().toPlainString();
             } catch (NumberFormatException ignored) {
-                return bounded(String.valueOf(raw));
+                return complete(String.valueOf(raw));
             }
         } else {
             String text = String.valueOf(raw).trim();
@@ -294,12 +294,12 @@ public final class SmartHomeShortcutStatePolicy {
             }
         }
         String suffix = unit == null ? "" : unit.trim();
-        return bounded(suffix.isEmpty() || "—".equals(value) ? value : value + " " + suffix);
+        return complete(suffix.isEmpty() || "—".equals(value) ? value : value + " " + suffix);
     }
 
-    private static String bounded(String text) {
-        String value = text == null ? "" : text.trim();
-        return value.length() <= 48 ? value : value.substring(0, 47) + "…";
+    /** The caller owns layout/scrolling; never silently truncate a device's actual state. */
+    private static String complete(String text) {
+        return text == null ? "" : text.trim();
     }
 
     private static String first(Object... values) {

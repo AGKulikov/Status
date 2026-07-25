@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import dezz.status.widget.Fonts;
 import dezz.status.widget.integration.SourceBinding;
 
 /** User-owned grid and read-only source bindings for the HOME “Information” panel. */
@@ -72,6 +73,18 @@ public final class InformationPanelConfig {
         public int scalePercent;
         public int decimals;
         @NonNull public String unitOverride;
+        public int labelTextSizeSp;
+        public int valueTextSizeSp;
+        @NonNull public String fontFamily;
+        public boolean textBold;
+        public boolean textItalic;
+        /** 0=start/top, 1=center, 2=end/bottom. */
+        public int horizontalAlignment;
+        public int verticalAlignment;
+        public int paddingLeftPx;
+        public int paddingTopPx;
+        public int paddingRightPx;
+        public int paddingBottomPx;
 
         private Item(@NonNull String id, @NonNull SourceKind sourceKind,
                      @NonNull String sourceId, @Nullable SourceBinding binding,
@@ -100,6 +113,17 @@ public final class InformationPanelConfig {
             scalePercent = 100;
             decimals = suggestedDecimals(sourceUnit);
             unitOverride = "";
+            labelTextSizeSp = 11;
+            valueTextSizeSp = 20;
+            fontFamily = Fonts.DEFAULT_KEY;
+            textBold = true;
+            textItalic = false;
+            horizontalAlignment = 0;
+            verticalAlignment = 1;
+            paddingLeftPx = 10;
+            paddingTopPx = 7;
+            paddingRightPx = 10;
+            paddingBottomPx = 7;
         }
 
         @NonNull
@@ -149,6 +173,17 @@ public final class InformationPanelConfig {
             value.scalePercent = scalePercent;
             value.decimals = decimals;
             value.unitOverride = unitOverride;
+            value.labelTextSizeSp = labelTextSizeSp;
+            value.valueTextSizeSp = valueTextSizeSp;
+            value.fontFamily = fontFamily;
+            value.textBold = textBold;
+            value.textItalic = textItalic;
+            value.horizontalAlignment = horizontalAlignment;
+            value.verticalAlignment = verticalAlignment;
+            value.paddingLeftPx = paddingLeftPx;
+            value.paddingTopPx = paddingTopPx;
+            value.paddingRightPx = paddingRightPx;
+            value.paddingBottomPx = paddingBottomPx;
             return value;
         }
 
@@ -171,6 +206,15 @@ public final class InformationPanelConfig {
             scalePercent = clamp(scalePercent, MIN_SCALE, MAX_SCALE);
             decimals = clamp(decimals, 0, 4);
             unitOverride = clean(unitOverride);
+            labelTextSizeSp = clamp(labelTextSizeSp, 8, 72);
+            valueTextSizeSp = clamp(valueTextSizeSp, 8, 96);
+            fontFamily = Fonts.findByKey(fontFamily).key;
+            horizontalAlignment = clamp(horizontalAlignment, 0, 2);
+            verticalAlignment = clamp(verticalAlignment, 0, 2);
+            paddingLeftPx = clamp(paddingLeftPx, 0, 96);
+            paddingTopPx = clamp(paddingTopPx, 0, 96);
+            paddingRightPx = clamp(paddingRightPx, 0, 96);
+            paddingBottomPx = clamp(paddingBottomPx, 0, 96);
             columnSpan = clamp(columnSpan, 1, columns);
             rowSpan = clamp(rowSpan, 1, rows);
             column = clamp(column, 0, Math.max(0, columns - columnSpan));

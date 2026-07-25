@@ -22,7 +22,7 @@ public final class YandexRouteWindowContractTest {
     public void floatingRouteUsesSharedYandexWindowLauncher() throws IOException {
         String source = source("dezz/status/widget/launcher/routes/YandexRouteLauncher.java");
 
-        assertTrue(source.contains("YandexWindowLauncher.launch("));
+        assertTrue(source.contains("YandexWindowLauncher.launchOverLauncher("));
         assertTrue(source.contains("windowProduct(route.product), false"));
         assertTrue(source.contains("postDelayed"));
         assertTrue(source.contains(
@@ -38,6 +38,15 @@ public final class YandexRouteWindowContractTest {
         assertFalse(source.contains("setLaunchDisplayId"));
         assertFalse(source.contains("bundle.putInt(\"android.activity.windowingMode\""));
         assertFalse(source.contains("startFreeformWindow"));
+    }
+
+    @Test
+    public void textDestinationUsesDirectRouteAndNeverAlice() throws IOException {
+        String source = source("dezz/status/widget/launcher/routes/YandexRouteLauncher.java");
+
+        assertTrue(source.contains("Uri.encode(\"~\" + addressValue"));
+        assertTrue(source.contains("&rtt=auto"));
+        assertFalse(source.contains("ask_alice"));
     }
 
     private static String source(String relative) throws IOException {

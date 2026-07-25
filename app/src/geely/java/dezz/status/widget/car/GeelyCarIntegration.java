@@ -625,26 +625,33 @@ final class GeelyCarIntegration implements CarIntegration {
     private static List<CarControlDescriptor.Option> fanOptions() {
         return Arrays.asList(option(IHvac.FAN_SPEED_OFF, "Выкл"),
                 option(IHvac.FAN_SPEED_LEVEL_1, "1"),
-                option(IHvac.FAN_SPEED_LEVEL_3, "2"),
-                option(IHvac.FAN_SPEED_LEVEL_5, "3"),
-                option(IHvac.FAN_SPEED_LEVEL_7, "4"),
-                option(IHvac.FAN_SPEED_LEVEL_9, "5"));
+                option(IHvac.FAN_SPEED_LEVEL_2, "2"),
+                option(IHvac.FAN_SPEED_LEVEL_3, "3"),
+                option(IHvac.FAN_SPEED_LEVEL_4, "4"),
+                option(IHvac.FAN_SPEED_LEVEL_5, "5"),
+                option(IHvac.FAN_SPEED_LEVEL_6, "6"),
+                option(IHvac.FAN_SPEED_LEVEL_7, "7"),
+                option(IHvac.FAN_SPEED_LEVEL_8, "8"),
+                option(IHvac.FAN_SPEED_LEVEL_9, "9"));
     }
 
-    /** Five evenly spaced UI positions over the exact ECARX manual raw range 1..9. */
+    /** Preserve every exact ECARX manual fan position in the UI. */
     static int manualFanDisplayLevel(int rawValue) {
         if (rawValue < IHvac.FAN_SPEED_LEVEL_1 || rawValue > IHvac.FAN_SPEED_LEVEL_9) return 0;
-        int rawLevel = rawValue - IHvac.FAN_SPEED_LEVEL_1 + 1;
-        return Math.min(5, (rawLevel + 1) / 2);
+        return rawValue - IHvac.FAN_SPEED_LEVEL_1 + 1;
     }
 
     static int manualFanValueForDisplayLevel(int displayLevel) {
         switch (displayLevel) {
             case 1: return IHvac.FAN_SPEED_LEVEL_1;
-            case 2: return IHvac.FAN_SPEED_LEVEL_3;
-            case 3: return IHvac.FAN_SPEED_LEVEL_5;
-            case 4: return IHvac.FAN_SPEED_LEVEL_7;
-            case 5: return IHvac.FAN_SPEED_LEVEL_9;
+            case 2: return IHvac.FAN_SPEED_LEVEL_2;
+            case 3: return IHvac.FAN_SPEED_LEVEL_3;
+            case 4: return IHvac.FAN_SPEED_LEVEL_4;
+            case 5: return IHvac.FAN_SPEED_LEVEL_5;
+            case 6: return IHvac.FAN_SPEED_LEVEL_6;
+            case 7: return IHvac.FAN_SPEED_LEVEL_7;
+            case 8: return IHvac.FAN_SPEED_LEVEL_8;
+            case 9: return IHvac.FAN_SPEED_LEVEL_9;
             default: return IHvac.FAN_SPEED_OFF;
         }
     }
@@ -710,7 +717,7 @@ final class GeelyCarIntegration implements CarIntegration {
     private static final ControlDefinition FAN_DEFINITION =
             new ControlDefinition(FAN_CONTROL_ID, "Скорость вентилятора", "Климат", "fan",
                     CarControlDescriptor.Kind.LEVELS, IHvac.HVAC_FUNC_FAN_SPEED,
-                    FRONT_FAN_ZONE, false, fanOptions(), 0, 5, 1, "", "#FF42A5F5");
+                    FRONT_FAN_ZONE, false, fanOptions(), 0, 9, 1, "", "#FF42A5F5");
 
     private static final ControlDefinition AUTO_FAN_DEFINITION =
             new ControlDefinition(FAN_CONTROL_ID, "Скорость вентилятора AUTO", "Климат", "fan",
@@ -2925,8 +2932,14 @@ final class GeelyCarIntegration implements CarIntegration {
 
     @NonNull
     static String controlCommandKey(@NonNull CarControlCommand command) {
-        return command.controlId + '\u0000' + command.operation.name() + '\u0000'
-                + Long.toHexString(Double.doubleToLongBits(command.value));
+        StringBuilder key = new StringBuilder(command.controlId)
+                .append('\u0000').append(command.operation.name()).append('\u0000')
+                .append(Long.toHexString(Double.doubleToLongBits(command.value)));
+        for (Double value : command.cycleValues) {
+            key.append('\u0000')
+                    .append(Long.toHexString(Double.doubleToLongBits(value)));
+        }
+        return key.toString();
     }
 
     private void enqueueControlCommandOnWorker(@NonNull CarControlCommand command,
@@ -3011,15 +3024,20 @@ final class GeelyCarIntegration implements CarIntegration {
             return;
         }
         active.pulse = definition.descriptor.kind == CarControlDescriptor.Kind.ACTION;
-        Double current = active.pulse ? 0d : readControlValue(source, definition);
+        // Keep nullable Binder reads out of a numeric conditional expression: Java would
+        // otherwise unbox a null Double before the explicit null guard below can run.
+        Double current = active.pulse
+                ? Double.valueOf(0d)
+                : readControlValue(source, definition);
         if (!active.pulse && current == null) {
             completeControlCommand(active, false, "Не удалось прочитать текущее состояние");
             scheduleControlRetry();
             return;
         }
         List<CarControlDescriptor.Option> runtimeOptions = supportedOptions(source, definition);
-        Double target = active.pulse ? 1d
-                : commandTarget(definition, command, current, runtimeOptions);
+        Double target = active.pulse
+                ? Double.valueOf(1d)
+                : commandTarget(definition, command, current.doubleValue(), runtimeOptions);
         if (target == null) {
             completeControlCommand(active, false, "Недопустимое значение команды");
             return;
@@ -3291,17 +3309,41 @@ final class GeelyCarIntegration implements CarIntegration {
                 }
                 return 1d;
             case CYCLE:
-                List<CarControlDescriptor.Option> options = availableOptions;
-                if (options.isEmpty()) return null;
-                for (int index = 0; index < options.size(); index++) {
-                    if (sameValue(options.get(index).value, current)) {
-                        return options.get((index + 1) % options.size()).value;
-                    }
-                }
-                return options.get(0).value;
+                return cycleTarget(availableOptions, command.cycleValues, current);
             default:
                 return null;
         }
+    }
+
+    /**
+     * Selects the next runtime-supported value while preserving the exact order chosen in UI.
+     * An empty selection means the complete vendor-reported list.
+     */
+    @Nullable
+    static Double cycleTarget(@NonNull List<CarControlDescriptor.Option> availableOptions,
+                              @NonNull List<Double> selectedValues,
+                              double current) {
+        List<CarControlDescriptor.Option> options = availableOptions;
+        if (!selectedValues.isEmpty()) {
+            List<CarControlDescriptor.Option> selected = new ArrayList<>();
+            for (Double requested : selectedValues) {
+                for (CarControlDescriptor.Option option : availableOptions) {
+                    if (sameValue(option.value, requested)
+                            && !selected.contains(option)) {
+                        selected.add(option);
+                        break;
+                    }
+                }
+            }
+            options = selected;
+        }
+        if (options.isEmpty()) return null;
+        for (int index = 0; index < options.size(); index++) {
+            if (sameValue(options.get(index).value, current)) {
+                return options.get((index + 1) % options.size()).value;
+            }
+        }
+        return options.get(0).value;
     }
 
     @NonNull

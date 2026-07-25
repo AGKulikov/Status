@@ -19,7 +19,7 @@ public final class LauncherShortcutSettingsGridContractTest {
         assertTrue(source.contains("preferences.launcherActionsVisible.set(checked)"));
         assertTrue(source.contains("PanelElementConfigStore.ACTION_TILES"));
         assertTrue(source.contains("PanelElementConfigStore.ACTION_ADD"));
-        assertTrue(source.contains("Показывать кнопки и устройства в панели"));
+        assertTrue(source.contains("Показывать кнопки и устройства в блоке"));
         assertTrue(source.contains("Показывать плитку «Добавить»"));
         assertTrue(source.contains("changeActionElementScale"));
         assertTrue(source.contains("LauncherActivity.EXTRA_EDIT_MODE"));

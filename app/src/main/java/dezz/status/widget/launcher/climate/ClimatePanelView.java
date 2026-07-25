@@ -39,6 +39,8 @@ import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarControlDescriptor;
 import dezz.status.widget.car.CarControlState;
 import dezz.status.widget.car.CarIntegration;
+import dezz.status.widget.launcher.LauncherGlobalElementTag;
+import dezz.status.widget.launcher.LauncherLayoutStore;
 
 /**
  * A standalone, responsive HOME climate surface backed by confirmed ECARX control state.
@@ -76,7 +78,13 @@ public final class ClimatePanelView extends FrameLayout {
 
     private final CarIntegration.ControlStateListener stateListener = state -> {
         CarControlState previous = states.put(state.controlId, state);
-        applyState(state.controlId);
+        if (ClimatePanelConfig.POWER.equals(state.controlId)) {
+            // Master OFF is authoritative for every dependent tile. Re-render all of them now;
+            // otherwise a stale airflow value can remain "Неизвестно" until its own next event.
+            for (String id : new ArrayList<>(bindings.keySet())) applyState(id);
+        } else {
+            applyState(state.controlId);
+        }
         updateConnectionLabel();
         CarControlDescriptor descriptor = catalog.get(state.controlId);
         boolean newlySupported = state.available
@@ -268,7 +276,7 @@ public final class ClimatePanelView extends FrameLayout {
             controlsLp.topMargin = scaledDp(4);
             root.addView(controls, controlsLp);
         } else {
-            TextView empty = label("Включите нужные элементы в настройках панели",
+            TextView empty = label("Включите нужные элементы в настройках блока",
                     scaledSp(14), false);
             empty.setGravity(Gravity.CENTER);
             empty.setAlpha(.72f);
@@ -284,6 +292,8 @@ public final class ClimatePanelView extends FrameLayout {
     @NonNull
     private View buildHeader() {
         LinearLayout header = new LinearLayout(getContext());
+        LauncherGlobalElementTag.attach(header, LauncherLayoutStore.CLIMATE,
+                "header", "Заголовок климата");
         header.setGravity(Gravity.CENTER_VERTICAL);
         ImageView icon = new ImageView(getContext());
         icon.setImageResource(R.drawable.ic_car_climate);
@@ -451,9 +461,9 @@ public final class ClimatePanelView extends FrameLayout {
                 ids.add(element.id);
             }
         }
-        // Fan position 1 decrements the HVAC master switch, even when the user hid the separate
-        // power tile. Keep its confirmed state subscribed without rendering another control.
-        if (ids.contains(ClimatePanelConfig.FAN)) {
+        // Master OFF is authoritative for every climate tile, even when the separate power tile
+        // is hidden. Keep its confirmed state subscribed without rendering another control.
+        if (!ids.isEmpty()) {
             CarControlDescriptor power = catalog.get(ClimatePanelConfig.POWER);
             if (!catalogResolved || (power != null && power.availability
                     != CarControlDescriptor.Availability.UNSUPPORTED)) {
@@ -602,9 +612,14 @@ public final class ClimatePanelView extends FrameLayout {
         if (binding == null) return;
         CarControlState state = states.get(id);
         boolean previewSample = isEditorPlaceholder(id);
-        boolean available = previewSample || (isFresh(state) && state.available);
-        boolean known = previewSample || (available && state.known);
-        boolean active = previewSample ? isPreviewActive(id) : known && state.active;
+        boolean climateOff = !previewSample
+                && !ClimatePanelConfig.POWER.equals(id)
+                && isClimateConfirmedOff();
+        boolean commandAvailable = isFresh(state) && state.available;
+        boolean available = previewSample || climateOff || commandAvailable;
+        boolean known = previewSample || climateOff || (commandAvailable && state.known);
+        boolean active = previewSample ? isPreviewActive(id)
+                : !climateOff && known && state.active;
         int accent = color(config.accentColor, Color.CYAN);
         if (active && state != null && config.useVehicleStateColors
                 && state.suggestedColor != null) {
@@ -613,10 +628,12 @@ public final class ClimatePanelView extends FrameLayout {
         int inactive = color(config.inactiveColor, Color.LTGRAY);
         int tint = active ? accent : inactive;
         binding.icon.setColorFilter(tint);
-        String displayValue = previewSample ? previewValue(id) : displayStateValue(id, state);
+        String displayValue = previewSample ? previewValue(id)
+                : climateOff ? "Выкл" : displayStateValue(id, state);
         // The fan tile is numeric at all times. While its command is pending keep the last
         // confirmed 1–5 value instead of temporarily replacing it with a word.
-        binding.value.setText(pending.containsKey(id) && !ClimatePanelConfig.FAN.equals(id)
+        binding.value.setText(!climateOff && pending.containsKey(id)
+                && !ClimatePanelConfig.FAN.equals(id)
                 ? "Ожидание…" : displayValue);
         binding.value.setTextColor(tint);
         // New CarPlay uses a calm translucent glass row and turns the selected action into a
@@ -641,14 +658,23 @@ public final class ClimatePanelView extends FrameLayout {
         boolean manualLevelReady = !config.hasLevelCycleOrder(id) || (known && optionsReady
                 && !binding.descriptor.options.isEmpty());
         binding.card.setEnabled(editorPreviewMode
-                || (available && manualLevelReady && !pending.containsKey(id)));
+                || (!climateOff && commandAvailable && manualLevelReady
+                && !pending.containsKey(id)));
         for (View interactive : binding.interactive) {
-            interactive.setEnabled(known && optionsReady && !pending.containsKey(id));
-            interactive.setAlpha(known && optionsReady ? 1f : .38f);
+            interactive.setEnabled(commandAvailable && !climateOff && state.known
+                    && optionsReady && !pending.containsKey(id));
+            interactive.setAlpha(commandAvailable && !climateOff && state.known
+                    && optionsReady ? 1f : .38f);
         }
         binding.card.setContentDescription(binding.descriptor.label + ", "
-                + (previewSample ? previewValue(id)
-                        : displayStateValue(id, state)));
+                + displayValue);
+    }
+
+    private boolean isClimateConfirmedOff() {
+        CarControlState power = states.get(ClimatePanelConfig.POWER);
+        boolean known = isFresh(power) && power.available && power.known;
+        return ClimatePowerStatePolicy.isConfirmedOff(
+                known, known && power.active);
     }
 
     @NonNull
@@ -705,6 +731,8 @@ public final class ClimatePanelView extends FrameLayout {
     @NonNull
     private ClimateTileView tileCard(@NonNull String id) {
         ClimateTileView card = new ClimateTileView(getContext());
+        LauncherGlobalElementTag.attach(card, LauncherLayoutStore.CLIMATE,
+                id, shortLabel(id));
         card.setRadius(config.tileCornerRadiusPx);
         card.setCardElevation(scaledPx(1));
         card.setClickable(true);

@@ -14,6 +14,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -28,7 +29,6 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
@@ -49,7 +49,7 @@ import dezz.status.widget.launcher.ShortcutActionPicker;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
-/** Visual editor for both independently configured Monjaro driver-panel generations. */
+/** Visual editor for the unified current-generation Monjaro driver panel. */
 public final class DriverPanelSettingsActivity extends AppCompatActivity {
     private interface IntSetter { void set(int value); }
 
@@ -90,7 +90,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             refreshButtons();
             applyPanel();
         });
-        setTitle("Панель водителя · " + styleName(profile.style));
+        setTitle("Панель водителя");
         View content = buildContent();
         setContentView(content);
         SettingsBackNavigation.install(this, content);
@@ -134,7 +134,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         settings.setPadding(dp(10), 0, dp(22), dp(28));
         scroll.addView(settings, new ScrollView.LayoutParams(match(), wrap()));
 
-        title(settings, "Панель водителя · " + styleNameLower(profile.style));
+        title(settings, "Панель водителя");
         hint(settings, "До 10 кнопок поверх любых приложений. Домой, Назад и полный список "
                 + "приложений уже добавлены по умолчанию.");
 
@@ -143,7 +143,6 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                     preferences.driverPanelEnabled.set(value);
                     applyPanel();
                 });
-        addStyleSelector(settings);
         addSwitch(settings, "Показывать справа",
                 profile.side.get() == 1, value -> {
                     profile.side.set(value ? 1 : 0);
@@ -219,13 +218,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         addApplication = button("＋ Приложение");
         addFunction = button("＋ Действие");
         addApplication.setOnClickListener(view -> addApplication());
-        addFunction.setOnClickListener(view -> {
-            if (store.all().size() >= LauncherShortcutStore.MAX_DRIVER_PANEL_SHORTCUTS) {
-                limitToast();
-            } else {
-                actionPicker.showNew();
-            }
-        });
+        addFunction.setOnClickListener(view -> actionPicker.showNew());
         addRow.addView(addApplication, new LinearLayout.LayoutParams(0, dp(52), 1f));
         LinearLayout.LayoutParams functionParams = new LinearLayout.LayoutParams(
                 0, dp(52), 1f);
@@ -288,11 +281,14 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         if (buttonsHost == null) return;
         buttonsHost.removeAllViews();
         List<LauncherShortcutStore.Shortcut> shortcuts = store.all();
-        countLabel.setText(shortcuts.size() + " из "
-                + LauncherShortcutStore.MAX_DRIVER_PANEL_SHORTCUTS);
-        boolean full = shortcuts.size() >= LauncherShortcutStore.MAX_DRIVER_PANEL_SHORTCUTS;
+        int interactive = interactiveCount(shortcuts);
+        int readOnly = shortcuts.size() - interactive;
+        countLabel.setText(interactive + " кнопок из "
+                + LauncherShortcutStore.MAX_DRIVER_PANEL_SHORTCUTS
+                + " · " + readOnly + " инфо/разделителей без лимита");
+        boolean full = interactive >= LauncherShortcutStore.MAX_DRIVER_PANEL_SHORTCUTS;
         addApplication.setEnabled(!full);
-        addFunction.setEnabled(!full);
+        addFunction.setEnabled(true);
         for (int index = 0; index < shortcuts.size(); index++) {
             buttonsHost.addView(shortcutRow(shortcuts.get(index), index, shortcuts.size()),
                     rowParams());
@@ -373,6 +369,37 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         });
         body.addView(size, new LinearLayout.LayoutParams(match(), dp(42)));
 
+        TextView gapValue = text(shortcut.gapAfterPx < 0
+                        ? "Отступ после кнопки: общий"
+                        : "Отступ после кнопки: " + shortcut.gapAfterPx + " px",
+                13, 0xFFC7C7CC);
+        body.addView(gapValue, topMargin(dp(6)));
+        SeekBar buttonGap = new SeekBar(this);
+        buttonGap.setMax(81);
+        buttonGap.setProgress(shortcut.gapAfterPx + 1);
+        buttonGap.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            int selected = shortcut.gapAfterPx;
+
+            @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                                                    boolean fromUser) {
+                selected = progress - 1;
+                gapValue.setText(selected < 0
+                        ? "Отступ после кнопки: общий"
+                        : "Отступ после кнопки: " + selected + " px");
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                shortcut.gapAfterPx = selected;
+                store.upsert(shortcut);
+                refreshPreview();
+                applyPanel();
+            }
+        });
+        body.addView(buttonGap, new LinearLayout.LayoutParams(match(), dp(42)));
+
         LinearLayout controls = new LinearLayout(this);
         controls.setOrientation(LinearLayout.HORIZONTAL);
         MaterialButton action = compactButton("Нажатие");
@@ -405,6 +432,27 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         controls.addView(remove, removeParams);
         body.addView(controls, topMargin(dp(8)));
 
+        if (shortcut.kind == LauncherShortcutStore.Kind.INFO) {
+            MaterialSwitch showIcon = new MaterialSwitch(this);
+            showIcon.setText("Показывать значок слева");
+            showIcon.setTextColor(Color.WHITE);
+            showIcon.setChecked(!"none".equalsIgnoreCase(shortcut.icon));
+            showIcon.setOnCheckedChangeListener((button, checked) -> {
+                shortcut.icon = checked ? "auto" : "none";
+                shortcut.iconCustomized = !checked;
+                store.upsert(shortcut);
+                refreshButtons();
+                applyPanel();
+            });
+            body.addView(showIcon, topMargin(dp(8)));
+
+            MaterialButton informationAppearance =
+                    compactButton("Текст, шрифт, выравнивание и отступы");
+            informationAppearance.setOnClickListener(
+                    view -> editInformationAppearance(shortcut));
+            body.addView(informationAppearance, topMargin(dp(8)));
+        }
+
         MaterialButton longAction = compactButton(shortcut.hasLongAction
                 ? "Удержание: " + longActionLabel(shortcut)
                 : "Удержание: не назначено");
@@ -422,25 +470,13 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             applyPanel();
         });
         body.addView(showTitle, topMargin(dp(8)));
-        if (isStockClimate(shortcut)) {
-            MaterialSwitch extended = new MaterialSwitch(this);
-            extended.setText("Расширенная информация: AUTO или направление обдува");
-            extended.setTextColor(Color.WHITE);
-            extended.setChecked(shortcut.extendedClimateInfo);
-            extended.setOnCheckedChangeListener((button, checked) -> {
-                shortcut.extendedClimateInfo = checked;
-                store.upsert(shortcut);
-                refreshPreview();
-                applyPanel();
-            });
-            body.addView(extended, topMargin(dp(8)));
-        }
         card.addView(body);
         return card;
     }
 
     private void addApplication() {
-        if (store.all().size() >= LauncherShortcutStore.MAX_DRIVER_PANEL_SHORTCUTS) {
+        if (interactiveCount(store.all())
+                >= LauncherShortcutStore.MAX_DRIVER_PANEL_SHORTCUTS) {
             limitToast();
             return;
         }
@@ -455,11 +491,21 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
     }
 
     private void addBuiltin() {
-        if (store.all().size() >= LauncherShortcutStore.MAX_DRIVER_PANEL_SHORTCUTS) {
+        if (interactiveCount(store.all())
+                >= LauncherShortcutStore.MAX_DRIVER_PANEL_SHORTCUTS) {
             limitToast();
             return;
         }
         showBuiltinPicker(null);
+    }
+
+    private static int interactiveCount(
+            @NonNull List<LauncherShortcutStore.Shortcut> values) {
+        int result = 0;
+        for (LauncherShortcutStore.Shortcut value : values) {
+            if (LauncherShortcutStore.isInteractive(value)) result++;
+        }
+        return result;
     }
 
     private void chooseReplacement(@NonNull LauncherShortcutStore.Shortcut shortcut) {
@@ -566,6 +612,145 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 .show();
     }
 
+    private void editInformationAppearance(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(20), dp(10), dp(20), dp(24));
+        scroll.addView(form, new ScrollView.LayoutParams(match(), wrap()));
+
+        MaterialButton text = compactButton("Текст подписи: " + shortcut.title);
+        text.setOnClickListener(view -> {
+            EditText input = new EditText(this);
+            input.setSingleLine(true);
+            input.setText(shortcut.title);
+            input.setSelection(input.length());
+            new AlertDialog.Builder(this)
+                    .setTitle("Текст информационной кнопки")
+                    .setView(input)
+                    .setPositiveButton("Применить", (dialog, which) -> {
+                        String value = input.getText().toString().trim();
+                        if (!value.isEmpty()) shortcut.title = value;
+                        persistInformationAppearance(shortcut);
+                    })
+                    .setNegativeButton("Отмена", null)
+                    .show();
+        });
+        form.addView(text, rowParams());
+
+        slider(form, "Размер подписи", 8, 72,
+                shortcut.informationLabelTextSizeSp, " sp", value -> {
+                    shortcut.informationLabelTextSizeSp = value;
+                    persistInformationAppearance(shortcut);
+                });
+        slider(form, "Размер значения", 8, 96,
+                shortcut.informationValueTextSizeSp, " sp", value -> {
+                    shortcut.informationValueTextSizeSp = value;
+                    persistInformationAppearance(shortcut);
+                });
+
+        MaterialButton font = compactButton("Шрифт: "
+                + getString(Fonts.findByKey(shortcut.informationFontFamily).labelRes));
+        font.setOnClickListener(view -> {
+            String[] labels = new String[Fonts.ALL.size()];
+            for (int index = 0; index < Fonts.ALL.size(); index++) {
+                labels[index] = getString(Fonts.ALL.get(index).labelRes);
+            }
+            new AlertDialog.Builder(this)
+                    .setTitle("Шрифт информационной кнопки")
+                    .setItems(labels, (dialog, which) -> {
+                        shortcut.informationFontFamily = Fonts.ALL.get(which).key;
+                        font.setText("Шрифт: " + labels[which]);
+                        persistInformationAppearance(shortcut);
+                    })
+                    .show();
+        });
+        form.addView(font, rowParams());
+
+        addSwitch(form, "Жирный текст", shortcut.informationTextBold, checked -> {
+            shortcut.informationTextBold = checked;
+            persistInformationAppearance(shortcut);
+        });
+        addSwitch(form, "Курсив", shortcut.informationTextItalic, checked -> {
+            shortcut.informationTextItalic = checked;
+            persistInformationAppearance(shortcut);
+        });
+
+        MaterialButton horizontal = compactButton("По горизонтали: "
+                + horizontalAlignmentLabel(shortcut.informationHorizontalAlignment));
+        horizontal.setOnClickListener(view -> new AlertDialog.Builder(this)
+                .setTitle("Выравнивание по горизонтали")
+                .setItems(new String[]{"Слева", "По центру", "Справа"},
+                        (dialog, which) -> {
+                            shortcut.informationHorizontalAlignment = which;
+                            horizontal.setText("По горизонтали: "
+                                    + horizontalAlignmentLabel(which));
+                            persistInformationAppearance(shortcut);
+                        })
+                .show());
+        form.addView(horizontal, rowParams());
+
+        MaterialButton vertical = compactButton("По вертикали: "
+                + verticalAlignmentLabel(shortcut.informationVerticalAlignment));
+        vertical.setOnClickListener(view -> new AlertDialog.Builder(this)
+                .setTitle("Выравнивание по вертикали")
+                .setItems(new String[]{"Сверху", "По центру", "Снизу"},
+                        (dialog, which) -> {
+                            shortcut.informationVerticalAlignment = which;
+                            vertical.setText("По вертикали: "
+                                    + verticalAlignmentLabel(which));
+                            persistInformationAppearance(shortcut);
+                        })
+                .show());
+        form.addView(vertical, rowParams());
+
+        title(form, "Отступы содержимого");
+        slider(form, "Слева", 0, 96, shortcut.informationPaddingLeftPx,
+                " px", value -> {
+                    shortcut.informationPaddingLeftPx = value;
+                    persistInformationAppearance(shortcut);
+                });
+        slider(form, "Сверху", 0, 96, shortcut.informationPaddingTopPx,
+                " px", value -> {
+                    shortcut.informationPaddingTopPx = value;
+                    persistInformationAppearance(shortcut);
+                });
+        slider(form, "Справа", 0, 96, shortcut.informationPaddingRightPx,
+                " px", value -> {
+                    shortcut.informationPaddingRightPx = value;
+                    persistInformationAppearance(shortcut);
+                });
+        slider(form, "Снизу", 0, 96, shortcut.informationPaddingBottomPx,
+                " px", value -> {
+                    shortcut.informationPaddingBottomPx = value;
+                    persistInformationAppearance(shortcut);
+                });
+
+        new AlertDialog.Builder(this)
+                .setTitle("Информационная кнопка")
+                .setView(scroll)
+                .setPositiveButton("Готово", null)
+                .show();
+    }
+
+    private void persistInformationAppearance(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        store.upsert(shortcut);
+        refreshPreview();
+        applyPanel();
+    }
+
+    @NonNull
+    private static String horizontalAlignmentLabel(int value) {
+        return value <= 0 ? "слева" : value == 1 ? "по центру" : "справа";
+    }
+
+    @NonNull
+    private static String verticalAlignmentLabel(int value) {
+        return value <= 0 ? "сверху" : value == 1 ? "по центру" : "снизу";
+    }
+
     private void chooseIcon(@NonNull LauncherShortcutStore.Shortcut shortcut) {
         List<LauncherIconResolver.Preset> presets = LauncherIconResolver.presets();
         String[] labels = new String[presets.size()];
@@ -643,7 +828,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             if (value.kind == LauncherShortcutStore.Kind.BUILTIN
                     && LauncherShortcutStore.Builtin.STOCK_CLIMATE.key.equals(value.target)) {
                 DriverClimateShortcutView climate = new DriverClimateShortcutView(
-                        this, CarIntegrations.get(this), value.iconColor);
+                        this, CarIntegrations.get(this), value.iconColor, true);
                 climate.showPreviewSample();
                 icon = climate;
             } else {
@@ -655,7 +840,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             int iconSize = Math.max(dp(18), Math.min(width - dp(8),
                     Math.round(value.iconSizePx * .62f)));
             FrameLayout cell = new FrameLayout(this);
-            boolean expandedClimate = isStockClimate(value) && value.extendedClimateInfo;
+            boolean expandedClimate = false;
             cell.addView(icon, new FrameLayout.LayoutParams(iconSize,
                     DriverPanelLayoutPolicy.shortcutIconHeight(iconSize, expandedClimate),
                     Gravity.CENTER));
@@ -669,6 +854,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
 
     @Nullable
     private Drawable resolveIcon(@NonNull LauncherShortcutStore.Shortcut shortcut) {
+        if ("none".equalsIgnoreCase(shortcut.icon)) return null;
         if (shortcut.kind == LauncherShortcutStore.Kind.APP
                 && "app".equals(shortcut.icon)) {
             ComponentName component = ComponentName.unflattenFromString(shortcut.target);
@@ -688,6 +874,10 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 return "Сценарий";
             case INTENT:
                 return "Системное действие";
+            case INFO:
+                return "Информация · без нажатия";
+            case DIVIDER:
+                return "Разделитель";
             case BUILTIN:
             default:
                 return "Функция панели · "
@@ -714,20 +904,14 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 return "умный дом";
             case INTENT:
                 return "Intent";
+            case INFO:
+                return "информация";
+            case DIVIDER:
+                return "разделитель";
             case BUILTIN:
             default:
                 return LauncherShortcutStore.Builtin.fromKey(shortcut.longTarget).label;
         }
-    }
-
-    @NonNull
-    private static String styleName(@NonNull Preferences.DriverPanelStyle style) {
-        return style == Preferences.DriverPanelStyle.NEW ? "Новая" : "Старая";
-    }
-
-    @NonNull
-    private static String styleNameLower(@NonNull Preferences.DriverPanelStyle style) {
-        return style == Preferences.DriverPanelStyle.NEW ? "новая" : "старая";
     }
 
     private void applyPanel() {
@@ -742,37 +926,6 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 running.applyPreferences();
             }
         }
-    }
-
-    private void addStyleSelector(@NonNull LinearLayout host) {
-        TextView label = text("Тип штатной панели", 15, 0xFFC7C7CC);
-        host.addView(label, rowParams());
-
-        MaterialButtonToggleGroup group = new MaterialButtonToggleGroup(this);
-        group.setOrientation(LinearLayout.HORIZONTAL);
-        group.setSingleSelection(true);
-        group.setSelectionRequired(true);
-
-        MaterialButton oldPanel = compactButton("Старая");
-        oldPanel.setId(View.generateViewId());
-        oldPanel.setCheckable(true);
-        MaterialButton newPanel = compactButton("Новая");
-        newPanel.setId(View.generateViewId());
-        newPanel.setCheckable(true);
-        group.addView(oldPanel, new LinearLayout.LayoutParams(0, dp(52), 1f));
-        group.addView(newPanel, new LinearLayout.LayoutParams(0, dp(52), 1f));
-        group.check(profile.style == Preferences.DriverPanelStyle.NEW
-                ? newPanel.getId() : oldPanel.getId());
-        group.addOnButtonCheckedListener((value, checkedId, isChecked) -> {
-            if (!isChecked) return;
-            Preferences.DriverPanelStyle selected = checkedId == newPanel.getId()
-                    ? Preferences.DriverPanelStyle.NEW : Preferences.DriverPanelStyle.OLD;
-            if (selected == profile.style) return;
-            preferences.driverPanelStyle.set(selected.key);
-            applyPanel();
-            recreate();
-        });
-        host.addView(group, rowParams());
     }
 
     private void limitToast() {

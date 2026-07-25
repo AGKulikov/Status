@@ -34,6 +34,22 @@
         <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.StatusWidget.Apple.Small</item>
         <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.StatusWidget.Apple.Medium</item>
         <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.StatusWidget.Apple.Large</item>
+        <item name="materialSwitchStyle">@style/Widget.StatusWidget.MaterialSwitch</item>
+        <item name="android:switchStyle">@style/Widget.StatusWidget.PlatformSwitch</item>
+    </style>
+
+    <style name="Widget.StatusWidget.MaterialSwitch"
+        parent="Widget.Material3.CompoundButton.MaterialSwitch">
+        <item name="trackTint">@color/settings_switch_track</item>
+        <item name="thumbTint">@color/settings_switch_thumb</item>
+    </style>
+
+    <style name="Widget.StatusWidget.PlatformSwitch" parent="@android:style/Widget.Material.CompoundButton.Switch">
+        <item name="android:trackTint">@color/settings_switch_track</item>
+        <item name="android:thumbTint">@color/settings_switch_thumb</item>
+        <item name="android:showText">true</item>
+        <item name="android:textOn">I</item>
+        <item name="android:textOff">O</item>
     </style>
 
     <style name="Theme.StatusWidget.Launcher" parent="Theme.Material3.DayNight.NoActionBar">

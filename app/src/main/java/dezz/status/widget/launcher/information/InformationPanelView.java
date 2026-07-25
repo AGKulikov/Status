@@ -8,11 +8,14 @@ package dezz.status.widget.launcher.information;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothProfile;
 import android.graphics.Color;
-import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.BatteryManager;
 import android.os.Environment;
 import android.os.Handler;
@@ -45,6 +48,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import dezz.status.widget.Fonts;
 import dezz.status.widget.WidgetService;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarTelemetryDescriptor;
@@ -52,7 +56,9 @@ import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.SourceBinding;
+import dezz.status.widget.launcher.LauncherGlobalElementTag;
 import dezz.status.widget.launcher.LauncherIconResolver;
+import dezz.status.widget.launcher.LauncherLayoutStore;
 
 /**
  * Read-only HOME surface combining current vehicle/system and smart-home values.
@@ -78,7 +84,9 @@ public final class InformationPanelView extends FrameLayout {
             new LinkedHashMap<>();
     private final Map<String, ConnectorValue> connectorValues = new HashMap<>();
     private final Map<String, ItemViews> itemViews = new LinkedHashMap<>();
+    private boolean editorPreviewMode;
     private InformationPanelConfig config;
+    @Nullable private Integer fixedCellBackgroundColor;
     private boolean started;
     private int catalogGeneration;
     private int connectorGeneration;
@@ -150,6 +158,13 @@ public final class InformationPanelView extends FrameLayout {
         setConfig(store.load());
     }
 
+    /** Shows every configured tile while its global HOME rectangle is being edited. */
+    public void setEditorPreviewMode(boolean enabled) {
+        if (editorPreviewMode == enabled) return;
+        editorPreviewMode = enabled;
+        updateValues();
+    }
+
     public void setConfig(@NonNull InformationPanelConfig source) {
         Set<String> oldVehicleIds = requestedVehicleIds();
         config = source.copy();
@@ -158,6 +173,27 @@ public final class InformationPanelView extends FrameLayout {
         if (started && !oldVehicleIds.equals(requestedVehicleIds())) {
             subscribeVehicleValues();
         }
+    }
+
+    /**
+     * Makes every cell use one caller-owned color instead of the panel's automatic active tint.
+     * Driver-rail information shortcuts use this to honour their normal per-item background
+     * setting, including a fully transparent value.
+     */
+    public void setFixedCellBackgroundColor(@Nullable String rawColor) {
+        Integer parsed = null;
+        if (rawColor != null) {
+            try {
+                parsed = "none".equalsIgnoreCase(rawColor.trim())
+                        ? Color.TRANSPARENT : Color.parseColor(rawColor);
+            } catch (IllegalArgumentException ignored) {
+                parsed = Color.TRANSPARENT;
+            }
+        }
+        if (fixedCellBackgroundColor == null
+                ? parsed == null : fixedCellBackgroundColor.equals(parsed)) return;
+        fixedCellBackgroundColor = parsed;
+        rebuild();
     }
 
     @NonNull
@@ -271,7 +307,7 @@ public final class InformationPanelView extends FrameLayout {
             if (item.enabled) visible.add(item);
         }
         if (visible.isEmpty()) {
-            TextView empty = text("Добавьте статусы в настройках панели «Информация»",
+            TextView empty = text("Добавьте статусы в настройках блока «Информация»",
                     15f, Color.WHITE, true);
             empty.setGravity(Gravity.CENTER);
             empty.setAlpha(.68f);
@@ -307,16 +343,21 @@ public final class InformationPanelView extends FrameLayout {
     @NonNull
     private View buildItem(@NonNull InformationPanelConfig.Item item) {
         LinearLayout tile = new LinearLayout(getContext());
+        LauncherGlobalElementTag.attach(tile, LauncherLayoutStore.INFORMATION,
+                item.id, item.displayLabel());
         tile.setOrientation(LinearLayout.HORIZONTAL);
-        tile.setGravity(Gravity.CENTER_VERTICAL);
-        tile.setPadding(scaledDp(10, item.scalePercent), scaledDp(7, item.scalePercent),
-                scaledDp(10, item.scalePercent), scaledDp(7, item.scalePercent));
+        tile.setGravity(itemGravity(item.horizontalAlignment, item.verticalAlignment));
+        tile.setPadding(scaledDp(item.paddingLeftPx, item.scalePercent),
+                scaledDp(item.paddingTopPx, item.scalePercent),
+                scaledDp(item.paddingRightPx, item.scalePercent),
+                scaledDp(item.paddingBottomPx, item.scalePercent));
         tile.setClickable(false);
         tile.setLongClickable(false);
         tile.setFocusable(false);
 
         GradientDrawable background = new GradientDrawable();
-        background.setColor(Color.argb(58, 255, 255, 255));
+        background.setColor(fixedCellBackgroundColor == null
+                ? Color.argb(58, 255, 255, 255) : fixedCellBackgroundColor);
         background.setCornerRadius(Math.max(4f, config.cornerRadiusPx * .48f));
         tile.setBackground(background);
 
@@ -334,16 +375,22 @@ public final class InformationPanelView extends FrameLayout {
 
         LinearLayout texts = new LinearLayout(getContext());
         texts.setOrientation(LinearLayout.VERTICAL);
-        texts.setGravity(Gravity.CENTER_VERTICAL);
-        TextView label = text(item.displayLabel(), scaledSp(11.5f, item.scalePercent),
-                color(item.labelColor, Color.LTGRAY), false);
+        texts.setGravity(itemGravity(item.horizontalAlignment, item.verticalAlignment));
+        TextView label = text(item.displayLabel(),
+                scaledSp(item.labelTextSizeSp, item.scalePercent),
+                color(item.labelColor, Color.LTGRAY), item);
         label.setSingleLine(true);
         label.setEllipsize(TextUtils.TruncateAt.END);
+        label.setGravity(itemGravity(item.horizontalAlignment, item.verticalAlignment));
         label.setVisibility(item.showLabel ? View.VISIBLE : View.GONE);
-        TextView value = text("—", scaledSp(20f, item.scalePercent),
-                color(item.valueColor, Color.WHITE), true);
-        value.setSingleLine(true);
-        value.setEllipsize(TextUtils.TruncateAt.END);
+        TextView value = text("—", scaledSp(item.valueTextSizeSp, item.scalePercent),
+                color(item.valueColor, Color.WHITE), item);
+        value.setGravity(itemGravity(item.horizontalAlignment, item.verticalAlignment));
+        // Smart-device states can carry a mode, value and availability explanation. Never cut
+        // that status down to one line on HOME, the driver rail or Driver Favorites.
+        value.setSingleLine(false);
+        value.setMaxLines(Integer.MAX_VALUE);
+        value.setEllipsize(null);
         texts.addView(label, new LinearLayout.LayoutParams(match(), wrap()));
         texts.addView(value, new LinearLayout.LayoutParams(match(), wrap()));
         tile.addView(texts, new LinearLayout.LayoutParams(0, wrap(), 1f));
@@ -368,15 +415,17 @@ public final class InformationPanelView extends FrameLayout {
                         getContext(), iconKey, item.iconColor));
                 views.resolvedIconKey = iconKey;
             }
-            views.tile.setVisibility(InformationValuePolicy.isVisible(
+            views.tile.setVisibility(editorPreviewMode || InformationValuePolicy.isVisible(
                     item.visibility, value.known, value.active) ? View.VISIBLE : View.INVISIBLE);
             views.label.setText(item.displayLabel());
             views.value.setText(value.known ? value.display : "—");
             views.value.setAlpha(value.known ? 1f : .48f);
             views.icon.setAlpha(value.known ? (value.active ? 1f : .58f) : .28f);
-            views.background.setColor(value.known && value.active
+            views.background.setColor(fixedCellBackgroundColor == null
+                    ? (value.known && value.active
                     ? Color.argb(82, 84, 168, 255)
-                    : Color.argb(58, 255, 255, 255));
+                    : Color.argb(58, 255, 255, 255))
+                    : fixedCellBackgroundColor);
             views.tile.setContentDescription(item.displayLabel() + ": "
                     + (value.known ? value.display : "нет актуальных данных"));
         }
@@ -469,6 +518,10 @@ public final class InformationPanelView extends FrameLayout {
                         || status == BatteryManager.BATTERY_STATUS_FULL;
                 return Value.known(charging ? "Заряжается" : "Не заряжается", charging);
             }
+            case "system.bluetooth":
+                return resolveBluetooth();
+            case "system.wifi":
+                return resolveWifi();
             case "system.network": {
                 try {
                     ConnectivityManager manager = (ConnectivityManager) getContext()
@@ -493,6 +546,59 @@ public final class InformationPanelView extends FrameLayout {
             }
             default:
                 return Value.unknown();
+        }
+    }
+
+    @NonNull
+    private Value resolveBluetooth() {
+        try {
+            BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+            if (adapter == null) return Value.unknown();
+            if (!adapter.isEnabled()) return Value.known("Выкл", false);
+            boolean connected = false;
+            int[] profiles = {
+                    BluetoothProfile.HEADSET,
+                    BluetoothProfile.A2DP,
+                    BluetoothProfile.GATT,
+                    // Automotive HFP/MAP client IDs are hidden from the Android 9 SDK stub.
+                    16, 18
+            };
+            for (int profile : profiles) {
+                try {
+                    if (adapter.getProfileConnectionState(profile)
+                            == BluetoothProfile.STATE_CONNECTED) {
+                        connected = true;
+                        break;
+                    }
+                } catch (RuntimeException unsupportedProfile) {
+                    // Vendor stacks are allowed to reject an otherwise valid profile ID.
+                }
+            }
+            return Value.known(connected ? "Подключено" : "Включён", connected);
+        } catch (RuntimeException ignored) {
+            return Value.unknown();
+        }
+    }
+
+    @NonNull
+    private Value resolveWifi() {
+        try {
+            WifiManager manager = (WifiManager) getContext().getApplicationContext()
+                    .getSystemService(Context.WIFI_SERVICE);
+            if (manager == null) return Value.unknown();
+            if (!manager.isWifiEnabled()) return Value.known("Выкл", false);
+            WifiInfo info = manager.getConnectionInfo();
+            if (info == null || info.getNetworkId() < 0) {
+                return Value.known("Не подключён", false);
+            }
+            String ssid = info.getSSID();
+            if (ssid == null || WifiManager.UNKNOWN_SSID.equals(ssid)) ssid = "";
+            ssid = ssid.replaceAll("^\"|\"$", "").trim();
+            int level = WifiManager.calculateSignalLevel(info.getRssi(), 5) + 1;
+            String display = ssid.isEmpty() ? "Подключён" : ssid;
+            return Value.known(display + " · " + level + "/5", true);
+        } catch (RuntimeException ignored) {
+            return Value.unknown();
         }
     }
 
@@ -576,8 +682,28 @@ public final class InformationPanelView extends FrameLayout {
         view.setText(value);
         view.setTextSize(size);
         view.setTextColor(color);
-        if (bold) view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        view.setTypeface(Fonts.resolve(getContext(), Fonts.DEFAULT_KEY, bold, false));
         return view;
+    }
+
+    @NonNull
+    private TextView text(@NonNull String value, float size, int color,
+                          @NonNull InformationPanelConfig.Item item) {
+        TextView view = new TextView(getContext());
+        view.setText(value);
+        view.setTextSize(size);
+        view.setTextColor(color);
+        view.setTypeface(Fonts.resolve(getContext(), item.fontFamily,
+                item.textBold, item.textItalic));
+        return view;
+    }
+
+    private static int itemGravity(int horizontalAlignment, int verticalAlignment) {
+        int horizontal = horizontalAlignment <= 0 ? Gravity.START
+                : horizontalAlignment == 1 ? Gravity.CENTER_HORIZONTAL : Gravity.END;
+        int vertical = verticalAlignment <= 0 ? Gravity.TOP
+                : verticalAlignment == 1 ? Gravity.CENTER_VERTICAL : Gravity.BOTTOM;
+        return horizontal | vertical;
     }
 
     private int scaledDp(int value, int scalePercent) {

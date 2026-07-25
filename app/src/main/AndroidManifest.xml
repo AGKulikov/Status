@@ -147,6 +147,11 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".HudPanelSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".InformationPanelSettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />
@@ -235,6 +240,13 @@
 
         <service
             android:name=".driver.DriverPanelService"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="false"
+            android:stopWithTask="false" />
+
+        <service
+            android:name=".hud.HudPresentationService"
             android:directBootAware="true"
             android:enabled="true"
             android:exported="false"

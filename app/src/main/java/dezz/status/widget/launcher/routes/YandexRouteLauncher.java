@@ -46,7 +46,7 @@ public final class YandexRouteLauncher {
         // "Navigator" shortcut already uses Yandex' ECARX-specific TransparentSplashActivity
         // (`ddnavwin`). Opening that exact entry point first also keeps route buttons compatible
         // with head units where ActivityOptions/windowingMode 5 opens on the wrong display.
-        boolean opened = YandexWindowLauncher.launch(
+        boolean opened = YandexWindowLauncher.launchOverLauncher(
                 context, windowProduct(route.product), false);
         if (!opened) {
             return startDeepLink(context, route.product, deepLink, alternateDeepLink);
@@ -77,10 +77,10 @@ public final class YandexRouteLauncher {
         }
         String addressValue = address == null ? "" : address.trim();
         if (addressValue.isEmpty()) throw new IllegalArgumentException("Destination is empty");
-        // This is the address path used by mNavi. `едем` asks compatible Yandex car builds to
-        // start navigation immediately instead of leaving a confirmation card open.
-        return Uri.parse(scheme + "://ask_alice?text="
-                + Uri.encode("Маршрут до " + addressValue + " едем"));
+        // A leading '~' means "current position -> destination". This is the same direct rtext
+        // route contract as coordinates and never hands the address to Alice.
+        return Uri.parse(scheme + "://maps.yandex.ru/?rtext="
+                + Uri.encode("~" + addressValue, "~,-.") + "&rtt=auto");
     }
 
     private static boolean startDeepLink(@NonNull Context context,

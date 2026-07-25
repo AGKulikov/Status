@@ -65,7 +65,7 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
                 && !PanelElementConfigStore.definitions(requestedPanel).isEmpty()) {
             selectedPanel = requestedPanel;
         }
-        setTitle("Элементы панелей HOME");
+        setTitle("Элементы блоков HOME");
         View screen = buildContent();
         setContentView(screen);
         dezz.status.widget.settings.SettingsBackNavigation.install(this, screen);
@@ -95,13 +95,13 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         navigation.setOrientation(LinearLayout.VERTICAL);
         navigation.setPadding(0, 0, dp(16), dp(20));
         navigationScroll.addView(navigation, new ScrollView.LayoutParams(match(), wrap()));
-        addSection(navigation, "СОСТАВ ПАНЕЛЕЙ");
+        addSection(navigation, "СОСТАВ БЛОКОВ");
         addPanelButton(navigation, "Приложения", LauncherLayoutStore.APPS);
         addPanelButton(navigation, "Часы", LauncherLayoutStore.CLOCK);
         addPanelButton(navigation, "Иконки и действия", LauncherLayoutStore.ACTIONS);
         TextView hint = new TextView(this);
-        hint.setText("Здесь собраны панели с общим редактором состава. Медиа, навигация, "
-                + "климат, данные автомобиля и панель «Информация» имеют собственный "
+        hint.setText("Здесь собраны блоки с общим редактором состава. Медиа, навигация, "
+                + "климат, данные автомобиля и блок «Информация» имеют собственный "
                 + "визуальный экран в разделе «Панели» единого центра настроек.");
         hint.setTextSize(13);
         hint.setAlpha(.68f);
@@ -211,7 +211,7 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         if (enabled.isEmpty()) {
             addHint(editor, LauncherLayoutStore.NAVIGATION.equals(panel.id)
                     ? "Во время активного маршрута плитка будет пустой. Кнопки избранного без маршрута продолжат работать."
-                    : "Панель сейчас пустая и на HOME будет скрыта полностью.");
+                    : "Блок сейчас пуст и на HOME будет скрыт полностью.");
         }
         for (PanelElementConfigStore.Element element : enabled) addElementEditor(panel, element);
 
@@ -225,8 +225,8 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         reset.setAllCaps(false);
         reset.setText("Вернуть состав и размеры по умолчанию");
         reset.setOnClickListener(v -> new AlertDialog.Builder(this)
-                .setTitle("Сбросить эту панель?")
-                .setMessage("Положение и размер самой панели сохранятся.")
+                .setTitle("Сбросить этот блок?")
+                .setMessage("Положение и размер самого блока сохранятся.")
                 .setPositiveButton("Сбросить", (dialog, which) -> {
                     store.reset(panel.id);
                     showPanel(panel.id);
@@ -242,13 +242,13 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         final String title;
         if (LauncherLayoutStore.APPS.equals(panelId)) {
             preference = preferences.launcherAppsVisible;
-            title = "Показывать панель приложений на HOME";
+            title = "Показывать блок приложений на HOME";
         } else if (LauncherLayoutStore.CLOCK.equals(panelId)) {
             preference = preferences.launcherClockVisible;
             title = "Показывать часы на HOME";
         } else if (LauncherLayoutStore.ACTIONS.equals(panelId)) {
             preference = preferences.launcherActionsVisible;
-            title = "Показывать панель кнопок на HOME";
+            title = "Показывать блок кнопок на HOME";
         } else {
             return;
         }
@@ -391,7 +391,7 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
         }
         if (preview.getChildCount() == 0) {
             TextView empty = new TextView(this);
-            empty.setText("Панель пустая");
+            empty.setText("Блок пуст");
             empty.setGravity(Gravity.CENTER);
             empty.setAlpha(.6f);
             preview.addView(empty, new LinearLayout.LayoutParams(match(), match()));
@@ -456,10 +456,10 @@ public final class PanelElementSettingsActivity extends AppCompatActivity {
     }
 
     @NonNull private static String panelTitle(@NonNull String id) {
-        if (LauncherLayoutStore.APPS.equals(id)) return "Панель приложений";
-        if (LauncherLayoutStore.CLOCK.equals(id)) return "Панель часов";
+        if (LauncherLayoutStore.APPS.equals(id)) return "Блок приложений";
+        if (LauncherLayoutStore.CLOCK.equals(id)) return "Блок часов";
         if (LauncherLayoutStore.NAVIGATION.equals(id)) return "Маршрут и избранное";
-        return "Панель иконок и действий";
+        return "Блок иконок и действий";
     }
 
     @NonNull private static String previewText(@NonNull String panelId,

@@ -20,6 +20,7 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
@@ -30,6 +31,7 @@ import android.widget.GridView;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -40,8 +42,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -51,6 +56,7 @@ import dezz.status.widget.WidgetAccessibilityService;
 import dezz.status.widget.WidgetService;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.launcher.HighResolutionAppIconLoader;
+import dezz.status.widget.launcher.InformationShortcutView;
 import dezz.status.widget.launcher.LauncherAppCatalog;
 import dezz.status.widget.launcher.LauncherAppTileRenderer;
 import dezz.status.widget.launcher.LauncherIconResolver;
@@ -96,6 +102,9 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private final DriverPanelActionExecutor actions;
     private final Map<String, SmartHomeBinding> panelSmartHomeBindings = new HashMap<>();
     private final Map<String, SmartHomeBinding> drawerSmartHomeBindings = new HashMap<>();
+    private final Map<String, View> favoritePanelAnchors = new HashMap<>();
+    private final Map<String, FavoritePanelWindow> favoriteWindows = new LinkedHashMap<>();
+    private final Set<String> manuallyOpenFavorites = new LinkedHashSet<>();
     private final Map<String, ConnectorValue> smartHomeValues = new HashMap<>();
     private Map<String, IntentActionRule> smartHomeRules = Collections.emptyMap();
     @Nullable private WidgetService smartHomeValueService;
@@ -128,7 +137,6 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private final List<AttachedWindow> panelWindows = new ArrayList<>();
     @Nullable private AttachedWindow drawerWindow;
     @Nullable private GridView drawerGrid;
-    private boolean favoritesDrawerOpen;
     private int attachedType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
     private int applyGeneration;
     private int drawerGeneration;
@@ -160,14 +168,17 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         List<AttachedWindow> previousWindows = new ArrayList<>(panelWindows);
         Map<String, SmartHomeBinding> previousBindings =
                 new HashMap<>(panelSmartHomeBindings);
+        Map<String, View> previousFavoriteAnchors = new HashMap<>(favoritePanelAnchors);
         panelWindows.clear();
         panelSmartHomeBindings.clear();
+        favoritePanelAnchors.clear();
         smartHomeRules = loadSmartHomeRules();
         mainHandler.removeCallbacks(ensureSmartHomeValueSubscription);
         mainHandler.post(ensureSmartHomeValueSubscription);
         if (!preferences.driverPanelEnabled.get()) {
             removeWindows(previousWindows);
             dismissAllApps();
+            dismissAllFavoritePanels();
             statusListener.onStatus("stopped", "Панель водителя выключена");
             return;
         }
@@ -176,7 +187,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         if (display == null) {
             panelWindows.addAll(previousWindows);
             panelSmartHomeBindings.putAll(previousBindings);
-            refreshFavoritesDrawer();
+            favoritePanelAnchors.putAll(previousFavoriteAnchors);
+            refreshFavoriteWindows();
             statusListener.onStatus("error", "Основной дисплей не найден");
             return;
         }
@@ -185,20 +197,31 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         Preferences.DriverPanelProfile profile = preferences.activeDriverPanelProfile();
         LauncherShortcutStore store = LauncherShortcutStore.forDriverPanel(preferences, profile);
         WidgetService widgetService = WidgetService.getInstance();
-        List<LauncherShortcutStore.Shortcut> enabled = new ArrayList<>();
+        List<LauncherShortcutStore.Shortcut> informational = new ArrayList<>();
+        List<LauncherShortcutStore.Shortcut> controls = new ArrayList<>();
+        int interactiveCount = 0;
         for (LauncherShortcutStore.Shortcut shortcut : store.all()) {
             boolean scenarioVisible = widgetService == null
                     || widgetService.driverShortcutVisible(shortcut.id, true);
-            if (shortcut.enabled && scenarioVisible
-                    && enabled.size() < DriverPanelLayoutPolicy.MAX_BUTTONS) {
-                enabled.add(shortcut);
+            if (!shortcut.enabled || !scenarioVisible) continue;
+            if (shortcut.kind == LauncherShortcutStore.Kind.INFO) {
+                informational.add(shortcut);
+                continue;
             }
+            if (LauncherShortcutStore.isInteractive(shortcut)
+                    && interactiveCount >= DriverPanelLayoutPolicy.MAX_BUTTONS) continue;
+            if (LauncherShortcutStore.isInteractive(shortcut)) interactiveCount++;
+            controls.add(shortcut);
         }
+        List<LauncherShortcutStore.Shortcut> enabled = new ArrayList<>(
+                informational.size() + controls.size());
+        enabled.addAll(informational);
+        enabled.addAll(controls);
         DriverPanelLayoutPolicy.Layout geometry = DriverPanelLayoutPolicy.calculate(
                 metrics.heightPixels,
                 profile.topPaddingPx.get(),
                 profile.bottomPaddingPx.get(),
-                enabled.size(),
+                interactiveCount,
                 false);
 
         RuntimeException failure = null;
@@ -213,14 +236,14 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 panelWindows.addAll(previousWindows);
                 panelWindows.addAll(successorWindows);
                 retireAfterFirstDraw(previousWindows, successorWindows);
-                refreshFavoritesDrawer();
+                refreshFavoriteWindows();
+                reconcileAutomatedFavoritePanels();
                 String mode = type == WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                         ? "обычный overlay" : "системный ECARX";
                 String pocket = "кнопки используют всю высоту; климат открывается прокси-кнопкой";
-                String style = profile.style == Preferences.DriverPanelStyle.NEW
-                        ? "Новая панель" : "Старая панель";
                 statusListener.onStatus("active",
-                        style + " · " + enabled.size() + " кнопок · "
+                        "Панель водителя · " + interactiveCount + " кнопок · "
+                                + informational.size() + " инфо · "
                                 + mode + " · " + pocket);
                 return;
             } catch (RuntimeException error) {
@@ -234,7 +257,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         // A rejected refresh must leave the last fully covering panel in place.
         panelWindows.addAll(previousWindows);
         panelSmartHomeBindings.putAll(previousBindings);
-        refreshFavoritesDrawer();
+        favoritePanelAnchors.putAll(previousFavoriteAnchors);
+        refreshFavoriteWindows();
         statusListener.onStatus("error", failure == null
                 ? "Не удалось добавить панель"
                 : "WindowManager отклонил панель: " + failure.getClass().getSimpleName());
@@ -285,6 +309,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     void destroy() {
         applyGeneration++;
         dismissAllApps();
+        dismissAllFavoritePanels();
         detachPanel();
         mainHandler.removeCallbacks(ensureSmartHomeValueSubscription);
         if (smartHomeValueService != null) {
@@ -313,8 +338,6 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         WindowManager manager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         if (manager == null) return;
 
-        FrameLayout root = new FrameLayout(context);
-        root.setBackgroundColor(Color.argb(247, 10, 13, 18));
         DisplayMetrics metrics = new DisplayMetrics();
         display.getRealMetrics(metrics);
         Preferences.DriverPanelProfile profile = preferences.activeDriverPanelProfile();
@@ -326,12 +349,18 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 metrics.widthPixels, referenceWidth);
         int appsGridScalePercent = Math.max(60, Math.min(180,
                 preferences.launcherAllAppsIconScalePercent.get()));
-        int railInset = Math.max(100, physicalWidth) + 24;
-        if (profile.side.get() == 0) {
-            root.setPadding(railInset, 24, 24, 24);
-        } else {
-            root.setPadding(24, 24, railInset, 24);
-        }
+        FrameLayout root = new FrameLayout(context);
+        root.setClickable(true);
+        root.setBackgroundColor(Color.argb(70, 0, 0, 0));
+        root.setOnClickListener(view -> dismissAllApps());
+
+        FrameLayout drawer = new FrameLayout(context);
+        drawer.setClickable(true);
+        // Consume taps inside the drawer; only the uncovered driver-rail side dismisses it.
+        drawer.setOnClickListener(view -> { });
+        drawer.setBackgroundColor(Color.argb(247, 10, 13, 18));
+        int contentPadding = dp(context, 24);
+        drawer.setPadding(contentPadding, contentPadding, contentPadding, contentPadding);
 
         TextView title = new TextView(context);
         title.setText("Все приложения");
@@ -340,7 +369,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         title.setGravity(Gravity.CENTER_VERTICAL);
         FrameLayout.LayoutParams titleParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, 72, Gravity.TOP | Gravity.START);
-        root.addView(title, titleParams);
+        drawer.addView(title, titleParams);
 
         ImageButton close = new ImageButton(context);
         close.setImageResource(R.drawable.ic_driver_close);
@@ -350,7 +379,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         close.setOnClickListener(view -> dismissAllApps());
         FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(72, 72,
                 Gravity.TOP | Gravity.END);
-        root.addView(close, closeParams);
+        drawer.addView(close, closeParams);
 
         GridView grid = new GridView(context);
         grid.setNumColumns(Math.max(3,
@@ -366,14 +395,25 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         FrameLayout.LayoutParams gridParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         gridParams.topMargin = 84;
-        root.addView(grid, gridParams);
+        drawer.addView(grid, gridParams);
 
-        WindowManager.LayoutParams params = fullScreenParams(attachedType);
+        // The full-screen modal root receives an outside tap while the actual drawer leaves the
+        // driver rail visible. Its child position uses physical display coordinates, independent
+        // of ECARX's shifted system-window origin.
+        int drawerWidth = Math.max(1, metrics.widthPixels - physicalWidth);
+        int drawerLeft = profile.side.get() == 0 ? physicalWidth : 0;
+        FrameLayout.LayoutParams drawerParams = new FrameLayout.LayoutParams(
+                drawerWidth, ViewGroup.LayoutParams.MATCH_PARENT,
+                Gravity.TOP | Gravity.LEFT);
+        drawerParams.leftMargin = drawerLeft;
+        root.addView(drawer, drawerParams);
+        WindowManager.LayoutParams params = allAppsOverlayParams(
+                attachedType, metrics.widthPixels, metrics.heightPixels,
+                "Status Widget all applications");
         try {
             manager.addView(root, params);
             drawerWindow = new AttachedWindow(root, params, manager);
             drawerGrid = grid;
-            favoritesDrawerOpen = false;
         } catch (RuntimeException error) {
             Log.w(TAG, "Could not show all-apps drawer", error);
             Toast.makeText(appContext, "Не удалось открыть список приложений",
@@ -395,15 +435,25 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     }
 
     @Override
-    public void showFavorites() {
+    public void showFavorites(@NonNull String panelId, @Nullable View anchor) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post(this::showFavorites);
+            mainHandler.post(() -> showFavorites(panelId, anchor));
             return;
         }
-        if (drawerWindow != null) {
-            dismissAllApps();
+        if (favoriteWindows.containsKey(panelId)) {
+            manuallyOpenFavorites.remove(panelId);
+            dismissFavoritePanel(panelId);
             return;
         }
+        dismissAllApps();
+        manuallyOpenFavorites.add(panelId);
+        showFavoritePanel(panelId, anchor);
+    }
+
+    private void showFavoritePanel(@NonNull String panelId, @Nullable View requestedAnchor) {
+        DriverFavoritesPanelConfig config =
+                new DriverFavoritesPanelStore(preferences).find(panelId);
+        if (config == null || favoriteWindows.containsKey(panelId)) return;
         Display display = defaultDisplay();
         if (display == null) return;
         Context context = windowContext(display, attachedType);
@@ -412,60 +462,72 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         DisplayMetrics metrics = new DisplayMetrics();
         display.getRealMetrics(metrics);
         Preferences.DriverPanelProfile profile = preferences.activeDriverPanelProfile();
-
         FrameLayout root = new FrameLayout(context);
-        root.setBackgroundColor(Color.argb(247, 10, 13, 18));
+        boolean panelOnRight = profile.side.get() == 1;
+        root.setBackground(favoritePanelBackground(context, profile, panelOnRight));
+        root.setClickable(true);
+        root.setOnTouchListener((view, event) -> {
+            if (event.getActionMasked() != MotionEvent.ACTION_OUTSIDE) return false;
+            manuallyOpenFavorites.remove(panelId);
+            dismissFavoritePanel(panelId);
+            return true;
+        });
+
+        int padding = Math.max(6, config.gapPx);
+        int desiredWidth = config.columns * config.cellSizePx
+                + Math.max(0, config.columns - 1) * config.gapPx + padding * 2;
+        int desiredHeight = config.visibleRows * config.cellSizePx
+                + Math.max(0, config.visibleRows - 1) * config.gapPx + padding * 2;
         int minimumReferenceWidth = DriverPanelLayoutPolicy.referencePanelWidth(
                 profile.style == Preferences.DriverPanelStyle.NEW);
         int referenceWidth = Math.max(minimumReferenceWidth,
                 Math.min(320, profile.widthPx.get()));
         int physicalWidth = DriverPanelLayoutPolicy.scaleReferenceWidth(
                 metrics.widthPixels, referenceWidth);
-        int railInset = Math.max(100, physicalWidth) + 24;
-        root.setPadding(profile.side.get() == 0 ? railInset : 24, 24,
-                profile.side.get() == 1 ? railInset : 24, 24);
-
-        TextView title = new TextView(context);
-        title.setText("Избранное");
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(24);
-        title.setGravity(Gravity.CENTER_VERTICAL);
-        root.addView(title, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, 72, Gravity.TOP | Gravity.START));
-
-        ImageButton close = new ImageButton(context);
-        close.setImageResource(R.drawable.ic_driver_close);
-        close.setColorFilter(Color.WHITE);
-        close.setBackground(rippleBackground(Color.argb(45, 255, 255, 255), 18));
-        close.setContentDescription("Закрыть избранное");
-        close.setOnClickListener(view -> dismissAllApps());
-        root.addView(close, new FrameLayout.LayoutParams(72, 72,
-                Gravity.TOP | Gravity.END));
+        int width = Math.max(1, Math.min(desiredWidth,
+                Math.max(1, metrics.widthPixels - physicalWidth)));
+        int height = Math.max(1, Math.min(desiredHeight, metrics.heightPixels));
 
         GridView grid = new GridView(context);
-        grid.setNumColumns(Math.max(3,
-                Math.min(8, preferences.launcherAllAppsColumns.get())));
-        int gap = Math.max(0, Math.min(40, preferences.launcherAllAppsGapPx.get()));
-        grid.setVerticalSpacing(dp(context, gap));
-        grid.setHorizontalSpacing(dp(context, gap));
-        grid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
-        grid.setPadding(dp(context, 16), dp(context, 16),
-                dp(context, 16), dp(context, 16));
-        grid.setAdapter(new ShortcutDrawerAdapter(context, visibleFavorites()));
-        FrameLayout.LayoutParams gridParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        gridParams.topMargin = 84;
-        root.addView(grid, gridParams);
+        grid.setNumColumns(config.columns);
+        grid.setColumnWidth(config.cellSizePx);
+        grid.setVerticalSpacing(config.gapPx);
+        grid.setHorizontalSpacing(config.gapPx);
+        grid.setStretchMode(GridView.NO_STRETCH);
+        grid.setGravity(Gravity.CENTER);
+        grid.setPadding(padding, padding, padding, padding);
+        grid.setClipToPadding(false);
+        List<LauncherShortcutStore.Shortcut> values = visibleFavorites(panelId);
+        grid.setAdapter(new ShortcutDrawerAdapter(context, panelId, config, values));
+        root.addView(grid, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         try {
-            WindowManager.LayoutParams params = fullScreenParams(attachedType);
-            params.setTitle("Status Widget driver favorites");
+            View anchor = requestedAnchor == null
+                    ? favoritePanelAnchors.get(panelId) : requestedAnchor;
+            int anchorCenterY = metrics.heightPixels / 2;
+            if (anchor != null && anchor.isAttachedToWindow()) {
+                int[] location = new int[2];
+                anchor.getLocationOnScreen(location);
+                anchorCenterY = location[1] + Math.max(1, anchor.getHeight()) / 2;
+            }
+            int panelX = DriverPanelLayoutPolicy.panelWindowX(
+                    metrics.widthPixels, physicalWidth, panelOnRight);
+            // Always grow toward the screen content and meet the driver rail with a zero-pixel gap.
+            int x = panelOnRight ? panelX - width : panelX + physicalWidth;
+            int y = Math.max(0, Math.min(metrics.heightPixels - height,
+                    anchorCenterY - height / 2));
+            WindowManager.LayoutParams params = compactDrawerParams(
+                    attachedType, width, height, x, y,
+                    "Status Widget driver favorites " + panelId);
             manager.addView(root, params);
-            drawerWindow = new AttachedWindow(root, params, manager);
-            drawerGrid = grid;
-            favoritesDrawerOpen = true;
+            Set<String> itemIds = new LinkedHashSet<>();
+            for (LauncherShortcutStore.Shortcut value : values) itemIds.add(value.id);
+            favoriteWindows.put(panelId, new FavoritePanelWindow(
+                    config, grid, new AttachedWindow(root, params, manager), itemIds));
         } catch (RuntimeException error) {
             Log.w(TAG, "Could not show driver favorites", error);
+            manuallyOpenFavorites.remove(panelId);
             Toast.makeText(appContext, "Не удалось открыть избранное",
                     Toast.LENGTH_SHORT).show();
         }
@@ -536,24 +598,53 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         AttachedWindow drawer = drawerWindow;
         drawerWindow = null;
         drawerGrid = null;
-        favoritesDrawerOpen = false;
-        drawerSmartHomeBindings.clear();
         if (drawer != null) drawer.remove();
     }
 
-    private void refreshFavoritesDrawer() {
-        GridView grid = drawerGrid;
-        if (!favoritesDrawerOpen || drawerWindow == null || grid == null) return;
+    private void dismissFavoritePanel(@NonNull String panelId) {
+        FavoritePanelWindow value = favoriteWindows.remove(panelId);
+        if (value == null) return;
+        for (String itemId : value.itemIds) drawerSmartHomeBindings.remove(itemId);
+        value.window.remove();
+    }
+
+    private void dismissAllFavoritePanels() {
+        List<String> ids = new ArrayList<>(favoriteWindows.keySet());
+        for (String id : ids) dismissFavoritePanel(id);
+        manuallyOpenFavorites.clear();
         drawerSmartHomeBindings.clear();
-        grid.setAdapter(new ShortcutDrawerAdapter(grid.getContext(), visibleFavorites()));
+    }
+
+    private void refreshFavoriteWindows() {
+        List<String> open = new ArrayList<>(favoriteWindows.keySet());
+        for (String id : open) {
+            dismissFavoritePanel(id);
+            showFavoritePanel(id, favoritePanelAnchors.get(id));
+        }
+    }
+
+    private void reconcileAutomatedFavoritePanels() {
+        WidgetService service = WidgetService.getInstance();
+        if (service == null) return;
+        for (DriverFavoritesPanelConfig panel :
+                new DriverFavoritesPanelStore(preferences).load()) {
+            Boolean visible = service.driverFavoritePanelVisibility(panel.id);
+            if (Boolean.TRUE.equals(visible)) {
+                showFavoritePanel(panel.id, favoritePanelAnchors.get(panel.id));
+            } else if (Boolean.FALSE.equals(visible)) {
+                manuallyOpenFavorites.remove(panel.id);
+                dismissFavoritePanel(panel.id);
+            }
+        }
     }
 
     @NonNull
-    private List<LauncherShortcutStore.Shortcut> visibleFavorites() {
+    private List<LauncherShortcutStore.Shortcut> visibleFavorites(
+            @NonNull String panelId) {
         List<LauncherShortcutStore.Shortcut> values = new ArrayList<>();
         WidgetService widgetService = WidgetService.getInstance();
         for (LauncherShortcutStore.Shortcut shortcut :
-                LauncherShortcutStore.forDriverFavorites(preferences).all()) {
+                LauncherShortcutStore.forDriverFavorites(preferences, panelId).all()) {
             boolean scenarioVisible = widgetService == null
                     || widgetService.driverShortcutVisible(shortcut.id, true);
             if (shortcut.enabled && scenarioVisible) values.add(shortcut);
@@ -590,14 +681,64 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         root.setPadding(0, geometry.contentTop, 0,
                 Math.max(0, screenHeight - geometry.contentBottom));
         int gap = Math.max(0, profile.itemGapPx.get());
+        List<LauncherShortcutStore.Shortcut> information = new ArrayList<>();
+        List<LauncherShortcutStore.Shortcut> controls = new ArrayList<>();
         for (LauncherShortcutStore.Shortcut shortcut : shortcuts) {
+            if (shortcut.kind == LauncherShortcutStore.Kind.INFO) information.add(shortcut);
+            else controls.add(shortcut);
+        }
+        int availableHeight = Math.max(1, geometry.contentBottom - geometry.contentTop);
+        if (!information.isEmpty()) {
+            ScrollView scroll = new ScrollView(context);
+            scroll.setFillViewport(false);
+            scroll.setVerticalScrollBarEnabled(information.size() > 3);
+            LinearLayout host = new LinearLayout(context);
+            host.setOrientation(LinearLayout.VERTICAL);
+            int informationContentHeight = 0;
+            for (LauncherShortcutStore.Shortcut shortcut : information) {
+                View tile = shortcutButton(context, shortcut, false);
+                int tileHeight = informationTileHeight(context, shortcut);
+                int tileGap = Math.max(0,
+                        shortcut.gapAfterPx < 0 ? gap : shortcut.gapAfterPx);
+                LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, tileHeight);
+                tileParams.setMargins(4, 0, 4, tileGap);
+                host.addView(tile, tileParams);
+                informationContentHeight += tileHeight + tileGap;
+            }
+            scroll.addView(host, new ScrollView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            int maximumInfoHeight = controls.isEmpty()
+                    ? availableHeight : Math.max(dp(context, 64),
+                    Math.round(availableHeight * .40f));
+            int infoHeight = Math.min(maximumInfoHeight, informationContentHeight);
+            root.addView(scroll, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, infoHeight)));
+        }
+        LinearLayout controlHost = new LinearLayout(context);
+        controlHost.setOrientation(LinearLayout.VERTICAL);
+        controlHost.setGravity(Gravity.CENTER);
+        for (LauncherShortcutStore.Shortcut shortcut : controls) {
             View button = shortcutButton(context, shortcut, false);
+            registerFavoriteAnchors(shortcut, button);
             boolean expandedClimate = isExpandedClimate(shortcut);
-            LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, 0,
-                    DriverPanelLayoutPolicy.shortcutWeight(expandedClimate));
-            itemParams.setMargins(4, gap / 2, 4, gap - gap / 2);
-            root.addView(button, itemParams);
+            int itemGap = shortcut.gapAfterPx < 0 ? gap : shortcut.gapAfterPx;
+            LinearLayout.LayoutParams itemParams;
+            if (shortcut.kind == LauncherShortcutStore.Kind.DIVIDER) {
+                itemParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        shortcut.dividerThicknessPx + Math.max(4, itemGap));
+            } else {
+                itemParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, 0,
+                        DriverPanelLayoutPolicy.shortcutWeight(expandedClimate));
+            }
+            itemParams.setMargins(4, 0, 4, Math.max(0, itemGap));
+            controlHost.addView(button, itemParams);
+        }
+        if (!controls.isEmpty()) {
+            root.addView(controlHost, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         }
         WindowManager.LayoutParams params = segmentParams(
                 type, screenHeight, screenWidth, profile);
@@ -608,10 +749,50 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         panelWindows.add(new AttachedWindow(root, params, manager));
     }
 
+    private void registerFavoriteAnchors(
+            @NonNull LauncherShortcutStore.Shortcut shortcut, @NonNull View button) {
+        if (shortcut.kind == LauncherShortcutStore.Kind.BUILTIN
+                && LauncherShortcutStore.isDriverFavoritesTarget(shortcut.target)) {
+            favoritePanelAnchors.put(
+                    LauncherShortcutStore.driverFavoritesPanelId(shortcut.target), button);
+        }
+        if (shortcut.hasLongAction
+                && shortcut.longKind == LauncherShortcutStore.Kind.BUILTIN
+                && LauncherShortcutStore.isDriverFavoritesTarget(shortcut.longTarget)) {
+            favoritePanelAnchors.put(
+                    LauncherShortcutStore.driverFavoritesPanelId(shortcut.longTarget), button);
+        }
+    }
+
+    private static int informationTileHeight(
+            @NonNull Context context,
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        float scaledDensity = context.getResources().getDisplayMetrics().scaledDensity;
+        int text = Math.round((shortcut.informationValueTextSizeSp
+                + (shortcut.showTitle ? shortcut.informationLabelTextSizeSp : 0))
+                * scaledDensity);
+        int padding = dp(context, shortcut.informationPaddingTopPx
+                + shortcut.informationPaddingBottomPx);
+        return Math.max(dp(context, 48), text + padding + dp(context, 8));
+    }
+
     @NonNull
     private View shortcutButton(@NonNull Context context,
                                 @NonNull LauncherShortcutStore.Shortcut shortcut,
                                 boolean drawer) {
+        if (shortcut.kind == LauncherShortcutStore.Kind.INFO) {
+            return new InformationShortcutView(context, preferences, shortcut);
+        }
+        if (shortcut.kind == LauncherShortcutStore.Kind.DIVIDER) {
+            FrameLayout holder = new FrameLayout(context);
+            View line = InformationShortcutView.divider(context,
+                    shortcut.backgroundColor, shortcut.dividerThicknessPx);
+            holder.addView(line, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    shortcut.dividerThicknessPx, Gravity.CENTER));
+            holder.setClickable(false);
+            return holder;
+        }
         FrameLayout button = new FrameLayout(context);
         button.setClickable(true);
         button.setFocusable(false);
@@ -632,7 +813,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         @Nullable ImageView stateIcon = null;
         if (stockClimate) {
             icon = new DriverClimateShortcutView(context, CarIntegrations.get(appContext),
-                    shortcut.iconColor);
+                    shortcut.iconColor, true);
         } else {
             ImageView image = new ImageView(context);
             image.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -650,9 +831,10 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             icon = image;
             stateIcon = image;
         }
-        if (stockClimate) {
-            // Only the OEM climate surface should produce a click sound. The proxy itself stays
-            // silent while its synthetic tap reaches the covered stock control.
+        if (stockClimate || opensWindowedYandex(shortcut)) {
+            // The destination surface already produces its own audible acknowledgement. Keeping
+            // the proxy button silent prevents the intermittent double click heard when ECARX
+            // creates a Yandex floating window (and does the same for the stock-climate proxy).
             button.setSoundEffectsEnabled(false);
             content.setSoundEffectsEnabled(false);
             icon.setSoundEffectsEnabled(false);
@@ -680,7 +862,9 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             stateLabel.setText("…");
             stateLabel.setTextSize(10);
             stateLabel.setTextColor(Color.LTGRAY);
-            stateLabel.setSingleLine(true);
+            stateLabel.setSingleLine(false);
+            stateLabel.setMaxLines(Integer.MAX_VALUE);
+            stateLabel.setEllipsize(null);
             stateLabel.setGravity(Gravity.CENTER);
             content.addView(stateLabel, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -694,9 +878,9 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 || widgetService.driverShortcutActionEnabled(shortcut.id, true);
         button.setAlpha(actionEnabled ? 1f : .42f);
         if (actionEnabled) {
-            button.setOnClickListener(view -> actions.execute(shortcut));
+            button.setOnClickListener(view -> actions.execute(shortcut, view));
             if (shortcut.hasLongAction) {
-                button.setOnLongClickListener(view -> actions.executeLong(shortcut));
+                button.setOnLongClickListener(view -> actions.executeLong(shortcut, view));
             }
         } else {
             button.setClickable(false);
@@ -719,7 +903,15 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
     private static boolean isExpandedClimate(
             @NonNull LauncherShortcutStore.Shortcut shortcut) {
-        return isStockClimate(shortcut) && shortcut.extendedClimateInfo;
+        // HA1085 keeps the detailed climate tile at the same height as every other rail button.
+        return false;
+    }
+
+    private static boolean opensWindowedYandex(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        if (shortcut.kind != LauncherShortcutStore.Kind.BUILTIN) return false;
+        return LauncherShortcutStore.Builtin.MAPS_WINDOW.key.equals(shortcut.target)
+                || LauncherShortcutStore.Builtin.NAVIGATOR_WINDOW.key.equals(shortcut.target);
     }
 
     @NonNull
@@ -735,6 +927,23 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     }
 
     @NonNull
+    private GradientDrawable favoritePanelBackground(
+            @NonNull Context context,
+            @NonNull Preferences.DriverPanelProfile profile,
+            boolean panelOnRight) {
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(safeOpaqueColor(profile.backgroundColor.get(),
+                Color.rgb(19, 23, 28)));
+        float radius = Math.max(dp(context, 20), profile.cornerRadiusPx.get());
+        // The edge that touches the rail is square, so Favorites reads as a continuation of the
+        // same driver panel. Only the outer free edge keeps the user-selected rounding.
+        background.setCornerRadii(panelOnRight
+                ? new float[]{radius, radius, 0f, 0f, 0f, 0f, radius, radius}
+                : new float[]{0f, 0f, radius, radius, radius, radius, 0f, 0f});
+        return background;
+    }
+
+    @NonNull
     private WindowManager.LayoutParams segmentParams(
             int type, int screenHeight, int screenWidth,
             @NonNull Preferences.DriverPanelProfile profile) {
@@ -746,6 +955,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 screenWidth, referenceWidth);
         int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                 | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
                 | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                 | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
                 | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
@@ -770,14 +980,46 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     }
 
     @NonNull
-    private static WindowManager.LayoutParams fullScreenParams(int type) {
-        int flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
+    private static WindowManager.LayoutParams compactDrawerParams(
+            int type, int width, int height, int x, int y, @NonNull String title) {
+        int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
-                type, flags, PixelFormat.TRANSLUCENT);
+                Math.max(1, width), Math.max(1, height), type, flags,
+                PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.TOP | Gravity.LEFT;
-        params.setTitle("Status Widget all applications");
+        params.x = x;
+        params.y = y;
+        params.setTitle(title);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            params.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            params.setFitInsetsTypes(0);
+            params.setFitInsetsSides(0);
+        }
+        return params;
+    }
+
+    @NonNull
+    private static WindowManager.LayoutParams allAppsOverlayParams(
+            int type, int screenWidth, int screenHeight, @NonNull String title) {
+        int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
+        WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                Math.max(1, screenWidth), Math.max(1, screenHeight), type, flags,
+                PixelFormat.TRANSLUCENT);
+        params.gravity = Gravity.TOP | Gravity.LEFT;
+        params.x = DriverPanelLayoutPolicy.panelWindowX(
+                screenWidth, screenWidth, false);
+        params.y = 0;
+        params.setTitle(title);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             params.layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
@@ -1012,11 +1254,17 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
     private final class ShortcutDrawerAdapter extends BaseAdapter {
         private final Context context;
+        private final String panelId;
+        private final DriverFavoritesPanelConfig config;
         private final List<LauncherShortcutStore.Shortcut> values;
 
         ShortcutDrawerAdapter(@NonNull Context context,
+                              @NonNull String panelId,
+                              @NonNull DriverFavoritesPanelConfig config,
                               @NonNull List<LauncherShortcutStore.Shortcut> values) {
             this.context = context;
+            this.panelId = panelId;
+            this.config = config;
             this.values = values;
         }
 
@@ -1033,19 +1281,58 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             WidgetService widgetService = WidgetService.getInstance();
             boolean enabled = widgetService == null
                     || widgetService.driverShortcutActionEnabled(shortcut.id, true);
-            if (enabled) {
+            if (enabled && LauncherShortcutStore.isInteractive(shortcut)) {
                 tile.setOnClickListener(view -> {
-                    dismissAllApps();
-                    actions.execute(shortcut);
+                    actions.execute(shortcut, view);
+                    if (shortcut.closeFavoritePanelAfterAction) {
+                        manuallyOpenFavorites.remove(panelId);
+                        dismissFavoritePanel(panelId);
+                    }
                 });
                 if (shortcut.hasLongAction) {
                     tile.setOnLongClickListener(view -> {
-                        dismissAllApps();
-                        return actions.executeLong(shortcut);
+                        boolean handled = actions.executeLong(shortcut, view);
+                        if (handled && shortcut.closeFavoritePanelAfterAction) {
+                            manuallyOpenFavorites.remove(panelId);
+                            dismissFavoritePanel(panelId);
+                        }
+                        return handled;
                     });
                 }
             }
-            return tile;
+            FrameLayout cell = new FrameLayout(context);
+            GradientDrawable outline = new GradientDrawable();
+            outline.setColor(Color.TRANSPARENT);
+            outline.setCornerRadius(Math.max(8, config.cellSizePx * .12f));
+            if (config.borderEnabled && config.borderWidthPx > 0) {
+                outline.setStroke(config.borderWidthPx,
+                        safeColor(config.borderColor, Color.argb(85, 255, 255, 255)));
+            }
+            cell.setBackground(outline);
+            int inset = config.borderEnabled ? Math.max(0, config.borderWidthPx) : 0;
+            cell.setPadding(inset, inset, inset, inset);
+            cell.addView(tile, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            cell.setLayoutParams(new android.widget.AbsListView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, config.cellSizePx));
+            return cell;
+        }
+    }
+
+    private static final class FavoritePanelWindow {
+        @NonNull final DriverFavoritesPanelConfig config;
+        @NonNull final GridView grid;
+        @NonNull final AttachedWindow window;
+        @NonNull final Set<String> itemIds;
+
+        FavoritePanelWindow(@NonNull DriverFavoritesPanelConfig config,
+                            @NonNull GridView grid,
+                            @NonNull AttachedWindow window,
+                            @NonNull Set<String> itemIds) {
+            this.config = config;
+            this.grid = grid;
+            this.window = window;
+            this.itemIds = itemIds;
         }
     }
 

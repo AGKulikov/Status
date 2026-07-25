@@ -111,6 +111,7 @@ import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.IntentScenarioController;
 import dezz.status.widget.integration.LocalScenarioController;
 import dezz.status.widget.driver.DriverPanelService;
+import dezz.status.widget.hud.HudPresentationService;
 import dezz.status.widget.ha.api.HaApiController;
 import dezz.status.widget.ha.api.HaEntityCatalog;
 import dezz.status.widget.ha.api.HaWebSocketConnector;
@@ -275,6 +276,13 @@ public class WidgetService extends Service {
                 }
             }
         }
+        if (changed.containsKey(AutomationContract.SCOPE_DRIVER)
+                && prefs != null && prefs.driverPanelEnabled.get()) {
+            DriverPanelService.apply(this);
+        }
+        if (changed.containsKey(AutomationContract.SCOPE_HUD)) {
+            HudPresentationService.notifyAutomationChanged(this);
+        }
         // Popup windows have an independent WindowManager lifecycle. A failed/retrying status-row
         // attachment must not discard their connector updates.
         if (WidgetService.this.binding == null) return;
@@ -316,7 +324,7 @@ public class WidgetService extends Service {
             // Location AppOps are shared with the status row but are not required by the
             // independently attached driver rail or its HA/MQTT/Sprut live-state host. Keep that
             // host alive while the status surface waits for permissions to be restored.
-            if (prefs.driverPanelEnabled.get()) {
+            if (prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get()) {
                 ensureEnabledRuntime();
             } else {
                 stopSelf();
@@ -763,7 +771,9 @@ public class WidgetService extends Service {
                         for (String target : targets) {
                             if (target.startsWith(AutomationContract.SCOPE_DRIVER + "|")) {
                                 DriverPanelService.apply(this);
-                                break;
+                            }
+                            if (target.startsWith(AutomationContract.SCOPE_HUD + "|")) {
+                                HudPresentationService.notifyAutomationChanged(this);
                             }
                         }
                     });
@@ -799,9 +809,9 @@ public class WidgetService extends Service {
 
         if (prefs.widgetEnabled.get()) {
             createOverlayView();
-        } else if (prefs.driverPanelEnabled.get()) {
-            // The driver rail is an independent UI surface. Keep HA/MQTT/Sprut and scenarios
-            // alive without attaching the status-row window when only that rail is enabled.
+        } else if (prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get()) {
+            // Driver and HUD surfaces are independent. Keep HA/MQTT/Sprut and scenarios alive
+            // without attaching the status-row window when only either one is enabled.
             runInitialIntegrationStartup();
         } else {
             stopSelf();
@@ -830,6 +840,7 @@ public class WidgetService extends Service {
         // driver rail once after that consolidated evaluation so boot-time visibility/action
         // overrides are already reflected in its very first stable configuration.
         if (prefs.driverPanelEnabled.get()) DriverPanelService.apply(this);
+        if (prefs.hudPanelEnabled.get()) HudPresentationService.notifyAutomationChanged(this);
         mainHandler.removeCallbacks(automationFreshnessTick);
         mainHandler.postDelayed(automationFreshnessTick, 30_000L);
     }
@@ -1083,7 +1094,8 @@ public class WidgetService extends Service {
             }
             // A transient status-row rejection must not freeze live smart-home state on the
             // independently attached driver rail while we wait for WindowManager's retry.
-            if (prefs.driverPanelEnabled.get() && !integrationsStarted) {
+            if ((prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get())
+                    && !integrationsStarted) {
                 runInitialIntegrationStartup();
             }
             return;
@@ -1278,7 +1290,8 @@ public class WidgetService extends Service {
      */
     void ensureEnabledRuntime() {
         if (destroyed || prefs == null) return;
-        if (prefs.driverPanelEnabled.get() && !integrationsStarted) {
+        if ((prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get())
+                && !integrationsStarted) {
             runInitialIntegrationStartup();
         }
         if (prefs.widgetEnabled.get() && binding == null && !overlayAttachRetryScheduled
@@ -1301,7 +1314,8 @@ public class WidgetService extends Service {
         if (!statusSurfaceEnabled) {
             detachStatusSurfaceRuntime("status row disabled");
         }
-        if (!statusSurfaceEnabled && !prefs.driverPanelEnabled.get()) {
+        if (!statusSurfaceEnabled && !prefs.driverPanelEnabled.get()
+                && !prefs.hudPanelEnabled.get()) {
             stopSelf();
             return;
         }
@@ -3912,6 +3926,14 @@ public class WidgetService extends Service {
         if (current != null) current.removeListener(listener);
     }
 
+    /** Complete scenario/broadcast presentation state for one external HUD element. */
+    @NonNull
+    public AutomationState hudAutomationState(@NonNull String automationId) {
+        AutomationStateStore current = automationStates;
+        return current == null ? AutomationState.missing() : current.get(
+                AutomationContract.SCOPE_HUD, automationId);
+    }
+
     /** Scenario-resolved visibility for one driver-panel shortcut. */
     public boolean driverShortcutVisible(@NonNull String shortcutId, boolean defaultValue) {
         AutomationStateStore current = automationStates;
@@ -3925,6 +3947,14 @@ public class WidgetService extends Service {
         AutomationStateStore current = automationStates;
         return current == null ? defaultValue : current.effectiveActionEnabled(
                 AutomationContract.SCOPE_DRIVER, shortcutId, defaultValue);
+    }
+
+    /** Explicit automation decision for one transient Favorites panel; null preserves manual UI. */
+    @Nullable
+    public Boolean driverFavoritePanelVisibility(@NonNull String panelId) {
+        AutomationStateStore current = automationStates;
+        return current == null ? null : current.explicitVisibility(
+                AutomationContract.SCOPE_DRIVER, panelId);
     }
 
     private static Rect getBounds(View view) {

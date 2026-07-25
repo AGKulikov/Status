@@ -30,10 +30,12 @@ import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.widget.BaseAdapter;
+import android.widget.ArrayAdapter;
 import android.widget.FrameLayout;
 import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextClock;
 import android.widget.TextView;
@@ -46,11 +48,13 @@ import androidx.core.content.ContextCompat;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.materialswitch.MaterialSwitch;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -65,11 +69,15 @@ import java.util.function.Supplier;
 
 import dezz.status.widget.launcher.CombinedNavigationPanelPolicy;
 import dezz.status.widget.launcher.HighResolutionAppIconLoader;
+import dezz.status.widget.launcher.InformationShortcutView;
 import dezz.status.widget.launcher.LauncherActionsGridConfig;
 import dezz.status.widget.launcher.LauncherActionsGridConfigStore;
 import dezz.status.widget.launcher.LauncherAppCatalog;
 import dezz.status.widget.launcher.LauncherAppTileRenderer;
 import dezz.status.widget.launcher.LauncherElementFrame;
+import dezz.status.widget.launcher.LauncherGlobalElementLayoutStore;
+import dezz.status.widget.launcher.LauncherGlobalElementProxyView;
+import dezz.status.widget.launcher.LauncherGlobalElementTag;
 import dezz.status.widget.launcher.LauncherGridView;
 import dezz.status.widget.launcher.LauncherLayoutStore;
 import dezz.status.widget.launcher.LauncherMediaController;
@@ -99,6 +107,8 @@ import dezz.status.widget.launcher.panels.PanelElementConfigStore;
 import dezz.status.widget.launcher.panels.PanelGridLayout;
 import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
 import dezz.status.widget.launcher.routes.FavoriteRoutesPanelView;
+import dezz.status.widget.launcher.routes.FavoriteRouteConfig;
+import dezz.status.widget.launcher.routes.YandexRouteLauncher;
 import dezz.status.widget.launcher.vehicle.VehicleInfoPanelConfigStore;
 import dezz.status.widget.launcher.vehicle.VehicleInfoPanelView;
 import dezz.status.widget.car.CarControlCommand;
@@ -111,6 +121,7 @@ import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.scenario.IntentActionRule;
 import dezz.status.widget.scenario.IntentActionRuleStore;
+import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.shell.PrivilegedShell;
 import dezz.status.widget.sprut.SprutHubController;
 
@@ -127,12 +138,18 @@ public final class LauncherActivity extends AppCompatActivity {
     private static final long NAVIGATION_UI_REFRESH_MS = 30_000L;
     private static final long NAVIGATION_DYNAMIC_REFRESH_MS = 5_000L;
     private static final long SAFE_AREA_REFRESH_MS = 500L;
+    private static final long GLOBAL_ELEMENT_REFRESH_MS = 500L;
     private static final long APP_CATALOG_REFRESH_MS = 10L * 60L * 1_000L;
     /** Gives the foreground WidgetService a chance to attach the status row before HOME work. */
     private static final long PANEL_INITIALIZATION_GRACE_MS = 200L;
     /** At most one optional panel is inflated in a display frame. */
     private static final long PANEL_INITIALIZATION_STAGE_MS = 16L;
-    private final Map<String, LauncherElementFrame> panels = new HashMap<>();
+    private final Map<String, LauncherElementFrame> panels = new LinkedHashMap<>();
+    private final Map<String, LauncherElementFrame> globalElementFrames =
+            new LinkedHashMap<>();
+    private final Map<String, LauncherGlobalElementProxyView> globalElementProxies =
+            new LinkedHashMap<>();
+    private final Map<String, View> globalElementSources = new LinkedHashMap<>();
     private final Handler navigationUiHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService launcherWorker = Executors.newFixedThreadPool(2, runnable -> {
         Thread thread = new Thread(() -> {
@@ -150,6 +167,14 @@ public final class LauncherActivity extends AppCompatActivity {
             scheduleNavigationRefresh();
         }
     };
+    private final Runnable globalElementRefresh = new Runnable() {
+        @Override public void run() {
+            if (!activityStarted || isFinishing() || isDestroyed()) return;
+            syncGlobalElements();
+            refreshGlobalElementVisibility();
+            navigationUiHandler.postDelayed(this, GLOBAL_ELEMENT_REFRESH_MS);
+        }
+    };
     private final BroadcastReceiver navigationReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
             updateNavigation();
@@ -159,6 +184,7 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private Preferences preferences;
     private LauncherLayoutStore layoutStore;
+    private LauncherGlobalElementLayoutStore globalElementLayoutStore;
     private PanelElementConfigStore panelElementStore;
     private LauncherActionsGridConfigStore actionsGridConfigStore;
     private NavigationPanelConfigStore navigationPanelConfigStore;
@@ -169,6 +195,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private FrameLayout workspace;
     private LauncherGridView editorGrid;
     private MaterialButton doneButton;
+    private MaterialButton widgetCatalogButton;
     private boolean editMode;
     private boolean navigationContentEditMode;
     private boolean mediaContentEditMode;
@@ -179,6 +206,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private int systemBottomInset;
     @Nullable private LauncherSafeAreaPolicy.Insets appliedSafeInsets;
     private boolean panelsInitialized;
+    private boolean globalElementsActivated;
     private boolean panelsInitializing;
     private boolean panelInitializationAllowed;
     private int panelInitializationStage;
@@ -240,6 +268,7 @@ public final class LauncherActivity extends AppCompatActivity {
     @Nullable private String appliedPanelElementsJson;
     @Nullable private String appliedNavigationConfigJson;
     @Nullable private String appliedActionsGridJson;
+    @Nullable private String appliedGlobalElementsJson;
     private int appliedAppsColumns = -1;
     private int appliedActionsColumns = -1;
     private int appsGridScalePercent = 100;
@@ -294,6 +323,7 @@ public final class LauncherActivity extends AppCompatActivity {
         preferences = new Preferences(this);
         carIntegration = CarIntegrations.get(this);
         layoutStore = new LauncherLayoutStore(preferences);
+        globalElementLayoutStore = new LauncherGlobalElementLayoutStore(preferences);
         panelElementStore = new PanelElementConfigStore(preferences);
         actionsGridConfigStore = new LauncherActionsGridConfigStore(preferences);
         navigationPanelConfigStore = new NavigationPanelConfigStore(preferences);
@@ -326,22 +356,51 @@ public final class LauncherActivity extends AppCompatActivity {
         // optional panel inflation across frames.
         navigationUiHandler.postDelayed(allowPanelInitialization,
                 PANEL_INITIALIZATION_GRACE_MS);
+        handleStagedOrHomeNavigation(getIntent());
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        handleStagedOrHomeNavigation(intent);
         if (panelsInitialized) {
-            if (intent.getBooleanExtra(EXTRA_EDIT_MEDIA_CONTENT, false)) {
-                setMediaContentEditMode(true);
-            } else if (intent.getBooleanExtra(EXTRA_EDIT_NAVIGATION_CONTENT, false)) {
-                setNavigationContentEditMode(true);
-            } else if (intent.getBooleanExtra(EXTRA_EDIT_ACTIONS_CONTENT, false)) {
-                setActionsContentEditMode(true);
-            } else if (intent.getBooleanExtra(EXTRA_EDIT_MODE, false)) {
-                setEditMode(true);
+            workspace.post(() -> {
+                activateGlobalElements();
+                if (requestsAnyHomeEditor(intent)) setEditMode(true);
+            });
+        }
+    }
+
+    private static boolean requestsAnyHomeEditor(@Nullable Intent intent) {
+        return intent != null && (intent.getBooleanExtra(EXTRA_EDIT_MODE, false)
+                || intent.getBooleanExtra(EXTRA_EDIT_MEDIA_CONTENT, false)
+                || intent.getBooleanExtra(EXTRA_EDIT_NAVIGATION_CONTENT, false)
+                || intent.getBooleanExtra(EXTRA_EDIT_ACTIONS_CONTENT, false));
+    }
+
+    private void handleStagedOrHomeNavigation(@Nullable Intent intent) {
+        if (intent == null || preferences == null) return;
+        String staged = intent.getStringExtra(YandexWindowLauncher.EXTRA_STAGED_PRODUCT);
+        if (staged != null && !staged.trim().isEmpty()) {
+            intent.removeExtra(YandexWindowLauncher.EXTRA_STAGED_PRODUCT);
+            boolean full = intent.getBooleanExtra(
+                    YandexWindowLauncher.EXTRA_STAGED_FULLSCREEN, false);
+            intent.removeExtra(YandexWindowLauncher.EXTRA_STAGED_FULLSCREEN);
+            final YandexWindowLauncher.Product product;
+            try {
+                product = YandexWindowLauncher.Product.valueOf(staged);
+            } catch (IllegalArgumentException error) {
+                return;
             }
+            navigationUiHandler.post(() -> launchYandex(product, full));
+            return;
+        }
+        boolean homeIntent = Intent.ACTION_MAIN.equals(intent.getAction())
+                && intent.hasCategory(Intent.CATEGORY_HOME);
+        if (homeIntent && preferences.launcherHomeOpensWindowedNavigator.get()) {
+            navigationUiHandler.post(() ->
+                    launchYandex(YandexWindowLauncher.Product.NAVIGATOR, false));
         }
     }
 
@@ -365,6 +424,8 @@ public final class LauncherActivity extends AppCompatActivity {
         WidgetServiceStarter.startIfNeeded(this);
         navigationUiHandler.removeCallbacks(safeAreaRefresh);
         navigationUiHandler.post(safeAreaRefresh);
+        navigationUiHandler.removeCallbacks(globalElementRefresh);
+        navigationUiHandler.post(globalElementRefresh);
         navigationUiHandler.removeCallbacks(ensureSmartHomeValueSubscription);
         navigationUiHandler.post(ensureSmartHomeValueSubscription);
         reconcileMediaController();
@@ -394,6 +455,7 @@ public final class LauncherActivity extends AppCompatActivity {
         navigationUiHandler.removeCallbacks(navigationUiRefresh);
         navigationUiHandler.removeCallbacks(ensureSmartHomeValueSubscription);
         navigationUiHandler.removeCallbacks(safeAreaRefresh);
+        navigationUiHandler.removeCallbacks(globalElementRefresh);
         dismissAllAppsDialog();
         if (smartHomeValueService != null) {
             smartHomeValueService.removeConnectorValueListener(smartHomeValueListener);
@@ -518,6 +580,7 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private void applyLauncherPreferences() {
         if (!panelsInitialized) return;
+        reconcileGlobalElementLayoutPreference();
         View root = (View) workspace.getParent();
         if (root != null) root.setBackground(buildBackground());
         setPanelVisibility(LauncherLayoutStore.APPS, preferences.launcherAppsVisible.get()
@@ -573,6 +636,29 @@ public final class LauncherActivity extends AppCompatActivity {
         refreshSimplePanelContentsIfNeeded();
         updateNavigation();
         scheduleNavigationRefresh();
+    }
+
+    private void reconcileGlobalElementLayoutPreference() {
+        if (!globalElementsActivated) return;
+        String raw = preferences.launcherGlobalElementsJson.get();
+        if (Objects.equals(appliedGlobalElementsJson, raw)) return;
+        if (raw == null || raw.trim().isEmpty()) {
+            for (LauncherElementFrame frame : globalElementFrames.values()) {
+                workspace.removeView(frame);
+            }
+            globalElementFrames.clear();
+            globalElementProxies.clear();
+            globalElementSources.clear();
+            globalElementsActivated = false;
+            for (LauncherElementFrame panel : panels.values()) {
+                panel.setAlpha(1f);
+                panel.setContentTouchBlocked(false);
+            }
+            workspace.post(this::activateGlobalElements);
+        } else {
+            applyStoredGlobalGeometry();
+        }
+        appliedGlobalElementsJson = raw;
     }
 
     /** Applies inner-element edits after returning from the visual panel editor. */
@@ -705,6 +791,17 @@ public final class LauncherActivity extends AppCompatActivity {
                 Gravity.TOP | Gravity.CENTER_HORIZONTAL);
         doneLp.topMargin = dp(12);
         root.addView(doneButton, doneLp);
+
+        widgetCatalogButton = new MaterialButton(this);
+        widgetCatalogButton.setText("＋ Виджет");
+        widgetCatalogButton.setAllCaps(false);
+        widgetCatalogButton.setOnClickListener(view -> showLauncherWidgetCatalog());
+        widgetCatalogButton.setVisibility(View.GONE);
+        FrameLayout.LayoutParams catalogLp = new FrameLayout.LayoutParams(
+                dp(220), dp(56), Gravity.TOP | Gravity.END);
+        catalogLp.topMargin = dp(12);
+        catalogLp.rightMargin = dp(18);
+        root.addView(widgetCatalogButton, catalogLp);
         return root;
     }
 
@@ -727,6 +824,14 @@ public final class LauncherActivity extends AppCompatActivity {
         doneParams.rightMargin = safe.right;
         doneParams.bottomMargin = safe.bottom;
         doneButton.setLayoutParams(doneParams);
+        if (widgetCatalogButton != null) {
+            FrameLayout.LayoutParams catalogParams =
+                    (FrameLayout.LayoutParams) widgetCatalogButton.getLayoutParams();
+            catalogParams.topMargin = safe.top + dp(12);
+            catalogParams.rightMargin = safe.right + dp(18);
+            catalogParams.bottomMargin = safe.bottom;
+            widgetCatalogButton.setLayoutParams(catalogParams);
+        }
         if (panelsInitialized) workspace.post(this::reflowPanelsInsideSafeArea);
     }
 
@@ -744,6 +849,7 @@ public final class LauncherActivity extends AppCompatActivity {
         if (!panelsInitialized || workspace.getWidth() <= 0 || workspace.getHeight() <= 0) return;
         layoutStore.load(workspace.getWidth(), workspace.getHeight());
         applyStoredPanelGeometry();
+        applyStoredGlobalGeometry();
     }
 
     private void applyStoredPanelGeometry() {
@@ -757,6 +863,608 @@ public final class LauncherActivity extends AppCompatActivity {
             params.topMargin = geometry.y;
             entry.getValue().setLayoutParams(params);
         }
+    }
+
+    /** Activates independent screen-space placement without reparenting live integration views. */
+    private void activateGlobalElements() {
+        if (workspace == null || globalElementLayoutStore == null
+                || workspace.getWidth() <= 0 || workspace.getHeight() <= 0) return;
+        if (!globalElementsActivated) {
+            globalElementLayoutStore.load(workspace.getWidth(), workspace.getHeight());
+            globalElementsActivated = true;
+        }
+        syncGlobalElements();
+        for (Map.Entry<String, LauncherElementFrame> entry : panels.entrySet()) {
+            if (!hasGlobalFrameForPanel(entry.getKey())) continue;
+            // The measured legacy hierarchy remains the live data/action source for the proxies,
+            // but it must neither draw nor receive a second touch at its old panel-local position.
+            entry.getValue().setAlpha(0f);
+            entry.getValue().setContentTouchBlocked(true);
+        }
+        refreshGlobalElementVisibility();
+        appliedGlobalElementsJson = preferences.launcherGlobalElementsJson.get();
+    }
+
+    private boolean hasGlobalFrameForPanel(@NonNull String panelId) {
+        String prefix = panelId + "/";
+        for (String id : globalElementFrames.keySet()) {
+            if (id.startsWith(prefix)) return true;
+        }
+        return false;
+    }
+
+    private void syncGlobalElements() {
+        if (!globalElementsActivated || workspace == null) return;
+        LinkedHashMap<String, View> discovered = new LinkedHashMap<>();
+        LinkedHashMap<String, LauncherGlobalElementTag> tags = new LinkedHashMap<>();
+        for (LauncherElementFrame panel : panels.values()) {
+            collectGlobalElements(panel, discovered, tags);
+        }
+        globalElementSources.clear();
+        globalElementSources.putAll(discovered);
+
+        int snap = Math.max(4, preferences.launcherSnapPx.get());
+        for (Map.Entry<String, View> entry : discovered.entrySet()) {
+            String id = entry.getKey();
+            View source = entry.getValue();
+            LauncherElementFrame existing = globalElementFrames.get(id);
+            if (existing == null) {
+                LauncherGlobalElementLayoutStore.Geometry geometry =
+                        globalElementLayoutStore.get(id);
+                if (geometry == null) geometry = migrateSourceGeometry(source);
+                if (geometry == null) continue;
+                LauncherGlobalElementTag tag = tags.get(id);
+                String label = tag == null ? id : tag.label;
+                LauncherGlobalElementLayoutStore.Appearance appearance =
+                        globalElementLayoutStore.getAppearance(id);
+                LauncherGlobalElementProxyView proxy =
+                        new LauncherGlobalElementProxyView(this,
+                                () -> globalElementSources.get(id),
+                                appearance,
+                                () -> showLauncherWidgetEditor(id, label));
+                LauncherElementFrame frame = new LauncherElementFrame(this, id, label,
+                        (changedId, x, y, width, height) ->
+                                globalElementLayoutStore.put(changedId,
+                                        new LauncherGlobalElementLayoutStore.Geometry(
+                                                x, y, width, height)));
+                frame.setMinimumGeometryPx(dp(36), dp(28));
+                frame.setCardBackgroundColor(Color.TRANSPARENT);
+                frame.setCardElevation(0);
+                frame.setRadius(0);
+                frame.setPreserveAspectRatio(appearance.preserveAspectRatio);
+                frame.setContent(proxy);
+                FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                        geometry.width, geometry.height);
+                params.leftMargin = geometry.x;
+                params.topMargin = geometry.y;
+                workspace.addView(frame, params);
+                frame.setEditMode(editMode, snap);
+                globalElementFrames.put(id, frame);
+                globalElementProxies.put(id, proxy);
+            }
+        }
+        for (Map.Entry<String, LauncherElementFrame> panel : panels.entrySet()) {
+            if (!hasGlobalFrameForPanel(panel.getKey())) continue;
+            panel.getValue().setAlpha(0f);
+            panel.getValue().setContentTouchBlocked(true);
+        }
+    }
+
+    private void collectGlobalElements(
+            @NonNull View current,
+            @NonNull Map<String, View> views,
+            @NonNull Map<String, LauncherGlobalElementTag> tags) {
+        LauncherGlobalElementTag tag = LauncherGlobalElementTag.from(current);
+        if (tag != null) {
+            // Stable IDs are unique. A newly rebuilt view intentionally replaces its detached
+            // predecessor while retaining the same saved global rectangle.
+            views.put(tag.id, current);
+            tags.put(tag.id, tag);
+        }
+        if (!(current instanceof ViewGroup)) return;
+        ViewGroup group = (ViewGroup) current;
+        for (int index = 0; index < group.getChildCount(); index++) {
+            collectGlobalElements(group.getChildAt(index), views, tags);
+        }
+    }
+
+    @Nullable
+    private LauncherGlobalElementLayoutStore.Geometry migrateSourceGeometry(
+            @NonNull View source) {
+        int width = Math.max(source.getWidth(), source.getMeasuredWidth());
+        int height = Math.max(source.getHeight(), source.getMeasuredHeight());
+        if (width <= 0 || height <= 0) return null;
+        int[] sourceLocation = new int[2];
+        int[] workspaceLocation = new int[2];
+        source.getLocationOnScreen(sourceLocation);
+        workspace.getLocationOnScreen(workspaceLocation);
+        LauncherGlobalElementLayoutStore.Geometry geometry =
+                new LauncherGlobalElementLayoutStore.Geometry(
+                        sourceLocation[0] - workspaceLocation[0],
+                        sourceLocation[1] - workspaceLocation[1],
+                        width, height);
+        globalElementLayoutStore.put(
+                LauncherGlobalElementTag.from(source).id, geometry);
+        return globalElementLayoutStore.get(LauncherGlobalElementTag.from(source).id);
+    }
+
+    private void refreshGlobalElementVisibility() {
+        if (!globalElementsActivated) return;
+        int snap = Math.max(4, preferences.launcherSnapPx.get());
+        for (Map.Entry<String, LauncherElementFrame> entry
+                : globalElementFrames.entrySet()) {
+            LauncherGlobalElementProxyView proxy = globalElementProxies.get(entry.getKey());
+            View source = globalElementSources.get(entry.getKey());
+            boolean visible = source != null
+                    && (editMode || proxy != null && proxy.sourceIsShown());
+            entry.getValue().setVisibility(visible ? View.VISIBLE : View.GONE);
+            entry.getValue().setEditMode(editMode, snap);
+            entry.getValue().setCardElevation(editMode ? dp(10) : 0);
+            if (proxy != null && visible) proxy.invalidate();
+        }
+    }
+
+    private void applyStoredGlobalGeometry() {
+        if (!globalElementsActivated || globalElementLayoutStore == null) return;
+        globalElementLayoutStore.load(workspace.getWidth(), workspace.getHeight());
+        for (Map.Entry<String, LauncherElementFrame> entry
+                : globalElementFrames.entrySet()) {
+            LauncherGlobalElementLayoutStore.Geometry geometry =
+                    globalElementLayoutStore.get(entry.getKey());
+            if (geometry == null) continue;
+            FrameLayout.LayoutParams params =
+                    (FrameLayout.LayoutParams) entry.getValue().getLayoutParams();
+            params.width = geometry.width;
+            params.height = geometry.height;
+            params.leftMargin = geometry.x;
+            params.topMargin = geometry.y;
+            entry.getValue().setLayoutParams(params);
+        }
+    }
+
+    /**
+     * Deep editor for one atomic HOME widget. It is opened by a long press on the real rendered
+     * element and writes through the same store as drag/resize, so no panel-local editor can
+     * subsequently overwrite its geometry or appearance.
+     */
+    private void showLauncherWidgetEditor(@NonNull String id, @NonNull String label) {
+        if (globalElementLayoutStore == null || isFinishing() || isDestroyed()) return;
+        LauncherGlobalElementLayoutStore.Appearance appearance =
+                globalElementLayoutStore.getAppearance(id);
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(20), dp(10), dp(20), dp(28));
+        scroll.addView(form, new ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView hint = text(13, Color.LTGRAY, false);
+        hint.setText("Размер и положение принадлежат только этому виджету. "
+                + "Режим «Вписать» показывает содержимое целиком и не деформирует его.");
+        hint.setPadding(0, 0, 0, dp(8));
+        form.addView(hint);
+
+        MaterialSwitch preserve = new MaterialSwitch(this);
+        preserve.setText("Сохранять пропорции при изменении размера");
+        preserve.setChecked(appearance.preserveAspectRatio);
+        preserve.setOnCheckedChangeListener((button, checked) -> {
+            appearance.preserveAspectRatio = checked;
+            saveLauncherWidgetAppearance(id, appearance);
+        });
+        form.addView(preserve, widgetEditorRow());
+
+        MaterialButton scaleMode = widgetEditorButton("Масштабирование: "
+                + widgetScaleModeLabel(appearance.scaleMode));
+        scaleMode.setOnClickListener(view -> new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Масштабирование содержимого")
+                .setItems(new String[]{"Вписать целиком", "Заполнить с обрезкой",
+                        "Растянуть (может исказить)"}, (dialog, which) -> {
+                    appearance.scaleMode = which == 0
+                            ? LauncherGlobalElementLayoutStore.ScaleMode.FIT
+                            : which == 1
+                            ? LauncherGlobalElementLayoutStore.ScaleMode.CROP
+                            : LauncherGlobalElementLayoutStore.ScaleMode.STRETCH;
+                    scaleMode.setText("Масштабирование: "
+                            + widgetScaleModeLabel(appearance.scaleMode));
+                    saveLauncherWidgetAppearance(id, appearance);
+                })
+                .show());
+        form.addView(scaleMode, widgetEditorRow());
+
+        TextView typography = text(17, Color.WHITE, true);
+        typography.setText("Текст и иконка");
+        form.addView(typography, widgetEditorSection());
+        addWidgetEditorSlider(form, "Размер текста · 0 = исходный",
+                0, 120, appearance.textSizeSp, " sp", value -> {
+                    appearance.textSizeSp = value;
+                    saveLauncherWidgetAppearance(id, appearance);
+                });
+
+        MaterialButton font = widgetEditorButton("Шрифт: "
+                + widgetFontLabel(appearance.fontFamily));
+        font.setOnClickListener(view -> {
+            String[] labels = new String[Fonts.ALL.size() + 1];
+            labels[0] = "Исходный шрифт элемента";
+            for (int index = 0; index < Fonts.ALL.size(); index++) {
+                labels[index + 1] = getString(Fonts.ALL.get(index).labelRes);
+            }
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("Шрифт виджета")
+                    .setItems(labels, (dialog, which) -> {
+                        appearance.fontFamily = which == 0
+                                ? "" : Fonts.ALL.get(which - 1).key;
+                        font.setText("Шрифт: " + widgetFontLabel(appearance.fontFamily));
+                        saveLauncherWidgetAppearance(id, appearance);
+                    })
+                    .show();
+        });
+        form.addView(font, widgetEditorRow());
+
+        MaterialSwitch bold = new MaterialSwitch(this);
+        bold.setText("Жирный текст");
+        bold.setChecked(appearance.textBold);
+        bold.setOnCheckedChangeListener((button, checked) -> {
+            appearance.textBold = checked;
+            saveLauncherWidgetAppearance(id, appearance);
+        });
+        form.addView(bold, widgetEditorRow());
+
+        MaterialSwitch italic = new MaterialSwitch(this);
+        italic.setText("Курсив");
+        italic.setChecked(appearance.textItalic);
+        italic.setOnCheckedChangeListener((button, checked) -> {
+            appearance.textItalic = checked;
+            saveLauncherWidgetAppearance(id, appearance);
+        });
+        form.addView(italic, widgetEditorRow());
+
+        addWidgetColorButton(form, "Цвет текста", appearance.textColor,
+                value -> {
+                    appearance.textColor = value;
+                    saveLauncherWidgetAppearance(id, appearance);
+                });
+        addWidgetColorButton(form, "Цвет иконки", appearance.iconColor,
+                value -> {
+                    appearance.iconColor = value;
+                    saveLauncherWidgetAppearance(id, appearance);
+                });
+
+        MaterialButton horizontal = widgetEditorButton("По горизонтали: "
+                + widgetHorizontalLabel(appearance.horizontalAlignment));
+        horizontal.setOnClickListener(view -> new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Выравнивание по горизонтали")
+                .setItems(new String[]{"Как в элементе", "Слева", "По центру", "Справа"},
+                        (dialog, which) -> {
+                            appearance.horizontalAlignment = which - 1;
+                            horizontal.setText("По горизонтали: "
+                                    + widgetHorizontalLabel(
+                                    appearance.horizontalAlignment));
+                            saveLauncherWidgetAppearance(id, appearance);
+                        })
+                .show());
+        form.addView(horizontal, widgetEditorRow());
+
+        MaterialButton vertical = widgetEditorButton("По вертикали: "
+                + widgetVerticalLabel(appearance.verticalAlignment));
+        vertical.setOnClickListener(view -> new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Выравнивание по вертикали")
+                .setItems(new String[]{"Как в элементе", "Сверху", "По центру", "Снизу"},
+                        (dialog, which) -> {
+                            appearance.verticalAlignment = which - 1;
+                            vertical.setText("По вертикали: "
+                                    + widgetVerticalLabel(appearance.verticalAlignment));
+                            saveLauncherWidgetAppearance(id, appearance);
+                        })
+                .show());
+        form.addView(vertical, widgetEditorRow());
+
+        TextView spacing = text(17, Color.WHITE, true);
+        spacing.setText("Отступы со всех сторон");
+        form.addView(spacing, widgetEditorSection());
+        addWidgetEditorSlider(form, "Слева", 0, 160,
+                appearance.paddingLeftPx, " px", value -> {
+                    appearance.paddingLeftPx = value;
+                    saveLauncherWidgetAppearance(id, appearance);
+                });
+        addWidgetEditorSlider(form, "Сверху", 0, 160,
+                appearance.paddingTopPx, " px", value -> {
+                    appearance.paddingTopPx = value;
+                    saveLauncherWidgetAppearance(id, appearance);
+                });
+        addWidgetEditorSlider(form, "Справа", 0, 160,
+                appearance.paddingRightPx, " px", value -> {
+                    appearance.paddingRightPx = value;
+                    saveLauncherWidgetAppearance(id, appearance);
+                });
+        addWidgetEditorSlider(form, "Снизу", 0, 160,
+                appearance.paddingBottomPx, " px", value -> {
+                    appearance.paddingBottomPx = value;
+                    saveLauncherWidgetAppearance(id, appearance);
+                });
+
+        TextView surface = text(17, Color.WHITE, true);
+        surface.setText("Фон виджета");
+        form.addView(surface, widgetEditorSection());
+        addWidgetColorButton(form, "Цвет фона", appearance.backgroundColor,
+                value -> {
+                    appearance.backgroundColor = value;
+                    saveLauncherWidgetAppearance(id, appearance);
+                });
+        addWidgetEditorSlider(form, "Скругление", 0, 160,
+                appearance.cornerRadiusPx, " px", value -> {
+                    appearance.cornerRadiusPx = value;
+                    saveLauncherWidgetAppearance(id, appearance);
+                });
+
+        TextView behavior = text(17, Color.WHITE, true);
+        behavior.setText("Поведение при нажатии");
+        form.addView(behavior, widgetEditorSection());
+        MaterialButton tap = widgetEditorButton("Нажатие: "
+                + widgetTapActionLabel(appearance));
+        tap.setOnClickListener(view -> new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Действие виджета")
+                .setItems(new String[]{"Исходное действие", "Без действия",
+                        "Открыть приложение…"}, (dialog, which) -> {
+                    if (which == 0) {
+                        appearance.tapAction =
+                                LauncherGlobalElementLayoutStore.TapAction.INHERIT;
+                        appearance.appComponent = "";
+                        tap.setText("Нажатие: " + widgetTapActionLabel(appearance));
+                        saveLauncherWidgetAppearance(id, appearance);
+                    } else if (which == 1) {
+                        appearance.tapAction =
+                                LauncherGlobalElementLayoutStore.TapAction.NONE;
+                        appearance.appComponent = "";
+                        tap.setText("Нажатие: " + widgetTapActionLabel(appearance));
+                        saveLauncherWidgetAppearance(id, appearance);
+                    } else {
+                        chooseLauncherWidgetApp(id, appearance, tap);
+                    }
+                })
+                .show());
+        form.addView(tap, widgetEditorRow());
+
+        androidx.appcompat.app.AlertDialog editor =
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("Виджет · " + label)
+                        .setView(scroll)
+                        .setPositiveButton("Готово", null)
+                        .setNeutralButton("Сбросить", null)
+                        .create();
+        editor.setOnShowListener(ignored -> editor.getButton(
+                androidx.appcompat.app.AlertDialog.BUTTON_NEUTRAL)
+                .setOnClickListener(view -> new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("Сбросить настройки виджета?")
+                        .setMessage("Положение и размер сохранятся; оформление и действие "
+                                + "вернутся к исходным.")
+                        .setPositiveButton("Сбросить", (dialog, which) -> {
+                            saveLauncherWidgetAppearance(id,
+                                    new LauncherGlobalElementLayoutStore.Appearance());
+                            editor.dismiss();
+                        })
+                        .setNegativeButton("Отмена", null)
+                        .show()));
+        editor.show();
+    }
+
+    private void saveLauncherWidgetAppearance(
+            @NonNull String id,
+            @NonNull LauncherGlobalElementLayoutStore.Appearance appearance) {
+        globalElementLayoutStore.putAppearance(id, appearance);
+        LauncherGlobalElementProxyView proxy = globalElementProxies.get(id);
+        if (proxy != null) proxy.setAppearance(appearance);
+        LauncherElementFrame frame = globalElementFrames.get(id);
+        if (frame != null) {
+            frame.setPreserveAspectRatio(appearance.preserveAspectRatio);
+        }
+    }
+
+    private void showLauncherWidgetCatalog() {
+        String[] entries = {
+                "Кнопка приложения или действие",
+                "Избранное приложение",
+                "Часы и дата",
+                "Медиа: обложка, текст и управление",
+                "Информационный статус",
+                "Навигация",
+                "Климат",
+                "Данные автомобиля"
+        };
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Добавить виджет")
+                .setMessage("После добавления новый элемент появляется на HOME как независимый "
+                        + "виджет. Долгое нажатие открывает его глубокие настройки.")
+                .setItems(entries, (dialog, which) -> {
+                    Intent intent;
+                    switch (which) {
+                        case 0:
+                            intent = new Intent(this, LauncherShortcutSettingsActivity.class);
+                            break;
+                        case 1:
+                            intent = new Intent(this, FavoriteAppsSettingsActivity.class);
+                            break;
+                        case 2:
+                            intent = new Intent(this, PanelElementSettingsActivity.class)
+                                    .putExtra(PanelElementSettingsActivity.EXTRA_PANEL_ID,
+                                            LauncherLayoutStore.CLOCK);
+                            break;
+                        case 3:
+                            intent = new Intent(this, MediaPanelSettingsActivity.class);
+                            break;
+                        case 4:
+                            intent = new Intent(this, InformationPanelSettingsActivity.class);
+                            break;
+                        case 5:
+                            intent = new Intent(this, NavigationPanelSettingsActivity.class);
+                            break;
+                        case 6:
+                            intent = new Intent(this, ClimatePanelSettingsActivity.class);
+                            break;
+                        case 7:
+                        default:
+                            intent = new Intent(this, VehicleInfoPanelSettingsActivity.class);
+                            break;
+                    }
+                    startActivity(intent);
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void addWidgetEditorSlider(
+            @NonNull LinearLayout parent, @NonNull String label,
+            int minimum, int maximum, int current, @NonNull String suffix,
+            @NonNull java.util.function.IntConsumer listener) {
+        LinearLayout block = new LinearLayout(this);
+        block.setOrientation(LinearLayout.VERTICAL);
+        TextView value = text(14, Color.LTGRAY, false);
+        value.setText(label + ": " + current + suffix);
+        block.addView(value);
+        SeekBar seek = new SeekBar(this);
+        seek.setMax(Math.max(0, maximum - minimum));
+        seek.setProgress(Math.max(0, Math.min(maximum - minimum, current - minimum)));
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                                                    boolean fromUser) {
+                if (!fromUser) return;
+                int selected = minimum + progress;
+                value.setText(label + ": " + selected + suffix);
+                listener.accept(selected);
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        block.addView(seek, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
+        parent.addView(block, widgetEditorRow());
+    }
+
+    private void addWidgetColorButton(
+            @NonNull LinearLayout parent, @NonNull String title,
+            @Nullable String current,
+            @NonNull java.util.function.Consumer<String> listener) {
+        String initial = current == null || current.trim().isEmpty()
+                ? "#00000000" : current;
+        MaterialButton button = widgetEditorButton(title + ": "
+                + (current == null || current.trim().isEmpty() ? "исходный" : current));
+        button.setOnClickListener(view -> AppleColorPickerDialog.show(
+                this, title, initial, AppleColorPickerDialog.Options.standard(),
+                new AppleColorPickerDialog.Listener() {
+                    @Override public void onPreview(@Nullable String value) {
+                        if (value == null) return;
+                        listener.accept(value);
+                        button.setText(title + ": " + value);
+                    }
+
+                    @Override public void onSelected(@Nullable String value) {
+                        if (value == null) return;
+                        listener.accept(value);
+                        button.setText(title + ": " + value);
+                    }
+                }));
+        parent.addView(button, widgetEditorRow());
+    }
+
+    private void chooseLauncherWidgetApp(
+            @NonNull String id,
+            @NonNull LauncherGlobalElementLayoutStore.Appearance appearance,
+            @NonNull MaterialButton actionButton) {
+        List<AppEntry> apps = appCatalog == null
+                ? Collections.emptyList() : appCatalog.all();
+        if (apps.isEmpty()) {
+            Toast.makeText(this, "Список приложений ещё загружается",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        List<String> labels = new ArrayList<>(apps.size());
+        for (AppEntry app : apps) labels.add(app.label + "\n" + app.packageName);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_list_item_1, labels);
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Приложение при нажатии")
+                .setAdapter(adapter, (dialog, which) -> {
+                    AppEntry app = apps.get(which);
+                    appearance.tapAction =
+                            LauncherGlobalElementLayoutStore.TapAction.APP;
+                    appearance.appComponent = app.component.flattenToString();
+                    actionButton.setText("Нажатие: открыть " + app.label);
+                    saveLauncherWidgetAppearance(id, appearance);
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    @NonNull
+    private MaterialButton widgetEditorButton(@NonNull String title) {
+        MaterialButton button = new MaterialButton(this);
+        button.setAllCaps(false);
+        button.setText(title);
+        button.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        return button;
+    }
+
+    @NonNull
+    private LinearLayout.LayoutParams widgetEditorRow() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.topMargin = dp(7);
+        return params;
+    }
+
+    @NonNull
+    private LinearLayout.LayoutParams widgetEditorSection() {
+        LinearLayout.LayoutParams params = widgetEditorRow();
+        params.topMargin = dp(18);
+        return params;
+    }
+
+    @NonNull
+    private static String widgetScaleModeLabel(
+            @NonNull LauncherGlobalElementLayoutStore.ScaleMode mode) {
+        switch (mode) {
+            case CROP: return "заполнить с обрезкой";
+            case STRETCH: return "растянуть";
+            case FIT:
+            default: return "вписать целиком";
+        }
+    }
+
+    @NonNull
+    private String widgetFontLabel(@Nullable String family) {
+        if (family == null || family.trim().isEmpty()) return "исходный";
+        return getString(Fonts.findByKey(family).labelRes);
+    }
+
+    @NonNull
+    private static String widgetHorizontalLabel(int value) {
+        return value < 0 ? "как в элементе"
+                : value == 0 ? "слева" : value == 1 ? "по центру" : "справа";
+    }
+
+    @NonNull
+    private static String widgetVerticalLabel(int value) {
+        return value < 0 ? "как в элементе"
+                : value == 0 ? "сверху" : value == 1 ? "по центру" : "снизу";
+    }
+
+    @NonNull
+    private String widgetTapActionLabel(
+            @NonNull LauncherGlobalElementLayoutStore.Appearance appearance) {
+        if (appearance.tapAction == LauncherGlobalElementLayoutStore.TapAction.NONE) {
+            return "без действия";
+        }
+        if (appearance.tapAction != LauncherGlobalElementLayoutStore.TapAction.APP) {
+            return "исходное действие";
+        }
+        ComponentName component = ComponentName.unflattenFromString(
+                appearance.appComponent);
+        if (component == null) return "открыть приложение";
+        if (appCatalog != null) {
+            for (AppEntry app : appCatalog.all()) {
+                if (component.equals(app.component)) return "открыть " + app.label;
+            }
+        }
+        return "открыть " + component.getPackageName();
     }
 
     private void finishActiveEditor() {
@@ -910,15 +1618,12 @@ public final class LauncherActivity extends AppCompatActivity {
         appliedActionsGridJson = preferences.launcherActionsGridJson.get();
         appliedAppsColumns = preferences.launcherAppsColumns.get();
         appliedActionsColumns = preferences.launcherActionsColumns.get();
-        if (getIntent().getBooleanExtra(EXTRA_EDIT_MEDIA_CONTENT, false)) {
-            setMediaContentEditMode(true);
-        } else if (getIntent().getBooleanExtra(EXTRA_EDIT_NAVIGATION_CONTENT, false)) {
-            setNavigationContentEditMode(true);
-        } else if (getIntent().getBooleanExtra(EXTRA_EDIT_ACTIONS_CONTENT, false)) {
-            setActionsContentEditMode(true);
-        } else if (getIntent().getBooleanExtra(EXTRA_EDIT_MODE, false)) {
-            setEditMode(true);
-        }
+        // Wait for the just-added live children to receive exact pixel bounds, then migrate each
+        // one from its old panel-local rectangle into the shared screen coordinate space.
+        workspace.post(() -> {
+            activateGlobalElements();
+            if (requestsAnyHomeEditor(getIntent())) setEditMode(true);
+        });
     }
 
     @NonNull
@@ -1048,6 +1753,8 @@ public final class LauncherActivity extends AppCompatActivity {
         for (PanelElementConfigStore.Element element : config.enabled()) {
             if (PanelElementConfigStore.APPS_HEADING.equals(element.id)) {
                 TextView heading = heading("Избранное");
+                LauncherGlobalElementTag.attach(heading, LauncherLayoutStore.APPS,
+                        element.id, "Заголовок приложений");
                 heading.setTextSize(18f * element.scalePercent / 100f);
                 heading.setOnClickListener(v -> showAllApps());
                 int height = Math.max(dp(34), dp(42) * element.scalePercent / 100);
@@ -1113,6 +1820,9 @@ public final class LauncherActivity extends AppCompatActivity {
                 continue;
             }
             value.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL));
+            LauncherGlobalElementTag.attach(value, LauncherLayoutStore.CLOCK,
+                    element.id, PanelElementConfigStore.CLOCK_TIME.equals(element.id)
+                            ? "Время" : "Дата");
             root.addView(value);
         }
         return root;
@@ -1255,6 +1965,9 @@ public final class LauncherActivity extends AppCompatActivity {
         if (grid == null) return;
         FrameLayout cell = new FrameLayout(this);
         cell.setTag(element.id);
+        NavigationPanelConfig.Spec spec = NavigationPanelConfig.spec(element.id);
+        LauncherGlobalElementTag.attach(cell, LauncherLayoutStore.NAVIGATION,
+                element.id, spec == null ? element.id : spec.label);
         cell.setPadding(dp(4), dp(2), dp(4), dp(2));
         ViewGroup.LayoutParams existing = content.getLayoutParams();
         FrameLayout.LayoutParams contentParams = existing instanceof FrameLayout.LayoutParams
@@ -1422,6 +2135,8 @@ public final class LauncherActivity extends AppCompatActivity {
                 if (placement == null) continue;
                 View tile = buildShortcutTile(shortcut, false);
                 tile.setTag(shortcut.id);
+                LauncherGlobalElementTag.attach(tile, LauncherLayoutStore.ACTIONS,
+                        shortcut.id, shortcut.title);
                 shortcutGrid.addView(tile, new PanelGridLayout.LayoutParams(
                         placement.column, placement.row,
                         placement.columnSpan, placement.rowSpan));
@@ -1438,6 +2153,8 @@ public final class LauncherActivity extends AppCompatActivity {
             if (placement != null) {
                 View tile = buildShortcutTile(add, true);
                 tile.setTag(LauncherActionsGridConfig.ADD_TILE_ID);
+                LauncherGlobalElementTag.attach(tile, LauncherLayoutStore.ACTIONS,
+                        LauncherActionsGridConfig.ADD_TILE_ID, "Добавить действие");
                 shortcutGrid.addView(tile, new PanelGridLayout.LayoutParams(
                         placement.column, placement.row,
                         placement.columnSpan, placement.rowSpan));
@@ -1566,6 +2283,30 @@ public final class LauncherActivity extends AppCompatActivity {
         card.setFocusable(true);
         try { card.setCardBackgroundColor(Color.parseColor(shortcut.backgroundColor)); }
         catch (IllegalArgumentException ignored) { card.setCardBackgroundColor(Color.argb(180, 34, 39, 51)); }
+        if (!addButton && shortcut.kind == LauncherShortcutStore.Kind.INFO) {
+            card.setClickable(false);
+            card.setLongClickable(false);
+            card.setFocusable(false);
+            card.setCardElevation(0);
+            card.addView(new InformationShortcutView(this, preferences, shortcut),
+                    new MaterialCardView.LayoutParams(matchWidth(), matchHeight()));
+            return card;
+        }
+        if (!addButton && shortcut.kind == LauncherShortcutStore.Kind.DIVIDER) {
+            card.setClickable(false);
+            card.setLongClickable(false);
+            card.setFocusable(false);
+            card.setCardElevation(0);
+            card.setCardBackgroundColor(Color.TRANSPARENT);
+            View line = InformationShortcutView.divider(this,
+                    shortcut.backgroundColor, shortcut.dividerThicknessPx);
+            FrameLayout holder = new FrameLayout(this);
+            holder.addView(line, new FrameLayout.LayoutParams(
+                    matchWidth(), shortcut.dividerThicknessPx, Gravity.CENTER));
+            card.addView(holder, new MaterialCardView.LayoutParams(
+                    matchWidth(), matchHeight()));
+            return card;
+        }
 
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -1604,7 +2345,9 @@ public final class LauncherActivity extends AppCompatActivity {
             stateLabel = text(11, Color.LTGRAY, true);
             stateLabel.setGravity(Gravity.CENTER);
             stateLabel.setText("…");
-            stateLabel.setMaxLines(1);
+            stateLabel.setSingleLine(false);
+            stateLabel.setMaxLines(Integer.MAX_VALUE);
+            stateLabel.setEllipsize(null);
             stateLabel.setPadding(dp(5), 0, dp(5), 0);
             GradientDrawable badge = new GradientDrawable();
             badge.setColor(Color.argb(150, 0, 0, 0));
@@ -1612,9 +2355,16 @@ public final class LauncherActivity extends AppCompatActivity {
             stateLabel.setBackground(badge);
         }
         card.addView(content, new MaterialCardView.LayoutParams(matchWidth(), matchHeight()));
+        if (!addButton && opensWindowedYandex(shortcut)) {
+            // ECARX/Yandex acknowledges creation of the floating window itself. Suppress the
+            // launcher-card effect so one tap cannot produce two audible clicks.
+            card.setSoundEffectsEnabled(false);
+            content.setSoundEffectsEnabled(false);
+            icon.setSoundEffectsEnabled(false);
+        }
         if (stateLabel != null) {
             FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(
-                    wrapContent(), dp(22), Gravity.TOP | Gravity.END);
+                    matchWidth(), wrapContent(), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
             badgeLp.setMargins(dp(4), dp(4), dp(4), dp(4));
             card.addView(stateLabel, badgeLp);
         }
@@ -1632,6 +2382,8 @@ public final class LauncherActivity extends AppCompatActivity {
                     action.packageName = shortcut.longPackageName;
                     action.command = shortcut.longCommand;
                     action.commandValue = shortcut.longCommandValue;
+                    action.commandCycleValues = new ArrayList<>(
+                            shortcut.longCommandCycleValues);
                     executeShortcut(action);
                 } else {
                     startActivity(new Intent(this, LauncherShortcutSettingsActivity.class));
@@ -1653,12 +2405,20 @@ public final class LauncherActivity extends AppCompatActivity {
         return card;
     }
 
+    private static boolean opensWindowedYandex(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        if (shortcut.kind != LauncherShortcutStore.Kind.BUILTIN) return false;
+        return LauncherShortcutStore.Builtin.MAPS_WINDOW.key.equals(shortcut.target)
+                || LauncherShortcutStore.Builtin.NAVIGATOR_WINDOW.key.equals(shortcut.target);
+    }
+
     private void executeShortcut(@NonNull LauncherShortcutStore.Shortcut shortcut) {
         try {
             if (shortcut.kind == LauncherShortcutStore.Kind.CAR) {
                 if (!pendingCarControls.add(shortcut.target)) return;
                 CarControlCommand command = new CarControlCommand(shortcut.target,
-                        shortcut.command, shortcut.commandValue);
+                        shortcut.command, shortcut.commandValue,
+                        shortcut.commandCycleValues);
                 carIntegration.executeControl(command, (success, message) -> {
                     pendingCarControls.remove(shortcut.target);
                     if (!success) {
@@ -1687,7 +2447,10 @@ public final class LauncherActivity extends AppCompatActivity {
                 executeSavedRule(shortcut.target);
                 return;
             }
-            executeBuiltin(LauncherShortcutStore.Builtin.fromKey(shortcut.target));
+            if (shortcut.kind == LauncherShortcutStore.Kind.INFO
+                    || shortcut.kind == LauncherShortcutStore.Kind.DIVIDER) return;
+            executeBuiltin(LauncherShortcutStore.Builtin.fromKey(shortcut.target),
+                    shortcut.target);
         } catch (RuntimeException error) {
             if (shortcut.kind == LauncherShortcutStore.Kind.CAR) {
                 pendingCarControls.remove(shortcut.target);
@@ -1828,7 +2591,8 @@ public final class LauncherActivity extends AppCompatActivity {
         throw new IllegalArgumentException("Saved action is missing");
     }
 
-    private void executeBuiltin(@NonNull LauncherShortcutStore.Builtin action) {
+    private void executeBuiltin(@NonNull LauncherShortcutStore.Builtin action,
+                                @NonNull String rawTarget) {
         switch (action) {
             case HOME:
                 startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
@@ -1848,7 +2612,20 @@ public final class LauncherActivity extends AppCompatActivity {
                 dezz.status.widget.driver.DriverPanelService.triggerStockClimate(this);
                 break;
             case FAVORITES:
-                dezz.status.widget.driver.DriverPanelService.showFavorites(this);
+                dezz.status.widget.driver.DriverPanelService.showFavorites(this,
+                        LauncherShortcutStore.driverFavoritesPanelId(rawTarget));
+                break;
+            case FAVORITE_ROUTE:
+                boolean found = false;
+                for (FavoriteRouteConfig route : favoriteRoutesConfigStore.load()) {
+                    if (!route.enabled || !route.id.equals(
+                            LauncherShortcutStore.favoriteRouteId(rawTarget))) continue;
+                    found = true;
+                    YandexRouteLauncher.launch(this, route);
+                    break;
+                }
+                if (!found) Toast.makeText(this, "Избранная точка не найдена",
+                        Toast.LENGTH_SHORT).show();
                 break;
             case MAPS_WINDOW: launchYandex(YandexWindowLauncher.Product.MAPS, false); break;
             case MAPS_FULL: launchYandex(YandexWindowLauncher.Product.MAPS, true); break;
@@ -1901,6 +2678,11 @@ public final class LauncherActivity extends AppCompatActivity {
         if (enabled && mediaContentEditMode) setMediaContentEditMode(false);
         if (enabled && actionsContentEditMode) setActionsContentEditMode(false);
         editMode = enabled;
+        if (mediaPanel != null) mediaPanel.setGlobalEditPreview(enabled);
+        if (climatePanel != null) climatePanel.setEditorPreviewMode(enabled);
+        if (vehicleInfoPanel != null) vehicleInfoPanel.setPreviewMode(enabled);
+        if (informationPanel != null) informationPanel.setEditorPreviewMode(enabled);
+        if (favoriteRoutesPanel != null) favoriteRoutesPanel.setPreviewMode(enabled);
         int snap = Math.max(4, preferences.launcherSnapPx.get());
         editorGrid.setStepPx(snap);
         editorGrid.setVisibility(enabled && preferences.launcherShowGrid.get()
@@ -1908,7 +2690,9 @@ public final class LauncherActivity extends AppCompatActivity {
         doneButton.setText("Готово · закрепить компоновку");
         doneButton.setVisibility(enabled || navigationContentEditMode || mediaContentEditMode
                 || actionsContentEditMode ? View.VISIBLE : View.GONE);
-        for (LauncherElementFrame frame : panels.values()) frame.setEditMode(enabled, snap);
+        widgetCatalogButton.setVisibility(enabled ? View.VISIBLE : View.GONE);
+        for (LauncherElementFrame frame : panels.values()) frame.setEditMode(false, snap);
+        refreshGlobalElementVisibility();
         updateLauncherSafeArea();
         updateNavigation();
         if (vehicleInfoPanel != null && preferences.launcherVehicleInfoVisible.get()) {
@@ -1919,8 +2703,14 @@ public final class LauncherActivity extends AppCompatActivity {
             setPanelVisibility(LauncherLayoutStore.INFORMATION,
                     enabled || informationPanel.hasConfiguredItems());
         }
+        if (enabled) showNavigationEditorSamples();
+        workspace.post(() -> {
+            activateGlobalElements();
+            syncGlobalElements();
+            refreshGlobalElementVisibility();
+        });
         Toast.makeText(this, enabled
-                ? "Тащите панель; размер меняется за любой из четырёх углов"
+                ? "Тащите любой элемент по всему HOME; размер меняется за четыре угла"
                 : "Компоновка сохранена", Toast.LENGTH_SHORT).show();
     }
 
@@ -1938,6 +2728,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 : "Готово · закрепить компоновку");
         doneButton.setVisibility(enabled || editMode || mediaContentEditMode
                 || actionsContentEditMode ? View.VISIBLE : View.GONE);
+        widgetCatalogButton.setVisibility(View.GONE);
         updateLauncherSafeArea();
         if (enabled) {
             setPanelVisibility(LauncherLayoutStore.NAVIGATION, true);
@@ -1970,10 +2761,11 @@ public final class LauncherActivity extends AppCompatActivity {
         }
         editorGrid.setVisibility(View.GONE);
         doneButton.setText(enabled
-                ? "Готово · сохранить элементы медиапанели"
+                ? "Готово · сохранить элементы медиаблока"
                 : "Готово · закрепить компоновку");
         doneButton.setVisibility(enabled || editMode || navigationContentEditMode
                 || actionsContentEditMode ? View.VISIBLE : View.GONE);
+        widgetCatalogButton.setVisibility(View.GONE);
         if (enabled) {
             setPanelVisibility(LauncherLayoutStore.MEDIA, true);
         } else {
@@ -1984,7 +2776,7 @@ public final class LauncherActivity extends AppCompatActivity {
         updateLauncherSafeArea();
         Toast.makeText(this, enabled
                 ? "Тащите элементы; любой из четырёх углов изменяет размер"
-                : "Сетка медиапанели сохранена", Toast.LENGTH_SHORT).show();
+                : "Сетка медиаблока сохранена", Toast.LENGTH_SHORT).show();
     }
 
     /** Edits the actual mixed buttons/smart-home grid without touching the outer panel rectangle. */
@@ -2006,6 +2798,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 : "Готово · закрепить компоновку");
         doneButton.setVisibility(enabled || editMode || navigationContentEditMode
                 || mediaContentEditMode ? View.VISIBLE : View.GONE);
+        widgetCatalogButton.setVisibility(View.GONE);
         if (enabled) {
             setPanelVisibility(LauncherLayoutStore.ACTIONS, true);
         } else {
@@ -2072,14 +2865,16 @@ public final class LauncherActivity extends AppCompatActivity {
     private void renderNavigation(@NonNull NavigationDataRepository.Snapshot state) {
         lastNavigationSnapshot = state;
         navigationDynamicRefresh = false;
-        boolean showFavorites = !navigationContentEditMode
+        boolean showFavorites = !editMode && !navigationContentEditMode
                 && CombinedNavigationPanelPolicy.showFavorites(
                 state.routeActive, favoriteRoutesAvailable);
         if (favoriteRoutesPanel != null) {
-            favoriteRoutesPanel.setVisibility(showFavorites ? View.VISIBLE : View.GONE);
+            favoriteRoutesPanel.setVisibility(editMode || showFavorites
+                    ? View.VISIBLE : View.GONE);
         }
         if (navigationRouteContent != null) {
-            navigationRouteContent.setVisibility(showFavorites ? View.GONE : View.VISIBLE);
+            navigationRouteContent.setVisibility(editMode || !showFavorites
+                    ? View.VISIBLE : View.GONE);
         }
         boolean phaseHasContent = CombinedNavigationPanelPolicy.hasVisibleContent(
                 state.routeActive, favoriteRoutesAvailable,
@@ -2110,7 +2905,7 @@ public final class LauncherActivity extends AppCompatActivity {
                         ? "Маршрут не запущен"
                         : "Маршрут не запущен\nДобавьте избранные маршруты в настройках");
             }
-            if (navigationContentEditMode) showNavigationEditorSamples();
+            if (editMode || navigationContentEditMode) showNavigationEditorSamples();
             return;
         }
         navigationLaunchProduct = NavigationDataRepository.PRODUCT_MAPS.equals(state.sourceProduct)
@@ -2222,6 +3017,7 @@ public final class LauncherActivity extends AppCompatActivity {
         showNavigationImage(navigationJamImage, state.available ? state.jamImage : null);
         showNavigationImage(navigationRainbowImage,
                 state.available ? state.rainbowImage : null);
+        if (editMode) showNavigationEditorSamples();
     }
 
     /** Clears every live field before idle/stale rendering so no old route can flash back. */
@@ -2560,12 +3356,24 @@ public final class LauncherActivity extends AppCompatActivity {
             AppEntry entry = getItem(position);
             FavoriteAppConfig appearance = appearances.get(entry.packageName);
             if (appearance == null) appearance = new FavoriteAppConfig(entry.packageName);
-            return LauncherAppTileRenderer.render(
+            View tile = LauncherAppTileRenderer.render(
                     LauncherActivity.this, reusable, entry.label,
                     entry.icon(LauncherActivity.this, cacheIcons),
                     appearance, cacheIcons ? appsGridScalePercent
                             : Math.max(60, Math.min(180,
                             preferences.launcherAllAppsIconScalePercent.get())));
+            if (cacheIcons) {
+                LauncherGlobalElementTag.attach(tile, LauncherLayoutStore.APPS,
+                        "app." + entry.component.flattenToShortString(),
+                        "Приложение · " + entry.label);
+                tile.setOnClickListener(view -> launchApp(entry));
+                tile.setOnLongClickListener(view -> {
+                    appCatalog.toggleFavorite(entry.packageName);
+                    refreshFavorites();
+                    return true;
+                });
+            }
+            return tile;
         }
     }
 
@@ -2593,8 +3401,7 @@ public final class LauncherActivity extends AppCompatActivity {
             Set<String> hidden = preferences.launcherAllAppsHiddenComponents.get();
             List<AppEntry> result = new ArrayList<>();
             for (AppEntry app : apps) {
-                if (!app.systemApp
-                        && !hidden.contains(app.component.flattenToString())) {
+                if (!hidden.contains(app.component.flattenToString())) {
                     result.add(app);
                 }
             }

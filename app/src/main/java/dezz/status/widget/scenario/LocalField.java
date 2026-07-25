@@ -6,6 +6,7 @@ import java.util.Locale;
 /** Whitelisted local presentation fields; actions cannot invoke connector services. */
 public enum LocalField {
     VISIBLE,
+    TEXT,
     TEXT_COLOR,
     ICON,
     BACKGROUND_COLOR,
