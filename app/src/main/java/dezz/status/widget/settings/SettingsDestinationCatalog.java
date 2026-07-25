@@ -146,6 +146,11 @@ public final class SettingsDestinationCatalog {
                 "Список, порядок, подписи и размеры иконок приложений",
                 "apps", "dezz.status.widget.FavoriteAppsSettingsActivity",
                 "приложения", "иконки", "избранное"));
+        values.add(activity("all_apps", Group.PANELS, "Меню «Все приложения»",
+                "Общий вид для HOME и панели водителя: масштаб, столбцы, интервалы и скрытие",
+                "apps", "dezz.status.widget.AllAppsSettingsActivity",
+                "все приложения", "лаунчер", "панель водителя", "иконки",
+                "масштаб", "расстояние", "столбцы", "скрыть", "показать"));
         values.add(activity("panel_media", Group.PANELS, "Медиапанель",
                 "Сетка, элементы, бегущие строки, обложка, громкость и цвета",
                 "media", "dezz.status.widget.MediaPanelSettingsActivity",
@@ -184,6 +189,12 @@ public final class SettingsDestinationCatalog {
                 "панель водителя", "старая панель", "новая панель",
                 "системные приложения", "домой",
                 "назад", "климат", "оверлей", "10 кнопок", "размер иконок"));
+        values.add(activity("driver_favorites", Group.PANELS,
+                "Избранное панели водителя",
+                "Своя сетка приложений, действий автомобиля, климата и устройств умного дома",
+                "apps", "dezz.status.widget.DriverFavoritesSettingsActivity",
+                "избранное", "панель водителя", "приложения", "умный дом",
+                "дворники", "климат", "долгое нажатие"));
         values.add(activity("panel_popup", Group.PANELS, "Плавающие панели",
                 "Независимые оверлеи, сетка, размер, положение и плитки",
                 "popup", "dezz.status.widget.PopupSettingsActivity",
