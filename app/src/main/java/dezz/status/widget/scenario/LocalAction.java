@@ -11,6 +11,7 @@ import dezz.status.widget.automation.AutomationContract;
 /** Declarative, local-only presentation change emitted by a matching scenario. */
 public final class LocalAction {
     private static final int MAX_STYLE_VALUE_CHARS = 128;
+    private static final int MAX_TEXT_VALUE_CHARS = 2_048;
 
     public final TargetScope targetScope;
     public final String targetId;
@@ -80,7 +81,9 @@ public final class LocalAction {
             throw new IllegalArgumentException("Scenario style action requires a string");
         }
         String value = raw.toString().trim();
-        if (value.isEmpty() || value.length() > MAX_STYLE_VALUE_CHARS
+        int maximum = field == LocalField.TEXT ? MAX_TEXT_VALUE_CHARS
+                : MAX_STYLE_VALUE_CHARS;
+        if (value.isEmpty() || value.length() > maximum
                 || value.indexOf('\u0000') >= 0) {
             throw new IllegalArgumentException("Invalid scenario local action value");
         }
