@@ -46,10 +46,11 @@ public final class IntentScenarioSafetyContractTest {
                 occurrences(source, "referencingShortcuts(rule.id)") >= 2);
         assertTrue(source.contains("showReferencedRuleDialog(rule, currentReferences)"));
         assertTrue(source.contains(
-                "LauncherShortcutStore.forDriverPanel(prefs, prefs.driverPanelOld)"));
+                "prefs, prefs.activeDriverPanelProfile()"));
         assertTrue(source.contains(
-                "LauncherShortcutStore.forDriverPanel(prefs, prefs.driverPanelNew)"));
-        assertTrue(source.contains("LauncherShortcutStore.forDriverFavorites(prefs)"));
+                "new dezz.status.widget.driver.DriverFavoritesPanelStore(prefs).load()"));
+        assertTrue(source.contains(
+                "LauncherShortcutStore.forDriverFavorites(prefs, panel.id)"));
     }
 
     @Test

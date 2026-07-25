@@ -275,6 +275,10 @@ public class WidgetService extends Service {
                 }
             }
         }
+        if (changed.containsKey(AutomationContract.SCOPE_DRIVER)
+                && prefs != null && prefs.driverPanelEnabled.get()) {
+            DriverPanelService.apply(this);
+        }
         // Popup windows have an independent WindowManager lifecycle. A failed/retrying status-row
         // attachment must not discard their connector updates.
         if (WidgetService.this.binding == null) return;
@@ -3925,6 +3929,14 @@ public class WidgetService extends Service {
         AutomationStateStore current = automationStates;
         return current == null ? defaultValue : current.effectiveActionEnabled(
                 AutomationContract.SCOPE_DRIVER, shortcutId, defaultValue);
+    }
+
+    /** Explicit automation decision for one transient Favorites panel; null preserves manual UI. */
+    @Nullable
+    public Boolean driverFavoritePanelVisibility(@NonNull String panelId) {
+        AutomationStateStore current = automationStates;
+        return current == null ? null : current.explicitVisibility(
+                AutomationContract.SCOPE_DRIVER, panelId);
     }
 
     private static Rect getBounds(View view) {

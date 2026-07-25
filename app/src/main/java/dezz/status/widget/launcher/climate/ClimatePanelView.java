@@ -268,7 +268,7 @@ public final class ClimatePanelView extends FrameLayout {
             controlsLp.topMargin = scaledDp(4);
             root.addView(controls, controlsLp);
         } else {
-            TextView empty = label("Включите нужные элементы в настройках панели",
+            TextView empty = label("Включите нужные элементы в настройках блока",
                     scaledSp(14), false);
             empty.setGravity(Gravity.CENTER);
             empty.setAlpha(.72f);

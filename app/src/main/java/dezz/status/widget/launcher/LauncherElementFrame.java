@@ -211,7 +211,7 @@ public final class LauncherElementFrame extends MaterialCardView {
             case TOP_RIGHT: return "Изменить размер за правый верхний угол";
             case BOTTOM_LEFT: return "Изменить размер за левый нижний угол";
             case BOTTOM_RIGHT: return "Изменить размер за правый нижний угол";
-            default: return "Изменить размер панели";
+            default: return "Изменить размер блока";
         }
     }
 

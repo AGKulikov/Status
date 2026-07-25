@@ -108,7 +108,8 @@ public final class AllAppsSettingsActivity extends AppCompatActivity {
 
     private void loadApplications() {
         loader.execute(() -> {
-            List<LauncherAppCatalog.App> values = LauncherAppCatalog.load(this);
+            List<LauncherAppCatalog.App> values =
+                    LauncherAppCatalog.loadIncludingSystem(this);
             runOnUiThread(() -> renderApplications(values));
         });
     }

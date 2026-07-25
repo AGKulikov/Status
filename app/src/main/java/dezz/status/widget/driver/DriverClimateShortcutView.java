@@ -9,6 +9,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.view.View;
@@ -25,10 +26,11 @@ import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.launcher.climate.ClimateFanIndicatorPolicy;
 
 /**
- * Resolution-independent live climate icon modelled after the old Monjaro driver control.
+ * Resolution-independent live climate status for the compact driver rail.
  *
- * <p>Temperature and fan are drawn directly on Canvas, so increasing the per-button icon size
- * never magnifies a bitmap. AUTO and manual fan modes intentionally have distinct lower rows.</p>
+ * <p>The three fixed rows are temperature, fan-level scale and the current airflow pictogram.
+ * Everything is drawn directly on Canvas, so increasing the per-button icon size never magnifies
+ * a bitmap.</p>
  */
 public final class DriverClimateShortcutView extends View {
     /** Keep boot/reconnect behavior identical to the main climate panel. */
@@ -46,6 +48,7 @@ public final class DriverClimateShortcutView extends View {
     private final Paint shapePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF shape = new RectF();
     private final int foregroundColor;
+    private final boolean detailed;
     private final CarIntegration.ControlStateListener listener = this::onControlState;
     private final Runnable expiry = this::expireStaleState;
 
@@ -68,9 +71,17 @@ public final class DriverClimateShortcutView extends View {
     public DriverClimateShortcutView(@NonNull Context context,
                                      @NonNull CarIntegration integration,
                                      @Nullable String color) {
+        this(context, integration, color, false);
+    }
+
+    public DriverClimateShortcutView(@NonNull Context context,
+                                     @NonNull CarIntegration integration,
+                                     @Nullable String color,
+                                     boolean detailed) {
         super(context);
         this.integration = integration;
         foregroundColor = parseColor(color, Color.WHITE);
+        this.detailed = detailed;
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
         setLayerType(LAYER_TYPE_SOFTWARE, null);
     }
@@ -162,21 +173,17 @@ public final class DriverClimateShortcutView extends View {
         float height = getHeight();
         if (width <= 0 || height <= 0) return;
         float unit = Math.min(width, height);
-        boolean expanded = height >= width * 1.35f;
+        // Detailed climate fits the ordinary rail slot and keeps three stable rows. In particular,
+        // there is no decorative fan blade competing with the level scale.
+        boolean expanded = detailed;
         boolean showFan = fanKnown && fanActive;
         int color = showFan ? foregroundColor : muted(foregroundColor);
 
-        textPaint.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD));
-        textPaint.setColor(color);
-        textPaint.setTextAlign(Paint.Align.CENTER);
-        textPaint.setTextSize(Math.max(12f, unit * (expanded ? .34f : .39f)));
         String temperatureText = DriverClimatePresentation.temperature(
                 temperature, temperatureKnown);
-        Paint.FontMetrics temperatureMetrics = textPaint.getFontMetrics();
-        float temperatureCenterY = height * (expanded ? .18f : showFan ? .31f : .50f);
-        float temperatureBaseline = temperatureCenterY
-                - (temperatureMetrics.ascent + temperatureMetrics.descent) / 2f;
-        canvas.drawText(temperatureText, width / 2f, temperatureBaseline, textPaint);
+        float temperatureCenterY = height * (expanded ? .18f : showFan ? .32f : .50f);
+        drawTemperature(canvas, temperatureText, width / 2f,
+                temperatureCenterY, unit, expanded, color);
         if (!showFan) return;
 
         ClimateFanIndicatorPolicy.Indicator indicator =
@@ -184,40 +191,48 @@ public final class DriverClimateShortcutView extends View {
         int bars = indicator.activeSegments;
         int totalBars = indicator.totalSegments;
         float rowCenterY = height * (expanded ? .45f : .73f);
-        float glyphCenterX = width * .18f;
-        drawFanGlyph(canvas, glyphCenterX, rowCenterY, unit, color);
-        drawBars(canvas, width * .34f, rowCenterY, width * .62f, unit,
+        drawBars(canvas, width * .12f, rowCenterY, width * .76f, unit,
                 bars, totalBars, color);
         if (!expanded) return;
 
-        boolean automatic = DriverClimatePresentation.automatic(
-                autoKnown, autoActive, fanLabel);
-        if (automatic) {
-            drawAuto(canvas, width / 2f, height * .76f, unit, color);
-        } else if (airflowKnown) {
+        if (airflowKnown) {
             drawAirflow(canvas, width / 2f, height * .77f, unit,
                     DriverClimatePresentation.airflowTargets(airflowLabel), color);
         }
     }
 
-    private void drawFanGlyph(Canvas canvas, float centerX, float centerY,
-                              float unit, int color) {
-        shapePaint.setColor(color);
-        shapePaint.setStyle(Paint.Style.FILL);
-        float hub = Math.max(1.5f, unit * .027f);
-        canvas.drawCircle(centerX, centerY, hub, shapePaint);
-        float bladeWidth = unit * .055f;
-        float bladeHeight = unit * .13f;
-        for (int index = 0; index < 4; index++) {
-            canvas.save();
-            canvas.rotate(index * 90f + 20f, centerX, centerY);
-            shape.set(centerX - bladeWidth / 2f,
-                    centerY - bladeHeight,
-                    centerX + bladeWidth / 2f,
-                    centerY - hub * 1.3f);
-            canvas.drawRoundRect(shape, bladeWidth / 2f, bladeWidth / 2f, shapePaint);
-            canvas.restore();
+    private void drawTemperature(@NonNull Canvas canvas, @NonNull String value,
+                                 float centerX, float centerY, float unit,
+                                 boolean compactDetailed, int color) {
+        float primarySize = Math.max(12f, unit * (compactDetailed ? .31f : .39f));
+        textPaint.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD));
+        textPaint.setColor(color);
+        int decimal = value.indexOf('.');
+        if (decimal <= 0 || decimal >= value.length() - 1) {
+            textPaint.setTextAlign(Paint.Align.CENTER);
+            textPaint.setTextSize(primarySize);
+            Paint.FontMetrics metrics = textPaint.getFontMetrics();
+            canvas.drawText(value, centerX,
+                    centerY - (metrics.ascent + metrics.descent) / 2f, textPaint);
+            return;
         }
+        String whole = value.substring(0, decimal);
+        String fraction = value.substring(decimal);
+        textPaint.setTextSize(primarySize);
+        float wholeWidth = textPaint.measureText(whole);
+        Paint.FontMetrics primaryMetrics = textPaint.getFontMetrics();
+        float baseline = centerY
+                - (primaryMetrics.ascent + primaryMetrics.descent) / 2f;
+        float fractionSize = Math.max(8f, primarySize * .58f);
+        textPaint.setTextSize(fractionSize);
+        float fractionWidth = textPaint.measureText(fraction);
+        float start = centerX - (wholeWidth + fractionWidth) / 2f;
+        textPaint.setTextAlign(Paint.Align.LEFT);
+        textPaint.setTextSize(primarySize);
+        canvas.drawText(whole, start, baseline, textPaint);
+        textPaint.setTextSize(fractionSize);
+        canvas.drawText(fraction, start + wholeWidth,
+                baseline - primarySize * .08f, textPaint);
     }
 
     private void drawBars(Canvas canvas, float startX, float centerY, float availableWidth,
@@ -239,52 +254,54 @@ public final class DriverClimateShortcutView extends View {
         }
     }
 
-    private void drawAuto(Canvas canvas, float centerX, float centerY, float unit, int color) {
-        textPaint.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD));
-        textPaint.setColor(color);
-        textPaint.setTextAlign(Paint.Align.CENTER);
-        textPaint.setTextSize(Math.max(9f, unit * .21f));
-        Paint.FontMetrics metrics = textPaint.getFontMetrics();
-        canvas.drawText("AUTO", centerX,
-                centerY - (metrics.ascent + metrics.descent) / 2f, textPaint);
-    }
-
     /**
-     * Compact icon-only outlet diagram. The three independently lit arrows point at the
-     * windshield, face and legs of a neutral passenger outline, so all seven ECARX combinations
-     * remain distinguishable without Russian/English labels.
+     * Standard seated-person airflow pictogram. The independently lit upper, middle and lower
+     * arrows represent windshield, face and feet, preserving all seven ECARX combinations.
      */
     private void drawAirflow(Canvas canvas, float centerX, float centerY, float unit,
                              int targets, int color) {
         if (targets == 0) return;
         shapePaint.setStyle(Paint.Style.STROKE);
-        shapePaint.setStrokeWidth(Math.max(1.3f, unit * .022f));
+        shapePaint.setStrokeWidth(Math.max(1.4f, unit * .023f));
         shapePaint.setStrokeCap(Paint.Cap.ROUND);
-        shapePaint.setColor(withAlpha(color, .52f));
+        shapePaint.setStrokeJoin(Paint.Join.ROUND);
+        shapePaint.setColor(withAlpha(color, .62f));
 
-        float figureX = centerX + unit * .20f;
-        float headY = centerY - unit * .10f;
-        float headRadius = unit * .055f;
-        canvas.drawCircle(figureX, headY, headRadius, shapePaint);
-        canvas.drawLine(figureX, headY + headRadius,
-                figureX, centerY + unit * .18f, shapePaint);
-        shape.set(figureX - unit * .26f, centerY - unit * .25f,
-                figureX + unit * .11f, centerY + unit * .05f);
-        canvas.drawArc(shape, 205f, 82f, false, shapePaint);
+        // A recognisable side-profile passenger and seat replace the former stick figure.
+        float headX = centerX + unit * .15f;
+        float headY = centerY - unit * .105f;
+        float headRadius = unit * .047f;
+        canvas.drawCircle(headX, headY, headRadius, shapePaint);
+        Path passenger = new Path();
+        passenger.moveTo(centerX + unit * .105f, centerY - unit * .045f);
+        passenger.lineTo(centerX + unit * .035f, centerY - unit * .015f);
+        passenger.lineTo(centerX + unit * .055f, centerY + unit * .085f);
+        passenger.lineTo(centerX + unit * .145f, centerY + unit * .09f);
+        passenger.lineTo(centerX + unit * .225f, centerY + unit * .165f);
+        canvas.drawPath(passenger, shapePaint);
+        Path seat = new Path();
+        seat.moveTo(centerX + unit * .005f, centerY - unit * .055f);
+        seat.lineTo(centerX + unit * .025f, centerY + unit * .11f);
+        seat.lineTo(centerX + unit * .17f, centerY + unit * .11f);
+        canvas.drawPath(seat, shapePaint);
+
+        // A short slanted windshield cue keeps the upper arrow unambiguous.
+        canvas.drawLine(centerX + unit * .055f, centerY - unit * .185f,
+                centerX + unit * .225f, centerY - unit * .155f, shapePaint);
 
         shapePaint.setColor(color);
-        shapePaint.setStrokeWidth(Math.max(1.6f, unit * .030f));
+        shapePaint.setStrokeWidth(Math.max(1.8f, unit * .032f));
         if ((targets & DriverClimatePresentation.AIRFLOW_WINDSHIELD) != 0) {
-            drawDirectionArrow(canvas, centerX - unit * .26f, centerY - unit * .12f,
-                    unit * .25f, -32f, unit, color);
+            drawDirectionArrow(canvas, centerX - unit * .25f, centerY - unit * .075f,
+                    unit * .27f, -24f, unit, color);
         }
         if ((targets & DriverClimatePresentation.AIRFLOW_FACE) != 0) {
-            drawDirectionArrow(canvas, centerX - unit * .29f, centerY - unit * .01f,
-                    unit * .30f, 0f, unit, color);
+            drawDirectionArrow(canvas, centerX - unit * .28f, centerY - unit * .015f,
+                    unit * .285f, 0f, unit, color);
         }
         if ((targets & DriverClimatePresentation.AIRFLOW_LEGS) != 0) {
-            drawDirectionArrow(canvas, centerX - unit * .24f, centerY + unit * .10f,
-                    unit * .27f, 31f, unit, color);
+            drawDirectionArrow(canvas, centerX - unit * .25f, centerY + unit * .055f,
+                    unit * .30f, 23f, unit, color);
         }
         shapePaint.setStyle(Paint.Style.FILL);
     }

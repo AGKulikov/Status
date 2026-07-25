@@ -61,7 +61,7 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
         store = new InformationPanelConfigStore(preferences);
         config = store.load();
         carIntegration = CarIntegrations.get(this);
-        setTitle("Панель «Информация»");
+        setTitle("Блок «Информация»");
         View screen = buildScreen();
         setContentView(screen);
         SettingsBackNavigation.install(this, screen);
@@ -92,7 +92,7 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
         LinearLayout controls = column();
         controls.setPadding(0, 0, dp(16), dp(24));
         controlsScroll.addView(controls, new ScrollView.LayoutParams(match(), wrap()));
-        TextView title = text("Панель «Информация»", 25, true);
+        TextView title = text("Блок «Информация»", 25, true);
         controls.addView(title);
         TextView hint = text("Объединяет внутренние датчики автомобиля/магнитолы и статусы "
                 + "Home Assistant, MQTT, Sprut.hub и выбранного iPhone. "
@@ -101,7 +101,7 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
         controls.addView(hint, lp(match(), wrap(), 0, 0, 0, dp(12)));
 
         MaterialSwitch visible = new MaterialSwitch(this);
-        visible.setText("Показывать панель на HOME");
+        visible.setText("Показывать блок на HOME");
         visible.setTextSize(16);
         visible.setChecked(preferences.launcherInformationVisible.get());
         visible.setOnCheckedChangeListener((button, checked) ->
@@ -141,7 +141,7 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
         add.setOnClickListener(v -> new InformationSourcePicker(this, carIntegration,
                 this::addSource).show());
         controls.addView(add, lp(match(), dp(56), 0, dp(10), 0, 0));
-        MaterialButton reset = button("Сбросить панель");
+        MaterialButton reset = button("Сбросить блок");
         reset.setOnClickListener(v -> confirmReset());
         controls.addView(reset, lp(match(), dp(50), 0, dp(8), 0, 0));
 
@@ -367,7 +367,7 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
 
     private void editBackgroundColor(@NonNull MaterialButton button) {
         String original = config.backgroundColor;
-        AppleColorPickerDialog.show(this, "Цвет фона панели", original,
+        AppleColorPickerDialog.show(this, "Цвет фона блока", original,
                 AppleColorPickerDialog.Options.opaque(),
                 new AppleColorPickerDialog.Listener() {
                     private void apply(@Nullable String selected) {
@@ -432,7 +432,7 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
 
     private void confirmReset() {
         new AlertDialog.Builder(this)
-                .setTitle("Сбросить информационную панель?")
+                .setTitle("Сбросить информационный блок?")
                 .setMessage("Все выбранные статусы и их расположение будут удалены.")
                 .setPositiveButton("Сбросить", (dialog, which) -> {
                     store.reset();
