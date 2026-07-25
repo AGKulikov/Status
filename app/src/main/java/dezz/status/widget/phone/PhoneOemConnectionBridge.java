@@ -178,8 +178,9 @@ public final class PhoneOemConnectionBridge {
                     } else if ("onPairedDevicesChanged".equals(name)
                             && args != null && args.length >= 1
                             && args[0] instanceof List) {
-                        Object device = findStockDevice((List<?>) args[0], address);
-                        deliverCurrentPower(extension, getPower, address, device, listener);
+                        Object updatedDevice = findStockDevice((List<?>) args[0], address);
+                        deliverCurrentPower(
+                                extension, getPower, address, updatedDevice, listener);
                     }
                     return defaultValue(method.getReturnType());
                 };
