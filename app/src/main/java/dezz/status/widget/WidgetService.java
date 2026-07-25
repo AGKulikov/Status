@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 47343)
-Total output lines: 3932
-
 /*
  * Copyright © 2025-2026 Dezz (https://github.com/DezzK)
  *
@@ -1229,7 +1226,1412 @@ public class WidgetService extends Service {
             binding.getRoot().animate().cancel();
             binding.overlayContainer.setLayoutTransition(null);
         }
-        contentLayoutTransition = nul…17343 tokens truncated…ontSize.get());
+        contentLayoutTransition = null;
+        pendingBufferedTransitions = 0;
+        usageStatsManager = null;
+        lastForegroundPackage = null;
+        overlayHiddenByApp = false;
+        wifiState = WiFiState.OFF;
+        gnssState = GnssState.OFF;
+        lastLocationUpdateTime = 0L;
+        btConnectedAddrs.clear();
+        bluetoothState = BluetoothState.OFF;
+        lastMediaSubtitle = null;
+        removeStatusOverlaySafely(reason);
+        binding = null;
+        params = null;
+    }
+
+    @Override
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // Re-create date/time formatters so a locale change is reflected.
+        timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+        currentDateFormatPattern = null;
+        // If the user is in "follow system" mode, the system uiMode flip means the cached
+        // themedContext now points at the wrong configuration — invalidate so the next
+        // applyPreferences() rebuilds it.
+        themedContext = null;
+        appliedThemePref = -1;
+
+        if (binding != null) {
+            removeStatusOverlaySafely("configuration change");
+            binding = null;
+            params = null;
+            createOverlayView();
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    public void applyPreferences() {
+        applyPreferences(true);
+    }
+
+    /**
+     * Wakes the already-running shared host after a driver-panel enable without reloading every
+     * connector on each geometry slider change.
+     *
+     * <p>This also resumes a status attach that was paused by a temporary permission denial. It
+     * deliberately leaves an existing attach retry alone so repeated settings events cannot bypass
+     * its bounded backoff.</p>
+     */
+    void ensureEnabledRuntime() {
+        if (destroyed || prefs == null) return;
+        if (prefs.driverPanelEnabled.get() && !integrationsStarted) {
+            runInitialIntegrationStartup();
+        }
+        if (prefs.widgetEnabled.get() && binding == null && !overlayAttachRetryScheduled
+                && Permissions.allPermissionsGranted(this)) {
+            createOverlayView();
+        }
+    }
+
+    /** Queues a fresh direct handshake for the explicit test button in Phone settings. */
+    public boolean reconnectPhoneForDiagnostics() {
+        PhoneConnectorController controller = phoneController;
+        return controller != null && controller.reconnectForDiagnostics();
+    }
+
+    @SuppressLint("MissingPermission")
+    private void applyPreferences(boolean reconfigureIntegrations) {
+        if (destroyed || prefs == null) return;
+
+        boolean statusSurfaceEnabled = prefs.widgetEnabled.get();
+        if (!statusSurfaceEnabled) {
+            detachStatusSurfaceRuntime("status row disabled");
+        }
+        if (!statusSurfaceEnabled && !prefs.driverPanelEnabled.get()) {
+            stopSelf();
+            return;
+        }
+        if (statusSurfaceEnabled && binding == null) {
+            ensurePopupOverlayManager();
+            createOverlayView();
+            if (reconfigureIntegrations) {
+                if (integrationsStarted) {
+                    reconfigureIntegrationControllers();
+                } else if (binding == null) {
+                    runInitialIntegrationStartup();
+                }
+                if (integrationsStarted) applyPopupPreferencesSafely();
+            }
+            return;
+        }
+
+        boolean popupAppliedByStartup = false;
+        if (reconfigureIntegrations) {
+            if (integrationsStarted) {
+                reconfigureIntegrationControllers();
+            } else if (binding == null) {
+                // USER_UNLOCKED can arrive while WindowManager is still rejecting the status
+                // window. Credentials must nevertheless be re-read now; a later successful
+                // attach uses the already-running authoritative connector sessions.
+                runInitialIntegrationStartup();
+                popupAppliedByStartup = integrationsStarted;
+            } else {
+                // Normal cold start: preserve the first-frame guarantee. The deferred startup
+                // reads current preferences, so no separate pre-frame reconfigure is required.
+                scheduleInitialIntegrationStartupAfterFrame();
+            }
+        }
+
+        if (reconfigureIntegrations && !popupAppliedByStartup && integrationsStarted) {
+            applyPopupPreferencesSafely();
+        }
+        if (binding == null) return;
+
+        // Configuration changes are comparatively rare. Cache the parsed document here so
+        // frequent connector packets only update existing views and in-memory states.
+        if (haConfigs != null) configuredMainBricks = haConfigs.loadMain();
+        hiddenInPackages = prefs.hideInPackages.get();
+        rebuildEffectiveHideLists();
+        updateForegroundAppTracking();
+        updateThemedContext();
+
+        updateBackground();
+        updateDateTime();
+
+        List<BrickType> bricks = BrickType.parseOrder(prefs.brickOrder.get());
+        Set<BrickType> bricksSet = EnumSet.noneOf(BrickType.class);
+        bricksSet.addAll(bricks);
+        Set<BrickType> trackingSet = EnumSet.copyOf(bricksSet);
+        trackingSet.addAll(popupBuiltinTypes());
+
+        // The content-change LayoutTransition only makes sense in floating mode, where the
+        // widget's own width animates as brick content grows/shrinks. In status-bar mode the
+        // row is full-width with fixed groups — there is nothing to animate, but the CHANGING
+        // tracker still arms itself on every layout pass of the container and on OEM head
+        // units it visibly "regroups" the media row once a second (triggered by the periodic
+        // GNSS/status redraws) while the marquee scrolls. Disable it entirely there.
+        binding.overlayContainer.setLayoutTransition(
+                prefs.widgetMode.get() == WIDGET_MODE_STATUS_BAR ? null : contentLayoutTransition);
+
+        // Reorder children of the root LinearLayout to match brickOrder. Hidden bricks are
+        // appended at the end with View.GONE — kept attached so we don't need to re-bind state.
+        reorderBricks(bricks);
+
+        // Apply each brick's settings (size/font, outline, margins) — independent of visibility.
+        applyTimeBrickSettings();
+        applyDateBrickSettings();
+        applyMediaBrickSettings();
+        applyWifiBrickSettings();
+        applyGpsBrickSettings();
+        applyBluetoothBrickSettings();
+        applyIndoorTempBrickSettings();
+        applyOutdoorTempBrickSettings();
+        renderHomeAssistantBricks(true);
+
+        applyBrickVisibility(bricksSet);
+        applyOverlayPosition();
+
+        // Re-apply icon style for the current state — icon style and outline may have changed.
+        updateWifiStatus();
+        updateGnssStatus();
+        updateBluetoothStatus();
+
+        // User-controllable global padding around the widget content (four independent sides).
+        // Was previously auto-computed as half of the largest brick dimension — many users found
+        // it too wide on small head units, so it's now explicit prefs. Slight outline clipping
+        // at thin paddings is acceptable.
+        // Padding goes on the INNER container — that's the view with the rounded background.
+        // Putting it on the outer FrameLayout instead leaves a transparent gutter around the
+        // background rect (visible at non-zero padding) and shifts the background's rounded
+        // corners outside the touchable area.
+        binding.overlayContainer.setPadding(
+                prefs.paddingLeft.get(),
+                prefs.paddingTop.get(),
+                prefs.paddingRight.get(),
+                prefs.paddingBottom.get());
+
+        // Lock the widget height to the tallest brick that's in the user's chosen order —
+        // including bricks currently hidden per-app. Otherwise hiding e.g. a big Time brick
+        // would let the row shrink vertically and the remaining icons would re-center up,
+        // breaking alignment with the device status bar that users carefully tune.
+        // {@code setMinimumHeight} compares against the view's *total* measured height (content
+        // plus padding), so we add the vertical padding here — otherwise when the tallest brick
+        // is visible the view measures to {@code maxBrick + padding} and when it's hidden it
+        // collapses to {@code minHeight = maxBrick} (without padding), shrinking by the padding
+        // amount on every hide.
+        int verticalPadding = binding.overlayContainer.getPaddingTop()
+                + binding.overlayContainer.getPaddingBottom();
+        binding.overlayContainer.setMinimumHeight(
+                computeMinWidgetHeight(bricksSet) + verticalPadding);
+
+        mainHandler.removeCallbacks(updateDateTimeRunnable);
+        if (trackingSet.contains(BrickType.TIME) || trackingSet.contains(BrickType.DATE)) {
+            long now = System.currentTimeMillis();
+            long delay = DATETIME_UPDATE_INTERVAL_MS - (now % DATETIME_UPDATE_INTERVAL_MS);
+            mainHandler.postDelayed(updateDateTimeRunnable, delay);
+        }
+
+        if (trackingSet.contains(BrickType.WIFI)) {
+            ensureConnectivityTracking();
+            updateWifiStatus();
+        } else {
+            stopConnectivityTracking();
+        }
+
+        if (trackingSet.contains(BrickType.GPS)) {
+            ensureLocationTracking();
+            if (prefs.gps.showSatelliteBadge.get()) {
+                registerSatelliteStatusReceiver();
+            } else {
+                unregisterSatelliteStatusReceiver();
+            }
+            updateGnssStatus();
+        } else {
+            unregisterSatelliteStatusReceiver();
+            stopLocationTracking();
+        }
+
+        if (trackingSet.contains(BrickType.BLUETOOTH)) {
+            registerBluetoothReceiver();
+            refreshBtConnectedFromProxies();
+        } else {
+            unregisterBluetoothReceiver();
+            btConnectedAddrs.clear();
+        }
+        updateBluetoothStatus();
+
+        if (trackingSet.contains(BrickType.MEDIA) && Permissions.isNotificationAccessGranted(this)) {
+            enableMediaTracking();
+        } else {
+            disableMediaTracking();
+            binding.mediaContainer.setVisibility(View.GONE);
+        }
+
+        // Car temperature bricks — one subscription per brick through the flavor's
+        // CarIntegration; the callback lands on the main thread per its contract.
+        updateCarTempSubscription(BrickType.INDOOR_TEMP, trackingSet, binding.indoorTempText);
+        updateCarTempSubscription(BrickType.OUTDOOR_TEMP, trackingSet, binding.outdoorTempText);
+    }
+
+    private void ensureConnectivityTracking() {
+        if (connectivityManager == null) {
+            try {
+                connectivityManager = getSystemService(ConnectivityManager.class);
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "ConnectivityManager is unavailable", failure);
+            }
+        }
+        ConnectivityManager manager = connectivityManager;
+        if (manager == null) return;
+
+        boolean wifiPresent = false;
+        try {
+            for (Network network : manager.getAllNetworks()) {
+                NetworkCapabilities capabilities = manager.getNetworkCapabilities(network);
+                if (capabilities != null
+                        && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                    setWifiStatus(WiFiState.NO_INTERNET);
+                    wifiPresent = true;
+                    break;
+                }
+            }
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Could not inspect active Wi-Fi networks", failure);
+        }
+
+        if (!networkCallbackRegistered) {
+            try {
+                NetworkRequest request = new NetworkRequest.Builder()
+                        .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                        .build();
+                // Deliver callbacks on the main thread: they touch overlay views and theme state.
+                manager.registerNetworkCallback(request, networkCallback, mainHandler);
+                networkCallbackRegistered = true;
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "Could not register Wi-Fi network callback", failure);
+            }
+        }
+
+        if (wifiPresent) {
+            probeReachability();
+        } else {
+            // The status surface may have been disabled while Wi-Fi disconnected. Start every
+            // reattach from the fresh ConnectivityManager snapshot, not its previous badge.
+            setWifiStatus(WiFiState.OFF);
+        }
+        mainHandler.removeCallbacks(reachabilityProbeRunnable);
+        mainHandler.postDelayed(reachabilityProbeRunnable, INTERNET_PROBE_INTERVAL_MS);
+    }
+
+    private void stopConnectivityTracking() {
+        mainHandler.removeCallbacks(reachabilityProbeRunnable);
+        ConnectivityManager manager = connectivityManager;
+        if (manager != null && networkCallbackRegistered) {
+            try {
+                manager.unregisterNetworkCallback(networkCallback);
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "Wi-Fi network callback was already unregistered", failure);
+            }
+        }
+        networkCallbackRegistered = false;
+        connectivityManager = null;
+    }
+
+    @SuppressLint("MissingPermission")
+    private void ensureLocationTracking() {
+        if (locationManager == null) {
+            try {
+                locationManager = getSystemService(LocationManager.class);
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "LocationManager is unavailable", failure);
+            }
+        }
+        LocationManager manager = locationManager;
+        if (manager == null) return;
+
+        if (!gnssStatusCallbackRegistered) {
+            try {
+                gnssStatusCallbackRegistered = manager.registerGnssStatusCallback(
+                        gnssStatusCallback, mainHandler);
+                if (!gnssStatusCallbackRegistered) {
+                    Log.w(TAG, "GNSS status callback registration was rejected");
+                }
+            } catch (RuntimeException failure) {
+                gnssStatusCallbackRegistered = false;
+                Log.w(TAG, "Could not register GNSS status callback", failure);
+            }
+        }
+
+        if (!locationUpdatesRegistered) {
+            try {
+                manager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
+                        GNSS_LOCATION_INTERVAL_MS, 0, locationListener,
+                        Looper.getMainLooper());
+                locationUpdatesRegistered = true;
+            } catch (RuntimeException failure) {
+                locationUpdatesRegistered = false;
+                Log.w(TAG, "Could not request GPS location updates", failure);
+            }
+        }
+
+        mainHandler.removeCallbacks(updateGnssStatusRunnable);
+        mainHandler.postDelayed(updateGnssStatusRunnable, GNSS_STATUS_CHECK_INTERVAL);
+    }
+
+    private void stopLocationTracking() {
+        mainHandler.removeCallbacks(updateGnssStatusRunnable);
+        LocationManager manager = locationManager;
+        if (manager != null && locationUpdatesRegistered) {
+            try {
+                manager.removeUpdates(locationListener);
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "GPS location updates were already removed", failure);
+            }
+        }
+        if (manager != null && gnssStatusCallbackRegistered) {
+            try {
+                manager.unregisterGnssStatusCallback(gnssStatusCallback);
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "GNSS status callback was already unregistered", failure);
+            }
+        }
+        locationUpdatesRegistered = false;
+        gnssStatusCallbackRegistered = false;
+        locationManager = null;
+    }
+
+    /** Applies only floating-window geometry/visibility. Used by live popup sliders so changing
+     * a pixel value does not re-scan every connector binding on every touch sample. */
+    public void applyPopupPreferences() {
+        if (destroyed || popupOverlay == null) return;
+        applyPopupPreferencesSafely();
+    }
+
+    /** Applies a popup tile's rules/action/style live from in-memory connector snapshots. This
+     * deliberately does not call connector reconfigure(), so an offline connector is not
+     * restarted and a large Sprut catalog is not fetched while the user drags a slider. */
+    public void applyPopupItemPreferences() {
+        if (destroyed || popupOverlay == null) return;
+        if (mqttController != null) mqttController.reapplyPopupBindings();
+        if (sprutController != null) sprutController.reapplyPopupBindings();
+        if (haApiController != null) haApiController.reapplyPopupBindings();
+        applyPopupPreferencesSafely();
+    }
+
+    /** Live main-row appearance/rule update without restarting an offline connector. */
+    public void applyMainItemPreferences() {
+        if (destroyed || binding == null) return;
+        if (mqttController != null) mqttController.reapplyMainBindings();
+        if (sprutController != null) sprutController.reapplyMainBindings();
+        if (haApiController != null) haApiController.reapplyMainBindings();
+        applyPreferences(false);
+    }
+
+    private Set<BrickType> popupBuiltinTypes() {
+        Set<BrickType> result = EnumSet.noneOf(BrickType.class);
+        Set<String> enabledOverlays = new HashSet<>();
+        for (PopupOverlayConfig overlay : new PopupOverlayConfigStore(prefs).load()) {
+            if (overlay.enabled) enabledOverlays.add(overlay.id);
+        }
+        if (enabledOverlays.isEmpty()) return result;
+        for (PopupItemConfig item : new PopupItemConfigStore(prefs).load()) {
+            if (!item.enabled || !enabledOverlays.contains(item.overlayId)
+                    || !PopupItemConfig.TYPE_BUILTIN.equals(item.type)) continue;
+            for (BrickType type : BrickType.values()) {
+                if (type.automationId().equals(item.builtinId)) result.add(type);
+            }
+        }
+        return result;
+    }
+
+    private boolean isPopupBuiltinRequested(BrickType type) {
+        return popupBuiltinTypes().contains(type);
+    }
+
+    private void updateCarTempSubscription(BrickType type, Set<BrickType> bricksSet,
+                                           OutlineTextView target) {
+        CarIntegration car = CarIntegrations.get(this);
+        if (bricksSet.contains(type)) {
+            // Subscribe regardless of isBrickSupported(): right after boot the vendor service
+            // may not have connected yet and support reads as "unknown/error" — but the SDK
+            // queues listener registrations locally, so subscribing now means data starts
+            // flowing the moment the service comes up. Visibility is gated separately in
+            // applyBrickVisibility, and the availability-changed callback re-runs
+            // applyPreferences when the support answer flips.
+            if (target.getText().length() == 0) {
+                // Placeholder until the first value arrives, so the brick occupies its slot
+                // instead of rendering as a zero-width hole.
+                target.setText(TEMP_PLACEHOLDER);
+            }
+            car.subscribe(type, (brickType, value) -> {
+                if (binding == null) return;
+                // The rolling ambient filter may intentionally republish its current median
+                // while sub-second raw packets are discarded. Avoid turning those identical
+                // values into needless status-row measure/layout passes.
+                setTextIfChanged(target, formatTemperature(value));
+                schedulePopupRefresh();
+            });
+        } else {
+            car.unsubscribe(type);
+            // Reset so a re-added brick starts from the placeholder, not a stale reading.
+            target.setText(TEMP_PLACEHOLDER);
+        }
+    }
+
+    /** Last rendered media subtitle — used to distinguish a real track change from the
+     *  once-a-second metadata republishes some players emit (see updateMediaInfo). */
+    @Nullable
+    private String lastMediaSubtitle = null;
+
+    /** Shown while a subscribed temperature brick has not yet received a plausible value. */
+    private static final String TEMP_PLACEHOLDER = "--°";
+
+    /** {@code TextView.setText} drops the layout and forces a relayout even for identical text —
+     *  callers on hot paths (per-second player callbacks) must skip unchanged values. */
+    private static void setTextIfChanged(android.widget.TextView view, CharSequence text) {
+        if (!TextUtils.equals(view.getText(), text)) {
+            view.setText(text);
+        }
+    }
+
+    private static String formatTemperature(float celsius) {
+        // Integer rounding via Math.round avoids "%.0f"-style "-0°" for readings in (-0.5, 0).
+        return Math.round(celsius) + "°";
+    }
+
+    private void reorderBricks(List<BrickType> bricks) {
+        // Adding/removing a brick changes child order/membership of the root.
+        // applyBrickVisibility() (called right after this from applyPreferences) drives the
+        // per-brick fade + width animation that gives us the "dynamic island" feel; we
+        // just rearrange children here.
+        if (prefs.widgetMode.get() == WIDGET_MODE_STATUS_BAR) {
+            reorderForStatusBar(bricks);
+        } else {
+            reorderForFloating(bricks);
+        }
+    }
+
+    private void reorderForFloating(List<BrickType> bricks) {
+        LinearLayout root = binding.overlayContainer;
+        // Status-bar group containers and spacers are hidden in floating mode and emptied so
+        // bricks live as direct children of the root again.
+        binding.startGroup.removeAllViews();
+        binding.centerGroup.removeAllViews();
+        binding.endGroup.removeAllViews();
+        binding.startGroup.setVisibility(View.GONE);
+        binding.centerGroup.setVisibility(View.GONE);
+        binding.endGroup.setVisibility(View.GONE);
+        binding.startCenterSpacer.setVisibility(View.GONE);
+        binding.centerEndSpacer.setVisibility(View.GONE);
+
+        List<View> expected = new ArrayList<>();
+        // Re-include the (empty) groups + spacers so their visibility=GONE keeps them out of
+        // measure but the views remain attached to the same root for next switch.
+        expected.add(binding.startGroup);
+        expected.add(binding.startCenterSpacer);
+        expected.add(binding.centerGroup);
+        expected.add(binding.centerEndSpacer);
+        expected.add(binding.endGroup);
+        for (BrickType type : bricks) {
+            View v = viewForBrick(type);
+            if (v != null) expected.add(v);
+        }
+        for (BrickType type : BrickType.values()) {
+            if (!bricks.contains(type)) {
+                View v = viewForBrick(type);
+                if (v != null) expected.add(v);
+            }
+        }
+        applyChildOrder(root, expected);
+    }
+
+    private void reorderForStatusBar(List<BrickType> bricks) {
+        LinearLayout root = binding.overlayContainer;
+        // Detach bricks from wherever they currently sit (root or any group).
+        binding.startGroup.removeAllViews();
+        binding.centerGroup.removeAllViews();
+        binding.endGroup.removeAllViews();
+
+        // Root order: startGroup, spacer, centerGroup, spacer, endGroup. Hidden bricks dangle off
+        // the root after these so they remain attached but invisible.
+        List<View> rootChildren = new ArrayList<>();
+        rootChildren.add(binding.startGroup);
+        rootChildren.add(binding.startCenterSpacer);
+        rootChildren.add(binding.centerGroup);
+        rootChildren.add(binding.centerEndSpacer);
+        rootChildren.add(binding.endGroup);
+        for (BrickType type : BrickType.values()) {
+            if (!bricks.contains(type)) {
+                View v = viewForBrick(type);
+                if (v != null) rootChildren.add(v);
+            }
+        }
+        applyChildOrder(root, rootChildren);
+
+        // Distribute visible bricks into the proper alignment group.
+        for (BrickType type : bricks) {
+            View v = viewForBrick(type);
+            if (v == null) continue;
+            int alignment = clampAlignment(prefs.statusAlignmentFor(type).get());
+            LinearLayout target = (alignment == 1) ? binding.centerGroup
+                    : (alignment == 2) ? binding.endGroup
+                    : binding.startGroup;
+            target.addView(v);
+        }
+
+        binding.startGroup.setVisibility(View.VISIBLE);
+        binding.centerGroup.setVisibility(View.VISIBLE);
+        binding.endGroup.setVisibility(View.VISIBLE);
+        binding.startCenterSpacer.setVisibility(View.VISIBLE);
+        binding.centerEndSpacer.setVisibility(View.VISIBLE);
+    }
+
+    private static void applyChildOrder(ViewGroup parent, List<View> expected) {
+        boolean inOrder = parent.getChildCount() == expected.size();
+        if (inOrder) {
+            for (int i = 0; i < expected.size(); i++) {
+                if (parent.getChildAt(i) != expected.get(i)) {
+                    inOrder = false;
+                    break;
+                }
+            }
+        }
+        if (inOrder) return;
+        parent.removeAllViews();
+        for (View v : expected) {
+            ViewGroup p = (ViewGroup) v.getParent();
+            if (p != null) p.removeView(v);
+            parent.addView(v);
+        }
+    }
+
+    private static int clampAlignment(int v) {
+        return v < 0 ? 0 : (v > 2 ? 2 : v);
+    }
+
+    @Nullable
+    private View viewForBrick(BrickType type) {
+        switch (type) {
+            case TIME:
+                return binding.timeText;
+            case DATE:
+                return binding.dateText;
+            case MEDIA:
+                return binding.mediaContainer;
+            case WIFI:
+                return binding.wifiStatusIcon;
+            case GPS:
+                return binding.gnssStatusIcon;
+            case BLUETOOTH:
+                return binding.bluetoothStatusIcon;
+            case INDOOR_TEMP:
+                return binding.indoorTempText;
+            case OUTDOOR_TEMP:
+                return binding.outdoorTempText;
+            case HOME_ASSISTANT:
+                return binding.homeAssistantContainer;
+            default:
+                return null;
+        }
+    }
+
+    private void applyTimeBrickSettings() {
+        applySingleLineTextBrick(binding.timeText, prefs.time);
+    }
+
+    private void applyIndoorTempBrickSettings() {
+        applySingleLineTextBrick(binding.indoorTempText, prefs.indoorTemp);
+    }
+
+    private void applyOutdoorTempBrickSettings() {
+        applySingleLineTextBrick(binding.outdoorTempText, prefs.outdoorTemp);
+    }
+
+    /** Reconciles the dynamic smart-home row without reallocating every tile on each packet. */
+    private void renderHomeAssistantBricks() {
+        renderHomeAssistantBricks(false);
+    }
+
+    private void renderHomeAssistantBricks(boolean forceStyle) {
+        if (binding == null || automationStates == null || haConfigs == null) return;
+        LinearLayout container = binding.homeAssistantContainer;
+        Map<String, MarqueeOutlineTextView> existing = new LinkedHashMap<>();
+        for (int index = 0; index < container.getChildCount(); index++) {
+            View child = container.getChildAt(index);
+            Object tag = child.getTag();
+            if (child instanceof MarqueeOutlineTextView && tag instanceof String) {
+                existing.put((String) tag, (MarqueeOutlineTextView) child);
+            }
+        }
+        List<MarqueeOutlineTextView> desired = new ArrayList<>();
+        long now = System.currentTimeMillis();
+        for (HaBrickConfig config : configuredMainBricks) {
+            if (!config.enabled) continue;
+            AutomationState state = automationStates.get(AutomationContract.SCOPE_MAIN, config.id);
+            if (!state.visible) continue;
+
+            boolean hiddenByOwnAppList = lastForegroundPackage != null
+                    && config.hideInPackages.contains(lastForegroundPackage);
+            boolean hiddenByGroupList = config.inheritGroupHide
+                    && isBrickHiddenByApp(BrickType.HOME_ASSISTANT);
+            if ((hiddenByOwnAppList || hiddenByGroupList) && !config.hideKeepsSpace) continue;
+
+            boolean stale = state.present
+                    && state.isStale(now, config.staleAfterSeconds * 1000L);
+            String text;
+            String color;
+            if (!state.present) {
+                text = config.pendingText;
+                color = config.pendingColor;
+            } else if (stale) {
+                text = config.staleText;
+                color = config.staleColor;
+            } else if (state.text == null) {
+                text = config.defaultText;
+                color = config.defaultColor;
+            } else if (TextUtils.isEmpty(state.text)) {
+                text = config.emptyText;
+                color = TextUtils.isEmpty(state.color) ? config.emptyColor : state.color;
+            } else {
+                text = state.text;
+                color = TextUtils.isEmpty(state.color) ? config.defaultColor : state.color;
+            }
+            if (config.collapseWhenEmpty && TextUtils.isEmpty(text)) continue;
+            // A transparent value selected by a value rule means "hide this brick", not
+            // "reserve its margins for invisible text". Keep this renderer-side guard for
+            // retained states written by older builds before connectors recompute visibility.
+            if (AutomationState.isFullyTransparentColor(color)) continue;
+
+            MarqueeOutlineTextView view = existing.remove(config.id);
+            boolean created = view == null;
+            if (created) {
+                view = new MarqueeOutlineTextView(
+                        themedContext != null ? themedContext : this);
+                view.setTag(config.id);
+                view.setIncludeFontPadding(false);
+                view.setSingleLine(true);
+            }
+            if (created || forceStyle) {
+                view.setTextSize(TypedValue.COMPLEX_UNIT_PX, config.fontSize);
+                view.setTypeface(Fonts.resolve(this, config.fontFamily,
+                        config.bold, config.italic));
+                int outlineBase = AutomationState.parseColor(
+                        config.outlineColor, 0xFF000000);
+                view.setOutlineColor((outlineBase & 0x00FFFFFF)
+                        | (config.outlineAlpha << 24));
+                view.setOutlineWidth(config.outlineWidth);
+                view.setTranslationY(config.adjustY);
+                view.setPadding(config.paddingLeft, config.paddingTop,
+                        config.paddingRight, config.paddingBottom);
+                if (config.maxWidth > 0) view.setMaxWidth(config.maxWidth);
+                else view.setMaxWidth(Integer.MAX_VALUE);
+                view.setMarqueeEnabled(config.marquee);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT);
+                lp.gravity = Gravity.CENTER_VERTICAL;
+                lp.setMarginStart(config.marginStart);
+                lp.setMarginEnd(config.marginEnd);
+                view.setLayoutParams(lp);
+            }
+            int textColor = AutomationState.parseColor(color, 0xFFFFFFFF);
+            if (view.getCurrentTextColor() != textColor) view.setTextColor(textColor);
+            float alpha = (hiddenByOwnAppList || hiddenByGroupList)
+                    ? 0f : config.contentAlpha / 255f;
+            if (view.getAlpha() != alpha) view.setAlpha(alpha);
+            view.setMarqueeText(text);
+            desired.add(view);
+        }
+        // Remove hidden/deleted bricks, then move only children whose configured order changed.
+        for (MarqueeOutlineTextView obsolete : existing.values()) {
+            container.removeView(obsolete);
+        }
+        for (int index = 0; index < desired.size(); index++) {
+            MarqueeOutlineTextView view = desired.get(index);
+            if (index < container.getChildCount() && container.getChildAt(index) == view) continue;
+            ViewGroup.LayoutParams layout = view.getLayoutParams();
+            if (view.getParent() == container) container.removeView(view);
+            if (layout == null) {
+                layout = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT);
+            }
+            container.addView(view, index, layout);
+        }
+        if (forceStyle) {
+            applyHorizontalMargins(container, prefs.homeAssistant.marginStart.get(),
+                    prefs.homeAssistant.marginEnd.get());
+            container.setTranslationY(prefs.homeAssistant.adjustY.get());
+            container.setAlpha(prefs.homeAssistant.contentAlpha.get() / 255f);
+        }
+    }
+
+    private void applyDateBrickSettings() {
+        applySingleLineTextBrick(binding.dateText, prefs.date);
+        switch (prefs.date.alignment.get()) {
+            case 1:
+                binding.dateText.setGravity(Gravity.CENTER_HORIZONTAL);
+                break;
+            case 2:
+                binding.dateText.setGravity(Gravity.END);
+                break;
+            default:
+                binding.dateText.setGravity(Gravity.START);
+                break;
+        }
+    }
+
+    private void applyMediaBrickSettings() {
+        int textColor = ContextCompat.getColor(themedContext, R.color.text_primary);
+
+        // Source line: independent font, opacity, outline.
+        Typeface sourceTypeface = Fonts.resolve(this, prefs.media.sourceFontFamily.get(),
+                prefs.media.sourceFontBold.get(), prefs.media.sourceFontItalic.get());
+        binding.mediaAppText.setOutlineColor(textOutlineColor(prefs.media.sourceOutlineAlpha.get()));
+        binding.mediaAppText.setOutlineWidth(prefs.media.sourceOutlineWidth.get());
+        binding.mediaAppText.setTextColor(textColor);
+        binding.mediaAppText.setTypeface(sourceTypeface);
+        binding.mediaAppText.setTextSize(TypedValue.COMPLEX_UNIT_PX, prefs.media.sourceFontSize.get());
+        binding.mediaAppText.setAlpha(prefs.media.sourceContentAlpha.get() / 255f);
+
+        // Title line: existing media.* font + opacity + outline (TextBrickPrefs inherited).
+        Typeface titleTypeface = Fonts.resolve(this, prefs.media.fontFamily.get(),
+                prefs.media.fontBold.get(), prefs.media.fontItalic.get());
+        binding.mediaTitleText.setOutlineColor(textOutlineColor(prefs.media.outlineAlpha.get()));
+        binding.mediaTitleText.setOutlineWidth(prefs.media.outlineWidth.get());
+        binding.mediaTitleText.setTextColor(textColor);
+        binding.mediaTitleText.setTypeface(titleTypeface);
+        binding.mediaTitleText.setTextSize(TypedValue.COMPLEX_UNIT_PX, prefs.media.fontSize.get());
+        binding.mediaTitleText.setAlpha(prefs.media.contentAlpha.get() / 255f);
+
+        // Source line is always static + ellipsized; only the title scrolls. Source is short
+        // and a constant moving marquee on it would be more distracting than helpful.
+        binding.mediaAppText.setMarqueeEnabled(false);
+        binding.mediaTitleText.setMarqueeEnabled(prefs.media.marqueeEnabled.get());
+
+        applyMediaStateIcon(textColor);
+        applyMediaLineStructure();
+
+        // Duration text — independent font size / alpha / outline so the user can dial it down
+        // (typically the duration is rendered smaller and dimmer than the track subtitle).
+        binding.mediaDurationText.setTypeface(titleTypeface);
+        binding.mediaDurationText.setTextSize(TypedValue.COMPLEX_UNIT_PX, prefs.media.durationFontSize.get());
+        binding.mediaDurationText.setTextColor(textColor);
+        binding.mediaDurationText.setOutlineColor(textOutlineColor(prefs.media.durationOutlineAlpha.get()));
+        binding.mediaDurationText.setOutlineWidth(prefs.media.durationOutlineWidth.get());
+        binding.mediaDurationText.setAlpha(prefs.media.durationContentAlpha.get() / 255f);
+        // An empty TextView still contributes its font line-box to the title row even though it
+        // draws no characters. Before the first MediaSession callback that made the status row
+        // measure against the (often larger) duration font, then shrink as soon as
+        // updateMediaInfo() finally honoured "show duration = off". Keep an empty field gone;
+        // an active track with a known duration is left alone and updateMediaInfo() remains the
+        // sole place that promotes the field back to VISIBLE.
+        if (!prefs.media.showDuration.get()
+                || TextUtils.isEmpty(binding.mediaDurationText.getText())) {
+            binding.mediaDurationText.setVisibility(View.GONE);
+        }
+        if (!prefs.media.progressBarEnabled.get() || lastMediaSubtitle == null) {
+            binding.mediaProgressBar.setVisibility(View.GONE);
+        }
+
+        applyHorizontalMargins(binding.mediaContainer, prefs.media.marginStart.get(), prefs.media.marginEnd.get());
+        binding.mediaContainer.setTranslationY(prefs.media.adjustY.get());
+        // Container alpha back to full — per-line alpha is set above so the two values don't
+        // multiply through the parent.
+        binding.mediaContainer.setAlpha(1f);
+        applyMediaMaxWidth(binding.mediaAppText);
+        applyMediaMaxWidth(binding.mediaTitleText);
+        // Alignment applies to the two ROWS — they, not the text views, are the children of the
+        // vertical container, and layout_gravity on a child of a horizontal LinearLayout only
+        // ever moves it vertically.
+        applyMediaChildAlignment(binding.mediaSourceRow, prefs.media.sourceAlignment.get());
+        applyMediaChildAlignment(binding.mediaTitleRow, prefs.media.alignment.get());
+    }
+
+    /**
+     * Applies the configured one-line/two-line structure before any MediaSession exists.
+     *
+     * <p>The XML source row is visible by default. Previously it was hidden only from
+     * {@link #updateMediaInfo()} after the first controller callback. With "show source" disabled,
+     * a cold-start widget therefore measured one empty source line too many until playback began,
+     * which made the whole status row temporarily taller. Keep this layout decision independent
+     * of media availability and remove the inter-line gap when there is only one line.</p>
+     */
+    private void applyMediaLineStructure() {
+        boolean showSource = prefs.media.showSource.get();
+        int sourceVisibility = showSource ? View.VISIBLE : View.GONE;
+        if (binding.mediaSourceRow.getVisibility() != sourceVisibility) {
+            binding.mediaSourceRow.setVisibility(sourceVisibility);
+        }
+
+        LinearLayout.LayoutParams titleLp =
+                (LinearLayout.LayoutParams) binding.mediaTitleRow.getLayoutParams();
+        int topMargin = showSource ? prefs.media.lineGap.get() : 0;
+        if (titleLp.topMargin != topMargin) {
+            titleLp.topMargin = topMargin;
+            binding.mediaTitleRow.setLayoutParams(titleLp);
+        }
+    }
+
+    /**
+     * Playback-state indicator. It lives at the head of the source row — "▶ Spotify" reads as one
+     * statement — but the source line is optional, so when it's off the icon is re-parented to the
+     * head of the title row instead of vanishing with its host. Either way it takes the size,
+     * outline and opacity of the line it sits on, so it scales with that line's font-size slider
+     * and flips colour with the widget theme like the text around it.
+     */
+    private void applyMediaStateIcon(int textColor) {
+        boolean onSourceRow = prefs.media.showSource.get();
+        LinearLayout host = onSourceRow ? binding.mediaSourceRow : binding.mediaTitleRow;
+        ViewGroup parent = (ViewGroup) binding.mediaStateIcon.getParent();
+        if (parent != host) {
+            if (parent != null) parent.removeView(binding.mediaStateIcon);
+            host.addView(binding.mediaStateIcon, 0);
+        }
+
+        int fontSize = onSourceRow ? prefs.media.sourceFontSize.get() : prefs.media.fontSize.get();
+        int outlineAlpha = onSourceRow
+                ? prefs.media.sourceOutlineAlpha.get() : prefs.media.outlineAlpha.get();
+        int outlineWidth = onSourceRow
+                ? prefs.media.sourceOutlineWidth.get() : prefs.media.outlineWidth.get();
+        int contentAlpha = onSourceRow
+                ? prefs.media.sourceContentAlpha.get() : prefs.media.contentAlpha.get();
+        binding.mediaStateIcon.setTextSizePx(fontSize);
+        binding.mediaStateIcon.setIconColor(textColor);
+        binding.mediaStateIcon.setOutlineColor(textOutlineColor(outlineAlpha));
+        binding.mediaStateIcon.setOutlineWidth(outlineWidth);
+        binding.mediaStateIcon.setAlpha(contentAlpha / 255f);
+
+        // Gap to the text scales with that text too — a fixed one would glue the icon to a 60px
+        // source line and strand it next to a 12px one.
+        LinearLayout.LayoutParams lp =
+                (LinearLayout.LayoutParams) binding.mediaStateIcon.getLayoutParams();
+        int gap = Math.round(fontSize * STATE_ICON_GAP_RATIO);
+        if (lp.getMarginEnd() != gap) {
+            lp.setMarginEnd(gap);
+            binding.mediaStateIcon.setLayoutParams(lp);
+        }
+    }
+
+    /**
+     * Horizontal alignment of a single line within the vertical media container.
+     * Container is wrap_content (sized to the wider of the two children), so the narrower
+     * child shifts within that band via its own {@code layout_gravity}.
+     */
+    private static void applyMediaChildAlignment(View view, int alignment) {
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) view.getLayoutParams();
+        int gravity;
+        switch (alignment) {
+            case 1: gravity = Gravity.CENTER_HORIZONTAL; break;
+            case 2: gravity = Gravity.END; break;
+            default: gravity = Gravity.START; break;
+        }
+        lp.gravity = gravity;
+        view.setLayoutParams(lp);
+    }
+
+    private void applyMediaMaxWidth(MarqueeOutlineTextView view) {
+        // The view itself toggles between WRAP_CONTENT (text fits) and a fixed maxWidth
+        // (overflow + scrolling). All we need here is to tell it the upper bound.
+        view.setMaxWidth(prefs.media.maxWidth.get());
+    }
+
+    private void applyWifiBrickSettings() {
+        ViewGroup.LayoutParams ip = binding.wifiStatusIcon.getLayoutParams();
+        ip.width = prefs.wifi.size.get();
+        ip.height = prefs.wifi.size.get();
+        binding.wifiStatusIcon.setLayoutParams(ip);
+        applyHorizontalMargins(binding.wifiStatusIcon, prefs.wifi.marginStart.get(), prefs.wifi.marginEnd.get());
+        binding.wifiStatusIcon.setTranslationY(prefs.wifi.adjustY.get());
+        binding.wifiStatusIcon.setAlpha(prefs.wifi.contentAlpha.get() / 255f);
+    }
+
+    private void applyGpsBrickSettings() {
+        ViewGroup.LayoutParams ip = binding.gnssStatusIcon.getLayoutParams();
+        ip.width = prefs.gps.size.get();
+        ip.height = prefs.gps.size.get();
+        binding.gnssStatusIcon.setLayoutParams(ip);
+        applyHorizontalMargins(binding.gnssStatusIcon, prefs.gps.marginStart.get(), prefs.gps.marginEnd.get());
+        binding.gnssStatusIcon.setTranslationY(prefs.gps.adjustY.get());
+        binding.gnssStatusIcon.setAlpha(prefs.gps.contentAlpha.get() / 255f);
+    }
+
+    private void applyBluetoothBrickSettings() {
+        ViewGroup.LayoutParams ip = binding.bluetoothStatusIcon.getLayoutParams();
+        ip.width = prefs.bluetooth.size.get();
+        ip.height = prefs.bluetooth.size.get();
+        binding.bluetoothStatusIcon.setLayoutParams(ip);
+        applyHorizontalMargins(binding.bluetoothStatusIcon,
+                prefs.bluetooth.marginStart.get(), prefs.bluetooth.marginEnd.get());
+        binding.bluetoothStatusIcon.setTranslationY(prefs.bluetooth.adjustY.get());
+        binding.bluetoothStatusIcon.setAlpha(prefs.bluetooth.contentAlpha.get() / 255f);
+    }
+
+    private void applySingleLineTextBrick(OutlineTextView view, Preferences.TextBrickPrefs p) {
+        view.setTextColor(ContextCompat.getColor(themedContext, R.color.text_primary));
+        view.setOutlineColor(textOutlineColor(p.outlineAlpha.get()));
+        view.setOutlineWidth(p.outlineWidth.get());
+        view.setTypeface(Fonts.resolve(this, p.fontFamily.get(), p.fontBold.get(), p.fontItalic.get()));
+        view.setTextSize(TypedValue.COMPLEX_UNIT_PX, p.fontSize.get());
+        view.setTranslationY(p.adjustY.get());
+        view.setAlpha(p.contentAlpha.get() / 255f);
+        applyHorizontalMargins(view, p.marginStart.get(), p.marginEnd.get());
+    }
+
+    private int textOutlineColor(int alpha) {
+        return (ContextCompat.getColor(themedContext, R.color.text_outline) & 0x00FFFFFF) | (alpha << 24);
+    }
+
+    /**
+     * Rebuilds {@link #themedContext} so theme-dependent colour lookups respect the user's
+     * "Widget theme" preference. Pref values: 0 = follow system, 1 = always light, 2 = always
+     * dark, 3 = inverse of system. Cached so we don't allocate a new Context on every
+     * {@code applyPreferences()}; {@code onConfigurationChanged} invalidates the cache so the
+     * inverse mode picks up system theme changes too.
+     */
+    private void updateThemedContext() {
+        int pref = prefs.widgetTheme.get();
+        if (themedContext != null && pref == appliedThemePref) return;
+        if (pref == 0) {
+            themedContext = this;
+        } else {
+            int uiMode;
+            if (pref == 1) {
+                uiMode = Configuration.UI_MODE_NIGHT_NO;
+            } else if (pref == 2) {
+                uiMode = Configuration.UI_MODE_NIGHT_YES;
+            } else {
+                int systemNight = getResources().getConfiguration().uiMode
+                        & Configuration.UI_MODE_NIGHT_MASK;
+                uiMode = (systemNight == Configuration.UI_MODE_NIGHT_YES)
+                        ? Configuration.UI_MODE_NIGHT_NO
+                        : Configuration.UI_MODE_NIGHT_YES;
+            }
+            Configuration cfg = new Configuration(getResources().getConfiguration());
+            cfg.uiMode = (cfg.uiMode & ~Configuration.UI_MODE_NIGHT_MASK) | uiMode;
+            themedContext = createConfigurationContext(cfg);
+        }
+        appliedThemePref = pref;
+    }
+
+    private static void applyHorizontalMargins(View view, int start, int end) {
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) view.getLayoutParams();
+        lp.setMarginStart(start);
+        lp.setMarginEnd(end);
+        view.setLayoutParams(lp);
+    }
+
+    private final EnumMap<BrickType, Set<String>> effectiveHideLists = new EnumMap<>(BrickType.class);
+
+    private void rebuildEffectiveHideLists() {
+        effectiveHideLists.clear();
+        for (BrickType type : BrickType.values()) {
+            BrickType source = prefs.effectiveHideSourceFor(type);
+            effectiveHideLists.put(type, prefs.hideListFor(source).get());
+        }
+    }
+
+    private boolean isBrickHiddenByApp(BrickType type) {
+        if (lastForegroundPackage == null) return false;
+        Set<String> list = effectiveHideLists.get(type);
+        return list != null && list.contains(lastForegroundPackage);
+    }
+
+    private boolean anyBrickHasHideList() {
+        for (Set<String> s : effectiveHideLists.values()) {
+            if (s != null && !s.isEmpty()) return true;
+        }
+        for (HaBrickConfig config : configuredMainBricks) {
+            if (!config.hideInPackages.isEmpty()) return true;
+        }
+        return false;
+    }
+
+    private void applyBrickVisibility(Set<BrickType> bricksSet) {
+        if (binding == null) return;
+        boolean dateActive = bricksSet.contains(BrickType.DATE)
+                && (prefs.date.showDate.get() || prefs.date.showDayOfWeek.get());
+        // Car bricks only render when the vehicle supports the sensor — a preset imported from
+        // another car may list them in brickOrder, and an unsupported sensor would otherwise
+        // leave a permanently frozen placeholder brick in the row.
+        CarIntegration car = CarIntegrations.get(this);
+        boolean indoorTempActive = bricksSet.contains(BrickType.INDOOR_TEMP)
+                && car.isBrickSupported(BrickType.INDOOR_TEMP);
+        boolean outdoorTempActive = bricksSet.contains(BrickType.OUTDOOR_TEMP)
+                && car.isBrickSupported(BrickType.OUTDOOR_TEMP);
+        boolean homeAssistantActive = bricksSet.contains(BrickType.HOME_ASSISTANT)
+                && binding.homeAssistantContainer.getChildCount() > 0;
+        BrickTarget[] targets = {
+                resolveTarget(BrickType.TIME, bricksSet.contains(BrickType.TIME),
+                        binding.timeText, prefs.time.contentAlpha.get()),
+                resolveTarget(BrickType.DATE, dateActive,
+                        binding.dateText, prefs.date.contentAlpha.get()),
+                resolveTarget(BrickType.WIFI, bricksSet.contains(BrickType.WIFI),
+                        binding.wifiStatusIcon, prefs.wifi.contentAlpha.get()),
+                resolveTarget(BrickType.GPS, bricksSet.contains(BrickType.GPS),
+                        binding.gnssStatusIcon, prefs.gps.contentAlpha.get()),
+                resolveTarget(BrickType.BLUETOOTH, bricksSet.contains(BrickType.BLUETOOTH),
+                        binding.bluetoothStatusIcon, prefs.bluetooth.contentAlpha.get()),
+                resolveTarget(BrickType.INDOOR_TEMP, indoorTempActive,
+                        binding.indoorTempText, prefs.indoorTemp.contentAlpha.get()),
+                resolveTarget(BrickType.OUTDOOR_TEMP, outdoorTempActive,
+                        binding.outdoorTempText, prefs.outdoorTemp.contentAlpha.get()),
+                resolveTarget(BrickType.HOME_ASSISTANT, homeAssistantActive,
+                        binding.homeAssistantContainer, prefs.homeAssistant.contentAlpha.get()),
+        };
+
+        // Media has the extra session gate, so we build its BrickTarget here. In particular, the
+        // deferred post-boot integration refresh must not make an empty mediaContainer visible
+        // after enableMediaTracking already hid it: only real active media may occupy the row.
+        boolean mediaSessionActive = pickActiveMediaController() != null;
+        boolean mediaShouldBeGone = !bricksSet.contains(BrickType.MEDIA)
+                || !isRemotelyVisible(BrickType.MEDIA) || !mediaSessionActive;
+        boolean mediaHiddenByApp = !mediaShouldBeGone && isBrickHiddenByApp(BrickType.MEDIA);
+        BrickTarget mediaTarget;
+        if (mediaShouldBeGone) {
+            mediaTarget = new BrickTarget(binding.mediaContainer, View.GONE, 1f);
+        } else if (mediaHiddenByApp) {
+            if (prefs.hideKeepsSpaceFor(BrickType.MEDIA).get()) {
+                mediaTarget = new BrickTarget(binding.mediaContainer, View.VISIBLE, 0f);
+            } else {
+                mediaTarget = new BrickTarget(binding.mediaContainer, View.GONE, 1f);
+            }
+        } else {
+            mediaTarget = new BrickTarget(binding.mediaContainer, View.VISIBLE,
+                    prefs.media.contentAlpha.get() / 255f);
+        }
+
+        // Categorise the changes. Visibility flips (VISIBLE↔GONE) get the TransitionManager +
+        // window-buffer treatment; pure alpha changes (keep-space mode where the brick stays
+        // in the layout) just get a plain alpha animation.
+        java.util.List<BrickTarget> visibilityFlips = new java.util.ArrayList<>();
+        java.util.List<BrickTarget> alphaOnly = new java.util.ArrayList<>();
+        boolean expanding = false;
+        for (BrickTarget t : targets) {
+            if (t.view.getVisibility() != t.visibility) {
+                visibilityFlips.add(t);
+                if (t.visibility == View.VISIBLE) expanding = true;
+            } else if (t.visibility == View.VISIBLE) {
+                alphaOnly.add(t);
+            }
+        }
+        // Media too.
+        if (mediaTarget.view.getVisibility() != mediaTarget.visibility) {
+            visibilityFlips.add(mediaTarget);
+            if (mediaTarget.visibility == View.VISIBLE) expanding = true;
+        }
+        boolean refreshVisibleMedia = mediaTarget.visibility == View.VISIBLE
+                && !mediaShouldBeGone && !mediaHiddenByApp;
+
+        if (!visibilityFlips.isEmpty() && overlayAttached) {
+            // Scene root for TransitionManager is the INNER container — the outer FrameLayout
+            // gets resized to a screen-width buffer via WindowManager, and we want the
+            // transition to play inside the stable inner LinearLayout, not chase the buffer.
+            beginVisibilityTransition(binding.overlayContainer, expanding);
+        }
+
+        // Apply all targets. For visibility flips Fade transition handles the alpha animation;
+        // for alpha-only ones we run an explicit ViewPropertyAnimator.
+        for (BrickTarget t : targets) {
+            applyBrickTarget(t, overlayAttached && visibilityFlips.contains(t));
+        }
+        applyBrickTarget(mediaTarget,
+                overlayAttached && visibilityFlips.contains(mediaTarget));
+        // Populate the media rows on the very frame in which the brick becomes visible. The old
+        // path refreshed only VISIBLE→VISIBLE; GONE→VISIBLE exposed the XML bootstrap state
+        // (state icon plus an empty-but-measurable duration TextView) until the next player
+        // callback. Depending on when Yandex Music published metadata, that could last seconds
+        // after boot and then visibly change the status-row height.
+        if (refreshVisibleMedia) {
+            updateMediaInfo();
+        }
+
+        // Per-brick alpha not covered by the Fade transition (keep-space VISIBLE→VISIBLE).
+        // The bricks in alphaOnly might still want a visible-alpha update if contentAlpha
+        // pref changed — handled by applyXxxBrickSettings setAlpha which runs before this.
+    }
+
+    /** Snapshot of the desired end state for a brick view. */
+    private static final class BrickTarget {
+        final View view;
+        final int visibility;
+        /** Target alpha when {@link #visibility} is {@code VISIBLE}; ignored otherwise. */
+        final float visibleAlpha;
+        BrickTarget(View view, int visibility, float visibleAlpha) {
+            this.view = view;
+            this.visibility = visibility;
+            this.visibleAlpha = visibleAlpha;
+        }
+    }
+
+    /**
+     * Decide the final view state for a brick. {@code activeInLayout=false} (brick not in
+     * the layout / Date with both flags off) → {@code GONE}, hard collapse. Otherwise honour
+     * {@link Preferences#hideKeepsSpaceFor}: if true, render an INVISIBLE-equivalent (VISIBLE
+     * view, alpha animated to 0); if false, plain GONE.
+     */
+    private BrickTarget resolveTarget(BrickType type, boolean activeInLayout, View view,
+                                      int contentAlphaPref) {
+        float baseAlpha = contentAlphaPref / 255f;
+        if (!activeInLayout || !isRemotelyVisible(type)) {
+            return new BrickTarget(view, View.GONE, baseAlpha);
+        }
+        // HA children independently choose whether to inherit the group's app list; their
+        // renderer has already removed or made transparent the matching children.
+        if (type != BrickType.HOME_ASSISTANT && isBrickHiddenByApp(type)) {
+            if (prefs.hideKeepsSpaceFor(type).get()) {
+                // VISIBLE-with-alpha-0 replaces the old INVISIBLE constant — same effect on
+                // layout (space preserved) but animatable.
+                return new BrickTarget(view, View.VISIBLE, 0f);
+            }
+            return new BrickTarget(view, View.GONE, baseAlpha);
+        }
+        return new BrickTarget(view, View.VISIBLE, baseAlpha);
+    }
+
+    private boolean isRemotelyVisible(BrickType type) {
+        return automationStates == null || automationStates
+                .get(AutomationContract.SCOPE_BUILTIN, type.automationId()).visible;
+    }
+
+    /** Called after either an exported Broadcast or MQTT packet has been persisted. */
+    public void onAutomationStateChanged(String scope, String id) {
+        if (destroyed) return;
+        synchronized (automationUiLock) {
+            pendingAutomationUi.computeIfAbsent(scope, ignored -> new HashSet<>()).add(id);
+            if (automationUiRefreshScheduled) return;
+            automationUiRefreshScheduled = true;
+        }
+        // One rendered frame per connector burst instead of rebuilding the row once per entity.
+        mainHandler.postDelayed(automationUiRefresh, 32L);
+    }
+
+    /** Read-only snapshots let the second overlay reuse original brick data without duplicating
+     * notification, eCarX, GNSS or connectivity listeners. Called only on the main thread. */
+    @Nullable
+    private PopupOverlayController.BuiltinValue popupBuiltinValue(@NonNull String id) {
+        if (binding == null) return null;
+        switch (id) {
+            case "builtin.time":
+                return new PopupOverlayController.BuiltinValue(timeFormat.format(new Date()),
+                        "#FFFFFFFF", null, true);
+            case "builtin.date":
+                return new PopupOverlayController.BuiltinValue(String.valueOf(binding.dateText.getText()),
+                        "#FFFFFFFF", null, true);
+            case "builtin.media":
+                return new PopupOverlayController.BuiltinValue(lastMediaSubtitle,
+                        "#FFFFFFFF", null, !isEmpty(lastMediaSubtitle));
+            case "builtin.wifi":
+                return new PopupOverlayController.BuiltinValue("", "#FFFFFFFF", "wifi",
+                        true);
+            case "builtin.gps":
+                return new PopupOverlayController.BuiltinValue("", "#FFFFFFFF", "gps",
+                        true);
+            case "builtin.bluetooth":
+                return new PopupOverlayController.BuiltinValue("", "#FFFFFFFF", "bluetooth",
+                        true);
+            case "builtin.indoor_temp":
+                return popupTextValue(binding.indoorTempText, "temperature", true);
+            case "builtin.outdoor_temp":
+                return popupTextValue(binding.outdoorTempText, "temperature", true);
+            case "builtin.home_assistant":
+                StringBuilder text = new StringBuilder();
+                for (int i = 0; i < binding.homeAssistantContainer.getChildCount(); i++) {
+                    View child = binding.homeAssistantContainer.getChildAt(i);
+                    if (!(child instanceof android.widget.TextView)
+                            || child.getVisibility() != View.VISIBLE) continue;
+                    if (text.length() > 0) text.append(' ');
+                    text.append(((android.widget.TextView) child).getText());
+                }
+                return new PopupOverlayController.BuiltinValue(text.toString(), "#FFFFFFFF", null,
+                        binding.homeAssistantContainer.getVisibility() == View.VISIBLE);
+            default:
+                return null;
+        }
+    }
+
+    private static PopupOverlayController.BuiltinValue popupTextValue(
+            android.widget.TextView view, @Nullable String iconId, boolean visible) {
+        return new PopupOverlayController.BuiltinValue(String.valueOf(view.getText()),
+                String.format(Locale.ROOT, "#%08X", view.getCurrentTextColor()), iconId,
+                visible);
+    }
+
+    /**
+     * Applies a brick's target state. For visibility flips the heavy lifting is done by the
+     * {@code TransitionManager} scene set up by {@link #beginVisibilityTransition} — we
+     * just toggle {@code setVisibility} and the Fade transition cross-fades alpha while
+     * ChangeBounds slides siblings into place. For alpha-only changes (keep-space hide)
+     * we animate alpha explicitly.
+     */
+    private void applyBrickTarget(BrickTarget target, boolean handledByTransition) {
+        if (!overlayAttached) {
+            // Pre-addView geometry normalization must be synchronous and final: animators on a
+            // detached tree can preserve the XML alpha/visibility into its first attached frame.
+            target.view.animate().cancel();
+            target.view.setVisibility(target.visibility);
+            if (target.visibility == View.VISIBLE) {
+                target.view.setAlpha(target.visibleAlpha);
+            }
+            return;
+        }
+        if (target.visibility == View.GONE) {
+            target.view.animate().cancel();
+            target.view.setVisibility(View.GONE);
+            return;
+        }
+        target.view.setVisibility(View.VISIBLE);
+        if (handledByTransition) {
+            // Fade transition animates the alpha for us; make sure the final value is the
+            // brick's contentAlpha pref (not 1.0 from Fade's default).
+            target.view.setAlpha(target.visibleAlpha);
+        } else {
+            target.view.animate().cancel();
+            target.view.animate()
+                    .alpha(target.visibleAlpha)
+                    .setDuration(BRICK_ALPHA_DURATION_MS)
+                    .start();
+        }
+    }
+
+    /**
+     * Runs the "buffer window" animation. Trick: before triggering the
+     * scene change we either expand the window to screen width (when something is about to
+     * appear) or pin it to its current width (when something is about to disappear). With
+     * the window's outer rectangle frozen the children's Fade + ChangeBounds animations
+     * play cleanly inside it; the listener restores the window to WRAP_CONTENT after the
+     * transition so it snaps to the new natural size in one go. This sidesteps the
+     * per-frame {@code updateViewLayout} approach that was visually broken on real hardware.
+     */
+    private void beginVisibilityTransition(ViewGroup sceneRoot, boolean expanding) {
+        if (binding == null) return;
+        beginBufferedTransition(expanding);
+
+        // Suppress the always-on CHANGING animation for the duration of this visibility flip.
+        // Sibling bricks shift positions when a brick appears/disappears, which LayoutTransition
+        // would otherwise interpret as a content change and animate in parallel with our own
+        // explicit ChangeBounds inside the TransitionSet — visible as a doubled motion.
+        if (contentLayoutTransition != null) {
+            contentLayoutTransition.disableTransitionType(
+                    android.animation.LayoutTransition.CHANGING);
+        }
+
+        android.transition.TransitionSet tx = new android.transition.TransitionSet();
+        tx.addTransition(new android.transition.ChangeBounds());
+        tx.addTransition(new android.transition.Fade());
+        tx.setOrdering(android.transition.TransitionSet.ORDERING_TOGETHER);
+        tx.setDuration(BRICK_TRANSITION_DURATION_MS);
+        tx.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+        // Listener can leak the buffer counter if TransitionManager decides nothing
+        // animatable changed and never fires the lifecycle callbacks — known foot-gun.
+        // Guard with a single-shot close flag and a safety runnable that runs unconditionally
+        // after slightly longer than the transition's own duration. Whichever fires first
+        // closes the buffer; the other becomes a no-op.
+        final boolean[] closed = {false};
+        Runnable closeOnce = () -> {
+            if (closed[0]) return;
+            closed[0] = true;
+            if (contentLayoutTransition != null) {
+                contentLayoutTransition.enableTransitionType(
+                        android.animation.LayoutTransition.CHANGING);
+            }
+            endBufferedTransition();
+        };
+        tx.addListener(new android.transition.Transition.TransitionListener() {
+            @Override public void onTransitionStart(android.transition.Transition t) {}
+            @Override public void onTransitionEnd(android.transition.Transition t) {
+                closeOnce.run();
+            }
+            @Override public void onTransitionCancel(android.transition.Transition t) {
+                closeOnce.run();
+            }
+            @Override public void onTransitionPause(android.transition.Transition t) {}
+            @Override public void onTransitionResume(android.transition.Transition t) {}
+        });
+        android.transition.TransitionManager.beginDelayedTransition(sceneRoot, tx);
+        mainHandler.postDelayed(closeOnce, BRICK_TRANSITION_DURATION_MS + 500);
+    }
+
+    /**
+     * Open a window-buffered transition: if no other buffered transition is in flight, pre-resize
+     * the WindowManager window to either screen width ({@code expanding}) or its current width
+     * (shrinking), so the animation that follows plays inside a stable rectangle instead of
+     * fighting wrap-content. Idempotent under nesting: re-entrant callers just bump the counter.
+     */
+    private void beginBufferedTransition(boolean expanding) {
+        if (binding == null) return;
+        if (pendingBufferedTransitions++ == 0) {
+            if (params != null && prefs.widgetMode.get() != WIDGET_MODE_STATUS_BAR) {
+                int oldWidth = params.width;
+                if (expanding) {
+                    params.width = getResources().getDisplayMetrics().widthPixels;
+                } else {
+                    int currentWidth = binding.getRoot().getWidth();
+                    if (currentWidth > 0) params.width = currentWidth;
+                }
+                try {
+                    windowManager.updateViewLayout(binding.getRoot(), params);
+                } catch (Exception ignored) {
+                    params.width = oldWidth;
+                }
+            }
+        }
+    }
+
+    /** Closes a transition opened by {@link #beginBufferedTransition}. When the last in-flight
+     *  transition ends, restores the window to WRAP_CONTENT so it snaps to natural size. */
+    private void endBufferedTransition() {
+        if (pendingBufferedTransitions <= 0) return;
+        if (--pendingBufferedTransitions == 0) {
+            restoreWindowToWrapContent();
+        }
+    }
+
+    private void restoreWindowToWrapContent() {
+        if (params == null || binding == null) return;
+        if (prefs.widgetMode.get() == WIDGET_MODE_STATUS_BAR) {
+            params.width = WindowManager.LayoutParams.MATCH_PARENT;
+        } else {
+            params.width = WindowManager.LayoutParams.WRAP_CONTENT;
+        }
+        try {
+            windowManager.updateViewLayout(binding.getRoot(), params);
+        } catch (Exception ignored) {}
+    }
+
+    private Set<BrickType> currentBrickSet() {
+        Set<BrickType> set = EnumSet.noneOf(BrickType.class);
+        set.addAll(BrickType.parseOrder(prefs.brickOrder.get()));
+        return set;
+    }
+
+    /**
+     * Computes the tallest brick height (in pixels) over all bricks currently in
+     * {@code brickOrder}, regardless of per-app visibility. Used as the widget's minimum height so
+     * a brick disappearing on a particular app doesn't shrink the row.
+     *
+     * Text bricks use {@link Paint#getFontMetrics()} on a copy of the TextView's paint at the
+     * given pixel size — this matches exactly the height the TextView itself would measure for a
+     * single line (with {@code includeFontPadding=true}, the default).
+     */
+    private int computeMinWidgetHeight(Set<BrickType> bricks) {
+        int h = 0;
+        if (bricks.contains(BrickType.TIME)) {
+            h = Math.max(h, textLineHeight(binding.timeText, prefs.time.fontSize.get()));
+        }
+        if (bricks.contains(BrickType.DATE)) {
+            // Two lines when day-of-week + date are both shown and not collapsed into one line.
+            int lines = (prefs.date.showDate.get() && prefs.date.showDayOfWeek.get()
+                    && !prefs.date.oneLineLayout.get()) ? 2 : 1;
+            h = Math.max(h, textLineHeight(binding.dateText, prefs.date.fontSize.get()) * lines);
+        }
+        if (bricks.contains(BrickType.MEDIA)) {
+            // Reserve the complete configured media geometry even before the first track
+            // arrives. Duration and progress are metadata-dependent children: if they are not
+            // included in this floor, the WindowManager's WRAP_CONTENT status window can change
+            // height when the first MediaSession snapshot populates them.
+            int titleHeight = textLineHeight(binding.mediaTitleText, prefs.media.fontSize.get());
+            int titleRowHeight = titleHeight;
+            if (prefs.media.showDuration.get()) {
+                titleRowHeight = Math.max(titleRowHeight, textLineHeight(
+                        binding.mediaDurationText, prefs.media.durationFontSize.get()));
+            }
+            int mediaHeight = titleRowHeight;
+            if (prefs.media.showSource.get()) {
+                int sourceHeight = textLineHeight(binding.mediaAppText,
+                        prefs.media.sourceFontSize.get());
                 mediaHeight = sourceHeight + titleRowHeight + prefs.media.lineGap.get();
             }
             if (prefs.media.progressBarEnabled.get()) {
