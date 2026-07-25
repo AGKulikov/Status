@@ -509,6 +509,16 @@ public class Preferences {
     /** Per-application HOME icon/label sizes; selection and order remain in the legacy list. */
     public final Str launcherFavoriteAppsAppearanceJson = new Str(this,
             "launcherFavoriteAppsAppearanceJson", "");
+    /** Shared appearance/filter for every runtime "Все приложения" surface. */
+    public final Int launcherAllAppsColumns = new Int(this,
+            "launcherAllAppsColumns", 5);
+    public final Int launcherAllAppsIconScalePercent = new Int(this,
+            "launcherAllAppsIconScalePercent", 100);
+    public final Int launcherAllAppsGapPx = new Int(this,
+            "launcherAllAppsGapPx", 8);
+    /** Flattened launcher components hidden from both HOME and driver-panel catalogs. */
+    public final StringSet launcherAllAppsHiddenComponents = new StringSet(
+            this, "launcherAllAppsHiddenComponents");
     public final Str launcherBackgroundColor = new Str(this, "launcherBackgroundColor", "#101827");
     public final Bool launcherShowGrid = new Bool(this, "launcherShowGrid", true);
     public final Int launcherSnapPx = new Int(this, "launcherSnapPx", 20);
@@ -590,6 +600,9 @@ public class Preferences {
     public final Str driverPanelBackgroundColor = driverPanelOld.backgroundColor;
     /** Separate ordered OLD-profile collection; never aliases the HOME action grid. */
     public final Str driverPanelShortcutsJson = driverPanelOld.shortcutsJson;
+    /** Independent fully customizable drawer opened from a driver-panel Favorites shortcut. */
+    public final Str driverFavoritesShortcutsJson = new Str(this,
+            "driverFavoritesShortcutsJson", "");
     /** Additive cell positions for action/smart-home icons; shortcut actions stay untouched. */
     public final Str launcherActionsGridJson = new Str(this, "launcherActionsGridJson", "");
     public final Int launcherAppsColumns = new Int(this, "launcherAppsColumns", 3);
