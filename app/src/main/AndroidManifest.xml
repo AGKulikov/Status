@@ -122,6 +122,16 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".AllAppsSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".DriverFavoritesSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".FavoriteAppsSettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />
