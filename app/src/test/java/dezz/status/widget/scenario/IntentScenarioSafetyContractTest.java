@@ -15,7 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-/** Guards shared Intent rules from connector conversion and dangling HOME references. */
+/** Guards shared Intent rules from connector conversion and dangling shortcut references. */
 public final class IntentScenarioSafetyContractTest {
     @Test
     public void nonSprutRuleIsRejectedBeforeSprutEditorConstruction() throws IOException {
@@ -43,19 +43,24 @@ public final class IntentScenarioSafetyContractTest {
                 "shortcut.longKind == LauncherShortcutStore.Kind.RULE"));
         assertTrue(source.contains("ruleId.equals(shortcut.longTarget)"));
         assertTrue("Deletion must recheck references inside the confirmation callback",
-                occurrences(source, "referencingHomeShortcuts(rule.id)") >= 2);
+                occurrences(source, "referencingShortcuts(rule.id)") >= 2);
         assertTrue(source.contains("showReferencedRuleDialog(rule, currentReferences)"));
+        assertTrue(source.contains(
+                "LauncherShortcutStore.forDriverPanel(prefs, prefs.driverPanelOld)"));
+        assertTrue(source.contains(
+                "LauncherShortcutStore.forDriverPanel(prefs, prefs.driverPanelNew)"));
+        assertTrue(source.contains("LauncherShortcutStore.forDriverFavorites(prefs)"));
     }
 
     @Test
-    public void blockedRuleOffersHomeButtonEditorAndKeepsStableId() throws IOException {
+    public void blockedRuleOffersSharedSettingsAndKeepsStableId() throws IOException {
         String source = activitySource();
 
-        assertTrue(source.contains(".setTitle(\"Правило используется на HOME\")"));
-        assertTrue(source.contains(".setPositiveButton(\"Открыть кнопки HOME\""));
+        assertTrue(source.contains(".setTitle(\"Правило используется в кнопках\")"));
+        assertTrue(source.contains(".setPositiveButton(\"Открыть настройки\""));
         assertTrue(source.contains(
-                "startActivity(new Intent(this, LauncherShortcutSettingsActivity.class))"));
-        assertTrue("Existing rule IDs are addresses used by HOME shortcuts",
+                "startActivity(new Intent(this, SettingsHubActivity.class))"));
+        assertTrue("Existing rule IDs are addresses used by shared shortcuts",
                 source.contains("id.setEnabled(false)"));
     }
 
