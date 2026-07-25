@@ -67,7 +67,11 @@ public class DriverPanelOverlayContractTest {
         String climateSource = read(climateView);
         assertTrue(climateSource.contains("fanKnown && fanActive"));
         assertTrue(climateSource.contains("if (!showFan) return;"));
-        assertFalse(climateSource.contains("drawText(\"AUTO\""));
+        assertTrue(climateSource.contains("drawText(\"AUTO\""));
+        assertTrue(climateSource.contains("AIRFLOW = \"climate.airflow\""));
+        assertTrue(source.contains("DriverPanelLayoutPolicy.shortcutWeight(expandedClimate)"));
+        assertTrue(source.contains("DriverPanelLayoutPolicy.shortcutIconHeight("));
+        assertTrue(source.contains("button.setSoundEffectsEnabled(false)"));
     }
 
     @Test
@@ -171,28 +175,59 @@ public class DriverPanelOverlayContractTest {
         String settings = read(widget.resolve(
                 "DriverPanelSettingsActivity.java"));
 
-        assertTrue(controller.contains("LauncherAppCatalog.load(appContext)"));
+        assertTrue(controller.contains("LauncherAppCatalog.loadVisible(appContext, preferences)"));
         assertTrue(controller.contains("LauncherAppTileRenderer.render("));
         assertFalse(controller.contains("InstalledAppCatalog"));
-        assertTrue(controller.contains("grid.setNumColumns(5)"));
-        assertTrue(controller.contains("grid.setVerticalSpacing(dp(context, 8))"));
+        assertTrue(controller.contains("preferences.launcherAllAppsColumns.get()"));
+        assertTrue(controller.contains("preferences.launcherAllAppsGapPx.get()"));
+        assertTrue(controller.contains("preferences.launcherAllAppsIconScalePercent.get()"));
         assertTrue(controller.contains("grid.setPadding(dp(context, 16), dp(context, 16),"));
         assertTrue(controller.contains("title.setText(\"Все приложения\")"));
         assertTrue(controller.contains("FavoriteAppsConfigStore"));
-        assertTrue(controller.contains("PanelElementConfigStore.APPS_GRID"));
 
-        assertTrue(launcher.contains("LauncherAppCatalog.load(context)"));
+        assertTrue(launcher.contains("LauncherAppCatalog.loadIncludingSystem(context)"));
+        assertTrue(launcher.contains("appCatalog.allVisible()"));
+        assertTrue(launcher.contains("if (!app.systemApp"));
         assertTrue(launcher.contains("LauncherAppTileRenderer.render("));
         assertTrue(catalog.contains("Intent.CATEGORY_LAUNCHER"));
         assertTrue(catalog.contains("queryIntentActivities(query, 0)"));
         assertTrue(catalog.contains("new LinkedHashSet<>()"));
         assertTrue(catalog.contains("toLowerCase(Locale.ROOT)"));
+        assertTrue(catalog.contains("ApplicationInfo.FLAG_SYSTEM"));
+        assertTrue(catalog.contains("ApplicationInfo.FLAG_UPDATED_SYSTEM_APP"));
         assertTrue(renderer.contains("appearance.iconSizePx * scale / 100"));
         assertTrue(renderer.contains("appearance.labelSizeSp * scale / 100f"));
 
         // The editor intentionally retains the broad catalog so system/non-launcher activities
         // remain assignable even though they never appear in a runtime all-apps surface.
         assertTrue(settings.contains("InstalledAppCatalog.load(this)"));
+    }
+
+    @Test
+    public void panelReplacementNeverExposesCoveredOemRail() throws Exception {
+        String root = System.getProperty("user.dir");
+        Path controller = Paths.get(root, "src/main/java/dezz/status/widget/driver/"
+                + "DriverPanelOverlayController.java");
+        if (!Files.exists(controller)) {
+            controller = Paths.get(root, "app/src/main/java/dezz/status/widget/driver/"
+                    + "DriverPanelOverlayController.java");
+        }
+        String source = read(controller);
+        int apply = source.indexOf("void applyPreferences()");
+        int navigation = source.indexOf("boolean setNavigationHidden", apply);
+        String replacement = source.substring(apply, navigation);
+        assertTrue(replacement.contains("previousWindows"));
+        assertTrue(replacement.contains("attachForType("));
+        assertTrue(replacement.contains(
+                "retireAfterFirstDraw(previousWindows, successorWindows)"));
+        assertTrue(replacement.contains("panelWindows.addAll(previousWindows)"));
+        assertTrue(source.contains("addOnPreDrawListener(callback[0])"));
+        assertTrue(source.contains(
+                "anchor.view.postOnAnimation(() -> anchor.view.postOnAnimation("));
+        assertTrue(source.contains("private int drawerGeneration;"));
+        assertTrue(source.contains("generation != drawerGeneration"));
+        assertFalse(replacement.contains(
+                "statusListener.onStatus(\"hidden\""));
     }
 
     @Test
