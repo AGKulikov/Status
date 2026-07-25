@@ -8,18 +8,18 @@ import org.junit.Test;
 
 public class ClimateFanIndicatorPolicyTest {
     @Test
-    public void manualModeUsesAllNineConfirmedFanLevels() {
+    public void manualModeUsesFiveVisibleFanPositions() {
         ClimateFanIndicatorPolicy.Indicator off =
                 ClimateFanIndicatorPolicy.fromConfirmedState("Выкл", 0);
         assertFalse(off.automatic);
-        assertEquals(9, off.totalSegments);
+        assertEquals(5, off.totalSegments);
         assertEquals(0, off.activeSegments);
 
         ClimateFanIndicatorPolicy.Indicator level =
-                ClimateFanIndicatorPolicy.fromConfirmedState("7", 7);
+                ClimateFanIndicatorPolicy.fromConfirmedState("5", 5);
         assertFalse(level.automatic);
-        assertEquals(9, level.totalSegments);
-        assertEquals(7, level.activeSegments);
+        assertEquals(5, level.totalSegments);
+        assertEquals(5, level.activeSegments);
     }
 
     @Test
