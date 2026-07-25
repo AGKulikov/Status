@@ -38,6 +38,7 @@ import java.util.Locale;
 
 import dezz.status.widget.integration.ActionBinding;
 import dezz.status.widget.integration.ConnectorType;
+import dezz.status.widget.driver.DriverPanelService;
 import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.scenario.IntentActionRule;
 import dezz.status.widget.scenario.IntentActionRuleStore;
@@ -272,7 +273,7 @@ public final class IntentScenarioSettingsActivity extends AppCompatActivity {
     }
 
     private void confirmDelete(IntentActionRule rule) {
-        List<LauncherShortcutStore.Shortcut> references = referencingHomeShortcuts(rule.id);
+        List<LauncherShortcutStore.Shortcut> references = referencingShortcuts(rule.id);
         if (!references.isEmpty()) {
             showReferencedRuleDialog(rule, references);
             return;
@@ -283,7 +284,7 @@ public final class IntentScenarioSettingsActivity extends AppCompatActivity {
                 .setNegativeButton("Отмена", null)
                 .setPositiveButton("Удалить", (dialog, which) -> {
                     List<LauncherShortcutStore.Shortcut> currentReferences =
-                            referencingHomeShortcuts(rule.id);
+                            referencingShortcuts(rule.id);
                     if (!currentReferences.isEmpty()) {
                         showReferencedRuleDialog(rule, currentReferences);
                         return;
@@ -360,22 +361,37 @@ public final class IntentScenarioSettingsActivity extends AppCompatActivity {
         }
         if (references.size() > shown) names.append(" и ещё ").append(references.size() - shown);
         new AlertDialog.Builder(this)
-                .setTitle("Правило используется на HOME")
+                .setTitle("Правило используется в кнопках")
                 .setMessage("Сначала измените или удалите "
                         + (references.size() == 1 ? "кнопку " : "кнопки ")
                         + names + ". Правило «" + rule.id
-                        + "» не удалено, чтобы кнопки HOME не перестали работать.")
+                        + "» не удалено, чтобы кнопки HOME, панели водителя или Избранного "
+                        + "не перестали работать.")
                 .setNegativeButton("Закрыть", null)
-                .setPositiveButton("Открыть кнопки HOME", (dialog, which) ->
-                        openHomeShortcutSettings())
+                .setPositiveButton("Открыть настройки", (dialog, which) ->
+                        startActivity(new Intent(this, SettingsHubActivity.class)))
                 .show();
     }
 
     @NonNull
-    private List<LauncherShortcutStore.Shortcut> referencingHomeShortcuts(
+    private List<LauncherShortcutStore.Shortcut> referencingShortcuts(
             @NonNull String ruleId) {
         List<LauncherShortcutStore.Shortcut> references = new ArrayList<>();
-        for (LauncherShortcutStore.Shortcut shortcut : new LauncherShortcutStore(prefs).all()) {
+        collectRuleReferences(references, new LauncherShortcutStore(prefs), ruleId);
+        collectRuleReferences(references,
+                LauncherShortcutStore.forDriverPanel(prefs, prefs.driverPanelOld), ruleId);
+        collectRuleReferences(references,
+                LauncherShortcutStore.forDriverPanel(prefs, prefs.driverPanelNew), ruleId);
+        collectRuleReferences(references,
+                LauncherShortcutStore.forDriverFavorites(prefs), ruleId);
+        return references;
+    }
+
+    private static void collectRuleReferences(
+            @NonNull List<LauncherShortcutStore.Shortcut> references,
+            @NonNull LauncherShortcutStore shortcutStore,
+            @NonNull String ruleId) {
+        for (LauncherShortcutStore.Shortcut shortcut : shortcutStore.all()) {
             boolean primary = shortcut.kind == LauncherShortcutStore.Kind.RULE
                     && ruleId.equals(shortcut.target);
             boolean longPress = shortcut.hasLongAction
@@ -383,7 +399,6 @@ public final class IntentScenarioSettingsActivity extends AppCompatActivity {
                     && ruleId.equals(shortcut.longTarget);
             if (primary || longPress) references.add(shortcut);
         }
-        return references;
     }
 
     private void openHomeShortcutSettings() {
@@ -427,9 +442,12 @@ public final class IntentScenarioSettingsActivity extends AppCompatActivity {
         WidgetService running = WidgetService.getInstance();
         if (running != null) {
             running.applyPreferences();
-        } else if (prefs.widgetEnabled.get() && Permissions.allPermissionsGranted(this)) {
-            startForegroundService(new Intent(this, WidgetService.class));
+        } else {
+            WidgetServiceStarter.startIfNeeded(this);
         }
+        // Driver shortcut labels/icons cache the referenced rule for live-state rendering.
+        // Rebuild immediately after a rule edit; click dispatch independently reloads the store.
+        DriverPanelService.apply(this);
     }
 
     private final class EditorViews {
