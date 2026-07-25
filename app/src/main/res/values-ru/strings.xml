@@ -314,8 +314,15 @@
     <string name="phone_diag_connection">Подключение выбранного iPhone</string>
     <string name="phone_diag_connected_selected">подключён</string>
     <string name="phone_diag_disconnected_selected">не подключён</string>
+    <string name="phone_diag_stock_connection">Штатный Bluetooth ECARX</string>
+    <string name="phone_diag_stock_accepted">запрос подключения уже сопряжённого телефона принят (это не новое сопряжение)</string>
+    <string name="phone_diag_stock_not_registered">Android видит сопряжение, но штатная служба ECARX не знает этот iPhone; пересопрягите его в штатных настройках</string>
+    <string name="phone_diag_stock_rejected">штатная служба отклонила запрос; после ограниченных повторов проверяется прямой GATT</string>
+    <string name="phone_diag_stock_unavailable">API штатного Bluetooth недоступен; после ограниченных повторов проверяется прямой GATT</string>
+    <string name="phone_diag_stock_waiting">ожидание ответа штатной службы Bluetooth</string>
     <string name="phone_diag_sms">Bluetooth SMS/MAP</string>
     <string name="phone_diag_notifications">Apple ANCS</string>
+    <string name="phone_diag_ancs_setup">Источник разрешения ANCS</string>
     <string name="phone_diag_not_required">выключено в этих настройках</string>
     <string name="phone_diag_map_ready">профиль MAP выбранного iPhone активен</string>
     <string name="phone_diag_map_waiting">ожидание профиля MAP выбранного iPhone</string>
@@ -328,7 +335,9 @@
     <string name="phone_diag_ancs_not_bonded">выбранный iPhone не сопряжён</string>
     <string name="phone_diag_ancs_bluetooth">включите Bluetooth</string>
     <string name="phone_diag_ancs_unavailable">ANCS недоступен в этом подключении iPhone</string>
-    <string name="phone_diag_ancs_not_published">ANCS ещё не опубликован; завершите штатное сопряжение или включите «Показывать уведомления» на iPhone</string>
+    <string name="phone_diag_ancs_not_published">iPhone пока не опубликовал ANCS; выполняется одно повторное чтение GATT, затем потребуется проверить штатное сопряжение</string>
+    <string name="phone_diag_ancs_stock_pairing_required">после повторного чтения iPhone не опубликовал ANCS; включите «Показывать уведомления» либо пересопрягите iPhone через штатный Bluetooth</string>
+    <string name="phone_diag_ancs_stock_route">на Android 9 публикацию и разрешение ANCS создаёт штатное сопряжение Bluetooth; приложение не может принудительно вызвать запрос на iPhone</string>
     <string name="phone_diag_ancs_waiting">ожидание подключения или разрешения ANCS</string>
     <string name="phone_diag_ancs_authorization">разблокируйте iPhone и разрешите «Показывать системные уведомления» для этой магнитолы</string>
     <string name="phone_diag_ancs_disconnected">выбранный iPhone отключён</string>
@@ -345,7 +354,7 @@
     <string name="phone_diag_seconds_ago">%1$d сек. назад</string>
     <string name="phone_diag_minutes_ago">%1$d мин. назад</string>
     <string name="phone_diag_hours_ago">%1$d ч. назад</string>
-    <string name="phone_test_ancs">Проверить уведомления сопряжённого iPhone</string>
+    <string name="phone_test_ancs">Проверить штатное подключение и ANCS</string>
     <string name="phone_notification_settings">Настройки уведомлений Android</string>
     <string name="phone_test_enable_first">Сначала включите коннектор iPhone.</string>
     <string name="phone_test_choose_source">Перед проверкой ANCS включите уведомления или сообщения.</string>
@@ -353,8 +362,8 @@
     <string name="phone_test_pairing_required_title">Нужно штатное сопряжение Bluetooth</string>
     <string name="phone_test_bluetooth_required">Включите Bluetooth и сначала сопрягите iPhone в штатных настройках Bluetooth магнитолы.</string>
     <string name="phone_test_pairing_required">Выбранный iPhone сейчас не сопряжён. Эта проверка не заменяет штатное сопряжение Bluetooth.</string>
-    <string name="phone_test_started_title">Проверка уведомлений запущена</string>
-    <string name="phone_test_started">Запущена проверка штатного Bluetooth и ANCS. Оставьте iPhone разблокированным на 2–3 минуты: при необходимости будет выполнена одна повторная попытка. Если запрос не появится, на iPhone откройте «Настройки → Bluetooth → ⓘ рядом с магнитолой» и включите «Показывать уведомления». Если такого пункта нет, удалите сопряжение на обеих сторонах и выполните его заново через штатные настройки Bluetooth.</string>
+    <string name="phone_test_started_title">Проверка штатного подключения и ANCS</string>
+    <string name="phone_test_started">Штатной службе ECARX отправлен запрос подключить уже сопряжённый iPhone. Это не новое сопряжение и само по себе не вызывает запрос на телефоне. Затем Status Widget обновит кэш GATT, проверит ANCS и при необходимости выполнит одну чистую повторную попытку; оставьте iPhone разблокированным на 2–3 минуты. На Android 9 приложение не может принудительно объявить ANCS и показать системный запрос iPhone. Если ANCS не появится, на iPhone откройте «Настройки → Bluetooth → ⓘ рядом с магнитолой» и включите «Показывать уведомления». Если такого пункта нет, удалите сопряжение на обеих сторонах и выполните его заново через штатные настройки Bluetooth магнитолы.</string>
     <string name="phone_privacy_hint">Данные ANCS и MAP с подтверждённым устройством принимаются только от выбранного iPhone; Android Notification Access и доступ к общему хранилищу SMS не требуются. Точный Bluetooth-адрес хранится только на этой магнитоле и показывается здесь в маскированном виде.</string>
     <string name="phone_apply">Применить настройки телефона</string>
     <string name="phone_saved">Настройки телефона применены</string>
