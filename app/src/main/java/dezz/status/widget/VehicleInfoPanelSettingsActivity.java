@@ -116,11 +116,11 @@ public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
         addTitle(settings, "Данные автомобиля / HUD");
         addHint(settings, "Выберите только нужные показатели. Изменения сохраняются сразу и "
                 + "показываются справа на реальных данных автомобиля.");
-        MaterialSwitch visible = addSwitch(settings, "Показывать панель на HOME",
+        MaterialSwitch visible = addSwitch(settings, "Показывать блок на HOME",
                 preferences.launcherVehicleInfoVisible.get(), checked ->
                         preferences.launcherVehicleInfoVisible.set(checked));
-        visible.setContentDescription("Показывать панель данных автомобиля на домашнем экране");
-        addButton(settings, "Размер и положение панели на HOME…", v ->
+        visible.setContentDescription("Показывать блок данных автомобиля на домашнем экране");
+        addButton(settings, "Размер и положение блока на HOME…", v ->
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_MODE, true)));
 
@@ -142,7 +142,7 @@ public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
             config.showLabels = checked;
             persistAndPreview();
         });
-        addSwitch(settings, "Скрывать панель до первых данных", config.hideUntilFirstSample,
+        addSwitch(settings, "Скрывать блок до первых данных", config.hideUntilFirstSample,
                 checked -> {
                     config.hideUntilFirstSample = checked;
                     persistAndPreview();
@@ -162,11 +162,11 @@ public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
         settings.addView(metricList, new LinearLayout.LayoutParams(match(), wrap()));
         rebuildMetricControls();
 
-        addButton(settings, "Вернуть настройки панели по умолчанию", v ->
+        addButton(settings, "Вернуть настройки блока по умолчанию", v ->
                 new AlertDialog.Builder(this)
-                        .setTitle("Сбросить панель?")
+                        .setTitle("Сбросить блок?")
                         .setMessage("Состав, порядок и оформление вернутся к исходным. "
-                                + "Положение и размер панели на HOME сохранятся.")
+                                + "Положение и размер блока на HOME сохранятся.")
                         .setPositiveButton("Сбросить", (dialog, which) -> {
                             store.reset();
                             config = store.load();

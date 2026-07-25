@@ -154,7 +154,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         title.setText("Кнопки и умный дом");
         content.addView(title);
         TextView hint = text(15, false);
-        hint.setText("Все настройки этой панели собраны здесь. Справа показана та же ячеистая "
+        hint.setText("Все настройки этого блока собраны здесь. Справа показана та же ячеистая "
                 + "компоновка, которую использует HOME: перетаскивайте плитки и тяните за угол, "
                 + "чтобы изменить их размер.");
         hint.setAlpha(.75f);
@@ -163,7 +163,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         content.addView(hint, hintLp);
 
         panelVisible = new MaterialSwitch(this);
-        panelVisible.setText("Показывать панель кнопок и умного дома на HOME");
+        panelVisible.setText("Показывать блок кнопок и умного дома на HOME");
         panelVisible.setTextSize(16);
         panelVisible.setMinHeight(dp(52));
         panelVisible.setChecked(preferences.launcherActionsVisible.get());
@@ -173,7 +173,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         content.addView(panelVisible, new LinearLayout.LayoutParams(match(), wrap()));
 
         tilesVisible = new MaterialSwitch(this);
-        tilesVisible.setText("Показывать кнопки и устройства в панели");
+        tilesVisible.setText("Показывать кнопки и устройства в блоке");
         tilesVisible.setTextSize(16);
         tilesVisible.setMinHeight(dp(50));
         tilesVisible.setChecked(showActionTiles());
@@ -211,10 +211,10 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
                 selected -> changeActionElementScale(
                         PanelElementConfigStore.ACTION_ADD, selected));
 
-        addPageButton(content, "Размер и положение всей панели на HOME…", view ->
+        addPageButton(content, "Размер и положение блока на HOME…", view ->
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_MODE, true)));
-        addPageButton(content, "Расположение плиток внутри панели на HOME…", view ->
+        addPageButton(content, "Расположение плиток блока на HOME…", view ->
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_ACTIONS_CONTENT, true)));
 
@@ -264,7 +264,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         previewTitle.setTextColor(Color.rgb(105, 165, 255));
         previewColumn.addView(previewTitle);
         TextView previewHint = text(14, false);
-        previewHint.setText("Это редактируемая схема реальной панели. Нажмите плитку для её "
+        previewHint.setText("Это редактируемая схема реального блока. Нажмите плитку для её "
                 + "настройки. Плитку «Добавить» тоже можно перемещать и растягивать.");
         previewHint.setAlpha(.72f);
         LinearLayout.LayoutParams previewHintLp =

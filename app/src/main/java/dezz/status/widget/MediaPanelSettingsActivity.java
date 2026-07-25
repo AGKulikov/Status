@@ -63,7 +63,7 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         store = new MediaPanelConfigStore(preferences);
         config = store.load();
         editScheduler = PanelEditScheduler.onMainThread(this::updatePreviewNow, this::saveNow);
-        setTitle("Медиапанель");
+        setTitle("Медиаблок");
         installContent();
     }
 
@@ -100,28 +100,28 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         settings.setPadding(dp(10), 0, dp(22), dp(28));
         settingsScroll.addView(settings, new ScrollView.LayoutParams(match(), wrap()));
 
-        addTitle(settings, "Медиапанель");
+        addTitle(settings, "Медиаблок");
         addHint(settings, "Расположение и размер элементов можно менять и здесь, в живом "
-                + "предпросмотре справа, и прямо на фактической панели HOME. Точные ползунки, "
+                + "предпросмотре справа и прямо в фактическом блоке HOME. Точные ползунки, "
                 + "состав элементов, оформление и прокрутка текста остаются синхронизированы.");
         MaterialSwitch panelVisible = new MaterialSwitch(this);
-        panelVisible.setText("Показывать медиапанель на HOME");
+        panelVisible.setText("Показывать медиаблок на HOME");
         panelVisible.setTextSize(16);
         panelVisible.setMinHeight(dp(50));
         panelVisible.setChecked(preferences.launcherMediaVisible.get());
         panelVisible.setOnCheckedChangeListener((button, checked) ->
                 preferences.launcherMediaVisible.set(checked));
         settings.addView(panelVisible, new LinearLayout.LayoutParams(match(), wrap()));
-        addButton(settings, "Размер и положение панели на HOME…", v ->
+        addButton(settings, "Размер и положение блока на HOME…", v ->
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_MODE, true)));
-        addButton(settings, "Расположение элементов внутри панели на HOME…", v ->
+        addButton(settings, "Расположение элементов блока на HOME…", v ->
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_MEDIA_CONTENT, true)));
 
         addTitle(settings, "Сетка");
         addHint(settings, "Число столбцов и строк задаёт размер ячейки внутри фактического "
-                + "размера панели. Если выбранная сетка не вмещает включённые элементы, "
+                + "размера блока. Если выбранная сетка не вмещает включённые элементы, "
                 + "приложение сохранит последний корректный размер.");
         addGridSlider(settings, "Столбцы", config.gridColumns,
                 MediaPanelConfig.MIN_GRID_COLUMNS, MediaPanelConfig.MAX_GRID_COLUMNS,
@@ -147,7 +147,7 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         settings.addView(elementList, new LinearLayout.LayoutParams(match(), wrap()));
         rebuildElementControls();
 
-        addTitle(settings, "Панель");
+        addTitle(settings, "Блок");
         addSlider(settings, "Расстояние между элементами", config.spacingPx, 0, 48,
                 value -> config.spacingPx = value, value -> value + " px");
         addSlider(settings, "Внутренний отступ", config.contentPaddingPx, 0, 64,
@@ -181,10 +181,10 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         addColor(settings, "Тонкая рамка", () -> config.outlineColor,
                 value -> config.outlineColor = value);
 
-        addButton(settings, "Вернуть медиапанель по умолчанию", v ->
+        addButton(settings, "Вернуть медиаблок по умолчанию", v ->
                 new AlertDialog.Builder(this)
-                        .setTitle("Сбросить медиапанель?")
-                        .setMessage("Состав, порядок, размеры и оформление вернутся к исходным. Положение панели на HOME сохранится.")
+                        .setTitle("Сбросить медиаблок?")
+                        .setMessage("Состав, порядок, размеры и оформление вернутся к исходным. Положение блока на HOME сохранится.")
                         .setPositiveButton("Сбросить", (dialog, which) -> {
                             store.reset();
                             config = store.load();
