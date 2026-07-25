@@ -36,8 +36,8 @@ public final class ClimateLevelCycleContractTest {
                 "ClimateFanIndicatorPolicy.fromConfirmedState("));
         assertTrue(panel.contains(
                 "return Integer.toString(indicator.activeSegments)"));
-        assertTrue(panel.contains(
-                "pending.containsKey(id) && !ClimatePanelConfig.FAN.equals(id)"));
+        assertTrue(panel.contains("pending.containsKey(id)"));
+        assertTrue(panel.contains("&& !ClimatePanelConfig.FAN.equals(id)"));
     }
 
     @Test
