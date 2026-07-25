@@ -18,8 +18,8 @@ import java.util.List;
  *
  * <p>mHUD 6.1 chooses array slot 2 or the first non-default display. That breaks when the OEM
  * changes display enumeration order. On the supported head unit the OEM assigns a fixed numeric
- * id to each physical display, so that exact id is authoritative. {@link Display#getUniqueId()}
- * remains a secondary fingerprint for compatible firmware variants.</p>
+ * id to each physical display, so that exact id is authoritative. The hidden OEM unique id is
+ * read only as a secondary fingerprint for compatible firmware variants.</p>
  */
 public final class HudDisplaySelector {
     public static final class Candidate {
@@ -36,7 +36,7 @@ public final class HudDisplaySelector {
         Candidate(@NonNull Display display) {
             this.display = display;
             id = display.getDisplayId();
-            uniqueId = safe(display.getUniqueId());
+            uniqueId = hiddenUniqueId(display);
             name = safe(display.getName());
             Point size = new Point();
             try {
@@ -82,6 +82,18 @@ public final class HudDisplaySelector {
     }
 
     private HudDisplaySelector() {}
+
+    @NonNull
+    private static String hiddenUniqueId(@NonNull Display display) {
+        try {
+            Object value = Display.class.getMethod("getUniqueId").invoke(display);
+            return safe(value == null ? "" : String.valueOf(value));
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            // getUniqueId is hidden from the public Android SDK used to compile this app.
+            // Numeric displayId remains authoritative, so losing this optional fingerprint is safe.
+            return "";
+        }
+    }
 
     @NonNull
     public static List<Candidate> available(@NonNull Context context) {
