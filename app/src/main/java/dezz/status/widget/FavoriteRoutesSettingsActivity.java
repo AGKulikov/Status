@@ -108,8 +108,8 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
         addHint(left, "Пока маршрут не построен, здесь видны кнопки «Домой», «Работа» и другие адреса. После построения маршрута плитка сама переключится на выбранную навигационную информацию.");
 
         addHint(left, "Видимость и данные активного маршрута настраиваются один раз в разделе "
-                + "«Навигационная панель». Здесь находятся только избранные места и их вид.");
-        addSlider(left, "Столбцов в панели", preferences.launcherFavoriteRoutesColumns.get(),
+                + "«Навигация». Здесь находятся только избранные места и их вид.");
+        addSlider(left, "Столбцов в блоке", preferences.launcherFavoriteRoutesColumns.get(),
                 1, 6, value -> {
                     preferences.launcherFavoriteRoutesColumns.set(value);
                     rebuildPreview();

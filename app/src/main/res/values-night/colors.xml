@@ -34,4 +34,9 @@
     <color name="settings_warning">#FF9F0A</color>
     <color name="settings_purple">#BF5AF2</color>
     <color name="settings_indigo">#5E5CE6</color>
+    <!-- High-contrast OFF state: do not let the track disappear into the dark card. -->
+    <color name="settings_switch_track_off">#FF63636A</color>
+    <color name="settings_switch_track_disabled">#665A5A60</color>
+    <color name="settings_switch_thumb_off">#FFF2F2F7</color>
+    <color name="settings_switch_thumb_disabled">#FF8E8E93</color>
 </resources>

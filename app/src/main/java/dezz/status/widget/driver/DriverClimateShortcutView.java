@@ -46,6 +46,7 @@ public final class DriverClimateShortcutView extends View {
     private final Paint shapePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF shape = new RectF();
     private final int foregroundColor;
+    private final boolean detailed;
     private final CarIntegration.ControlStateListener listener = this::onControlState;
     private final Runnable expiry = this::expireStaleState;
 
@@ -68,9 +69,17 @@ public final class DriverClimateShortcutView extends View {
     public DriverClimateShortcutView(@NonNull Context context,
                                      @NonNull CarIntegration integration,
                                      @Nullable String color) {
+        this(context, integration, color, false);
+    }
+
+    public DriverClimateShortcutView(@NonNull Context context,
+                                     @NonNull CarIntegration integration,
+                                     @Nullable String color,
+                                     boolean detailed) {
         super(context);
         this.integration = integration;
         foregroundColor = parseColor(color, Color.WHITE);
+        this.detailed = detailed;
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
         setLayerType(LAYER_TYPE_SOFTWARE, null);
     }
@@ -162,21 +171,17 @@ public final class DriverClimateShortcutView extends View {
         float height = getHeight();
         if (width <= 0 || height <= 0) return;
         float unit = Math.min(width, height);
-        boolean expanded = height >= width * 1.35f;
+        // Detailed climate now fits the ordinary rail slot. Its geometry never changes when
+        // AUTO toggles; only the fixed fan segment count/fill and lower pictogram change.
+        boolean expanded = detailed;
         boolean showFan = fanKnown && fanActive;
         int color = showFan ? foregroundColor : muted(foregroundColor);
 
-        textPaint.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD));
-        textPaint.setColor(color);
-        textPaint.setTextAlign(Paint.Align.CENTER);
-        textPaint.setTextSize(Math.max(12f, unit * (expanded ? .34f : .39f)));
         String temperatureText = DriverClimatePresentation.temperature(
                 temperature, temperatureKnown);
-        Paint.FontMetrics temperatureMetrics = textPaint.getFontMetrics();
         float temperatureCenterY = height * (expanded ? .18f : showFan ? .31f : .50f);
-        float temperatureBaseline = temperatureCenterY
-                - (temperatureMetrics.ascent + temperatureMetrics.descent) / 2f;
-        canvas.drawText(temperatureText, width / 2f, temperatureBaseline, textPaint);
+        drawTemperature(canvas, temperatureText, width / 2f,
+                temperatureCenterY, unit, expanded, color);
         if (!showFan) return;
 
         ClimateFanIndicatorPolicy.Indicator indicator =
@@ -198,6 +203,40 @@ public final class DriverClimateShortcutView extends View {
             drawAirflow(canvas, width / 2f, height * .77f, unit,
                     DriverClimatePresentation.airflowTargets(airflowLabel), color);
         }
+    }
+
+    private void drawTemperature(@NonNull Canvas canvas, @NonNull String value,
+                                 float centerX, float centerY, float unit,
+                                 boolean compactDetailed, int color) {
+        float primarySize = Math.max(12f, unit * (compactDetailed ? .31f : .39f));
+        textPaint.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD));
+        textPaint.setColor(color);
+        int decimal = value.indexOf('.');
+        if (decimal <= 0 || decimal >= value.length() - 1) {
+            textPaint.setTextAlign(Paint.Align.CENTER);
+            textPaint.setTextSize(primarySize);
+            Paint.FontMetrics metrics = textPaint.getFontMetrics();
+            canvas.drawText(value, centerX,
+                    centerY - (metrics.ascent + metrics.descent) / 2f, textPaint);
+            return;
+        }
+        String whole = value.substring(0, decimal);
+        String fraction = value.substring(decimal);
+        textPaint.setTextSize(primarySize);
+        float wholeWidth = textPaint.measureText(whole);
+        Paint.FontMetrics primaryMetrics = textPaint.getFontMetrics();
+        float baseline = centerY
+                - (primaryMetrics.ascent + primaryMetrics.descent) / 2f;
+        float fractionSize = Math.max(8f, primarySize * .58f);
+        textPaint.setTextSize(fractionSize);
+        float fractionWidth = textPaint.measureText(fraction);
+        float start = centerX - (wholeWidth + fractionWidth) / 2f;
+        textPaint.setTextAlign(Paint.Align.LEFT);
+        textPaint.setTextSize(primarySize);
+        canvas.drawText(whole, start, baseline, textPaint);
+        textPaint.setTextSize(fractionSize);
+        canvas.drawText(fraction, start + wholeWidth,
+                baseline - primarySize * .08f, textPaint);
     }
 
     private void drawFanGlyph(Canvas canvas, float centerX, float centerY,

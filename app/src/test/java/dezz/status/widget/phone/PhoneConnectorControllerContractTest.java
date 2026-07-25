@@ -142,6 +142,30 @@ public final class PhoneConnectorControllerContractTest {
                 "|| stockConnectionRequestInProgress) return;"));
     }
 
+    @Test public void missingAndroidIphoneBatteryFallsBackToExactEcarxHeadsetPower()
+            throws IOException {
+        String bridge = javaSource("PhoneOemConnectionBridge.java");
+        String controller = controller();
+
+        assertTrue(bridge.contains("observeHeadsetPower("));
+        assertTrue(bridge.contains("\"registerBtCallback\""));
+        assertTrue(bridge.contains("\"unregisterBtCallback\""));
+        assertTrue(bridge.contains("\"getHeadsetPower\""));
+        assertTrue(bridge.contains("\"onDevicePowerUpdated\""));
+        assertTrue(bridge.contains("address.equalsIgnoreCase(deviceAddress(device))"));
+        assertTrue(bridge.contains("deliverCurrentPower(extension, getPower, address, device"));
+        assertTrue(bridge.contains("unregister.invoke(extension, callback)"));
+        assertFalse(bridge.contains("setAudioAttributes"));
+        assertFalse(bridge.contains("setUsage(31)"));
+
+        assertTrue(controller.contains("startOemPowerObservation(token, selectedAddress)"));
+        assertTrue(controller.contains("PhoneOemConnectionBridge.observeHeadsetPower("));
+        assertTrue(controller.contains("applyOemHeadsetPower("));
+        assertTrue(controller.contains("PhoneConnectorPolicy.normalizeHfpBattery(rawPower)"));
+        assertTrue(controller.contains("replaceOemPowerObservation(null)"));
+        assertTrue(controller.contains("closeOemObservation(oldOemObservation)"));
+    }
+
     @Test public void privacyModeAndAppPresentationRemainSourceOnly() throws IOException {
         String source = controller();
         assertTrue(source.contains("notificationAttributeRequest(uid, includeText)"));

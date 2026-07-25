@@ -75,20 +75,22 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         addTitle("Вид и поведение");
         addSwitch("Полноэкранный режим", preferences.launcherImmersive);
         addSwitch("Показывать сетку в режиме редактирования", preferences.launcherShowGrid);
+        addSwitch("HOME → наш лаунчер → оконный Навигатор",
+                preferences.launcherHomeOpensWindowedNavigator);
         addSnapControl();
         backgroundColorButton = addButton("Цвет фона", v -> showBackgroundDialog());
         AppleColorPickerDialog.decorateButton(backgroundColorButton, "Цвет фона",
                 preferences.launcherBackgroundColor.get());
 
         addTitle("Компоновка");
-        addHint("Размер и положение панелей меняются прямо на HOME. Видимость и содержимое "
-                + "задаются в едином разделе панелей — без дублирующих переключателей.");
-        addButton("Открыть единый раздел панелей…", v ->
+        addHint("Размер и положение блоков меняются прямо на HOME. Видимость и содержимое "
+                + "задаются в едином разделе блоков — без дублирующих переключателей.");
+        addButton("Открыть единый раздел блоков…", v ->
                 startActivity(SettingsHubActivity.intent(this,
                         dezz.status.widget.settings.SettingsDestinationCatalog.Group.PANELS)));
-        addButton("Сбросить расположение панелей", v -> new AlertDialog.Builder(this)
+        addButton("Сбросить расположение блоков", v -> new AlertDialog.Builder(this)
                 .setTitle("Сбросить компоновку?")
-                .setMessage("Панели вернутся в исходные позиции. Остальные настройки не изменятся.")
+                .setMessage("Блоки вернутся в исходные позиции. Остальные настройки не изменятся.")
                 .setPositiveButton("Сбросить", (dialog, which) -> {
                     preferences.launcherLayoutJson.set("");
                     Toast.makeText(this, "Компоновка сброшена", Toast.LENGTH_SHORT).show();

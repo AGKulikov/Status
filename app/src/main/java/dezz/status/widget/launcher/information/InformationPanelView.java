@@ -8,11 +8,15 @@ package dezz.status.widget.launcher.information;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothProfile;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.BatteryManager;
 import android.os.Environment;
 import android.os.Handler;
@@ -271,7 +275,7 @@ public final class InformationPanelView extends FrameLayout {
             if (item.enabled) visible.add(item);
         }
         if (visible.isEmpty()) {
-            TextView empty = text("Добавьте статусы в настройках панели «Информация»",
+            TextView empty = text("Добавьте статусы в настройках блока «Информация»",
                     15f, Color.WHITE, true);
             empty.setGravity(Gravity.CENTER);
             empty.setAlpha(.68f);
@@ -342,8 +346,11 @@ public final class InformationPanelView extends FrameLayout {
         label.setVisibility(item.showLabel ? View.VISIBLE : View.GONE);
         TextView value = text("—", scaledSp(20f, item.scalePercent),
                 color(item.valueColor, Color.WHITE), true);
-        value.setSingleLine(true);
-        value.setEllipsize(TextUtils.TruncateAt.END);
+        // Smart-device states can carry a mode, value and availability explanation. Never cut
+        // that status down to one line on HOME, the driver rail or Driver Favorites.
+        value.setSingleLine(false);
+        value.setMaxLines(Integer.MAX_VALUE);
+        value.setEllipsize(null);
         texts.addView(label, new LinearLayout.LayoutParams(match(), wrap()));
         texts.addView(value, new LinearLayout.LayoutParams(match(), wrap()));
         tile.addView(texts, new LinearLayout.LayoutParams(0, wrap(), 1f));
@@ -469,6 +476,10 @@ public final class InformationPanelView extends FrameLayout {
                         || status == BatteryManager.BATTERY_STATUS_FULL;
                 return Value.known(charging ? "Заряжается" : "Не заряжается", charging);
             }
+            case "system.bluetooth":
+                return resolveBluetooth();
+            case "system.wifi":
+                return resolveWifi();
             case "system.network": {
                 try {
                     ConnectivityManager manager = (ConnectivityManager) getContext()
@@ -493,6 +504,59 @@ public final class InformationPanelView extends FrameLayout {
             }
             default:
                 return Value.unknown();
+        }
+    }
+
+    @NonNull
+    private Value resolveBluetooth() {
+        try {
+            BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+            if (adapter == null) return Value.unknown();
+            if (!adapter.isEnabled()) return Value.known("Выкл", false);
+            boolean connected = false;
+            int[] profiles = {
+                    BluetoothProfile.HEADSET,
+                    BluetoothProfile.A2DP,
+                    BluetoothProfile.GATT,
+                    // Automotive HFP/MAP client IDs are hidden from the Android 9 SDK stub.
+                    16, 18
+            };
+            for (int profile : profiles) {
+                try {
+                    if (adapter.getProfileConnectionState(profile)
+                            == BluetoothProfile.STATE_CONNECTED) {
+                        connected = true;
+                        break;
+                    }
+                } catch (RuntimeException unsupportedProfile) {
+                    // Vendor stacks are allowed to reject an otherwise valid profile ID.
+                }
+            }
+            return Value.known(connected ? "Подключено" : "Включён", connected);
+        } catch (RuntimeException ignored) {
+            return Value.unknown();
+        }
+    }
+
+    @NonNull
+    private Value resolveWifi() {
+        try {
+            WifiManager manager = (WifiManager) getContext().getApplicationContext()
+                    .getSystemService(Context.WIFI_SERVICE);
+            if (manager == null) return Value.unknown();
+            if (!manager.isWifiEnabled()) return Value.known("Выкл", false);
+            WifiInfo info = manager.getConnectionInfo();
+            if (info == null || info.getNetworkId() < 0) {
+                return Value.known("Не подключён", false);
+            }
+            String ssid = info.getSSID();
+            if (ssid == null || WifiManager.UNKNOWN_SSID.equals(ssid)) ssid = "";
+            ssid = ssid.replaceAll("^\"|\"$", "").trim();
+            int level = WifiManager.calculateSignalLevel(info.getRssi(), 5) + 1;
+            String display = ssid.isEmpty() ? "Подключён" : ssid;
+            return Value.known(display + " · " + level + "/5", true);
+        } catch (RuntimeException ignored) {
+            return Value.unknown();
         }
     }
 

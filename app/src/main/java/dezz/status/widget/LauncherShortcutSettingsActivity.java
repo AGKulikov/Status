@@ -50,6 +50,13 @@ import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.launcher.LauncherRuleIdPolicy;
 import dezz.status.widget.launcher.LauncherRuleIconPolicy;
 import dezz.status.widget.launcher.SmartHomeShortcutPicker;
+import dezz.status.widget.launcher.InformationShortcutView;
+import dezz.status.widget.launcher.information.InformationIconPolicy;
+import dezz.status.widget.launcher.information.InformationSourcePicker;
+import dezz.status.widget.driver.DriverFavoritesPanelConfig;
+import dezz.status.widget.driver.DriverFavoritesPanelStore;
+import dezz.status.widget.launcher.routes.FavoriteRouteConfig;
+import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
 import dezz.status.widget.launcher.panels.PanelContentEditOverlay;
 import dezz.status.widget.launcher.panels.PanelElementConfigStore;
 import dezz.status.widget.launcher.panels.PanelGridLayout;
@@ -151,7 +158,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         title.setText("Кнопки и умный дом");
         content.addView(title);
         TextView hint = text(15, false);
-        hint.setText("Все настройки этой панели собраны здесь. Справа показана та же ячеистая "
+        hint.setText("Все настройки этого блока собраны здесь. Справа показана та же ячеистая "
                 + "компоновка, которую использует HOME: перетаскивайте плитки и тяните за угол, "
                 + "чтобы изменить их размер.");
         hint.setAlpha(.75f);
@@ -160,7 +167,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         content.addView(hint, hintLp);
 
         panelVisible = new MaterialSwitch(this);
-        panelVisible.setText("Показывать панель кнопок и умного дома на HOME");
+        panelVisible.setText("Показывать блок кнопок и умного дома на HOME");
         panelVisible.setTextSize(16);
         panelVisible.setMinHeight(dp(52));
         panelVisible.setChecked(preferences.launcherActionsVisible.get());
@@ -170,7 +177,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         content.addView(panelVisible, new LinearLayout.LayoutParams(match(), wrap()));
 
         tilesVisible = new MaterialSwitch(this);
-        tilesVisible.setText("Показывать кнопки и устройства в панели");
+        tilesVisible.setText("Показывать кнопки и устройства в блоке");
         tilesVisible.setTextSize(16);
         tilesVisible.setMinHeight(dp(50));
         tilesVisible.setChecked(showActionTiles());
@@ -208,10 +215,10 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
                 selected -> changeActionElementScale(
                         PanelElementConfigStore.ACTION_ADD, selected));
 
-        addPageButton(content, "Размер и положение всей панели на HOME…", view ->
+        addPageButton(content, "Размер и положение всего блока на HOME…", view ->
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_MODE, true)));
-        addPageButton(content, "Расположение плиток внутри панели на HOME…", view ->
+        addPageButton(content, "Расположение плиток внутри блока на HOME…", view ->
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_ACTIONS_CONTENT, true)));
 
@@ -261,7 +268,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         previewTitle.setTextColor(Color.rgb(105, 165, 255));
         previewColumn.addView(previewTitle);
         TextView previewHint = text(14, false);
-        previewHint.setText("Это редактируемая схема реальной панели. Нажмите плитку для её "
+        previewHint.setText("Это редактируемая схема реального блока. Нажмите плитку для её "
                 + "настройки. Плитку «Добавить» тоже можно перемещать и растягивать.");
         previewHint.setAlpha(.72f);
         LinearLayout.LayoutParams previewHintLp =
@@ -799,7 +806,8 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
     private void chooseKindForNew() {
         editingLongAction = false;
         String[] choices = {"Приложение", "Готовая функция", "Функция автомобиля",
-                "Действие устройства / сценарий", "Android Intent"};
+                "Действие устройства / сценарий", "Android Intent",
+                "Информационная плитка (без нажатия)", "Разделитель"};
         new AlertDialog.Builder(this)
                 .setTitle("Что добавить?")
                 .setItems(choices, (dialog, which) -> {
@@ -807,7 +815,9 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
                     else if (which == 1) chooseBuiltin(null);
                     else if (which == 2) chooseCarControl(null);
                     else if (which == 3) chooseRule(null);
-                    else editIntentTarget(null);
+                    else if (which == 4) editIntentTarget(null);
+                    else if (which == 5) chooseInformation(null);
+                    else chooseDivider(null);
                 })
                 .setNegativeButton(android.R.string.cancel, null).show();
     }
@@ -827,15 +837,54 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
     private void chooseKindForExisting(@NonNull LauncherShortcutStore.Shortcut value) {
         editingLongAction = false;
         String[] choices = {"Приложение", "Готовая функция", "Функция автомобиля",
-                "Действие устройства / сценарий", "Android Intent"};
+                "Действие устройства / сценарий", "Android Intent",
+                "Информационная плитка (без нажатия)", "Разделитель"};
         new AlertDialog.Builder(this).setTitle("Новое действие")
                 .setItems(choices, (dialog, which) -> {
                     if (which == 0) chooseApplication(value);
                     else if (which == 1) chooseBuiltin(value);
                     else if (which == 2) chooseCarControl(value);
                     else if (which == 3) chooseRule(value);
-                    else editIntentTarget(value);
+                    else if (which == 4) editIntentTarget(value);
+                    else if (which == 5) chooseInformation(value);
+                    else chooseDivider(value);
                 }).show();
+    }
+
+    private void chooseInformation(@Nullable LauncherShortcutStore.Shortcut existing) {
+        new InformationSourcePicker(this, CarIntegrations.get(this), item -> {
+            LauncherShortcutStore.Shortcut value = existing == null
+                    ? new LauncherShortcutStore.Shortcut() : existing;
+            value.kind = LauncherShortcutStore.Kind.INFO;
+            value.target = InformationShortcutView.target(item);
+            value.packageName = "";
+            value.title = item.displayLabel();
+            value.icon = InformationIconPolicy.resolve(item);
+            value.iconColor = item.iconColor;
+            value.textColor = item.valueColor;
+            value.backgroundColor = "#00000000";
+            value.stateBinding = item.binding;
+            value.showTitle = true;
+            value.showState = true;
+            value.hasLongAction = false;
+            editAppearance(value);
+        }).show();
+    }
+
+    private void chooseDivider(@Nullable LauncherShortcutStore.Shortcut existing) {
+        LauncherShortcutStore.Shortcut value = existing == null
+                ? new LauncherShortcutStore.Shortcut() : existing;
+        value.kind = LauncherShortcutStore.Kind.DIVIDER;
+        value.target = "divider";
+        value.packageName = "";
+        value.title = "Разделитель";
+        value.icon = "none";
+        value.backgroundColor = "#66FFFFFF";
+        value.showTitle = false;
+        value.showState = false;
+        value.hasLongAction = false;
+        value.stateBinding = null;
+        editAppearance(value);
     }
 
     private void chooseLongKind(@NonNull LauncherShortcutStore.Shortcut value) {
@@ -914,6 +963,9 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
                     ? "Переключать режимы по кругу" : "Переключать уровни по кругу");
             operations.add(CarControlCommand.Operation.CYCLE);
             values.add(0d);
+            labels.add("Переключать только выбранные режимы…");
+            operations.add(null);
+            values.add(0d);
         }
         for (CarControlDescriptor.Option option : control.options) {
             labels.add("Установить: " + option.label);
@@ -921,9 +973,44 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
             values.add(option.value);
         }
         new AlertDialog.Builder(this).setTitle(control.label + " — нажатие")
-                .setItems(labels.toArray(new String[0]), (dialog, which) ->
-                        saveCarAction(existing, control, operations.get(which), values.get(which)))
+                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
+                    CarControlCommand.Operation operation = operations.get(which);
+                    if (operation == null) chooseCarCycleSubset(existing, control);
+                    else saveCarAction(existing, control, operation, values.get(which));
+                })
                 .setNegativeButton(android.R.string.cancel, null).show();
+    }
+
+    private void chooseCarCycleSubset(@Nullable LauncherShortcutStore.Shortcut existing,
+                                      @NonNull CarControlDescriptor control) {
+        String[] labels = new String[control.options.size()];
+        boolean[] checked = new boolean[control.options.size()];
+        for (int index = 0; index < control.options.size(); index++) {
+            labels[index] = control.options.get(index).label;
+            checked[index] = true;
+        }
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(control.label + " · выбранный цикл")
+                .setMultiChoiceItems(labels, checked,
+                        (value, which, selected) -> checked[which] = selected)
+                .setPositiveButton("Выбрать", null)
+                .setNegativeButton("Отмена", null)
+                .create();
+        dialog.setOnShowListener(ignored ->
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+                    List<Double> selected = new ArrayList<>();
+                    for (int index = 0; index < checked.length; index++) {
+                        if (checked[index]) selected.add(control.options.get(index).value);
+                    }
+                    if (selected.size() < 2) {
+                        Toast.makeText(this, "Выберите минимум два режима",
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    dialog.dismiss();
+                    saveCarCycle(existing, control, selected);
+                }));
+        dialog.show();
     }
 
     private void chooseCarRange(@Nullable LauncherShortcutStore.Shortcut existing,
@@ -975,6 +1062,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
             shortcut.longPackageName = "";
             shortcut.longCommand = operation;
             shortcut.longCommandValue = value;
+            shortcut.longCommandCycleValues.clear();
             editingLongAction = false;
             store.upsert(shortcut);
             refresh();
@@ -986,12 +1074,46 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         shortcut.packageName = "";
         shortcut.command = operation;
         shortcut.commandValue = value;
+        shortcut.commandCycleValues.clear();
         shortcut.title = control.label;
         shortcut.icon = control.iconKey;
         shortcut.iconColor = "#99FFFFFF";
         shortcut.activeIconColor = control.suggestedActiveColor;
         shortcut.useVehicleStateColor = true;
         shortcut.showState = control.kind != CarControlDescriptor.Kind.ACTION;
+        editAppearance(shortcut);
+    }
+
+    private void saveCarCycle(@Nullable LauncherShortcutStore.Shortcut existing,
+                              @NonNull CarControlDescriptor control,
+                              @NonNull List<Double> selected) {
+        LauncherShortcutStore.Shortcut shortcut = existing == null
+                ? new LauncherShortcutStore.Shortcut() : existing;
+        if (editingLongAction) {
+            shortcut.hasLongAction = true;
+            shortcut.longKind = LauncherShortcutStore.Kind.CAR;
+            shortcut.longTarget = control.id;
+            shortcut.longPackageName = "";
+            shortcut.longCommand = CarControlCommand.Operation.CYCLE;
+            shortcut.longCommandValue = 0;
+            shortcut.longCommandCycleValues = new ArrayList<>(selected);
+            editingLongAction = false;
+            store.upsert(shortcut);
+            refresh();
+            return;
+        }
+        shortcut.kind = LauncherShortcutStore.Kind.CAR;
+        shortcut.target = control.id;
+        shortcut.packageName = "";
+        shortcut.command = CarControlCommand.Operation.CYCLE;
+        shortcut.commandValue = 0;
+        shortcut.commandCycleValues = new ArrayList<>(selected);
+        shortcut.title = control.label;
+        shortcut.icon = control.iconKey;
+        shortcut.iconColor = "#99FFFFFF";
+        shortcut.activeIconColor = control.suggestedActiveColor;
+        shortcut.useVehicleStateColor = true;
+        shortcut.showState = true;
         editAppearance(shortcut);
     }
 
@@ -1206,6 +1328,14 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
                     LauncherShortcutStore.Builtin action = actions[which];
                     LauncherShortcutStore.Shortcut value = existing == null
                             ? new LauncherShortcutStore.Shortcut() : existing;
+                    if (action == LauncherShortcutStore.Builtin.FAVORITES) {
+                        chooseDriverFavorites(value);
+                        return;
+                    }
+                    if (action == LauncherShortcutStore.Builtin.FAVORITE_ROUTE) {
+                        chooseFavoriteRoute(value);
+                        return;
+                    }
                     if (editingLongAction) {
                         saveLongAction(value, LauncherShortcutStore.Kind.BUILTIN, action.key, "");
                     } else {
@@ -1218,6 +1348,68 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
                         editAppearance(value);
                     }
                 }).show();
+    }
+
+    private void chooseDriverFavorites(@NonNull LauncherShortcutStore.Shortcut value) {
+        List<DriverFavoritesPanelConfig> panels =
+                new DriverFavoritesPanelStore(preferences).load();
+        String[] labels = new String[panels.size()];
+        for (int index = 0; index < panels.size(); index++) {
+            labels[index] = panels.get(index).title;
+        }
+        new AlertDialog.Builder(this).setTitle("Избранное водителя")
+                .setItems(labels, (dialog, which) -> {
+                    DriverFavoritesPanelConfig panel = panels.get(which);
+                    String target = LauncherShortcutStore.driverFavoritesTarget(panel.id);
+                    if (editingLongAction) {
+                        saveLongAction(value, LauncherShortcutStore.Kind.BUILTIN,
+                                target, "");
+                    } else {
+                        value.kind = LauncherShortcutStore.Kind.BUILTIN;
+                        value.target = target;
+                        value.packageName = "";
+                        value.title = panel.title;
+                        value.icon = LauncherShortcutStore.Builtin.FAVORITES.icon;
+                        value.iconColor = "#FFFFFFFF";
+                        editAppearance(value);
+                    }
+                }).setNegativeButton("Отмена", null).show();
+    }
+
+    private void chooseFavoriteRoute(@NonNull LauncherShortcutStore.Shortcut value) {
+        List<FavoriteRouteConfig> enabled = new ArrayList<>();
+        for (FavoriteRouteConfig route :
+                new FavoriteRoutesConfigStore(preferences).load()) {
+            if (route.enabled) enabled.add(route);
+        }
+        if (enabled.isEmpty()) {
+            Toast.makeText(this, "Сначала добавьте избранную точку",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        String[] labels = new String[enabled.size()];
+        for (int index = 0; index < enabled.size(); index++) {
+            labels[index] = enabled.get(index).title;
+        }
+        new AlertDialog.Builder(this).setTitle("Избранная точка")
+                .setItems(labels, (dialog, which) -> {
+                    FavoriteRouteConfig route = enabled.get(which);
+                    String target = LauncherShortcutStore.favoriteRouteTarget(route.id);
+                    if (editingLongAction) {
+                        saveLongAction(value, LauncherShortcutStore.Kind.BUILTIN,
+                                target, "");
+                    } else {
+                        value.kind = LauncherShortcutStore.Kind.BUILTIN;
+                        value.target = target;
+                        value.packageName = "";
+                        value.title = route.title;
+                        value.icon = route.icon;
+                        value.iconColor = route.iconColor;
+                        value.backgroundColor = route.backgroundColor;
+                        value.textColor = route.textColor;
+                        editAppearance(value);
+                    }
+                }).setNegativeButton("Отмена", null).show();
     }
 
     private void editIntentTarget(@Nullable LauncherShortcutStore.Shortcut existing) {
@@ -1269,6 +1461,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         value.longKind = kind;
         value.longTarget = target;
         value.longPackageName = packageName;
+        value.longCommandCycleValues.clear();
         editingLongAction = false;
         store.upsert(value);
         refresh();
@@ -1322,6 +1515,9 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         SeekValue iconSize = seek(form, "Размер иконки",
                 LauncherShortcutStore.MIN_ICON_SIZE_PX,
                 LauncherShortcutStore.MAX_ICON_SIZE_PX, value.iconSizePx, " px");
+        SeekValue dividerThickness = value.kind == LauncherShortcutStore.Kind.DIVIDER
+                ? seek(form, "Толщина разделителя", 1, 20,
+                value.dividerThicknessPx, " px") : null;
         int initialWidth = openedPlacement == null
                 ? value.columnSpan : openedPlacement.columnSpan;
         int initialHeight = openedPlacement == null
@@ -1357,6 +1553,9 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
                         value.showState = showState.isChecked();
                     }
                     value.iconSizePx = iconSize.value;
+                    if (dividerThickness != null) {
+                        value.dividerThicknessPx = dividerThickness.value;
+                    }
                     value.showTitle = showTitle.isChecked();
                     value.enabled = enabled.isChecked();
 
@@ -1425,6 +1624,8 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
             case INTENT: return longSuffix("Intent · " + value.target, value);
             case CAR: return longSuffix("Автомобиль · " + value.target + " · "
                     + carOperationLabel(value.command, value.commandValue), value);
+            case INFO: return "Информация · без нажатия";
+            case DIVIDER: return "Разделитель";
             case BUILTIN:
             default: return longSuffix("Функция · "
                     + LauncherShortcutStore.Builtin.fromKey(value.target).label, value);

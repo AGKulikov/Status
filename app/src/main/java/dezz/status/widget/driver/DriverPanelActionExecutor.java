@@ -10,10 +10,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.media.AudioManager;
 import android.os.SystemClock;
+import android.view.View;
 import android.view.KeyEvent;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.util.List;
 
@@ -24,6 +26,9 @@ import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.launcher.YandexWindowLauncher;
+import dezz.status.widget.launcher.routes.FavoriteRouteConfig;
+import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
+import dezz.status.widget.launcher.routes.YandexRouteLauncher;
 import dezz.status.widget.scenario.IntentActionRule;
 import dezz.status.widget.scenario.IntentActionRuleStore;
 import dezz.status.widget.settings.SettingsDestinationCatalog;
@@ -33,7 +38,7 @@ import dezz.status.widget.shell.PrivilegedShell;
 final class DriverPanelActionExecutor {
     interface Host {
         void showAllApps();
-        void showFavorites();
+        void showFavorites(@NonNull String panelId, @Nullable View anchor);
         void triggerStockClimate();
     }
 
@@ -49,6 +54,11 @@ final class DriverPanelActionExecutor {
     }
 
     void execute(@NonNull LauncherShortcutStore.Shortcut shortcut) {
+        execute(shortcut, null);
+    }
+
+    void execute(@NonNull LauncherShortcutStore.Shortcut shortcut,
+                 @Nullable View anchor) {
         try {
             switch (shortcut.kind) {
                 case APP:
@@ -64,15 +74,20 @@ final class DriverPanelActionExecutor {
                     return;
                 case CAR:
                     CarIntegrations.get(context).executeControl(new CarControlCommand(
-                            shortcut.target, shortcut.command, shortcut.commandValue),
+                            shortcut.target, shortcut.command, shortcut.commandValue,
+                            shortcut.commandCycleValues),
                             (success, message) -> {
                                 if (!success) toast(message == null
                                         ? "Команда автомобиля не выполнена" : message);
                             });
                     return;
+                case INFO:
+                case DIVIDER:
+                    return;
                 case BUILTIN:
                 default:
-                    executeBuiltin(LauncherShortcutStore.Builtin.fromKey(shortcut.target));
+                    executeBuiltin(LauncherShortcutStore.Builtin.fromKey(shortcut.target),
+                            shortcut.target, anchor);
             }
         } catch (RuntimeException error) {
             toast("Действие не выполнено: " + shortcut.title);
@@ -80,6 +95,11 @@ final class DriverPanelActionExecutor {
     }
 
     boolean executeLong(@NonNull LauncherShortcutStore.Shortcut shortcut) {
+        return executeLong(shortcut, null);
+    }
+
+    boolean executeLong(@NonNull LauncherShortcutStore.Shortcut shortcut,
+                        @Nullable View anchor) {
         if (!shortcut.hasLongAction) return false;
         LauncherShortcutStore.Shortcut action = shortcut.copy();
         action.kind = shortcut.longKind;
@@ -87,11 +107,15 @@ final class DriverPanelActionExecutor {
         action.packageName = shortcut.longPackageName;
         action.command = shortcut.longCommand;
         action.commandValue = shortcut.longCommandValue;
-        execute(action);
+        action.commandCycleValues = new java.util.ArrayList<>(
+                shortcut.longCommandCycleValues);
+        execute(action, anchor);
         return true;
     }
 
-    private void executeBuiltin(@NonNull LauncherShortcutStore.Builtin action) {
+    private void executeBuiltin(@NonNull LauncherShortcutStore.Builtin action,
+                                @NonNull String rawTarget,
+                                @Nullable View anchor) {
         switch (action) {
             case HOME:
                 context.startActivity(new Intent(Intent.ACTION_MAIN)
@@ -120,7 +144,20 @@ final class DriverPanelActionExecutor {
                 host.showAllApps();
                 return;
             case FAVORITES:
-                host.showFavorites();
+                host.showFavorites(LauncherShortcutStore.driverFavoritesPanelId(rawTarget),
+                        anchor);
+                return;
+            case FAVORITE_ROUTE:
+                for (FavoriteRouteConfig route :
+                        new FavoriteRoutesConfigStore(preferences).load()) {
+                    if (!route.enabled || !route.id.equals(
+                            LauncherShortcutStore.favoriteRouteId(rawTarget))) continue;
+                    if (!YandexRouteLauncher.launch(context, route)) {
+                        toast("Не удалось открыть маршрут");
+                    }
+                    return;
+                }
+                toast("Избранная точка не найдена");
                 return;
             case MAPS_WINDOW:
                 launchYandex(YandexWindowLauncher.Product.MAPS, false);
@@ -169,7 +206,7 @@ final class DriverPanelActionExecutor {
     }
 
     private void launchYandex(YandexWindowLauncher.Product product, boolean full) {
-        if (!YandexWindowLauncher.launch(context, product, full)) {
+        if (!YandexWindowLauncher.launchOverLauncher(context, product, full)) {
             toast("Приложение Яндекса не найдено");
         }
     }

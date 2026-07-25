@@ -116,7 +116,7 @@ public final class NavigationPanelSettingsActivity extends AppCompatActivity {
             preferences.launcherFavoriteRoutesVisible.set(checked);
         });
         root.addView(visible, new LinearLayout.LayoutParams(match(), wrap()));
-        addButton(root, "Размер и положение всей панели на HOME…", v ->
+        addButton(root, "Размер и положение всего блока на HOME…", v ->
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_MODE, true)));
 
@@ -149,7 +149,7 @@ public final class NavigationPanelSettingsActivity extends AppCompatActivity {
         addButton(root, "Вернуть сетку по умолчанию", v -> new AlertDialog.Builder(this)
                 .setTitle("Сбросить сетку навигации?")
                 .setMessage("Видимость, положение, размеры и масштаб элементов вернутся "
-                        + "к исходным значениям. Размер всей HOME-панели не изменится.")
+                        + "к исходным значениям. Размер всего блока HOME не изменится.")
                 .setPositiveButton("Сбросить", (dialog, which) -> {
                     store.reset();
                     config = store.load();

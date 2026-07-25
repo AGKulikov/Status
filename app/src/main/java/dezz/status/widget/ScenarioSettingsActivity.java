@@ -1320,12 +1320,19 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 }
                 break;
             case DRIVER:
-                addDriverTargets(result, prefs.driverPanelOld, "Старая панель");
-                addDriverTargets(result, prefs.driverPanelNew, "Новая панель");
-                for (LauncherShortcutStore.Shortcut shortcut :
-                        LauncherShortcutStore.forDriverFavorites(prefs).all()) {
-                    result.add(new TargetOption(shortcut.id,
-                            "Избранное · " + shortcut.title + " [" + shortcut.id + "]"));
+                addDriverTargets(result, prefs.activeDriverPanelProfile(),
+                        "Панель водителя");
+                for (dezz.status.widget.driver.DriverFavoritesPanelConfig panel :
+                        new dezz.status.widget.driver.DriverFavoritesPanelStore(prefs).load()) {
+                    result.add(new TargetOption(panel.id,
+                            "Панель избранного · " + panel.title
+                                    + " [" + panel.id + "]"));
+                    for (LauncherShortcutStore.Shortcut shortcut :
+                            LauncherShortcutStore.forDriverFavorites(prefs, panel.id).all()) {
+                        result.add(new TargetOption(shortcut.id,
+                                panel.title + " · " + shortcut.title
+                                        + " [" + shortcut.id + "]"));
+                    }
                 }
                 break;
             default:

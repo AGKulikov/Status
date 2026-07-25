@@ -10,8 +10,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-/** Source-level release contract for HA1084 driver-panel integrations. */
-public final class DriverPanelHa1084ContractTest {
+/** Source-level release contract for HA1085 driver-panel integrations. */
+public final class DriverPanelHa1085ContractTest {
     @Test
     public void longPressRecentsFavoritesAndSmartHomeUseOneShortcutModel() throws Exception {
         Path widget = widgetRoot();
@@ -31,12 +31,87 @@ public final class DriverPanelHa1084ContractTest {
         assertTrue(executor.contains("boolean executeLong("));
         assertTrue(executor.contains("action.kind = shortcut.longKind"));
         assertTrue(executor.contains("case FAVORITES:"));
-        assertTrue(overlay.contains("void showFavorites()"));
+        assertTrue(overlay.contains(
+                "void showFavorites(@NonNull String panelId, @Nullable View anchor)"));
         assertTrue(overlay.contains("ShortcutDrawerAdapter"));
+        assertTrue(overlay.contains("favoriteWindows"));
+        assertTrue(overlay.contains("compactDrawerParams("));
         assertTrue(overlay.contains("SmartHomeShortcutStatePolicy.resolveValue("));
         assertTrue(overlay.contains("addConnectorValueListener("));
         assertTrue(settings.contains("actionPicker.showLong(shortcut)"));
-        assertTrue(settings.contains("Расширенная информация"));
+        assertTrue(settings.contains("Подробный климат в обычной ячейке"));
+    }
+
+    @Test
+    public void favoritesPanelsAreUnlimitedAnchoredConfigurableAndAutomatable()
+            throws Exception {
+        Path widget = widgetRoot();
+        String config = read(widget.resolve("driver/DriverFavoritesPanelConfig.java"));
+        String store = read(widget.resolve("driver/DriverFavoritesPanelStore.java"));
+        String shortcuts = read(widget.resolve("launcher/LauncherShortcutStore.java"));
+        String settings = read(widget.resolve("DriverFavoritesSettingsActivity.java"));
+        String overlay = read(widget.resolve("driver/DriverPanelOverlayController.java"));
+        String scenarios = read(widget.resolve("ScenarioSettingsActivity.java"));
+        String automation = read(widget.resolve("automation/AutomationStateStore.java"));
+
+        assertFalse(store.contains("MAX_PANELS"));
+        assertFalse(store.contains("MAX_ITEMS"));
+        assertTrue(store.contains("values.add(value);"));
+        assertTrue(shortcuts.contains("DRIVER_FAVORITES_TARGET_PREFIX = \"favorites:\""));
+        assertTrue(shortcuts.contains("preferences.driverFavoritesShortcuts(panelId)"));
+        assertTrue(settings.contains("без ограничения количества"));
+        assertTrue(settings.contains("Видимые строки"));
+        assertTrue(settings.contains("Показывать границы ячеек"));
+        assertTrue(settings.contains("Цвет границы ячеек"));
+        assertTrue(config.contains("visibleRows"));
+        assertTrue(config.contains("borderEnabled"));
+        assertTrue(config.contains("borderWidthPx"));
+        assertTrue(config.contains("borderColor"));
+
+        assertTrue(overlay.contains("favoriteWindows = new LinkedHashMap<>()"));
+        assertTrue(overlay.contains("anchor.getLocationOnScreen(location)"));
+        assertTrue(overlay.contains("anchorCenterY - height / 2"));
+        assertTrue(overlay.contains("? physicalWidth"));
+        assertTrue(overlay.contains("favoritePanelBackground(context, profile)"));
+        assertTrue(overlay.contains("config.visibleRows * config.cellSizePx"));
+        assertTrue(overlay.contains("config.borderEnabled && config.borderWidthPx > 0"));
+
+        assertTrue(scenarios.contains("result.add(new TargetOption(panel.id,"));
+        assertTrue(scenarios.contains("\"Панель избранного · \" + panel.title"));
+        assertTrue(automation.contains("explicitVisibility(String scope, String id)"));
+        assertTrue(automation.contains("\"_visible_explicit\""));
+    }
+
+    @Test
+    public void readOnlyInformationAndDividersAreUnlimitedAndNeverTruncateState()
+            throws Exception {
+        Path widget = widgetRoot();
+        String store = read(widget.resolve("launcher/LauncherShortcutStore.java"));
+        String information = read(widget.resolve("launcher/InformationShortcutView.java"));
+        String policy = read(widget.resolve("launcher/SmartHomeShortcutStatePolicy.java"));
+        String infoView = read(widget.resolve(
+                "launcher/information/InformationPanelView.java"));
+        String picker = read(widget.resolve(
+                "launcher/information/InformationSourcePicker.java"));
+        String overlay = read(widget.resolve("driver/DriverPanelOverlayController.java"));
+
+        assertTrue(store.contains("INFO, DIVIDER"));
+        assertTrue(store.contains(
+                "value.kind != Kind.INFO && value.kind != Kind.DIVIDER"));
+        assertTrue(store.contains("interactiveCount(shortcuts)"));
+        assertTrue(information.contains("setClickable(false)"));
+        assertTrue(information.contains("content.start()"));
+        assertTrue(information.contains("content.stop()"));
+        assertTrue(overlay.contains("information.add(shortcut)"));
+        assertTrue(overlay.contains("new InformationShortcutView("));
+        assertTrue(infoView.contains("value.setSingleLine(false)"));
+        assertTrue(infoView.contains("value.setMaxLines(Integer.MAX_VALUE)"));
+        assertTrue(picker.contains("\"system.bluetooth\""));
+        assertTrue(picker.contains("\"system.wifi\""));
+        assertTrue(infoView.contains("private Value resolveBluetooth()"));
+        assertTrue(infoView.contains("private Value resolveWifi()"));
+        assertTrue(policy.contains("private static String complete(String text)"));
+        assertFalse(policy.contains("substring(0, 47)"));
     }
 
     @Test
@@ -54,7 +129,9 @@ public final class DriverPanelHa1084ContractTest {
         assertTrue(editor.contains("case DRIVER:"));
         assertTrue(overlay.contains("driverShortcutVisible(shortcut.id, true)"));
         assertTrue(overlay.contains("driverShortcutActionEnabled(shortcut.id, true)"));
-        assertTrue(overlay.contains("refreshFavoritesDrawer()"));
+        assertTrue(overlay.contains("refreshFavoriteWindows()"));
+        assertTrue(overlay.contains("reconcileAutomatedFavoritePanels()"));
+        assertTrue(service.contains("driverFavoritePanelVisibility("));
         assertTrue(service.contains("effectiveActionEnabled("));
         assertTrue(service.contains("DriverPanelService.apply(this)"));
     }
@@ -80,11 +157,11 @@ public final class DriverPanelHa1084ContractTest {
         assertTrue(preferences.contains("launcherAllAppsHiddenComponents"));
         assertTrue(preferences.contains("launcherAllAppsIconScalePercent"));
         assertFalse(overlay.contains("PanelElementConfigStore.APPS_GRID"));
+        assertTrue(intentRules.contains("prefs.activeDriverPanelProfile()"));
         assertTrue(intentRules.contains(
-                "LauncherShortcutStore.forDriverPanel(prefs, prefs.driverPanelOld)"));
+                "new dezz.status.widget.driver.DriverFavoritesPanelStore(prefs).load()"));
         assertTrue(intentRules.contains(
-                "LauncherShortcutStore.forDriverPanel(prefs, prefs.driverPanelNew)"));
-        assertTrue(intentRules.contains("LauncherShortcutStore.forDriverFavorites(prefs)"));
+                "LauncherShortcutStore.forDriverFavorites(prefs, panel.id)"));
         assertTrue(homeIcons.contains("InstalledAppCatalog.load(this)"));
         assertTrue(homeIcons.contains("app.system"));
     }

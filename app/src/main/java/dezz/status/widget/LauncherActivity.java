@@ -65,6 +65,7 @@ import java.util.function.Supplier;
 
 import dezz.status.widget.launcher.CombinedNavigationPanelPolicy;
 import dezz.status.widget.launcher.HighResolutionAppIconLoader;
+import dezz.status.widget.launcher.InformationShortcutView;
 import dezz.status.widget.launcher.LauncherActionsGridConfig;
 import dezz.status.widget.launcher.LauncherActionsGridConfigStore;
 import dezz.status.widget.launcher.LauncherAppCatalog;
@@ -99,6 +100,8 @@ import dezz.status.widget.launcher.panels.PanelElementConfigStore;
 import dezz.status.widget.launcher.panels.PanelGridLayout;
 import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
 import dezz.status.widget.launcher.routes.FavoriteRoutesPanelView;
+import dezz.status.widget.launcher.routes.FavoriteRouteConfig;
+import dezz.status.widget.launcher.routes.YandexRouteLauncher;
 import dezz.status.widget.launcher.vehicle.VehicleInfoPanelConfigStore;
 import dezz.status.widget.launcher.vehicle.VehicleInfoPanelView;
 import dezz.status.widget.car.CarControlCommand;
@@ -326,12 +329,14 @@ public final class LauncherActivity extends AppCompatActivity {
         // optional panel inflation across frames.
         navigationUiHandler.postDelayed(allowPanelInitialization,
                 PANEL_INITIALIZATION_GRACE_MS);
+        handleStagedOrHomeNavigation(getIntent());
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        handleStagedOrHomeNavigation(intent);
         if (panelsInitialized) {
             if (intent.getBooleanExtra(EXTRA_EDIT_MEDIA_CONTENT, false)) {
                 setMediaContentEditMode(true);
@@ -342,6 +347,31 @@ public final class LauncherActivity extends AppCompatActivity {
             } else if (intent.getBooleanExtra(EXTRA_EDIT_MODE, false)) {
                 setEditMode(true);
             }
+        }
+    }
+
+    private void handleStagedOrHomeNavigation(@Nullable Intent intent) {
+        if (intent == null || preferences == null) return;
+        String staged = intent.getStringExtra(YandexWindowLauncher.EXTRA_STAGED_PRODUCT);
+        if (staged != null && !staged.trim().isEmpty()) {
+            intent.removeExtra(YandexWindowLauncher.EXTRA_STAGED_PRODUCT);
+            boolean full = intent.getBooleanExtra(
+                    YandexWindowLauncher.EXTRA_STAGED_FULLSCREEN, false);
+            intent.removeExtra(YandexWindowLauncher.EXTRA_STAGED_FULLSCREEN);
+            final YandexWindowLauncher.Product product;
+            try {
+                product = YandexWindowLauncher.Product.valueOf(staged);
+            } catch (IllegalArgumentException error) {
+                return;
+            }
+            navigationUiHandler.post(() -> launchYandex(product, full));
+            return;
+        }
+        boolean homeIntent = Intent.ACTION_MAIN.equals(intent.getAction())
+                && intent.hasCategory(Intent.CATEGORY_HOME);
+        if (homeIntent && preferences.launcherHomeOpensWindowedNavigator.get()) {
+            navigationUiHandler.post(() ->
+                    launchYandex(YandexWindowLauncher.Product.NAVIGATOR, false));
         }
     }
 
@@ -1566,6 +1596,30 @@ public final class LauncherActivity extends AppCompatActivity {
         card.setFocusable(true);
         try { card.setCardBackgroundColor(Color.parseColor(shortcut.backgroundColor)); }
         catch (IllegalArgumentException ignored) { card.setCardBackgroundColor(Color.argb(180, 34, 39, 51)); }
+        if (!addButton && shortcut.kind == LauncherShortcutStore.Kind.INFO) {
+            card.setClickable(false);
+            card.setLongClickable(false);
+            card.setFocusable(false);
+            card.setCardElevation(0);
+            card.addView(new InformationShortcutView(this, preferences, shortcut),
+                    new MaterialCardView.LayoutParams(matchWidth(), matchHeight()));
+            return card;
+        }
+        if (!addButton && shortcut.kind == LauncherShortcutStore.Kind.DIVIDER) {
+            card.setClickable(false);
+            card.setLongClickable(false);
+            card.setFocusable(false);
+            card.setCardElevation(0);
+            card.setCardBackgroundColor(Color.TRANSPARENT);
+            View line = InformationShortcutView.divider(this,
+                    shortcut.backgroundColor, shortcut.dividerThicknessPx);
+            FrameLayout holder = new FrameLayout(this);
+            holder.addView(line, new FrameLayout.LayoutParams(
+                    matchWidth(), shortcut.dividerThicknessPx, Gravity.CENTER));
+            card.addView(holder, new MaterialCardView.LayoutParams(
+                    matchWidth(), matchHeight()));
+            return card;
+        }
 
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -1604,7 +1658,9 @@ public final class LauncherActivity extends AppCompatActivity {
             stateLabel = text(11, Color.LTGRAY, true);
             stateLabel.setGravity(Gravity.CENTER);
             stateLabel.setText("…");
-            stateLabel.setMaxLines(1);
+            stateLabel.setSingleLine(false);
+            stateLabel.setMaxLines(Integer.MAX_VALUE);
+            stateLabel.setEllipsize(null);
             stateLabel.setPadding(dp(5), 0, dp(5), 0);
             GradientDrawable badge = new GradientDrawable();
             badge.setColor(Color.argb(150, 0, 0, 0));
@@ -1614,7 +1670,7 @@ public final class LauncherActivity extends AppCompatActivity {
         card.addView(content, new MaterialCardView.LayoutParams(matchWidth(), matchHeight()));
         if (stateLabel != null) {
             FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(
-                    wrapContent(), dp(22), Gravity.TOP | Gravity.END);
+                    matchWidth(), wrapContent(), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
             badgeLp.setMargins(dp(4), dp(4), dp(4), dp(4));
             card.addView(stateLabel, badgeLp);
         }
@@ -1632,6 +1688,8 @@ public final class LauncherActivity extends AppCompatActivity {
                     action.packageName = shortcut.longPackageName;
                     action.command = shortcut.longCommand;
                     action.commandValue = shortcut.longCommandValue;
+                    action.commandCycleValues = new ArrayList<>(
+                            shortcut.longCommandCycleValues);
                     executeShortcut(action);
                 } else {
                     startActivity(new Intent(this, LauncherShortcutSettingsActivity.class));
@@ -1658,7 +1716,8 @@ public final class LauncherActivity extends AppCompatActivity {
             if (shortcut.kind == LauncherShortcutStore.Kind.CAR) {
                 if (!pendingCarControls.add(shortcut.target)) return;
                 CarControlCommand command = new CarControlCommand(shortcut.target,
-                        shortcut.command, shortcut.commandValue);
+                        shortcut.command, shortcut.commandValue,
+                        shortcut.commandCycleValues);
                 carIntegration.executeControl(command, (success, message) -> {
                     pendingCarControls.remove(shortcut.target);
                     if (!success) {
@@ -1687,7 +1746,10 @@ public final class LauncherActivity extends AppCompatActivity {
                 executeSavedRule(shortcut.target);
                 return;
             }
-            executeBuiltin(LauncherShortcutStore.Builtin.fromKey(shortcut.target));
+            if (shortcut.kind == LauncherShortcutStore.Kind.INFO
+                    || shortcut.kind == LauncherShortcutStore.Kind.DIVIDER) return;
+            executeBuiltin(LauncherShortcutStore.Builtin.fromKey(shortcut.target),
+                    shortcut.target);
         } catch (RuntimeException error) {
             if (shortcut.kind == LauncherShortcutStore.Kind.CAR) {
                 pendingCarControls.remove(shortcut.target);
@@ -1828,7 +1890,8 @@ public final class LauncherActivity extends AppCompatActivity {
         throw new IllegalArgumentException("Saved action is missing");
     }
 
-    private void executeBuiltin(@NonNull LauncherShortcutStore.Builtin action) {
+    private void executeBuiltin(@NonNull LauncherShortcutStore.Builtin action,
+                                @NonNull String rawTarget) {
         switch (action) {
             case HOME:
                 startActivity(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
@@ -1848,7 +1911,20 @@ public final class LauncherActivity extends AppCompatActivity {
                 dezz.status.widget.driver.DriverPanelService.triggerStockClimate(this);
                 break;
             case FAVORITES:
-                dezz.status.widget.driver.DriverPanelService.showFavorites(this);
+                dezz.status.widget.driver.DriverPanelService.showFavorites(this,
+                        LauncherShortcutStore.driverFavoritesPanelId(rawTarget));
+                break;
+            case FAVORITE_ROUTE:
+                boolean found = false;
+                for (FavoriteRouteConfig route : favoriteRoutesConfigStore.load()) {
+                    if (!route.enabled || !route.id.equals(
+                            LauncherShortcutStore.favoriteRouteId(rawTarget))) continue;
+                    found = true;
+                    YandexRouteLauncher.launch(this, route);
+                    break;
+                }
+                if (!found) Toast.makeText(this, "Избранная точка не найдена",
+                        Toast.LENGTH_SHORT).show();
                 break;
             case MAPS_WINDOW: launchYandex(YandexWindowLauncher.Product.MAPS, false); break;
             case MAPS_FULL: launchYandex(YandexWindowLauncher.Product.MAPS, true); break;
@@ -1920,7 +1996,7 @@ public final class LauncherActivity extends AppCompatActivity {
                     enabled || informationPanel.hasConfiguredItems());
         }
         Toast.makeText(this, enabled
-                ? "Тащите панель; размер меняется за любой из четырёх углов"
+                ? "Тащите блок; размер меняется за любой из четырёх углов"
                 : "Компоновка сохранена", Toast.LENGTH_SHORT).show();
     }
 
@@ -1970,7 +2046,7 @@ public final class LauncherActivity extends AppCompatActivity {
         }
         editorGrid.setVisibility(View.GONE);
         doneButton.setText(enabled
-                ? "Готово · сохранить элементы медиапанели"
+                ? "Готово · сохранить элементы медиаблока"
                 : "Готово · закрепить компоновку");
         doneButton.setVisibility(enabled || editMode || navigationContentEditMode
                 || actionsContentEditMode ? View.VISIBLE : View.GONE);
@@ -1984,7 +2060,7 @@ public final class LauncherActivity extends AppCompatActivity {
         updateLauncherSafeArea();
         Toast.makeText(this, enabled
                 ? "Тащите элементы; любой из четырёх углов изменяет размер"
-                : "Сетка медиапанели сохранена", Toast.LENGTH_SHORT).show();
+                : "Сетка медиаблока сохранена", Toast.LENGTH_SHORT).show();
     }
 
     /** Edits the actual mixed buttons/smart-home grid without touching the outer panel rectangle. */
