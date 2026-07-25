@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 32838)
+Total output lines: 2657
+
 /*
  * Copyright © 2025-2026 Dezz (https://github.com/DezzK)
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -111,6 +114,7 @@ import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.scenario.IntentActionRule;
 import dezz.status.widget.scenario.IntentActionRuleStore;
+import dezz.status.widget.shell.PrivilegedShell;
 import dezz.status.widget.sprut.SprutHubController;
 
 /** Full HOME implementation that coexists with the original Status Widget settings activity. */
@@ -1235,234 +1239,7 @@ public final class LauncherActivity extends AppCompatActivity {
             }
         }, (id, finished) -> {
             applyNavigationGridPlacements();
-            navigationPanelConfigStore.save(config);
-            appliedNavigationConfigJson = preferences.launcherNavigationConfigJson.get();
-        });
-        host.addView(navigationContentEditOverlay, match());
-        navigationContentEditOverlay.setEditing(navigationContentEditMode);
-        host.setOnClickListener(v -> {
-            if (!navigationContentEditMode) {
-                launchYandex(navigationLaunchProduct, false);
-            }
-        });
-        return host;
-    }
-
-    private void addNavigationGridElement(@NonNull NavigationPanelConfig.Element element,
-                                          @NonNull View content) {
-        PanelGridLayout grid = navigationGrid;
-        if (grid == null) return;
-        FrameLayout cell = new FrameLayout(this);
-        cell.setTag(element.id);
-        cell.setPadding(dp(4), dp(2), dp(4), dp(2));
-        ViewGroup.LayoutParams existing = content.getLayoutParams();
-        FrameLayout.LayoutParams contentParams = existing instanceof FrameLayout.LayoutParams
-                ? (FrameLayout.LayoutParams) existing : match();
-        cell.addView(content, contentParams);
-        grid.addView(cell, new PanelGridLayout.LayoutParams(
-                element.column, element.row, element.columnSpan, element.rowSpan));
-    }
-
-    private void applyNavigationGridPlacements() {
-        NavigationPanelConfig config = navigationPanelConfig;
-        PanelGridLayout grid = navigationGrid;
-        if (config == null || grid == null) return;
-        grid.setGridSize(config.gridColumns, config.gridRows);
-        for (NavigationPanelConfig.Element element : config.enabledElements()) {
-            grid.updatePlacement(element.id, element.column, element.row,
-                    element.columnSpan, element.rowSpan);
-        }
-        if (navigationContentEditOverlay != null) navigationContentEditOverlay.invalidate();
-    }
-
-    @NonNull
-    private ImageView navigationImage(int scalePercent, int baseHeightDp) {
-        ImageView value = new ImageView(this);
-        value.setAdjustViewBounds(true);
-        value.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        value.setVisibility(View.GONE);
-        int height = dp(Math.max(28, baseHeightDp * scalePercent / 100));
-        value.setLayoutParams(new FrameLayout.LayoutParams(matchWidth(), height, Gravity.CENTER));
-        return value;
-    }
-
-    @NonNull
-    private LinearLayout buildNavigationCombined(int scalePercent) {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.HORIZONTAL);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setVisibility(View.GONE);
-        navigationCombinedImage = new ImageView(this);
-        navigationCombinedImage.setAdjustViewBounds(true);
-        navigationCombinedImage.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        int imageSize = dp(Math.max(42, 68 * scalePercent / 100));
-        card.addView(navigationCombinedImage, new LinearLayout.LayoutParams(imageSize, imageSize));
-        LinearLayout labels = new LinearLayout(this);
-        labels.setOrientation(LinearLayout.VERTICAL);
-        labels.setPadding(dp(8), 0, 0, 0);
-        navigationCombinedDistance = text(24f * scalePercent / 100f, Color.WHITE, true);
-        navigationCombinedManeuver = text(16f * scalePercent / 100f, Color.LTGRAY, false);
-        labels.addView(navigationCombinedDistance);
-        labels.addView(navigationCombinedManeuver);
-        card.addView(labels, new LinearLayout.LayoutParams(0, wrapContent(), 1f));
-        return card;
-    }
-
-    @NonNull
-    private View buildActionsPanel() {
-        PanelElementConfigStore.Panel config = panelElementStore.load(LauncherLayoutStore.ACTIONS);
-        showActionTiles = config.isEnabled(PanelElementConfigStore.ACTION_TILES);
-        showActionAdd = config.isEnabled(PanelElementConfigStore.ACTION_ADD);
-        actionsTileScalePercent = config.scale(PanelElementConfigStore.ACTION_TILES);
-        actionsAddScalePercent = config.scale(PanelElementConfigStore.ACTION_ADD);
-
-        FrameLayout host = new FrameLayout(this);
-        host.setPadding(dp(7), dp(7), dp(7), dp(7));
-        shortcutGrid = new PanelGridLayout(this);
-        host.addView(shortcutGrid, match());
-
-        actionsContentEditOverlay = new PanelContentEditOverlay(this);
-        actionsContentEditOverlay.setModel(new PanelContentEditOverlay.Model() {
-            @Override public int columns() {
-                LauncherActionsGridConfig value = actionsGridConfig;
-                return value == null ? LauncherActionsGridConfig.DEFAULT_COLUMNS : value.columns;
-            }
-
-            @Override public int rows() {
-                LauncherActionsGridConfig value = actionsGridConfig;
-                return value == null ? LauncherActionsGridConfig.MIN_ROWS : value.rows;
-            }
-
-            @NonNull
-            @Override public List<PanelContentEditOverlay.Item> items() {
-                List<PanelContentEditOverlay.Item> result = new ArrayList<>();
-                LauncherActionsGridConfig value = actionsGridConfig;
-                if (value == null || shortcutStore == null) return result;
-                if (showActionTiles) {
-                    for (LauncherShortcutStore.Shortcut shortcut : shortcutStore.all()) {
-                        if (!shortcut.enabled) continue;
-                        LauncherActionsGridConfig.Placement placement =
-                                value.placement(shortcut.id);
-                        if (placement == null) continue;
-                        result.add(new PanelContentEditOverlay.Item(shortcut.id,
-                                shortcut.title + " · " + shortcut.iconSizePx + " px",
-                                placement.column, placement.row,
-                                placement.columnSpan, placement.rowSpan));
-                    }
-                }
-                if (showActionAdd) {
-                    LauncherActionsGridConfig.Placement placement =
-                            value.placement(LauncherActionsGridConfig.ADD_TILE_ID);
-                    if (placement != null) {
-                        result.add(new PanelContentEditOverlay.Item(
-                                LauncherActionsGridConfig.ADD_TILE_ID, "Добавить",
-                                placement.column, placement.row,
-                                placement.columnSpan, placement.rowSpan));
-                    }
-                }
-                return result;
-            }
-
-            @Override public boolean setPlacement(@NonNull String id, int column, int row,
-                                                  int columnSpan, int rowSpan) {
-                LauncherActionsGridConfig value = actionsGridConfig;
-                return value != null && value.setPlacement(id, column, row,
-                        columnSpan, rowSpan);
-            }
-        }, new PanelContentEditOverlay.Listener() {
-            @Override public void onPlacementChanged(@NonNull String id, boolean finished) {
-                applyActionsGridPlacements();
-                if (finished && actionsGridConfig != null) {
-                    actionsGridConfigStore.save(actionsGridConfig);
-                    mirrorActionSpansToLegacyShortcut(id);
-                    appliedActionsGridJson = preferences.launcherActionsGridJson.get();
-                }
-            }
-
-            @Override public void onItemClicked(@NonNull String id) {
-                if (LauncherActionsGridConfig.ADD_TILE_ID.equals(id)) {
-                    startActivity(new Intent(LauncherActivity.this,
-                            LauncherShortcutSettingsActivity.class)
-                            .putExtra(LauncherShortcutSettingsActivity.EXTRA_ADD_NEW, true));
-                } else {
-                    showShortcutIconSizeEditor(id);
-                }
-            }
-        });
-        host.addView(actionsContentEditOverlay, match());
-        actionsContentEditOverlay.setEditing(actionsContentEditMode);
-        shortcutGrid.post(this::refreshShortcutGrid);
-        return host;
-    }
-
-    @NonNull
-    private View buildClimatePanel() {
-        climatePanel = new ClimatePanelView(this, carIntegration,
-                new ClimatePanelConfigStore(preferences));
-        return climatePanel;
-    }
-
-    private void refreshShortcutGrid() {
-        if (shortcutGrid == null || shortcutStore == null) return;
-        shortcutGrid.removeAllViews();
-        carShortcutBindings.clear();
-        smartHomeShortcutBindings.clear();
-        smartHomeRules = loadSmartHomeRules();
-        List<LauncherShortcutStore.Shortcut> shortcuts = shortcutStore.all();
-        actionsGridConfig = actionsGridConfigStore.load(shortcuts);
-        LauncherActionsGridConfig gridConfig = actionsGridConfig;
-        shortcutGrid.setGridSize(gridConfig.columns, gridConfig.rows);
-        shortcutGrid.setCellGapPx(gridConfig.gapPx);
-        if (showActionTiles) {
-            for (LauncherShortcutStore.Shortcut shortcut : shortcuts) {
-                if (!shortcut.enabled) continue;
-                LauncherActionsGridConfig.Placement placement =
-                        gridConfig.placement(shortcut.id);
-                if (placement == null) continue;
-                View tile = buildShortcutTile(shortcut, false);
-                tile.setTag(shortcut.id);
-                shortcutGrid.addView(tile, new PanelGridLayout.LayoutParams(
-                        placement.column, placement.row,
-                        placement.columnSpan, placement.rowSpan));
-            }
-        }
-        if (showActionAdd) {
-            LauncherShortcutStore.Shortcut add = new LauncherShortcutStore.Shortcut();
-            add.id = LauncherActionsGridConfig.ADD_TILE_ID;
-            add.title = "Добавить";
-            add.icon = "apps";
-            add.backgroundColor = "#553A465B";
-            LauncherActionsGridConfig.Placement placement =
-                    gridConfig.placement(LauncherActionsGridConfig.ADD_TILE_ID);
-            if (placement != null) {
-                View tile = buildShortcutTile(add, true);
-                tile.setTag(LauncherActionsGridConfig.ADD_TILE_ID);
-                shortcutGrid.addView(tile, new PanelGridLayout.LayoutParams(
-                        placement.column, placement.row,
-                        placement.columnSpan, placement.rowSpan));
-            }
-        }
-        if (actionsContentEditOverlay != null) actionsContentEditOverlay.invalidate();
-        appliedActionsGridJson = preferences.launcherActionsGridJson.get();
-        appliedActionsColumns = gridConfig.columns;
-        resubscribeCarControls();
-        applySmartHomeStates();
-    }
-
-    private void applyActionsGridPlacements() {
-        PanelGridLayout grid = shortcutGrid;
-        LauncherActionsGridConfig config = actionsGridConfig;
-        if (grid == null || config == null) return;
-        grid.setGridSize(config.columns, config.rows);
-        grid.setCellGapPx(config.gapPx);
-        for (LauncherActionsGridConfig.Placement placement : config.placements()) {
-            grid.updatePlacement(placement.id, placement.column, placement.row,
-                    placement.columnSpan, placement.rowSpan);
-        }
-        if (actionsContentEditOverlay != null) actionsContentEditOverlay.invalidate();
-    }
-
-    /** Mirrors only legacy spans so HA1079 rollback keeps the closest possible tile sizes. */
+            navigationPanelConfigStore.sav…2838 tokens truncated…/
     private void mirrorActionSpansToLegacyShortcut(@NonNull String id) {
         if (shortcutStore == null || actionsGridConfig == null
                 || LauncherActionsGridConfig.ADD_TILE_ID.equals(id)) return;
@@ -1837,8 +1614,17 @@ public final class LauncherActivity extends AppCompatActivity {
             case BACK:
                 if (!WidgetAccessibilityService.performGlobalBack()) onBackPressed();
                 break;
+            case RECENTS:
+                if (!WidgetAccessibilityService.performGlobalRecents(
+                        accepted -> {
+                            if (!accepted) openRecentsWithShell();
+                        })) openRecentsWithShell();
+                break;
             case STOCK_CLIMATE:
                 dezz.status.widget.driver.DriverPanelService.triggerStockClimate(this);
+                break;
+            case FAVORITES:
+                dezz.status.widget.driver.DriverPanelService.showFavorites(this);
                 break;
             case MAPS_WINDOW: launchYandex(YandexWindowLauncher.Product.MAPS, false); break;
             case MAPS_FULL: launchYandex(YandexWindowLauncher.Product.MAPS, true); break;
@@ -1875,6 +1661,15 @@ public final class LauncherActivity extends AppCompatActivity {
             case ALL_APPS:
             default: showAllApps(); break;
         }
+    }
+
+    private void openRecentsWithShell() {
+        PrivilegedShell.get(this).runCommand("input keyevent 187",
+                (output, error) -> {
+                    if (error != null) runOnUiThread(() -> Toast.makeText(this,
+                            "Включите спецвозможности для списка приложений",
+                            Toast.LENGTH_LONG).show());
+                });
     }
 
     private void setEditMode(boolean enabled) {
@@ -2332,19 +2127,45 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private void showAllApps() {
         dismissAllAppsDialog();
+        FrameLayout root = new FrameLayout(this);
+        root.setPadding(dp(24), dp(18), dp(24), dp(24));
+        root.setBackgroundColor(Color.argb(247, 10, 13, 18));
+        TextView title = text(24, Color.WHITE, true);
+        title.setText("Все приложения");
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        root.addView(title, new FrameLayout.LayoutParams(
+                wrapContent(), dp(72), Gravity.TOP | Gravity.START));
+
+        MaterialButton close = new MaterialButton(this);
+        close.setText("✕");
+        close.setTextSize(24);
+        close.setTextColor(Color.WHITE);
+        close.setAllCaps(false);
+        close.setMinWidth(0);
+        close.setInsetTop(0);
+        close.setInsetBottom(0);
+        close.setContentDescription("Закрыть список приложений");
+        root.addView(close, new FrameLayout.LayoutParams(
+                dp(72), dp(72), Gravity.TOP | Gravity.END));
+
         GridView grid = new GridView(this);
-        grid.setNumColumns(5);
+        grid.setNumColumns(Math.max(3,
+                Math.min(8, preferences.launcherAllAppsColumns.get())));
         grid.setPadding(dp(16), dp(16), dp(16), dp(16));
-        grid.setVerticalSpacing(dp(8));
-        AppAdapter adapter = new AppAdapter(appCatalog.all(), false);
+        int gap = Math.max(0, Math.min(40, preferences.launcherAllAppsGapPx.get()));
+        grid.setVerticalSpacing(dp(gap));
+        grid.setHorizontalSpacing(dp(gap));
+        AppAdapter adapter = new AppAdapter(appCatalog.allVisible(), false);
         grid.setAdapter(adapter);
+        FrameLayout.LayoutParams gridParams = new FrameLayout.LayoutParams(
+                matchWidth(), matchHeight());
+        gridParams.topMargin = dp(84);
+        root.addView(grid, gridParams);
         boolean overlay = Permissions.checkOverlayPermission(this);
         Context dialogContext = overlay ? getApplicationContext() : this;
         android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(dialogContext,
-                android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle("Все приложения · удержание добавляет в избранное")
-                .setView(grid)
-                .setNegativeButton(android.R.string.cancel, null)
+                android.R.style.Theme_DeviceDefault_NoActionBar_Fullscreen)
+                .setView(root)
                 .create();
         Window dialogWindow = dialog.getWindow();
         if (overlay && dialogWindow != null) {
@@ -2355,6 +2176,7 @@ public final class LauncherActivity extends AppCompatActivity {
             dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
         }
         allAppsDialog = dialog;
+        close.setOnClickListener(view -> dismissAllAppsDialog());
         dialog.setOnDismissListener(ignored -> {
             if (allAppsDialog == dialog) allAppsDialog = null;
         });
@@ -2371,6 +2193,12 @@ public final class LauncherActivity extends AppCompatActivity {
         });
         try {
             dialog.show();
+            Window shown = dialog.getWindow();
+            if (shown != null) {
+                shown.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                shown.setLayout(WindowManager.LayoutParams.MATCH_PARENT,
+                        WindowManager.LayoutParams.MATCH_PARENT);
+            }
         } catch (RuntimeException failure) {
             allAppsDialog = null;
             Log.e(TAG, "Could not show all-apps overlay", failure);
@@ -2450,12 +2278,15 @@ public final class LauncherActivity extends AppCompatActivity {
         final String label;
         final String packageName;
         final ComponentName component;
+        final boolean systemApp;
         @Nullable private volatile Drawable cachedIcon;
 
-        AppEntry(String label, String packageName, ComponentName component) {
+        AppEntry(String label, String packageName, ComponentName component,
+                 boolean systemApp) {
             this.label = label;
             this.packageName = packageName;
             this.component = component;
+            this.systemApp = systemApp;
         }
 
         Drawable icon(Context context, boolean cache) {
@@ -2508,7 +2339,9 @@ public final class LauncherActivity extends AppCompatActivity {
             return LauncherAppTileRenderer.render(
                     LauncherActivity.this, reusable, entry.label,
                     entry.icon(LauncherActivity.this, cacheIcons),
-                    appearance, appsGridScalePercent);
+                    appearance, cacheIcons ? appsGridScalePercent
+                            : Math.max(60, Math.min(180,
+                            preferences.launcherAllAppsIconScalePercent.get())));
         }
     }
 
@@ -2519,8 +2352,10 @@ public final class LauncherActivity extends AppCompatActivity {
 
         void reload() {
             apps.clear();
-            for (LauncherAppCatalog.App app : LauncherAppCatalog.load(context)) {
-                apps.add(new AppEntry(app.label, app.packageName, app.component));
+            for (LauncherAppCatalog.App app
+                    : LauncherAppCatalog.loadIncludingSystem(context)) {
+                apps.add(new AppEntry(app.label, app.packageName, app.component,
+                        app.systemApp));
             }
             ensureDefaultFavorites();
             // Preload only the handful of icons shown on HOME. The full application list keeps
@@ -2529,6 +2364,18 @@ public final class LauncherActivity extends AppCompatActivity {
         }
 
         List<AppEntry> all() { return new ArrayList<>(apps); }
+
+        List<AppEntry> allVisible() {
+            Set<String> hidden = preferences.launcherAllAppsHiddenComponents.get();
+            List<AppEntry> result = new ArrayList<>();
+            for (AppEntry app : apps) {
+                if (!app.systemApp
+                        && !hidden.contains(app.component.flattenToString())) {
+                    result.add(app);
+                }
+            }
+            return result;
+        }
 
         boolean isEmpty() { return apps.isEmpty(); }
 
