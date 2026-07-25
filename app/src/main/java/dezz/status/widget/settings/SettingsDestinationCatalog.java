@@ -171,6 +171,11 @@ public final class SettingsDestinationCatalog {
                 "Внутренние датчики, вычисляемые показатели, подписи и цвета",
                 "vehicle", "dezz.status.widget.VehicleInfoPanelSettingsActivity",
                 "hud", "телеметрия", "топливо", "температура", "датчики"));
+        values.add(activity("panel_hud", Group.PANELS, "Отдельный HUD-дисплей",
+                "Живой редактор с сеткой, стабильный ID дисплея, навигация, автомобиль и умный дом",
+                "hud", "dezz.status.widget.HudPanelSettingsActivity",
+                "hud", "проекция", "внешний дисплей", "стрелки", "светофоры",
+                "полосы", "телеметрия", "умный дом", "сценарии", "сетка"));
         values.add(activity("panel_information", Group.PANELS, "Блок «Информация»",
                 "Своя сетка статусов автомобиля, магнитолы и устройств умного дома",
                 "information", "dezz.status.widget.InformationPanelSettingsActivity",
