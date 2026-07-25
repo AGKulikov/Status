@@ -8,7 +8,8 @@ public enum TargetScope {
     MAIN,
     POPUP,
     BUILTIN,
-    OVERLAY;
+    OVERLAY,
+    DRIVER;
 
     public String jsonName() {
         return name();
