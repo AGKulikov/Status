@@ -122,8 +122,8 @@ public final class ClimateLevelCyclePlanner {
         int automaticIndex = findValue(automatic, current);
         if (automaticIndex >= 0) {
             if (!includeAuto) return off == null ? firstValue(manual) : off.value;
-            int step = direction > 0 ? 1 : -1;
-            int next = (automaticIndex + step + automatic.size()) % automatic.size();
+            int next = Math.max(0, Math.min(automatic.size() - 1,
+                    automaticIndex + (direction > 0 ? 1 : -1)));
             return automatic.get(next).value;
         }
 
@@ -134,6 +134,31 @@ public final class ClimateLevelCyclePlanner {
         int next = Math.max(0, Math.min(manual.size() - 1,
                 manualIndex + (direction > 0 ? 1 : -1)));
         return manual.get(next).value;
+    }
+
+    /**
+     * The first visible fan position is not a second OFF state. A decrement from it is translated
+     * by the panel into an explicit climate.power=OFF command, matching the stock climate control.
+     */
+    public static boolean shouldPowerOffClimateOnFanDecrease(
+            @NonNull List<CarControlDescriptor.Option> source,
+            double current, int direction) {
+        if (direction >= 0) return false;
+        int automaticIndex = 0;
+        for (CarControlDescriptor.Option option : source) {
+            boolean automatic = ClimateFanIndicatorPolicy.isAutomaticLabel(option.label);
+            if (same(option.value, current)) {
+                if (automatic) {
+                    return ClimateFanIndicatorPolicy.fromConfirmedState(
+                            option.label, automaticIndex).activeSegments == 1;
+                }
+                Integer level = parsePositiveInteger(option.label == null
+                        ? "" : option.label.trim());
+                return level != null && level == 1;
+            }
+            if (automatic) automaticIndex++;
+        }
+        return false;
     }
 
     @Nullable
