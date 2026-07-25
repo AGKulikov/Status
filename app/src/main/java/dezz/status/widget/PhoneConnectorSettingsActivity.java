@@ -352,6 +352,8 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         boolean phoneConnected = false;
         String ancsStatus = "";
         String mapStatus = "";
+        String stockConnectionStatus = "";
+        String ancsSetup = "";
         String lastError = "";
         String lastAppName = "";
         long lastAppAt = 0L;
@@ -370,6 +372,14 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 } else if ("diagnostics.sms".equals(value.resourceId)) {
                     mapStatus = clean(value.rawValue == null
                             ? "" : String.valueOf(value.rawValue));
+                } else if ("diagnostics.device".equals(value.resourceId)
+                        && value.rawValue instanceof Map) {
+                    Map<?, ?> device = (Map<?, ?>) value.rawValue;
+                    Object stockConnection = device.get("stock_connection");
+                    Object setup = device.get("ancs_setup");
+                    stockConnectionStatus = clean(stockConnection == null
+                            ? "" : String.valueOf(stockConnection));
+                    ancsSetup = clean(setup == null ? "" : String.valueOf(setup));
                 } else if ("diagnostics.last_error".equals(value.resourceId)) {
                     lastError = clean(value.rawValue == null
                             ? "" : String.valueOf(value.rawValue));
@@ -409,6 +419,10 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 phoneConnected
                         ? getString(R.string.phone_diag_connected_selected)
                         : getString(R.string.phone_diag_disconnected_selected)));
+        result.append('\n').append(line("accepted".equals(stockConnectionStatus)
+                        || ancsReceiving,
+                getString(R.string.phone_diag_stock_connection),
+                localizedStockConnectionStatus(stockConnectionStatus)));
         result.append('\n').append(line(!messagesEnabled.isChecked()
                         || "ready".equals(mapStatus),
                 getString(R.string.phone_diag_sms),
@@ -428,6 +442,11 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                                 : getString(R.string.phone_diag_ancs_receiving))
                         : getString(R.string.phone_diag_ancs_iphone,
                                 localizedAncsStatus(ancsStatus))));
+        result.append('\n').append(line(!ancsRequested || ancsReceiving,
+                getString(R.string.phone_diag_ancs_setup),
+                !ancsRequested
+                        ? getString(R.string.phone_diag_not_required)
+                        : localizedAncsSetup(ancsSetup)));
         result.append('\n').append(line(!ancsRequested || notificationDelivery,
                 getString(R.string.phone_diag_android_notifications),
                 !ancsRequested
@@ -482,6 +501,8 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 return getString(R.string.phone_diag_ancs_unavailable);
             case "service_not_published":
                 return getString(R.string.phone_diag_ancs_not_published);
+            case "stock_pairing_required":
+                return getString(R.string.phone_diag_ancs_stock_pairing_required);
             case "connecting":
             case "negotiating":
             case "discovering":
@@ -501,6 +522,43 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 return status.isEmpty()
                         ? getString(R.string.phone_diag_ancs_waiting) : status;
         }
+    }
+
+    @NonNull
+    private String localizedStockConnectionStatus(@NonNull String status) {
+        switch (status) {
+            case "accepted":
+                return getString(R.string.phone_diag_stock_accepted);
+            case "phone_not_registered":
+                return getString(R.string.phone_diag_stock_not_registered);
+            case "rejected":
+                return getString(R.string.phone_diag_stock_rejected);
+            case "api_unavailable":
+                return getString(R.string.phone_diag_stock_unavailable);
+            case "invalid_address":
+            case "no_configured_phone":
+                return getString(R.string.phone_diag_ancs_no_phone);
+            case "not_bonded":
+                return getString(R.string.phone_diag_ancs_not_bonded);
+            case "bluetooth_off":
+                return getString(R.string.phone_diag_ancs_bluetooth);
+            case "requesting":
+            case "starting":
+            case "reconfigured":
+                return getString(R.string.phone_diag_stock_waiting);
+            case "disabled":
+            case "stopped":
+                return getString(R.string.phone_diag_not_required);
+            default:
+                return status.isEmpty()
+                        ? getString(R.string.phone_diag_stock_waiting) : status;
+        }
+    }
+
+    @NonNull
+    private String localizedAncsSetup(@NonNull String setup) {
+        if ("disabled".equals(setup)) return getString(R.string.phone_diag_not_required);
+        return getString(R.string.phone_diag_ancs_stock_route);
     }
 
     @NonNull
