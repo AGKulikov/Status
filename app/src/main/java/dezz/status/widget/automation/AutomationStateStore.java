@@ -68,6 +68,30 @@ public final class AutomationStateStore {
         }
     }
 
+    /** Interaction with a caller-defined default, using scenario overrides before retained data. */
+    public synchronized boolean effectiveActionEnabled(String scope, String id,
+                                                       boolean defaultValue) {
+        String storageKey = key(scope, id);
+        JSONObject override = scenarioOverrides.get(storageKey);
+        if (override != null && override.has("action_enabled")) {
+            return AutomationContract.parseBoolean(override.opt("action_enabled"));
+        }
+        String raw = prefs.getString(storageKey, null);
+        if (raw == null) return defaultValue;
+        try {
+            JSONObject state = new JSONObject(raw);
+            if (state.has("action_enabled")) {
+                return AutomationContract.parseBoolean(state.opt("action_enabled"));
+            }
+            if (state.has("enabled")) {
+                return AutomationContract.parseBoolean(state.opt("enabled"));
+            }
+            return defaultValue;
+        } catch (JSONException ignored) {
+            return defaultValue;
+        }
+    }
+
     /** Partial-update merge. A payload with clear=true removes the retained local state. */
     @NonNull
     public synchronized AutomationState apply(String scope, String id, @NonNull JSONObject patch)
