@@ -10,7 +10,6 @@ import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
-import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -46,6 +45,7 @@ import dezz.status.widget.launcher.HighResolutionAppIconLoader;
 import dezz.status.widget.launcher.InstalledAppCatalog;
 import dezz.status.widget.launcher.LauncherIconResolver;
 import dezz.status.widget.launcher.LauncherShortcutStore;
+import dezz.status.widget.launcher.ShortcutActionPicker;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
@@ -62,6 +62,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
     private TextView runtimeLabel;
     private MaterialButton addApplication;
     private MaterialButton addFunction;
+    private ShortcutActionPicker actionPicker;
     private final ExecutorService catalogExecutor = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "driver-settings-app-catalog");
         thread.setDaemon(true);
@@ -85,6 +86,10 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         preferences = new Preferences(this);
         profile = preferences.activeDriverPanelProfile();
         store = LauncherShortcutStore.forDriverPanel(preferences, profile);
+        actionPicker = new ShortcutActionPicker(this, preferences, store, () -> {
+            refreshButtons();
+            applyPanel();
+        });
         setTitle("Панель водителя · " + styleName(profile.style));
         View content = buildContent();
         setContentView(content);
@@ -212,15 +217,30 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         LinearLayout addRow = new LinearLayout(this);
         addRow.setOrientation(LinearLayout.HORIZONTAL);
         addApplication = button("＋ Приложение");
-        addFunction = button("＋ Функция");
+        addFunction = button("＋ Действие");
         addApplication.setOnClickListener(view -> addApplication());
-        addFunction.setOnClickListener(view -> addBuiltin());
+        addFunction.setOnClickListener(view -> {
+            if (store.all().size() >= LauncherShortcutStore.MAX_DRIVER_PANEL_SHORTCUTS) {
+                limitToast();
+            } else {
+                actionPicker.showNew();
+            }
+        });
         addRow.addView(addApplication, new LinearLayout.LayoutParams(0, dp(52), 1f));
         LinearLayout.LayoutParams functionParams = new LinearLayout.LayoutParams(
                 0, dp(52), 1f);
         functionParams.leftMargin = dp(10);
         addRow.addView(addFunction, functionParams);
         settings.addView(addRow, rowParams());
+
+        MaterialButton allAppsSettings = button("Общие настройки меню «Все приложения»");
+        allAppsSettings.setOnClickListener(view ->
+                startActivity(new android.content.Intent(this, AllAppsSettingsActivity.class)));
+        settings.addView(allAppsSettings, rowParams());
+        MaterialButton favoritesSettings = button("Настроить «Избранное» панели водителя");
+        favoritesSettings.setOnClickListener(view -> startActivity(
+                new android.content.Intent(this, DriverFavoritesSettingsActivity.class)));
+        settings.addView(favoritesSettings, rowParams());
 
         buttonsHost = new LinearLayout(this);
         buttonsHost.setOrientation(LinearLayout.VERTICAL);
@@ -355,8 +375,8 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
 
         LinearLayout controls = new LinearLayout(this);
         controls.setOrientation(LinearLayout.HORIZONTAL);
-        MaterialButton action = compactButton("Действие");
-        action.setOnClickListener(view -> chooseReplacement(shortcut));
+        MaterialButton action = compactButton("Нажатие");
+        action.setOnClickListener(view -> actionPicker.showPrimary(shortcut));
         controls.addView(action, new LinearLayout.LayoutParams(0, dp(46), 1f));
         MaterialButton appearance = compactButton("Цвет");
         appearance.setOnClickListener(view -> editColors(shortcut));
@@ -385,6 +405,12 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         controls.addView(remove, removeParams);
         body.addView(controls, topMargin(dp(8)));
 
+        MaterialButton longAction = compactButton(shortcut.hasLongAction
+                ? "Удержание: " + longActionLabel(shortcut)
+                : "Удержание: не назначено");
+        longAction.setOnClickListener(view -> actionPicker.showLong(shortcut));
+        body.addView(longAction, topMargin(dp(8)));
+
         MaterialSwitch showTitle = new MaterialSwitch(this);
         showTitle.setText("Показывать подпись на узкой панели");
         showTitle.setTextColor(Color.WHITE);
@@ -396,6 +422,19 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             applyPanel();
         });
         body.addView(showTitle, topMargin(dp(8)));
+        if (isStockClimate(shortcut)) {
+            MaterialSwitch extended = new MaterialSwitch(this);
+            extended.setText("Расширенная информация: AUTO или направление обдува");
+            extended.setTextColor(Color.WHITE);
+            extended.setChecked(shortcut.extendedClimateInfo);
+            extended.setOnCheckedChangeListener((button, checked) -> {
+                shortcut.extendedClimateInfo = checked;
+                store.upsert(shortcut);
+                refreshPreview();
+                applyPanel();
+            });
+            body.addView(extended, topMargin(dp(8)));
+        }
         card.addView(body);
         return card;
     }
@@ -424,18 +463,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
     }
 
     private void chooseReplacement(@NonNull LauncherShortcutStore.Shortcut shortcut) {
-        new AlertDialog.Builder(this)
-                .setTitle("Новое действие кнопки")
-                .setItems(new String[]{"Приложение", "Функция панели"}, (dialog, which) -> {
-                    if (which == 0) {
-                        if (cachedApps == null) loadApplications();
-                        else showApplicationPicker(shortcut, cachedApps);
-                    } else {
-                        showBuiltinPicker(shortcut);
-                    }
-                })
-                .setNegativeButton("Отмена", null)
-                .show();
+        actionPicker.showPrimary(shortcut);
     }
 
     private void showBuiltinPicker(@Nullable LauncherShortcutStore.Shortcut existing) {
@@ -627,9 +655,12 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             int iconSize = Math.max(dp(18), Math.min(width - dp(8),
                     Math.round(value.iconSizePx * .62f)));
             FrameLayout cell = new FrameLayout(this);
-            cell.addView(icon, new FrameLayout.LayoutParams(iconSize, iconSize,
+            boolean expandedClimate = isStockClimate(value) && value.extendedClimateInfo;
+            cell.addView(icon, new FrameLayout.LayoutParams(iconSize,
+                    DriverPanelLayoutPolicy.shortcutIconHeight(iconSize, expandedClimate),
                     Gravity.CENTER));
-            rail.addView(cell, new LinearLayout.LayoutParams(match(), 0, 1f));
+            rail.addView(cell, new LinearLayout.LayoutParams(match(), 0,
+                    DriverPanelLayoutPolicy.shortcutWeight(expandedClimate)));
         }
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, screenHeight,
                 Gravity.TOP | (side == 0 ? Gravity.LEFT : Gravity.RIGHT));
@@ -671,6 +702,25 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
     }
 
     @NonNull
+    private static String longActionLabel(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        if (!shortcut.hasLongAction) return "не назначено";
+        switch (shortcut.longKind) {
+            case APP:
+                return "приложение";
+            case CAR:
+                return "автомобиль";
+            case RULE:
+                return "умный дом";
+            case INTENT:
+                return "Intent";
+            case BUILTIN:
+            default:
+                return LauncherShortcutStore.Builtin.fromKey(shortcut.longTarget).label;
+        }
+    }
+
+    @NonNull
     private static String styleName(@NonNull Preferences.DriverPanelStyle style) {
         return style == Preferences.DriverPanelStyle.NEW ? "Новая" : "Старая";
     }
@@ -682,15 +732,15 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
 
     private void applyPanel() {
         if (preferences.driverPanelEnabled.get()) {
-            if (!Settings.canDrawOverlays(this)) {
-                // The existing privileged bootstrap will grant this automatically on the head
-                // unit when its trusted shell is available. Starting now also allows an ECARX
-                // system-bar type to work without waiting for a settings round trip.
-                AppRuntimeBootstrap.reconcileServices(this, preferences);
-            }
-            DriverPanelService.apply(this);
+            // Also restores the headless connector/scenario host when the status row itself is
+            // disabled. The same reconciliation starts the rail on its ECARX window tier.
+            AppRuntimeBootstrap.reconcileServices(this, preferences);
         } else {
             DriverPanelService.stop(this);
+            WidgetService running = WidgetService.getInstance();
+            if (running != null && !preferences.widgetEnabled.get()) {
+                running.applyPreferences();
+            }
         }
     }
 
