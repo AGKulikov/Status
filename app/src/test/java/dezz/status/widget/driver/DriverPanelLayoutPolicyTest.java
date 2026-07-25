@@ -89,4 +89,12 @@ public class DriverPanelLayoutPolicyTest {
         assertEquals(1845, right.x);
         assertEquals(405, right.y);
     }
+
+    @Test
+    public void stockClimateOwnsTwoRailAndCanvasHeightUnits() {
+        assertEquals(1f, DriverPanelLayoutPolicy.shortcutWeight(false), 0f);
+        assertEquals(2f, DriverPanelLayoutPolicy.shortcutWeight(true), 0f);
+        assertEquals(76, DriverPanelLayoutPolicy.shortcutIconHeight(76, false));
+        assertEquals(152, DriverPanelLayoutPolicy.shortcutIconHeight(76, true));
+    }
 }
