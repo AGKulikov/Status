@@ -51,6 +51,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -71,6 +72,9 @@ import dezz.status.widget.launcher.LauncherActionsGridConfigStore;
 import dezz.status.widget.launcher.LauncherAppCatalog;
 import dezz.status.widget.launcher.LauncherAppTileRenderer;
 import dezz.status.widget.launcher.LauncherElementFrame;
+import dezz.status.widget.launcher.LauncherGlobalElementLayoutStore;
+import dezz.status.widget.launcher.LauncherGlobalElementProxyView;
+import dezz.status.widget.launcher.LauncherGlobalElementTag;
 import dezz.status.widget.launcher.LauncherGridView;
 import dezz.status.widget.launcher.LauncherLayoutStore;
 import dezz.status.widget.launcher.LauncherMediaController;
@@ -130,12 +134,18 @@ public final class LauncherActivity extends AppCompatActivity {
     private static final long NAVIGATION_UI_REFRESH_MS = 30_000L;
     private static final long NAVIGATION_DYNAMIC_REFRESH_MS = 5_000L;
     private static final long SAFE_AREA_REFRESH_MS = 500L;
+    private static final long GLOBAL_ELEMENT_REFRESH_MS = 500L;
     private static final long APP_CATALOG_REFRESH_MS = 10L * 60L * 1_000L;
     /** Gives the foreground WidgetService a chance to attach the status row before HOME work. */
     private static final long PANEL_INITIALIZATION_GRACE_MS = 200L;
     /** At most one optional panel is inflated in a display frame. */
     private static final long PANEL_INITIALIZATION_STAGE_MS = 16L;
-    private final Map<String, LauncherElementFrame> panels = new HashMap<>();
+    private final Map<String, LauncherElementFrame> panels = new LinkedHashMap<>();
+    private final Map<String, LauncherElementFrame> globalElementFrames =
+            new LinkedHashMap<>();
+    private final Map<String, LauncherGlobalElementProxyView> globalElementProxies =
+            new LinkedHashMap<>();
+    private final Map<String, View> globalElementSources = new LinkedHashMap<>();
     private final Handler navigationUiHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService launcherWorker = Executors.newFixedThreadPool(2, runnable -> {
         Thread thread = new Thread(() -> {
@@ -153,6 +163,14 @@ public final class LauncherActivity extends AppCompatActivity {
             scheduleNavigationRefresh();
         }
     };
+    private final Runnable globalElementRefresh = new Runnable() {
+        @Override public void run() {
+            if (!activityStarted || isFinishing() || isDestroyed()) return;
+            syncGlobalElements();
+            refreshGlobalElementVisibility();
+            navigationUiHandler.postDelayed(this, GLOBAL_ELEMENT_REFRESH_MS);
+        }
+    };
     private final BroadcastReceiver navigationReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
             updateNavigation();
@@ -162,6 +180,7 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private Preferences preferences;
     private LauncherLayoutStore layoutStore;
+    private LauncherGlobalElementLayoutStore globalElementLayoutStore;
     private PanelElementConfigStore panelElementStore;
     private LauncherActionsGridConfigStore actionsGridConfigStore;
     private NavigationPanelConfigStore navigationPanelConfigStore;
@@ -182,6 +201,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private int systemBottomInset;
     @Nullable private LauncherSafeAreaPolicy.Insets appliedSafeInsets;
     private boolean panelsInitialized;
+    private boolean globalElementsActivated;
     private boolean panelsInitializing;
     private boolean panelInitializationAllowed;
     private int panelInitializationStage;
@@ -243,6 +263,7 @@ public final class LauncherActivity extends AppCompatActivity {
     @Nullable private String appliedPanelElementsJson;
     @Nullable private String appliedNavigationConfigJson;
     @Nullable private String appliedActionsGridJson;
+    @Nullable private String appliedGlobalElementsJson;
     private int appliedAppsColumns = -1;
     private int appliedActionsColumns = -1;
     private int appsGridScalePercent = 100;
@@ -297,6 +318,7 @@ public final class LauncherActivity extends AppCompatActivity {
         preferences = new Preferences(this);
         carIntegration = CarIntegrations.get(this);
         layoutStore = new LauncherLayoutStore(preferences);
+        globalElementLayoutStore = new LauncherGlobalElementLayoutStore(preferences);
         panelElementStore = new PanelElementConfigStore(preferences);
         actionsGridConfigStore = new LauncherActionsGridConfigStore(preferences);
         navigationPanelConfigStore = new NavigationPanelConfigStore(preferences);
@@ -338,16 +360,18 @@ public final class LauncherActivity extends AppCompatActivity {
         setIntent(intent);
         handleStagedOrHomeNavigation(intent);
         if (panelsInitialized) {
-            if (intent.getBooleanExtra(EXTRA_EDIT_MEDIA_CONTENT, false)) {
-                setMediaContentEditMode(true);
-            } else if (intent.getBooleanExtra(EXTRA_EDIT_NAVIGATION_CONTENT, false)) {
-                setNavigationContentEditMode(true);
-            } else if (intent.getBooleanExtra(EXTRA_EDIT_ACTIONS_CONTENT, false)) {
-                setActionsContentEditMode(true);
-            } else if (intent.getBooleanExtra(EXTRA_EDIT_MODE, false)) {
-                setEditMode(true);
-            }
+            workspace.post(() -> {
+                activateGlobalElements();
+                if (requestsAnyHomeEditor(intent)) setEditMode(true);
+            });
         }
+    }
+
+    private static boolean requestsAnyHomeEditor(@Nullable Intent intent) {
+        return intent != null && (intent.getBooleanExtra(EXTRA_EDIT_MODE, false)
+                || intent.getBooleanExtra(EXTRA_EDIT_MEDIA_CONTENT, false)
+                || intent.getBooleanExtra(EXTRA_EDIT_NAVIGATION_CONTENT, false)
+                || intent.getBooleanExtra(EXTRA_EDIT_ACTIONS_CONTENT, false));
     }
 
     private void handleStagedOrHomeNavigation(@Nullable Intent intent) {
@@ -395,6 +419,8 @@ public final class LauncherActivity extends AppCompatActivity {
         WidgetServiceStarter.startIfNeeded(this);
         navigationUiHandler.removeCallbacks(safeAreaRefresh);
         navigationUiHandler.post(safeAreaRefresh);
+        navigationUiHandler.removeCallbacks(globalElementRefresh);
+        navigationUiHandler.post(globalElementRefresh);
         navigationUiHandler.removeCallbacks(ensureSmartHomeValueSubscription);
         navigationUiHandler.post(ensureSmartHomeValueSubscription);
         reconcileMediaController();
@@ -424,6 +450,7 @@ public final class LauncherActivity extends AppCompatActivity {
         navigationUiHandler.removeCallbacks(navigationUiRefresh);
         navigationUiHandler.removeCallbacks(ensureSmartHomeValueSubscription);
         navigationUiHandler.removeCallbacks(safeAreaRefresh);
+        navigationUiHandler.removeCallbacks(globalElementRefresh);
         dismissAllAppsDialog();
         if (smartHomeValueService != null) {
             smartHomeValueService.removeConnectorValueListener(smartHomeValueListener);
@@ -548,6 +575,7 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private void applyLauncherPreferences() {
         if (!panelsInitialized) return;
+        reconcileGlobalElementLayoutPreference();
         View root = (View) workspace.getParent();
         if (root != null) root.setBackground(buildBackground());
         setPanelVisibility(LauncherLayoutStore.APPS, preferences.launcherAppsVisible.get()
@@ -603,6 +631,29 @@ public final class LauncherActivity extends AppCompatActivity {
         refreshSimplePanelContentsIfNeeded();
         updateNavigation();
         scheduleNavigationRefresh();
+    }
+
+    private void reconcileGlobalElementLayoutPreference() {
+        if (!globalElementsActivated) return;
+        String raw = preferences.launcherGlobalElementsJson.get();
+        if (Objects.equals(appliedGlobalElementsJson, raw)) return;
+        if (raw == null || raw.trim().isEmpty()) {
+            for (LauncherElementFrame frame : globalElementFrames.values()) {
+                workspace.removeView(frame);
+            }
+            globalElementFrames.clear();
+            globalElementProxies.clear();
+            globalElementSources.clear();
+            globalElementsActivated = false;
+            for (LauncherElementFrame panel : panels.values()) {
+                panel.setAlpha(1f);
+                panel.setContentTouchBlocked(false);
+            }
+            workspace.post(this::activateGlobalElements);
+        } else {
+            applyStoredGlobalGeometry();
+        }
+        appliedGlobalElementsJson = raw;
     }
 
     /** Applies inner-element edits after returning from the visual panel editor. */
@@ -774,11 +825,164 @@ public final class LauncherActivity extends AppCompatActivity {
         if (!panelsInitialized || workspace.getWidth() <= 0 || workspace.getHeight() <= 0) return;
         layoutStore.load(workspace.getWidth(), workspace.getHeight());
         applyStoredPanelGeometry();
+        applyStoredGlobalGeometry();
     }
 
     private void applyStoredPanelGeometry() {
         for (Map.Entry<String, LauncherElementFrame> entry : panels.entrySet()) {
             LauncherLayoutStore.Geometry geometry = layoutStore.get(entry.getKey());
+            FrameLayout.LayoutParams params =
+                    (FrameLayout.LayoutParams) entry.getValue().getLayoutParams();
+            params.width = geometry.width;
+            params.height = geometry.height;
+            params.leftMargin = geometry.x;
+            params.topMargin = geometry.y;
+            entry.getValue().setLayoutParams(params);
+        }
+    }
+
+    /** Activates independent screen-space placement without reparenting live integration views. */
+    private void activateGlobalElements() {
+        if (workspace == null || globalElementLayoutStore == null
+                || workspace.getWidth() <= 0 || workspace.getHeight() <= 0) return;
+        if (!globalElementsActivated) {
+            globalElementLayoutStore.load(workspace.getWidth(), workspace.getHeight());
+            globalElementsActivated = true;
+        }
+        syncGlobalElements();
+        for (Map.Entry<String, LauncherElementFrame> entry : panels.entrySet()) {
+            if (!hasGlobalFrameForPanel(entry.getKey())) continue;
+            // The measured legacy hierarchy remains the live data/action source for the proxies,
+            // but it must neither draw nor receive a second touch at its old panel-local position.
+            entry.getValue().setAlpha(0f);
+            entry.getValue().setContentTouchBlocked(true);
+        }
+        refreshGlobalElementVisibility();
+        appliedGlobalElementsJson = preferences.launcherGlobalElementsJson.get();
+    }
+
+    private boolean hasGlobalFrameForPanel(@NonNull String panelId) {
+        String prefix = panelId + "/";
+        for (String id : globalElementFrames.keySet()) {
+            if (id.startsWith(prefix)) return true;
+        }
+        return false;
+    }
+
+    private void syncGlobalElements() {
+        if (!globalElementsActivated || workspace == null) return;
+        LinkedHashMap<String, View> discovered = new LinkedHashMap<>();
+        LinkedHashMap<String, LauncherGlobalElementTag> tags = new LinkedHashMap<>();
+        for (LauncherElementFrame panel : panels.values()) {
+            collectGlobalElements(panel, discovered, tags);
+        }
+        globalElementSources.clear();
+        globalElementSources.putAll(discovered);
+
+        int snap = Math.max(4, preferences.launcherSnapPx.get());
+        for (Map.Entry<String, View> entry : discovered.entrySet()) {
+            String id = entry.getKey();
+            View source = entry.getValue();
+            LauncherElementFrame existing = globalElementFrames.get(id);
+            if (existing == null) {
+                LauncherGlobalElementLayoutStore.Geometry geometry =
+                        globalElementLayoutStore.get(id);
+                if (geometry == null) geometry = migrateSourceGeometry(source);
+                if (geometry == null) continue;
+                LauncherGlobalElementTag tag = tags.get(id);
+                String label = tag == null ? id : tag.label;
+                LauncherGlobalElementProxyView proxy =
+                        new LauncherGlobalElementProxyView(this,
+                                () -> globalElementSources.get(id));
+                LauncherElementFrame frame = new LauncherElementFrame(this, id, label,
+                        (changedId, x, y, width, height) ->
+                                globalElementLayoutStore.put(changedId,
+                                        new LauncherGlobalElementLayoutStore.Geometry(
+                                                x, y, width, height)));
+                frame.setMinimumGeometryPx(dp(36), dp(28));
+                frame.setCardBackgroundColor(Color.TRANSPARENT);
+                frame.setCardElevation(0);
+                frame.setRadius(0);
+                frame.setContent(proxy);
+                FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                        geometry.width, geometry.height);
+                params.leftMargin = geometry.x;
+                params.topMargin = geometry.y;
+                workspace.addView(frame, params);
+                frame.setEditMode(editMode, snap);
+                globalElementFrames.put(id, frame);
+                globalElementProxies.put(id, proxy);
+            }
+        }
+        for (Map.Entry<String, LauncherElementFrame> panel : panels.entrySet()) {
+            if (!hasGlobalFrameForPanel(panel.getKey())) continue;
+            panel.getValue().setAlpha(0f);
+            panel.getValue().setContentTouchBlocked(true);
+        }
+    }
+
+    private void collectGlobalElements(
+            @NonNull View current,
+            @NonNull Map<String, View> views,
+            @NonNull Map<String, LauncherGlobalElementTag> tags) {
+        LauncherGlobalElementTag tag = LauncherGlobalElementTag.from(current);
+        if (tag != null) {
+            // Stable IDs are unique. A newly rebuilt view intentionally replaces its detached
+            // predecessor while retaining the same saved global rectangle.
+            views.put(tag.id, current);
+            tags.put(tag.id, tag);
+        }
+        if (!(current instanceof ViewGroup)) return;
+        ViewGroup group = (ViewGroup) current;
+        for (int index = 0; index < group.getChildCount(); index++) {
+            collectGlobalElements(group.getChildAt(index), views, tags);
+        }
+    }
+
+    @Nullable
+    private LauncherGlobalElementLayoutStore.Geometry migrateSourceGeometry(
+            @NonNull View source) {
+        int width = Math.max(source.getWidth(), source.getMeasuredWidth());
+        int height = Math.max(source.getHeight(), source.getMeasuredHeight());
+        if (width <= 0 || height <= 0) return null;
+        int[] sourceLocation = new int[2];
+        int[] workspaceLocation = new int[2];
+        source.getLocationOnScreen(sourceLocation);
+        workspace.getLocationOnScreen(workspaceLocation);
+        LauncherGlobalElementLayoutStore.Geometry geometry =
+                new LauncherGlobalElementLayoutStore.Geometry(
+                        sourceLocation[0] - workspaceLocation[0],
+                        sourceLocation[1] - workspaceLocation[1],
+                        width, height);
+        globalElementLayoutStore.put(
+                LauncherGlobalElementTag.from(source).id, geometry);
+        return globalElementLayoutStore.get(LauncherGlobalElementTag.from(source).id);
+    }
+
+    private void refreshGlobalElementVisibility() {
+        if (!globalElementsActivated) return;
+        int snap = Math.max(4, preferences.launcherSnapPx.get());
+        for (Map.Entry<String, LauncherElementFrame> entry
+                : globalElementFrames.entrySet()) {
+            LauncherGlobalElementProxyView proxy = globalElementProxies.get(entry.getKey());
+            View source = globalElementSources.get(entry.getKey());
+            boolean visible = source != null
+                    && (editMode || proxy != null && proxy.sourceIsShown());
+            entry.getValue().setVisibility(visible ? View.VISIBLE : View.GONE);
+            entry.getValue().setEditMode(editMode, snap);
+            entry.getValue().setCardElevation(editMode ? dp(10) : 0);
+            if (proxy != null && visible) proxy.invalidate();
+        }
+    }
+
+    private void applyStoredGlobalGeometry() {
+        if (!globalElementsActivated || globalElementLayoutStore == null) return;
+        globalElementLayoutStore.load(workspace.getWidth(), workspace.getHeight());
+        for (Map.Entry<String, LauncherElementFrame> entry
+                : globalElementFrames.entrySet()) {
+            LauncherGlobalElementLayoutStore.Geometry geometry =
+                    globalElementLayoutStore.get(entry.getKey());
+            if (geometry == null) continue;
             FrameLayout.LayoutParams params =
                     (FrameLayout.LayoutParams) entry.getValue().getLayoutParams();
             params.width = geometry.width;
@@ -940,15 +1144,12 @@ public final class LauncherActivity extends AppCompatActivity {
         appliedActionsGridJson = preferences.launcherActionsGridJson.get();
         appliedAppsColumns = preferences.launcherAppsColumns.get();
         appliedActionsColumns = preferences.launcherActionsColumns.get();
-        if (getIntent().getBooleanExtra(EXTRA_EDIT_MEDIA_CONTENT, false)) {
-            setMediaContentEditMode(true);
-        } else if (getIntent().getBooleanExtra(EXTRA_EDIT_NAVIGATION_CONTENT, false)) {
-            setNavigationContentEditMode(true);
-        } else if (getIntent().getBooleanExtra(EXTRA_EDIT_ACTIONS_CONTENT, false)) {
-            setActionsContentEditMode(true);
-        } else if (getIntent().getBooleanExtra(EXTRA_EDIT_MODE, false)) {
-            setEditMode(true);
-        }
+        // Wait for the just-added live children to receive exact pixel bounds, then migrate each
+        // one from its old panel-local rectangle into the shared screen coordinate space.
+        workspace.post(() -> {
+            activateGlobalElements();
+            if (requestsAnyHomeEditor(getIntent())) setEditMode(true);
+        });
     }
 
     @NonNull
@@ -1078,12 +1279,16 @@ public final class LauncherActivity extends AppCompatActivity {
         for (PanelElementConfigStore.Element element : config.enabled()) {
             if (PanelElementConfigStore.APPS_HEADING.equals(element.id)) {
                 TextView heading = heading("Избранное");
+                LauncherGlobalElementTag.attach(heading, LauncherLayoutStore.APPS,
+                        element.id, "Заголовок приложений");
                 heading.setTextSize(18f * element.scalePercent / 100f);
                 heading.setOnClickListener(v -> showAllApps());
                 int height = Math.max(dp(34), dp(42) * element.scalePercent / 100);
                 root.addView(heading, new LinearLayout.LayoutParams(matchWidth(), height));
             } else if (PanelElementConfigStore.APPS_GRID.equals(element.id)) {
                 favoritesGrid = new GridView(this);
+                LauncherGlobalElementTag.attach(favoritesGrid, LauncherLayoutStore.APPS,
+                        element.id, "Избранные приложения");
                 favoritesGrid.setNumColumns(Math.max(1, Math.min(6,
                         preferences.launcherAppsColumns.get())));
                 favoritesGrid.setVerticalSpacing(dp(4));
@@ -1143,6 +1348,9 @@ public final class LauncherActivity extends AppCompatActivity {
                 continue;
             }
             value.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL));
+            LauncherGlobalElementTag.attach(value, LauncherLayoutStore.CLOCK,
+                    element.id, PanelElementConfigStore.CLOCK_TIME.equals(element.id)
+                            ? "Время" : "Дата");
             root.addView(value);
         }
         return root;
@@ -1285,6 +1493,9 @@ public final class LauncherActivity extends AppCompatActivity {
         if (grid == null) return;
         FrameLayout cell = new FrameLayout(this);
         cell.setTag(element.id);
+        NavigationPanelConfig.Spec spec = NavigationPanelConfig.spec(element.id);
+        LauncherGlobalElementTag.attach(cell, LauncherLayoutStore.NAVIGATION,
+                element.id, spec == null ? element.id : spec.label);
         cell.setPadding(dp(4), dp(2), dp(4), dp(2));
         ViewGroup.LayoutParams existing = content.getLayoutParams();
         FrameLayout.LayoutParams contentParams = existing instanceof FrameLayout.LayoutParams
@@ -1452,6 +1663,8 @@ public final class LauncherActivity extends AppCompatActivity {
                 if (placement == null) continue;
                 View tile = buildShortcutTile(shortcut, false);
                 tile.setTag(shortcut.id);
+                LauncherGlobalElementTag.attach(tile, LauncherLayoutStore.ACTIONS,
+                        shortcut.id, shortcut.title);
                 shortcutGrid.addView(tile, new PanelGridLayout.LayoutParams(
                         placement.column, placement.row,
                         placement.columnSpan, placement.rowSpan));
@@ -1468,6 +1681,8 @@ public final class LauncherActivity extends AppCompatActivity {
             if (placement != null) {
                 View tile = buildShortcutTile(add, true);
                 tile.setTag(LauncherActionsGridConfig.ADD_TILE_ID);
+                LauncherGlobalElementTag.attach(tile, LauncherLayoutStore.ACTIONS,
+                        LauncherActionsGridConfig.ADD_TILE_ID, "Добавить действие");
                 shortcutGrid.addView(tile, new PanelGridLayout.LayoutParams(
                         placement.column, placement.row,
                         placement.columnSpan, placement.rowSpan));
@@ -1991,6 +2206,11 @@ public final class LauncherActivity extends AppCompatActivity {
         if (enabled && mediaContentEditMode) setMediaContentEditMode(false);
         if (enabled && actionsContentEditMode) setActionsContentEditMode(false);
         editMode = enabled;
+        if (mediaPanel != null) mediaPanel.setGlobalEditPreview(enabled);
+        if (climatePanel != null) climatePanel.setEditorPreviewMode(enabled);
+        if (vehicleInfoPanel != null) vehicleInfoPanel.setPreviewMode(enabled);
+        if (informationPanel != null) informationPanel.setEditorPreviewMode(enabled);
+        if (favoriteRoutesPanel != null) favoriteRoutesPanel.setPreviewMode(enabled);
         int snap = Math.max(4, preferences.launcherSnapPx.get());
         editorGrid.setStepPx(snap);
         editorGrid.setVisibility(enabled && preferences.launcherShowGrid.get()
@@ -1998,7 +2218,8 @@ public final class LauncherActivity extends AppCompatActivity {
         doneButton.setText("Готово · закрепить компоновку");
         doneButton.setVisibility(enabled || navigationContentEditMode || mediaContentEditMode
                 || actionsContentEditMode ? View.VISIBLE : View.GONE);
-        for (LauncherElementFrame frame : panels.values()) frame.setEditMode(enabled, snap);
+        for (LauncherElementFrame frame : panels.values()) frame.setEditMode(false, snap);
+        refreshGlobalElementVisibility();
         updateLauncherSafeArea();
         updateNavigation();
         if (vehicleInfoPanel != null && preferences.launcherVehicleInfoVisible.get()) {
@@ -2009,8 +2230,14 @@ public final class LauncherActivity extends AppCompatActivity {
             setPanelVisibility(LauncherLayoutStore.INFORMATION,
                     enabled || informationPanel.hasConfiguredItems());
         }
+        if (enabled) showNavigationEditorSamples();
+        workspace.post(() -> {
+            activateGlobalElements();
+            syncGlobalElements();
+            refreshGlobalElementVisibility();
+        });
         Toast.makeText(this, enabled
-                ? "Тащите блок; размер меняется за любой из четырёх углов"
+                ? "Тащите любой элемент по всему HOME; размер меняется за четыре угла"
                 : "Компоновка сохранена", Toast.LENGTH_SHORT).show();
     }
 
@@ -2162,14 +2389,16 @@ public final class LauncherActivity extends AppCompatActivity {
     private void renderNavigation(@NonNull NavigationDataRepository.Snapshot state) {
         lastNavigationSnapshot = state;
         navigationDynamicRefresh = false;
-        boolean showFavorites = !navigationContentEditMode
+        boolean showFavorites = !editMode && !navigationContentEditMode
                 && CombinedNavigationPanelPolicy.showFavorites(
                 state.routeActive, favoriteRoutesAvailable);
         if (favoriteRoutesPanel != null) {
-            favoriteRoutesPanel.setVisibility(showFavorites ? View.VISIBLE : View.GONE);
+            favoriteRoutesPanel.setVisibility(editMode || showFavorites
+                    ? View.VISIBLE : View.GONE);
         }
         if (navigationRouteContent != null) {
-            navigationRouteContent.setVisibility(showFavorites ? View.GONE : View.VISIBLE);
+            navigationRouteContent.setVisibility(editMode || !showFavorites
+                    ? View.VISIBLE : View.GONE);
         }
         boolean phaseHasContent = CombinedNavigationPanelPolicy.hasVisibleContent(
                 state.routeActive, favoriteRoutesAvailable,
@@ -2200,7 +2429,7 @@ public final class LauncherActivity extends AppCompatActivity {
                         ? "Маршрут не запущен"
                         : "Маршрут не запущен\nДобавьте избранные маршруты в настройках");
             }
-            if (navigationContentEditMode) showNavigationEditorSamples();
+            if (editMode || navigationContentEditMode) showNavigationEditorSamples();
             return;
         }
         navigationLaunchProduct = NavigationDataRepository.PRODUCT_MAPS.equals(state.sourceProduct)
@@ -2312,6 +2541,7 @@ public final class LauncherActivity extends AppCompatActivity {
         showNavigationImage(navigationJamImage, state.available ? state.jamImage : null);
         showNavigationImage(navigationRainbowImage,
                 state.available ? state.rainbowImage : null);
+        if (editMode) showNavigationEditorSamples();
     }
 
     /** Clears every live field before idle/stale rendering so no old route can flash back. */
