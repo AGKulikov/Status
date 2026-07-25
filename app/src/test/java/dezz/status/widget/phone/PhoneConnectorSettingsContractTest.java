@@ -80,6 +80,9 @@ public final class PhoneConnectorSettingsContractTest {
         assertFalse(source.contains("Manifest.permission.READ_SMS"));
         assertFalse(source.contains("requestPermissions("));
         assertTrue(source.contains("\"diagnostics.sms\".equals(value.resourceId)"));
+        assertTrue(source.contains("\"diagnostics.device\".equals(value.resourceId)"));
+        assertTrue(source.contains("device.get(\"stock_connection\")"));
+        assertTrue(source.contains("device.get(\"ancs_setup\")"));
         assertTrue(source.contains("\"diagnostics.last_app\".equals(value.resourceId)"));
         assertTrue(source.contains("\"diagnostics.last_error\".equals(value.resourceId)"));
         assertTrue(source.contains("diagnosticsHandler.postDelayed(diagnosticsPoll, 1_000L)"));
@@ -94,6 +97,8 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("manager.areNotificationsEnabled()"));
         assertTrue(source.contains("NotificationManager.IMPORTANCE_NONE"));
         assertTrue(source.contains("line(!ancsRequested || notificationDelivery"));
+        assertTrue(source.contains("localizedStockConnectionStatus(stockConnectionStatus)"));
+        assertTrue(source.contains("localizedAncsSetup(ancsSetup)"));
     }
 
     @Test
@@ -153,6 +158,10 @@ public final class PhoneConnectorSettingsContractTest {
             assertTrue(source.contains("name=\"phone_diag_map_waiting\""));
             assertTrue(source.contains("name=\"phone_diag_ancs_authorization\""));
             assertTrue(source.contains("name=\"phone_diag_ancs_ready_degraded\""));
+            assertTrue(source.contains("name=\"phone_diag_ancs_stock_pairing_required\""));
+            assertTrue(source.contains("name=\"phone_diag_ancs_stock_route\""));
+            assertTrue(source.contains("name=\"phone_diag_stock_connection\""));
+            assertTrue(source.contains("name=\"phone_diag_stock_not_registered\""));
             assertTrue(source.contains("name=\"phone_diag_last_app\""));
             assertTrue(source.contains("name=\"phone_test_ancs\""));
             assertTrue(source.contains("name=\"phone_test_choose_source\""));
@@ -163,6 +172,8 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(russian.contains("маскированном виде"));
         assertTrue(russian.contains("Android Notification Access"));
         assertTrue(russian.contains("доступ к общему хранилищу SMS не требуются"));
+        assertTrue(russian.contains("не может принудительно вызвать запрос на iPhone"));
+        assertTrue(english.contains("cannot force an iPhone prompt"));
     }
 
     private static String javaSource(String relative) throws IOException {
