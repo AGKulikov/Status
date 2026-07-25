@@ -376,7 +376,7 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
                         + "Ключ хранится отдельно и не попадает в экспорт настроек Status Widget.")
                 .setView(form)
                 .setPositiveButton("Сохранить", null)
-                .setNeutralButton("Очистить", (dialog, which) -> {
+                .setNeutralButton("Очистить", (ignoredDialog, which) -> {
                     access.clear();
                     Toast.makeText(this, "Ключ прямого запуска удалён",
                             Toast.LENGTH_SHORT).show();
