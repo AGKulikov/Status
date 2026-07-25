@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 32838)
-Total output lines: 2657
-
 /*
  * Copyright © 2025-2026 Dezz (https://github.com/DezzK)
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -1239,7 +1236,234 @@ public final class LauncherActivity extends AppCompatActivity {
             }
         }, (id, finished) -> {
             applyNavigationGridPlacements();
-            navigationPanelConfigStore.sav…2838 tokens truncated…/
+            navigationPanelConfigStore.save(config);
+            appliedNavigationConfigJson = preferences.launcherNavigationConfigJson.get();
+        });
+        host.addView(navigationContentEditOverlay, match());
+        navigationContentEditOverlay.setEditing(navigationContentEditMode);
+        host.setOnClickListener(v -> {
+            if (!navigationContentEditMode) {
+                launchYandex(navigationLaunchProduct, false);
+            }
+        });
+        return host;
+    }
+
+    private void addNavigationGridElement(@NonNull NavigationPanelConfig.Element element,
+                                          @NonNull View content) {
+        PanelGridLayout grid = navigationGrid;
+        if (grid == null) return;
+        FrameLayout cell = new FrameLayout(this);
+        cell.setTag(element.id);
+        cell.setPadding(dp(4), dp(2), dp(4), dp(2));
+        ViewGroup.LayoutParams existing = content.getLayoutParams();
+        FrameLayout.LayoutParams contentParams = existing instanceof FrameLayout.LayoutParams
+                ? (FrameLayout.LayoutParams) existing : match();
+        cell.addView(content, contentParams);
+        grid.addView(cell, new PanelGridLayout.LayoutParams(
+                element.column, element.row, element.columnSpan, element.rowSpan));
+    }
+
+    private void applyNavigationGridPlacements() {
+        NavigationPanelConfig config = navigationPanelConfig;
+        PanelGridLayout grid = navigationGrid;
+        if (config == null || grid == null) return;
+        grid.setGridSize(config.gridColumns, config.gridRows);
+        for (NavigationPanelConfig.Element element : config.enabledElements()) {
+            grid.updatePlacement(element.id, element.column, element.row,
+                    element.columnSpan, element.rowSpan);
+        }
+        if (navigationContentEditOverlay != null) navigationContentEditOverlay.invalidate();
+    }
+
+    @NonNull
+    private ImageView navigationImage(int scalePercent, int baseHeightDp) {
+        ImageView value = new ImageView(this);
+        value.setAdjustViewBounds(true);
+        value.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        value.setVisibility(View.GONE);
+        int height = dp(Math.max(28, baseHeightDp * scalePercent / 100));
+        value.setLayoutParams(new FrameLayout.LayoutParams(matchWidth(), height, Gravity.CENTER));
+        return value;
+    }
+
+    @NonNull
+    private LinearLayout buildNavigationCombined(int scalePercent) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setVisibility(View.GONE);
+        navigationCombinedImage = new ImageView(this);
+        navigationCombinedImage.setAdjustViewBounds(true);
+        navigationCombinedImage.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        int imageSize = dp(Math.max(42, 68 * scalePercent / 100));
+        card.addView(navigationCombinedImage, new LinearLayout.LayoutParams(imageSize, imageSize));
+        LinearLayout labels = new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        labels.setPadding(dp(8), 0, 0, 0);
+        navigationCombinedDistance = text(24f * scalePercent / 100f, Color.WHITE, true);
+        navigationCombinedManeuver = text(16f * scalePercent / 100f, Color.LTGRAY, false);
+        labels.addView(navigationCombinedDistance);
+        labels.addView(navigationCombinedManeuver);
+        card.addView(labels, new LinearLayout.LayoutParams(0, wrapContent(), 1f));
+        return card;
+    }
+
+    @NonNull
+    private View buildActionsPanel() {
+        PanelElementConfigStore.Panel config = panelElementStore.load(LauncherLayoutStore.ACTIONS);
+        showActionTiles = config.isEnabled(PanelElementConfigStore.ACTION_TILES);
+        showActionAdd = config.isEnabled(PanelElementConfigStore.ACTION_ADD);
+        actionsTileScalePercent = config.scale(PanelElementConfigStore.ACTION_TILES);
+        actionsAddScalePercent = config.scale(PanelElementConfigStore.ACTION_ADD);
+
+        FrameLayout host = new FrameLayout(this);
+        host.setPadding(dp(7), dp(7), dp(7), dp(7));
+        shortcutGrid = new PanelGridLayout(this);
+        host.addView(shortcutGrid, match());
+
+        actionsContentEditOverlay = new PanelContentEditOverlay(this);
+        actionsContentEditOverlay.setModel(new PanelContentEditOverlay.Model() {
+            @Override public int columns() {
+                LauncherActionsGridConfig value = actionsGridConfig;
+                return value == null ? LauncherActionsGridConfig.DEFAULT_COLUMNS : value.columns;
+            }
+
+            @Override public int rows() {
+                LauncherActionsGridConfig value = actionsGridConfig;
+                return value == null ? LauncherActionsGridConfig.MIN_ROWS : value.rows;
+            }
+
+            @NonNull
+            @Override public List<PanelContentEditOverlay.Item> items() {
+                List<PanelContentEditOverlay.Item> result = new ArrayList<>();
+                LauncherActionsGridConfig value = actionsGridConfig;
+                if (value == null || shortcutStore == null) return result;
+                if (showActionTiles) {
+                    for (LauncherShortcutStore.Shortcut shortcut : shortcutStore.all()) {
+                        if (!shortcut.enabled) continue;
+                        LauncherActionsGridConfig.Placement placement =
+                                value.placement(shortcut.id);
+                        if (placement == null) continue;
+                        result.add(new PanelContentEditOverlay.Item(shortcut.id,
+                                shortcut.title + " · " + shortcut.iconSizePx + " px",
+                                placement.column, placement.row,
+                                placement.columnSpan, placement.rowSpan));
+                    }
+                }
+                if (showActionAdd) {
+                    LauncherActionsGridConfig.Placement placement =
+                            value.placement(LauncherActionsGridConfig.ADD_TILE_ID);
+                    if (placement != null) {
+                        result.add(new PanelContentEditOverlay.Item(
+                                LauncherActionsGridConfig.ADD_TILE_ID, "Добавить",
+                                placement.column, placement.row,
+                                placement.columnSpan, placement.rowSpan));
+                    }
+                }
+                return result;
+            }
+
+            @Override public boolean setPlacement(@NonNull String id, int column, int row,
+                                                  int columnSpan, int rowSpan) {
+                LauncherActionsGridConfig value = actionsGridConfig;
+                return value != null && value.setPlacement(id, column, row,
+                        columnSpan, rowSpan);
+            }
+        }, new PanelContentEditOverlay.Listener() {
+            @Override public void onPlacementChanged(@NonNull String id, boolean finished) {
+                applyActionsGridPlacements();
+                if (finished && actionsGridConfig != null) {
+                    actionsGridConfigStore.save(actionsGridConfig);
+                    mirrorActionSpansToLegacyShortcut(id);
+                    appliedActionsGridJson = preferences.launcherActionsGridJson.get();
+                }
+            }
+
+            @Override public void onItemClicked(@NonNull String id) {
+                if (LauncherActionsGridConfig.ADD_TILE_ID.equals(id)) {
+                    startActivity(new Intent(LauncherActivity.this,
+                            LauncherShortcutSettingsActivity.class)
+                            .putExtra(LauncherShortcutSettingsActivity.EXTRA_ADD_NEW, true));
+                } else {
+                    showShortcutIconSizeEditor(id);
+                }
+            }
+        });
+        host.addView(actionsContentEditOverlay, match());
+        actionsContentEditOverlay.setEditing(actionsContentEditMode);
+        shortcutGrid.post(this::refreshShortcutGrid);
+        return host;
+    }
+
+    @NonNull
+    private View buildClimatePanel() {
+        climatePanel = new ClimatePanelView(this, carIntegration,
+                new ClimatePanelConfigStore(preferences));
+        return climatePanel;
+    }
+
+    private void refreshShortcutGrid() {
+        if (shortcutGrid == null || shortcutStore == null) return;
+        shortcutGrid.removeAllViews();
+        carShortcutBindings.clear();
+        smartHomeShortcutBindings.clear();
+        smartHomeRules = loadSmartHomeRules();
+        List<LauncherShortcutStore.Shortcut> shortcuts = shortcutStore.all();
+        actionsGridConfig = actionsGridConfigStore.load(shortcuts);
+        LauncherActionsGridConfig gridConfig = actionsGridConfig;
+        shortcutGrid.setGridSize(gridConfig.columns, gridConfig.rows);
+        shortcutGrid.setCellGapPx(gridConfig.gapPx);
+        if (showActionTiles) {
+            for (LauncherShortcutStore.Shortcut shortcut : shortcuts) {
+                if (!shortcut.enabled) continue;
+                LauncherActionsGridConfig.Placement placement =
+                        gridConfig.placement(shortcut.id);
+                if (placement == null) continue;
+                View tile = buildShortcutTile(shortcut, false);
+                tile.setTag(shortcut.id);
+                shortcutGrid.addView(tile, new PanelGridLayout.LayoutParams(
+                        placement.column, placement.row,
+                        placement.columnSpan, placement.rowSpan));
+            }
+        }
+        if (showActionAdd) {
+            LauncherShortcutStore.Shortcut add = new LauncherShortcutStore.Shortcut();
+            add.id = LauncherActionsGridConfig.ADD_TILE_ID;
+            add.title = "Добавить";
+            add.icon = "apps";
+            add.backgroundColor = "#553A465B";
+            LauncherActionsGridConfig.Placement placement =
+                    gridConfig.placement(LauncherActionsGridConfig.ADD_TILE_ID);
+            if (placement != null) {
+                View tile = buildShortcutTile(add, true);
+                tile.setTag(LauncherActionsGridConfig.ADD_TILE_ID);
+                shortcutGrid.addView(tile, new PanelGridLayout.LayoutParams(
+                        placement.column, placement.row,
+                        placement.columnSpan, placement.rowSpan));
+            }
+        }
+        if (actionsContentEditOverlay != null) actionsContentEditOverlay.invalidate();
+        appliedActionsGridJson = preferences.launcherActionsGridJson.get();
+        appliedActionsColumns = gridConfig.columns;
+        resubscribeCarControls();
+        applySmartHomeStates();
+    }
+
+    private void applyActionsGridPlacements() {
+        PanelGridLayout grid = shortcutGrid;
+        LauncherActionsGridConfig config = actionsGridConfig;
+        if (grid == null || config == null) return;
+        grid.setGridSize(config.columns, config.rows);
+        grid.setCellGapPx(config.gapPx);
+        for (LauncherActionsGridConfig.Placement placement : config.placements()) {
+            grid.updatePlacement(placement.id, placement.column, placement.row,
+                    placement.columnSpan, placement.rowSpan);
+        }
+        if (actionsContentEditOverlay != null) actionsContentEditOverlay.invalidate();
+    }
+
+    /** Mirrors only legacy spans so HA1079 rollback keeps the closest possible tile sizes. */
     private void mirrorActionSpansToLegacyShortcut(@NonNull String id) {
         if (shortcutStore == null || actionsGridConfig == null
                 || LauncherActionsGridConfig.ADD_TILE_ID.equals(id)) return;
