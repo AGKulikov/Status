@@ -368,7 +368,9 @@ public final class ClimatePanelView extends FrameLayout {
         center.addView(icon, new LinearLayout.LayoutParams(
                 elementScaledDp(id, 23), elementScaledDp(id, 23)));
         center.addView(value);
-        center.addView(title);
+        // The fan's five-position pictogram is self-explanatory in the compact rail. Keep
+        // temperature-zone captions, but do not spend a third line on "Вентилятор".
+        if (!ClimatePanelConfig.FAN.equals(id)) center.addView(title);
         content.addView(minus, new LinearLayout.LayoutParams(elementScaledDp(id, 40),
                 ViewGroup.LayoutParams.MATCH_PARENT));
         content.addView(center, new LinearLayout.LayoutParams(0,
@@ -449,6 +451,15 @@ public final class ClimatePanelView extends FrameLayout {
                 ids.add(element.id);
             }
         }
+        // Fan position 1 decrements the HVAC master switch, even when the user hid the separate
+        // power tile. Keep its confirmed state subscribed without rendering another control.
+        if (ids.contains(ClimatePanelConfig.FAN)) {
+            CarControlDescriptor power = catalog.get(ClimatePanelConfig.POWER);
+            if (!catalogResolved || (power != null && power.availability
+                    != CarControlDescriptor.Availability.UNSUPPORTED)) {
+                ids.add(ClimatePanelConfig.POWER);
+            }
+        }
         return ids;
     }
 
@@ -481,6 +492,13 @@ public final class ClimatePanelView extends FrameLayout {
                 || !state.available || !state.known
                 || !Double.isFinite(state.value)) return;
         CarControlDescriptor descriptor = binding.descriptor;
+        if (ClimatePanelConfig.FAN.equals(id)
+                && ClimateLevelCyclePlanner.shouldPowerOffClimateOnFanDecrease(
+                descriptor.options, state.value, direction)) {
+            executeBound(id, ClimatePanelConfig.POWER,
+                    CarControlCommand.Operation.SET, 0);
+            return;
+        }
         double target;
         if (!descriptor.options.isEmpty()) {
             boolean includeAuto = ClimatePanelConfig.FAN.equals(id);
@@ -530,25 +548,30 @@ public final class ClimatePanelView extends FrameLayout {
 
     private void execute(@NonNull String id, @NonNull CarControlCommand.Operation operation,
                          double value) {
-        ControlBinding binding = bindings.get(id);
-        CarControlState state = states.get(id);
-        if (binding == null || pending.containsKey(id)) return;
+        executeBound(id, id, operation, value);
+    }
+
+    private void executeBound(@NonNull String bindingId, @NonNull String commandId,
+                              @NonNull CarControlCommand.Operation operation, double value) {
+        ControlBinding binding = bindings.get(bindingId);
+        CarControlState state = states.get(commandId);
+        if (binding == null || pending.containsKey(bindingId)) return;
         // The editor is a layout surface, never a second climate remote. It uses representative
         // values so active/inactive styling is visible without touching the vehicle.
-        if (isEditorPlaceholder(id)) return;
-        boolean available = !isEditorPlaceholder(id) && isFresh(state) && state.available;
+        if (isEditorPlaceholder(bindingId)) return;
+        boolean available = isFresh(state) && state.available;
         if (!available) {
             Toast.makeText(getContext(), "Функция пока недоступна", Toast.LENGTH_SHORT).show();
             return;
         }
         final long token = ++nextCommandToken;
-        pending.put(id, token);
+        pending.put(bindingId, token);
         Runnable timeout = () -> {
-            Long current = pending.get(id);
+            Long current = pending.get(bindingId);
             if (current == null || current.longValue() != token) return;
-            pending.remove(id);
-            pendingTimeouts.remove(id);
-            applyState(id);
+            pending.remove(bindingId);
+            pendingTimeouts.remove(bindingId);
+            applyState(bindingId);
             // Replacing this listener's subscription is the public, non-invasive way to request
             // a fresh read without guessing whether the timed-out write reached the ECU.
             if (started) subscribeVisibleControls();
@@ -556,17 +579,17 @@ public final class ClimatePanelView extends FrameLayout {
                     "Нет ответа от автомобиля. Состояние обновляется",
                     Toast.LENGTH_LONG).show();
         };
-        pendingTimeouts.put(id, timeout);
+        pendingTimeouts.put(bindingId, timeout);
         postDelayed(timeout, COMMAND_WATCHDOG_MS);
-        applyState(id);
-        integration.executeControl(new CarControlCommand(id, operation, value),
+        applyState(bindingId);
+        integration.executeControl(new CarControlCommand(commandId, operation, value),
                 (success, message) -> {
-                    Long current = pending.get(id);
+                    Long current = pending.get(bindingId);
                     if (current == null || current.longValue() != token) return;
-                    pending.remove(id);
-                    Runnable scheduled = pendingTimeouts.remove(id);
+                    pending.remove(bindingId);
+                    Runnable scheduled = pendingTimeouts.remove(bindingId);
                     if (scheduled != null) removeCallbacks(scheduled);
-                    applyState(id);
+                    applyState(bindingId);
                     if (!success) {
                         Toast.makeText(getContext(), message == null
                                 ? "Команда не выполнена" : message, Toast.LENGTH_LONG).show();
@@ -590,8 +613,11 @@ public final class ClimatePanelView extends FrameLayout {
         int inactive = color(config.inactiveColor, Color.LTGRAY);
         int tint = active ? accent : inactive;
         binding.icon.setColorFilter(tint);
-        binding.value.setText(pending.containsKey(id) ? "Ожидание…" : previewSample
-                ? previewValue(id) : displayStateValue(state));
+        String displayValue = previewSample ? previewValue(id) : displayStateValue(id, state);
+        // The fan tile is numeric at all times. While its command is pending keep the last
+        // confirmed 1–5 value instead of temporarily replacing it with a word.
+        binding.value.setText(pending.containsKey(id) && !ClimatePanelConfig.FAN.equals(id)
+                ? "Ожидание…" : displayValue);
         binding.value.setTextColor(tint);
         // New CarPlay uses a calm translucent glass row and turns the selected action into a
         // bright, soft tile. A real blur would be too expensive (and unavailable) on Android 9,
@@ -622,11 +648,12 @@ public final class ClimatePanelView extends FrameLayout {
         }
         binding.card.setContentDescription(binding.descriptor.label + ", "
                 + (previewSample ? previewValue(id)
-                        : displayStateValue(state)));
+                        : displayStateValue(id, state)));
     }
 
     @NonNull
-    private String displayStateValue(@Nullable CarControlState state) {
+    private String displayStateValue(@NonNull String id,
+                                     @Nullable CarControlState state) {
         if (!isFresh(state)) return "…";
         if (!state.available) {
             String value = state.valueLabel == null ? "" : state.valueLabel.trim();
@@ -634,6 +661,14 @@ public final class ClimatePanelView extends FrameLayout {
                     ? "Недоступно" : value;
         }
         if (!state.known) return "Неизвестно";
+        if (ClimatePanelConfig.FAN.equals(id)) {
+            ClimateFanIndicatorPolicy.Indicator indicator =
+                    ClimateFanIndicatorPolicy.fromConfirmedState(
+                            state.valueLabel, state.level);
+            // The control is intentionally numeric in both manual and AUTO modes. AUTO remains
+            // visible on the separate AUTO tile and on the optional extended driver shortcut.
+            return Integer.toString(indicator.activeSegments);
+        }
         String value = state.valueLabel == null ? "" : state.valueLabel.trim();
         return value.isEmpty() || "—".equals(value) || "-".equals(value)
                 ? "Неизвестно" : value;
