@@ -38,7 +38,10 @@ public final class LauncherElementFrame extends MaterialCardView {
     private final ImageView[] resizeHandles = new ImageView[4];
     private final GeometryListener listener;
     private boolean editMode;
+    private boolean contentTouchBlocked;
     private int snapPx = 20;
+    private int minimumWidthPx;
+    private int minimumHeightPx;
     private float downRawX;
     private float downRawY;
     private int downX;
@@ -53,6 +56,8 @@ public final class LauncherElementFrame extends MaterialCardView {
         super(context);
         this.elementId = elementId;
         this.listener = listener;
+        minimumWidthPx = dp(160);
+        minimumHeightPx = dp(96);
 
         setRadius(dp(24));
         setCardElevation(dp(5));
@@ -111,18 +116,33 @@ public final class LauncherElementFrame extends MaterialCardView {
         setClickable(enabled);
     }
 
+    /** Prevents the invisible legacy source panel from receiving touches behind global proxies. */
+    public void setContentTouchBlocked(boolean blocked) {
+        contentTouchBlocked = blocked;
+        if (blocked) setClickable(false);
+    }
+
+    /** Individual labels and icons may be much smaller than the old whole-panel minimum. */
+    public void setMinimumGeometryPx(int width, int height) {
+        minimumWidthPx = Math.max(1, width);
+        minimumHeightPx = Math.max(1, height);
+    }
+
     @Override
     public boolean onInterceptTouchEvent(MotionEvent event) {
+        if (contentTouchBlocked) return true;
         return editMode || super.onInterceptTouchEvent(event);
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        if (contentTouchBlocked) return false;
         if (!editMode) return super.onTouchEvent(event);
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) getLayoutParams();
         if (lp == null) return false;
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                bringToFront();
                 downRawX = event.getRawX();
                 downRawY = event.getRawY();
                 downX = lp.leftMargin;
@@ -143,7 +163,7 @@ public final class LauncherElementFrame extends MaterialCardView {
                             new LauncherPanelResizeMath.Rect(
                                     downX, downY, downX + downWidth, downY + downHeight),
                             dx, dy, parent.getWidth(), parent.getHeight(),
-                            dp(160), dp(96), snapPx);
+                            minimumWidthPx, minimumHeightPx, snapPx);
                     lp.leftMargin = resized.left;
                     lp.topMargin = resized.top;
                     lp.width = resized.width();
