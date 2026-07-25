@@ -34,6 +34,8 @@ public final class DriverPanelService extends Service {
             "ru.natro.statuswidget.action.DRIVER_PANEL_RAISE";
     public static final String ACTION_STOCK_CLIMATE =
             "ru.natro.statuswidget.action.DRIVER_PANEL_STOCK_CLIMATE";
+    public static final String ACTION_FAVORITES =
+            "ru.natro.statuswidget.action.DRIVER_PANEL_FAVORITES";
 
     private static final String CHANNEL_ID = "DriverPanelChannel";
     private static final int NOTIFICATION_ID = 1007;
@@ -63,13 +65,20 @@ public final class DriverPanelService extends Service {
         start(context, ACTION_STOCK_CLIMATE);
     }
 
+    public static void showFavorites(@NonNull Context context) {
+        start(context, ACTION_FAVORITES);
+    }
+
     public static void onNavigationBarStatus(@NonNull Context context, boolean hidden) {
         navigationHidden = hidden;
         DriverPanelService current = instance;
         if (current != null && current.controller != null) {
-            current.controller.setNavigationHidden(hidden);
-            if (!hidden) current.controller.raise();
-        } else if (!hidden && new Preferences(context).driverPanelEnabled.get()) {
+            boolean refreshed = current.controller.setNavigationHidden(hidden);
+            // ECARX emits this callback around application/freeform transitions. Treat every
+            // notification as a z-order invalidation even when the boolean did not change;
+            // fullscreen apps must not get a frame in which the covered OEM rail is exposed.
+            if (!refreshed) current.controller.raise();
+        } else if (new Preferences(context).driverPanelEnabled.get()) {
             apply(context);
         }
     }
@@ -110,12 +119,11 @@ public final class DriverPanelService extends Service {
             return START_NOT_STICKY;
         }
         if (controller != null) {
-            controller.setNavigationHidden(navigationHidden);
-            if (!navigationHidden) {
-                if (ACTION_STOCK_CLIMATE.equals(action)) controller.triggerStockClimate();
-                else if (ACTION_RAISE.equals(action)) controller.raise();
-                else controller.applyPreferences();
-            }
+            boolean refreshed = controller.setNavigationHidden(navigationHidden);
+            if (ACTION_STOCK_CLIMATE.equals(action)) controller.triggerStockClimate();
+            else if (ACTION_FAVORITES.equals(action)) controller.showFavorites();
+            else if (ACTION_RAISE.equals(action)) controller.raise();
+            else if (!refreshed) controller.applyPreferences();
         }
         return START_STICKY;
     }
