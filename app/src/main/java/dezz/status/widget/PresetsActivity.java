@@ -202,15 +202,16 @@ public class PresetsActivity extends AppCompatActivity {
             Toast.makeText(this, R.string.preset_apply_failed, Toast.LENGTH_LONG).show();
             return;
         }
-        // Same restart pattern MainActivity itself uses for reset / preset application — start
-        // a fresh MainActivity with CLEAR_TASK so view-state restoration can't write the old
-        // values back through listeners attached during initializeViews().
-        if (WidgetService.isRunning()) {
-            stopService(new Intent(this, WidgetService.class));
+        // Reconfigure the live integration host in place. This preserves a driver-only
+        // headless host and lets WidgetService attach/detach the status surface dynamically.
+        WidgetService running = WidgetService.getInstance();
+        if (running != null) {
+            running.applyPreferences();
+        } else {
+            WidgetServiceStarter.startIfNeeded(this);
         }
-        if (prefs.widgetEnabled.get() && Permissions.allPermissionsGranted(this)) {
-            startForegroundService(new Intent(this, WidgetService.class));
-        }
+        // A complete user preset may also switch the driver rail profile or disable it.
+        dezz.status.widget.driver.DriverPanelService.apply(this);
         // Applying a complete user preset may switch reserved/compact/off climate modes. Do not
         // rely on a particular next Activity to reconcile WindowManager state.
         dezz.status.widget.climate.ClimatePanelService.apply(this);
