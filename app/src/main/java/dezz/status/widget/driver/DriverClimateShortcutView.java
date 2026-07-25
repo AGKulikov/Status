@@ -24,6 +24,8 @@ import java.util.Set;
 import dezz.status.widget.car.CarControlState;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.launcher.climate.ClimateFanIndicatorPolicy;
+import dezz.status.widget.launcher.climate.ClimateFanScaleGeometry;
+import dezz.status.widget.launcher.climate.ClimatePowerStatePolicy;
 
 /**
  * Resolution-independent live climate status for the compact driver rail.
@@ -35,12 +37,13 @@ import dezz.status.widget.launcher.climate.ClimateFanIndicatorPolicy;
 public final class DriverClimateShortcutView extends View {
     /** Keep boot/reconnect behavior identical to the main climate panel. */
     private static final long STATE_FRESH_MS = 75_000L;
+    private static final String POWER = "climate.power";
     private static final String TEMP_DRIVER = "climate.temp_driver";
     private static final String FAN = "climate.fan";
     private static final String AUTO = "climate.auto";
     private static final String AIRFLOW = "climate.airflow";
     private static final Set<String> CONTROL_IDS = new LinkedHashSet<>(
-            Arrays.asList(TEMP_DRIVER, FAN, AUTO, AIRFLOW));
+            Arrays.asList(POWER, TEMP_DRIVER, FAN, AUTO, AIRFLOW));
 
     private final CarIntegration integration;
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG
@@ -53,6 +56,9 @@ public final class DriverClimateShortcutView extends View {
     private final Runnable expiry = this::expireStaleState;
 
     private boolean subscribed;
+    private boolean powerKnown;
+    private boolean powerActive;
+    private long powerObservedAtMillis;
     private boolean temperatureKnown;
     private double temperature;
     private long temperatureObservedAtMillis;
@@ -88,6 +94,8 @@ public final class DriverClimateShortcutView extends View {
 
     /** Fixed sample used only by settings when no vehicle state has arrived yet. */
     public void showPreviewSample() {
+        powerKnown = true;
+        powerActive = true;
         temperatureKnown = true;
         temperature = 22d;
         fanKnown = true;
@@ -121,7 +129,16 @@ public final class DriverClimateShortcutView extends View {
     }
 
     private void onControlState(@NonNull CarControlState state) {
-        if (TEMP_DRIVER.equals(state.controlId)) {
+        if (POWER.equals(state.controlId)) {
+            powerKnown = isFresh(state) && state.available && state.known;
+            if (powerKnown) {
+                powerActive = state.active;
+                powerObservedAtMillis = state.observedAtMillis;
+            } else {
+                powerActive = false;
+                powerObservedAtMillis = 0;
+            }
+        } else if (TEMP_DRIVER.equals(state.controlId)) {
             temperatureKnown = isFresh(state) && state.available && state.known
                     && Double.isFinite(state.value);
             if (temperatureKnown) {
@@ -176,6 +193,12 @@ public final class DriverClimateShortcutView extends View {
         // Detailed climate fits the ordinary rail slot and keeps three stable rows. In particular,
         // there is no decorative fan blade competing with the level scale.
         boolean expanded = detailed;
+        boolean powerOff = ClimatePowerStatePolicy.isConfirmedOff(powerKnown, powerActive);
+        if (powerOff) {
+            drawTemperature(canvas, "Выкл", width / 2f, height * .50f,
+                    unit, expanded, muted(foregroundColor));
+            return;
+        }
         boolean showFan = fanKnown && fanActive;
         int color = showFan ? foregroundColor : muted(foregroundColor);
 
@@ -237,14 +260,20 @@ public final class DriverClimateShortcutView extends View {
 
     private void drawBars(Canvas canvas, float startX, float centerY, float availableWidth,
                           float unit, int activeBars, int total, int color) {
-        float gap = Math.max(.7f, unit * (total > 5 ? .010f : .018f));
-        float barWidth = Math.max(.75f, (availableWidth - gap * (total - 1)) / total);
+        // Manual and AUTO share one immutable nine-slot geometry. AUTO draws its five logical
+        // divisions in slots 0/2/4/6/8, so switching mode cannot resize or shift the scale.
+        int physicalSlots = ClimateFanScaleGeometry.PHYSICAL_SLOTS;
+        int logicalTotal = Math.max(1, Math.min(physicalSlots, total));
+        float gap = Math.max(.7f, unit * .010f);
+        float barWidth = Math.max(.75f,
+                (availableWidth - gap * (physicalSlots - 1)) / physicalSlots);
         float barHeight = Math.max(4f, unit * .115f);
-        for (int index = 0; index < total; index++) {
+        for (int index = 0; index < logicalTotal; index++) {
             int alpha = index < activeBars ? Color.alpha(color)
                     : Math.max(34, Math.round(Color.alpha(color) * .23f));
             shapePaint.setColor((color & 0x00FFFFFF) | (alpha << 24));
-            float left = startX + index * (barWidth + gap);
+            int physicalSlot = ClimateFanScaleGeometry.physicalSlot(index, logicalTotal);
+            float left = startX + physicalSlot * (barWidth + gap);
             canvas.save();
             canvas.rotate(-14f, left + barWidth / 2f, centerY);
             shape.set(left, centerY - barHeight / 2f,
@@ -356,8 +385,8 @@ public final class DriverClimateShortcutView extends View {
 
     private void scheduleExpiry() {
         removeCallbacks(expiry);
-        long oldest = oldestPositive(temperatureObservedAtMillis, fanObservedAtMillis,
-                autoObservedAtMillis, airflowObservedAtMillis);
+        long oldest = oldestPositive(powerObservedAtMillis, temperatureObservedAtMillis,
+                fanObservedAtMillis, autoObservedAtMillis, airflowObservedAtMillis);
         if (oldest <= 0) return;
         long remaining = STATE_FRESH_MS
                 - Math.max(0, System.currentTimeMillis() - oldest);
@@ -365,6 +394,11 @@ public final class DriverClimateShortcutView extends View {
     }
 
     private void expireStaleState() {
+        if (powerKnown && !isFresh(powerObservedAtMillis)) {
+            powerKnown = false;
+            powerActive = false;
+            powerObservedAtMillis = 0;
+        }
         if (temperatureKnown && !isFresh(temperatureObservedAtMillis)) {
             temperatureKnown = false;
             temperatureObservedAtMillis = 0;
