@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import dezz.status.widget.automation.AutomationContract;
+import dezz.status.widget.driver.DriverPanelService;
 import dezz.status.widget.ha.HaBrickConfig;
 import dezz.status.widget.ha.HaBrickConfigStore;
 import dezz.status.widget.ha.api.HaApiController;
@@ -64,6 +65,7 @@ import dezz.status.widget.scenario.Scenario;
 import dezz.status.widget.scenario.TargetScope;
 import dezz.status.widget.scenario.ValueReference;
 import dezz.status.widget.settings.AppleColorPickerDialog;
+import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.sprut.SprutCatalog;
 import dezz.status.widget.sprut.SprutHubCatalogStore;
 import dezz.status.widget.sprut.SprutHubController;
@@ -102,10 +104,12 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             "начинается с", "заканчивается на", "пустое", "не пустое", "доступно", "недоступно",
             "актуально", "устарело", "всегда"
     };
-    private static final String[] TARGET_VALUES = {"MAIN", "POPUP", "BUILTIN", "OVERLAY"};
+    private static final String[] TARGET_VALUES = {
+            "MAIN", "POPUP", "BUILTIN", "OVERLAY", "DRIVER"
+    };
     private static final String[] TARGET_LABELS = {
             "Элемент основной строки", "Плитка плавающего оверлея",
-            "Штатный элемент", "Весь плавающий оверлей"
+            "Штатный элемент", "Весь плавающий оверлей", "Кнопка панели водителя"
     };
     private static final String[] FIELD_VALUES = {
             "VISIBLE", "TEXT_COLOR", "BACKGROUND_COLOR", "ICON", "ACTION_ENABLED"
@@ -514,7 +518,13 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             JSONArray array = new JSONArray();
             for (Entry entry : entries) array.put(entry.raw);
             prefs.localScenariosJson.set(array.toString());
-            if (WidgetService.isRunning()) WidgetService.getInstance().applyPreferences();
+            WidgetService running = WidgetService.getInstance();
+            if (running != null) {
+                running.applyPreferences();
+            } else {
+                WidgetServiceStarter.startIfNeeded(this);
+            }
+            DriverPanelService.apply(this);
             if (showSuccess) {
                 Toast.makeText(this, "Сценарии сохранены", Toast.LENGTH_SHORT).show();
             }
@@ -673,6 +683,7 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             localField.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override public void onItemSelected(AdapterView<?> parent, View view,
                                                      int position, long id) {
+                    keepDriverActionSupported();
                     updateValueControl();
                     keepTileVisibilityOutOfPopupScope();
                 }
@@ -684,11 +695,14 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             target.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override public void onItemSelected(AdapterView<?> parent, View view,
                                                      int position, long id) {
+                    keepDriverActionSupported();
+                    updateValueControl();
                     keepTileVisibilityOutOfPopupScope();
                 }
 
                 @Override public void onNothingSelected(AdapterView<?> parent) {}
             });
+            keepDriverActionSupported();
             updateValueControl();
             keepTileVisibilityOutOfPopupScope();
         }
@@ -717,6 +731,10 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             if (field == LocalField.VISIBLE && targetScope == TargetScope.POPUP) {
                 throw new IllegalArgumentException("Видимость настраивается для всего "
                         + "плавающего оверлея. Выберите «Весь плавающий оверлей»");
+            }
+            if (targetScope == TargetScope.DRIVER && !isBooleanField(field)) {
+                throw new IllegalArgumentException("Для панели водителя доступны только "
+                        + "показ/скрытие и разрешение/запрет нажатия");
             }
             List<LocalAction> trueActions = branchActions(false, targetScope,
                     selectedTargetId, field);
@@ -785,6 +803,20 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             selectSpinnerValue(target, TARGET_VALUES, TargetScope.OVERLAY.jsonName());
             targetId.setText("");
             targetSummary.setText("Выберите плавающий оверлей целиком");
+        }
+
+        /** Driver-panel scenarios intentionally expose only the two runtime-supported gates. */
+        private void keepDriverActionSupported() {
+            if (!TargetScope.DRIVER.jsonName().equals(
+                    mappedValue(target, TARGET_VALUES))) return;
+            LocalField field;
+            try {
+                field = LocalField.fromJsonName(mappedValue(localField, FIELD_VALUES));
+            } catch (RuntimeException ignored) {
+                field = LocalField.VISIBLE;
+            }
+            if (isBooleanField(field)) return;
+            selectSpinnerValue(localField, FIELD_VALUES, LocalField.VISIBLE.jsonName());
         }
 
         private void showSourcePicker() {
@@ -1286,10 +1318,29 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                             overlay.name + " — весь оверлей [" + overlay.id + "]"));
                 }
                 break;
+            case DRIVER:
+                addDriverTargets(result, prefs.driverPanelOld, "Старая панель");
+                addDriverTargets(result, prefs.driverPanelNew, "Новая панель");
+                for (LauncherShortcutStore.Shortcut shortcut :
+                        LauncherShortcutStore.forDriverFavorites(prefs).all()) {
+                    result.add(new TargetOption(shortcut.id,
+                            "Избранное · " + shortcut.title + " [" + shortcut.id + "]"));
+                }
+                break;
             default:
                 break;
         }
         return result;
+    }
+
+    private void addDriverTargets(@NonNull List<TargetOption> result,
+                                  @NonNull Preferences.DriverPanelProfile profile,
+                                  @NonNull String profileLabel) {
+        for (LauncherShortcutStore.Shortcut shortcut :
+                LauncherShortcutStore.forDriverPanel(prefs, profile).all()) {
+            result.add(new TargetOption(shortcut.id,
+                    profileLabel + " · " + shortcut.title + " [" + shortcut.id + "]"));
+        }
     }
 
     private SprutCatalog loadCachedSprutCatalog() {
