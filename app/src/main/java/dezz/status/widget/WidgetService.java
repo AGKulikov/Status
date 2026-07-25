@@ -916,7 +916,8 @@ public class WidgetService extends Service {
     public int onStartCommand(@Nullable Intent intent, int flags, int startId) {
         if (!destroyed && prefs != null
                 && ((prefs.widgetEnabled.get() && binding == null
-                && !overlayAttachRetryScheduled)
+                && !overlayAttachRetryScheduled
+                && Permissions.allPermissionsGranted(this))
                 || (!prefs.widgetEnabled.get()
                 && (binding != null || popupOverlay != null)))) {
             applyPreferences(false);
