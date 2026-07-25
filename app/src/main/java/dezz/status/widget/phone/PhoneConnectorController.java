@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 31997)
+Total output lines: 2864
+
 /*
  * Copyright © 2025-2026 Dezz (https://github.com/DezzK)
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -185,6 +188,7 @@ public final class PhoneConnectorController {
     private String lastError = "";
     private String ancsStatus = "stopped";
     private String smsStatus = "stopped";
+    private String stockConnectionStatus = "stopped";
     private boolean ancsReady;
     private boolean smsAvailable;
     private boolean hfpBatteryKnown;
@@ -228,7 +232,10 @@ public final class PhoneConnectorController {
     @Nullable private Runnable deviceRescanTask;
     @Nullable private Runnable gattReconnectTask;
     @Nullable private Runnable ancsPublicationRetryTask;
+    @Nullable private Runnable stockConnectionTask;
     private int ancsPublicationRetryCount;
+    private int stockConnectionAttempt;
+    private boolean stockConnectionRequestInProgress;
     private final ArrayDeque<GattOperation> gattOperations = new ArrayDeque<>();
     @Nullable private GattOperation currentGattOperation;
     @Nullable private Runnable gattOperationTimeout;
@@ -321,9 +328,10 @@ public final class PhoneConnectorController {
     }
 
     /**
-     * Queues one direct, user-initiated ANCS handshake without changing the selected device.
+     * Queues one user-initiated stock-connect request followed by a clean ANCS handshake without
+     * changing the selected device.
      *
-     * @return {@code true} only when a live controller accepted the request
+     * @return {@code true} only when a live controller accepted the diagnostic request
      */
     public boolean reconnectForDiagnostics() {
         synchronized (lifecycleLock) {
@@ -332,13 +340,14 @@ public final class PhoneConnectorController {
             long token = generation;
             if (currentWorker == null) return false;
             currentWorker.post(() -> runIfCurrent(token, () -> {
-                PhoneOemConnectionBridge.requestStockConnection(context,
-                        config == null ? "" : config.deviceAddress);
+                String configuredAddress = config == null ? "" : config.deviceAddress;
                 BluetoothGatt previous = gatt;
                 gatt = null;
                 cancelGattWatchdogs();
                 cancelGattReconnect();
                 cancelAncsPublicationRetry();
+                cancelStockConnectionRequest();
+                refreshGattCache(previous);
                 closeGatt(previous);
                 gattConnected = false;
                 clearBasData();
@@ -348,7 +357,12 @@ public final class PhoneConnectorController {
                 ancsPublicationRetryCount = 0;
                 lastError = "";
                 updateConnected(token);
-                ensureGatt(token);
+                if (selectedDevice == null
+                        || !configuredAddress.equalsIgnoreCase(selectedAddress)) {
+                    selectAndConnect(token);
+                } else {
+                    beginStockConnectionRequest(token, selectedAddress);
+                }
             }));
             return true;
         }
@@ -407,9 +421,12 @@ public final class PhoneConnectorController {
         connected = false;
         reconnectAttempt = 0;
         ancsPublicationRetryCount = 0;
+        stockConnectionAttempt = 0;
+        stockConnectionRequestInProgress = false;
         lastError = "";
         ancsStatus = diagnostic;
         smsStatus = diagnostic;
+        stockConnectionStatus = diagnostic;
         ancsReady = false;
         smsAvailable = false;
         hfpBatteryKnown = false;
@@ -576,6 +593,7 @@ public final class PhoneConnectorController {
         BluetoothGatt previous = gatt;
         gatt = null;
         cancelGattWatchdogs();
+        cancelStockConnectionRequest();
         closeGatt(previous);
         aclConnected = false;
         hfpConnected = false;
@@ -589,6 +607,7 @@ public final class PhoneConnectorController {
         selectedAddress = "";
         selectedName = "";
         ancsStatus = status;
+        stockConnectionStatus = status;
         smsStatus = config != null && config.messagesEnabled ? status : "disabled";
         publishSnapshot(token);
     }
@@ -597,6 +616,7 @@ public final class PhoneConnectorController {
         BluetoothAdapter adapter = bluetoothAdapter();
         if (adapter == null || !adapter.isEnabled()) {
             ancsStatus = "bluetooth_off";
+            stockConnectionStatus = "bluetooth_off";
             smsStatus = config != null && config.messagesEnabled
                     ? "bluetooth_off" : smsStatus;
             publishSnapshot(token);
@@ -606,6 +626,7 @@ public final class PhoneConnectorController {
         String configuredAddress = config == null ? "" : config.deviceAddress;
         if (configuredAddress.isEmpty()) {
             ancsStatus = "no_configured_phone";
+            stockConnectionStatus = "no_configured_phone";
             smsStatus = config != null && config.messagesEnabled
                     ? "no_configured_phone" : smsStatus;
             publishSnapshot(token);
@@ -615,6 +636,7 @@ public final class PhoneConnectorController {
                 configuredAddress);
         if (selected == null) {
             ancsStatus = "not_bonded";
+            stockConnectionStatus = "not_bonded";
             smsStatus = config != null && config.messagesEnabled
                     ? "not_bonded" : smsStatus;
             publishSnapshot(token);
@@ -625,11 +647,70 @@ public final class PhoneConnectorController {
         cancelDeviceRescan();
         selectedAddress = safeAddress(selected);
         selectedName = safeName(selected);
-        PhoneOemConnectionBridge.requestStockConnection(context, selectedAddress);
         updateConnected(token);
         queryInitialProfileState(token, adapter, BluetoothProfile.A2DP);
         queryInitialProfileState(token, adapter, PROFILE_HEADSET_CLIENT);
         queryInitialProfileState(token, adapter, PROFILE_MAP_CLIENT);
+        beginStockConnectionRequest(token, selectedAddress);
+    }
+
+    /**
+     * Serializes the vendor connection owner and this app's BLE client. The ECARX extension can
+     * be present before its backing service is ready, so a rejected request gets two bounded
+     * retries. An accepted request receives a short settle window for HFP/A2DP/MAP before GATT.
+     */
+    private void beginStockConnectionRequest(long token, @NonNull String address) {
+        cancelStockConnectionRequest();
+        if (!isCurrent(token) || selectedDevice == null || address.trim().isEmpty()) {
+            stockConnectionStatus = "invalid_address";
+            ensureGatt(token);
+            return;
+        }
+        stockConnectionRequestInProgress = true;
+        stockConnectionAttempt = 0;
+        stockConnectionStatus = "requesting";
+        publishSnapshot(token);
+        performStockConnectionRequest(token, address);
+    }
+
+    private void performStockConnectionRequest(long token, @NonNull String address) {
+        if (!isCurrent(token) || !stockConnectionRequestInProgress) return;
+        PhoneOemConnectionBridge.RequestResult result =
+                PhoneOemConnectionBridge.requestStockConnection(context, address);
+        stockConnectionAttempt++;
+        stockConnectionStatus = result.diagnosticCode();
+        publishSnapshot(token);
+
+        Handler handler = worker;
+        if (handler == null) {
+            stockConnectionRequestInProgress = false;
+            return;
+        }
+        if (result.accepted()) {
+            Runnable settle = () -> runIfCurrent(token, () -> {
+                stockConnectionTask = null;
+                stockConnectionRequestInProgress = false;
+                ensureGatt(token);
+            });
+            stockConnectionTask = settle;
+            handler.postDelayed(settle, PhoneConnectorPolicy.stockConnectionSettleMillis());
+            return;
+        }
+        if (result.retryable()
+                && stockConnectionAttempt < PhoneConnectorPolicy.stockConnectionMaxAttempts()) {
+            int retryIndex = stockConnectionAttempt - 1;
+            Runnable retry = () -> runIfCurrent(token, () -> {
+                stockConnectionTask = null;
+                performStockConnectionRequest(token, address);
+            });
+            stockConnectionTask = retry;
+            handler.postDelayed(retry,
+                    PhoneConnectorPolicy.stockConnectionRetryDelayMillis(retryIndex));
+            return;
+        }
+        // ECARX is optional. A missing/rejected stock request must remain visible in diagnostics,
+        // but it must not suppress the exact-device public GATT path.
+        stockConnectionRequestInProgress = false;
         ensureGatt(token);
     }
 
@@ -744,7 +825,8 @@ public final class PhoneConnectorController {
     }
 
     private void ensureGatt(long token) {
-        if (!isCurrent(token) || selectedDevice == null || gatt != null) return;
+        if (!isCurrent(token) || selectedDevice == null || gatt != null
+                || stockConnectionRequestInProgress) return;
         cancelGattReconnect();
         Config current = config;
         if (current == null) return;
@@ -1223,170 +1305,7 @@ public final class PhoneConnectorController {
         return operation.characteristic == callbackCharacteristic;
     }
 
-    private void maybeFinishAncsSetup(long token) {
-        if (!ancsReady && ancsDataSubscribed && ancsNotificationSubscribed) {
-            ancsReady = true;
-            ancsAuthorizedThisRun = true;
-            forceDirectGatt = false;
-            reconnectAttempt = 0;
-            ancsStatus = serviceChangedSubscribed ? "ready" : "ready_degraded";
-            if (serviceChangedSubscribed) lastError = "";
-            rebuildMessageSnapshot();
-            cancelSmsFallbackNotifications();
-            updateMessageAvailability();
-            publishSnapshot(token);
-            pumpAttributeRequests(token);
-        }
-    }
-
-    private void handleCharacteristicChanged(long token, @NonNull UUID uuid,
-                                             @Nullable byte[] payload) {
-        if (AncsProtocol.NOTIFICATION_SOURCE.equals(uuid)) {
-            handleAncsEvent(token, AncsProtocol.parseEvent(payload));
-        } else if (AncsProtocol.DATA_SOURCE.equals(uuid)) {
-            handleAncsData(token, payload);
-        } else if (SERVICE_CHANGED.equals(uuid)) {
-            handleServiceChanged(token);
-        } else if (BATTERY_LEVEL.equals(uuid) || BATTERY_POWER_STATE.equals(uuid)) {
-            applyBatteryCharacteristic(token, uuid, payload);
-        }
-    }
-
-    private void handleAncsEvent(long token, @Nullable AncsProtocol.Event event) {
-        Config current = config;
-        if (event == null || current == null || !current.ancsNeeded()
-                || ancsNotificationSource == null || !ancsNotificationListening) return;
-        if (event.eventId == AncsProtocol.EVENT_REMOVED) {
-            removeAncsNotification(token, event.uid);
-            return;
-        }
-        removedAttributeUids.remove(event.uid);
-        pendingAncsEvents.remove(event.uid);
-        pendingAncsEvents.put(event.uid, event);
-        if (activeAttributeUid != null && activeAttributeUid == event.uid) {
-            dirtyAttributeUids.add(event.uid);
-        } else if (queuedAttributeUids.add(event.uid)) {
-            trimPendingNotificationRequests();
-            attributeRequests.add(event.uid);
-        }
-        pumpAttributeRequests(token);
-    }
-
-    private void trimPendingNotificationRequests() {
-        while (attributeRequests.size() >= MAX_PENDING_ANCS_REQUESTS) {
-            Long dropped = attributeRequests.poll();
-            if (dropped == null) break;
-            queuedAttributeUids.remove(dropped);
-            pendingAncsEvents.remove(dropped);
-            dirtyAttributeUids.remove(dropped);
-            fullTextAttributeUids.remove(dropped);
-        }
-    }
-
-    private void handleServiceChanged(long token) {
-        if (gatt == null || !gattConnected) return;
-        // Android 9 vendor stacks can deliver late callbacks from the old attribute database.
-        // Reopening GATT gives the new database its own callback identity and operation queue.
-        forceDirectGatt = true;
-        scheduleGattReconnect(token, "GATT services changed", "services_changed");
-    }
-
-    private void restartAncsAfterBond(long token, @NonNull BluetoothGatt expected) {
-        Handler handler = worker;
-        if (handler == null) return;
-        handler.postDelayed(() -> runIfCurrent(token, () -> {
-            if (gatt != expected || !gattConnected) return;
-            // Never overlap service discovery with a descriptor write that Android's security
-            // manager may still be completing. Reopen one clean client after the bond settles.
-            forceDirectGatt = true;
-            scheduleGattReconnect(token, "Bluetooth LE bond completed", "negotiating");
-        }), 750L);
-    }
-
-    private void pumpAttributeRequests(long token) {
-        if (!ancsReady || activeAttributeUid != null || activeAppIdentifier != null
-                || ancsControlPoint == null) return;
-        Long uid = attributeRequests.poll();
-        if (uid != null) {
-            queuedAttributeUids.remove(uid);
-            activeAttributeUid = uid;
-            long requestSequence = ++nextAncsRequestSequence;
-            activeAncsRequestSequence = requestSequence;
-            boolean includeText = config != null && config.includeNotificationText
-                    && (config.notificationsEnabled || fullTextAttributeUids.contains(uid));
-            activeAttributeIncludesText = includeText;
-            attributeAccumulator = new AncsProtocol.AttributeAccumulator(uid, includeText);
-            byte[] request = AncsProtocol.notificationAttributeRequest(uid, includeText);
-            gattOperations.add(new GattOperation(GattKind.CONTROL_WRITE, GattTag.CONTROL,
-                    null, ancsControlPoint, request, uid, requestSequence));
-            pumpGattOperations(token);
-            return;
-        }
-        while (true) {
-            String appIdentifier = appAttributeRequests.poll();
-            if (appIdentifier == null) return;
-            queuedAppIdentifiers.remove(appIdentifier);
-            final AncsProtocol.AppAttributeAccumulator accumulator;
-            final byte[] request;
-            try {
-                accumulator = new AncsProtocol.AppAttributeAccumulator(appIdentifier);
-                request = AncsProtocol.appAttributeRequest(appIdentifier);
-            } catch (IllegalArgumentException invalidIdentifier) {
-                cacheAppDisplayName(appIdentifier,
-                        PhoneAppCatalog.displayNameFallback(appIdentifier));
-                continue;
-            }
-            activeAppIdentifier = appIdentifier;
-            long requestSequence = ++nextAncsRequestSequence;
-            activeAncsRequestSequence = requestSequence;
-            appAttributeAccumulator = accumulator;
-            gattOperations.add(new GattOperation(GattKind.CONTROL_WRITE, GattTag.CONTROL,
-                    null, ancsControlPoint, request, appIdentifier, requestSequence));
-            pumpGattOperations(token);
-            return;
-        }
-    }
-
-    private void scheduleAttributeTimeout(long token, @NonNull GattOperation operation) {
-        Handler handler = worker;
-        if (handler == null) {
-            scheduleGattReconnect(token, "ANCS response worker unavailable");
-            return;
-        }
-        long expectedSequence = operation.requestSequence;
-        // The Data Source response is allowed to arrive before Android reports completion of the
-        // Control Point write. If that already completed this exact request, there is no response
-        // left to time out and the next serialized request owns any newly queued operation.
-        if (expectedSequence == 0L || activeAncsRequestSequence != expectedSequence) return;
-        Runnable timeout = () -> runIfCurrent(token, () -> {
-            if (activeAncsRequestSequence == expectedSequence) {
-                scheduleGattReconnect(token, "ANCS attribute response timed out");
-            }
-        });
-        attributeTimeout = timeout;
-        handler.postDelayed(timeout, ATTRIBUTE_TIMEOUT_MS);
-    }
-
-    private void handleAncsData(long token, @Nullable byte[] payload) {
-        if (payload == null) return;
-        if (activeAttributeUid != null && attributeAccumulator != null) {
-            handleNotificationAttributes(token, payload);
-            return;
-        }
-        if (activeAppIdentifier != null && appAttributeAccumulator != null) {
-            handleAppAttributes(token, payload);
-        }
-    }
-
-    private void handleNotificationAttributes(long token, @NonNull byte[] payload) {
-        Long uid = activeAttributeUid;
-        AncsProtocol.AttributeAccumulator accumulator = attributeAccumulator;
-        long requestSequence = activeAncsRequestSequence;
-        boolean responseIncludedText = activeAttributeIncludesText;
-        if (uid == null || accumulator == null) return;
-        if (!accumulator.append(payload)) {
-            scheduleGattReconnect(token, "ANCS notification response exceeded its limit");
-            return;
+    private void maybeFinishAncsSetup(…1997 tokens truncated…   return;
         }
         AncsProtocol.Notification notification = accumulator.complete();
         if (notification == null) return;
@@ -2022,6 +1941,7 @@ public final class PhoneConnectorController {
         cancelDeviceRescan();
         cancelGattReconnect();
         cancelAncsPublicationRetry();
+        cancelStockConnectionRequest();
     }
 
     private void cancelDeviceRescan() {
@@ -2036,6 +1956,14 @@ public final class PhoneConnectorController {
         gattReconnectTask = null;
     }
 
+    private void cancelStockConnectionRequest() {
+        Runnable task = stockConnectionTask;
+        if (task != null && worker != null) worker.removeCallbacks(task);
+        stockConnectionTask = null;
+        stockConnectionAttempt = 0;
+        stockConnectionRequestInProgress = false;
+    }
+
     private void scheduleAncsPublicationRetry(long token,
                                               @NonNull BluetoothGatt expected) {
         cancelAncsPublicationRetry();
@@ -2045,22 +1973,20 @@ public final class PhoneConnectorController {
             ancsPublicationRetryTask = null;
             if (gatt != expected || !gattConnected
                     || !"service_not_published".equals(ancsStatus)) return;
-            if (serviceChangedSubscribed) {
-                // The iPhone can now publish ANCS without connection churn; its indication owns
-                // the next transition.
-                publishSnapshot(token);
-                return;
-            }
             if (ancsPublicationRetryCount >= 1) {
-                ancsStatus = "service_unavailable";
-                lastError = "ANCS was not published and Service Changed is unavailable";
+                ancsStatus = "stock_pairing_required";
+                lastError = "ANCS was not published by the iPhone after clean rediscovery";
                 publishSnapshot(token);
                 return;
             }
             ancsPublicationRetryCount++;
             forceDirectGatt = true;
+            refreshGattCache(expected);
             scheduleGattReconnect(token,
-                    "ANCS was not published; retrying one clean GATT session",
+                    serviceChangedSubscribed
+                            ? "ANCS was not published; refreshing one clean GATT session"
+                            : "ANCS was not published and Service Changed is unavailable; "
+                            + "refreshing one clean GATT session",
                     "service_not_published");
         });
         ancsPublicationRetryTask = retry;
@@ -2333,6 +2259,9 @@ public final class PhoneConnectorController {
         LinkedHashMap<String, Object> device = new LinkedHashMap<>();
         device.put("address", maskedAddress(selectedAddress));
         device.put("name", selectedName);
+        device.put("stock_connection", stockConnectionStatus);
+        device.put("ancs_setup", config != null && config.ancsNeeded()
+                ? "stock_bluetooth_required" : "disabled");
         snapshot.add(value("diagnostics.device", device, !selectedAddress.isEmpty(),
                 "object", "", now));
         LinkedHashMap<String, Object> lastApp = new LinkedHashMap<>();
@@ -2606,6 +2535,24 @@ public final class PhoneConnectorController {
         try {
             item.close();
         } catch (RuntimeException ignored) {}
+    }
+
+    /**
+     * Android 9 caches a peripheral's attribute database across GATT clients. Its hidden refresh
+     * hook is the only best-effort way for a target-28 app to see ANCS after iPhone publishes the
+     * service without rebooting the head unit. Failure is harmless and the normal reconnect still
+     * runs.
+     */
+    private static boolean refreshGattCache(@Nullable BluetoothGatt item) {
+        if (item == null) return false;
+        try {
+            Method refresh = item.getClass().getMethod("refresh");
+            Object result = refresh.invoke(item);
+            return !(result instanceof Boolean) || (Boolean) result;
+        } catch (Throwable unavailable) {
+            Log.d(TAG, "Bluetooth GATT cache refresh is unavailable", unavailable);
+            return false;
+        }
     }
 
     @NonNull
