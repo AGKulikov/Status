@@ -25,6 +25,7 @@ import android.util.Log;
 import dezz.status.widget.climate.ClimatePanelService;
 import dezz.status.widget.climate.ScreenReservationStateStore;
 import dezz.status.widget.driver.DriverPanelService;
+import dezz.status.widget.hud.HudPresentationService;
 
 public class BootReceiver extends BroadcastReceiver {
     private static final String TAG = "BootReceiver";
@@ -44,6 +45,7 @@ public class BootReceiver extends BroadcastReceiver {
             // OEM ROMs. This reconfigure is independent from status-window attachment.
             restoreStatusWidget(context, true);
             restoreDriverPanelSafely(context);
+            restoreHudSafely(context);
             restoreClimateSafely(context);
             return;
         }
@@ -58,6 +60,7 @@ public class BootReceiver extends BroadcastReceiver {
             // must never prevent the status row from being started (or vice versa).
             restoreStatusWidget(context, false);
             restoreDriverPanelSafely(context);
+            restoreHudSafely(context);
             restoreClimateSafely(context);
         }
     }
@@ -71,6 +74,18 @@ public class BootReceiver extends BroadcastReceiver {
             }
         } catch (RuntimeException failure) {
             Log.e(TAG, "Could not restore driver panel", failure);
+        }
+    }
+
+    private static void restoreHudSafely(Context context) {
+        try {
+            Preferences prefs = new Preferences(context);
+            if (prefs.hudPanelEnabled.get() && prefs.hudPanelAutostart.get()) {
+                Log.i(TAG, "Restoring external HUD presentation");
+                HudPresentationService.apply(context);
+            }
+        } catch (RuntimeException failure) {
+            Log.e(TAG, "Could not restore HUD presentation", failure);
         }
     }
 
