@@ -193,7 +193,7 @@ public final class MediaPanelInteractionContractTest {
         String launcher = source("dezz/status/widget/LauncherActivity.java");
         assertTrue(settings.contains("LauncherActivity.EXTRA_EDIT_MODE"));
         assertTrue(settings.contains("LauncherActivity.EXTRA_EDIT_MEDIA_CONTENT"));
-        assertTrue(settings.contains("Расположение элементов внутри панели на HOME"));
+        assertTrue(settings.contains("Расположение элементов блока на HOME"));
         assertTrue(settings.contains("ЖИВОЙ РЕДАКТОР · ТАЩИТЕ ЭЛЕМЕНТЫ"));
         assertTrue(settings.contains("preview.setInPlaceEditMode(true"));
         assertTrue(launcher.contains("private void setMediaContentEditMode(boolean enabled)"));

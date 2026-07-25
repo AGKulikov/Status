@@ -517,6 +517,12 @@ public class Preferences {
     public final Bool launcherShowGrid = new Bool(this, "launcherShowGrid", true);
     public final Int launcherSnapPx = new Int(this, "launcherSnapPx", 20);
     public final Bool launcherImmersive = new Bool(this, "launcherImmersive", true);
+    /**
+     * Grid-based HOME blocks use the complete safe launcher canvas. The block remains a logical
+     * settings group, while each of its children can be positioned anywhere on HOME.
+     */
+    public final Bool launcherFreeBlockCanvas = new Bool(this,
+            "launcherFreeBlockCanvas", true);
     /** HOME first renders our launcher, then opens Navigator through its ECARX window entry. */
     public final Bool launcherAutoWindowedNavigatorOnHome = new Bool(this,
             "launcherAutoWindowedNavigatorOnHome", false);

@@ -97,6 +97,7 @@ public final class MediaPanelView extends FrameLayout {
     private boolean playPauseRenderInitialized;
     private boolean renderedPlaying;
     private int renderedPlayPauseTint;
+    private boolean wholeHomeCanvas;
     @NonNull private String titleValue = "Музыка не воспроизводится";
     @NonNull private String artistValue = "";
     @NonNull private String albumValue = "";
@@ -120,6 +121,13 @@ public final class MediaPanelView extends FrameLayout {
 
     public void reloadConfig() {
         setConfig(store.load());
+    }
+
+    /** Suppresses only the block-wide surface; individual media cells keep their own glass. */
+    public void setWholeHomeCanvas(boolean enabled) {
+        if (wholeHomeCanvas == enabled) return;
+        wholeHomeCanvas = enabled;
+        rebuild();
     }
 
     /** Used by the editor for a no-restart live preview. */
@@ -222,6 +230,10 @@ public final class MediaPanelView extends FrameLayout {
             MediaPanelConfig.Spec spec = MediaPanelConfig.spec(element.id);
             if (spec == null) continue;
             View view = buildElement(element, spec);
+            if (wholeHomeCanvas && layoutEditor == null && opensMediaApplication(element.id)) {
+                view.setOnClickListener(ignored -> openMediaApplication());
+                view.setClickable(true);
+            }
             elementViews.put(element.id, view);
             if (layoutEditor != null) attachEditorDrag(view, element.id);
             grid.addView(view, elementLayout(element));
@@ -394,18 +406,29 @@ public final class MediaPanelView extends FrameLayout {
     }
 
     private void configurePanelClick() {
-        if (controls == null || layoutEditor != null) {
+        if (controls == null || layoutEditor != null || wholeHomeCanvas) {
             setOnClickListener(null);
             setClickable(false);
             return;
         }
         setClickable(true);
-        setOnClickListener(view -> {
-            if (!MediaAppLauncher.launchYandexMusic(getContext())) {
-                Toast.makeText(getContext(), "Яндекс Музыка не найдена",
-                        Toast.LENGTH_SHORT).show();
-            }
-        });
+        setOnClickListener(view -> openMediaApplication());
+    }
+
+    private void openMediaApplication() {
+        if (!MediaAppLauncher.launchYandexMusic(getContext())) {
+            Toast.makeText(getContext(), "Яндекс Музыка не найдена",
+                    Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private static boolean opensMediaApplication(@NonNull String id) {
+        return MediaPanelConfig.ARTWORK.equals(id)
+                || MediaPanelConfig.TITLE.equals(id)
+                || MediaPanelConfig.ARTIST.equals(id)
+                || MediaPanelConfig.ALBUM.equals(id)
+                || MediaPanelConfig.APPLICATION.equals(id)
+                || MediaPanelConfig.PROGRESS.equals(id);
     }
 
     @NonNull
@@ -667,6 +690,10 @@ public final class MediaPanelView extends FrameLayout {
     }
 
     private void applySurface() {
+        if (wholeHomeCanvas) {
+            setBackground(null);
+            return;
+        }
         int base = color(config.backgroundColor, Color.rgb(18, 25, 35));
         GradientDrawable background = new GradientDrawable();
         background.setColor(Color.argb(config.backgroundAlpha, Color.red(base),

@@ -19,12 +19,14 @@ import java.nio.file.Paths;
 public final class LauncherWindowBackgroundGuardContractTest {
     @Test public void windowedLaunchRaisesLauncherBeforeYandex() throws IOException {
         String launcher = source("dezz/status/widget/LauncherActivity.java");
+        String guard = source("dezz/status/widget/launcher/StatusHomeBackgroundGuard.java");
         int method = launcher.indexOf("private void launchYandex(");
         int end = launcher.indexOf("private void dismissAllAppsDialog()", method);
         String block = launcher.substring(method, end);
         assertTrue(block.contains("ensureLauncherTaskForeground()"));
         assertTrue(block.contains("moveTaskToFront(getTaskId()"));
-        assertTrue(block.contains("FLAG_ACTIVITY_REORDER_TO_FRONT"));
+        assertTrue(guard.contains("FLAG_ACTIVITY_REORDER_TO_FRONT"));
+        assertTrue(guard.contains("LauncherActivity.class"));
         assertTrue(block.indexOf("ensureLauncherTaskForeground()")
                 < block.indexOf("launchYandexNow(product, false"));
     }
@@ -32,6 +34,21 @@ public final class LauncherWindowBackgroundGuardContractTest {
     @Test public void manifestGrantsNormalTaskReorderPermission() throws IOException {
         String manifest = sourceManifest();
         assertTrue(manifest.contains("android.permission.REORDER_TASKS"));
+    }
+
+    @Test public void driverAndFavoriteWindowsUseTheSameHomeGuard() throws IOException {
+        String window = source("dezz/status/widget/launcher/YandexWindowLauncher.java");
+        String route = source(
+                "dezz/status/widget/launcher/routes/YandexRouteLauncher.java");
+        String driver = source(
+                "dezz/status/widget/driver/DriverPanelActionExecutor.java");
+        assertTrue(window.contains("launchOverStatusHome"));
+        assertTrue(window.contains("StatusHomeBackgroundGuard.raise(context)"));
+        assertTrue(window.contains("if (!StatusHomeBackgroundGuard.raise(context))"));
+        assertTrue(route.contains("launchOverStatusHome"));
+        assertTrue(route.contains("if (!scheduled)"));
+        assertTrue(driver.contains("launchOverStatusHome"));
+        assertTrue(driver.contains("if (!scheduled)"));
     }
 
     private static String source(String relative) throws IOException {

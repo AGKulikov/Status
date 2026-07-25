@@ -325,7 +325,7 @@ public final class VehicleInfoPanelSettingsActivity extends AppCompatActivity {
 
         addHint(body, "Оставьте поле пустым, чтобы использовать название или единицу, "
                 + "которые сообщает автомобиль.");
-        EditText title = addInput(body, "Название на панели", metric.labelOverride,
+        EditText title = addInput(body, "Название в блоке", metric.labelOverride,
                 InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         EditText unit = addInput(body, "Единица измерения", metric.unitOverride,
                 InputType.TYPE_CLASS_TEXT);

@@ -183,6 +183,16 @@ final class DriverPanelActionExecutor {
     }
 
     private void launchYandex(YandexWindowLauncher.Product product, boolean full) {
+        if (!full) {
+            boolean scheduled = YandexWindowLauncher.launchOverStatusHome(
+                    context, product, opened -> {
+                        if (!opened) toast("Приложение Яндекса не найдено");
+                    });
+            if (!scheduled) {
+                toast("Оконный режим не открыт: не удалось закрепить лаунчер снизу");
+            }
+            return;
+        }
         if (!YandexWindowLauncher.launch(context, product, full)) {
             toast("Приложение Яндекса не найдено");
         }

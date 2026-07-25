@@ -30,9 +30,11 @@ public final class YandexRouteLauncher {
         final Uri deepLink;
         final Uri alternateDeepLink;
         try {
-            deepLink = deepLink(route.product, route.address, route.coordinates);
-            alternateDeepLink = deepLink(opposite(route.product),
-                    route.address, route.coordinates);
+            deepLink = authenticatedDeepLink(context, route.product,
+                    deepLink(route.product, route.address, route.coordinates));
+            FavoriteRouteConfig.Product alternate = opposite(route.product);
+            alternateDeepLink = authenticatedDeepLink(context, alternate,
+                    deepLink(alternate, route.address, route.coordinates));
         } catch (IllegalArgumentException invalid) {
             Toast.makeText(context, route.coordinates.trim().isEmpty()
                     ? "Для прямого построения маршрута добавьте координаты точки"
@@ -48,22 +50,28 @@ public final class YandexRouteLauncher {
         // "Navigator" shortcut already uses Yandex' ECARX-specific TransparentSplashActivity
         // (`ddnavwin`). Opening that exact entry point first also keeps route buttons compatible
         // with head units where ActivityOptions/windowingMode 5 opens on the wrong display.
-        boolean opened = YandexWindowLauncher.launch(
-                context, windowProduct(route.product), false);
-        if (!opened) {
-            return startDeepLink(context, route.product, deepLink, alternateDeepLink);
+        boolean scheduled = YandexWindowLauncher.launchOverStatusHome(
+                context, windowProduct(route.product), opened -> {
+                    if (!opened) {
+                        startDeepLink(context, route.product, deepLink, alternateDeepLink);
+                        return;
+                    }
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        // The Yandex task is now the same floating task created by the normal
+                        // Navigator button. ACTION_VIEW changes only its destination.
+                        if (!startDeepLink(context, route.product,
+                                deepLink, alternateDeepLink)) {
+                            Toast.makeText(context, "Не удалось передать маршрут в Яндекс",
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    }, ROUTE_AFTER_WINDOW_DELAY_MS);
+                });
+        if (!scheduled) {
+            Toast.makeText(context,
+                    "Маршрут не открыт: не удалось закрепить лаунчер под окном",
+                    Toast.LENGTH_LONG).show();
         }
-
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            // The Yandex task is now the same floating task created by the normal Navigator
-            // button. ACTION_VIEW is delivered afterwards, so only its destination changes and
-            // Android reuses that already-windowed task instead of constructing another window.
-            if (!startDeepLink(context, route.product, deepLink, alternateDeepLink)) {
-                Toast.makeText(context, "Не удалось передать маршрут в Яндекс",
-                        Toast.LENGTH_LONG).show();
-            }
-        }, ROUTE_AFTER_WINDOW_DELAY_MS);
-        return true;
+        return scheduled;
     }
 
     @NonNull
@@ -96,6 +104,22 @@ public final class YandexRouteLauncher {
                     .appendQueryParameter("lon_via_" + index, via.longitude);
         }
         return uri.build();
+    }
+
+    @NonNull
+    private static Uri authenticatedDeepLink(@NonNull Context context,
+                                             @NonNull FavoriteRouteConfig.Product product,
+                                             @NonNull Uri source) {
+        if (product != FavoriteRouteConfig.Product.NAVIGATOR) return source;
+        YandexNavigatorAccessStore access = new YandexNavigatorAccessStore(context);
+        if (!access.isConfigured()) return source;
+        try {
+            return YandexNavigatorUrlSigner.sign(
+                    source, access.clientId(), access.privateKeyPem());
+        } catch (Exception invalid) {
+            // A malformed imported credential must not break the direct unsigned hand-off.
+            return source;
+        }
     }
 
     private static boolean startDeepLink(@NonNull Context context,

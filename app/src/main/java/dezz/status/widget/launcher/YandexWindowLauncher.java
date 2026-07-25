@@ -9,6 +9,8 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -16,6 +18,9 @@ import androidx.annotation.Nullable;
 /** Starts the special floating-window entry points used by the head-unit Yandex builds. */
 public final class YandexWindowLauncher {
     public enum Product { MAPS, NAVIGATOR }
+    public interface Result {
+        void onResult(boolean opened);
+    }
 
     private static final String MAPS_PACKAGE = "ru.yandex.yandexmaps";
     private static final String NAVIGATOR_PACKAGE = "ru.yandex.yandexnavi";
@@ -49,6 +54,24 @@ public final class YandexWindowLauncher {
     };
 
     private YandexWindowLauncher() {}
+
+    /**
+     * Windowed Yandex is always created after Status Widget HOME has one frame to become the
+     * backing task. This path is shared by launcher buttons, driver-panel buttons and routes.
+     */
+    public static boolean launchOverStatusHome(@NonNull Context context,
+                                               @NonNull Product product,
+                                               @Nullable Result result) {
+        Context app = context.getApplicationContext();
+        if (!StatusHomeBackgroundGuard.raise(context)) {
+            return false;
+        }
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            boolean opened = launch(app, product, false);
+            if (result != null) result.onResult(opened);
+        }, StatusHomeBackgroundGuard.SETTLE_MS);
+        return true;
+    }
 
     public static boolean launch(@NonNull Context context, @NonNull Product product,
                                  boolean forceFullScreen) {

@@ -71,6 +71,7 @@ import dezz.status.widget.launcher.LauncherActionsGridConfigStore;
 import dezz.status.widget.launcher.LauncherAppCatalog;
 import dezz.status.widget.launcher.LauncherAppTileRenderer;
 import dezz.status.widget.launcher.LauncherAllAppsSurface;
+import dezz.status.widget.launcher.LauncherBlockCanvasPolicy;
 import dezz.status.widget.launcher.LauncherElementFrame;
 import dezz.status.widget.launcher.LauncherGridView;
 import dezz.status.widget.launcher.LauncherLayoutStore;
@@ -83,6 +84,7 @@ import dezz.status.widget.launcher.NavigationDataRepository;
 import dezz.status.widget.launcher.SingleFlightRefresh;
 import dezz.status.widget.launcher.SmartHomeShortcutStateBindingPolicy;
 import dezz.status.widget.launcher.SmartHomeShortcutStatePolicy;
+import dezz.status.widget.launcher.StatusHomeBackgroundGuard;
 import dezz.status.widget.launcher.YandexWindowLauncher;
 import dezz.status.widget.launcher.apps.FavoriteAppConfig;
 import dezz.status.widget.launcher.apps.FavoriteAppsConfigStore;
@@ -92,6 +94,7 @@ import dezz.status.widget.launcher.climate.ClimatePanelView;
 import dezz.status.widget.launcher.media.MediaPanelConfig;
 import dezz.status.widget.launcher.media.MediaPanelConfigStore;
 import dezz.status.widget.launcher.media.MediaPanelView;
+import dezz.status.widget.launcher.information.InformationPanelConfig;
 import dezz.status.widget.launcher.information.InformationPanelConfigStore;
 import dezz.status.widget.launcher.information.InformationPanelView;
 import dezz.status.widget.launcher.navigation.NavigationPanelConfig;
@@ -128,14 +131,13 @@ public final class LauncherActivity extends AppCompatActivity {
             "dezz.status.widget.extra.EDIT_MEDIA_CONTENT";
     public static final String EXTRA_EDIT_ACTIONS_CONTENT =
             "dezz.status.widget.extra.EDIT_ACTIONS_CONTENT";
-    private static final String EXTRA_WINDOW_BACKGROUND_GUARD =
-            "dezz.status.widget.extra.WINDOW_BACKGROUND_GUARD";
+    public static final String EXTRA_EDIT_INFORMATION_CONTENT =
+            "dezz.status.widget.extra.EDIT_INFORMATION_CONTENT";
     private static final long NAVIGATION_UI_REFRESH_MS = 30_000L;
     private static final long NAVIGATION_DYNAMIC_REFRESH_MS = 5_000L;
     private static final long SAFE_AREA_REFRESH_MS = 500L;
     private static final long APP_CATALOG_REFRESH_MS = 10L * 60L * 1_000L;
     /** One visible launcher frame prevents the previous application becoming freeform backing. */
-    private static final long WINDOWED_YANDEX_BACKGROUND_SETTLE_MS = 96L;
     private static final long AUTO_NAVIGATOR_HOME_DEBOUNCE_MS = 800L;
     /** Gives the foreground WidgetService a chance to attach the status row before HOME work. */
     private static final long PANEL_INITIALIZATION_GRACE_MS = 200L;
@@ -184,6 +186,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private boolean navigationContentEditMode;
     private boolean mediaContentEditMode;
     private boolean actionsContentEditMode;
+    private boolean informationContentEditMode;
     private int systemLeftInset;
     private int systemTopInset;
     private int systemRightInset;
@@ -248,6 +251,8 @@ public final class LauncherActivity extends AppCompatActivity {
     private boolean favoriteRoutesAvailable;
     private VehicleInfoPanelView vehicleInfoPanel;
     private InformationPanelView informationPanel;
+    @Nullable private InformationPanelConfig informationEditorConfig;
+    @Nullable private PanelContentEditOverlay informationContentEditOverlay;
     @Nullable private String appliedPanelElementsJson;
     @Nullable private String appliedNavigationConfigJson;
     @Nullable private String appliedActionsGridJson;
@@ -351,6 +356,8 @@ public final class LauncherActivity extends AppCompatActivity {
                 setNavigationContentEditMode(true);
             } else if (intent.getBooleanExtra(EXTRA_EDIT_ACTIONS_CONTENT, false)) {
                 setActionsContentEditMode(true);
+            } else if (intent.getBooleanExtra(EXTRA_EDIT_INFORMATION_CONTENT, false)) {
+                setInformationContentEditMode(true);
             } else if (intent.getBooleanExtra(EXTRA_EDIT_MODE, false)) {
                 setEditMode(true);
             }
@@ -533,6 +540,7 @@ public final class LauncherActivity extends AppCompatActivity {
         if (!panelsInitialized) return;
         View root = (View) workspace.getParent();
         if (root != null) root.setBackground(buildBackground());
+        applyBlockCanvasPolicy();
         setPanelVisibility(LauncherLayoutStore.APPS, preferences.launcherAppsVisible.get()
                 && hasSimplePanelContent(LauncherLayoutStore.APPS));
         if (preferences.launcherAppsVisible.get() && appCatalog != null
@@ -570,10 +578,14 @@ public final class LauncherActivity extends AppCompatActivity {
         }
         boolean informationVisible = preferences.launcherInformationVisible.get();
         if (informationPanel != null) {
-            informationPanel.reloadConfig();
+            if (!informationContentEditMode) {
+                informationEditorConfig = informationConfigStore.load();
+                informationPanel.setConfig(informationEditorConfig);
+            }
             boolean hasInformation = informationPanel.hasConfiguredItems();
             setPanelVisibility(LauncherLayoutStore.INFORMATION,
-                    informationVisible && (editMode || hasInformation));
+                    informationContentEditMode
+                            || informationVisible && (editMode || hasInformation));
             if (activityStarted && informationVisible && hasInformation) {
                 informationPanel.start();
             } else {
@@ -665,6 +677,8 @@ public final class LauncherActivity extends AppCompatActivity {
             setNavigationContentEditMode(false);
         } else if (actionsContentEditMode) {
             setActionsContentEditMode(false);
+        } else if (informationContentEditMode) {
+            setInformationContentEditMode(false);
         } else if (editMode) {
             setEditMode(false);
         } else {
@@ -705,7 +719,7 @@ public final class LauncherActivity extends AppCompatActivity {
         workspace.setLongClickable(true);
         workspace.setOnLongClickListener(v -> {
             if (!navigationContentEditMode && !mediaContentEditMode
-                    && !actionsContentEditMode) setEditMode(true);
+                    && !actionsContentEditMode && !informationContentEditMode) setEditMode(true);
             return true;
         });
         root.addView(workspace, match());
@@ -761,7 +775,7 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private void applyStoredPanelGeometry() {
         for (Map.Entry<String, LauncherElementFrame> entry : panels.entrySet()) {
-            LauncherLayoutStore.Geometry geometry = layoutStore.get(entry.getKey());
+            LauncherLayoutStore.Geometry geometry = runtimeBlockGeometry(entry.getKey());
             FrameLayout.LayoutParams params =
                     (FrameLayout.LayoutParams) entry.getValue().getLayoutParams();
             params.width = geometry.width;
@@ -779,6 +793,8 @@ public final class LauncherActivity extends AppCompatActivity {
             setNavigationContentEditMode(false);
         } else if (actionsContentEditMode) {
             setActionsContentEditMode(false);
+        } else if (informationContentEditMode) {
+            setInformationContentEditMode(false);
         } else {
             setEditMode(false);
         }
@@ -892,8 +908,79 @@ public final class LauncherActivity extends AppCompatActivity {
     private void makePanelTransparent(@NonNull String id) {
         LauncherElementFrame frame = panels.get(id);
         if (frame == null) return;
-        frame.setCardBackgroundColor(Color.TRANSPARENT);
-        frame.setCardElevation(0);
+        frame.setTransparentSurface(true);
+    }
+
+    private boolean usesWholeHomeCanvas(@NonNull String id) {
+        return LauncherBlockCanvasPolicy.usesWholeHome(id,
+                preferences.launcherFreeBlockCanvas.get());
+    }
+
+    @NonNull
+    private LauncherLayoutStore.Geometry runtimeBlockGeometry(@NonNull String id) {
+        if (usesWholeHomeCanvas(id)) {
+            return new LauncherLayoutStore.Geometry(0, 0,
+                    Math.max(1, workspace.getWidth()), Math.max(1, workspace.getHeight()));
+        }
+        return layoutStore.get(id);
+    }
+
+    private void applyBlockCanvasPolicy() {
+        for (Map.Entry<String, LauncherElementFrame> entry : panels.entrySet()) {
+            applyBlockFrameStyle(entry.getKey(), entry.getValue());
+        }
+        boolean mediaCanvas = usesWholeHomeCanvas(LauncherLayoutStore.MEDIA);
+        if (mediaPanel != null) mediaPanel.setWholeHomeCanvas(mediaCanvas);
+        boolean informationCanvas = usesWholeHomeCanvas(LauncherLayoutStore.INFORMATION);
+        if (informationPanel != null) informationPanel.setWholeHomeCanvas(informationCanvas);
+        if (favoriteRoutesPanel != null) {
+            favoriteRoutesPanel.setWholeHomeCanvas(
+                    usesWholeHomeCanvas(LauncherLayoutStore.NAVIGATION));
+        }
+        applyNavigationCanvasInteraction();
+    }
+
+    private void applyBlockFrameStyle(@NonNull String id,
+                                      @NonNull LauncherElementFrame frame) {
+        boolean canvas = usesWholeHomeCanvas(id);
+        frame.setCanvasMode(canvas);
+        frame.setTransparentSurface(canvas || hasOwnBlockSurface(id));
+        if (LauncherLayoutStore.MEDIA.equals(id) && mediaPanel != null) {
+            mediaPanel.setWholeHomeCanvas(canvas);
+        } else if (LauncherLayoutStore.NAVIGATION.equals(id)
+                && favoriteRoutesPanel != null) {
+            favoriteRoutesPanel.setWholeHomeCanvas(canvas);
+        } else if (LauncherLayoutStore.INFORMATION.equals(id)
+                && informationPanel != null) {
+            informationPanel.setWholeHomeCanvas(canvas);
+        }
+    }
+
+    private static boolean hasOwnBlockSurface(@NonNull String id) {
+        return LauncherLayoutStore.MEDIA.equals(id)
+                || LauncherLayoutStore.CLIMATE.equals(id)
+                || LauncherLayoutStore.VEHICLE_INFO.equals(id)
+                || LauncherLayoutStore.INFORMATION.equals(id);
+    }
+
+    private void bringBlockToFront(@NonNull String id) {
+        LauncherElementFrame frame = panels.get(id);
+        if (frame != null) frame.bringToFront();
+    }
+
+    private void applyNavigationCanvasInteraction() {
+        View route = navigationRouteContent;
+        if (route == null) return;
+        if (usesWholeHomeCanvas(LauncherLayoutStore.NAVIGATION)) {
+            route.setOnClickListener(null);
+            route.setClickable(false);
+        } else {
+            route.setOnClickListener(v -> {
+                if (!navigationContentEditMode) {
+                    launchYandex(navigationLaunchProduct, false);
+                }
+            });
+        }
     }
 
     private void finishPanelInitialization() {
@@ -929,6 +1016,8 @@ public final class LauncherActivity extends AppCompatActivity {
             setNavigationContentEditMode(true);
         } else if (getIntent().getBooleanExtra(EXTRA_EDIT_ACTIONS_CONTENT, false)) {
             setActionsContentEditMode(true);
+        } else if (getIntent().getBooleanExtra(EXTRA_EDIT_INFORMATION_CONTENT, false)) {
+            setInformationContentEditMode(true);
         } else if (getIntent().getBooleanExtra(EXTRA_EDIT_MODE, false)) {
             setEditMode(true);
         }
@@ -1009,22 +1098,77 @@ public final class LauncherActivity extends AppCompatActivity {
 
     @NonNull
     private View buildInformationPanel() {
+        FrameLayout host = new FrameLayout(this);
+        informationEditorConfig = informationConfigStore.load();
         informationPanel = new InformationPanelView(this, carIntegration,
                 informationConfigStore);
         informationPanel.setContentListener(hasItems ->
                 setPanelVisibility(LauncherLayoutStore.INFORMATION,
-                        preferences.launcherInformationVisible.get()
+                        informationContentEditMode
+                                || preferences.launcherInformationVisible.get()
                                 && (editMode || hasItems)));
-        return informationPanel;
+        host.addView(informationPanel, match());
+
+        informationContentEditOverlay = new PanelContentEditOverlay(this);
+        informationContentEditOverlay.setModel(new PanelContentEditOverlay.Model() {
+            @Override public int columns() {
+                InformationPanelConfig value = informationEditorConfig;
+                return value == null ? 1 : value.columns;
+            }
+
+            @Override public int rows() {
+                InformationPanelConfig value = informationEditorConfig;
+                return value == null ? 1 : value.rows;
+            }
+
+            @NonNull
+            @Override public List<PanelContentEditOverlay.Item> items() {
+                InformationPanelConfig value = informationEditorConfig;
+                if (value == null) return Collections.emptyList();
+                List<PanelContentEditOverlay.Item> result = new ArrayList<>();
+                for (InformationPanelConfig.Item item : value.items()) {
+                    if (!item.enabled) continue;
+                    result.add(new PanelContentEditOverlay.Item(item.id,
+                            item.displayLabel(), item.column, item.row,
+                            item.columnSpan, item.rowSpan));
+                }
+                return result;
+            }
+
+            @Override public boolean setPlacement(@NonNull String id, int column, int row,
+                                                  int columnSpan, int rowSpan) {
+                InformationPanelConfig value = informationEditorConfig;
+                return value != null && value.setPlacement(id, column, row,
+                        columnSpan, rowSpan);
+            }
+        }, (id, finished) -> {
+            InformationPanelConfig value = informationEditorConfig;
+            if (value == null || informationPanel == null) return;
+            informationPanel.setConfig(value);
+            if (finished) informationConfigStore.save(value);
+            if (informationContentEditOverlay != null) {
+                informationContentEditOverlay.invalidate();
+            }
+        });
+        host.addView(informationContentEditOverlay, match());
+        informationContentEditOverlay.setEditing(informationContentEditMode);
+        return host;
     }
 
     private void addPanel(@NonNull String id, @NonNull String label, @NonNull View content,
                           boolean visible) {
         LauncherElementFrame frame = new LauncherElementFrame(this, id, label,
-                (changedId, x, y, width, height) -> layoutStore.put(changedId,
-                        new LauncherLayoutStore.Geometry(x, y, width, height)));
+                (changedId, x, y, width, height) -> {
+                    // Whole-HOME blocks are coordinate hosts, not user-owned outer rectangles.
+                    // Keep the last compact geometry intact for compatibility mode.
+                    if (!usesWholeHomeCanvas(changedId)) {
+                        layoutStore.put(changedId,
+                                new LauncherLayoutStore.Geometry(x, y, width, height));
+                    }
+                });
         frame.setContent(content);
-        LauncherLayoutStore.Geometry g = layoutStore.get(id);
+        applyBlockFrameStyle(id, frame);
+        LauncherLayoutStore.Geometry g = runtimeBlockGeometry(id);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(g.width, g.height);
         lp.leftMargin = g.x;
         lp.topMargin = g.y;
@@ -1254,11 +1398,13 @@ public final class LauncherActivity extends AppCompatActivity {
         });
         host.addView(navigationContentEditOverlay, match());
         navigationContentEditOverlay.setEditing(navigationContentEditMode);
-        host.setOnClickListener(v -> {
-            if (!navigationContentEditMode) {
-                launchYandex(navigationLaunchProduct, false);
-            }
-        });
+        if (!usesWholeHomeCanvas(LauncherLayoutStore.NAVIGATION)) {
+            host.setOnClickListener(v -> {
+                if (!navigationContentEditMode) {
+                    launchYandex(navigationLaunchProduct, false);
+                }
+            });
+        }
         return host;
     }
 
@@ -1269,6 +1415,11 @@ public final class LauncherActivity extends AppCompatActivity {
         FrameLayout cell = new FrameLayout(this);
         cell.setTag(element.id);
         cell.setPadding(dp(4), dp(2), dp(4), dp(2));
+        cell.setOnClickListener(v -> {
+            if (!navigationContentEditMode) {
+                launchYandex(navigationLaunchProduct, false);
+            }
+        });
         ViewGroup.LayoutParams existing = content.getLayoutParams();
         FrameLayout.LayoutParams contentParams = existing instanceof FrameLayout.LayoutParams
                 ? (FrameLayout.LayoutParams) existing : match();
@@ -1618,7 +1769,7 @@ public final class LauncherActivity extends AppCompatActivity {
             stateLabel.setGravity(Gravity.CENTER);
             stateLabel.setText("…");
             stateLabel.setSingleLine(false);
-            stateLabel.setMaxLines(3);
+            stateLabel.setMaxLines(Integer.MAX_VALUE);
             stateLabel.setHorizontallyScrolling(false);
             stateLabel.setEllipsize(null);
             stateLabel.setIncludeFontPadding(false);
@@ -1941,6 +2092,7 @@ public final class LauncherActivity extends AppCompatActivity {
         if (enabled && navigationContentEditMode) setNavigationContentEditMode(false);
         if (enabled && mediaContentEditMode) setMediaContentEditMode(false);
         if (enabled && actionsContentEditMode) setActionsContentEditMode(false);
+        if (enabled && informationContentEditMode) setInformationContentEditMode(false);
         editMode = enabled;
         int snap = Math.max(4, preferences.launcherSnapPx.get());
         editorGrid.setStepPx(snap);
@@ -1948,8 +2100,11 @@ public final class LauncherActivity extends AppCompatActivity {
                 ? View.VISIBLE : View.GONE);
         doneButton.setText("Готово · закрепить компоновку");
         doneButton.setVisibility(enabled || navigationContentEditMode || mediaContentEditMode
-                || actionsContentEditMode ? View.VISIBLE : View.GONE);
-        for (LauncherElementFrame frame : panels.values()) frame.setEditMode(enabled, snap);
+                || actionsContentEditMode || informationContentEditMode
+                ? View.VISIBLE : View.GONE);
+        for (Map.Entry<String, LauncherElementFrame> entry : panels.entrySet()) {
+            entry.getValue().setEditMode(enabled && !usesWholeHomeCanvas(entry.getKey()), snap);
+        }
         updateLauncherSafeArea();
         updateNavigation();
         if (vehicleInfoPanel != null && preferences.launcherVehicleInfoVisible.get()) {
@@ -1961,7 +2116,7 @@ public final class LauncherActivity extends AppCompatActivity {
                     enabled || informationPanel.hasConfiguredItems());
         }
         Toast.makeText(this, enabled
-                ? "Тащите панель; размер меняется за любой из четырёх углов"
+                ? "Тащите компактные блоки; свободные элементы меняются в редакторе блока"
                 : "Компоновка сохранена", Toast.LENGTH_SHORT).show();
     }
 
@@ -1969,6 +2124,7 @@ public final class LauncherActivity extends AppCompatActivity {
         if (enabled && editMode) setEditMode(false);
         if (enabled && mediaContentEditMode) setMediaContentEditMode(false);
         if (enabled && actionsContentEditMode) setActionsContentEditMode(false);
+        if (enabled && informationContentEditMode) setInformationContentEditMode(false);
         navigationContentEditMode = enabled;
         if (navigationContentEditOverlay != null) {
             navigationContentEditOverlay.setEditing(enabled);
@@ -1978,10 +2134,12 @@ public final class LauncherActivity extends AppCompatActivity {
                 ? "Готово · сохранить элементы навигации"
                 : "Готово · закрепить компоновку");
         doneButton.setVisibility(enabled || editMode || mediaContentEditMode
-                || actionsContentEditMode ? View.VISIBLE : View.GONE);
+                || actionsContentEditMode || informationContentEditMode
+                ? View.VISIBLE : View.GONE);
         updateLauncherSafeArea();
         if (enabled) {
             setPanelVisibility(LauncherLayoutStore.NAVIGATION, true);
+            bringBlockToFront(LauncherLayoutStore.NAVIGATION);
             if (favoriteRoutesPanel != null) favoriteRoutesPanel.setVisibility(View.GONE);
             if (navigationRouteContent != null) {
                 navigationRouteContent.setVisibility(View.VISIBLE);
@@ -2004,6 +2162,7 @@ public final class LauncherActivity extends AppCompatActivity {
         if (enabled && editMode) setEditMode(false);
         if (enabled && navigationContentEditMode) setNavigationContentEditMode(false);
         if (enabled && actionsContentEditMode) setActionsContentEditMode(false);
+        if (enabled && informationContentEditMode) setInformationContentEditMode(false);
         mediaContentEditMode = enabled;
         if (mediaPanel != null) {
             if (enabled) mediaPanel.reloadConfig();
@@ -2011,12 +2170,14 @@ public final class LauncherActivity extends AppCompatActivity {
         }
         editorGrid.setVisibility(View.GONE);
         doneButton.setText(enabled
-                ? "Готово · сохранить элементы медиапанели"
+                ? "Готово · сохранить элементы медиаблока"
                 : "Готово · закрепить компоновку");
         doneButton.setVisibility(enabled || editMode || navigationContentEditMode
-                || actionsContentEditMode ? View.VISIBLE : View.GONE);
+                || actionsContentEditMode || informationContentEditMode
+                ? View.VISIBLE : View.GONE);
         if (enabled) {
             setPanelVisibility(LauncherLayoutStore.MEDIA, true);
+            bringBlockToFront(LauncherLayoutStore.MEDIA);
         } else {
             setPanelVisibility(LauncherLayoutStore.MEDIA,
                     preferences.launcherMediaVisible.get() && hasMediaPanelContent());
@@ -2025,7 +2186,7 @@ public final class LauncherActivity extends AppCompatActivity {
         updateLauncherSafeArea();
         Toast.makeText(this, enabled
                 ? "Тащите элементы; любой из четырёх углов изменяет размер"
-                : "Сетка медиапанели сохранена", Toast.LENGTH_SHORT).show();
+                : "Сетка медиаблока сохранена", Toast.LENGTH_SHORT).show();
     }
 
     /** Edits the actual mixed buttons/smart-home grid without touching the outer panel rectangle. */
@@ -2033,6 +2194,7 @@ public final class LauncherActivity extends AppCompatActivity {
         if (enabled && editMode) setEditMode(false);
         if (enabled && navigationContentEditMode) setNavigationContentEditMode(false);
         if (enabled && mediaContentEditMode) setMediaContentEditMode(false);
+        if (enabled && informationContentEditMode) setInformationContentEditMode(false);
         actionsContentEditMode = enabled;
         if (enabled && shortcutStore != null) {
             shortcutStore.load();
@@ -2046,9 +2208,11 @@ public final class LauncherActivity extends AppCompatActivity {
                 ? "Готово · сохранить сетку кнопок"
                 : "Готово · закрепить компоновку");
         doneButton.setVisibility(enabled || editMode || navigationContentEditMode
-                || mediaContentEditMode ? View.VISIBLE : View.GONE);
+                || mediaContentEditMode || informationContentEditMode
+                ? View.VISIBLE : View.GONE);
         if (enabled) {
             setPanelVisibility(LauncherLayoutStore.ACTIONS, true);
+            bringBlockToFront(LauncherLayoutStore.ACTIONS);
         } else {
             setPanelVisibility(LauncherLayoutStore.ACTIONS,
                     preferences.launcherActionsVisible.get()
@@ -2059,6 +2223,43 @@ public final class LauncherActivity extends AppCompatActivity {
                 ? "Тащите плитки по сетке; потяните любой из четырёх углов. "
                 + "Нажатие на плитку меняет размер её иконки."
                 : "Сетка кнопок сохранена", Toast.LENGTH_SHORT).show();
+    }
+
+    /** Edits non-interactive information tiles directly on their full HOME coordinate canvas. */
+    private void setInformationContentEditMode(boolean enabled) {
+        if (enabled && editMode) setEditMode(false);
+        if (enabled && navigationContentEditMode) setNavigationContentEditMode(false);
+        if (enabled && mediaContentEditMode) setMediaContentEditMode(false);
+        if (enabled && actionsContentEditMode) setActionsContentEditMode(false);
+        informationContentEditMode = enabled;
+        if (enabled) {
+            informationEditorConfig = informationConfigStore.load();
+            if (informationPanel != null) informationPanel.setConfig(informationEditorConfig);
+        }
+        if (informationContentEditOverlay != null) {
+            informationContentEditOverlay.setEditing(enabled);
+        }
+        editorGrid.setVisibility(View.GONE);
+        doneButton.setText(enabled
+                ? "Готово · сохранить информационные плитки"
+                : "Готово · закрепить компоновку");
+        doneButton.setVisibility(enabled || editMode || navigationContentEditMode
+                || mediaContentEditMode || actionsContentEditMode
+                ? View.VISIBLE : View.GONE);
+        if (enabled) {
+            setPanelVisibility(LauncherLayoutStore.INFORMATION, true);
+            bringBlockToFront(LauncherLayoutStore.INFORMATION);
+        } else {
+            InformationPanelConfig value = informationEditorConfig;
+            if (value != null) informationConfigStore.save(value);
+            boolean visible = preferences.launcherInformationVisible.get()
+                    && informationPanel != null && informationPanel.hasConfiguredItems();
+            setPanelVisibility(LauncherLayoutStore.INFORMATION, visible);
+        }
+        updateLauncherSafeArea();
+        Toast.makeText(this, enabled
+                ? "Тащите информационные плитки по всему HOME; углы меняют размер"
+                : "Сетка информационных плиток сохранена", Toast.LENGTH_SHORT).show();
     }
 
     private void updateMedia(@NonNull LauncherMediaController.Snapshot state) {
@@ -2400,7 +2601,7 @@ public final class LauncherActivity extends AppCompatActivity {
         View decor = getWindow().getDecorView();
         decor.postOnAnimation(() -> navigationUiHandler.postDelayed(
                 () -> launchYandexNow(product, false, generation),
-                WINDOWED_YANDEX_BACKGROUND_SETTLE_MS));
+                StatusHomeBackgroundGuard.SETTLE_MS));
     }
 
     private void ensureLauncherTaskForeground() {
@@ -2415,13 +2616,7 @@ public final class LauncherActivity extends AppCompatActivity {
             }
         }
         try {
-            startActivity(new Intent(this, LauncherActivity.class)
-                    .setAction(Intent.ACTION_MAIN)
-                    .addCategory(Intent.CATEGORY_HOME)
-                    .putExtra(EXTRA_WINDOW_BACKGROUND_GUARD, true)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                            | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                            | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+            StatusHomeBackgroundGuard.raise(this);
         } catch (RuntimeException error) {
             Log.w(TAG, "Could not reassert launcher HOME task", error);
         }
@@ -2429,14 +2624,16 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private void scheduleAutoNavigatorForHomeIntent(@Nullable Intent intent) {
         if (intent == null
-                || intent.getBooleanExtra(EXTRA_WINDOW_BACKGROUND_GUARD, false)
+                || intent.getBooleanExtra(
+                        StatusHomeBackgroundGuard.EXTRA_BACKGROUND_GUARD, false)
                 || !Intent.ACTION_MAIN.equals(intent.getAction())
                 || !intent.hasCategory(Intent.CATEGORY_HOME)
                 || !preferences.launcherAutoWindowedNavigatorOnHome.get()
                 || intent.getBooleanExtra(EXTRA_EDIT_MODE, false)
                 || intent.getBooleanExtra(EXTRA_EDIT_NAVIGATION_CONTENT, false)
                 || intent.getBooleanExtra(EXTRA_EDIT_MEDIA_CONTENT, false)
-                || intent.getBooleanExtra(EXTRA_EDIT_ACTIONS_CONTENT, false)) {
+                || intent.getBooleanExtra(EXTRA_EDIT_ACTIONS_CONTENT, false)
+                || intent.getBooleanExtra(EXTRA_EDIT_INFORMATION_CONTENT, false)) {
             return;
         }
         long now = SystemClock.elapsedRealtime();

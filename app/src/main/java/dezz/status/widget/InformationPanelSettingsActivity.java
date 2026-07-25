@@ -5,6 +5,7 @@
 
 package dezz.status.widget;
 
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.text.InputType;
@@ -124,6 +125,11 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
             visible.setOnCheckedChangeListener((button, checked) ->
                     preferences.launcherInformationVisible.set(checked));
             controls.addView(visible, new LinearLayout.LayoutParams(match(), dp(54)));
+            MaterialButton placeOnHome = button("Расположение плиток по всему HOME…");
+            placeOnHome.setOnClickListener(v -> startActivity(
+                    new Intent(this, LauncherActivity.class)
+                            .putExtra(LauncherActivity.EXTRA_EDIT_INFORMATION_CONTENT, true)));
+            controls.addView(placeOnHome, lp(match(), dp(52), 0, dp(4), 0, dp(8)));
 
             addSeek(controls, "Столбцы", 1, 8, config.columns, value -> {
                 config.columns = value;

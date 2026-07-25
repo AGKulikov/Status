@@ -100,12 +100,12 @@ public final class DriverPanelHa1084ContractTest {
                 "launcher/information/InformationPanelView.java"));
 
         assertTrue(launcher.contains("stateLabel.setSingleLine(false)"));
-        assertTrue(launcher.contains("stateLabel.setMaxLines(3)"));
+        assertTrue(launcher.contains("stateLabel.setMaxLines(Integer.MAX_VALUE)"));
         assertTrue(launcher.contains("stateLabel.setEllipsize(null)"));
         assertTrue(overlay.contains("stateLabel.setSingleLine(false)"));
-        assertTrue(overlay.contains("stateLabel.setMaxLines(3)"));
+        assertTrue(overlay.contains("stateLabel.setMaxLines(Integer.MAX_VALUE)"));
         assertTrue(overlay.contains("stateLabel.setEllipsize(null)"));
-        assertTrue(information.contains("value.setMaxLines(3)"));
+        assertTrue(information.contains("value.setMaxLines(Integer.MAX_VALUE)"));
         assertTrue(information.contains("value.setEllipsize(null)"));
     }
 

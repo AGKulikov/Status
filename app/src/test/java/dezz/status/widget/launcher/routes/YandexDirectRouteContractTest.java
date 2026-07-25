@@ -35,6 +35,18 @@ public final class YandexDirectRouteContractTest {
         assertTrue(executor.contains("YandexRouteLauncher.launch(context, route)"));
     }
 
+    @Test public void optionalOfficialAccessKeySignsNavigatorUrls() throws IOException {
+        String launcher = source("dezz/status/widget/launcher/routes/YandexRouteLauncher.java");
+        String signer = source(
+                "dezz/status/widget/launcher/routes/YandexNavigatorUrlSigner.java");
+        String settings = source("dezz/status/widget/FavoriteRoutesSettingsActivity.java");
+        assertTrue(launcher.contains("authenticatedDeepLink"));
+        assertTrue(signer.contains("SHA256withRSA"));
+        assertTrue(signer.contains("appendQueryParameter(\"client\""));
+        assertTrue(signer.contains("appendQueryParameter(\"signature\""));
+        assertTrue(settings.contains("Ключ прямого запуска Яндекс Навигатора"));
+    }
+
     private static String source(String relative) throws IOException {
         Path fromRoot = Paths.get("app", "src", "main", "java").resolve(relative);
         Path fromApp = Paths.get("src", "main", "java").resolve(relative);

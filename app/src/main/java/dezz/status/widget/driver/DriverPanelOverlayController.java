@@ -733,7 +733,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             stateLabel.setTextSize(10);
             stateLabel.setTextColor(Color.LTGRAY);
             stateLabel.setSingleLine(false);
-            stateLabel.setMaxLines(3);
+            stateLabel.setMaxLines(Integer.MAX_VALUE);
             stateLabel.setHorizontallyScrolling(false);
             stateLabel.setGravity(Gravity.CENTER);
             stateLabel.setIncludeFontPadding(false);

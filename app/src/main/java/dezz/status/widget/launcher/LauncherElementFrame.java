@@ -38,6 +38,7 @@ public final class LauncherElementFrame extends MaterialCardView {
     private final ImageView[] resizeHandles = new ImageView[4];
     private final GeometryListener listener;
     private boolean editMode;
+    private boolean canvasMode;
     private int snapPx = 20;
     private float downRawX;
     private float downRawY;
@@ -65,6 +66,8 @@ public final class LauncherElementFrame extends MaterialCardView {
                 LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
         contentHost = new FrameLayout(context);
+        contentHost.setClipChildren(false);
+        contentHost.setClipToPadding(false);
         rootHost.addView(contentHost, new FrameLayout.LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
@@ -99,16 +102,32 @@ public final class LauncherElementFrame extends MaterialCardView {
     }
 
     public void setEditMode(boolean enabled, int snapPx) {
-        editMode = enabled;
+        editMode = enabled && !canvasMode;
         this.snapPx = Math.max(1, snapPx);
-        editBadge.setVisibility(enabled ? VISIBLE : GONE);
+        editBadge.setVisibility(editMode ? VISIBLE : GONE);
         for (ImageView handle : resizeHandles) {
-            if (handle != null) handle.setVisibility(enabled ? VISIBLE : GONE);
+            if (handle != null) handle.setVisibility(editMode ? VISIBLE : GONE);
         }
-        setStrokeWidth(enabled ? dp(3) : 0);
+        setStrokeWidth(editMode ? dp(3) : 0);
         setStrokeColor(Color.rgb(55, 135, 245));
-        setCardElevation(enabled ? dp(10) : dp(5));
-        setClickable(enabled);
+        setClickable(editMode);
+    }
+
+    /**
+     * A canvas block fills HOME only as a coordinate host. Its empty area must not intercept
+     * gestures and its old persisted outer rectangle must remain untouched.
+     */
+    public void setCanvasMode(boolean enabled) {
+        canvasMode = enabled;
+        setRadius(enabled ? 0 : dp(24));
+        setPreventCornerOverlap(!enabled);
+        if (enabled) setEditMode(false, snapPx);
+    }
+
+    public void setTransparentSurface(boolean transparent) {
+        setCardBackgroundColor(transparent
+                ? Color.TRANSPARENT : Color.argb(150, 18, 18, 24));
+        setCardElevation(transparent ? 0 : dp(5));
     }
 
     @Override

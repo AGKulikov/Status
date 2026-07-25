@@ -243,6 +243,32 @@ public final class InformationPanelConfig {
         return true;
     }
 
+    /** Atomic WYSIWYG placement used by the real-HOME editor. */
+    public boolean setPlacement(@NonNull String id, int column, int row,
+                                int columnSpan, int rowSpan) {
+        Item target = find(id);
+        if (target == null || !target.enabled) return false;
+        int nextColumnSpan = clamp(columnSpan, 1, columns);
+        int nextRowSpan = clamp(rowSpan, 1, rows);
+        int nextColumn = clamp(column, 0, columns - nextColumnSpan);
+        int nextRow = clamp(row, 0, rows - nextRowSpan);
+        if (target.column == nextColumn && target.row == nextRow
+                && target.columnSpan == nextColumnSpan
+                && target.rowSpan == nextRowSpan) return false;
+        for (Item other : items) {
+            if (other == target || !other.enabled) continue;
+            if (intersects(nextColumn, nextRow, nextColumnSpan, nextRowSpan,
+                    other.column, other.row, other.columnSpan, other.rowSpan)) {
+                return false;
+            }
+        }
+        target.column = nextColumn;
+        target.row = nextRow;
+        target.columnSpan = nextColumnSpan;
+        target.rowSpan = nextRowSpan;
+        return true;
+    }
+
     public boolean hasEnabledItems() {
         for (Item item : items) if (item.enabled) return true;
         return false;
@@ -350,6 +376,16 @@ public final class InformationPanelConfig {
                 occupied[row][column] = true;
             }
         }
+    }
+
+    private static boolean intersects(int firstColumn, int firstRow,
+                                      int firstColumnSpan, int firstRowSpan,
+                                      int secondColumn, int secondRow,
+                                      int secondColumnSpan, int secondRowSpan) {
+        return firstColumn < secondColumn + secondColumnSpan
+                && firstColumn + firstColumnSpan > secondColumn
+                && firstRow < secondRow + secondRowSpan
+                && firstRow + firstRowSpan > secondRow;
     }
 
     private void placeInFirstFreeCell(@NonNull Item item) {

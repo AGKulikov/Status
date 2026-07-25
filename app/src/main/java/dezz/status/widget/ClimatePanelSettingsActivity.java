@@ -94,7 +94,7 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
             store.save(config);
             applyClimatePanel();
         });
-        setTitle("Климатическая панель");
+        setTitle("Климат");
         View content = buildContent();
         setContentView(content);
         SettingsBackNavigation.install(this, content);
@@ -160,8 +160,9 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
         settings.setPadding(dp(10), 0, dp(22), dp(28));
         settingsScroll.addView(settings, new ScrollView.LayoutParams(match(), wrap()));
 
-        addTitle(settings, "Панель климата");
-        addHint(settings, "Все изменения сохраняются сразу. Справа показан живой вид панели с текущими значениями автомобиля.");
+        addTitle(settings, "Климатический блок");
+        addHint(settings, "Все изменения сохраняются сразу. Справа показан живой вид "
+                + "климатического блока с текущими значениями автомобиля.");
 
         addTitle(settings, "Постоянная панель в приложениях");
         addHint(settings, "Работает независимо от основного виджета и HOME. Выберите маленькую плавающую кнопку или постоянно занятую полосу экрана.");

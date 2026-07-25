@@ -31,7 +31,8 @@ public final class LauncherAutoNavigatorHomeContractTest {
         String launcher = source("dezz/status/widget/LauncherActivity.java");
         assertTrue(launcher.contains("scheduleAutoNavigatorForHomeIntent(getIntent())"));
         assertTrue(launcher.contains("intent.hasCategory(Intent.CATEGORY_HOME)"));
-        assertTrue(launcher.contains("EXTRA_WINDOW_BACKGROUND_GUARD"));
+        assertTrue(launcher.contains(
+                "StatusHomeBackgroundGuard.EXTRA_BACKGROUND_GUARD"));
         assertTrue(launcher.contains(
                 "launchYandex(YandexWindowLauncher.Product.NAVIGATOR, false)"));
     }

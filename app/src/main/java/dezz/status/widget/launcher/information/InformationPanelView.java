@@ -84,6 +84,7 @@ public final class InformationPanelView extends FrameLayout {
     private final Map<String, ItemViews> itemViews = new LinkedHashMap<>();
     private InformationPanelConfig config;
     private boolean started;
+    private boolean wholeHomeCanvas;
     private int catalogGeneration;
     private int connectorGeneration;
     @Nullable private WidgetService subscribedService;
@@ -152,6 +153,14 @@ public final class InformationPanelView extends FrameLayout {
 
     public void reloadConfig() {
         setConfig(store.load());
+    }
+
+    /** The full HOME canvas replaces the old block surface; status tiles remain independently
+     * styled and non-interactive. */
+    public void setWholeHomeCanvas(boolean enabled) {
+        if (wholeHomeCanvas == enabled) return;
+        wholeHomeCanvas = enabled;
+        applySurface();
     }
 
     public void setConfig(@NonNull InformationPanelConfig source) {
@@ -275,7 +284,7 @@ public final class InformationPanelView extends FrameLayout {
             if (item.enabled) visible.add(item);
         }
         if (visible.isEmpty()) {
-            TextView empty = text("Добавьте статусы в настройках панели «Информация»",
+            TextView empty = text("Добавьте статусы в настройках блока «Информация»",
                     15f, Color.WHITE, true);
             empty.setGravity(Gravity.CENTER);
             empty.setAlpha(.68f);
@@ -351,7 +360,7 @@ public final class InformationPanelView extends FrameLayout {
         TextView value = text("—", scaledSp(20f, item.scalePercent),
                 color(item.valueColor, Color.WHITE), true);
         value.setSingleLine(false);
-        value.setMaxLines(3);
+        value.setMaxLines(Integer.MAX_VALUE);
         value.setHorizontallyScrolling(false);
         value.setEllipsize(null);
         value.setIncludeFontPadding(false);
@@ -613,6 +622,10 @@ public final class InformationPanelView extends FrameLayout {
     }
 
     private void applySurface() {
+        if (wholeHomeCanvas) {
+            setBackground(null);
+            return;
+        }
         GradientDrawable surface = new GradientDrawable();
         int color = color(config.backgroundColor, Color.rgb(17, 24, 34));
         surface.setColor(Color.argb(config.backgroundAlpha, Color.red(color),

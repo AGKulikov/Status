@@ -48,6 +48,7 @@ public final class FavoriteRoutesPanelView extends FrameLayout {
     @NonNull private List<FavoriteRouteConfig> routes = Collections.emptyList();
     private int columns;
     private boolean previewMode;
+    private boolean wholeHomeCanvas;
 
     public FavoriteRoutesPanelView(@NonNull Context context,
                                    @NonNull FavoriteRoutesConfigStore store) {
@@ -108,6 +109,13 @@ public final class FavoriteRoutesPanelView extends FrameLayout {
         return previewMode;
     }
 
+    /** Avoids a full-screen ScrollView intercepting unrelated free HOME elements. */
+    public void setWholeHomeCanvas(boolean enabled) {
+        if (wholeHomeCanvas == enabled) return;
+        wholeHomeCanvas = enabled;
+        rebuild();
+    }
+
     /** True when the current saved configuration contains at least one visible destination. */
     public boolean hasEnabledRoutes() {
         for (FavoriteRouteConfig route : routes) {
@@ -151,6 +159,12 @@ public final class FavoriteRoutesPanelView extends FrameLayout {
 
         // The number of destinations is intentionally unlimited. A compact HOME rectangle keeps
         // its chosen pixel size and becomes scrollable instead of silently clipping later rows.
+        if (wholeHomeCanvas) {
+            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            addView(grid, params);
+            return;
+        }
         ScrollView scroll = new ScrollView(getContext());
         scroll.setFillViewport(true);
         scroll.setClipToPadding(false);

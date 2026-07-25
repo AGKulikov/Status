@@ -23,6 +23,7 @@ import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -42,6 +43,8 @@ import dezz.status.widget.launcher.routes.FavoriteRouteConfig;
 import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
 import dezz.status.widget.launcher.routes.FavoriteRoutesPanelView;
 import dezz.status.widget.launcher.routes.RouteDestinationParser;
+import dezz.status.widget.launcher.routes.YandexNavigatorAccessStore;
+import dezz.status.widget.launcher.routes.YandexNavigatorUrlSigner;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
@@ -108,8 +111,12 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
         addHint(left, "Пока маршрут не построен, здесь видны кнопки «Домой», «Работа» и другие адреса. После построения маршрута плитка сама переключится на выбранную навигационную информацию.");
 
         addHint(left, "Видимость и данные активного маршрута настраиваются один раз в разделе "
-                + "«Навигационная панель». Здесь находятся только избранные места и их вид.");
-        addSlider(left, "Столбцов в панели", preferences.launcherFavoriteRoutesColumns.get(),
+                + "«Навигационный блок». Здесь находятся только избранные места и их вид.");
+        addHint(left, "Маршруты уходят напрямую в Яндекс, без Алисы. Без выданного Яндексом "
+                + "ключа URL-переходы ограничены пятью в сутки; ключ снимает этот лимит.");
+        addButton(left, "Ключ прямого запуска Яндекс Навигатора…",
+                v -> editYandexNavigatorAccess());
+        addSlider(left, "Столбцов в блоке", preferences.launcherFavoriteRoutesColumns.get(),
                 1, 6, value -> {
                     preferences.launcherFavoriteRoutesColumns.set(value);
                     rebuildPreview();
@@ -345,6 +352,52 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
                 value -> route.iconColor = value);
         addColorField(editorHost, "Цвет текста", route.textColor,
                 value -> route.textColor = value);
+    }
+
+    private void editYandexNavigatorAccess() {
+        YandexNavigatorAccessStore access = new YandexNavigatorAccessStore(this);
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(20), dp(8), dp(20), 0);
+
+        EditText client = input("Client ID от Яндекса", access.clientId());
+        form.addView(client, fieldLp());
+        EditText key = new EditText(this);
+        key.setHint("RSA private key (PEM, PKCS#1 или PKCS#8)");
+        key.setText(access.privateKeyPem());
+        key.setSingleLine(false);
+        key.setMinLines(6);
+        key.setGravity(Gravity.TOP | Gravity.START);
+        form.addView(key, new LinearLayout.LayoutParams(match(), dp(220)));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Подпись URL Яндекс Навигатора")
+                .setMessage("Client и RSA-ключ выдаёт Яндекс после регистрации приложения. "
+                        + "Ключ хранится отдельно и не попадает в экспорт настроек Status Widget.")
+                .setView(form)
+                .setPositiveButton("Сохранить", null)
+                .setNeutralButton("Очистить", (dialog, which) -> {
+                    access.clear();
+                    Toast.makeText(this, "Ключ прямого запуска удалён",
+                            Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        dialog.setOnShowListener(ignored ->
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                        String clientValue = client.getText().toString().trim();
+                        String keyValue = key.getText().toString().trim();
+                        if (!YandexNavigatorUrlSigner.isValid(clientValue, keyValue)) {
+                            Toast.makeText(this, "Проверьте Client ID и формат RSA-ключа",
+                                    Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        access.save(clientValue, keyValue);
+                        Toast.makeText(this, "Подпись прямых маршрутов сохранена",
+                                Toast.LENGTH_SHORT).show();
+                        dialog.dismiss();
+                    }));
+        dialog.show();
     }
 
     private interface StringChange { void set(@NonNull String value); }

@@ -75,6 +75,11 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         addTitle("Вид и поведение");
         addSwitch("Полноэкранный режим", preferences.launcherImmersive);
         addSwitch("Показывать сетку в режиме редактирования", preferences.launcherShowGrid);
+        addSwitch("Свободно размещать элементы блоков по всему HOME",
+                preferences.launcherFreeBlockCanvas);
+        addHint("Медиа, навигация, кнопки и информационные плитки используют весь экран как "
+                + "рабочую сетку. Их прежние внешние размеры сохраняются для возврата к "
+                + "классическим компактным блокам.");
         addSwitch("При нажатии HOME открывать Навигатор окном поверх лаунчера",
                 preferences.launcherAutoWindowedNavigatorOnHome);
         addHint("Сначала поднимается домашний экран Status Widget, затем поверх него "
