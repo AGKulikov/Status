@@ -28,7 +28,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import dezz.status.widget.BuildConfig;
 import dezz.status.widget.WidgetService;
 import dezz.status.widget.WidgetServiceStarter;
 import dezz.status.widget.automation.AutomationContract;
@@ -233,7 +232,7 @@ public final class HudRuntimeData {
             case CUSTOM_TEXT:
                 return item.options.optString("customText", item.title);
             case UPDATE_STATUS:
-                return "Status Widget " + BuildConfig.VERSION_NAME;
+                return "Status Widget " + appVersion();
             case SMART_HOME_STATUS:
             case CONNECTOR_VALUE:
                 return connectorText(item);
@@ -506,6 +505,18 @@ public final class HudRuntimeData {
         if (!started) return;
         try { listener.onHudDataChanged(); }
         catch (RuntimeException ignored) {}
+    }
+
+    @NonNull
+    private String appVersion() {
+        try {
+            String version = context.getPackageManager()
+                    .getPackageInfo(context.getPackageName(), 0).versionName;
+            return version == null || version.trim().isEmpty() ? "—" : version.trim();
+        } catch (android.content.pm.PackageManager.NameNotFoundException
+                 | RuntimeException ignored) {
+            return "—";
+        }
     }
 
     @NonNull
