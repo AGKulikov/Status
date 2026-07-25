@@ -92,6 +92,60 @@ public final class GeelyClimateControlReliabilityTest {
                 GeelyCarIntegration.fanFunctionIdForMode(true));
     }
 
+    @Test public void manualFanPresentsFivePositionsAcrossTheFullEcarxOneToNineRange() {
+        int[] rawValues = {
+                IHvac.FAN_SPEED_LEVEL_1, IHvac.FAN_SPEED_LEVEL_2,
+                IHvac.FAN_SPEED_LEVEL_3, IHvac.FAN_SPEED_LEVEL_4,
+                IHvac.FAN_SPEED_LEVEL_5, IHvac.FAN_SPEED_LEVEL_6,
+                IHvac.FAN_SPEED_LEVEL_7, IHvac.FAN_SPEED_LEVEL_8,
+                IHvac.FAN_SPEED_LEVEL_9
+        };
+        int[] visible = {1, 1, 2, 2, 3, 3, 4, 4, 5};
+        for (int index = 0; index < rawValues.length; index++) {
+            assertEquals(visible[index],
+                    GeelyCarIntegration.manualFanDisplayLevel(rawValues[index]));
+        }
+        assertEquals(IHvac.FAN_SPEED_LEVEL_1,
+                GeelyCarIntegration.manualFanValueForDisplayLevel(1));
+        assertEquals(IHvac.FAN_SPEED_LEVEL_3,
+                GeelyCarIntegration.manualFanValueForDisplayLevel(2));
+        assertEquals(IHvac.FAN_SPEED_LEVEL_5,
+                GeelyCarIntegration.manualFanValueForDisplayLevel(3));
+        assertEquals(IHvac.FAN_SPEED_LEVEL_7,
+                GeelyCarIntegration.manualFanValueForDisplayLevel(4));
+        assertEquals(IHvac.FAN_SPEED_LEVEL_9,
+                GeelyCarIntegration.manualFanValueForDisplayLevel(5));
+    }
+
+    @Test public void airflowUsesExactSevenAdaptApiValuesAndFrontAggregateZone()
+            throws IOException {
+        assertEquals(Arrays.asList(
+                        IHvac.BLOWING_MODE_FACE,
+                        IHvac.BLOWING_MODE_LEG,
+                        IHvac.BLOWING_MODE_FACE_AND_LEG,
+                        IHvac.BLOWING_MODE_FRONT_WINDOW,
+                        IHvac.BLOWING_MODE_FACE_AND_FRONT_WINDOW,
+                        IHvac.BLOWING_MODE_LEG_AND_FRONT_WINDOW,
+                        IHvac.BLOWING_ALL),
+                values(GeelyCarIntegration.airflowDirectionOptions()));
+        assertEquals(Arrays.asList(
+                        "Лицо", "Ноги", "Лицо + ноги", "Стекло",
+                        "Лицо + стекло", "Ноги + стекло",
+                        "Лицо + ноги + стекло"),
+                labels(GeelyCarIntegration.airflowDirectionOptions()));
+
+        String source = geelySource();
+        assertTrue(source.contains(
+                "FRONT_FAN_ZONE = VehicleZone.ZONE_ROW_1_ALL"));
+        assertTrue(source.contains(
+                "IHvac.HVAC_FUNC_BLOWING_MODE, FRONT_FAN_ZONE"));
+        assertTrue(source.contains(
+                "source.registerFunctionValueWatcher(id, watcher)"));
+        assertTrue(source.contains(
+                "onFunctionValueChanged(int functionId, int zone, int value)"));
+        assertTrue(source.contains("readDemandedFunction(functionId)"));
+    }
+
     @Test public void transientAutoReadNeverSilentlyFallsBackToManualRouting()
             throws IOException {
         assertEquals(Boolean.TRUE,
@@ -195,11 +249,21 @@ public final class GeelyClimateControlReliabilityTest {
             throws IOException {
         String panel = climatePanelSource();
         assertTrue(panel.contains("COMMAND_WATCHDOG_MS = 7_000L"));
-        assertTrue(panel.contains("pendingTimeouts.put(id, timeout)"));
+        assertTrue(panel.contains("pendingTimeouts.put(bindingId, timeout)"));
         assertTrue(panel.contains("postDelayed(timeout, COMMAND_WATCHDOG_MS)"));
-        assertTrue(panel.contains("pending.remove(id)"));
+        assertTrue(panel.contains("pending.remove(bindingId)"));
         assertTrue(panel.contains("if (started) subscribeVisibleControls()"));
         assertTrue(panel.contains("Нет ответа от автомобиля. Состояние обновляется"));
+    }
+
+    @Test public void compactFanTileHasNoCaptionAndLevelOneDecreaseUsesHvacPower()
+            throws IOException {
+        String panel = climatePanelSource();
+        assertTrue(panel.contains(
+                "if (!ClimatePanelConfig.FAN.equals(id)) center.addView(title)"));
+        assertTrue(panel.contains("if (ids.contains(ClimatePanelConfig.FAN))"));
+        assertTrue(panel.contains(
+                "executeBound(id, ClimatePanelConfig.POWER,"));
     }
 
     @Test public void finiteUnknownVendorLevelHasAnExplicitNonDashFallback()
