@@ -39,6 +39,20 @@ public final class PhoneOemConnectionBridge {
         void onHeadsetPower(@NonNull String address, int rawPower);
     }
 
+    /** Selected-device events that can make a previously hidden ANCS service discoverable. */
+    public interface DeviceStateListener {
+        void onDeviceStateChanged(@NonNull String address, @NonNull DeviceStateChange change);
+    }
+
+    public enum DeviceStateChange {
+        UUIDS_UPDATED,
+        BOND_STATE_CHANGED,
+        PAIRED_DEVICES_CHANGED
+    }
+
+    private static final DeviceStateListener NO_DEVICE_STATE_LISTENER =
+            (address, change) -> { };
+
     /** Registration handle for the vendor callback. Closing it is always safe and idempotent. */
     public interface Observation extends AutoCloseable {
         @Override
@@ -143,6 +157,20 @@ public final class PhoneOemConnectionBridge {
             @NonNull Context context,
             @NonNull String rawAddress,
             @NonNull HeadsetPowerListener listener) {
+        return observeHeadsetPower(context, rawAddress, listener, NO_DEVICE_STATE_LISTENER);
+    }
+
+    /**
+     * Also forwards exact-device UUID/bond callbacks. ECARX emits these after its stock pairing
+     * owner updates the phone record, which is the earliest reliable signal that Android's stale
+     * GATT cache should be reopened for ANCS.
+     */
+    @Nullable
+    public static Observation observeHeadsetPower(
+            @NonNull Context context,
+            @NonNull String rawAddress,
+            @NonNull HeadsetPowerListener listener,
+            @NonNull DeviceStateListener stateListener) {
         String address = rawAddress.trim();
         if (address.isEmpty()) return null;
         synchronized (LOCK) {
@@ -171,16 +199,24 @@ public final class PhoneOemConnectionBridge {
                     if ("onDevicePowerUpdated".equals(name)
                             && args != null && args.length >= 2) {
                         deliverPower(address, args[0], args[1], listener);
-                    } else if (("onDeviceUuidsUpdated".equals(name)
-                            || "onDeviceBondStateChanged".equals(name))
+                    } else if ("onDeviceUuidsUpdated".equals(name)
                             && args != null && args.length >= 1) {
                         deliverCurrentPower(extension, getPower, address, args[0], listener);
+                        deliverState(address, args[0], DeviceStateChange.UUIDS_UPDATED,
+                                stateListener);
+                    } else if ("onDeviceBondStateChanged".equals(name)
+                            && args != null && args.length >= 1) {
+                        deliverCurrentPower(extension, getPower, address, args[0], listener);
+                        deliverState(address, args[0], DeviceStateChange.BOND_STATE_CHANGED,
+                                stateListener);
                     } else if ("onPairedDevicesChanged".equals(name)
                             && args != null && args.length >= 1
                             && args[0] instanceof List) {
                         Object updatedDevice = findStockDevice((List<?>) args[0], address);
                         deliverCurrentPower(
                                 extension, getPower, address, updatedDevice, listener);
+                        deliverState(address, updatedDevice,
+                                DeviceStateChange.PAIRED_DEVICES_CHANGED, stateListener);
                     }
                     return defaultValue(method.getReturnType());
                 };
@@ -263,6 +299,15 @@ public final class PhoneOemConnectionBridge {
         if (!address.equalsIgnoreCase(deviceAddress(device))
                 || !(rawPower instanceof Number)) return;
         listener.onHeadsetPower(address, ((Number) rawPower).intValue());
+    }
+
+    private static void deliverState(
+            @NonNull String address,
+            @Nullable Object device,
+            @NonNull DeviceStateChange change,
+            @NonNull DeviceStateListener listener) {
+        if (!address.equalsIgnoreCase(deviceAddress(device))) return;
+        listener.onDeviceStateChanged(address, change);
     }
 
     @NonNull
