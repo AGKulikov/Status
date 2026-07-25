@@ -166,6 +166,19 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(controller.contains("closeOemObservation(oldOemObservation)"));
     }
 
+    @Test public void exactEcarxUuidAndBondEventsRefreshTheAncsGattCache()
+            throws IOException {
+        String bridge = javaSource("PhoneOemConnectionBridge.java");
+        String controller = controller();
+
+        assertTrue(bridge.contains("DeviceStateChange.UUIDS_UPDATED"));
+        assertTrue(bridge.contains("DeviceStateChange.BOND_STATE_CHANGED"));
+        assertTrue(bridge.contains("DeviceStateChange.PAIRED_DEVICES_CHANGED"));
+        assertTrue(controller.contains("handleOemDeviceStateChange("));
+        assertTrue(controller.contains("refreshGattCache(expected)"));
+        assertTrue(controller.contains("oemGattRefreshTask"));
+    }
+
     @Test public void privacyModeAndAppPresentationRemainSourceOnly() throws IOException {
         String source = controller();
         assertTrue(source.contains("notificationAttributeRequest(uid, includeText)"));
