@@ -56,7 +56,9 @@ import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.SourceBinding;
+import dezz.status.widget.launcher.LauncherGlobalElementTag;
 import dezz.status.widget.launcher.LauncherIconResolver;
+import dezz.status.widget.launcher.LauncherLayoutStore;
 
 /**
  * Read-only HOME surface combining current vehicle/system and smart-home values.
@@ -82,6 +84,7 @@ public final class InformationPanelView extends FrameLayout {
             new LinkedHashMap<>();
     private final Map<String, ConnectorValue> connectorValues = new HashMap<>();
     private final Map<String, ItemViews> itemViews = new LinkedHashMap<>();
+    private boolean editorPreviewMode;
     private InformationPanelConfig config;
     @Nullable private Integer fixedCellBackgroundColor;
     private boolean started;
@@ -153,6 +156,13 @@ public final class InformationPanelView extends FrameLayout {
 
     public void reloadConfig() {
         setConfig(store.load());
+    }
+
+    /** Shows every configured tile while its global HOME rectangle is being edited. */
+    public void setEditorPreviewMode(boolean enabled) {
+        if (editorPreviewMode == enabled) return;
+        editorPreviewMode = enabled;
+        updateValues();
     }
 
     public void setConfig(@NonNull InformationPanelConfig source) {
@@ -333,6 +343,8 @@ public final class InformationPanelView extends FrameLayout {
     @NonNull
     private View buildItem(@NonNull InformationPanelConfig.Item item) {
         LinearLayout tile = new LinearLayout(getContext());
+        LauncherGlobalElementTag.attach(tile, LauncherLayoutStore.INFORMATION,
+                item.id, item.displayLabel());
         tile.setOrientation(LinearLayout.HORIZONTAL);
         tile.setGravity(Gravity.CENTER_VERTICAL);
         tile.setPadding(scaledDp(10, item.scalePercent), scaledDp(7, item.scalePercent),
@@ -398,7 +410,7 @@ public final class InformationPanelView extends FrameLayout {
                         getContext(), iconKey, item.iconColor));
                 views.resolvedIconKey = iconKey;
             }
-            views.tile.setVisibility(InformationValuePolicy.isVisible(
+            views.tile.setVisibility(editorPreviewMode || InformationValuePolicy.isVisible(
                     item.visibility, value.known, value.active) ? View.VISIBLE : View.INVISIBLE);
             views.label.setText(item.displayLabel());
             views.value.setText(value.known ? value.display : "—");
