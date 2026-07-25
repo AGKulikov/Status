@@ -1668,6 +1668,13 @@ public final class LauncherActivity extends AppCompatActivity {
             stateLabel.setBackground(badge);
         }
         card.addView(content, new MaterialCardView.LayoutParams(matchWidth(), matchHeight()));
+        if (!addButton && opensWindowedYandex(shortcut)) {
+            // ECARX/Yandex acknowledges creation of the floating window itself. Suppress the
+            // launcher-card effect so one tap cannot produce two audible clicks.
+            card.setSoundEffectsEnabled(false);
+            content.setSoundEffectsEnabled(false);
+            icon.setSoundEffectsEnabled(false);
+        }
         if (stateLabel != null) {
             FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(
                     matchWidth(), wrapContent(), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
@@ -1709,6 +1716,13 @@ public final class LauncherActivity extends AppCompatActivity {
             }
         }
         return card;
+    }
+
+    private static boolean opensWindowedYandex(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        if (shortcut.kind != LauncherShortcutStore.Kind.BUILTIN) return false;
+        return LauncherShortcutStore.Builtin.MAPS_WINDOW.key.equals(shortcut.target)
+                || LauncherShortcutStore.Builtin.NAVIGATOR_WINDOW.key.equals(shortcut.target);
     }
 
     private void executeShortcut(@NonNull LauncherShortcutStore.Shortcut shortcut) {
@@ -2669,8 +2683,7 @@ public final class LauncherActivity extends AppCompatActivity {
             Set<String> hidden = preferences.launcherAllAppsHiddenComponents.get();
             List<AppEntry> result = new ArrayList<>();
             for (AppEntry app : apps) {
-                if (!app.systemApp
-                        && !hidden.contains(app.component.flattenToString())) {
+                if (!hidden.contains(app.component.flattenToString())) {
                     result.add(app);
                 }
             }

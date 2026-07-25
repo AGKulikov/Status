@@ -73,6 +73,8 @@ public final class LauncherShortcutStore {
         public int columnSpan = 1;
         public int rowSpan = 1;
         public boolean showTitle = true;
+        /** Driver Favorites only: dismiss the owning compact panel after either action. */
+        public boolean closeFavoritePanelAfterAction = false;
         public boolean enabled = true;
 
         @NonNull
@@ -110,6 +112,7 @@ public final class LauncherShortcutStore {
             value.columnSpan = columnSpan;
             value.rowSpan = rowSpan;
             value.showTitle = showTitle;
+            value.closeFavoritePanelAfterAction = closeFavoritePanelAfterAction;
             value.enabled = enabled;
             return value;
         }
@@ -393,6 +396,8 @@ public final class LauncherShortcutStore {
                 .put("gapAfterPx", value.gapAfterPx)
                 .put("columnSpan", value.columnSpan)
                 .put("rowSpan", value.rowSpan).put("showTitle", value.showTitle)
+                .put("closeFavoritePanelAfterAction",
+                        value.closeFavoritePanelAfterAction)
                 .put("enabled", value.enabled);
         if (value.stateBinding != null && value.stateBinding.isBound()) {
             json.put("stateBinding", value.stateBinding.toJson());
@@ -443,6 +448,8 @@ public final class LauncherShortcutStore {
             value.columnSpan = json.optInt("columnSpan", 1);
             value.rowSpan = json.optInt("rowSpan", 1);
             value.showTitle = json.optBoolean("showTitle", true);
+            value.closeFavoritePanelAfterAction =
+                    json.optBoolean("closeFavoritePanelAfterAction", false);
             value.enabled = json.optBoolean("enabled", true);
             return sanitize(value);
         } catch (IllegalArgumentException ignored) {

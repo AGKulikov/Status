@@ -337,8 +337,6 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         WindowManager manager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         if (manager == null) return;
 
-        FrameLayout root = new FrameLayout(context);
-        root.setBackgroundColor(Color.argb(247, 10, 13, 18));
         DisplayMetrics metrics = new DisplayMetrics();
         display.getRealMetrics(metrics);
         Preferences.DriverPanelProfile profile = preferences.activeDriverPanelProfile();
@@ -350,8 +348,18 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 metrics.widthPixels, referenceWidth);
         int appsGridScalePercent = Math.max(60, Math.min(180,
                 preferences.launcherAllAppsIconScalePercent.get()));
+        FrameLayout root = new FrameLayout(context);
+        root.setClickable(true);
+        root.setBackgroundColor(Color.argb(70, 0, 0, 0));
+        root.setOnClickListener(view -> dismissAllApps());
+
+        FrameLayout drawer = new FrameLayout(context);
+        drawer.setClickable(true);
+        // Consume taps inside the drawer; only the uncovered driver-rail side dismisses it.
+        drawer.setOnClickListener(view -> { });
+        drawer.setBackgroundColor(Color.argb(247, 10, 13, 18));
         int contentPadding = dp(context, 24);
-        root.setPadding(contentPadding, contentPadding, contentPadding, contentPadding);
+        drawer.setPadding(contentPadding, contentPadding, contentPadding, contentPadding);
 
         TextView title = new TextView(context);
         title.setText("Все приложения");
@@ -360,7 +368,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         title.setGravity(Gravity.CENTER_VERTICAL);
         FrameLayout.LayoutParams titleParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, 72, Gravity.TOP | Gravity.START);
-        root.addView(title, titleParams);
+        drawer.addView(title, titleParams);
 
         ImageButton close = new ImageButton(context);
         close.setImageResource(R.drawable.ic_driver_close);
@@ -370,7 +378,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         close.setOnClickListener(view -> dismissAllApps());
         FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(72, 72,
                 Gravity.TOP | Gravity.END);
-        root.addView(close, closeParams);
+        drawer.addView(close, closeParams);
 
         GridView grid = new GridView(context);
         grid.setNumColumns(Math.max(3,
@@ -386,14 +394,20 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         FrameLayout.LayoutParams gridParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         gridParams.topMargin = 84;
-        root.addView(grid, gridParams);
+        drawer.addView(grid, gridParams);
 
-        // Keep the driver rail outside the drawer's actual touchable rectangle. Tiles still use
-        // the shared launcher renderer and the common all-apps appearance preferences.
+        // The full-screen modal root receives an outside tap while the actual drawer leaves the
+        // driver rail visible. Its child position uses physical display coordinates, independent
+        // of ECARX's shifted system-window origin.
         int drawerWidth = Math.max(1, metrics.widthPixels - physicalWidth);
-        int drawerX = profile.side.get() == 0 ? physicalWidth : 0;
-        WindowManager.LayoutParams params = compactDrawerParams(
-                attachedType, drawerWidth, metrics.heightPixels, drawerX, 0,
+        int drawerLeft = profile.side.get() == 0 ? physicalWidth : 0;
+        FrameLayout.LayoutParams drawerParams = new FrameLayout.LayoutParams(
+                drawerWidth, ViewGroup.LayoutParams.MATCH_PARENT,
+                Gravity.TOP | Gravity.LEFT);
+        drawerParams.leftMargin = drawerLeft;
+        root.addView(drawer, drawerParams);
+        WindowManager.LayoutParams params = allAppsOverlayParams(
+                attachedType, metrics.widthPixels, metrics.heightPixels,
                 "Status Widget all applications");
         try {
             manager.addView(root, params);
@@ -488,9 +502,11 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 anchor.getLocationOnScreen(location);
                 anchorCenterY = location[1] + Math.max(1, anchor.getHeight()) / 2;
             }
-            int x = profile.side.get() == 0
-                    ? physicalWidth
-                    : metrics.widthPixels - physicalWidth - width;
+            boolean panelOnRight = profile.side.get() == 1;
+            int panelX = DriverPanelLayoutPolicy.panelWindowX(
+                    metrics.widthPixels, physicalWidth, panelOnRight);
+            // Always grow toward the screen content and meet the driver rail with a zero-pixel gap.
+            int x = panelOnRight ? panelX - width : panelX + physicalWidth;
             int y = Math.max(0, Math.min(metrics.heightPixels - height,
                     anchorCenterY - height / 2));
             WindowManager.LayoutParams params = compactDrawerParams(
@@ -792,9 +808,10 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             icon = image;
             stateIcon = image;
         }
-        if (stockClimate) {
-            // Only the OEM climate surface should produce a click sound. The proxy itself stays
-            // silent while its synthetic tap reaches the covered stock control.
+        if (stockClimate || opensWindowedYandex(shortcut)) {
+            // The destination surface already produces its own audible acknowledgement. Keeping
+            // the proxy button silent prevents the intermittent double click heard when ECARX
+            // creates a Yandex floating window (and does the same for the stock-climate proxy).
             button.setSoundEffectsEnabled(false);
             content.setSoundEffectsEnabled(false);
             icon.setSoundEffectsEnabled(false);
@@ -865,6 +882,13 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             @NonNull LauncherShortcutStore.Shortcut shortcut) {
         // HA1085 keeps the detailed climate tile at the same height as every other rail button.
         return false;
+    }
+
+    private static boolean opensWindowedYandex(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        if (shortcut.kind != LauncherShortcutStore.Kind.BUILTIN) return false;
+        return LauncherShortcutStore.Builtin.MAPS_WINDOW.key.equals(shortcut.target)
+                || LauncherShortcutStore.Builtin.NAVIGATOR_WINDOW.key.equals(shortcut.target);
     }
 
     @NonNull
@@ -939,6 +963,32 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         params.gravity = Gravity.TOP | Gravity.LEFT;
         params.x = x;
         params.y = y;
+        params.setTitle(title);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            params.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            params.setFitInsetsTypes(0);
+            params.setFitInsetsSides(0);
+        }
+        return params;
+    }
+
+    @NonNull
+    private static WindowManager.LayoutParams allAppsOverlayParams(
+            int type, int screenWidth, int screenHeight, @NonNull String title) {
+        int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
+        WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                Math.max(1, screenWidth), Math.max(1, screenHeight), type, flags,
+                PixelFormat.TRANSLUCENT);
+        params.gravity = Gravity.TOP | Gravity.LEFT;
+        params.x = DriverPanelLayoutPolicy.panelWindowX(
+                screenWidth, screenWidth, false);
+        params.y = 0;
         params.setTitle(title);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             params.layoutInDisplayCutoutMode =
@@ -1204,13 +1254,15 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             if (enabled && LauncherShortcutStore.isInteractive(shortcut)) {
                 tile.setOnClickListener(view -> {
                     actions.execute(shortcut, view);
-                    manuallyOpenFavorites.remove(panelId);
-                    dismissFavoritePanel(panelId);
+                    if (shortcut.closeFavoritePanelAfterAction) {
+                        manuallyOpenFavorites.remove(panelId);
+                        dismissFavoritePanel(panelId);
+                    }
                 });
                 if (shortcut.hasLongAction) {
                     tile.setOnLongClickListener(view -> {
                         boolean handled = actions.executeLong(shortcut, view);
-                        if (handled) {
+                        if (handled && shortcut.closeFavoritePanelAfterAction) {
                             manuallyOpenFavorites.remove(panelId);
                             dismissFavoritePanel(panelId);
                         }

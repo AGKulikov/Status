@@ -431,6 +431,21 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         controls.addView(remove, removeParams);
         body.addView(controls, topMargin(dp(8)));
 
+        if (shortcut.kind == LauncherShortcutStore.Kind.INFO) {
+            MaterialSwitch showIcon = new MaterialSwitch(this);
+            showIcon.setText("Показывать значок слева");
+            showIcon.setTextColor(Color.WHITE);
+            showIcon.setChecked(!"none".equalsIgnoreCase(shortcut.icon));
+            showIcon.setOnCheckedChangeListener((button, checked) -> {
+                shortcut.icon = checked ? "auto" : "none";
+                shortcut.iconCustomized = !checked;
+                store.upsert(shortcut);
+                refreshButtons();
+                applyPanel();
+            });
+            body.addView(showIcon, topMargin(dp(8)));
+        }
+
         MaterialButton longAction = compactButton(shortcut.hasLongAction
                 ? "Удержание: " + longActionLabel(shortcut)
                 : "Удержание: не назначено");
@@ -707,6 +722,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
 
     @Nullable
     private Drawable resolveIcon(@NonNull LauncherShortcutStore.Shortcut shortcut) {
+        if ("none".equalsIgnoreCase(shortcut.icon)) return null;
         if (shortcut.kind == LauncherShortcutStore.Kind.APP
                 && "app".equals(shortcut.icon)) {
             ComponentName component = ComponentName.unflattenFromString(shortcut.target);

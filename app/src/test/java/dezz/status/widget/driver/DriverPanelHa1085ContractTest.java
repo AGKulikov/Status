@@ -68,14 +68,19 @@ public final class DriverPanelHa1085ContractTest {
         assertTrue(config.contains("borderEnabled"));
         assertTrue(config.contains("borderWidthPx"));
         assertTrue(config.contains("borderColor"));
+        assertTrue(shortcuts.contains("closeFavoritePanelAfterAction"));
+        assertTrue(shortcuts.contains(
+                "json.optBoolean(\"closeFavoritePanelAfterAction\", false)"));
+        assertTrue(settings.contains("Закрывать панель после нажатия"));
 
         assertTrue(overlay.contains("favoriteWindows = new LinkedHashMap<>()"));
         assertTrue(overlay.contains("anchor.getLocationOnScreen(location)"));
         assertTrue(overlay.contains("anchorCenterY - height / 2"));
-        assertTrue(overlay.contains("? physicalWidth"));
+        assertTrue(overlay.contains("panelOnRight ? panelX - width : panelX + physicalWidth"));
         assertTrue(overlay.contains("favoritePanelBackground(context, profile)"));
         assertTrue(overlay.contains("config.visibleRows * config.cellSizePx"));
         assertTrue(overlay.contains("config.borderEnabled && config.borderWidthPx > 0"));
+        assertTrue(overlay.contains("if (shortcut.closeFavoritePanelAfterAction)"));
 
         assertTrue(scenarios.contains("result.add(new TargetOption(panel.id,"));
         assertTrue(scenarios.contains("\"Панель избранного · \" + panel.title"));
@@ -103,8 +108,11 @@ public final class DriverPanelHa1085ContractTest {
         assertTrue(information.contains("setClickable(false)"));
         assertTrue(information.contains("content.start()"));
         assertTrue(information.contains("content.stop()"));
+        assertTrue(information.contains(
+                "content.setFixedCellBackgroundColor(shortcut.backgroundColor)"));
         assertTrue(overlay.contains("information.add(shortcut)"));
         assertTrue(overlay.contains("new InformationShortcutView("));
+        assertTrue(settings(widget).contains("Показывать значок слева"));
         assertTrue(infoView.contains("value.setSingleLine(false)"));
         assertTrue(infoView.contains("value.setMaxLines(Integer.MAX_VALUE)"));
         assertTrue(picker.contains("\"system.bluetooth\""));
@@ -138,7 +146,7 @@ public final class DriverPanelHa1085ContractTest {
     }
 
     @Test
-    public void runtimeAllAppsIsSharedAndExcludesSystemPackages() throws Exception {
+    public void runtimeAllAppsIsSharedAndIncludesLaunchableSystemPackages() throws Exception {
         Path widget = widgetRoot();
         String catalog = read(widget.resolve("launcher/LauncherAppCatalog.java"));
         String launcher = read(widget.resolve("LauncherActivity.java"));
@@ -153,8 +161,9 @@ public final class DriverPanelHa1085ContractTest {
         assertTrue(catalog.contains("loadIncludingSystem("));
         assertTrue(launcher.contains("appCatalog.allVisible()"));
         assertTrue(launcher.contains("LauncherAppCatalog.loadIncludingSystem(context)"));
-        assertTrue(launcher.contains("if (!app.systemApp"));
+        assertFalse(launcher.contains("if (!app.systemApp"));
         assertTrue(overlay.contains("LauncherAppCatalog.loadVisible("));
+        assertTrue(catalog.contains("return loadIncludingSystem(context)"));
         assertTrue(preferences.contains("launcherAllAppsHiddenComponents"));
         assertTrue(preferences.contains("launcherAllAppsIconScalePercent"));
         assertFalse(overlay.contains("PanelElementConfigStore.APPS_GRID"));
@@ -233,5 +242,9 @@ public final class DriverPanelHa1085ContractTest {
 
     private static String read(Path path) throws Exception {
         return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
+    }
+
+    private static String settings(Path widget) throws Exception {
+        return read(widget.resolve("DriverPanelSettingsActivity.java"));
     }
 }

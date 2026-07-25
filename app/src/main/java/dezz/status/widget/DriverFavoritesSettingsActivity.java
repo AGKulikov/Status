@@ -195,7 +195,8 @@ public final class DriverFavoritesSettingsActivity extends AppCompatActivity {
         LinearLayout head = new LinearLayout(this);
         head.setGravity(Gravity.CENTER_VERTICAL);
         ImageView icon = new ImageView(this);
-        Drawable drawable = LauncherIconResolver.resolve(this, shortcut);
+        Drawable drawable = "none".equalsIgnoreCase(shortcut.icon)
+                ? null : LauncherIconResolver.resolve(this, shortcut);
         if (drawable != null) icon.setImageDrawable(drawable);
         head.addView(icon, new LinearLayout.LayoutParams(dp(48), dp(48)));
         LinearLayout labels = new LinearLayout(this);
@@ -256,6 +257,33 @@ public final class DriverFavoritesSettingsActivity extends AppCompatActivity {
         });
         actions.addView(remove, weightedMargin());
         body.addView(actions, rowParams());
+
+        if (LauncherShortcutStore.isInteractive(shortcut)) {
+            MaterialSwitch closeAfterAction = new MaterialSwitch(this);
+            closeAfterAction.setText("Закрывать панель после нажатия");
+            closeAfterAction.setTextColor(Color.WHITE);
+            closeAfterAction.setChecked(shortcut.closeFavoritePanelAfterAction);
+            closeAfterAction.setOnCheckedChangeListener((button, checked) -> {
+                shortcut.closeFavoritePanelAfterAction = checked;
+                store.upsert(shortcut);
+                applyPanel();
+            });
+            body.addView(closeAfterAction, rowParams());
+        }
+
+        if (shortcut.kind == LauncherShortcutStore.Kind.INFO) {
+            MaterialSwitch showIcon = new MaterialSwitch(this);
+            showIcon.setText("Показывать значок слева");
+            showIcon.setTextColor(Color.WHITE);
+            showIcon.setChecked(!"none".equalsIgnoreCase(shortcut.icon));
+            showIcon.setOnCheckedChangeListener((button, checked) -> {
+                shortcut.icon = checked ? "auto" : "none";
+                shortcut.iconCustomized = !checked;
+                store.upsert(shortcut);
+                changed();
+            });
+            body.addView(showIcon, rowParams());
+        }
 
         MaterialSwitch title = new MaterialSwitch(this);
         title.setText("Показывать подпись");

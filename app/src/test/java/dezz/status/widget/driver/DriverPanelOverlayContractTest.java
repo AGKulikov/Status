@@ -31,8 +31,10 @@ public class DriverPanelOverlayContractTest {
         assertTrue(source.contains("windowContext(display, attachedType)"));
         assertFalse(source.contains("fullScreenParams(attachedType)"));
         assertTrue(source.contains("metrics.widthPixels - physicalWidth"));
-        assertTrue(source.contains("profile.side.get() == 0 ? physicalWidth : 0"));
+        assertTrue(source.contains("int drawerLeft = profile.side.get() == 0 ? physicalWidth : 0"));
         assertTrue(source.contains("compactDrawerParams("));
+        assertTrue(source.contains("allAppsOverlayParams("));
+        assertTrue(source.contains("root.setOnClickListener(view -> dismissAllApps())"));
         assertTrue(source.contains("root.setPadding(0, geometry.contentTop, 0,"));
         assertTrue(source.contains("screenHeight - geometry.contentBottom"));
         assertTrue(source.contains("width, Math.max(1, screenHeight), type"));
@@ -71,7 +73,10 @@ public class DriverPanelOverlayContractTest {
         String climateSource = read(climateView);
         assertTrue(climateSource.contains("fanKnown && fanActive"));
         assertTrue(climateSource.contains("if (!showFan) return;"));
-        assertTrue(climateSource.contains("drawText(\"AUTO\""));
+        assertFalse(climateSource.contains("drawFanGlyph"));
+        assertFalse(climateSource.contains("drawText(\"AUTO\""));
+        assertTrue(climateSource.contains("drawBars(canvas, width * .12f"));
+        assertTrue(climateSource.contains("Standard seated-person airflow pictogram"));
         assertTrue(climateSource.contains("AIRFLOW = \"climate.airflow\""));
         assertTrue(climateSource.contains("boolean expanded = detailed;"));
         assertTrue(climateSource.contains("primarySize * .58f"));
@@ -201,7 +206,7 @@ public class DriverPanelOverlayContractTest {
 
         assertTrue(launcher.contains("LauncherAppCatalog.loadIncludingSystem(context)"));
         assertTrue(launcher.contains("appCatalog.allVisible()"));
-        assertTrue(launcher.contains("if (!app.systemApp"));
+        assertFalse(launcher.contains("if (!app.systemApp"));
         assertTrue(launcher.contains("LauncherAppTileRenderer.render("));
         assertTrue(catalog.contains("Intent.CATEGORY_LAUNCHER"));
         assertTrue(catalog.contains("queryIntentActivities(query, 0)"));

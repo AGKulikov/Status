@@ -29,9 +29,10 @@ import dezz.status.widget.R;
 /**
  * Canonical application list used by HOME and every runtime "all applications" surface.
  *
- * <p>Only user-installed {@link Intent#CATEGORY_LAUNCHER} activities are included. Settings
- * pickers use {@link InstalledAppCatalog} instead because they intentionally need system,
- * disabled and non-launcher packages as action targets.</p>
+ * <p>Runtime “All applications” surfaces include every enabled
+ * {@link Intent#CATEGORY_LAUNCHER} activity, including OEM/system apps such as the stock Phone.
+ * Settings pickers use {@link InstalledAppCatalog} when they also need disabled or non-launcher
+ * packages as action targets.</p>
  */
 public final class LauncherAppCatalog {
     public static final class App {
@@ -52,16 +53,14 @@ public final class LauncherAppCatalog {
     private LauncherAppCatalog() {
     }
 
-    /** User-installed launcher activities shown by runtime "All applications" surfaces. */
+    /** User-installed launcher activities retained for callers that explicitly need that subset. */
     @NonNull
     public static List<App> load(@NonNull Context context) {
         return load(context, false);
     }
 
     /**
-     * Complete launcher-activity catalog used only to resolve explicitly pinned applications.
-     * System applications stay out of every runtime "All applications" list, but a target that
-     * the user deliberately selected in settings must not disappear from HOME or the driver rail.
+     * Complete launcher-activity catalog used by runtime application menus and pinned apps.
      */
     @NonNull
     public static List<App> loadIncludingSystem(@NonNull Context context) {
@@ -94,15 +93,16 @@ public final class LauncherAppCatalog {
 
     /**
      * Returns the shared user-visible catalog. Filtering is component based so two launcher
-     * activities from one package may be controlled independently.
+     * activities from one package may be controlled independently; system applications are not
+     * silently discarded.
      */
     @NonNull
     public static List<App> loadVisible(@NonNull Context context,
                                         @NonNull Preferences preferences) {
         Set<String> hidden = preferences.launcherAllAppsHiddenComponents.get();
-        if (hidden.isEmpty()) return load(context);
+        if (hidden.isEmpty()) return loadIncludingSystem(context);
         List<App> visible = new ArrayList<>();
-        for (App app : load(context)) {
+        for (App app : loadIncludingSystem(context)) {
             if (!hidden.contains(app.component.flattenToString())) visible.add(app);
         }
         return visible;

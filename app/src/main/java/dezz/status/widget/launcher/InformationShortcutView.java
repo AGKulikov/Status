@@ -40,6 +40,7 @@ public final class InformationShortcutView extends FrameLayout {
         content = new InformationPanelView(context, CarIntegrations.get(context),
                 new InformationPanelConfigStore(preferences));
         content.setConfig(config);
+        content.setFixedCellBackgroundColor(shortcut.backgroundColor);
         content.setClickable(false);
         addView(content, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));

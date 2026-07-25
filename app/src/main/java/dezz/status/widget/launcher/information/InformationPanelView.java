@@ -83,6 +83,7 @@ public final class InformationPanelView extends FrameLayout {
     private final Map<String, ConnectorValue> connectorValues = new HashMap<>();
     private final Map<String, ItemViews> itemViews = new LinkedHashMap<>();
     private InformationPanelConfig config;
+    @Nullable private Integer fixedCellBackgroundColor;
     private boolean started;
     private int catalogGeneration;
     private int connectorGeneration;
@@ -162,6 +163,27 @@ public final class InformationPanelView extends FrameLayout {
         if (started && !oldVehicleIds.equals(requestedVehicleIds())) {
             subscribeVehicleValues();
         }
+    }
+
+    /**
+     * Makes every cell use one caller-owned color instead of the panel's automatic active tint.
+     * Driver-rail information shortcuts use this to honour their normal per-item background
+     * setting, including a fully transparent value.
+     */
+    public void setFixedCellBackgroundColor(@Nullable String rawColor) {
+        Integer parsed = null;
+        if (rawColor != null) {
+            try {
+                parsed = "none".equalsIgnoreCase(rawColor.trim())
+                        ? Color.TRANSPARENT : Color.parseColor(rawColor);
+            } catch (IllegalArgumentException ignored) {
+                parsed = Color.TRANSPARENT;
+            }
+        }
+        if (fixedCellBackgroundColor == null
+                ? parsed == null : fixedCellBackgroundColor.equals(parsed)) return;
+        fixedCellBackgroundColor = parsed;
+        rebuild();
     }
 
     @NonNull
@@ -320,7 +342,8 @@ public final class InformationPanelView extends FrameLayout {
         tile.setFocusable(false);
 
         GradientDrawable background = new GradientDrawable();
-        background.setColor(Color.argb(58, 255, 255, 255));
+        background.setColor(fixedCellBackgroundColor == null
+                ? Color.argb(58, 255, 255, 255) : fixedCellBackgroundColor);
         background.setCornerRadius(Math.max(4f, config.cornerRadiusPx * .48f));
         tile.setBackground(background);
 
@@ -381,9 +404,11 @@ public final class InformationPanelView extends FrameLayout {
             views.value.setText(value.known ? value.display : "—");
             views.value.setAlpha(value.known ? 1f : .48f);
             views.icon.setAlpha(value.known ? (value.active ? 1f : .58f) : .28f);
-            views.background.setColor(value.known && value.active
+            views.background.setColor(fixedCellBackgroundColor == null
+                    ? (value.known && value.active
                     ? Color.argb(82, 84, 168, 255)
-                    : Color.argb(58, 255, 255, 255));
+                    : Color.argb(58, 255, 255, 255))
+                    : fixedCellBackgroundColor);
             views.tile.setContentDescription(item.displayLabel() + ": "
                     + (value.known ? value.display : "нет актуальных данных"));
         }
