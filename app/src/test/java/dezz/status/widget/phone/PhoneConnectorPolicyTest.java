@@ -35,4 +35,12 @@ public final class PhoneConnectorPolicyTest {
         assertEquals(60_000L, PhoneConnectorPolicy.reconnectDelayMillis(5));
         assertEquals(60_000L, PhoneConnectorPolicy.reconnectDelayMillis(1_000));
     }
+
+    @Test public void stockOwnerGetsBoundedRetriesAndASettleWindowBeforeGatt() {
+        assertEquals(3, PhoneConnectorPolicy.stockConnectionMaxAttempts());
+        assertEquals(1_000L, PhoneConnectorPolicy.stockConnectionRetryDelayMillis(0));
+        assertEquals(2_500L, PhoneConnectorPolicy.stockConnectionRetryDelayMillis(1));
+        assertEquals(2_500L, PhoneConnectorPolicy.stockConnectionRetryDelayMillis(100));
+        assertEquals(2_500L, PhoneConnectorPolicy.stockConnectionSettleMillis());
+    }
 }
