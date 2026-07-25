@@ -33,6 +33,7 @@ import dezz.status.widget.shell.PrivilegedShell;
 final class DriverPanelActionExecutor {
     interface Host {
         void showAllApps();
+        void showFavorites();
         void triggerStockClimate();
     }
 
@@ -78,6 +79,18 @@ final class DriverPanelActionExecutor {
         }
     }
 
+    boolean executeLong(@NonNull LauncherShortcutStore.Shortcut shortcut) {
+        if (!shortcut.hasLongAction) return false;
+        LauncherShortcutStore.Shortcut action = shortcut.copy();
+        action.kind = shortcut.longKind;
+        action.target = shortcut.longTarget;
+        action.packageName = shortcut.longPackageName;
+        action.command = shortcut.longCommand;
+        action.commandValue = shortcut.longCommandValue;
+        execute(action);
+        return true;
+    }
+
     private void executeBuiltin(@NonNull LauncherShortcutStore.Builtin action) {
         switch (action) {
             case HOME:
@@ -94,11 +107,20 @@ final class DriverPanelActionExecutor {
                             });
                 }
                 return;
+            case RECENTS:
+                if (!WidgetAccessibilityService.performGlobalRecents(
+                        accepted -> {
+                            if (!accepted) openRecentsWithShell();
+                        })) openRecentsWithShell();
+                return;
             case STOCK_CLIMATE:
                 host.triggerStockClimate();
                 return;
             case ALL_APPS:
                 host.showAllApps();
+                return;
+            case FAVORITES:
+                host.showFavorites();
                 return;
             case MAPS_WINDOW:
                 launchYandex(YandexWindowLauncher.Product.MAPS, false);
@@ -150,6 +172,15 @@ final class DriverPanelActionExecutor {
         if (!YandexWindowLauncher.launch(context, product, full)) {
             toast("Приложение Яндекса не найдено");
         }
+    }
+
+    private void openRecentsWithShell() {
+        PrivilegedShell.get(context).runCommand("input keyevent 187",
+                (output, error) -> {
+                    if (error != null) {
+                        toast("Включите спецвозможности для списка приложений");
+                    }
+                });
     }
 
     private void openSettings(SettingsDestinationCatalog.Group group) {
