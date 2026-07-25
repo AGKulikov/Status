@@ -69,10 +69,10 @@ public final class DrivingModeShortcutContractTest {
     }
 
     @Test public void sharedPickerAndBothExecutorsCarryTheSelectedSubset() throws IOException {
-        String picker = source("app/src/main/java/dezz/status/widget/launcher/"
+        String picker = source("dezz/status/widget/launcher/"
                 + "ShortcutActionPicker.java");
-        String launcher = source("app/src/main/java/dezz/status/widget/LauncherActivity.java");
-        String driver = source("app/src/main/java/dezz/status/widget/driver/"
+        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        String driver = source("dezz/status/widget/driver/"
                 + "DriverPanelActionExecutor.java");
         assertTrue(picker.contains("Переключать только выбранные режимы"));
         assertTrue(picker.contains("value.cycleValues = new ArrayList<>(cycleValues)"));
@@ -80,7 +80,11 @@ public final class DrivingModeShortcutContractTest {
         assertTrue(driver.contains("shortcut.cycleValues"));
     }
 
-    private static String source(String path) throws IOException {
-        return new String(Files.readAllBytes(Paths.get(path)), StandardCharsets.UTF_8);
+    private static String source(String relative) throws IOException {
+        java.nio.file.Path fromRoot = Paths.get("app", "src", "main", "java")
+                .resolve(relative);
+        java.nio.file.Path fromApp = Paths.get("src", "main", "java").resolve(relative);
+        java.nio.file.Path file = Files.isRegularFile(fromRoot) ? fromRoot : fromApp;
+        return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
     }
 }

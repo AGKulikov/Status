@@ -123,7 +123,8 @@ public final class DriverPanelHa1084ContractTest {
         assertTrue(bootstrap.contains("preferences.widgetEnabled.get()")
                 && bootstrap.contains("preferences.driverPanelEnabled.get()"));
         assertTrue(starter.contains("!preferences.driverPanelEnabled.get()"));
-        assertTrue(service.contains("else if (prefs.driverPanelEnabled.get())"));
+        assertTrue(service.contains("else if (prefs.driverPanelEnabled.get()"
+                + " || prefs.phoneConnectorEnabled.get())"));
         assertTrue(service.contains("runInitialIntegrationStartup()"));
         assertTrue(service.contains("detachStatusSurfaceRuntime(\"status row disabled\")"));
         assertTrue(service.contains("stopLocationTracking()"));

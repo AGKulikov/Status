@@ -105,8 +105,9 @@ public final class LauncherPanelResizeMathTest {
                 "addResizeHandle(LauncherPanelResizeMath.Corner.BOTTOM_RIGHT"));
         assertTrue(source.contains("LauncherPanelResizeMath.cornerAt("));
         assertTrue(source.contains("LauncherPanelResizeMath.resize("));
+        assertTrue(source.contains("editMode = enabled && !canvasMode"));
         assertTrue(source.contains(
-                "handle.setVisibility(enabled ? VISIBLE : GONE)"));
+                "handle.setVisibility(editMode ? VISIBLE : GONE)"));
         assertTrue(source.contains("listener.onGeometryChanged(elementId, lp.leftMargin"));
     }
 

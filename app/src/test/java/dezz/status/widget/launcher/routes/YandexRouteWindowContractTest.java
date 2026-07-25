@@ -22,8 +22,8 @@ public final class YandexRouteWindowContractTest {
     public void floatingRouteUsesSharedYandexWindowLauncher() throws IOException {
         String source = source("dezz/status/widget/launcher/routes/YandexRouteLauncher.java");
 
-        assertTrue(source.contains("YandexWindowLauncher.launch("));
-        assertTrue(source.contains("windowProduct(route.product), false"));
+        assertTrue(source.contains("YandexWindowLauncher.launchOverStatusHome("));
+        assertTrue(source.contains("windowProduct(route.product), opened ->"));
         assertTrue(source.contains("postDelayed"));
         assertTrue(source.contains(
                 "startDeepLink(context, route.product, deepLink, alternateDeepLink)"));
