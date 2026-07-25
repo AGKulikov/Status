@@ -81,6 +81,18 @@ public final class DriverPanelLayoutPolicy {
         return newPanel ? REFERENCE_NEW_PANEL_WIDTH : REFERENCE_OLD_PANEL_WIDTH;
     }
 
+    /** The expanded live-climate shortcut owns two ordinary rail slots. */
+    public static float shortcutWeight(boolean expandedClimate) {
+        return expandedClimate ? 2f : 1f;
+    }
+
+    /** The expanded climate canvas uses the same width but two icon-height units. */
+    public static int shortcutIconHeight(int requestedSize, boolean expandedClimate) {
+        int size = Math.max(1, requestedSize);
+        if (!expandedClimate) return size;
+        return size > Integer.MAX_VALUE / 2 ? Integer.MAX_VALUE : size * 2;
+    }
+
     /** Reserved left-side ECARX frame that must be crossed to cover the stock driver rail. */
     public static int stockNavigationInset(int screenWidth) {
         return scaleReferenceWidth(screenWidth, REFERENCE_STOCK_NAVIGATION_INSET);
