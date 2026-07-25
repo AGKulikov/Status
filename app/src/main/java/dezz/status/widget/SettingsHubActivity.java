@@ -649,10 +649,13 @@ public final class SettingsHubActivity extends AppCompatActivity {
             return;
         }
 
-        if (WidgetService.isRunning()) stopService(new Intent(this, WidgetService.class));
-        if (preferences.widgetEnabled.get() && Permissions.allPermissionsGranted(this)) {
-            startForegroundService(new Intent(this, WidgetService.class));
+        WidgetService running = WidgetService.getInstance();
+        if (running != null) {
+            running.applyPreferences();
+        } else {
+            WidgetServiceStarter.startIfNeeded(this);
         }
+        dezz.status.widget.driver.DriverPanelService.apply(this);
         ClimatePanelService.apply(this);
         Toast.makeText(this, R.string.import_success_toast, Toast.LENGTH_SHORT).show();
         recreate();
