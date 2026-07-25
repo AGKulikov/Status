@@ -265,10 +265,11 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
             prefs.sprutHubSerial.set(text(serial));
             prefs.sprutKeepAwake.set(keepAwake.isChecked());
             password.setText("");
-            if (WidgetService.isRunning()) {
-                WidgetService.getInstance().applyPreferences();
-            } else if (prefs.widgetEnabled.get() && Permissions.allPermissionsGranted(this)) {
-                startForegroundService(new Intent(this, WidgetService.class));
+            WidgetService running = WidgetService.getInstance();
+            if (running != null) {
+                running.applyPreferences();
+            } else {
+                WidgetServiceStarter.startIfNeeded(this);
             }
             Toast.makeText(this, "Настройки Sprut.hub сохранены", Toast.LENGTH_SHORT).show();
             main.removeCallbacks(delayedReload);
@@ -854,7 +855,12 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
     }
 
     private void applyLiveSettings() {
-        if (WidgetService.isRunning()) WidgetService.getInstance().applyPreferences();
+        WidgetService running = WidgetService.getInstance();
+        if (running != null) {
+            running.applyPreferences();
+        } else {
+            WidgetServiceStarter.startIfNeeded(this);
+        }
     }
 
     private static String uniqueMainId(String base, List<HaBrickConfig> items) {
