@@ -27,6 +27,7 @@ public final class LauncherShortcutStore {
     public static final int MIN_ICON_SIZE_PX = 24;
     public static final int MAX_ICON_SIZE_PX = 320;
     public static final int MAX_DRIVER_PANEL_SHORTCUTS = 10;
+    public static final int MAX_DRIVER_FAVORITES = 48;
 
     public enum Kind { APP, BUILTIN, RULE, INTENT, CAR }
 
@@ -61,6 +62,8 @@ public final class LauncherShortcutStore {
         @NonNull public String activeIconColor = "#FFFFB300";
         public boolean useVehicleStateColor = true;
         public boolean showState = true;
+        /** Driver climate tile occupies two slots and shows AUTO/airflow when enabled. */
+        public boolean extendedClimateInfo = false;
         public int iconSizePx = 54;
         public int columnSpan = 1;
         public int rowSpan = 1;
@@ -93,6 +96,7 @@ public final class LauncherShortcutStore {
             value.activeIconColor = activeIconColor;
             value.useVehicleStateColor = useVehicleStateColor;
             value.showState = showState;
+            value.extendedClimateInfo = extendedClimateInfo;
             value.iconSizePx = iconSizePx;
             value.columnSpan = columnSpan;
             value.rowSpan = rowSpan;
@@ -105,8 +109,10 @@ public final class LauncherShortcutStore {
     public enum Builtin {
         HOME("home", "Домой", "home"),
         BACK("back", "Назад", "back"),
+        RECENTS("recents", "Недавние приложения", "apps"),
         STOCK_CLIMATE("stock_climate", "Штатный климат", "climate"),
         ALL_APPS("all_apps", "Все приложения", "apps"),
+        FAVORITES("favorites", "Избранное", "work"),
         MAPS_WINDOW("maps_window", "Карты в окне", "navigation"),
         MAPS_FULL("maps_full", "Карты на весь экран", "navigation"),
         NAVIGATOR_WINDOW("navigator_window", "Навигатор в окне", "navigation"),
@@ -142,18 +148,21 @@ public final class LauncherShortcutStore {
     private final Preferences preferences;
     private final Preferences.Str storage;
     private final boolean driverPanel;
+    private final boolean driverFavorites;
     private final List<Shortcut> shortcuts = new ArrayList<>();
 
     public LauncherShortcutStore(@NonNull Preferences preferences) {
-        this(preferences, preferences.launcherShortcutsJson, false);
+        this(preferences, preferences.launcherShortcutsJson, false, false);
     }
 
     private LauncherShortcutStore(@NonNull Preferences preferences,
                                   @NonNull Preferences.Str storage,
-                                  boolean driverPanel) {
+                                  boolean driverPanel,
+                                  boolean driverFavorites) {
         this.preferences = preferences;
         this.storage = storage;
         this.driverPanel = driverPanel;
+        this.driverFavorites = driverFavorites;
         load();
     }
 
@@ -166,7 +175,14 @@ public final class LauncherShortcutStore {
     public static LauncherShortcutStore forDriverPanel(
             @NonNull Preferences preferences,
             @NonNull Preferences.DriverPanelProfile profile) {
-        return new LauncherShortcutStore(preferences, profile.shortcutsJson, true);
+        return new LauncherShortcutStore(preferences, profile.shortcutsJson, true, false);
+    }
+
+    @NonNull
+    public static LauncherShortcutStore forDriverFavorites(
+            @NonNull Preferences preferences) {
+        return new LauncherShortcutStore(preferences,
+                preferences.driverFavoritesShortcutsJson, false, true);
     }
 
     public void load() {
@@ -215,6 +231,7 @@ public final class LauncherShortcutStore {
             }
         }
         if (driverPanel && shortcuts.size() >= MAX_DRIVER_PANEL_SHORTCUTS) return;
+        if (driverFavorites && shortcuts.size() >= MAX_DRIVER_FAVORITES) return;
         shortcuts.add(sanitize(value.copy()));
         save();
     }
@@ -285,6 +302,7 @@ public final class LauncherShortcutStore {
                 .put("activeIconColor", value.activeIconColor)
                 .put("useVehicleStateColor", value.useVehicleStateColor)
                 .put("showState", value.showState)
+                .put("extendedClimateInfo", value.extendedClimateInfo)
                 .put("iconSizePx", value.iconSizePx).put("columnSpan", value.columnSpan)
                 .put("rowSpan", value.rowSpan).put("showTitle", value.showTitle)
                 .put("enabled", value.enabled);
@@ -326,6 +344,7 @@ public final class LauncherShortcutStore {
             value.activeIconColor = json.optString("activeIconColor", "#FFFFB300");
             value.useVehicleStateColor = json.optBoolean("useVehicleStateColor", true);
             value.showState = json.optBoolean("showState", true);
+            value.extendedClimateInfo = json.optBoolean("extendedClimateInfo", false);
             value.iconSizePx = json.optInt("iconSizePx", 54);
             value.columnSpan = json.optInt("columnSpan", 1);
             value.rowSpan = json.optInt("rowSpan", 1);
@@ -339,12 +358,14 @@ public final class LauncherShortcutStore {
 
     @NonNull
     private List<Shortcut> defaults() {
+        if (driverFavorites) return Collections.emptyList();
         if (driverPanel) {
             List<Shortcut> values = new ArrayList<>();
             values.add(driverBuiltin(Builtin.HOME, "Домой"));
             values.add(driverBuiltin(Builtin.BACK, "Назад"));
             Shortcut climate = driverBuiltin(Builtin.STOCK_CLIMATE, "Климат");
             climate.iconSizePx = 76;
+            climate.extendedClimateInfo = false;
             values.add(climate);
             values.add(driverBuiltin(Builtin.ALL_APPS, "Приложения"));
             return values;
