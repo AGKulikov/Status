@@ -83,16 +83,18 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
                 preferences.launcherBackgroundColor.get());
 
         addTitle("Компоновка");
-        addHint("Размер и положение блоков меняются прямо на HOME. Видимость и содержимое "
-                + "задаются в едином разделе блоков — без дублирующих переключателей.");
+        addHint("Каждый элемент перемещается и масштабируется по всему HOME независимо от "
+                + "исходного блока. Видимость и содержимое задаются в едином разделе.");
         addButton("Открыть единый раздел блоков…", v ->
                 startActivity(SettingsHubActivity.intent(this,
                         dezz.status.widget.settings.SettingsDestinationCatalog.Group.PANELS)));
-        addButton("Сбросить расположение блоков", v -> new AlertDialog.Builder(this)
+        addButton("Сбросить расположение элементов", v -> new AlertDialog.Builder(this)
                 .setTitle("Сбросить компоновку?")
-                .setMessage("Блоки вернутся в исходные позиции. Остальные настройки не изменятся.")
+                .setMessage("Элементы вернутся к расположению, рассчитанному из текущих блоков. "
+                        + "Остальные настройки не изменятся.")
                 .setPositiveButton("Сбросить", (dialog, which) -> {
                     preferences.launcherLayoutJson.set("");
+                    preferences.launcherGlobalElementsJson.set("");
                     Toast.makeText(this, "Компоновка сброшена", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton(android.R.string.cancel, null).show());
