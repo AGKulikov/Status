@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 31997)
-Total output lines: 2864
-
 /*
  * Copyright © 2025-2026 Dezz (https://github.com/DezzK)
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -1305,7 +1302,172 @@ public final class PhoneConnectorController {
         return operation.characteristic == callbackCharacteristic;
     }
 
-    private void maybeFinishAncsSetup(…1997 tokens truncated…   return;
+    private void maybeFinishAncsSetup(long token) {
+        if (!ancsReady && ancsDataSubscribed && ancsNotificationSubscribed) {
+            ancsReady = true;
+            ancsAuthorizedThisRun = true;
+            forceDirectGatt = false;
+            reconnectAttempt = 0;
+            ancsStatus = serviceChangedSubscribed ? "ready" : "ready_degraded";
+            if (serviceChangedSubscribed) lastError = "";
+            rebuildMessageSnapshot();
+            cancelSmsFallbackNotifications();
+            updateMessageAvailability();
+            publishSnapshot(token);
+            pumpAttributeRequests(token);
+        }
+    }
+
+    private void handleCharacteristicChanged(long token, @NonNull UUID uuid,
+                                             @Nullable byte[] payload) {
+        if (AncsProtocol.NOTIFICATION_SOURCE.equals(uuid)) {
+            handleAncsEvent(token, AncsProtocol.parseEvent(payload));
+        } else if (AncsProtocol.DATA_SOURCE.equals(uuid)) {
+            handleAncsData(token, payload);
+        } else if (SERVICE_CHANGED.equals(uuid)) {
+            handleServiceChanged(token);
+        } else if (BATTERY_LEVEL.equals(uuid) || BATTERY_POWER_STATE.equals(uuid)) {
+            applyBatteryCharacteristic(token, uuid, payload);
+        }
+    }
+
+    private void handleAncsEvent(long token, @Nullable AncsProtocol.Event event) {
+        Config current = config;
+        if (event == null || current == null || !current.ancsNeeded()
+                || ancsNotificationSource == null || !ancsNotificationListening) return;
+        if (event.eventId == AncsProtocol.EVENT_REMOVED) {
+            removeAncsNotification(token, event.uid);
+            return;
+        }
+        removedAttributeUids.remove(event.uid);
+        pendingAncsEvents.remove(event.uid);
+        pendingAncsEvents.put(event.uid, event);
+        if (activeAttributeUid != null && activeAttributeUid == event.uid) {
+            dirtyAttributeUids.add(event.uid);
+        } else if (queuedAttributeUids.add(event.uid)) {
+            trimPendingNotificationRequests();
+            attributeRequests.add(event.uid);
+        }
+        pumpAttributeRequests(token);
+    }
+
+    private void trimPendingNotificationRequests() {
+        while (attributeRequests.size() >= MAX_PENDING_ANCS_REQUESTS) {
+            Long dropped = attributeRequests.poll();
+            if (dropped == null) break;
+            queuedAttributeUids.remove(dropped);
+            pendingAncsEvents.remove(dropped);
+            dirtyAttributeUids.remove(dropped);
+            fullTextAttributeUids.remove(dropped);
+        }
+    }
+
+    private void handleServiceChanged(long token) {
+        if (gatt == null || !gattConnected) return;
+        // Android 9 vendor stacks can deliver late callbacks from the old attribute database.
+        // Refreshing then reopening GATT gives the new database its own callback identity and
+        // operation queue instead of rediscovering Android's stale cached service list.
+        forceDirectGatt = true;
+        refreshGattCache(gatt);
+        scheduleGattReconnect(token, "GATT services changed", "services_changed");
+    }
+
+    private void restartAncsAfterBond(long token, @NonNull BluetoothGatt expected) {
+        Handler handler = worker;
+        if (handler == null) return;
+        handler.postDelayed(() -> runIfCurrent(token, () -> {
+            if (gatt != expected || !gattConnected) return;
+            // Never overlap service discovery with a descriptor write that Android's security
+            // manager may still be completing. Reopen one clean client after the bond settles.
+            forceDirectGatt = true;
+            scheduleGattReconnect(token, "Bluetooth LE bond completed", "negotiating");
+        }), 750L);
+    }
+
+    private void pumpAttributeRequests(long token) {
+        if (!ancsReady || activeAttributeUid != null || activeAppIdentifier != null
+                || ancsControlPoint == null) return;
+        Long uid = attributeRequests.poll();
+        if (uid != null) {
+            queuedAttributeUids.remove(uid);
+            activeAttributeUid = uid;
+            long requestSequence = ++nextAncsRequestSequence;
+            activeAncsRequestSequence = requestSequence;
+            boolean includeText = config != null && config.includeNotificationText
+                    && (config.notificationsEnabled || fullTextAttributeUids.contains(uid));
+            activeAttributeIncludesText = includeText;
+            attributeAccumulator = new AncsProtocol.AttributeAccumulator(uid, includeText);
+            byte[] request = AncsProtocol.notificationAttributeRequest(uid, includeText);
+            gattOperations.add(new GattOperation(GattKind.CONTROL_WRITE, GattTag.CONTROL,
+                    null, ancsControlPoint, request, uid, requestSequence));
+            pumpGattOperations(token);
+            return;
+        }
+        while (true) {
+            String appIdentifier = appAttributeRequests.poll();
+            if (appIdentifier == null) return;
+            queuedAppIdentifiers.remove(appIdentifier);
+            final AncsProtocol.AppAttributeAccumulator accumulator;
+            final byte[] request;
+            try {
+                accumulator = new AncsProtocol.AppAttributeAccumulator(appIdentifier);
+                request = AncsProtocol.appAttributeRequest(appIdentifier);
+            } catch (IllegalArgumentException invalidIdentifier) {
+                cacheAppDisplayName(appIdentifier,
+                        PhoneAppCatalog.displayNameFallback(appIdentifier));
+                continue;
+            }
+            activeAppIdentifier = appIdentifier;
+            long requestSequence = ++nextAncsRequestSequence;
+            activeAncsRequestSequence = requestSequence;
+            appAttributeAccumulator = accumulator;
+            gattOperations.add(new GattOperation(GattKind.CONTROL_WRITE, GattTag.CONTROL,
+                    null, ancsControlPoint, request, appIdentifier, requestSequence));
+            pumpGattOperations(token);
+            return;
+        }
+    }
+
+    private void scheduleAttributeTimeout(long token, @NonNull GattOperation operation) {
+        Handler handler = worker;
+        if (handler == null) {
+            scheduleGattReconnect(token, "ANCS response worker unavailable");
+            return;
+        }
+        long expectedSequence = operation.requestSequence;
+        // The Data Source response is allowed to arrive before Android reports completion of the
+        // Control Point write. If that already completed this exact request, there is no response
+        // left to time out and the next serialized request owns any newly queued operation.
+        if (expectedSequence == 0L || activeAncsRequestSequence != expectedSequence) return;
+        Runnable timeout = () -> runIfCurrent(token, () -> {
+            if (activeAncsRequestSequence == expectedSequence) {
+                scheduleGattReconnect(token, "ANCS attribute response timed out");
+            }
+        });
+        attributeTimeout = timeout;
+        handler.postDelayed(timeout, ATTRIBUTE_TIMEOUT_MS);
+    }
+
+    private void handleAncsData(long token, @Nullable byte[] payload) {
+        if (payload == null) return;
+        if (activeAttributeUid != null && attributeAccumulator != null) {
+            handleNotificationAttributes(token, payload);
+            return;
+        }
+        if (activeAppIdentifier != null && appAttributeAccumulator != null) {
+            handleAppAttributes(token, payload);
+        }
+    }
+
+    private void handleNotificationAttributes(long token, @NonNull byte[] payload) {
+        Long uid = activeAttributeUid;
+        AncsProtocol.AttributeAccumulator accumulator = attributeAccumulator;
+        long requestSequence = activeAncsRequestSequence;
+        boolean responseIncludedText = activeAttributeIncludesText;
+        if (uid == null || accumulator == null) return;
+        if (!accumulator.append(payload)) {
+            scheduleGattReconnect(token, "ANCS notification response exceeded its limit");
+            return;
         }
         AncsProtocol.Notification notification = accumulator.complete();
         if (notification == null) return;
