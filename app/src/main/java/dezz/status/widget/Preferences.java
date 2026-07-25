@@ -373,7 +373,7 @@ public class Preferences {
         }
     }
 
-    /** Stock Monjaro driver-panel generation selected by the user. */
+    /** Legacy storage discriminator retained only for importing HA1082-HA1084 settings. */
     public enum DriverPanelStyle {
         OLD("old"),
         NEW("new");
@@ -390,13 +390,7 @@ public class Preferences {
         }
     }
 
-    /**
-     * One complete, independently persisted driver-panel profile.
-     *
-     * <p>The old profile deliberately keeps every HA1082 storage key unchanged. The new profile
-     * uses the additive {@code driverPanelNew*} namespace, so selecting another generation never
-     * overwrites the user's dimensions, appearance or ordered buttons.</p>
-     */
+    /** One complete, independently persisted driver-panel profile. */
     public static final class DriverPanelProfile {
         @NonNull public final DriverPanelStyle style;
         public final Int side;
@@ -523,6 +517,9 @@ public class Preferences {
     public final Bool launcherShowGrid = new Bool(this, "launcherShowGrid", true);
     public final Int launcherSnapPx = new Int(this, "launcherSnapPx", 20);
     public final Bool launcherImmersive = new Bool(this, "launcherImmersive", true);
+    /** HOME first renders our launcher, then opens Navigator through its ECARX window entry. */
+    public final Bool launcherAutoWindowedNavigatorOnHome = new Bool(this,
+            "launcherAutoWindowedNavigatorOnHome", false);
     public final Bool launcherAppsVisible = new Bool(this, "launcherAppsVisible", true);
     public final Bool launcherMediaVisible = new Bool(this, "launcherMediaVisible", true);
     public final Bool launcherClockVisible = new Bool(this, "launcherClockVisible", true);
@@ -578,13 +575,13 @@ public class Preferences {
     public final Int climateButtonY = new Int(this, "climateButtonY", 300);
     public final Bool climateButtonLocked = new Bool(this, "climateButtonLocked", false);
     public final Str launcherShortcutsJson = new Str(this, "launcherShortcutsJson", "");
-    // Optional replacement for either generation of the Monjaro driver rail. Enabled state and
-    // selected style are global; every dimension, appearance value and button collection below is
-    // profile-local. Missing driverPanelStyle intentionally resolves to OLD so an HA1082 upgrade
-    // continues using the existing driverPanel* values without a destructive copy migration.
+    // Only the new Monjaro-style rail is rendered. The old namespace remains readable for a
+    // one-time non-destructive HA1082-HA1084 migration and settings import compatibility.
     public final Bool driverPanelEnabled = new Bool(this, "driverPanelEnabled", false);
     public final Str driverPanelStyle = new Str(this, "driverPanelStyle",
-            DriverPanelStyle.OLD.key);
+            DriverPanelStyle.NEW.key);
+    public final Bool driverPanelNewOnlyMigrated = new Bool(this,
+            "driverPanelNewOnlyMigrated", false);
     public final DriverPanelProfile driverPanelOld = new DriverPanelProfile(
             this, DriverPanelStyle.OLD, "driverPanel", 120);
     public final DriverPanelProfile driverPanelNew = new DriverPanelProfile(
@@ -603,6 +600,12 @@ public class Preferences {
     /** Independent fully customizable drawer opened from a driver-panel Favorites shortcut. */
     public final Str driverFavoritesShortcutsJson = new Str(this,
             "driverFavoritesShortcutsJson", "");
+    /** Up to ten compact grids assigned independently to driver-panel Favorites buttons. */
+    public final Str driverFavoriteBlocksJson = new Str(this,
+            "driverFavoriteBlocksJson", "");
+    /** Unlimited read-only information tiles rendered above driver-panel buttons. */
+    public final Str driverPanelInformationConfigJson = new Str(this,
+            "driverPanelInformationConfigJson", "");
     /** Additive cell positions for action/smart-home icons; shortcut actions stay untouched. */
     public final Str launcherActionsGridJson = new Str(this, "launcherActionsGridJson", "");
     public final Int launcherAppsColumns = new Int(this, "launcherAppsColumns", 3);
@@ -765,17 +768,78 @@ public class Preferences {
         final Context deviceContext = context.getApplicationContext().createDeviceProtectedStorageContext();
         prefs = deviceContext.getSharedPreferences(context.getPackageName() + "_preferences", Context.MODE_PRIVATE);
         migrateLegacyPrefsIfNeeded();
+        migrateDriverPanelToNewOnly();
     }
 
     @NonNull
     public DriverPanelStyle activeDriverPanelStyle() {
-        return DriverPanelStyle.fromKey(driverPanelStyle.get());
+        return DriverPanelStyle.NEW;
     }
 
     @NonNull
     public DriverPanelProfile activeDriverPanelProfile() {
-        return activeDriverPanelStyle() == DriverPanelStyle.NEW
-                ? driverPanelNew : driverPanelOld;
+        return driverPanelNew;
+    }
+
+    /**
+     * Converts an installation that only ever configured the HA1082 rail without overwriting an
+     * already customized new profile. Width is raised to the new rail's covering minimum.
+     */
+    private void migrateDriverPanelToNewOnly() {
+        if (driverPanelNewOnlyMigrated.get()) {
+            if (!DriverPanelStyle.NEW.key.equals(driverPanelStyle.get())) {
+                driverPanelStyle.set(DriverPanelStyle.NEW.key);
+            }
+            return;
+        }
+        boolean newProfileExists = DriverPanelStyle.NEW.key.equalsIgnoreCase(
+                prefs.getString("driverPanelStyle", ""))
+                || prefs.contains("driverPanelNewSide")
+                || prefs.contains("driverPanelNewWidthPx")
+                || prefs.contains("driverPanelNewTopPaddingPx")
+                || prefs.contains("driverPanelNewBottomPaddingPx")
+                || prefs.contains("driverPanelNewItemGapPx")
+                || prefs.contains("driverPanelNewCornerRadiusPx")
+                || prefs.contains("driverPanelNewBackgroundColor")
+                || prefs.contains("driverPanelNewShortcutsJson");
+        SharedPreferences.Editor editor = prefs.edit();
+        if (!newProfileExists) {
+            if (prefs.contains("driverPanelSide")) {
+                editor.putInt("driverPanelNewSide",
+                        prefs.getInt("driverPanelSide", 0));
+            }
+            if (prefs.contains("driverPanelWidthPx")) {
+                editor.putInt("driverPanelNewWidthPx",
+                        Math.max(150, prefs.getInt("driverPanelWidthPx", 120)));
+            }
+            if (prefs.contains("driverPanelTopPaddingPx")) {
+                editor.putInt("driverPanelNewTopPaddingPx",
+                        prefs.getInt("driverPanelTopPaddingPx", 8));
+            }
+            if (prefs.contains("driverPanelBottomPaddingPx")) {
+                editor.putInt("driverPanelNewBottomPaddingPx",
+                        prefs.getInt("driverPanelBottomPaddingPx", 8));
+            }
+            if (prefs.contains("driverPanelItemGapPx")) {
+                editor.putInt("driverPanelNewItemGapPx",
+                        prefs.getInt("driverPanelItemGapPx", 10));
+            }
+            if (prefs.contains("driverPanelCornerRadiusPx")) {
+                editor.putInt("driverPanelNewCornerRadiusPx",
+                        prefs.getInt("driverPanelCornerRadiusPx", 20));
+            }
+            if (prefs.contains("driverPanelBackgroundColor")) {
+                editor.putString("driverPanelNewBackgroundColor",
+                        prefs.getString("driverPanelBackgroundColor", "#FF13171C"));
+            }
+            if (prefs.contains("driverPanelShortcutsJson")) {
+                editor.putString("driverPanelNewShortcutsJson",
+                        prefs.getString("driverPanelShortcutsJson", ""));
+            }
+        }
+        editor.putString("driverPanelStyle", DriverPanelStyle.NEW.key)
+                .putBoolean("driverPanelNewOnlyMigrated", true)
+                .apply();
     }
 
     /**
@@ -1049,5 +1113,7 @@ public class Preferences {
         editor.commit();
         // The file may be from the legacy (pre-brick) schema — re-run migration so it adapts.
         migrateLegacyPrefsIfNeeded();
+        // HA1082-HA1084 backups may contain only the removed old driver-panel namespace.
+        migrateDriverPanelToNewOnly();
     }
 }

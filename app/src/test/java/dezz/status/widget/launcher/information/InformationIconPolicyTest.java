@@ -37,9 +37,12 @@ public final class InformationIconPolicyTest {
         assertEquals("battery", InformationIconPolicy.resolve(
                 InformationPanelConfig.Item.connector(
                         phone("battery.level"), "Заряд iPhone", "%", "number")));
-        assertEquals("devices", InformationIconPolicy.resolve(
+        assertEquals("wifi", InformationIconPolicy.resolve(
                 InformationPanelConfig.Item.connector(
                         phone("network.type"), "Сеть iPhone", "", "string")));
+        assertEquals("bluetooth", InformationIconPolicy.resolve(
+                InformationPanelConfig.Item.system(
+                        "system.bluetooth", "Bluetooth", "", "bluetooth connection")));
         assertEquals("notification", InformationIconPolicy.resolve(
                 InformationPanelConfig.Item.connector(
                         phone("diagnostics.last_app"), "Последнее приложение", "", "object")));

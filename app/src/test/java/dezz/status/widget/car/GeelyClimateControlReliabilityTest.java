@@ -92,7 +92,7 @@ public final class GeelyClimateControlReliabilityTest {
                 GeelyCarIntegration.fanFunctionIdForMode(true));
     }
 
-    @Test public void manualFanPresentsFivePositionsAcrossTheFullEcarxOneToNineRange() {
+    @Test public void manualFanPresentsAllNineEcarxPositionsWithoutCompression() {
         int[] rawValues = {
                 IHvac.FAN_SPEED_LEVEL_1, IHvac.FAN_SPEED_LEVEL_2,
                 IHvac.FAN_SPEED_LEVEL_3, IHvac.FAN_SPEED_LEVEL_4,
@@ -100,21 +100,21 @@ public final class GeelyClimateControlReliabilityTest {
                 IHvac.FAN_SPEED_LEVEL_7, IHvac.FAN_SPEED_LEVEL_8,
                 IHvac.FAN_SPEED_LEVEL_9
         };
-        int[] visible = {1, 1, 2, 2, 3, 3, 4, 4, 5};
         for (int index = 0; index < rawValues.length; index++) {
-            assertEquals(visible[index],
+            assertEquals(index + 1,
                     GeelyCarIntegration.manualFanDisplayLevel(rawValues[index]));
+            assertEquals(rawValues[index],
+                    GeelyCarIntegration.manualFanValueForDisplayLevel(index + 1));
         }
-        assertEquals(IHvac.FAN_SPEED_LEVEL_1,
-                GeelyCarIntegration.manualFanValueForDisplayLevel(1));
-        assertEquals(IHvac.FAN_SPEED_LEVEL_3,
-                GeelyCarIntegration.manualFanValueForDisplayLevel(2));
-        assertEquals(IHvac.FAN_SPEED_LEVEL_5,
-                GeelyCarIntegration.manualFanValueForDisplayLevel(3));
-        assertEquals(IHvac.FAN_SPEED_LEVEL_7,
-                GeelyCarIntegration.manualFanValueForDisplayLevel(4));
-        assertEquals(IHvac.FAN_SPEED_LEVEL_9,
-                GeelyCarIntegration.manualFanValueForDisplayLevel(5));
+    }
+
+    @Test public void nullableCommandTargetIsNeverUnboxedBeforeValidation() throws IOException {
+        String source = geelySource();
+        assertFalse(source.contains("Double target = active.pulse ? 1d"));
+        assertTrue(source.contains("Double target;"));
+        assertTrue(source.contains("target = commandTarget(definition, command, current, "
+                + "runtimeOptions);"));
+        assertTrue(source.contains("if (target == null)"));
     }
 
     @Test public void airflowUsesExactSevenAdaptApiValuesAndFrontAggregateZone()

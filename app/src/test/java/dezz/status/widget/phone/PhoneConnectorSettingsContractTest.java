@@ -88,7 +88,10 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("diagnosticsHandler.postDelayed(diagnosticsPoll, 1_000L)"));
         assertTrue(source.contains("diagnosticsHandler.removeCallbacks(diagnosticsPoll)"));
         assertTrue(source.contains("this::testAncsConnection"));
-        assertTrue(source.contains("!service.reconnectPhoneForDiagnostics()"));
+        assertTrue(source.contains("WidgetServiceStarter.startIfNeeded(this)"));
+        assertTrue(source.contains("reconnectWhenServiceReady(24)"));
+        assertTrue(source.contains("service.reconnectPhoneForDiagnostics()"));
+        assertTrue(source.contains("remainingAttempts - 1"));
         assertTrue(source.contains(
                 "!notificationsEnabled.isChecked() && !messagesEnabled.isChecked()"));
         assertTrue(source.contains("localizedMapStatus(mapStatus)"));

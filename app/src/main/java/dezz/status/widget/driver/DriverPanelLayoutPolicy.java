@@ -22,7 +22,6 @@ public final class DriverPanelLayoutPolicy {
     public static final int STOCK_CLIMATE_MIN_HEIGHT_PX = 88;
     public static final int REFERENCE_SCREEN_WIDTH = 1920;
     public static final int REFERENCE_STOCK_NAVIGATION_INSET = 160;
-    public static final int REFERENCE_OLD_PANEL_WIDTH = 120;
     public static final int REFERENCE_NEW_PANEL_WIDTH = 150;
     public static final int MIN_SCALED_WIDTH_PX = 80;
 
@@ -77,20 +76,18 @@ public final class DriverPanelLayoutPolicy {
                 * width / (float) REFERENCE_SCREEN_WIDTH), MIN_SCALED_WIDTH_PX);
     }
 
-    public static int referencePanelWidth(boolean newPanel) {
-        return newPanel ? REFERENCE_NEW_PANEL_WIDTH : REFERENCE_OLD_PANEL_WIDTH;
+    public static int referencePanelWidth(boolean ignoredLegacyPanel) {
+        return REFERENCE_NEW_PANEL_WIDTH;
     }
 
-    /** The expanded live-climate shortcut owns two ordinary rail slots. */
-    public static float shortcutWeight(boolean expandedClimate) {
-        return expandedClimate ? 2f : 1f;
+    /** Climate details never change the standard height of a driver-rail shortcut. */
+    public static float shortcutWeight(boolean detailedClimate) {
+        return 1f;
     }
 
-    /** The expanded climate canvas uses the same width but two icon-height units. */
-    public static int shortcutIconHeight(int requestedSize, boolean expandedClimate) {
-        int size = Math.max(1, requestedSize);
-        if (!expandedClimate) return size;
-        return size > Integer.MAX_VALUE / 2 ? Integer.MAX_VALUE : size * 2;
+    /** The climate canvas always uses exactly the configured icon height. */
+    public static int shortcutIconHeight(int requestedSize, boolean detailedClimate) {
+        return Math.max(1, requestedSize);
     }
 
     /** Reserved left-side ECARX frame that must be crossed to cover the stock driver rail. */
@@ -118,7 +115,7 @@ public final class DriverPanelLayoutPolicy {
     @NonNull
     public static TapTarget stockClimateTapTarget(int screenWidth, int screenHeight,
                                                   boolean panelOnRight) {
-        return stockClimateTapTarget(screenWidth, screenHeight, panelOnRight, false);
+        return stockClimateTapTarget(screenWidth, screenHeight, panelOnRight, true);
     }
 
     /** Centre of the covered OEM climate button for the selected stock-panel generation. */
@@ -128,7 +125,7 @@ public final class DriverPanelLayoutPolicy {
                                                   boolean newPanel) {
         int width = Math.max(1, screenWidth);
         int height = Math.max(1, screenHeight);
-        int stockPanelWidth = scaleReferenceWidth(width, referencePanelWidth(newPanel));
+        int stockPanelWidth = scaleReferenceWidth(width, REFERENCE_NEW_PANEL_WIDTH);
         int x = panelOnRight ? width - stockPanelWidth / 2 : stockPanelWidth / 2;
         int quarter = Math.max(height / 4, 1);
         int y = quarter / 2 + quarter;

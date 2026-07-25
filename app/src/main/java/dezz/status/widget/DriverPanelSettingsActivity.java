@@ -28,7 +28,6 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
@@ -49,7 +48,7 @@ import dezz.status.widget.launcher.ShortcutActionPicker;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
-/** Visual editor for both independently configured Monjaro driver-panel generations. */
+/** Visual editor for the single new Monjaro-style driver panel. */
 public final class DriverPanelSettingsActivity extends AppCompatActivity {
     private interface IntSetter { void set(int value); }
 
@@ -90,7 +89,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             refreshButtons();
             applyPanel();
         });
-        setTitle("Панель водителя · " + styleName(profile.style));
+        setTitle("Панель водителя");
         View content = buildContent();
         setContentView(content);
         SettingsBackNavigation.install(this, content);
@@ -134,7 +133,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         settings.setPadding(dp(10), 0, dp(22), dp(28));
         scroll.addView(settings, new ScrollView.LayoutParams(match(), wrap()));
 
-        title(settings, "Панель водителя · " + styleNameLower(profile.style));
+        title(settings, "Панель водителя");
         hint(settings, "До 10 кнопок поверх любых приложений. Домой, Назад и полный список "
                 + "приложений уже добавлены по умолчанию.");
 
@@ -143,7 +142,6 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                     preferences.driverPanelEnabled.set(value);
                     applyPanel();
                 });
-        addStyleSelector(settings);
         addSwitch(settings, "Показывать справа",
                 profile.side.get() == 1, value -> {
                     profile.side.set(value ? 1 : 0);
@@ -155,8 +153,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 + "перестаёт перехватывать касания и имитирует тап в исходном центре кнопки "
                 + "на 37,5% высоты экрана.");
 
-        int minimumPanelWidth = DriverPanelLayoutPolicy.referencePanelWidth(
-                profile.style == Preferences.DriverPanelStyle.NEW);
+        int minimumPanelWidth = DriverPanelLayoutPolicy.referencePanelWidth(true);
         slider(settings, "Ширина панели", minimumPanelWidth, 260,
                 Math.max(minimumPanelWidth, profile.widthPx.get()), " px", value -> {
                     profile.widthPx.set(value);
@@ -175,7 +172,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                     refreshPreview();
                     applyPanel();
                 });
-        slider(settings, "Расстояние между кнопками", 0, 30,
+        slider(settings, "Отступ между кнопками по умолчанию", 0, 30,
                 profile.itemGapPx.get(), " px", value -> {
                     profile.itemGapPx.set(value);
                     refreshPreview();
@@ -211,6 +208,16 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                     }
                 }));
         settings.addView(background, rowParams());
+
+        title(settings, "Информационные плитки");
+        hint(settings, "Часы, Bluetooth, Wi‑Fi, данные автомобиля и умного дома. "
+                + "Количество не ограничено; плитки не нажимаются и всегда находятся "
+                + "выше кнопок. Порядок и отступ каждой плитки настраиваются отдельно.");
+        MaterialButton informationTiles = button("Настроить информационные плитки");
+        informationTiles.setOnClickListener(view -> startActivity(
+                new android.content.Intent(this, InformationPanelSettingsActivity.class)
+                        .putExtra(InformationPanelSettingsActivity.EXTRA_DRIVER_PANEL, true)));
+        settings.addView(informationTiles, rowParams());
 
         title(settings, "Кнопки");
         countLabel = hint(settings, "");
@@ -373,6 +380,46 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         });
         body.addView(size, new LinearLayout.LayoutParams(match(), dp(42)));
 
+        if (index > 0) {
+            int inheritedGap = Math.max(0, profile.itemGapPx.get());
+            int currentGap = shortcut.gapBeforePx >= 0
+                    ? shortcut.gapBeforePx : inheritedGap;
+            TextView gapValue = text("Отступ перед значком: " + currentGap + " px"
+                            + (shortcut.gapBeforePx < 0 ? " · общий" : ""),
+                    13, 0xFFC7C7CC);
+            body.addView(gapValue, topMargin(dp(6)));
+            SeekBar gap = new SeekBar(this);
+            gap.setMax(80);
+            gap.setProgress(currentGap);
+            gap.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                int selected = currentGap;
+                @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                                                        boolean fromUser) {
+                    selected = progress;
+                    gapValue.setText("Отступ перед значком: " + selected + " px");
+                }
+                @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+                @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                    shortcut.gapBeforePx = selected;
+                    store.upsert(shortcut);
+                    refreshPreview();
+                    applyPanel();
+                }
+            });
+            body.addView(gap, new LinearLayout.LayoutParams(match(), dp(42)));
+            MaterialSwitch divider = new MaterialSwitch(this);
+            divider.setText("Разделительная граница перед значком");
+            divider.setTextColor(Color.WHITE);
+            divider.setChecked(shortcut.dividerBefore);
+            divider.setOnCheckedChangeListener((button, checked) -> {
+                shortcut.dividerBefore = checked;
+                store.upsert(shortcut);
+                refreshPreview();
+                applyPanel();
+            });
+            body.addView(divider, topMargin(dp(4)));
+        }
+
         LinearLayout controls = new LinearLayout(this);
         controls.setOrientation(LinearLayout.HORIZONTAL);
         MaterialButton action = compactButton("Нажатие");
@@ -424,7 +471,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         body.addView(showTitle, topMargin(dp(8)));
         if (isStockClimate(shortcut)) {
             MaterialSwitch extended = new MaterialSwitch(this);
-            extended.setText("Расширенная информация: AUTO или направление обдува");
+            extended.setText("Показывать режим: AUTO или направление обдува");
             extended.setTextColor(Color.WHITE);
             extended.setChecked(shortcut.extendedClimateInfo);
             extended.setOnCheckedChangeListener((button, checked) -> {
@@ -607,8 +654,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 enabled.add(value);
             }
         }
-        int minimumPanelWidth = DriverPanelLayoutPolicy.referencePanelWidth(
-                profile.style == Preferences.DriverPanelStyle.NEW);
+        int minimumPanelWidth = DriverPanelLayoutPolicy.referencePanelWidth(true);
         int railWidth = Math.max(dp(52), Math.min(dp(100),
                 Math.round(Math.max(minimumPanelWidth, profile.widthPx.get()) * .62f)));
         int side = profile.side.get();
@@ -638,12 +684,22 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         float radius = Math.max(dp(20), profile.cornerRadiusPx.get()) * .62f;
         background.setCornerRadii(panelCornerRadii(radius, side == 1));
         rail.setBackground(background);
-        for (LauncherShortcutStore.Shortcut value : values) {
+        for (int index = 0; index < values.size(); index++) {
+            LauncherShortcutStore.Shortcut value = values.get(index);
+            if (index > 0 && value.dividerBefore) {
+                View divider = new View(this);
+                divider.setBackgroundColor(0x88E1E7F2);
+                LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
+                        match(), Math.max(1, dp(1)));
+                dividerParams.setMargins(dp(8), dp(2), dp(8), dp(2));
+                rail.addView(divider, dividerParams);
+            }
             View icon;
             if (value.kind == LauncherShortcutStore.Kind.BUILTIN
                     && LauncherShortcutStore.Builtin.STOCK_CLIMATE.key.equals(value.target)) {
                 DriverClimateShortcutView climate = new DriverClimateShortcutView(
-                        this, CarIntegrations.get(this), value.iconColor);
+                        this, CarIntegrations.get(this), value.iconColor,
+                        value.extendedClimateInfo);
                 climate.showPreviewSample();
                 icon = climate;
             } else {
@@ -659,8 +715,12 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             cell.addView(icon, new FrameLayout.LayoutParams(iconSize,
                     DriverPanelLayoutPolicy.shortcutIconHeight(iconSize, expandedClimate),
                     Gravity.CENTER));
-            rail.addView(cell, new LinearLayout.LayoutParams(match(), 0,
-                    DriverPanelLayoutPolicy.shortcutWeight(expandedClimate)));
+            LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(match(), 0,
+                    DriverPanelLayoutPolicy.shortcutWeight(expandedClimate));
+            cellParams.topMargin = index == 0 || value.dividerBefore ? 0 : Math.round(
+                    (value.gapBeforePx >= 0 ? value.gapBeforePx
+                            : profile.itemGapPx.get()) * .62f);
+            rail.addView(cell, cellParams);
         }
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, screenHeight,
                 Gravity.TOP | (side == 0 ? Gravity.LEFT : Gravity.RIGHT));
@@ -678,18 +738,28 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
     }
 
     @NonNull
-    private static String shortcutType(@NonNull LauncherShortcutStore.Shortcut shortcut) {
+    private String shortcutType(@NonNull LauncherShortcutStore.Shortcut shortcut) {
         switch (shortcut.kind) {
             case APP:
                 return "Приложение · " + shortcut.packageName;
             case CAR:
                 return "Функция автомобиля";
+            case ROUTE:
+                return "Избранная точка навигации";
             case RULE:
                 return "Сценарий";
             case INTENT:
                 return "Системное действие";
             case BUILTIN:
             default:
+                if (dezz.status.widget.launcher.DriverFavoriteBlocksStore
+                        .isFavoritesTarget(shortcut.target)) {
+                    dezz.status.widget.launcher.DriverFavoriteBlocksStore blocks =
+                            new dezz.status.widget.launcher.DriverFavoriteBlocksStore(preferences);
+                    return "Блок избранного · " + blocks.find(
+                            dezz.status.widget.launcher.DriverFavoriteBlocksStore
+                                    .blockIdFromTarget(shortcut.target)).title;
+                }
                 return "Функция панели · "
                         + LauncherShortcutStore.Builtin.fromKey(shortcut.target).label;
         }
@@ -710,6 +780,8 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 return "приложение";
             case CAR:
                 return "автомобиль";
+            case ROUTE:
+                return "избранная точка";
             case RULE:
                 return "умный дом";
             case INTENT:
@@ -718,16 +790,6 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             default:
                 return LauncherShortcutStore.Builtin.fromKey(shortcut.longTarget).label;
         }
-    }
-
-    @NonNull
-    private static String styleName(@NonNull Preferences.DriverPanelStyle style) {
-        return style == Preferences.DriverPanelStyle.NEW ? "Новая" : "Старая";
-    }
-
-    @NonNull
-    private static String styleNameLower(@NonNull Preferences.DriverPanelStyle style) {
-        return style == Preferences.DriverPanelStyle.NEW ? "новая" : "старая";
     }
 
     private void applyPanel() {
@@ -742,37 +804,6 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 running.applyPreferences();
             }
         }
-    }
-
-    private void addStyleSelector(@NonNull LinearLayout host) {
-        TextView label = text("Тип штатной панели", 15, 0xFFC7C7CC);
-        host.addView(label, rowParams());
-
-        MaterialButtonToggleGroup group = new MaterialButtonToggleGroup(this);
-        group.setOrientation(LinearLayout.HORIZONTAL);
-        group.setSingleSelection(true);
-        group.setSelectionRequired(true);
-
-        MaterialButton oldPanel = compactButton("Старая");
-        oldPanel.setId(View.generateViewId());
-        oldPanel.setCheckable(true);
-        MaterialButton newPanel = compactButton("Новая");
-        newPanel.setId(View.generateViewId());
-        newPanel.setCheckable(true);
-        group.addView(oldPanel, new LinearLayout.LayoutParams(0, dp(52), 1f));
-        group.addView(newPanel, new LinearLayout.LayoutParams(0, dp(52), 1f));
-        group.check(profile.style == Preferences.DriverPanelStyle.NEW
-                ? newPanel.getId() : oldPanel.getId());
-        group.addOnButtonCheckedListener((value, checkedId, isChecked) -> {
-            if (!isChecked) return;
-            Preferences.DriverPanelStyle selected = checkedId == newPanel.getId()
-                    ? Preferences.DriverPanelStyle.NEW : Preferences.DriverPanelStyle.OLD;
-            if (selected == profile.style) return;
-            preferences.driverPanelStyle.set(selected.key);
-            applyPanel();
-            recreate();
-        });
-        host.addView(group, rowParams());
     }
 
     private void limitToast() {

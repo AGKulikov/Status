@@ -69,7 +69,7 @@ public class DriverPanelOverlayContractTest {
         assertTrue(climateSource.contains("if (!showFan) return;"));
         assertTrue(climateSource.contains("drawText(\"AUTO\""));
         assertTrue(climateSource.contains("AIRFLOW = \"climate.airflow\""));
-        assertTrue(source.contains("DriverPanelLayoutPolicy.shortcutWeight(expandedClimate)"));
+        assertTrue(source.contains("DriverPanelLayoutPolicy.shortcutWeight(detailedClimate)"));
         assertTrue(source.contains("DriverPanelLayoutPolicy.shortcutIconHeight("));
         assertTrue(source.contains("button.setSoundEffectsEnabled(false)"));
     }
@@ -100,7 +100,7 @@ public class DriverPanelOverlayContractTest {
     }
 
     @Test
-    public void oldAndNewPanelProfilesRemainIndependent() throws Exception {
+    public void runtimeKeepsOnlyNewPanelAndMigratesLegacySettingsOnce() throws Exception {
         String root = System.getProperty("user.dir");
         Path preferences = Paths.get(root, "src/main/java/dezz/status/widget/Preferences.java");
         if (!Files.exists(preferences)) {
@@ -109,7 +109,8 @@ public class DriverPanelOverlayContractTest {
         }
         String preferencesSource = read(preferences);
         assertTrue(preferencesSource.contains("\"driverPanelStyle\""));
-        assertTrue(preferencesSource.contains("DriverPanelStyle.OLD.key"));
+        assertTrue(preferencesSource.contains(
+                "\"driverPanelNewOnlyMigrated\", false"));
         assertTrue(preferencesSource.contains(
                 "this, DriverPanelStyle.OLD, \"driverPanel\", 120"));
         assertTrue(preferencesSource.contains(
@@ -125,15 +126,15 @@ public class DriverPanelOverlayContractTest {
         assertTrue(preferencesSource.contains(
                 "public final Str driverPanelShortcutsJson = driverPanelOld.shortcutsJson;"));
         assertTrue(preferencesSource.contains(
-                "? driverPanelNew : driverPanelOld;"));
+                "return driverPanelNew;"));
+        assertTrue(preferencesSource.contains(
+                "Math.max(150, prefs.getInt(\"driverPanelWidthPx\", 120))"));
 
         Path settings = preferences.resolveSibling("DriverPanelSettingsActivity.java");
         String settingsSource = read(settings);
-        assertTrue(settingsSource.contains("MaterialButtonToggleGroup"));
-        assertTrue(settingsSource.contains("compactButton(\"Старая\")"));
-        assertTrue(settingsSource.contains("compactButton(\"Новая\")"));
-        assertTrue(settingsSource.contains(
-                "preferences.driverPanelStyle.set(selected.key);"));
+        assertFalse(settingsSource.contains("MaterialButtonToggleGroup"));
+        assertFalse(settingsSource.contains("compactButton(\"Старая\")"));
+        assertFalse(settingsSource.contains("addStyleSelector("));
         assertTrue(settingsSource.contains("AppleColorPickerDialog.Options.opaque()"));
         assertFalse(settingsSource.contains("\"Цвет и прозрачность панели\""));
         assertTrue(settingsSource.contains(
@@ -172,17 +173,22 @@ public class DriverPanelOverlayContractTest {
                 "launcher/LauncherAppCatalog.java"));
         String renderer = read(widget.resolve(
                 "launcher/LauncherAppTileRenderer.java"));
+        String surface = read(widget.resolve(
+                "launcher/LauncherAllAppsSurface.java"));
         String settings = read(widget.resolve(
                 "DriverPanelSettingsActivity.java"));
 
         assertTrue(controller.contains("LauncherAppCatalog.loadVisible(appContext, preferences)"));
         assertTrue(controller.contains("LauncherAppTileRenderer.render("));
         assertFalse(controller.contains("InstalledAppCatalog"));
-        assertTrue(controller.contains("preferences.launcherAllAppsColumns.get()"));
-        assertTrue(controller.contains("preferences.launcherAllAppsGapPx.get()"));
         assertTrue(controller.contains("preferences.launcherAllAppsIconScalePercent.get()"));
-        assertTrue(controller.contains("grid.setPadding(dp(context, 16), dp(context, 16),"));
-        assertTrue(controller.contains("title.setText(\"Все приложения\")"));
+        assertTrue(controller.contains(
+                "LauncherAllAppsSurface.create(context, preferences)"));
+        assertTrue(surface.contains("grid.setPadding(dp(context, 16), dp(context, 16),"));
+        assertTrue(surface.contains("preferences.launcherAllAppsColumns.get()"));
+        assertTrue(surface.contains("preferences.launcherAllAppsGapPx.get()"));
+        assertTrue(surface.contains("title.setText(\"Все приложения\")"));
+        assertTrue(surface.contains("close.setText(\"✕\")"));
         assertTrue(controller.contains("FavoriteAppsConfigStore"));
 
         assertTrue(launcher.contains("LauncherAppCatalog.loadIncludingSystem(context)"));

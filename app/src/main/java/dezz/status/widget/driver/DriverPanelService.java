@@ -121,7 +121,8 @@ public final class DriverPanelService extends Service {
         if (controller != null) {
             boolean refreshed = controller.setNavigationHidden(navigationHidden);
             if (ACTION_STOCK_CLIMATE.equals(action)) controller.triggerStockClimate();
-            else if (ACTION_FAVORITES.equals(action)) controller.showFavorites();
+            else if (ACTION_FAVORITES.equals(action)) controller.showFavorites(
+                    dezz.status.widget.launcher.DriverFavoriteBlocksStore.DEFAULT_BLOCK_ID);
             else if (ACTION_RAISE.equals(action)) controller.raise();
             else if (!refreshed) controller.applyPreferences();
         }

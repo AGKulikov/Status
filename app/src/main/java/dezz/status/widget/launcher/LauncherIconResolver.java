@@ -57,6 +57,11 @@ public final class LauncherIconResolver {
             new Preset("defrost_rear", "Обогрев заднего стекла"),
             new Preset("wiper", "Дворники"),
             new Preset("drive_mode", "Режим движения"),
+            new Preset("drive_cycle", "Цикл режимов движения"),
+            new Preset("drive_sport", "Режим Sport"),
+            new Preset("drive_comfort", "Режим Comfort"),
+            new Preset("drive_eco", "Режим Eco"),
+            new Preset("drive_snow", "Режим Snow"),
             new Preset("auto_hold", "Auto Hold"),
             new Preset("start_stop", "Start/Stop"),
             new Preset("fuel_save", "Экономия топлива"),
@@ -94,6 +99,8 @@ public final class LauncherIconResolver {
             new Preset("phone_notification", "Уведомление телефона"),
             new Preset("car", "Автомобиль"),
             new Preset("location", "Местоположение"),
+            new Preset("wifi", "Wi‑Fi"),
+            new Preset("bluetooth", "Bluetooth"),
             new Preset("devices", "Умный дом"),
             new Preset("scenario", "Сценарий"),
             new Preset("edit", "Изменить"),
@@ -172,6 +179,11 @@ public final class LauncherIconResolver {
             case "defrost_rear": return R.drawable.ic_car_defrost_rear;
             case "wiper": return R.drawable.ic_car_wiper;
             case "drive_mode": return R.drawable.ic_car_drive_mode;
+            case "drive_cycle": return R.drawable.ic_car_drive_cycle;
+            case "drive_sport": return R.drawable.ic_car_drive_sport;
+            case "drive_comfort": return R.drawable.ic_car_drive_comfort;
+            case "drive_eco": return R.drawable.ic_car_fuel_save;
+            case "drive_snow": return R.drawable.ic_car_drive_snow;
             case "fuel_save": return R.drawable.ic_car_fuel_save;
             case "auto_hold":
             case "start_stop": return R.drawable.ic_popup_power;
@@ -209,6 +221,8 @@ public final class LauncherIconResolver {
             case "phone_notification": return R.drawable.ic_phone_app_notification;
             case "car": return R.drawable.ic_smart_car;
             case "location": return R.drawable.ic_smart_location;
+            case "wifi": return R.drawable.ic_status_wifi_internet;
+            case "bluetooth": return R.drawable.ic_status_bt_connected;
             case "devices": return R.drawable.ic_section_widget;
             case "scenario": return R.drawable.ic_section_content;
             case "edit": return R.drawable.ic_drag_handle;

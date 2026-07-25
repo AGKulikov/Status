@@ -45,7 +45,7 @@ public final class IntentScenarioSafetyContractTest {
         assertTrue("Deletion must recheck references inside the confirmation callback",
                 occurrences(source, "referencingShortcuts(rule.id)") >= 2);
         assertTrue(source.contains("showReferencedRuleDialog(rule, currentReferences)"));
-        assertTrue(source.contains(
+        assertTrue(!source.contains(
                 "LauncherShortcutStore.forDriverPanel(prefs, prefs.driverPanelOld)"));
         assertTrue(source.contains(
                 "LauncherShortcutStore.forDriverPanel(prefs, prefs.driverPanelNew)"));

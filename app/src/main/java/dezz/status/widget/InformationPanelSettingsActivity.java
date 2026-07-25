@@ -36,6 +36,8 @@ import java.util.List;
 
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
+import dezz.status.widget.driver.DriverInformationTilePolicy;
+import dezz.status.widget.driver.DriverPanelService;
 import dezz.status.widget.launcher.LauncherIconResolver;
 import dezz.status.widget.launcher.information.InformationIconPolicy;
 import dezz.status.widget.launcher.information.InformationPanelConfig;
@@ -47,21 +49,30 @@ import dezz.status.widget.settings.SettingsBackNavigation;
 
 /** Visual editor for the read-only HOME “Information” grid. */
 public final class InformationPanelSettingsActivity extends AppCompatActivity {
+    public static final String EXTRA_DRIVER_PANEL =
+            "dezz.status.widget.extra.DRIVER_INFORMATION_PANEL";
+
     private Preferences preferences;
     private InformationPanelConfigStore store;
     private InformationPanelConfig config;
     private CarIntegration carIntegration;
     private InformationPanelView preview;
     private LinearLayout itemHost;
+    private boolean driverPanelMode;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         preferences = new Preferences(this);
-        store = new InformationPanelConfigStore(preferences);
+        driverPanelMode = getIntent().getBooleanExtra(EXTRA_DRIVER_PANEL, false);
+        store = driverPanelMode
+                ? InformationPanelConfigStore.forDriverPanel(preferences)
+                : new InformationPanelConfigStore(preferences);
         config = store.load();
         carIntegration = CarIntegrations.get(this);
-        setTitle("Панель «Информация»");
+        setTitle(driverPanelMode
+                ? "Информационные плитки панели водителя"
+                : "Панель «Информация»");
         View screen = buildScreen();
         setContentView(screen);
         SettingsBackNavigation.install(this, screen);
@@ -92,51 +103,64 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
         LinearLayout controls = column();
         controls.setPadding(0, 0, dp(16), dp(24));
         controlsScroll.addView(controls, new ScrollView.LayoutParams(match(), wrap()));
-        TextView title = text("Панель «Информация»", 25, true);
+        TextView title = text(driverPanelMode
+                ? "Информационные плитки"
+                : "Панель «Информация»", 25, true);
         controls.addView(title);
-        TextView hint = text("Объединяет внутренние датчики автомобиля/магнитолы и статусы "
+        TextView hint = text(driverPanelMode
+                ? "Неограниченные плитки часов, Bluetooth, Wi‑Fi, автомобиля и умного дома. "
+                + "Они не нажимаются и всегда располагаются выше кнопок панели водителя."
+                : "Объединяет внутренние датчики автомобиля/магнитолы и статусы "
                 + "Home Assistant, MQTT, Sprut.hub и выбранного iPhone. "
                 + "Нажатие ничего не выполняет.", 14, false);
         hint.setAlpha(.7f);
         controls.addView(hint, lp(match(), wrap(), 0, 0, 0, dp(12)));
 
-        MaterialSwitch visible = new MaterialSwitch(this);
-        visible.setText("Показывать панель на HOME");
-        visible.setTextSize(16);
-        visible.setChecked(preferences.launcherInformationVisible.get());
-        visible.setOnCheckedChangeListener((button, checked) ->
-                preferences.launcherInformationVisible.set(checked));
-        controls.addView(visible, new LinearLayout.LayoutParams(match(), dp(54)));
+        if (!driverPanelMode) {
+            MaterialSwitch visible = new MaterialSwitch(this);
+            visible.setText("Показывать панель на HOME");
+            visible.setTextSize(16);
+            visible.setChecked(preferences.launcherInformationVisible.get());
+            visible.setOnCheckedChangeListener((button, checked) ->
+                    preferences.launcherInformationVisible.set(checked));
+            controls.addView(visible, new LinearLayout.LayoutParams(match(), dp(54)));
 
-        addSeek(controls, "Столбцы", 1, 8, config.columns, value -> {
-            config.columns = value;
-            changed(true);
-        });
-        addSeek(controls, "Строки", 1, 12, config.rows, value -> {
-            config.rows = value;
-            changed(true);
-        });
-        addSeek(controls, "Отступ внутри, px", 0, 80, config.contentPaddingPx, value -> {
-            config.contentPaddingPx = value;
-            changed(false);
-        });
+            addSeek(controls, "Столбцы", 1, 8, config.columns, value -> {
+                config.columns = value;
+                changed(true);
+            });
+            addSeek(controls, "Строки", 1, 12, config.rows, value -> {
+                config.rows = value;
+                changed(true);
+            });
+            addSeek(controls, "Отступ внутри, px", 0, 80,
+                    config.contentPaddingPx, value -> {
+                        config.contentPaddingPx = value;
+                        changed(false);
+                    });
+        }
         addSeek(controls, "Промежуток, px", 0, 48, config.gapPx, value -> {
             config.gapPx = value;
             changed(false);
         });
-        addSeek(controls, "Скругление, px", 0, 120, config.cornerRadiusPx, value -> {
-            config.cornerRadiusPx = value;
-            changed(false);
-        });
-        addSeek(controls, "Прозрачность фона", 0, 255, config.backgroundAlpha, value -> {
-            config.backgroundAlpha = value;
-            changed(false);
-        });
+        if (!driverPanelMode) {
+            addSeek(controls, "Скругление, px", 0, 120,
+                    config.cornerRadiusPx, value -> {
+                        config.cornerRadiusPx = value;
+                        changed(false);
+                    });
+            addSeek(controls, "Прозрачность фона", 0, 255,
+                    config.backgroundAlpha, value -> {
+                        config.backgroundAlpha = value;
+                        changed(false);
+                    });
 
-        MaterialButton background = button("");
-        AppleColorPickerDialog.decorateButton(background, "Цвет фона", config.backgroundColor);
-        background.setOnClickListener(v -> editBackgroundColor(background));
-        controls.addView(background, new LinearLayout.LayoutParams(match(), dp(62)));
+            MaterialButton background = button("");
+            AppleColorPickerDialog.decorateButton(background,
+                    "Цвет фона", config.backgroundColor);
+            background.setOnClickListener(v -> editBackgroundColor(background));
+            controls.addView(background, new LinearLayout.LayoutParams(match(), dp(62)));
+        }
         MaterialButton add = button("+  Добавить статус из каталога");
         add.setOnClickListener(v -> new InformationSourcePicker(this, carIntegration,
                 this::addSource).show());
@@ -161,7 +185,9 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
         preview = new InformationPanelView(this, carIntegration, store);
         previewHost.addView(preview, new FrameLayout.LayoutParams(match(), match()));
         previewColumn.addView(previewHost, new LinearLayout.LayoutParams(match(), 0, 1f));
-        TextView saved = text("✓ Сохраняется автоматически · устаревший кэш не показывается",
+        TextView saved = text(driverPanelMode
+                        ? "✓ Сохраняется автоматически · плитки всегда выше кнопок"
+                        : "✓ Сохраняется автоматически · устаревший кэш не показывается",
                 12, false);
         saved.setGravity(Gravity.CENTER);
         saved.setAlpha(.68f);
@@ -185,7 +211,9 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
     private void refreshItems() {
         if (itemHost == null) return;
         itemHost.removeAllViews();
-        TextView heading = text("СТАТУСЫ В СЕТКЕ", 14, true);
+        TextView heading = text(driverPanelMode
+                ? "ПЛИТКИ СВЕРХУ ВНИЗ"
+                : "СТАТУСЫ В СЕТКЕ", 14, true);
         heading.setTextColor(Color.rgb(105, 165, 255));
         itemHost.addView(heading, new LinearLayout.LayoutParams(match(), dp(38)));
         List<InformationPanelConfig.Item> items = config.mutableItems();
@@ -197,11 +225,14 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
             itemHost.addView(empty);
             return;
         }
-        for (InformationPanelConfig.Item item : items) itemHost.addView(buildItemCard(item));
+        for (int index = 0; index < items.size(); index++) {
+            itemHost.addView(buildItemCard(items.get(index), index, items.size()));
+        }
     }
 
     @NonNull
-    private View buildItemCard(@NonNull InformationPanelConfig.Item item) {
+    private View buildItemCard(@NonNull InformationPanelConfig.Item item,
+                               int index, int total) {
         MaterialCardView card = new MaterialCardView(this);
         card.setRadius(dp(18));
         card.setCardElevation(dp(2));
@@ -228,9 +259,21 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
 
         MaterialButton edit = compactButton("✎");
         edit.setOnClickListener(v -> editItem(item));
+        MaterialButton up = compactButton("↑");
+        up.setEnabled(index > 0);
+        up.setOnClickListener(v -> {
+            if (config.move(item.id, -1)) changed(true);
+        });
+        MaterialButton down = compactButton("↓");
+        down.setEnabled(index < total - 1);
+        down.setOnClickListener(v -> {
+            if (config.move(item.id, 1)) changed(true);
+        });
         MaterialButton delete = compactButton("×");
         delete.setOnClickListener(v -> confirmDelete(item));
         row.addView(edit);
+        row.addView(up);
+        row.addView(down);
         row.addView(delete);
         card.addView(row);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), wrap());
@@ -286,13 +329,41 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
         visibility.setSelection(item.visibility.ordinal());
         form.addView(visibility, new LinearLayout.LayoutParams(match(), dp(52)));
 
-        LinearLayout coordinates = new LinearLayout(this);
-        coordinates.setOrientation(LinearLayout.HORIZONTAL);
-        EditText column = numericField(coordinates, "Столбец", item.column + 1);
-        EditText row = numericField(coordinates, "Строка", item.row + 1);
-        EditText columnSpan = numericField(coordinates, "Ширина", item.columnSpan);
-        EditText rowSpan = numericField(coordinates, "Высота", item.rowSpan);
-        form.addView(coordinates, new LinearLayout.LayoutParams(match(), dp(70)));
+        final EditText column;
+        final EditText row;
+        final EditText columnSpan;
+        final EditText rowSpan;
+        if (driverPanelMode) {
+            column = null;
+            row = null;
+            columnSpan = null;
+            rowSpan = null;
+        } else {
+            LinearLayout coordinates = new LinearLayout(this);
+            coordinates.setOrientation(LinearLayout.HORIZONTAL);
+            column = numericField(coordinates, "Столбец", item.column + 1);
+            row = numericField(coordinates, "Строка", item.row + 1);
+            columnSpan = numericField(coordinates, "Ширина", item.columnSpan);
+            rowSpan = numericField(coordinates, "Высота", item.rowSpan);
+            form.addView(coordinates, new LinearLayout.LayoutParams(match(), dp(70)));
+        }
+
+        final SeekBar individualGap;
+        if (driverPanelMode) {
+            int currentGap = item.gapBeforePx >= 0 ? item.gapBeforePx : config.gapPx;
+            TextView gapValue = text("Отступ перед этой плиткой: "
+                    + currentGap + " px", 14, false);
+            form.addView(gapValue);
+            individualGap = new SeekBar(this);
+            individualGap.setMax(160);
+            individualGap.setProgress(currentGap);
+            individualGap.setOnSeekBarChangeListener(new SimpleSeekListener(progress ->
+                    gapValue.setText("Отступ перед этой плиткой: "
+                            + progress + " px")));
+            form.addView(individualGap, new LinearLayout.LayoutParams(match(), dp(48)));
+        } else {
+            individualGap = null;
+        }
 
         TextView scaleValue = text("Масштаб: " + item.scalePercent + "%", 14, false);
         form.addView(scaleValue);
@@ -308,9 +379,12 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
         MaterialSwitch enabled = toggle("Показывать статус", item.enabled);
         MaterialSwitch showIcon = toggle("Показывать иконку", item.showIcon);
         MaterialSwitch showLabel = toggle("Показывать подпись", item.showLabel);
+        MaterialSwitch divider = toggle("Разделительная граница перед плиткой",
+                item.dividerBefore);
         toggles.addView(enabled);
         toggles.addView(showIcon);
         toggles.addView(showLabel);
+        toggles.addView(divider);
         form.addView(toggles);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
@@ -332,15 +406,22 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
                         item.iconKey = iconKeys.get(icon.getSelectedItemPosition());
                         item.visibility = InformationPanelConfig.Visibility.values()[
                                 visibility.getSelectedItemPosition()];
-                        item.column = positive(column, "Столбец") - 1;
-                        item.row = positive(row, "Строка") - 1;
-                        item.columnSpan = positive(columnSpan, "Ширина");
-                        item.rowSpan = positive(rowSpan, "Высота");
+                        if (column != null && row != null
+                                && columnSpan != null && rowSpan != null) {
+                            item.column = positive(column, "Столбец") - 1;
+                            item.row = positive(row, "Строка") - 1;
+                            item.columnSpan = positive(columnSpan, "Ширина");
+                            item.rowSpan = positive(rowSpan, "Высота");
+                        }
+                        if (individualGap != null) {
+                            item.gapBeforePx = individualGap.getProgress();
+                        }
                         item.scalePercent = InformationPanelConfig.MIN_SCALE
                                 + scale.getProgress();
                         item.enabled = enabled.isChecked();
                         item.showIcon = showIcon.isChecked();
                         item.showLabel = showLabel.isChecked();
+                        item.dividerBefore = divider.isChecked();
                         changed(true);
                         dialog.dismiss();
                     } catch (IllegalArgumentException error) {
@@ -355,6 +436,9 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
         persist();
         applyPreview();
         if (refreshList) refreshItems();
+        if (driverPanelMode && preferences.driverPanelEnabled.get()) {
+            DriverPanelService.apply(this);
+        }
     }
 
     private void persist() {
@@ -362,7 +446,8 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
     }
 
     private void applyPreview() {
-        if (preview != null) preview.setConfig(config);
+        if (preview != null) preview.setConfig(driverPanelMode
+                ? DriverInformationTilePolicy.vertical(config) : config);
     }
 
     private void editBackgroundColor(@NonNull MaterialButton button) {
@@ -439,6 +524,9 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
                     config = store.load();
                     refreshItems();
                     applyPreview();
+                    if (driverPanelMode && preferences.driverPanelEnabled.get()) {
+                        DriverPanelService.apply(this);
+                    }
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
@@ -550,7 +638,7 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
     }
 
     @NonNull
-    private static String sourceSummary(@NonNull InformationPanelConfig.Item item) {
+    private String sourceSummary(@NonNull InformationPanelConfig.Item item) {
         String source;
         if (item.sourceKind == InformationPanelConfig.SourceKind.SYSTEM) {
             source = "Магнитола · " + item.sourceId;
@@ -560,6 +648,11 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
             source = item.binding.connectorType.name() + " · " + item.binding.resourceId;
         } else {
             source = "Источник не настроен";
+        }
+        if (driverPanelMode) {
+            int gap = item.gapBeforePx >= 0 ? item.gapBeforePx : config.gapPx;
+            return source + "\nотступ перед плиткой " + gap + " px"
+                    + (item.enabled ? "" : " · скрыта");
         }
         return source + "\nячейка " + (item.column + 1) + "×" + (item.row + 1)
                 + ", размер " + item.columnSpan + "×" + item.rowSpan

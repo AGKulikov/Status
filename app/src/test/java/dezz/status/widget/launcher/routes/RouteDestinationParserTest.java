@@ -18,6 +18,17 @@ public final class RouteDestinationParserTest {
                         "55.7500,37.6100  55.71,37.55"));
     }
 
+    @Test public void exposesNormalizedOrderedPointsForNavigatorUrl() {
+        java.util.List<RouteDestinationParser.Coordinate> points =
+                RouteDestinationParser.coordinatePoints(
+                        "55.7500, 37.6100; 55.71,37.5500");
+        assertEquals(2, points.size());
+        assertEquals("55.75", points.get(0).latitude);
+        assertEquals("37.61", points.get(0).longitude);
+        assertEquals("55.71", points.get(1).latitude);
+        assertEquals("37.55", points.get(1).longitude);
+    }
+
     @Test public void addressIsUsedWhenCoordinatesAreEmpty() {
         assertEquals("Москва, Тверская 1",
                 RouteDestinationParser.routeText("  Москва, Тверская 1  ", ""));

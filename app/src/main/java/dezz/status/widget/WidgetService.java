@@ -799,9 +799,9 @@ public class WidgetService extends Service {
 
         if (prefs.widgetEnabled.get()) {
             createOverlayView();
-        } else if (prefs.driverPanelEnabled.get()) {
-            // The driver rail is an independent UI surface. Keep HA/MQTT/Sprut and scenarios
-            // alive without attaching the status-row window when only that rail is enabled.
+        } else if (prefs.driverPanelEnabled.get() || prefs.phoneConnectorEnabled.get()) {
+            // The driver rail and paired-phone connector are independent of the status surface.
+            // Keep their shared integration host alive without attaching the status-row window.
             runInitialIntegrationStartup();
         } else {
             stopSelf();
@@ -1278,7 +1278,8 @@ public class WidgetService extends Service {
      */
     void ensureEnabledRuntime() {
         if (destroyed || prefs == null) return;
-        if (prefs.driverPanelEnabled.get() && !integrationsStarted) {
+        if ((prefs.driverPanelEnabled.get() || prefs.phoneConnectorEnabled.get())
+                && !integrationsStarted) {
             runInitialIntegrationStartup();
         }
         if (prefs.widgetEnabled.get() && binding == null && !overlayAttachRetryScheduled
@@ -1301,7 +1302,8 @@ public class WidgetService extends Service {
         if (!statusSurfaceEnabled) {
             detachStatusSurfaceRuntime("status row disabled");
         }
-        if (!statusSurfaceEnabled && !prefs.driverPanelEnabled.get()) {
+        if (!statusSurfaceEnabled && !prefs.driverPanelEnabled.get()
+                && !prefs.phoneConnectorEnabled.get()) {
             stopSelf();
             return;
         }

@@ -120,6 +120,9 @@ public final class InformationSourcePicker {
                 "battery charging"));
         result.add(system("system.network", "Сетевое подключение", "",
                 "network wifi"));
+        result.add(system("system.wifi", "Wi‑Fi", "", "wifi network ssid"));
+        result.add(system("system.bluetooth", "Bluetooth", "",
+                "bluetooth device connection"));
         result.add(system("system.storage.free", "Свободная память", "ГБ",
                 "storage disk"));
         return result;

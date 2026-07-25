@@ -1320,8 +1320,7 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 }
                 break;
             case DRIVER:
-                addDriverTargets(result, prefs.driverPanelOld, "Старая панель");
-                addDriverTargets(result, prefs.driverPanelNew, "Новая панель");
+                addDriverTargets(result, prefs.driverPanelNew, "Панель водителя");
                 for (LauncherShortcutStore.Shortcut shortcut :
                         LauncherShortcutStore.forDriverFavorites(prefs).all()) {
                     result.add(new TargetOption(shortcut.id,

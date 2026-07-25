@@ -11,12 +11,10 @@ public class DriverPanelLayoutPolicyTest {
     public void monjaroReferenceWidthsScaleFrom1920WithMinimum() {
         assertEquals(160, DriverPanelLayoutPolicy.stockNavigationInset(1920));
         assertEquals(107, DriverPanelLayoutPolicy.stockNavigationInset(1280));
-        assertEquals(80, DriverPanelLayoutPolicy.scaleReferenceWidth(1280,
-                DriverPanelLayoutPolicy.REFERENCE_OLD_PANEL_WIDTH));
         assertEquals(100, DriverPanelLayoutPolicy.scaleReferenceWidth(1280,
                 DriverPanelLayoutPolicy.REFERENCE_NEW_PANEL_WIDTH));
         assertEquals(80, DriverPanelLayoutPolicy.scaleReferenceWidth(800,
-                DriverPanelLayoutPolicy.REFERENCE_OLD_PANEL_WIDTH));
+                DriverPanelLayoutPolicy.REFERENCE_NEW_PANEL_WIDTH));
     }
 
     @Test
@@ -65,14 +63,14 @@ public class DriverPanelLayoutPolicyTest {
     }
 
     @Test
-    public void proxyTapUsesOldPanelClimateCentre() {
+    public void defaultProxyTapUsesNewPanelClimateCentre() {
         DriverPanelLayoutPolicy.TapTarget left =
                 DriverPanelLayoutPolicy.stockClimateTapTarget(1920, 1080, false);
-        assertEquals(60, left.x);
+        assertEquals(75, left.x);
         assertEquals(405, left.y);
         DriverPanelLayoutPolicy.TapTarget right =
                 DriverPanelLayoutPolicy.stockClimateTapTarget(1920, 1080, true);
-        assertEquals(1860, right.x);
+        assertEquals(1845, right.x);
         assertEquals(405, right.y);
     }
 
@@ -91,10 +89,10 @@ public class DriverPanelLayoutPolicyTest {
     }
 
     @Test
-    public void stockClimateOwnsTwoRailAndCanvasHeightUnits() {
+    public void stockClimateAlwaysKeepsStandardRailAndCanvasHeight() {
         assertEquals(1f, DriverPanelLayoutPolicy.shortcutWeight(false), 0f);
-        assertEquals(2f, DriverPanelLayoutPolicy.shortcutWeight(true), 0f);
+        assertEquals(1f, DriverPanelLayoutPolicy.shortcutWeight(true), 0f);
         assertEquals(76, DriverPanelLayoutPolicy.shortcutIconHeight(76, false));
-        assertEquals(152, DriverPanelLayoutPolicy.shortcutIconHeight(76, true));
+        assertEquals(76, DriverPanelLayoutPolicy.shortcutIconHeight(76, true));
     }
 }

@@ -21,7 +21,9 @@ public final class InformationIconPolicy {
                 if (item.binding.connectorType == ConnectorType.PHONE) {
                     String resource = item.binding.resourceId.toLowerCase(Locale.ROOT);
                     if (resource.startsWith("battery.")) return "battery";
-                    if (resource.startsWith("network.")) return "devices";
+                    if (resource.contains("wifi")) return "wifi";
+                    if (resource.contains("bluetooth")) return "bluetooth";
+                    if (resource.startsWith("network.")) return "wifi";
                     if (resource.startsWith("notifications.")
                             || resource.startsWith("messages.")
                             || "diagnostics.last_app".equals(resource)) {
@@ -44,8 +46,9 @@ public final class InformationIconPolicy {
         if (value.contains("humidity") || value.contains("влажност")) return "humidity";
         if (value.contains("location") || value.contains("местополож")) return "location";
         if (value.contains("music") || value.contains("media")) return "music";
+        if (value.contains("bluetooth") || value.contains("блютуз")) return "bluetooth";
         if (value.contains("network") || value.contains("wifi")
-                || value.contains("сеть")) return "devices";
+                || value.contains("wi-fi") || value.contains("сеть")) return "wifi";
         if (item.sourceKind == InformationPanelConfig.SourceKind.VEHICLE) return "car";
         return "notification";
     }

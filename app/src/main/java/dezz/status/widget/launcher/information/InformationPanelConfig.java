@@ -72,6 +72,10 @@ public final class InformationPanelConfig {
         public int scalePercent;
         public int decimals;
         @NonNull public String unitOverride;
+        /** Optional top gap for vertical surfaces; -1 inherits the panel-wide gap. */
+        public int gapBeforePx;
+        /** Draw a visual group boundary immediately before this item. */
+        public boolean dividerBefore;
 
         private Item(@NonNull String id, @NonNull SourceKind sourceKind,
                      @NonNull String sourceId, @Nullable SourceBinding binding,
@@ -100,6 +104,8 @@ public final class InformationPanelConfig {
             scalePercent = 100;
             decimals = suggestedDecimals(sourceUnit);
             unitOverride = "";
+            gapBeforePx = -1;
+            dividerBefore = false;
         }
 
         @NonNull
@@ -149,6 +155,8 @@ public final class InformationPanelConfig {
             value.scalePercent = scalePercent;
             value.decimals = decimals;
             value.unitOverride = unitOverride;
+            value.gapBeforePx = gapBeforePx;
+            value.dividerBefore = dividerBefore;
             return value;
         }
 
@@ -171,6 +179,7 @@ public final class InformationPanelConfig {
             scalePercent = clamp(scalePercent, MIN_SCALE, MAX_SCALE);
             decimals = clamp(decimals, 0, 4);
             unitOverride = clean(unitOverride);
+            gapBeforePx = clamp(gapBeforePx, -1, 160);
             columnSpan = clamp(columnSpan, 1, columns);
             rowSpan = clamp(rowSpan, 1, rows);
             column = clamp(column, 0, Math.max(0, columns - columnSpan));
@@ -218,6 +227,22 @@ public final class InformationPanelConfig {
         return false;
     }
 
+    public boolean move(@NonNull String id, int delta) {
+        int from = -1;
+        for (int index = 0; index < items.size(); index++) {
+            if (items.get(index).id.equals(id)) {
+                from = index;
+                break;
+            }
+        }
+        if (from < 0 || delta == 0) return false;
+        int to = clamp(from + (delta < 0 ? -1 : 1), 0, items.size() - 1);
+        if (from == to) return false;
+        Item value = items.remove(from);
+        items.add(to, value);
+        return true;
+    }
+
     public boolean hasEnabledItems() {
         for (Item item : items) if (item.enabled) return true;
         return false;
@@ -245,7 +270,10 @@ public final class InformationPanelConfig {
         contentPaddingPx = clamp(contentPaddingPx, 0, 80);
         gapPx = clamp(gapPx, 0, 48);
         columns = clamp(columns, 1, 8);
-        rows = clamp(rows, 1, 12);
+        // Driver information tiles are intentionally not subject to the ten-button limit.
+        // HOME keeps its traditional twelve-row ceiling unless actual configured items require
+        // more storage rows; the driver policy later projects every enabled item to one row.
+        rows = clamp(rows, 1, Math.max(12, items.size() + 1));
         Set<String> ids = new HashSet<>();
         for (int index = 0; index < items.size();) {
             Item item = items.get(index);
@@ -260,7 +288,7 @@ public final class InformationPanelConfig {
         // GridLayout permits overlapping specs, but a status hidden behind another tile is never
         // a useful or discoverable result. Preserve the first item at its requested rectangle;
         // relocate later collisions deterministically, growing rows when necessary.
-        boolean[][] occupied = new boolean[12][columns];
+        boolean[][] occupied = new boolean[Math.max(rows, items.size() + 1)][columns];
         for (Item item : items) {
             if (!item.enabled) continue;
             if (!fits(item, occupied, rows)) {
@@ -294,7 +322,7 @@ public final class InformationPanelConfig {
     private static int[] firstFree(int columnSpan, int rowSpan,
                                    @NonNull boolean[][] occupied, int activeRows,
                                    int columns) {
-        int maximumStart = 12 - rowSpan;
+        int maximumStart = occupied.length - rowSpan;
         for (int row = 0; row <= maximumStart; row++) {
             // Existing rows are searched first; new rows immediately follow when the visible
             // rectangle is full. This keeps imported order stable and makes growth predictable.
@@ -345,17 +373,9 @@ public final class InformationPanelConfig {
                 }
             }
         }
-        if (rows < 12) {
-            item.row = rows;
-            item.column = 0;
-            rows++;
-        } else {
-            // A completely occupied 8×12 grid has no honest non-overlapping placement. Keep the
-            // source in settings but do not silently cover another live status.
-            item.enabled = false;
-            item.row = rows - 1;
-            item.column = columns - 1;
-        }
+        item.row = rows;
+        item.column = 0;
+        rows++;
     }
 
     @NonNull

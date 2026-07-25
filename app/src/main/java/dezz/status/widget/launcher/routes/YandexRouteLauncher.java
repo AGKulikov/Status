@@ -14,6 +14,8 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.List;
+
 import dezz.status.widget.launcher.YandexWindowLauncher;
 
 /** Opens a saved destination through the same ECARX window entry point as the HOME shortcut. */
@@ -33,7 +35,7 @@ public final class YandexRouteLauncher {
                     route.address, route.coordinates);
         } catch (IllegalArgumentException invalid) {
             Toast.makeText(context, route.coordinates.trim().isEmpty()
-                    ? "Укажите адрес или координаты маршрута"
+                    ? "Для прямого построения маршрута добавьте координаты точки"
                     : "Проверьте координаты маршрута", Toast.LENGTH_LONG).show();
             return false;
         }
@@ -68,19 +70,32 @@ public final class YandexRouteLauncher {
     static Uri deepLink(@NonNull FavoriteRouteConfig.Product product,
                         @Nullable String address, @Nullable String coordinates) {
         String coordinateValue = coordinates == null ? "" : coordinates.trim();
-        String scheme = product == FavoriteRouteConfig.Product.MAPS
-                ? "yandexmaps" : "yandexnavi";
-        if (!coordinateValue.isEmpty()) {
+        if (coordinateValue.isEmpty()) {
+            // Navigator's documented direct-route URL accepts coordinates, not an address.
+            // Refuse to reopen Alice: the settings screen explains how to add the exact point.
+            throw new IllegalArgumentException("Direct route requires coordinates");
+        }
+        if (product == FavoriteRouteConfig.Product.MAPS) {
             String route = RouteDestinationParser.coordinateRouteText(coordinateValue);
-            return Uri.parse(scheme + "://maps.yandex.ru/?rtext="
+            return Uri.parse("yandexmaps://maps.yandex.ru/?rtext="
                     + Uri.encode(route, "~,-.") + "&rtt=auto");
         }
-        String addressValue = address == null ? "" : address.trim();
-        if (addressValue.isEmpty()) throw new IllegalArgumentException("Destination is empty");
-        // This is the address path used by mNavi. `едем` asks compatible Yandex car builds to
-        // start navigation immediately instead of leaving a confirmation card open.
-        return Uri.parse(scheme + "://ask_alice?text="
-                + Uri.encode("Маршрут до " + addressValue + " едем"));
+
+        // Official Yandex Navigator contract. With one saved point Navigator uses the current
+        // position as the origin. With several points the last one is the destination and all
+        // preceding points are passed as ordered via points.
+        List<RouteDestinationParser.Coordinate> points =
+                RouteDestinationParser.coordinatePoints(coordinateValue);
+        RouteDestinationParser.Coordinate destination = points.get(points.size() - 1);
+        Uri.Builder uri = Uri.parse("yandexnavi://build_route_on_map").buildUpon()
+                .appendQueryParameter("lat_to", destination.latitude)
+                .appendQueryParameter("lon_to", destination.longitude);
+        for (int index = 0; index < points.size() - 1; index++) {
+            RouteDestinationParser.Coordinate via = points.get(index);
+            uri.appendQueryParameter("lat_via_" + index, via.latitude)
+                    .appendQueryParameter("lon_via_" + index, via.longitude);
+        }
+        return uri.build();
     }
 
     private static boolean startDeepLink(@NonNull Context context,

@@ -18,27 +18,37 @@ import dezz.status.widget.integration.SourceBinding;
 /** Versioned persistence for the independent HOME information panel. */
 public final class InformationPanelConfigStore {
     public static final int SCHEMA_VERSION = 1;
-    private final Preferences preferences;
+    private final Preferences.Str storage;
 
     public InformationPanelConfigStore(@NonNull Preferences preferences) {
-        this.preferences = preferences;
+        this(preferences.launcherInformationConfigJson);
+    }
+
+    private InformationPanelConfigStore(@NonNull Preferences.Str storage) {
+        this.storage = storage;
+    }
+
+    @NonNull
+    public static InformationPanelConfigStore forDriverPanel(
+            @NonNull Preferences preferences) {
+        return new InformationPanelConfigStore(preferences.driverPanelInformationConfigJson);
     }
 
     @NonNull
     public InformationPanelConfig load() {
-        return decode(preferences.launcherInformationConfigJson.get());
+        return decode(storage.get());
     }
 
     public void save(@NonNull InformationPanelConfig source) {
         try {
-            preferences.launcherInformationConfigJson.set(encode(source).toString());
+            storage.set(encode(source).toString());
         } catch (JSONException ignored) {
             // SourceBinding and normalized primitive fields are always JSON-safe.
         }
     }
 
     public void reset() {
-        preferences.launcherInformationConfigJson.set("");
+        storage.set("");
     }
 
     @NonNull
@@ -106,6 +116,8 @@ public final class InformationPanelConfigStore {
                     item.scalePercent = encoded.optInt("scalePercent", 100);
                     item.decimals = encoded.optInt("decimals", item.decimals);
                     item.unitOverride = encoded.optString("unitOverride", "");
+                    item.gapBeforePx = encoded.optInt("gapBeforePx", -1);
+                    item.dividerBefore = encoded.optBoolean("dividerBefore", false);
                     result.mutableItems().add(item);
                 }
             }
@@ -155,6 +167,8 @@ public final class InformationPanelConfigStore {
             encoded.put("scalePercent", item.scalePercent);
             encoded.put("decimals", item.decimals);
             encoded.put("unitOverride", item.unitOverride);
+            encoded.put("gapBeforePx", item.gapBeforePx);
+            encoded.put("dividerBefore", item.dividerBefore);
             items.put(encoded);
         }
         root.put("items", items);

@@ -5,6 +5,7 @@
 
 package dezz.status.widget;
 
+import android.app.ActivityManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentCallbacks2;
 import android.content.ComponentName;
@@ -69,6 +70,7 @@ import dezz.status.widget.launcher.LauncherActionsGridConfig;
 import dezz.status.widget.launcher.LauncherActionsGridConfigStore;
 import dezz.status.widget.launcher.LauncherAppCatalog;
 import dezz.status.widget.launcher.LauncherAppTileRenderer;
+import dezz.status.widget.launcher.LauncherAllAppsSurface;
 import dezz.status.widget.launcher.LauncherElementFrame;
 import dezz.status.widget.launcher.LauncherGridView;
 import dezz.status.widget.launcher.LauncherLayoutStore;
@@ -99,6 +101,8 @@ import dezz.status.widget.launcher.panels.PanelElementConfigStore;
 import dezz.status.widget.launcher.panels.PanelGridLayout;
 import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
 import dezz.status.widget.launcher.routes.FavoriteRoutesPanelView;
+import dezz.status.widget.launcher.routes.FavoriteRouteConfig;
+import dezz.status.widget.launcher.routes.YandexRouteLauncher;
 import dezz.status.widget.launcher.vehicle.VehicleInfoPanelConfigStore;
 import dezz.status.widget.launcher.vehicle.VehicleInfoPanelView;
 import dezz.status.widget.car.CarControlCommand;
@@ -124,16 +128,23 @@ public final class LauncherActivity extends AppCompatActivity {
             "dezz.status.widget.extra.EDIT_MEDIA_CONTENT";
     public static final String EXTRA_EDIT_ACTIONS_CONTENT =
             "dezz.status.widget.extra.EDIT_ACTIONS_CONTENT";
+    private static final String EXTRA_WINDOW_BACKGROUND_GUARD =
+            "dezz.status.widget.extra.WINDOW_BACKGROUND_GUARD";
     private static final long NAVIGATION_UI_REFRESH_MS = 30_000L;
     private static final long NAVIGATION_DYNAMIC_REFRESH_MS = 5_000L;
     private static final long SAFE_AREA_REFRESH_MS = 500L;
     private static final long APP_CATALOG_REFRESH_MS = 10L * 60L * 1_000L;
+    /** One visible launcher frame prevents the previous application becoming freeform backing. */
+    private static final long WINDOWED_YANDEX_BACKGROUND_SETTLE_MS = 96L;
+    private static final long AUTO_NAVIGATOR_HOME_DEBOUNCE_MS = 800L;
     /** Gives the foreground WidgetService a chance to attach the status row before HOME work. */
     private static final long PANEL_INITIALIZATION_GRACE_MS = 200L;
     /** At most one optional panel is inflated in a display frame. */
     private static final long PANEL_INITIALIZATION_STAGE_MS = 16L;
     private final Map<String, LauncherElementFrame> panels = new HashMap<>();
     private final Handler navigationUiHandler = new Handler(Looper.getMainLooper());
+    private int yandexLaunchGeneration;
+    private long lastAutoNavigatorHomeElapsed;
     private final ExecutorService launcherWorker = Executors.newFixedThreadPool(2, runnable -> {
         Thread thread = new Thread(() -> {
             try { Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND); }
@@ -326,6 +337,7 @@ public final class LauncherActivity extends AppCompatActivity {
         // optional panel inflation across frames.
         navigationUiHandler.postDelayed(allowPanelInitialization,
                 PANEL_INITIALIZATION_GRACE_MS);
+        scheduleAutoNavigatorForHomeIntent(getIntent());
     }
 
     @Override
@@ -343,6 +355,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 setEditMode(true);
             }
         }
+        scheduleAutoNavigatorForHomeIntent(intent);
     }
 
     @Override
@@ -1604,20 +1617,24 @@ public final class LauncherActivity extends AppCompatActivity {
             stateLabel = text(11, Color.LTGRAY, true);
             stateLabel.setGravity(Gravity.CENTER);
             stateLabel.setText("…");
-            stateLabel.setMaxLines(1);
-            stateLabel.setPadding(dp(5), 0, dp(5), 0);
+            stateLabel.setSingleLine(false);
+            stateLabel.setMaxLines(3);
+            stateLabel.setHorizontallyScrolling(false);
+            stateLabel.setEllipsize(null);
+            stateLabel.setIncludeFontPadding(false);
+            stateLabel.setPadding(dp(5), dp(2), dp(5), dp(2));
+            androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                    stateLabel, 6, 11, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
             GradientDrawable badge = new GradientDrawable();
             badge.setColor(Color.argb(150, 0, 0, 0));
             badge.setCornerRadius(dp(9));
             stateLabel.setBackground(badge);
+            LinearLayout.LayoutParams stateLp = new LinearLayout.LayoutParams(
+                    matchWidth(), wrapContent());
+            stateLp.topMargin = dp(3);
+            content.addView(stateLabel, stateLp);
         }
         card.addView(content, new MaterialCardView.LayoutParams(matchWidth(), matchHeight()));
-        if (stateLabel != null) {
-            FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(
-                    wrapContent(), dp(22), Gravity.TOP | Gravity.END);
-            badgeLp.setMargins(dp(4), dp(4), dp(4), dp(4));
-            card.addView(stateLabel, badgeLp);
-        }
         if (addButton) {
             card.setOnClickListener(v -> startActivity(new Intent(this,
                     LauncherShortcutSettingsActivity.class)
@@ -1632,6 +1649,8 @@ public final class LauncherActivity extends AppCompatActivity {
                     action.packageName = shortcut.longPackageName;
                     action.command = shortcut.longCommand;
                     action.commandValue = shortcut.longCommandValue;
+                    action.cycleValues =
+                            new ArrayList<>(shortcut.longCycleValues);
                     executeShortcut(action);
                 } else {
                     startActivity(new Intent(this, LauncherShortcutSettingsActivity.class));
@@ -1650,6 +1669,20 @@ public final class LauncherActivity extends AppCompatActivity {
                 applySmartHomeState(binding);
             }
         }
+        if (!addButton && shortcut.dividerBefore) {
+            FrameLayout host = new FrameLayout(this);
+            host.setClipChildren(false);
+            host.setClipToPadding(false);
+            host.addView(card, new FrameLayout.LayoutParams(matchWidth(), matchHeight()));
+            View divider = new View(this);
+            divider.setBackgroundColor(Color.argb(165, 224, 229, 243));
+            FrameLayout.LayoutParams dividerLp = new FrameLayout.LayoutParams(
+                    Math.max(1, dp(2)), matchHeight(), Gravity.START);
+            dividerLp.topMargin = dp(8);
+            dividerLp.bottomMargin = dp(8);
+            host.addView(divider, dividerLp);
+            return host;
+        }
         return card;
     }
 
@@ -1658,7 +1691,7 @@ public final class LauncherActivity extends AppCompatActivity {
             if (shortcut.kind == LauncherShortcutStore.Kind.CAR) {
                 if (!pendingCarControls.add(shortcut.target)) return;
                 CarControlCommand command = new CarControlCommand(shortcut.target,
-                        shortcut.command, shortcut.commandValue);
+                        shortcut.command, shortcut.commandValue, shortcut.cycleValues);
                 carIntegration.executeControl(command, (success, message) -> {
                     pendingCarControls.remove(shortcut.target);
                     if (!success) {
@@ -1682,6 +1715,14 @@ public final class LauncherActivity extends AppCompatActivity {
                 sendBroadcast(command);
                 Toast.makeText(this, "Intent отправлен", Toast.LENGTH_SHORT).show();
                 return;
+            }
+            if (shortcut.kind == LauncherShortcutStore.Kind.ROUTE) {
+                for (FavoriteRouteConfig route : favoriteRoutesConfigStore.load()) {
+                    if (!route.id.equals(shortcut.target)) continue;
+                    YandexRouteLauncher.launch(this, route);
+                    return;
+                }
+                throw new IllegalArgumentException("Favorite route is missing");
             }
             if (shortcut.kind == LauncherShortcutStore.Kind.RULE) {
                 executeSavedRule(shortcut.target);
@@ -2344,6 +2385,70 @@ public final class LauncherActivity extends AppCompatActivity {
     }
 
     private void launchYandex(YandexWindowLauncher.Product product, boolean full) {
+        int generation = ++yandexLaunchGeneration;
+        if (full) {
+            launchYandexNow(product, true, generation);
+            return;
+        }
+
+        // ECARX creates its transparent/freeform entry point in a separate task. If another app
+        // was the last fullscreen task, WindowManager can briefly promote that task underneath
+        // Navigator even though the click came from HOME. Explicitly make our singleTask HOME
+        // activity the foreground task, allow one rendered frame, and only then create the
+        // Yandex window. No third-party task is killed or removed.
+        ensureLauncherTaskForeground();
+        View decor = getWindow().getDecorView();
+        decor.postOnAnimation(() -> navigationUiHandler.postDelayed(
+                () -> launchYandexNow(product, false, generation),
+                WINDOWED_YANDEX_BACKGROUND_SETTLE_MS));
+    }
+
+    private void ensureLauncherTaskForeground() {
+        ActivityManager manager =
+                (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        if (manager != null) {
+            try {
+                manager.moveTaskToFront(getTaskId(),
+                        ActivityManager.MOVE_TASK_NO_USER_ACTION);
+            } catch (RuntimeException error) {
+                Log.w(TAG, "Could not explicitly raise launcher task", error);
+            }
+        }
+        try {
+            startActivity(new Intent(this, LauncherActivity.class)
+                    .setAction(Intent.ACTION_MAIN)
+                    .addCategory(Intent.CATEGORY_HOME)
+                    .putExtra(EXTRA_WINDOW_BACKGROUND_GUARD, true)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                            | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                            | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Could not reassert launcher HOME task", error);
+        }
+    }
+
+    private void scheduleAutoNavigatorForHomeIntent(@Nullable Intent intent) {
+        if (intent == null
+                || intent.getBooleanExtra(EXTRA_WINDOW_BACKGROUND_GUARD, false)
+                || !Intent.ACTION_MAIN.equals(intent.getAction())
+                || !intent.hasCategory(Intent.CATEGORY_HOME)
+                || !preferences.launcherAutoWindowedNavigatorOnHome.get()
+                || intent.getBooleanExtra(EXTRA_EDIT_MODE, false)
+                || intent.getBooleanExtra(EXTRA_EDIT_NAVIGATION_CONTENT, false)
+                || intent.getBooleanExtra(EXTRA_EDIT_MEDIA_CONTENT, false)
+                || intent.getBooleanExtra(EXTRA_EDIT_ACTIONS_CONTENT, false)) {
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastAutoNavigatorHomeElapsed < AUTO_NAVIGATOR_HOME_DEBOUNCE_MS) return;
+        lastAutoNavigatorHomeElapsed = now;
+        navigationUiHandler.post(() ->
+                launchYandex(YandexWindowLauncher.Product.NAVIGATOR, false));
+    }
+
+    private void launchYandexNow(@NonNull YandexWindowLauncher.Product product,
+                                 boolean full, int generation) {
+        if (generation != yandexLaunchGeneration || isFinishing() || isDestroyed()) return;
         if (!YandexWindowLauncher.launch(this, product, full)) {
             Toast.makeText(this, "Яндекс-приложение не найдено", Toast.LENGTH_SHORT).show();
         }
@@ -2351,40 +2456,13 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private void showAllApps() {
         dismissAllAppsDialog();
-        FrameLayout root = new FrameLayout(this);
-        root.setPadding(dp(24), dp(18), dp(24), dp(24));
-        root.setBackgroundColor(Color.argb(247, 10, 13, 18));
-        TextView title = text(24, Color.WHITE, true);
-        title.setText("Все приложения");
-        title.setGravity(Gravity.CENTER_VERTICAL);
-        root.addView(title, new FrameLayout.LayoutParams(
-                wrapContent(), dp(72), Gravity.TOP | Gravity.START));
-
-        MaterialButton close = new MaterialButton(this);
-        close.setText("✕");
-        close.setTextSize(24);
-        close.setTextColor(Color.WHITE);
-        close.setAllCaps(false);
-        close.setMinWidth(0);
-        close.setInsetTop(0);
-        close.setInsetBottom(0);
-        close.setContentDescription("Закрыть список приложений");
-        root.addView(close, new FrameLayout.LayoutParams(
-                dp(72), dp(72), Gravity.TOP | Gravity.END));
-
-        GridView grid = new GridView(this);
-        grid.setNumColumns(Math.max(3,
-                Math.min(8, preferences.launcherAllAppsColumns.get())));
-        grid.setPadding(dp(16), dp(16), dp(16), dp(16));
-        int gap = Math.max(0, Math.min(40, preferences.launcherAllAppsGapPx.get()));
-        grid.setVerticalSpacing(dp(gap));
-        grid.setHorizontalSpacing(dp(gap));
+        LauncherAllAppsSurface.Views surface =
+                LauncherAllAppsSurface.create(this, preferences);
+        FrameLayout root = surface.root;
+        MaterialButton close = surface.close;
+        GridView grid = surface.grid;
         AppAdapter adapter = new AppAdapter(appCatalog.allVisible(), false);
         grid.setAdapter(adapter);
-        FrameLayout.LayoutParams gridParams = new FrameLayout.LayoutParams(
-                matchWidth(), matchHeight());
-        gridParams.topMargin = dp(84);
-        root.addView(grid, gridParams);
         boolean overlay = Permissions.checkOverlayPermission(this);
         Context dialogContext = overlay ? getApplicationContext() : this;
         android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(dialogContext,

@@ -38,6 +38,7 @@ import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
@@ -50,6 +51,7 @@ import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.launcher.LauncherRuleIdPolicy;
 import dezz.status.widget.launcher.LauncherRuleIconPolicy;
 import dezz.status.widget.launcher.SmartHomeShortcutPicker;
+import dezz.status.widget.launcher.DriverFavoriteBlocksStore;
 import dezz.status.widget.launcher.panels.PanelContentEditOverlay;
 import dezz.status.widget.launcher.panels.PanelElementConfigStore;
 import dezz.status.widget.launcher.panels.PanelGridLayout;
@@ -64,6 +66,7 @@ import dezz.status.widget.settings.AppleColorPickerDialog;
 /** Visual, code-free editor for arbitrary HOME icons. */
 public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
     public static final String EXTRA_ADD_NEW = "dezz.status.widget.extra.ADD_HOME_SHORTCUT";
+    private static final String DRIVE_MODE_CONTROL_ID = "vehicle.drive_mode";
 
     private Preferences preferences;
     private LauncherShortcutStore store;
@@ -908,22 +911,80 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         if (control.kind == CarControlDescriptor.Kind.TOGGLE) {
             labels.add("Переключать Вкл / Выкл");
             operations.add(CarControlCommand.Operation.TOGGLE);
-            values.add(0d);
+        } else if (isDriveMode(control)) {
+            labels.add("Переключать только выбранные режимы…");
+            operations.add(CarControlCommand.Operation.CYCLE);
+            labels.add("Переключать все доступные режимы");
+            operations.add(CarControlCommand.Operation.CYCLE);
         } else {
             labels.add(control.kind == CarControlDescriptor.Kind.OPTIONS
                     ? "Переключать режимы по кругу" : "Переключать уровни по кругу");
             operations.add(CarControlCommand.Operation.CYCLE);
-            values.add(0d);
         }
+        while (values.size() < operations.size()) values.add(0d);
         for (CarControlDescriptor.Option option : control.options) {
             labels.add("Установить: " + option.label);
             operations.add(CarControlCommand.Operation.SET);
             values.add(option.value);
         }
         new AlertDialog.Builder(this).setTitle(control.label + " — нажатие")
-                .setItems(labels.toArray(new String[0]), (dialog, which) ->
-                        saveCarAction(existing, control, operations.get(which), values.get(which)))
+                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
+                    if (isDriveMode(control) && which == 0) {
+                        chooseDriveModeCycle(existing, control);
+                    } else {
+                        saveCarAction(existing, control,
+                                operations.get(which), values.get(which));
+                    }
+                })
                 .setNegativeButton(android.R.string.cancel, null).show();
+    }
+
+    private void chooseDriveModeCycle(
+            @Nullable LauncherShortcutStore.Shortcut existing,
+            @NonNull CarControlDescriptor control) {
+        boolean[] checked = new boolean[control.options.size()];
+        List<Double> current = Collections.emptyList();
+        if (existing != null) {
+            if (editingLongAction && existing.hasLongAction
+                    && existing.longKind == LauncherShortcutStore.Kind.CAR
+                    && existing.longTarget.equals(control.id)) {
+                current = existing.longCycleValues;
+            } else if (!editingLongAction && existing.kind == LauncherShortcutStore.Kind.CAR
+                    && existing.target.equals(control.id)) {
+                current = existing.cycleValues;
+            }
+        }
+        String[] labels = new String[control.options.size()];
+        for (int index = 0; index < control.options.size(); index++) {
+            CarControlDescriptor.Option option = control.options.get(index);
+            labels[index] = option.label;
+            checked[index] = containsValue(current, option.value);
+        }
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Режимы для переключения")
+                .setMessage("Выберите минимум два. Они будут переключаться в порядке списка; "
+                        + "режимы, которых нет в этой машине, автоматически пропускаются.")
+                .setMultiChoiceItems(labels, checked,
+                        (ignored, which, selected) -> checked[which] = selected)
+                .setPositiveButton("Сохранить", null)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        dialog.setOnShowListener(ignored ->
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+                    List<Double> selected = new ArrayList<>();
+                    for (int index = 0; index < checked.length; index++) {
+                        if (checked[index]) selected.add(control.options.get(index).value);
+                    }
+                    if (selected.size() < 2) {
+                        Toast.makeText(this, "Выберите минимум два режима",
+                                Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    dialog.dismiss();
+                    saveCarAction(existing, control, CarControlCommand.Operation.CYCLE,
+                            0, selected);
+                }));
+        dialog.show();
     }
 
     private void chooseCarRange(@Nullable LauncherShortcutStore.Shortcut existing,
@@ -966,6 +1027,13 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
     private void saveCarAction(@Nullable LauncherShortcutStore.Shortcut existing,
                                @NonNull CarControlDescriptor control,
                                @NonNull CarControlCommand.Operation operation, double value) {
+        saveCarAction(existing, control, operation, value, Collections.emptyList());
+    }
+
+    private void saveCarAction(@Nullable LauncherShortcutStore.Shortcut existing,
+                               @NonNull CarControlDescriptor control,
+                               @NonNull CarControlCommand.Operation operation, double value,
+                               @NonNull List<Double> cycleValues) {
         LauncherShortcutStore.Shortcut shortcut = existing == null
                 ? new LauncherShortcutStore.Shortcut() : existing;
         if (editingLongAction) {
@@ -975,6 +1043,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
             shortcut.longPackageName = "";
             shortcut.longCommand = operation;
             shortcut.longCommandValue = value;
+            shortcut.longCycleValues = new ArrayList<>(cycleValues);
             editingLongAction = false;
             store.upsert(shortcut);
             refresh();
@@ -986,8 +1055,9 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         shortcut.packageName = "";
         shortcut.command = operation;
         shortcut.commandValue = value;
-        shortcut.title = control.label;
-        shortcut.icon = control.iconKey;
+        shortcut.cycleValues = new ArrayList<>(cycleValues);
+        shortcut.title = carShortcutTitle(control, operation, value, cycleValues);
+        shortcut.icon = carShortcutIcon(control, operation, value, cycleValues);
         shortcut.iconColor = "#99FFFFFF";
         shortcut.activeIconColor = control.suggestedActiveColor;
         shortcut.useVehicleStateColor = true;
@@ -1334,6 +1404,10 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         showTitle.setText("Показывать название");
         showTitle.setChecked(value.showTitle);
         form.addView(showTitle);
+        MaterialSwitch dividerBefore = new MaterialSwitch(this);
+        dividerBefore.setText("Разделительная граница перед иконкой");
+        dividerBefore.setChecked(value.dividerBefore);
+        form.addView(dividerBefore);
         MaterialSwitch enabled = new MaterialSwitch(this);
         enabled.setText("Иконка включена");
         enabled.setChecked(value.enabled);
@@ -1358,6 +1432,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
                     }
                     value.iconSizePx = iconSize.value;
                     value.showTitle = showTitle.isChecked();
+                    value.dividerBefore = dividerBefore.isChecked();
                     value.enabled = enabled.isChecked();
 
                     // Re-read the grid at commit time. The actual HOME editor may have changed
@@ -1421,24 +1496,88 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
     private String typeLabel(LauncherShortcutStore.Shortcut value) {
         switch (value.kind) {
             case APP: return longSuffix("Приложение · " + value.packageName, value);
+            case ROUTE: return longSuffix("Избранная точка · " + value.target, value);
             case RULE: return longSuffix("Действие устройства · " + value.target, value);
             case INTENT: return longSuffix("Intent · " + value.target, value);
             case CAR: return longSuffix("Автомобиль · " + value.target + " · "
-                    + carOperationLabel(value.command, value.commandValue), value);
+                    + carOperationLabel(value.command, value.commandValue,
+                    value.cycleValues), value);
             case BUILTIN:
-            default: return longSuffix("Функция · "
-                    + LauncherShortcutStore.Builtin.fromKey(value.target).label, value);
+            default:
+                if (DriverFavoriteBlocksStore.isFavoritesTarget(value.target)) {
+                    return longSuffix("Блок избранного · "
+                            + new DriverFavoriteBlocksStore(preferences).find(
+                            DriverFavoriteBlocksStore.blockIdFromTarget(value.target)).title,
+                            value);
+                }
+                return longSuffix("Функция · "
+                        + LauncherShortcutStore.Builtin.fromKey(value.target).label, value);
         }
     }
 
-    private String carOperationLabel(CarControlCommand.Operation operation, double value) {
+    private String carOperationLabel(CarControlCommand.Operation operation, double value,
+                                     @NonNull List<Double> cycleValues) {
         switch (operation) {
-            case CYCLE: return "следующее значение";
+            case CYCLE: return cycleValues.isEmpty() ? "следующее значение"
+                    : "цикл из " + cycleValues.size();
             case SET: return "установить " + String.format(Locale.ROOT, "%s", value);
             case ACTIVATE: return "выполнить";
             case TOGGLE:
             default: return "переключить";
         }
+    }
+
+    private static boolean isDriveMode(@NonNull CarControlDescriptor control) {
+        return DRIVE_MODE_CONTROL_ID.equals(control.id);
+    }
+
+    private static boolean containsValue(@NonNull List<Double> values, double candidate) {
+        for (Double value : values) {
+            if (value != null && Math.abs(value - candidate) < .01d) return true;
+        }
+        return false;
+    }
+
+    @NonNull
+    private static String carShortcutTitle(
+            @NonNull CarControlDescriptor control,
+            @NonNull CarControlCommand.Operation operation,
+            double commandValue,
+            @NonNull List<Double> cycleValues) {
+        if (!isDriveMode(control)) return control.label;
+        if (operation == CarControlCommand.Operation.SET) {
+            for (CarControlDescriptor.Option option : control.options) {
+                if (Math.abs(option.value - commandValue) < .01d) {
+                    return "Режим · " + option.label;
+                }
+            }
+        }
+        if (operation == CarControlCommand.Operation.CYCLE && !cycleValues.isEmpty()) {
+            return "Выбранные режимы";
+        }
+        return control.label;
+    }
+
+    @NonNull
+    private static String carShortcutIcon(
+            @NonNull CarControlDescriptor control,
+            @NonNull CarControlCommand.Operation operation,
+            double commandValue,
+            @NonNull List<Double> cycleValues) {
+        if (!isDriveMode(control)) return control.iconKey;
+        if (operation == CarControlCommand.Operation.CYCLE && !cycleValues.isEmpty()) {
+            return "drive_cycle";
+        }
+        if (operation != CarControlCommand.Operation.SET) return "drive_mode";
+        for (CarControlDescriptor.Option option : control.options) {
+            if (Math.abs(option.value - commandValue) >= .01d) continue;
+            String label = option.label.toLowerCase(Locale.ROOT);
+            if (label.contains("sport")) return "drive_sport";
+            if (label.contains("comfort")) return "drive_comfort";
+            if (label.startsWith("eco")) return "drive_eco";
+            if (label.contains("snow")) return "drive_snow";
+        }
+        return "drive_mode";
     }
 
     private String longSuffix(String base, LauncherShortcutStore.Shortcut value) {

@@ -379,8 +379,6 @@ public final class IntentScenarioSettingsActivity extends AppCompatActivity {
         List<LauncherShortcutStore.Shortcut> references = new ArrayList<>();
         collectRuleReferences(references, new LauncherShortcutStore(prefs), ruleId);
         collectRuleReferences(references,
-                LauncherShortcutStore.forDriverPanel(prefs, prefs.driverPanelOld), ruleId);
-        collectRuleReferences(references,
                 LauncherShortcutStore.forDriverPanel(prefs, prefs.driverPanelNew), ruleId);
         collectRuleReferences(references,
                 LauncherShortcutStore.forDriverFavorites(prefs), ruleId);

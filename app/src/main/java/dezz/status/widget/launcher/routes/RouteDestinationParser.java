@@ -9,6 +9,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -19,6 +22,17 @@ public final class RouteDestinationParser {
     private static final Pattern SEPARATOR = Pattern.compile("[\\s;]*");
 
     private RouteDestinationParser() {}
+
+    /** One validated point in the order entered by the user. */
+    public static final class Coordinate {
+        @NonNull public final String latitude;
+        @NonNull public final String longitude;
+
+        Coordinate(@NonNull String latitude, @NonNull String longitude) {
+            this.latitude = latitude;
+            this.longitude = longitude;
+        }
+    }
 
     /** Coordinates take priority; otherwise the trimmed address is returned. */
     @NonNull
@@ -31,12 +45,24 @@ public final class RouteDestinationParser {
     /** Returns `~lat,lon~lat,lon`, exactly as consumed by Yandex's `rtext`. */
     @NonNull
     public static String coordinateRouteText(@NonNull String coordinates) {
+        StringBuilder result = new StringBuilder();
+        for (Coordinate point : coordinatePoints(coordinates)) {
+            result.append('~').append(point.latitude).append(',').append(point.longitude);
+        }
+        return result.toString();
+    }
+
+    /**
+     * Parses the coordinate chain once for both the legacy Maps {@code rtext} link and the
+     * official Navigator {@code build_route_on_map} parameters.
+     */
+    @NonNull
+    public static List<Coordinate> coordinatePoints(@NonNull String coordinates) {
         String input = clean(coordinates);
         if (input.isEmpty()) throw new IllegalArgumentException("Coordinates are empty");
         Matcher matcher = POINT.matcher(input);
-        StringBuilder result = new StringBuilder();
+        List<Coordinate> result = new ArrayList<>();
         int end = 0;
-        int count = 0;
         while (matcher.find()) {
             if (!SEPARATOR.matcher(input.substring(end, matcher.start())).matches()) {
                 throw new IllegalArgumentException("Unexpected coordinate separator");
@@ -49,15 +75,13 @@ public final class RouteDestinationParser {
             if (!Double.isFinite(longitude) || longitude < -180d || longitude > 180d) {
                 throw new IllegalArgumentException("Longitude is out of range");
             }
-            result.append('~').append(number(matcher.group(1)))
-                    .append(',').append(number(matcher.group(2)));
-            count++;
+            result.add(new Coordinate(number(matcher.group(1)), number(matcher.group(2))));
             end = matcher.end();
         }
-        if (count == 0 || !SEPARATOR.matcher(input.substring(end)).matches()) {
+        if (result.isEmpty() || !SEPARATOR.matcher(input.substring(end)).matches()) {
             throw new IllegalArgumentException("Invalid coordinates");
         }
-        return result.toString();
+        return Collections.unmodifiableList(result);
     }
 
     public static boolean hasDestination(@Nullable String address, @Nullable String coordinates) {

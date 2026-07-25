@@ -31,12 +31,13 @@ public final class DriverPanelHa1084ContractTest {
         assertTrue(executor.contains("boolean executeLong("));
         assertTrue(executor.contains("action.kind = shortcut.longKind"));
         assertTrue(executor.contains("case FAVORITES:"));
-        assertTrue(overlay.contains("void showFavorites()"));
-        assertTrue(overlay.contains("ShortcutDrawerAdapter"));
+        assertTrue(overlay.contains("void showFavorites(@NonNull String blockId)"));
+        assertTrue(overlay.contains("showFavoriteBlock("));
+        assertTrue(overlay.contains("DriverFavoriteBlocksStore"));
         assertTrue(overlay.contains("SmartHomeShortcutStatePolicy.resolveValue("));
         assertTrue(overlay.contains("addConnectorValueListener("));
         assertTrue(settings.contains("actionPicker.showLong(shortcut)"));
-        assertTrue(settings.contains("Расширенная информация"));
+        assertTrue(settings.contains("Показывать режим: AUTO"));
     }
 
     @Test
@@ -80,13 +81,32 @@ public final class DriverPanelHa1084ContractTest {
         assertTrue(preferences.contains("launcherAllAppsHiddenComponents"));
         assertTrue(preferences.contains("launcherAllAppsIconScalePercent"));
         assertFalse(overlay.contains("PanelElementConfigStore.APPS_GRID"));
-        assertTrue(intentRules.contains(
+        assertFalse(intentRules.contains(
                 "LauncherShortcutStore.forDriverPanel(prefs, prefs.driverPanelOld)"));
         assertTrue(intentRules.contains(
                 "LauncherShortcutStore.forDriverPanel(prefs, prefs.driverPanelNew)"));
         assertTrue(intentRules.contains("LauncherShortcutStore.forDriverFavorites(prefs)"));
         assertTrue(homeIcons.contains("InstalledAppCatalog.load(this)"));
         assertTrue(homeIcons.contains("app.system"));
+    }
+
+    @Test
+    public void smartDeviceStatusIsNeverForcedIntoOneTruncatedLine() throws Exception {
+        Path widget = widgetRoot();
+        String launcher = read(widget.resolve("LauncherActivity.java"));
+        String overlay = read(widget.resolve(
+                "driver/DriverPanelOverlayController.java"));
+        String information = read(widget.resolve(
+                "launcher/information/InformationPanelView.java"));
+
+        assertTrue(launcher.contains("stateLabel.setSingleLine(false)"));
+        assertTrue(launcher.contains("stateLabel.setMaxLines(3)"));
+        assertTrue(launcher.contains("stateLabel.setEllipsize(null)"));
+        assertTrue(overlay.contains("stateLabel.setSingleLine(false)"));
+        assertTrue(overlay.contains("stateLabel.setMaxLines(3)"));
+        assertTrue(overlay.contains("stateLabel.setEllipsize(null)"));
+        assertTrue(information.contains("value.setMaxLines(3)"));
+        assertTrue(information.contains("value.setEllipsize(null)"));
     }
 
     @Test

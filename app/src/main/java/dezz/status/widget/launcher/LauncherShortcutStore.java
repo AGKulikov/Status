@@ -27,21 +27,24 @@ public final class LauncherShortcutStore {
     public static final int MIN_ICON_SIZE_PX = 24;
     public static final int MAX_ICON_SIZE_PX = 320;
     public static final int MAX_DRIVER_PANEL_SHORTCUTS = 10;
-    public static final int MAX_DRIVER_FAVORITES = 48;
+    /** Ten favorite blocks may each contain a substantial independent icon grid. */
+    public static final int MAX_DRIVER_FAVORITES = 480;
 
-    public enum Kind { APP, BUILTIN, RULE, INTENT, CAR }
+    public enum Kind { APP, BUILTIN, ROUTE, RULE, INTENT, CAR }
 
     public static final class Shortcut {
         @NonNull public String id = UUID.randomUUID().toString();
         @NonNull public String title = "Новая иконка";
         @NonNull public Kind kind = Kind.BUILTIN;
-        /** Flattened ComponentName, built-in action key, or Intent action. */
+        /** Flattened ComponentName, built-in key, favorite-route ID, or Intent action. */
         @NonNull public String target = Builtin.ALL_APPS.key;
         /** Optional package restriction for an INTENT shortcut. */
         @NonNull public String packageName = "";
         /** CAR command kept separate from the stable control ID in target. */
         @NonNull public CarControlCommand.Operation command = CarControlCommand.Operation.TOGGLE;
         public double commandValue = 0;
+        /** Ordered subset for a user-configured CAR cycle; empty means all supported values. */
+        @NonNull public List<Double> cycleValues = new ArrayList<>();
         /** app = original application icon; otherwise one of LauncherIconResolver preset keys. */
         @NonNull public String icon = "apps";
         /** False means a connector may refresh the suggested icon; true preserves user choice. */
@@ -58,12 +61,22 @@ public final class LauncherShortcutStore {
         @NonNull public String longPackageName = "";
         @NonNull public CarControlCommand.Operation longCommand = CarControlCommand.Operation.TOGGLE;
         public double longCommandValue = 0;
+        @NonNull public List<Double> longCycleValues = new ArrayList<>();
         @NonNull public String activeBackgroundColor = "#CC374151";
         @NonNull public String activeIconColor = "#FFFFB300";
         public boolean useVehicleStateColor = true;
         public boolean showState = true;
-        /** Driver climate tile occupies two slots and shows AUTO/airflow when enabled. */
+        /** Driver climate tile adds AUTO/airflow inside the standard-height icon when enabled. */
         public boolean extendedClimateInfo = false;
+        /** Driver rail gap immediately before this shortcut; -1 inherits the profile default. */
+        public int gapBeforePx = -1;
+        /** Optional group boundary immediately before this item on one-column surfaces. */
+        public boolean dividerBefore = false;
+        /** Driver-favorite block membership; empty migrates to the stable default block. */
+        @NonNull public String collectionId = "";
+        /** Exact cell inside a driver-favorite block. */
+        public int gridColumn = -1;
+        public int gridRow = -1;
         public int iconSizePx = 54;
         public int columnSpan = 1;
         public int rowSpan = 1;
@@ -80,6 +93,7 @@ public final class LauncherShortcutStore {
             value.packageName = packageName;
             value.command = command;
             value.commandValue = commandValue;
+            value.cycleValues = new ArrayList<>(cycleValues);
             value.icon = icon;
             value.iconCustomized = iconCustomized;
             value.stateBinding = stateBinding;
@@ -92,11 +106,17 @@ public final class LauncherShortcutStore {
             value.longPackageName = longPackageName;
             value.longCommand = longCommand;
             value.longCommandValue = longCommandValue;
+            value.longCycleValues = new ArrayList<>(longCycleValues);
             value.activeBackgroundColor = activeBackgroundColor;
             value.activeIconColor = activeIconColor;
             value.useVehicleStateColor = useVehicleStateColor;
             value.showState = showState;
             value.extendedClimateInfo = extendedClimateInfo;
+            value.gapBeforePx = gapBeforePx;
+            value.dividerBefore = dividerBefore;
+            value.collectionId = collectionId;
+            value.gridColumn = gridColumn;
+            value.gridRow = gridRow;
             value.iconSizePx = iconSizePx;
             value.columnSpan = columnSpan;
             value.rowSpan = rowSpan;
@@ -277,8 +297,16 @@ public final class LauncherShortcutStore {
                 ? "#FFFFB300" : value.activeIconColor.trim();
         if (!Double.isFinite(value.commandValue)) value.commandValue = 0;
         if (!Double.isFinite(value.longCommandValue)) value.longCommandValue = 0;
+        value.cycleValues = sanitizeCycleValues(value.cycleValues);
+        value.longCycleValues = sanitizeCycleValues(value.longCycleValues);
         value.iconSizePx = Math.max(MIN_ICON_SIZE_PX,
                 Math.min(MAX_ICON_SIZE_PX, value.iconSizePx));
+        value.gapBeforePx = Math.max(-1, Math.min(80, value.gapBeforePx));
+        value.collectionId = value.collectionId == null ? "" : value.collectionId.trim();
+        value.gridColumn = Math.max(-1,
+                Math.min(DriverFavoriteBlocksStore.MAX_COLUMNS - 1, value.gridColumn));
+        value.gridRow = Math.max(-1,
+                Math.min(DriverFavoriteBlocksStore.MAX_ROWS - 1, value.gridRow));
         value.columnSpan = Math.max(1,
                 Math.min(LauncherActionsGridConfig.MAX_COLUMNS, value.columnSpan));
         value.rowSpan = Math.max(1,
@@ -291,6 +319,7 @@ public final class LauncherShortcutStore {
                 .put("id", value.id).put("title", value.title).put("kind", value.kind.name())
                 .put("target", value.target).put("packageName", value.packageName)
                 .put("command", value.command.name()).put("commandValue", value.commandValue)
+                .put("cycleValues", cycleValuesToJson(value.cycleValues))
                 .put("icon", value.icon).put("backgroundColor", value.backgroundColor)
                 .put("iconCustomized", value.iconCustomized)
                 .put("iconColor", value.iconColor).put("textColor", value.textColor)
@@ -298,11 +327,16 @@ public final class LauncherShortcutStore {
                 .put("longTarget", value.longTarget).put("longPackageName", value.longPackageName)
                 .put("longCommand", value.longCommand.name())
                 .put("longCommandValue", value.longCommandValue)
+                .put("longCycleValues", cycleValuesToJson(value.longCycleValues))
                 .put("activeBackgroundColor", value.activeBackgroundColor)
                 .put("activeIconColor", value.activeIconColor)
                 .put("useVehicleStateColor", value.useVehicleStateColor)
                 .put("showState", value.showState)
                 .put("extendedClimateInfo", value.extendedClimateInfo)
+                .put("gapBeforePx", value.gapBeforePx)
+                .put("dividerBefore", value.dividerBefore)
+                .put("collectionId", value.collectionId)
+                .put("gridColumn", value.gridColumn).put("gridRow", value.gridRow)
                 .put("iconSizePx", value.iconSizePx).put("columnSpan", value.columnSpan)
                 .put("rowSpan", value.rowSpan).put("showTitle", value.showTitle)
                 .put("enabled", value.enabled);
@@ -323,6 +357,7 @@ public final class LauncherShortcutStore {
             value.command = CarControlCommand.Operation.valueOf(json.optString(
                     "command", CarControlCommand.Operation.TOGGLE.name()));
             value.commandValue = json.optDouble("commandValue", 0);
+            value.cycleValues = cycleValuesFromJson(json.optJSONArray("cycleValues"));
             value.icon = json.optString("icon", "apps");
             value.iconCustomized = json.has("iconCustomized")
                     ? json.optBoolean("iconCustomized", false)
@@ -340,11 +375,18 @@ public final class LauncherShortcutStore {
             value.longCommand = CarControlCommand.Operation.valueOf(json.optString(
                     "longCommand", CarControlCommand.Operation.TOGGLE.name()));
             value.longCommandValue = json.optDouble("longCommandValue", 0);
+            value.longCycleValues =
+                    cycleValuesFromJson(json.optJSONArray("longCycleValues"));
             value.activeBackgroundColor = json.optString("activeBackgroundColor", "#CC374151");
             value.activeIconColor = json.optString("activeIconColor", "#FFFFB300");
             value.useVehicleStateColor = json.optBoolean("useVehicleStateColor", true);
             value.showState = json.optBoolean("showState", true);
             value.extendedClimateInfo = json.optBoolean("extendedClimateInfo", false);
+            value.gapBeforePx = json.optInt("gapBeforePx", -1);
+            value.dividerBefore = json.optBoolean("dividerBefore", false);
+            value.collectionId = json.optString("collectionId", "");
+            value.gridColumn = json.optInt("gridColumn", -1);
+            value.gridRow = json.optInt("gridRow", -1);
             value.iconSizePx = json.optInt("iconSizePx", 54);
             value.columnSpan = json.optInt("columnSpan", 1);
             value.rowSpan = json.optInt("rowSpan", 1);
@@ -354,6 +396,43 @@ public final class LauncherShortcutStore {
         } catch (IllegalArgumentException ignored) {
             return null;
         }
+    }
+
+    @NonNull
+    private static List<Double> sanitizeCycleValues(@Nullable List<Double> raw) {
+        List<Double> values = new ArrayList<>();
+        if (raw == null) return values;
+        for (Double candidate : raw) {
+            if (candidate == null || !Double.isFinite(candidate)) continue;
+            boolean duplicate = false;
+            for (Double existing : values) {
+                if (Math.abs(existing - candidate) < .01d) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (!duplicate) values.add(candidate);
+            if (values.size() >= 32) break;
+        }
+        return values;
+    }
+
+    @NonNull
+    private static JSONArray cycleValuesToJson(@Nullable List<Double> values) {
+        JSONArray result = new JSONArray();
+        for (Double value : sanitizeCycleValues(values)) result.put(value);
+        return result;
+    }
+
+    @NonNull
+    private static List<Double> cycleValuesFromJson(@Nullable JSONArray json) {
+        List<Double> values = new ArrayList<>();
+        if (json == null) return values;
+        for (int index = 0; index < json.length(); index++) {
+            double value = json.optDouble(index, Double.NaN);
+            if (Double.isFinite(value)) values.add(value);
+        }
+        return sanitizeCycleValues(values);
     }
 
     @NonNull

@@ -65,7 +65,8 @@ public final class AppRuntimeBootstrap {
                                   @NonNull Preferences preferences) {
         Context appContext = context.getApplicationContext();
         boolean integrationHostRequired = preferences.widgetEnabled.get()
-                || preferences.driverPanelEnabled.get();
+                || preferences.driverPanelEnabled.get()
+                || preferences.phoneConnectorEnabled.get();
         WidgetService runningHost = WidgetService.getInstance();
         if (integrationHostRequired) {
             if (runningHost != null) {

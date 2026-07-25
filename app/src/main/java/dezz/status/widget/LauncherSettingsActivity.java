@@ -75,6 +75,10 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         addTitle("Вид и поведение");
         addSwitch("Полноэкранный режим", preferences.launcherImmersive);
         addSwitch("Показывать сетку в режиме редактирования", preferences.launcherShowGrid);
+        addSwitch("При нажатии HOME открывать Навигатор окном поверх лаунчера",
+                preferences.launcherAutoWindowedNavigatorOnHome);
+        addHint("Сначала поднимается домашний экран Status Widget, затем поверх него "
+                + "открывается оконный Яндекс Навигатор.");
         addSnapControl();
         backgroundColorButton = addButton("Цвет фона", v -> showBackgroundDialog());
         AppleColorPickerDialog.decorateButton(backgroundColorButton, "Цвет фона",

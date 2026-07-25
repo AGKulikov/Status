@@ -249,7 +249,9 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
     private void renderEditor(@NonNull FavoriteRouteConfig route) {
         editorHost.removeAllViews();
         addTitle(editorHost, "НАСТРОЙКА КНОПКИ");
-        addHint(editorHost, "Координаты имеют приоритет над адресом. Формат: 55.7558,37.6176. Можно указать несколько точек через пробел.");
+        addHint(editorHost, "Маршрут передаётся напрямую, без Алисы. Укажите координаты "
+                + "конечной точки: 55.7558,37.6176. Несколько точек через пробел будут "
+                + "переданы как промежуточные, последняя — как конечная.");
 
         EditText title = input("Название кнопки", route.title);
         editorHost.addView(title, fieldLp());
@@ -276,10 +278,10 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
                     destinationStatus.setTextColor(Color.rgb(255, 105, 105));
                 }
             } else if (!addressValue.isEmpty()) {
-                destinationStatus.setText("✓ Адрес будет передан Яндекс Навигатору");
-                destinationStatus.setTextColor(Color.rgb(90, 220, 145));
+                destinationStatus.setText("Для прямого маршрута добавьте координаты адреса");
+                destinationStatus.setTextColor(Color.rgb(255, 180, 80));
             } else {
-                destinationStatus.setText("Укажите адрес или координаты");
+                destinationStatus.setText("Укажите координаты конечной точки");
                 destinationStatus.setTextColor(Color.rgb(255, 180, 80));
             }
         };

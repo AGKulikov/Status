@@ -5,6 +5,8 @@
 
 package dezz.status.widget.launcher.information;
 
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -13,6 +15,8 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.BatteryManager;
 import android.os.Environment;
 import android.os.Handler;
@@ -296,7 +300,8 @@ public final class InformationPanelView extends FrameLayout {
             lp.width = 0;
             lp.height = 0;
             int first = config.gapPx / 2;
-            lp.setMargins(first, first, config.gapPx - first, config.gapPx - first);
+            int top = item.gapBeforePx >= 0 ? item.gapBeforePx : first;
+            lp.setMargins(first, top, config.gapPx - first, config.gapPx - first);
             grid.addView(tile, lp);
         }
         addView(grid, new FrameLayout.LayoutParams(match(), match()));
@@ -306,6 +311,9 @@ public final class InformationPanelView extends FrameLayout {
 
     @NonNull
     private View buildItem(@NonNull InformationPanelConfig.Item item) {
+        FrameLayout host = new FrameLayout(getContext());
+        host.setClickable(false);
+        host.setFocusable(false);
         LinearLayout tile = new LinearLayout(getContext());
         tile.setOrientation(LinearLayout.HORIZONTAL);
         tile.setGravity(Gravity.CENTER_VERTICAL);
@@ -342,15 +350,32 @@ public final class InformationPanelView extends FrameLayout {
         label.setVisibility(item.showLabel ? View.VISIBLE : View.GONE);
         TextView value = text("—", scaledSp(20f, item.scalePercent),
                 color(item.valueColor, Color.WHITE), true);
-        value.setSingleLine(true);
-        value.setEllipsize(TextUtils.TruncateAt.END);
+        value.setSingleLine(false);
+        value.setMaxLines(3);
+        value.setHorizontallyScrolling(false);
+        value.setEllipsize(null);
+        value.setIncludeFontPadding(false);
+        androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                value, 7, Math.max(8, Math.round(scaledSp(20f, item.scalePercent))), 1,
+                android.util.TypedValue.COMPLEX_UNIT_SP);
         texts.addView(label, new LinearLayout.LayoutParams(match(), wrap()));
         texts.addView(value, new LinearLayout.LayoutParams(match(), wrap()));
         tile.addView(texts, new LinearLayout.LayoutParams(0, wrap(), 1f));
 
-        itemViews.put(item.id, new ItemViews(tile, icon, label, value, background,
+        host.addView(tile, new FrameLayout.LayoutParams(match(), match()));
+        if (item.dividerBefore) {
+            View divider = new View(getContext());
+            divider.setBackgroundColor(Color.argb(145, 224, 229, 243));
+            FrameLayout.LayoutParams dividerLp = new FrameLayout.LayoutParams(
+                    match(), Math.max(1, dp(1)), Gravity.TOP);
+            dividerLp.leftMargin = scaledDp(7, item.scalePercent);
+            dividerLp.rightMargin = scaledDp(7, item.scalePercent);
+            host.addView(divider, dividerLp);
+        }
+
+        itemViews.put(item.id, new ItemViews(host, icon, label, value, background,
                 resolvedIconKey));
-        return tile;
+        return host;
     }
 
     private void updateValues() {
@@ -478,6 +503,37 @@ public final class InformationPanelView extends FrameLayout {
                     String type = connected && active.getTypeName() != null
                             ? active.getTypeName() : "Нет сети";
                     return Value.known(type, connected);
+                } catch (RuntimeException ignored) {
+                    return Value.unknown();
+                }
+            }
+            case "system.wifi": {
+                try {
+                    WifiManager manager = (WifiManager) getContext().getApplicationContext()
+                            .getSystemService(Context.WIFI_SERVICE);
+                    if (manager == null || !manager.isWifiEnabled()) {
+                        return Value.known("Выключен", false);
+                    }
+                    WifiInfo connection = manager.getConnectionInfo();
+                    String ssid = connection == null ? "" : connection.getSSID();
+                    if (ssid == null || WifiManager.UNKNOWN_SSID.equals(ssid)) ssid = "";
+                    ssid = ssid.replace("\"", "").trim();
+                    return Value.known(ssid.isEmpty() ? "Включён" : ssid, true);
+                } catch (RuntimeException ignored) {
+                    return Value.unknown();
+                }
+            }
+            case "system.bluetooth": {
+                try {
+                    BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+                    if (adapter == null || !adapter.isEnabled()) {
+                        return Value.known("Выключен", false);
+                    }
+                    boolean connected = adapter.getProfileConnectionState(
+                            BluetoothProfile.A2DP) == BluetoothProfile.STATE_CONNECTED
+                            || adapter.getProfileConnectionState(
+                            BluetoothProfile.HEADSET) == BluetoothProfile.STATE_CONNECTED;
+                    return Value.known(connected ? "Подключён" : "Включён", connected);
                 } catch (RuntimeException ignored) {
                     return Value.unknown();
                 }

@@ -782,8 +782,37 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                     .show();
             return;
         }
+        if (!WidgetServiceStarter.startIfNeeded(this)) {
+            Toast.makeText(this, R.string.phone_test_service_unavailable,
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        reconnectWhenServiceReady(24);
+    }
+
+    /**
+     * A foreground-service start is asynchronous. Poll briefly so the same explicit button press
+     * reaches the phone controller even when the integration host was not already running.
+     */
+    private void reconnectWhenServiceReady(int remainingAttempts) {
+        if (isFinishing() || isDestroyed()) return;
         WidgetService service = WidgetService.getInstance();
-        if (service == null || !service.reconnectPhoneForDiagnostics()) {
+        if (service == null) {
+            if (remainingAttempts > 0) {
+                diagnosticsHandler.postDelayed(
+                        () -> reconnectWhenServiceReady(remainingAttempts - 1), 250L);
+                return;
+            }
+            Toast.makeText(this, R.string.phone_test_service_unavailable,
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (!service.reconnectPhoneForDiagnostics()) {
+            if (remainingAttempts > 0) {
+                diagnosticsHandler.postDelayed(
+                        () -> reconnectWhenServiceReady(remainingAttempts - 1), 250L);
+                return;
+            }
             Toast.makeText(this, R.string.phone_test_service_unavailable,
                     Toast.LENGTH_LONG).show();
             return;

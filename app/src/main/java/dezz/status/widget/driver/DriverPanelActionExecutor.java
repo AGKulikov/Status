@@ -23,7 +23,11 @@ import dezz.status.widget.automation.ScenarioTriggerReceiver;
 import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.launcher.LauncherShortcutStore;
+import dezz.status.widget.launcher.DriverFavoriteBlocksStore;
 import dezz.status.widget.launcher.YandexWindowLauncher;
+import dezz.status.widget.launcher.routes.FavoriteRouteConfig;
+import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
+import dezz.status.widget.launcher.routes.YandexRouteLauncher;
 import dezz.status.widget.scenario.IntentActionRule;
 import dezz.status.widget.scenario.IntentActionRuleStore;
 import dezz.status.widget.settings.SettingsDestinationCatalog;
@@ -33,7 +37,7 @@ import dezz.status.widget.shell.PrivilegedShell;
 final class DriverPanelActionExecutor {
     interface Host {
         void showAllApps();
-        void showFavorites();
+        void showFavorites(@NonNull String blockId);
         void triggerStockClimate();
     }
 
@@ -59,12 +63,16 @@ final class DriverPanelActionExecutor {
                     if (!shortcut.packageName.isEmpty()) command.setPackage(shortcut.packageName);
                     context.sendBroadcast(command);
                     return;
+                case ROUTE:
+                    launchFavoriteRoute(shortcut.target);
+                    return;
                 case RULE:
                     executeRule(shortcut.target);
                     return;
                 case CAR:
                     CarIntegrations.get(context).executeControl(new CarControlCommand(
-                            shortcut.target, shortcut.command, shortcut.commandValue),
+                            shortcut.target, shortcut.command, shortcut.commandValue,
+                            shortcut.cycleValues),
                             (success, message) -> {
                                 if (!success) toast(message == null
                                         ? "Команда автомобиля не выполнена" : message);
@@ -72,6 +80,11 @@ final class DriverPanelActionExecutor {
                     return;
                 case BUILTIN:
                 default:
+                    if (DriverFavoriteBlocksStore.isFavoritesTarget(shortcut.target)) {
+                        host.showFavorites(
+                                DriverFavoriteBlocksStore.blockIdFromTarget(shortcut.target));
+                        return;
+                    }
                     executeBuiltin(LauncherShortcutStore.Builtin.fromKey(shortcut.target));
             }
         } catch (RuntimeException error) {
@@ -87,6 +100,7 @@ final class DriverPanelActionExecutor {
         action.packageName = shortcut.longPackageName;
         action.command = shortcut.longCommand;
         action.commandValue = shortcut.longCommandValue;
+        action.cycleValues = new java.util.ArrayList<>(shortcut.longCycleValues);
         execute(action);
         return true;
     }
@@ -120,7 +134,7 @@ final class DriverPanelActionExecutor {
                 host.showAllApps();
                 return;
             case FAVORITES:
-                host.showFavorites();
+                host.showFavorites(DriverFavoriteBlocksStore.DEFAULT_BLOCK_ID);
                 return;
             case MAPS_WINDOW:
                 launchYandex(YandexWindowLauncher.Product.MAPS, false);
@@ -172,6 +186,18 @@ final class DriverPanelActionExecutor {
         if (!YandexWindowLauncher.launch(context, product, full)) {
             toast("Приложение Яндекса не найдено");
         }
+    }
+
+    private void launchFavoriteRoute(@NonNull String routeId) {
+        for (FavoriteRouteConfig route :
+                new FavoriteRoutesConfigStore(preferences).load()) {
+            if (!route.id.equals(routeId)) continue;
+            if (!YandexRouteLauncher.launch(context, route)) {
+                toast("Не удалось открыть точку «" + route.title + "»");
+            }
+            return;
+        }
+        toast("Избранная точка больше не существует");
     }
 
     private void openRecentsWithShell() {

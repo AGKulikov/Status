@@ -28,6 +28,10 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Lets the HOME activity explicitly restore its own task immediately before an ECARX
+         floating Navigator window is opened. This is a normal permission and never closes or
+         reorders third-party tasks except by bringing our own launcher task to the front. -->
+    <uses-permission android:name="android.permission.REORDER_TASKS" />
     <!-- Legacy Bluetooth permissions (granted at install time on targetSdk 28). They are
          sufficient on Android 9-12 for the calls we make: reading adapter state, observing
          ACL connect/disconnect broadcasts, and querying the connected device count. The new
