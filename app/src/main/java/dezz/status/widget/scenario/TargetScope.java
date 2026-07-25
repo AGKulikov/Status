@@ -9,7 +9,8 @@ public enum TargetScope {
     POPUP,
     BUILTIN,
     OVERLAY,
-    DRIVER;
+    DRIVER,
+    HUD;
 
     public String jsonName() {
         return name();
