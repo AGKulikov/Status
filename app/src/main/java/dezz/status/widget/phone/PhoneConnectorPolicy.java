@@ -8,6 +8,10 @@ public final class PhoneConnectorPolicy {
     private static final long[] RETRY_DELAYS_MS = {
             2_000L, 5_000L, 10_000L, 20_000L, 30_000L, 60_000L
     };
+    private static final long[] STOCK_CONNECT_RETRY_DELAYS_MS = {
+            1_000L, 2_500L
+    };
+    private static final long STOCK_CONNECT_SETTLE_MS = 2_500L;
 
     private PhoneConnectorPolicy() {
     }
@@ -50,5 +54,28 @@ public final class PhoneConnectorPolicy {
     public static long reconnectDelayMillis(int attempt) {
         if (attempt <= 0) return RETRY_DELAYS_MS[0];
         return RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
+    }
+
+    /**
+     * The ECARX extension is backed by an asynchronously initialised service. Two quick retries
+     * cover that startup window without postponing the public Android GATT fallback indefinitely.
+     */
+    public static int stockConnectionMaxAttempts() {
+        return STOCK_CONNECT_RETRY_DELAYS_MS.length + 1;
+    }
+
+    /** Delay before the next ECARX connection request, indexed from zero. */
+    public static long stockConnectionRetryDelayMillis(int retryIndex) {
+        if (retryIndex <= 0) return STOCK_CONNECT_RETRY_DELAYS_MS[0];
+        return STOCK_CONNECT_RETRY_DELAYS_MS[
+                Math.min(retryIndex, STOCK_CONNECT_RETRY_DELAYS_MS.length - 1)];
+    }
+
+    /**
+     * Gives the stock owner time to establish its automotive profiles before this app creates a
+     * second, optional BLE GATT client for ANCS.
+     */
+    public static long stockConnectionSettleMillis() {
+        return STOCK_CONNECT_SETTLE_MS;
     }
 }
