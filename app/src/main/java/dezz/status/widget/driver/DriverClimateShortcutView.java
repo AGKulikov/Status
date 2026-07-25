@@ -35,8 +35,10 @@ public final class DriverClimateShortcutView extends View {
     private static final long STATE_FRESH_MS = 75_000L;
     private static final String TEMP_DRIVER = "climate.temp_driver";
     private static final String FAN = "climate.fan";
+    private static final String AUTO = "climate.auto";
+    private static final String AIRFLOW = "climate.airflow";
     private static final Set<String> CONTROL_IDS = new LinkedHashSet<>(
-            Arrays.asList(TEMP_DRIVER, FAN));
+            Arrays.asList(TEMP_DRIVER, FAN, AUTO, AIRFLOW));
 
     private final CarIntegration integration;
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG
@@ -56,6 +58,12 @@ public final class DriverClimateShortcutView extends View {
     private int fanLevel;
     private long fanObservedAtMillis;
     @NonNull private String fanLabel = "";
+    private boolean autoKnown;
+    private boolean autoActive;
+    private long autoObservedAtMillis;
+    private boolean airflowKnown;
+    private long airflowObservedAtMillis;
+    @NonNull private String airflowLabel = "";
 
     public DriverClimateShortcutView(@NonNull Context context,
                                      @NonNull CarIntegration integration,
@@ -75,6 +83,10 @@ public final class DriverClimateShortcutView extends View {
         fanActive = true;
         fanLevel = 5;
         fanLabel = "5";
+        autoKnown = true;
+        autoActive = false;
+        airflowKnown = true;
+        airflowLabel = "Лицо + ноги";
         invalidate();
     }
 
@@ -120,6 +132,24 @@ public final class DriverClimateShortcutView extends View {
                 fanLabel = "";
                 fanObservedAtMillis = 0;
             }
+        } else if (AUTO.equals(state.controlId)) {
+            autoKnown = isFresh(state) && state.available && state.known;
+            if (autoKnown) {
+                autoActive = state.active;
+                autoObservedAtMillis = state.observedAtMillis;
+            } else {
+                autoActive = false;
+                autoObservedAtMillis = 0;
+            }
+        } else if (AIRFLOW.equals(state.controlId)) {
+            airflowKnown = isFresh(state) && state.available && state.known;
+            if (airflowKnown) {
+                airflowLabel = state.valueLabel;
+                airflowObservedAtMillis = state.observedAtMillis;
+            } else {
+                airflowLabel = "";
+                airflowObservedAtMillis = 0;
+            }
         }
         scheduleExpiry();
         invalidate();
@@ -132,17 +162,18 @@ public final class DriverClimateShortcutView extends View {
         float height = getHeight();
         if (width <= 0 || height <= 0) return;
         float unit = Math.min(width, height);
+        boolean expanded = height >= width * 1.35f;
         boolean showFan = fanKnown && fanActive;
         int color = showFan ? foregroundColor : muted(foregroundColor);
 
         textPaint.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD));
         textPaint.setColor(color);
         textPaint.setTextAlign(Paint.Align.CENTER);
-        textPaint.setTextSize(Math.max(12f, unit * .39f));
+        textPaint.setTextSize(Math.max(12f, unit * (expanded ? .34f : .39f)));
         String temperatureText = DriverClimatePresentation.temperature(
                 temperature, temperatureKnown);
         Paint.FontMetrics temperatureMetrics = textPaint.getFontMetrics();
-        float temperatureCenterY = height * (showFan ? .31f : .50f);
+        float temperatureCenterY = height * (expanded ? .18f : showFan ? .31f : .50f);
         float temperatureBaseline = temperatureCenterY
                 - (temperatureMetrics.ascent + temperatureMetrics.descent) / 2f;
         canvas.drawText(temperatureText, width / 2f, temperatureBaseline, textPaint);
@@ -152,11 +183,21 @@ public final class DriverClimateShortcutView extends View {
                 ClimateFanIndicatorPolicy.fromConfirmedState(fanLabel, fanLevel);
         int bars = indicator.activeSegments;
         int totalBars = indicator.totalSegments;
-        float rowCenterY = height * .73f;
+        float rowCenterY = height * (expanded ? .45f : .73f);
         float glyphCenterX = width * .18f;
         drawFanGlyph(canvas, glyphCenterX, rowCenterY, unit, color);
         drawBars(canvas, width * .34f, rowCenterY, width * .62f, unit,
                 bars, totalBars, color);
+        if (!expanded) return;
+
+        boolean automatic = DriverClimatePresentation.automatic(
+                autoKnown, autoActive, fanLabel);
+        if (automatic) {
+            drawAuto(canvas, width / 2f, height * .76f, unit, color);
+        } else if (airflowKnown) {
+            drawAirflow(canvas, width / 2f, height * .77f, unit,
+                    DriverClimatePresentation.airflowTargets(airflowLabel), color);
+        }
     }
 
     private void drawFanGlyph(Canvas canvas, float centerX, float centerY,
@@ -198,6 +239,74 @@ public final class DriverClimateShortcutView extends View {
         }
     }
 
+    private void drawAuto(Canvas canvas, float centerX, float centerY, float unit, int color) {
+        textPaint.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD));
+        textPaint.setColor(color);
+        textPaint.setTextAlign(Paint.Align.CENTER);
+        textPaint.setTextSize(Math.max(9f, unit * .21f));
+        Paint.FontMetrics metrics = textPaint.getFontMetrics();
+        canvas.drawText("AUTO", centerX,
+                centerY - (metrics.ascent + metrics.descent) / 2f, textPaint);
+    }
+
+    /**
+     * Compact icon-only outlet diagram. The three independently lit arrows point at the
+     * windshield, face and legs of a neutral passenger outline, so all seven ECARX combinations
+     * remain distinguishable without Russian/English labels.
+     */
+    private void drawAirflow(Canvas canvas, float centerX, float centerY, float unit,
+                             int targets, int color) {
+        if (targets == 0) return;
+        shapePaint.setStyle(Paint.Style.STROKE);
+        shapePaint.setStrokeWidth(Math.max(1.3f, unit * .022f));
+        shapePaint.setStrokeCap(Paint.Cap.ROUND);
+        shapePaint.setColor(withAlpha(color, .52f));
+
+        float figureX = centerX + unit * .20f;
+        float headY = centerY - unit * .10f;
+        float headRadius = unit * .055f;
+        canvas.drawCircle(figureX, headY, headRadius, shapePaint);
+        canvas.drawLine(figureX, headY + headRadius,
+                figureX, centerY + unit * .18f, shapePaint);
+        shape.set(figureX - unit * .26f, centerY - unit * .25f,
+                figureX + unit * .11f, centerY + unit * .05f);
+        canvas.drawArc(shape, 205f, 82f, false, shapePaint);
+
+        shapePaint.setColor(color);
+        shapePaint.setStrokeWidth(Math.max(1.6f, unit * .030f));
+        if ((targets & DriverClimatePresentation.AIRFLOW_WINDSHIELD) != 0) {
+            drawDirectionArrow(canvas, centerX - unit * .26f, centerY - unit * .12f,
+                    unit * .25f, -32f, unit, color);
+        }
+        if ((targets & DriverClimatePresentation.AIRFLOW_FACE) != 0) {
+            drawDirectionArrow(canvas, centerX - unit * .29f, centerY - unit * .01f,
+                    unit * .30f, 0f, unit, color);
+        }
+        if ((targets & DriverClimatePresentation.AIRFLOW_LEGS) != 0) {
+            drawDirectionArrow(canvas, centerX - unit * .24f, centerY + unit * .10f,
+                    unit * .27f, 31f, unit, color);
+        }
+        shapePaint.setStyle(Paint.Style.FILL);
+    }
+
+    private void drawDirectionArrow(Canvas canvas, float startX, float startY, float length,
+                                    float degrees, float unit, int color) {
+        double radians = Math.toRadians(degrees);
+        float endX = startX + (float) Math.cos(radians) * length;
+        float endY = startY + (float) Math.sin(radians) * length;
+        shapePaint.setColor(color);
+        canvas.drawLine(startX, startY, endX, endY, shapePaint);
+        float wing = Math.max(2.5f, unit * .055f);
+        double left = radians + Math.toRadians(150);
+        double right = radians - Math.toRadians(150);
+        canvas.drawLine(endX, endY,
+                endX + (float) Math.cos(left) * wing,
+                endY + (float) Math.sin(left) * wing, shapePaint);
+        canvas.drawLine(endX, endY,
+                endX + (float) Math.cos(right) * wing,
+                endY + (float) Math.sin(right) * wing, shapePaint);
+    }
+
     private static int parseColor(@Nullable String raw, int fallback) {
         if (raw == null || "none".equalsIgnoreCase(raw)) return fallback;
         try {
@@ -209,6 +318,12 @@ public final class DriverClimateShortcutView extends View {
 
     private static int muted(int color) {
         int alpha = Math.max(36, Math.round(Color.alpha(color) * .42f));
+        return (color & 0x00FFFFFF) | (alpha << 24);
+    }
+
+    private static int withAlpha(int color, float fraction) {
+        int alpha = Math.max(0, Math.min(255,
+                Math.round(Color.alpha(color) * fraction)));
         return (color & 0x00FFFFFF) | (alpha << 24);
     }
 
@@ -224,10 +339,9 @@ public final class DriverClimateShortcutView extends View {
 
     private void scheduleExpiry() {
         removeCallbacks(expiry);
-        if (temperatureObservedAtMillis <= 0 && fanObservedAtMillis <= 0) return;
-        long oldest = temperatureObservedAtMillis <= 0 ? fanObservedAtMillis
-                : fanObservedAtMillis <= 0 ? temperatureObservedAtMillis
-                : Math.min(temperatureObservedAtMillis, fanObservedAtMillis);
+        long oldest = oldestPositive(temperatureObservedAtMillis, fanObservedAtMillis,
+                autoObservedAtMillis, airflowObservedAtMillis);
+        if (oldest <= 0) return;
         long remaining = STATE_FRESH_MS
                 - Math.max(0, System.currentTimeMillis() - oldest);
         postDelayed(expiry, Math.max(1, remaining + 1));
@@ -245,7 +359,25 @@ public final class DriverClimateShortcutView extends View {
             fanLabel = "";
             fanObservedAtMillis = 0;
         }
+        if (autoKnown && !isFresh(autoObservedAtMillis)) {
+            autoKnown = false;
+            autoActive = false;
+            autoObservedAtMillis = 0;
+        }
+        if (airflowKnown && !isFresh(airflowObservedAtMillis)) {
+            airflowKnown = false;
+            airflowLabel = "";
+            airflowObservedAtMillis = 0;
+        }
         invalidate();
         scheduleExpiry();
+    }
+
+    private static long oldestPositive(long... values) {
+        long oldest = 0;
+        for (long value : values) {
+            if (value > 0 && (oldest == 0 || value < oldest)) oldest = value;
+        }
+        return oldest;
     }
 }
