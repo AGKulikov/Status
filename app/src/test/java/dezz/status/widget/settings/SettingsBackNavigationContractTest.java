@@ -30,7 +30,9 @@ import java.util.regex.Pattern;
  */
 public final class SettingsBackNavigationContractTest {
     private static final String[] SHARED_CHROME_DETAILS = {
+            "AllAppsSettingsActivity.java",
             "ClimatePanelSettingsActivity.java",
+            "DriverFavoritesSettingsActivity.java",
             "DriverPanelSettingsActivity.java",
             "FavoriteAppsSettingsActivity.java",
             "FavoriteRoutesSettingsActivity.java",
