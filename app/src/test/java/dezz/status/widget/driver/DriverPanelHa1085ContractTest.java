@@ -22,7 +22,8 @@ public final class DriverPanelHa1085ContractTest {
 
         assertTrue(store.contains("RECENTS(\"recents\""));
         assertTrue(store.contains("FAVORITES(\"favorites\""));
-        assertTrue(store.contains("driverFavoritesShortcutsJson"));
+        assertTrue(store.contains("private final Preferences.Str storage;"));
+        assertTrue(store.contains("this.storage = storage;"));
         assertTrue(store.contains("forDriverFavorites("));
         assertTrue(executor.contains("case RECENTS:"));
         assertTrue(executor.contains("performGlobalRecents("));
