@@ -99,6 +99,9 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("gattOperationTimeoutMillis(operation)"));
         assertTrue(source.contains("ancsStatus = \"service_not_published\""));
         assertTrue(source.contains("ancsPublicationRetryCount >= 1"));
+        assertTrue(source.contains("ancsStatus = \"stock_pairing_required\""));
+        assertTrue(source.contains("refreshGattCache(expected)"));
+        assertTrue(source.contains("refreshGattCache(gatt)"));
         assertTrue(source.contains(
                 "if (operation.tag == GattTag.SERVICE_CHANGED)"));
         assertTrue(source.contains(
@@ -120,9 +123,23 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains(
                 "\"com.ecarx.xui.adaptapi.device.Device\""));
         assertTrue(source.contains("getMethod(\"reqBtPair\", String.class)"));
+        assertTrue(source.contains("getMethod(\"reqBtPairedDevices\")"));
+        assertTrue(source.contains("getMethod(\"getAddress\")"));
+        assertTrue(source.contains("PSDBluetoothManager.requestConnect()"));
+        assertTrue(source.contains("PHONE_NOT_REGISTERED"));
+        assertTrue(source.contains("RequestResult"));
         assertFalse(source.contains("reqBtUnpair"));
-        assertTrue(controller().contains(
-                "PhoneOemConnectionBridge.requestStockConnection(context, selectedAddress)"));
+        String controller = controller();
+        assertTrue(controller.contains("beginStockConnectionRequest(token, selectedAddress)"));
+        assertTrue(controller.contains(
+                "PhoneOemConnectionBridge.requestStockConnection(context, address)"));
+        assertTrue(controller.contains("stockConnectionRequestInProgress"));
+        assertTrue(controller.contains(
+                "PhoneConnectorPolicy.stockConnectionSettleMillis()"));
+        assertTrue(controller.contains(
+                "PhoneConnectorPolicy.stockConnectionMaxAttempts()"));
+        assertTrue(controller.contains(
+                "|| stockConnectionRequestInProgress) return;"));
     }
 
     @Test public void privacyModeAndAppPresentationRemainSourceOnly() throws IOException {
@@ -184,6 +201,8 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("ConnectorType.PHONE, CONNECTOR_ID"));
         assertTrue(source.contains("SourceBinding.DEFAULT_CONNECTOR_ID"));
         assertTrue(source.contains("device.put(\"address\", maskedAddress(selectedAddress))"));
+        assertTrue(source.contains("device.put(\"stock_connection\""));
+        assertTrue(source.contains("device.put(\"ancs_setup\""));
         assertFalse(source.contains("device.put(\"address\", selectedAddress)"));
     }
 
