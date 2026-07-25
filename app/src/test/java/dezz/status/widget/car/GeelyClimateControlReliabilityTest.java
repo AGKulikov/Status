@@ -300,12 +300,12 @@ public final class GeelyClimateControlReliabilityTest {
         assertTrue(panel.contains("Нет ответа от автомобиля. Состояние обновляется"));
     }
 
-    @Test public void compactFanTileHasNoCaptionAndLevelOneDecreaseUsesHvacPower()
+    @Test public void compactFanTileHasNoCaptionAndClimateStateAlwaysIncludesHvacPower()
             throws IOException {
         String panel = climatePanelSource();
         assertTrue(panel.contains(
                 "if (!ClimatePanelConfig.FAN.equals(id)) center.addView(title)"));
-        assertTrue(panel.contains("if (ids.contains(ClimatePanelConfig.FAN))"));
+        assertTrue(panel.contains("if (!ids.isEmpty())"));
         assertTrue(panel.contains(
                 "executeBound(id, ClimatePanelConfig.POWER,"));
     }
