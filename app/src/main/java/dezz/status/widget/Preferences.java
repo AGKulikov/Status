@@ -505,6 +505,9 @@ public class Preferences {
     // Geometry is stored as versioned JSON because launcher elements are independent rectangles
     // (x/y/width/height) and the set will grow as new panels are added.
     public final Str launcherLayoutJson = new Str(this, "launcherLayoutJson", "");
+    /** Screen-wide geometry of individual HOME elements after migration from panel-local grids. */
+    public final Str launcherGlobalElementsJson = new Str(this,
+            "launcherGlobalElementsJson", "");
     public final Str launcherFavoritePackages = new Str(this, "launcherFavoritePackages", "");
     /** Per-application HOME icon/label sizes; selection and order remain in the legacy list. */
     public final Str launcherFavoriteAppsAppearanceJson = new Str(this,
@@ -609,6 +612,12 @@ public class Preferences {
     /** Last panel edited in settings; does not control runtime visibility. */
     public final Str driverFavoritesSelectedPanelId = new Str(this,
             "driverFavoritesSelectedPanelId", "favorites_default");
+    /** Independent multi-display HUD surface. The JSON document contains the selected display,
+     * grid, global presentation options and an unlimited ordered element collection. */
+    public final Bool hudPanelEnabled = new Bool(this, "hudPanelEnabled", false);
+    /** Restore the HUD presentation after boot/package replacement while the master switch is on. */
+    public final Bool hudPanelAutostart = new Bool(this, "hudPanelAutostart", true);
+    public final Str hudPanelConfigJson = new Str(this, "hudPanelConfigJson", "");
     /** Additive cell positions for action/smart-home icons; shortcut actions stay untouched. */
     public final Str launcherActionsGridJson = new Str(this, "launcherActionsGridJson", "");
     public final Int launcherAppsColumns = new Int(this, "launcherAppsColumns", 3);
