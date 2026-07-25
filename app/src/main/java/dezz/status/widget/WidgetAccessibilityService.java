@@ -150,6 +150,34 @@ public class WidgetAccessibilityService extends AccessibilityService {
         return true;
     }
 
+    /** Opens Android's system recent-applications surface. */
+    public static boolean performGlobalRecents() {
+        return performGlobalRecents(success -> {});
+    }
+
+    public interface GlobalActionCallback {
+        void onFinished(boolean success);
+    }
+
+    /**
+     * Opens Recents and reports whether the OEM accessibility service accepted the action.
+     * Callers can safely fall back to keyevent 187 when an ECARX build returns false.
+     */
+    public static boolean performGlobalRecents(@NonNull GlobalActionCallback callback) {
+        WidgetAccessibilityService current = instance;
+        if (current == null) return false;
+        new Handler(Looper.getMainLooper()).post(() -> {
+            boolean accepted;
+            try {
+                accepted = current.performGlobalAction(GLOBAL_ACTION_RECENTS);
+            } catch (RuntimeException failure) {
+                accepted = false;
+            }
+            callback.onFinished(accepted);
+        });
+        return true;
+    }
+
     /**
      * Injects one short screen tap. The driver panel temporarily marks its own windows
      * NOT_TOUCHABLE before calling this method, so input is delivered to the covered OEM button
