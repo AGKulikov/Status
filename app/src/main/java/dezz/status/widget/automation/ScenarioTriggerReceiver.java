@@ -50,7 +50,8 @@ public final class ScenarioTriggerReceiver extends BroadcastReceiver {
 
         Preferences preferences = new Preferences(context);
         if (!preferences.widgetEnabled.get()
-                && !preferences.driverPanelEnabled.get()) {
+                && !preferences.driverPanelEnabled.get()
+                && !preferences.hudPanelEnabled.get()) {
             Log.i(TAG, "Ignored trigger while every integration surface is disabled");
             return;
         }
