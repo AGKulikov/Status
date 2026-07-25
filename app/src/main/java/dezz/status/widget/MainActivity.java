@@ -412,12 +412,20 @@ public class MainActivity extends AppCompatActivity {
 
     private void startWidgetService() {
         prefs.widgetEnabled.set(true);
-        startForegroundService(new Intent(this, WidgetService.class));
+        WidgetService running = WidgetService.getInstance();
+        if (running != null) running.applyPreferences();
+        else startForegroundService(new Intent(this, WidgetService.class));
     }
 
     private void stopWidgetService() {
         prefs.widgetEnabled.set(false);
-        stopService(new Intent(this, WidgetService.class));
+        WidgetService running = WidgetService.getInstance();
+        if (running != null) running.applyPreferences();
+        else if (prefs.driverPanelEnabled.get()) {
+            AppRuntimeBootstrap.reconcileServices(this, prefs);
+        } else {
+            stopService(new Intent(this, WidgetService.class));
+        }
     }
 
     private void requestPermissions() {
