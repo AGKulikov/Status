@@ -32,6 +32,12 @@ public final class ClimateLevelCycleContractTest {
         assertTrue(panel.contains("ClimateLevelCyclePlanner.nextTarget"));
         assertTrue(panel.contains("execute(id, CarControlCommand.Operation.SET, target)"));
         assertTrue(panel.contains("pending.containsKey(id)"));
+        assertTrue(panel.contains(
+                "ClimateFanIndicatorPolicy.fromConfirmedState("));
+        assertTrue(panel.contains(
+                "return Integer.toString(indicator.activeSegments)"));
+        assertTrue(panel.contains(
+                "pending.containsKey(id) && !ClimatePanelConfig.FAN.equals(id)"));
     }
 
     @Test
