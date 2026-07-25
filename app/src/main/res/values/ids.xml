@@ -2,4 +2,5 @@
 <resources>
     <item name="settings_back_button" type="id" />
     <item name="settings_back_base_padding" type="id" />
+    <item name="launcher_global_element_id" type="id" />
 </resources>
