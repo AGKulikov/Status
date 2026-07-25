@@ -23,9 +23,11 @@ import java.util.Set;
 public final class SettingsDestinationCatalogTest {
     private static final Set<String> USER_FACING_ACTIVITIES = new HashSet<>(Arrays.asList(
             "dezz.status.widget.AboutActivity",
+            "dezz.status.widget.AllAppsSettingsActivity",
             "dezz.status.widget.AutomationSettingsActivity",
             "dezz.status.widget.ClimatePanelSettingsActivity",
             "dezz.status.widget.DriverPanelSettingsActivity",
+            "dezz.status.widget.DriverFavoritesSettingsActivity",
             "dezz.status.widget.FavoriteAppsSettingsActivity",
             "dezz.status.widget.FavoriteRoutesSettingsActivity",
             "dezz.status.widget.HomeAssistantSettingsActivity",
