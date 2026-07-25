@@ -249,7 +249,11 @@ public final class MediaPanelView extends FrameLayout {
         switch (element.id) {
             case MediaPanelConfig.ARTWORK:
                 artwork = new ImageView(getContext());
-                artwork.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                // Artwork is an independent HOME widget. Show the complete cover by default;
+                // users who deliberately want a crop can choose CROP in the widget's long-press
+                // settings without permanently losing pixels at every other size.
+                artwork.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                artwork.setAdjustViewBounds(false);
                 artwork.setContentDescription("Обложка");
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     artwork.setClipToOutline(true);

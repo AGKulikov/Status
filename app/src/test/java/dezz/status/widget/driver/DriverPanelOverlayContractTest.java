@@ -74,7 +74,7 @@ public class DriverPanelOverlayContractTest {
         assertTrue(climateSource.contains("fanKnown && fanActive"));
         assertTrue(climateSource.contains("if (!showFan) return;"));
         assertFalse(climateSource.contains("drawFanGlyph"));
-        assertFalse(climateSource.contains("drawText(\"AUTO\""));
+        assertTrue(climateSource.contains("drawText(\"AUTO\""));
         assertTrue(climateSource.contains("drawBars(canvas, width * .12f"));
         assertTrue(climateSource.contains("Standard seated-person airflow pictogram"));
         assertTrue(climateSource.contains("AIRFLOW = \"climate.airflow\""));

@@ -77,7 +77,8 @@ public final class DriverPanelHa1085ContractTest {
         assertTrue(overlay.contains("anchor.getLocationOnScreen(location)"));
         assertTrue(overlay.contains("anchorCenterY - height / 2"));
         assertTrue(overlay.contains("panelOnRight ? panelX - width : panelX + physicalWidth"));
-        assertTrue(overlay.contains("favoritePanelBackground(context, profile)"));
+        assertTrue(overlay.contains(
+                "favoritePanelBackground(context, profile, panelOnRight)"));
         assertTrue(overlay.contains("config.visibleRows * config.cellSizePx"));
         assertTrue(overlay.contains("config.borderEnabled && config.borderWidthPx > 0"));
         assertTrue(overlay.contains("if (shortcut.closeFavoritePanelAfterAction)"));

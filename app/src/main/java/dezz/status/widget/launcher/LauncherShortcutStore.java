@@ -17,6 +17,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import dezz.status.widget.Fonts;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.driver.DriverFavoritesPanelConfig;
@@ -73,6 +74,19 @@ public final class LauncherShortcutStore {
         public int columnSpan = 1;
         public int rowSpan = 1;
         public boolean showTitle = true;
+        /** INFO only: independently styled label/value text on the driver rail and Favorites. */
+        public int informationLabelTextSizeSp = 11;
+        public int informationValueTextSizeSp = 20;
+        @NonNull public String informationFontFamily = Fonts.DEFAULT_KEY;
+        public boolean informationTextBold = true;
+        public boolean informationTextItalic = false;
+        /** 0=start/top, 1=center, 2=end/bottom. */
+        public int informationHorizontalAlignment = 0;
+        public int informationVerticalAlignment = 1;
+        public int informationPaddingLeftPx = 10;
+        public int informationPaddingTopPx = 7;
+        public int informationPaddingRightPx = 10;
+        public int informationPaddingBottomPx = 7;
         /** Driver Favorites only: dismiss the owning compact panel after either action. */
         public boolean closeFavoritePanelAfterAction = false;
         public boolean enabled = true;
@@ -112,6 +126,17 @@ public final class LauncherShortcutStore {
             value.columnSpan = columnSpan;
             value.rowSpan = rowSpan;
             value.showTitle = showTitle;
+            value.informationLabelTextSizeSp = informationLabelTextSizeSp;
+            value.informationValueTextSizeSp = informationValueTextSizeSp;
+            value.informationFontFamily = informationFontFamily;
+            value.informationTextBold = informationTextBold;
+            value.informationTextItalic = informationTextItalic;
+            value.informationHorizontalAlignment = informationHorizontalAlignment;
+            value.informationVerticalAlignment = informationVerticalAlignment;
+            value.informationPaddingLeftPx = informationPaddingLeftPx;
+            value.informationPaddingTopPx = informationPaddingTopPx;
+            value.informationPaddingRightPx = informationPaddingRightPx;
+            value.informationPaddingBottomPx = informationPaddingBottomPx;
             value.closeFavoritePanelAfterAction = closeFavoritePanelAfterAction;
             value.enabled = enabled;
             return value;
@@ -369,7 +394,29 @@ public final class LauncherShortcutStore {
                 Math.min(LauncherActionsGridConfig.MAX_COLUMNS, value.columnSpan));
         value.rowSpan = Math.max(1,
                 Math.min(LauncherActionsGridConfig.MAX_ROWS, value.rowSpan));
+        value.informationLabelTextSizeSp = Math.max(8,
+                Math.min(72, value.informationLabelTextSizeSp));
+        value.informationValueTextSizeSp = Math.max(8,
+                Math.min(96, value.informationValueTextSizeSp));
+        value.informationFontFamily = Fonts.findByKey(
+                value.informationFontFamily).key;
+        value.informationHorizontalAlignment = Math.max(0,
+                Math.min(2, value.informationHorizontalAlignment));
+        value.informationVerticalAlignment = Math.max(0,
+                Math.min(2, value.informationVerticalAlignment));
+        value.informationPaddingLeftPx = clampInformationPadding(
+                value.informationPaddingLeftPx);
+        value.informationPaddingTopPx = clampInformationPadding(
+                value.informationPaddingTopPx);
+        value.informationPaddingRightPx = clampInformationPadding(
+                value.informationPaddingRightPx);
+        value.informationPaddingBottomPx = clampInformationPadding(
+                value.informationPaddingBottomPx);
         return value;
+    }
+
+    private static int clampInformationPadding(int value) {
+        return Math.max(0, Math.min(96, value));
     }
 
     private static JSONObject toJson(Shortcut value) throws JSONException {
@@ -396,6 +443,19 @@ public final class LauncherShortcutStore {
                 .put("gapAfterPx", value.gapAfterPx)
                 .put("columnSpan", value.columnSpan)
                 .put("rowSpan", value.rowSpan).put("showTitle", value.showTitle)
+                .put("informationLabelTextSizeSp", value.informationLabelTextSizeSp)
+                .put("informationValueTextSizeSp", value.informationValueTextSizeSp)
+                .put("informationFontFamily", value.informationFontFamily)
+                .put("informationTextBold", value.informationTextBold)
+                .put("informationTextItalic", value.informationTextItalic)
+                .put("informationHorizontalAlignment",
+                        value.informationHorizontalAlignment)
+                .put("informationVerticalAlignment",
+                        value.informationVerticalAlignment)
+                .put("informationPaddingLeftPx", value.informationPaddingLeftPx)
+                .put("informationPaddingTopPx", value.informationPaddingTopPx)
+                .put("informationPaddingRightPx", value.informationPaddingRightPx)
+                .put("informationPaddingBottomPx", value.informationPaddingBottomPx)
                 .put("closeFavoritePanelAfterAction",
                         value.closeFavoritePanelAfterAction)
                 .put("enabled", value.enabled);
@@ -448,6 +508,28 @@ public final class LauncherShortcutStore {
             value.columnSpan = json.optInt("columnSpan", 1);
             value.rowSpan = json.optInt("rowSpan", 1);
             value.showTitle = json.optBoolean("showTitle", true);
+            value.informationLabelTextSizeSp =
+                    json.optInt("informationLabelTextSizeSp", 11);
+            value.informationValueTextSizeSp =
+                    json.optInt("informationValueTextSizeSp", 20);
+            value.informationFontFamily = json.optString(
+                    "informationFontFamily", Fonts.DEFAULT_KEY);
+            value.informationTextBold =
+                    json.optBoolean("informationTextBold", true);
+            value.informationTextItalic =
+                    json.optBoolean("informationTextItalic", false);
+            value.informationHorizontalAlignment =
+                    json.optInt("informationHorizontalAlignment", 0);
+            value.informationVerticalAlignment =
+                    json.optInt("informationVerticalAlignment", 1);
+            value.informationPaddingLeftPx =
+                    json.optInt("informationPaddingLeftPx", 10);
+            value.informationPaddingTopPx =
+                    json.optInt("informationPaddingTopPx", 7);
+            value.informationPaddingRightPx =
+                    json.optInt("informationPaddingRightPx", 10);
+            value.informationPaddingBottomPx =
+                    json.optInt("informationPaddingBottomPx", 7);
             value.closeFavoritePanelAfterAction =
                     json.optBoolean("closeFavoritePanelAfterAction", false);
             value.enabled = json.optBoolean("enabled", true);

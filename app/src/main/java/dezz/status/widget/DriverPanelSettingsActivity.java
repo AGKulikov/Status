@@ -14,6 +14,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -444,6 +445,12 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 applyPanel();
             });
             body.addView(showIcon, topMargin(dp(8)));
+
+            MaterialButton informationAppearance =
+                    compactButton("Текст, шрифт, выравнивание и отступы");
+            informationAppearance.setOnClickListener(
+                    view -> editInformationAppearance(shortcut));
+            body.addView(informationAppearance, topMargin(dp(8)));
         }
 
         MaterialButton longAction = compactButton(shortcut.hasLongAction
@@ -463,19 +470,6 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             applyPanel();
         });
         body.addView(showTitle, topMargin(dp(8)));
-        if (isStockClimate(shortcut)) {
-            MaterialSwitch extended = new MaterialSwitch(this);
-            extended.setText("Подробный климат в обычной ячейке: AUTO / направление");
-            extended.setTextColor(Color.WHITE);
-            extended.setChecked(shortcut.extendedClimateInfo);
-            extended.setOnCheckedChangeListener((button, checked) -> {
-                shortcut.extendedClimateInfo = checked;
-                store.upsert(shortcut);
-                refreshPreview();
-                applyPanel();
-            });
-            body.addView(extended, topMargin(dp(8)));
-        }
         card.addView(body);
         return card;
     }
@@ -618,6 +612,145 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 .show();
     }
 
+    private void editInformationAppearance(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(20), dp(10), dp(20), dp(24));
+        scroll.addView(form, new ScrollView.LayoutParams(match(), wrap()));
+
+        MaterialButton text = compactButton("Текст подписи: " + shortcut.title);
+        text.setOnClickListener(view -> {
+            EditText input = new EditText(this);
+            input.setSingleLine(true);
+            input.setText(shortcut.title);
+            input.setSelection(input.length());
+            new AlertDialog.Builder(this)
+                    .setTitle("Текст информационной кнопки")
+                    .setView(input)
+                    .setPositiveButton("Применить", (dialog, which) -> {
+                        String value = input.getText().toString().trim();
+                        if (!value.isEmpty()) shortcut.title = value;
+                        persistInformationAppearance(shortcut);
+                    })
+                    .setNegativeButton("Отмена", null)
+                    .show();
+        });
+        form.addView(text, rowParams());
+
+        slider(form, "Размер подписи", 8, 72,
+                shortcut.informationLabelTextSizeSp, " sp", value -> {
+                    shortcut.informationLabelTextSizeSp = value;
+                    persistInformationAppearance(shortcut);
+                });
+        slider(form, "Размер значения", 8, 96,
+                shortcut.informationValueTextSizeSp, " sp", value -> {
+                    shortcut.informationValueTextSizeSp = value;
+                    persistInformationAppearance(shortcut);
+                });
+
+        MaterialButton font = compactButton("Шрифт: "
+                + getString(Fonts.findByKey(shortcut.informationFontFamily).labelRes));
+        font.setOnClickListener(view -> {
+            String[] labels = new String[Fonts.ALL.size()];
+            for (int index = 0; index < Fonts.ALL.size(); index++) {
+                labels[index] = getString(Fonts.ALL.get(index).labelRes);
+            }
+            new AlertDialog.Builder(this)
+                    .setTitle("Шрифт информационной кнопки")
+                    .setItems(labels, (dialog, which) -> {
+                        shortcut.informationFontFamily = Fonts.ALL.get(which).key;
+                        font.setText("Шрифт: " + labels[which]);
+                        persistInformationAppearance(shortcut);
+                    })
+                    .show();
+        });
+        form.addView(font, rowParams());
+
+        addSwitch(form, "Жирный текст", shortcut.informationTextBold, checked -> {
+            shortcut.informationTextBold = checked;
+            persistInformationAppearance(shortcut);
+        });
+        addSwitch(form, "Курсив", shortcut.informationTextItalic, checked -> {
+            shortcut.informationTextItalic = checked;
+            persistInformationAppearance(shortcut);
+        });
+
+        MaterialButton horizontal = compactButton("По горизонтали: "
+                + horizontalAlignmentLabel(shortcut.informationHorizontalAlignment));
+        horizontal.setOnClickListener(view -> new AlertDialog.Builder(this)
+                .setTitle("Выравнивание по горизонтали")
+                .setItems(new String[]{"Слева", "По центру", "Справа"},
+                        (dialog, which) -> {
+                            shortcut.informationHorizontalAlignment = which;
+                            horizontal.setText("По горизонтали: "
+                                    + horizontalAlignmentLabel(which));
+                            persistInformationAppearance(shortcut);
+                        })
+                .show());
+        form.addView(horizontal, rowParams());
+
+        MaterialButton vertical = compactButton("По вертикали: "
+                + verticalAlignmentLabel(shortcut.informationVerticalAlignment));
+        vertical.setOnClickListener(view -> new AlertDialog.Builder(this)
+                .setTitle("Выравнивание по вертикали")
+                .setItems(new String[]{"Сверху", "По центру", "Снизу"},
+                        (dialog, which) -> {
+                            shortcut.informationVerticalAlignment = which;
+                            vertical.setText("По вертикали: "
+                                    + verticalAlignmentLabel(which));
+                            persistInformationAppearance(shortcut);
+                        })
+                .show());
+        form.addView(vertical, rowParams());
+
+        title(form, "Отступы содержимого");
+        slider(form, "Слева", 0, 96, shortcut.informationPaddingLeftPx,
+                " px", value -> {
+                    shortcut.informationPaddingLeftPx = value;
+                    persistInformationAppearance(shortcut);
+                });
+        slider(form, "Сверху", 0, 96, shortcut.informationPaddingTopPx,
+                " px", value -> {
+                    shortcut.informationPaddingTopPx = value;
+                    persistInformationAppearance(shortcut);
+                });
+        slider(form, "Справа", 0, 96, shortcut.informationPaddingRightPx,
+                " px", value -> {
+                    shortcut.informationPaddingRightPx = value;
+                    persistInformationAppearance(shortcut);
+                });
+        slider(form, "Снизу", 0, 96, shortcut.informationPaddingBottomPx,
+                " px", value -> {
+                    shortcut.informationPaddingBottomPx = value;
+                    persistInformationAppearance(shortcut);
+                });
+
+        new AlertDialog.Builder(this)
+                .setTitle("Информационная кнопка")
+                .setView(scroll)
+                .setPositiveButton("Готово", null)
+                .show();
+    }
+
+    private void persistInformationAppearance(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        store.upsert(shortcut);
+        refreshPreview();
+        applyPanel();
+    }
+
+    @NonNull
+    private static String horizontalAlignmentLabel(int value) {
+        return value <= 0 ? "слева" : value == 1 ? "по центру" : "справа";
+    }
+
+    @NonNull
+    private static String verticalAlignmentLabel(int value) {
+        return value <= 0 ? "сверху" : value == 1 ? "по центру" : "снизу";
+    }
+
     private void chooseIcon(@NonNull LauncherShortcutStore.Shortcut shortcut) {
         List<LauncherIconResolver.Preset> presets = LauncherIconResolver.presets();
         String[] labels = new String[presets.size()];
@@ -695,8 +828,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             if (value.kind == LauncherShortcutStore.Kind.BUILTIN
                     && LauncherShortcutStore.Builtin.STOCK_CLIMATE.key.equals(value.target)) {
                 DriverClimateShortcutView climate = new DriverClimateShortcutView(
-                        this, CarIntegrations.get(this), value.iconColor,
-                        value.extendedClimateInfo);
+                        this, CarIntegrations.get(this), value.iconColor, true);
                 climate.showPreviewSample();
                 icon = climate;
             } else {

@@ -211,16 +211,27 @@ public final class DriverClimateShortcutView extends View {
 
         ClimateFanIndicatorPolicy.Indicator indicator =
                 ClimateFanIndicatorPolicy.fromConfirmedState(fanLabel, fanLevel);
-        int bars = indicator.activeSegments;
-        int totalBars = indicator.totalSegments;
+        boolean automatic = DriverClimatePresentation.automatic(
+                autoKnown, autoActive, fanLabel);
+        int totalBars = automatic
+                ? ClimateFanIndicatorPolicy.AUTO_SEGMENTS
+                : ClimateFanIndicatorPolicy.MANUAL_SEGMENTS;
+        int bars = automatic
+                ? (indicator.automatic ? indicator.activeSegments
+                : Math.max(1, Math.min(totalBars, fanLevel + 1)))
+                : (indicator.automatic ? Math.max(0, Math.min(totalBars, fanLevel))
+                : indicator.activeSegments);
         float rowCenterY = height * (expanded ? .45f : .73f);
         drawBars(canvas, width * .12f, rowCenterY, width * .76f, unit,
                 bars, totalBars, color);
         if (!expanded) return;
 
-        if (airflowKnown) {
+        if (airflowKnown || automatic) {
             drawAirflow(canvas, width / 2f, height * .77f, unit,
                     DriverClimatePresentation.airflowTargets(airflowLabel), color);
+        }
+        if (automatic) {
+            drawAutoBadge(canvas, width * .76f, height * .61f, unit, color);
         }
     }
 
@@ -260,13 +271,13 @@ public final class DriverClimateShortcutView extends View {
 
     private void drawBars(Canvas canvas, float startX, float centerY, float availableWidth,
                           float unit, int activeBars, int total, int color) {
-        // Manual and AUTO share one immutable nine-slot geometry. AUTO draws its five logical
-        // divisions in slots 0/2/4/6/8, so switching mode cannot resize or shift the scale.
-        int physicalSlots = ClimateFanScaleGeometry.PHYSICAL_SLOTS;
-        int logicalTotal = Math.max(1, Math.min(physicalSlots, total));
-        float gap = Math.max(.7f, unit * .010f);
-        float barWidth = Math.max(.75f,
-                (availableWidth - gap * (physicalSlots - 1)) / physicalSlots);
+        // Both modes occupy the same immutable envelope. Five AUTO divisions become wider while
+        // retaining this compact gap, instead of being spread through every other manual slot.
+        int logicalTotal = Math.max(1,
+                Math.min(ClimateFanScaleGeometry.PHYSICAL_SLOTS, total));
+        float gap = Math.max(.7f, unit * .009f);
+        float barWidth = ClimateFanScaleGeometry.segmentWidth(
+                availableWidth, gap, logicalTotal);
         float barHeight = Math.max(4f, unit * .115f);
         for (int index = 0; index < logicalTotal; index++) {
             int alpha = index < activeBars ? Color.alpha(color)
@@ -284,54 +295,98 @@ public final class DriverClimateShortcutView extends View {
     }
 
     /**
-     * Standard seated-person airflow pictogram. The independently lit upper, middle and lower
-     * arrows represent windshield, face and feet, preserving all seven ECARX combinations.
+     * Automotive seated-person airflow pictogram matching the familiar climate-control symbol.
+     * Independently lit windshield, face and feet arrows preserve all seven ECARX combinations.
      */
     private void drawAirflow(Canvas canvas, float centerX, float centerY, float unit,
                              int targets, int color) {
-        if (targets == 0) return;
+        float pictogram = unit * .72f;
         shapePaint.setStyle(Paint.Style.STROKE);
-        shapePaint.setStrokeWidth(Math.max(1.4f, unit * .023f));
+        shapePaint.setStrokeWidth(Math.max(1.6f, unit * .035f));
         shapePaint.setStrokeCap(Paint.Cap.ROUND);
         shapePaint.setStrokeJoin(Paint.Join.ROUND);
-        shapePaint.setColor(withAlpha(color, .62f));
+        shapePaint.setColor(withAlpha(color, .76f));
 
-        // A recognisable side-profile passenger and seat replace the former stick figure.
-        float headX = centerX + unit * .15f;
-        float headY = centerY - unit * .105f;
-        float headRadius = unit * .047f;
+        // Bold side-profile passenger and seat remain legible in the narrow driver rail.
+        float headX = centerX + pictogram * .21f;
+        float headY = centerY - pictogram * .14f;
+        float headRadius = pictogram * .075f;
+        shapePaint.setStyle(Paint.Style.FILL);
         canvas.drawCircle(headX, headY, headRadius, shapePaint);
+        shapePaint.setStyle(Paint.Style.STROKE);
+        shapePaint.setStrokeWidth(Math.max(2.1f, pictogram * .085f));
         Path passenger = new Path();
-        passenger.moveTo(centerX + unit * .105f, centerY - unit * .045f);
-        passenger.lineTo(centerX + unit * .035f, centerY - unit * .015f);
-        passenger.lineTo(centerX + unit * .055f, centerY + unit * .085f);
-        passenger.lineTo(centerX + unit * .145f, centerY + unit * .09f);
-        passenger.lineTo(centerX + unit * .225f, centerY + unit * .165f);
+        passenger.moveTo(centerX + pictogram * .14f, centerY - pictogram * .04f);
+        passenger.lineTo(centerX + pictogram * .05f, centerY + pictogram * .02f);
+        passenger.lineTo(centerX + pictogram * .10f, centerY + pictogram * .15f);
+        passenger.lineTo(centerX + pictogram * .25f, centerY + pictogram * .16f);
+        passenger.lineTo(centerX + pictogram * .34f, centerY + pictogram * .26f);
         canvas.drawPath(passenger, shapePaint);
+        shapePaint.setStrokeWidth(Math.max(1.5f, pictogram * .045f));
         Path seat = new Path();
-        seat.moveTo(centerX + unit * .005f, centerY - unit * .055f);
-        seat.lineTo(centerX + unit * .025f, centerY + unit * .11f);
-        seat.lineTo(centerX + unit * .17f, centerY + unit * .11f);
+        seat.moveTo(centerX - pictogram * .02f, centerY - pictogram * .09f);
+        seat.lineTo(centerX + pictogram * .02f, centerY + pictogram * .20f);
+        seat.lineTo(centerX + pictogram * .25f, centerY + pictogram * .20f);
         canvas.drawPath(seat, shapePaint);
 
-        // A short slanted windshield cue keeps the upper arrow unambiguous.
-        canvas.drawLine(centerX + unit * .055f, centerY - unit * .185f,
-                centerX + unit * .225f, centerY - unit * .155f, shapePaint);
-
         shapePaint.setColor(color);
-        shapePaint.setStrokeWidth(Math.max(1.8f, unit * .032f));
+        shapePaint.setStrokeWidth(Math.max(1.8f, pictogram * .052f));
         if ((targets & DriverClimatePresentation.AIRFLOW_WINDSHIELD) != 0) {
-            drawDirectionArrow(canvas, centerX - unit * .25f, centerY - unit * .075f,
-                    unit * .27f, -24f, unit, color);
+            drawWindshieldFlow(canvas, centerX - pictogram * .16f,
+                    centerY - pictogram * .13f, pictogram, color);
         }
         if ((targets & DriverClimatePresentation.AIRFLOW_FACE) != 0) {
-            drawDirectionArrow(canvas, centerX - unit * .28f, centerY - unit * .015f,
-                    unit * .285f, 0f, unit, color);
+            drawDirectionArrow(canvas, centerX - pictogram * .38f,
+                    centerY - pictogram * .10f,
+                    pictogram * .34f, 0f, pictogram, color);
         }
         if ((targets & DriverClimatePresentation.AIRFLOW_LEGS) != 0) {
-            drawDirectionArrow(canvas, centerX - unit * .25f, centerY + unit * .055f,
-                    unit * .30f, 23f, unit, color);
+            drawDirectionArrow(canvas, centerX - pictogram * .27f,
+                    centerY + pictogram * .01f,
+                    pictogram * .27f, 72f, pictogram, color);
         }
+        shapePaint.setStyle(Paint.Style.FILL);
+    }
+
+    private void drawWindshieldFlow(@NonNull Canvas canvas, float centerX, float centerY,
+                                    float unit, int color) {
+        shapePaint.setStyle(Paint.Style.STROKE);
+        shapePaint.setStrokeWidth(Math.max(1.3f, unit * .035f));
+        shapePaint.setColor(withAlpha(color, .76f));
+        RectF windshield = new RectF(centerX - unit * .17f, centerY - unit * .12f,
+                centerX + unit * .22f, centerY + unit * .13f);
+        canvas.drawArc(windshield, 202f, 136f, false, shapePaint);
+        for (int index = 0; index < 3; index++) {
+            float x = centerX - unit * .09f + index * unit * .09f;
+            drawDirectionArrow(canvas, x, centerY + unit * .10f,
+                    unit * .16f, -82f, unit * .72f, color);
+        }
+    }
+
+    private void drawAutoBadge(@NonNull Canvas canvas, float centerX, float centerY,
+                               float unit, int color) {
+        textPaint.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
+        textPaint.setTextAlign(Paint.Align.CENTER);
+        textPaint.setTextSize(Math.max(7f, unit * .095f));
+        float textWidth = textPaint.measureText("AUTO");
+        Paint.FontMetrics metrics = textPaint.getFontMetrics();
+        float halfHeight = Math.max(unit * .065f,
+                (metrics.descent - metrics.ascent) * .58f);
+        float horizontalPadding = unit * .045f;
+        shape.set(centerX - textWidth / 2f - horizontalPadding,
+                centerY - halfHeight,
+                centerX + textWidth / 2f + horizontalPadding,
+                centerY + halfHeight);
+        shapePaint.setStyle(Paint.Style.FILL);
+        shapePaint.setColor(withAlpha(color, .18f));
+        canvas.drawRoundRect(shape, halfHeight, halfHeight, shapePaint);
+        shapePaint.setStyle(Paint.Style.STROKE);
+        shapePaint.setStrokeWidth(Math.max(1f, unit * .012f));
+        shapePaint.setColor(withAlpha(color, .72f));
+        canvas.drawRoundRect(shape, halfHeight, halfHeight, shapePaint);
+        textPaint.setColor(color);
+        canvas.drawText("AUTO", centerX,
+                centerY - (metrics.ascent + metrics.descent) / 2f, textPaint);
         shapePaint.setStyle(Paint.Style.FILL);
     }
 

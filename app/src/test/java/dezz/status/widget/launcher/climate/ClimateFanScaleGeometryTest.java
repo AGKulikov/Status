@@ -21,13 +21,16 @@ public final class ClimateFanScaleGeometryTest {
     }
 
     @Test
-    public void autoKeepsTheSameEdgesAndBarGeometry() {
+    public void autoUsesContiguousDivisionsInsideTheSameEnvelope() {
         int[] slots = new int[5];
         for (int index = 0; index < slots.length; index++) {
             slots[index] = ClimateFanScaleGeometry.physicalSlot(index, 5);
         }
-        assertArrayEquals(new int[]{0, 2, 4, 6, 8}, slots);
+        assertArrayEquals(new int[]{0, 1, 2, 3, 4}, slots);
         assertEquals(ClimateFanIndicatorPolicy.MANUAL_SEGMENTS,
                 ClimateFanScaleGeometry.PHYSICAL_SLOTS);
+        float manual = ClimateFanScaleGeometry.segmentWidth(180f, 2f, 9);
+        float automatic = ClimateFanScaleGeometry.segmentWidth(180f, 2f, 5);
+        org.junit.Assert.assertTrue(automatic > manual);
     }
 }

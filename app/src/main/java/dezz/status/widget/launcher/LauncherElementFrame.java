@@ -39,6 +39,7 @@ public final class LauncherElementFrame extends MaterialCardView {
     private final GeometryListener listener;
     private boolean editMode;
     private boolean contentTouchBlocked;
+    private boolean preserveAspectRatio;
     private int snapPx = 20;
     private int minimumWidthPx;
     private int minimumHeightPx;
@@ -128,6 +129,10 @@ public final class LauncherElementFrame extends MaterialCardView {
         minimumHeightPx = Math.max(1, height);
     }
 
+    public void setPreserveAspectRatio(boolean preserve) {
+        preserveAspectRatio = preserve;
+    }
+
     @Override
     public boolean onInterceptTouchEvent(MotionEvent event) {
         if (contentTouchBlocked) return true;
@@ -158,12 +163,19 @@ public final class LauncherElementFrame extends MaterialCardView {
                 int dy = Math.round(event.getRawY() - downRawY);
                 if (resizeCorner != LauncherPanelResizeMath.Corner.NONE) {
                     View parent = (View) getParent();
-                    LauncherPanelResizeMath.Rect resized = LauncherPanelResizeMath.resize(
-                            resizeCorner,
+                    LauncherPanelResizeMath.Rect start =
                             new LauncherPanelResizeMath.Rect(
-                                    downX, downY, downX + downWidth, downY + downHeight),
-                            dx, dy, parent.getWidth(), parent.getHeight(),
-                            minimumWidthPx, minimumHeightPx, snapPx);
+                                    downX, downY, downX + downWidth, downY + downHeight);
+                    LauncherPanelResizeMath.Rect resized = preserveAspectRatio
+                            ? LauncherPanelResizeMath.resizeKeepingAspect(
+                                    resizeCorner, start, dx, dy,
+                                    parent.getWidth(), parent.getHeight(),
+                                    minimumWidthPx, minimumHeightPx, snapPx,
+                                    downWidth / (float) Math.max(1, downHeight))
+                            : LauncherPanelResizeMath.resize(
+                                    resizeCorner, start, dx, dy,
+                                    parent.getWidth(), parent.getHeight(),
+                                    minimumWidthPx, minimumHeightPx, snapPx);
                     lp.leftMargin = resized.left;
                     lp.topMargin = resized.top;
                     lp.width = resized.width();

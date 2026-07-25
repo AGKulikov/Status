@@ -26,6 +26,16 @@ public final class LauncherGlobalElementContractTest {
         assertTrue(activity.contains(
                 "Тащите любой элемент по всему HOME"));
         assertTrue(activity.contains("frame.setEditMode(false, snap)"));
+        assertTrue(activity.contains("showLauncherWidgetEditor"));
+        assertTrue(activity.contains("Сохранять пропорции"));
+        assertTrue(activity.contains("Поведение при нажатии"));
+        assertTrue(activity.contains("showLauncherWidgetCatalog"));
+        String proxy = read("launcher/LauncherGlobalElementProxyView.java");
+        assertTrue(proxy.contains("ScaleMode.STRETCH"));
+        assertTrue(proxy.contains("Math.min(widthScale, heightScale)"));
+        assertTrue(proxy.contains("configurationListener.onConfigure()"));
+        String media = read("launcher/media/MediaPanelView.java");
+        assertTrue(media.contains("ImageView.ScaleType.FIT_CENTER"));
     }
 
     @Test

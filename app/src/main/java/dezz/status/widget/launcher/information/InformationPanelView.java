@@ -11,7 +11,6 @@ import android.content.IntentFilter;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothProfile;
 import android.graphics.Color;
-import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -49,6 +48,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import dezz.status.widget.Fonts;
 import dezz.status.widget.WidgetService;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarTelemetryDescriptor;
@@ -346,9 +346,11 @@ public final class InformationPanelView extends FrameLayout {
         LauncherGlobalElementTag.attach(tile, LauncherLayoutStore.INFORMATION,
                 item.id, item.displayLabel());
         tile.setOrientation(LinearLayout.HORIZONTAL);
-        tile.setGravity(Gravity.CENTER_VERTICAL);
-        tile.setPadding(scaledDp(10, item.scalePercent), scaledDp(7, item.scalePercent),
-                scaledDp(10, item.scalePercent), scaledDp(7, item.scalePercent));
+        tile.setGravity(itemGravity(item.horizontalAlignment, item.verticalAlignment));
+        tile.setPadding(scaledDp(item.paddingLeftPx, item.scalePercent),
+                scaledDp(item.paddingTopPx, item.scalePercent),
+                scaledDp(item.paddingRightPx, item.scalePercent),
+                scaledDp(item.paddingBottomPx, item.scalePercent));
         tile.setClickable(false);
         tile.setLongClickable(false);
         tile.setFocusable(false);
@@ -373,14 +375,17 @@ public final class InformationPanelView extends FrameLayout {
 
         LinearLayout texts = new LinearLayout(getContext());
         texts.setOrientation(LinearLayout.VERTICAL);
-        texts.setGravity(Gravity.CENTER_VERTICAL);
-        TextView label = text(item.displayLabel(), scaledSp(11.5f, item.scalePercent),
-                color(item.labelColor, Color.LTGRAY), false);
+        texts.setGravity(itemGravity(item.horizontalAlignment, item.verticalAlignment));
+        TextView label = text(item.displayLabel(),
+                scaledSp(item.labelTextSizeSp, item.scalePercent),
+                color(item.labelColor, Color.LTGRAY), item);
         label.setSingleLine(true);
         label.setEllipsize(TextUtils.TruncateAt.END);
+        label.setGravity(itemGravity(item.horizontalAlignment, item.verticalAlignment));
         label.setVisibility(item.showLabel ? View.VISIBLE : View.GONE);
-        TextView value = text("—", scaledSp(20f, item.scalePercent),
-                color(item.valueColor, Color.WHITE), true);
+        TextView value = text("—", scaledSp(item.valueTextSizeSp, item.scalePercent),
+                color(item.valueColor, Color.WHITE), item);
+        value.setGravity(itemGravity(item.horizontalAlignment, item.verticalAlignment));
         // Smart-device states can carry a mode, value and availability explanation. Never cut
         // that status down to one line on HOME, the driver rail or Driver Favorites.
         value.setSingleLine(false);
@@ -677,8 +682,28 @@ public final class InformationPanelView extends FrameLayout {
         view.setText(value);
         view.setTextSize(size);
         view.setTextColor(color);
-        if (bold) view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        view.setTypeface(Fonts.resolve(getContext(), Fonts.DEFAULT_KEY, bold, false));
         return view;
+    }
+
+    @NonNull
+    private TextView text(@NonNull String value, float size, int color,
+                          @NonNull InformationPanelConfig.Item item) {
+        TextView view = new TextView(getContext());
+        view.setText(value);
+        view.setTextSize(size);
+        view.setTextColor(color);
+        view.setTypeface(Fonts.resolve(getContext(), item.fontFamily,
+                item.textBold, item.textItalic));
+        return view;
+    }
+
+    private static int itemGravity(int horizontalAlignment, int verticalAlignment) {
+        int horizontal = horizontalAlignment <= 0 ? Gravity.START
+                : horizontalAlignment == 1 ? Gravity.CENTER_HORIZONTAL : Gravity.END;
+        int vertical = verticalAlignment <= 0 ? Gravity.TOP
+                : verticalAlignment == 1 ? Gravity.CENTER_VERTICAL : Gravity.BOTTOM;
+        return horizontal | vertical;
     }
 
     private int scaledDp(int value, int scalePercent) {

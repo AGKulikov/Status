@@ -25,7 +25,7 @@ public final class DriverPanelPost1117ContractTest {
         assertTrue(climate.contains("drawBars(canvas, width * .12f"));
         assertTrue(climate.contains("drawAirflow("));
         assertFalse(climate.contains("drawFanGlyph"));
-        assertFalse(climate.contains("drawText(\"AUTO\""));
+        assertTrue(climate.contains("drawText(\"AUTO\""));
         assertTrue(climate.contains("AIRFLOW_WINDSHIELD"));
         assertTrue(climate.contains("AIRFLOW_FACE"));
         assertTrue(climate.contains("AIRFLOW_LEGS"));
@@ -62,6 +62,11 @@ public final class DriverPanelPost1117ContractTest {
                 "setFixedCellBackgroundColor(shortcut.backgroundColor)"));
         assertTrue(informationPanel.contains("fixedCellBackgroundColor"));
         assertTrue(driverSettings.contains("Показывать значок слева"));
+        assertTrue(driverSettings.contains(
+                "Текст, шрифт, выравнивание и отступы"));
+        assertTrue(shortcuts.contains("informationHorizontalAlignment"));
+        assertTrue(shortcuts.contains("informationPaddingLeftPx"));
+        assertTrue(information.contains("item.fontFamily"));
         assertTrue(favoriteSettings.contains("Закрывать панель после нажатия"));
         assertTrue(shortcuts.contains("closeFavoritePanelAfterAction = false"));
         assertTrue(shortcuts.contains(
@@ -69,6 +74,9 @@ public final class DriverPanelPost1117ContractTest {
         assertTrue(overlay.contains("if (shortcut.closeFavoritePanelAfterAction)"));
         assertTrue(overlay.contains(
                 "panelOnRight ? panelX - width : panelX + physicalWidth"));
+        assertTrue(overlay.contains("FLAG_WATCH_OUTSIDE_TOUCH"));
+        assertTrue(overlay.contains("MotionEvent.ACTION_OUTSIDE"));
+        assertTrue(overlay.contains("background.setCornerRadii(panelOnRight"));
     }
 
     @Test

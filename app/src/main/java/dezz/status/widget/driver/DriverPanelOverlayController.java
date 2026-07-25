@@ -20,6 +20,7 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
@@ -462,7 +463,15 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         display.getRealMetrics(metrics);
         Preferences.DriverPanelProfile profile = preferences.activeDriverPanelProfile();
         FrameLayout root = new FrameLayout(context);
-        root.setBackground(favoritePanelBackground(context, profile));
+        boolean panelOnRight = profile.side.get() == 1;
+        root.setBackground(favoritePanelBackground(context, profile, panelOnRight));
+        root.setClickable(true);
+        root.setOnTouchListener((view, event) -> {
+            if (event.getActionMasked() != MotionEvent.ACTION_OUTSIDE) return false;
+            manuallyOpenFavorites.remove(panelId);
+            dismissFavoritePanel(panelId);
+            return true;
+        });
 
         int padding = Math.max(6, config.gapPx);
         int desiredWidth = config.columns * config.cellSizePx
@@ -502,7 +511,6 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 anchor.getLocationOnScreen(location);
                 anchorCenterY = location[1] + Math.max(1, anchor.getHeight()) / 2;
             }
-            boolean panelOnRight = profile.side.get() == 1;
             int panelX = DriverPanelLayoutPolicy.panelWindowX(
                     metrics.widthPixels, physicalWidth, panelOnRight);
             // Always grow toward the screen content and meet the driver rail with a zero-pixel gap.
@@ -686,21 +694,24 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             scroll.setVerticalScrollBarEnabled(information.size() > 3);
             LinearLayout host = new LinearLayout(context);
             host.setOrientation(LinearLayout.VERTICAL);
+            int informationContentHeight = 0;
             for (LauncherShortcutStore.Shortcut shortcut : information) {
                 View tile = shortcutButton(context, shortcut, false);
+                int tileHeight = informationTileHeight(context, shortcut);
+                int tileGap = Math.max(0,
+                        shortcut.gapAfterPx < 0 ? gap : shortcut.gapAfterPx);
                 LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, dp(context, 64));
-                tileParams.setMargins(4, 0, 4,
-                        Math.max(0, shortcut.gapAfterPx < 0 ? gap : shortcut.gapAfterPx));
+                        ViewGroup.LayoutParams.MATCH_PARENT, tileHeight);
+                tileParams.setMargins(4, 0, 4, tileGap);
                 host.addView(tile, tileParams);
+                informationContentHeight += tileHeight + tileGap;
             }
             scroll.addView(host, new ScrollView.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             int maximumInfoHeight = controls.isEmpty()
                     ? availableHeight : Math.max(dp(context, 64),
                     Math.round(availableHeight * .40f));
-            int infoHeight = Math.min(maximumInfoHeight,
-                    information.size() * (dp(context, 64) + gap));
+            int infoHeight = Math.min(maximumInfoHeight, informationContentHeight);
             root.addView(scroll, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, infoHeight)));
         }
@@ -753,6 +764,18 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         }
     }
 
+    private static int informationTileHeight(
+            @NonNull Context context,
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        float scaledDensity = context.getResources().getDisplayMetrics().scaledDensity;
+        int text = Math.round((shortcut.informationValueTextSizeSp
+                + (shortcut.showTitle ? shortcut.informationLabelTextSizeSp : 0))
+                * scaledDensity);
+        int padding = dp(context, shortcut.informationPaddingTopPx
+                + shortcut.informationPaddingBottomPx);
+        return Math.max(dp(context, 48), text + padding + dp(context, 8));
+    }
+
     @NonNull
     private View shortcutButton(@NonNull Context context,
                                 @NonNull LauncherShortcutStore.Shortcut shortcut,
@@ -790,7 +813,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         @Nullable ImageView stateIcon = null;
         if (stockClimate) {
             icon = new DriverClimateShortcutView(context, CarIntegrations.get(appContext),
-                    shortcut.iconColor, shortcut.extendedClimateInfo);
+                    shortcut.iconColor, true);
         } else {
             ImageView image = new ImageView(context);
             image.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -906,11 +929,17 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     @NonNull
     private GradientDrawable favoritePanelBackground(
             @NonNull Context context,
-            @NonNull Preferences.DriverPanelProfile profile) {
+            @NonNull Preferences.DriverPanelProfile profile,
+            boolean panelOnRight) {
         GradientDrawable background = new GradientDrawable();
         background.setColor(safeOpaqueColor(profile.backgroundColor.get(),
                 Color.rgb(19, 23, 28)));
-        background.setCornerRadius(Math.max(dp(context, 20), profile.cornerRadiusPx.get()));
+        float radius = Math.max(dp(context, 20), profile.cornerRadiusPx.get());
+        // The edge that touches the rail is square, so Favorites reads as a continuation of the
+        // same driver panel. Only the outer free edge keeps the user-selected rounding.
+        background.setCornerRadii(panelOnRight
+                ? new float[]{radius, radius, 0f, 0f, 0f, 0f, radius, radius}
+                : new float[]{0f, 0f, radius, radius, radius, radius, 0f, 0f});
         return background;
     }
 
@@ -926,6 +955,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 screenWidth, referenceWidth);
         int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                 | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
                 | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                 | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
                 | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
