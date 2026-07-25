@@ -7,8 +7,6 @@ package dezz.status.widget;
 
 import android.content.ComponentName;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
@@ -40,11 +38,10 @@ import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
-import dezz.status.widget.launcher.HighResolutionAppIconLoader;
+import dezz.status.widget.launcher.InstalledAppCatalog;
 import dezz.status.widget.launcher.LauncherActionsGridConfig;
 import dezz.status.widget.launcher.LauncherActionsGridConfigStore;
 import dezz.status.widget.launcher.LauncherIconResolver;
@@ -1411,16 +1408,12 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
 
     @NonNull
     private List<AppChoice> queryApplications() {
-        PackageManager manager = getPackageManager();
-        Intent query = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
         List<AppChoice> values = new ArrayList<>();
-        for (ResolveInfo info : manager.queryIntentActivities(query, 0)) {
-            if (info.activityInfo == null) continue;
-            values.add(new AppChoice(String.valueOf(info.loadLabel(manager)),
-                    new ComponentName(info.activityInfo.packageName, info.activityInfo.name),
-                    HighResolutionAppIconLoader.load(this, info.activityInfo)));
+        for (InstalledAppCatalog.App app : InstalledAppCatalog.load(this)) {
+            if (!app.launchable() || app.component == null) continue;
+            values.add(new AppChoice(app.label, app.component,
+                    InstalledAppCatalog.loadIcon(this, app), app.system));
         }
-        values.sort(Comparator.comparing(value -> value.label.toLowerCase(Locale.ROOT)));
         return values;
     }
 
@@ -1567,7 +1560,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
             icon.setImageDrawable(app.icon);
             cell.addView(icon, new LinearLayout.LayoutParams(dp(54), dp(54)));
             TextView label = text(12, false);
-            label.setText(app.label);
+            label.setText(app.system ? app.label + "\nСистемное" : app.label);
             label.setGravity(Gravity.CENTER);
             label.setMaxLines(2);
             cell.addView(label, new LinearLayout.LayoutParams(match(), dp(38)));
@@ -1579,8 +1572,13 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         final String label;
         final ComponentName component;
         final android.graphics.drawable.Drawable icon;
-        AppChoice(String label, ComponentName component, android.graphics.drawable.Drawable icon) {
-            this.label = label; this.component = component; this.icon = icon;
+        final boolean system;
+        AppChoice(String label, ComponentName component,
+                  android.graphics.drawable.Drawable icon, boolean system) {
+            this.label = label;
+            this.component = component;
+            this.icon = icon;
+            this.system = system;
         }
     }
 
