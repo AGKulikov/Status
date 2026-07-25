@@ -40,6 +40,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import dezz.status.widget.R;
+import dezz.status.widget.launcher.LauncherGlobalElementTag;
+import dezz.status.widget.launcher.LauncherLayoutStore;
 import dezz.status.widget.launcher.LauncherMediaController;
 import dezz.status.widget.launcher.MediaTimeline;
 import dezz.status.widget.launcher.panels.PanelContentResizeMath;
@@ -77,6 +79,7 @@ public final class MediaPanelView extends FrameLayout {
     private MediaPanelConfig config;
     private MediaElementGridLayout grid;
     @Nullable private LayoutEditor layoutEditor;
+    private boolean globalEditPreview;
     private ImageView artwork;
     private TextView title;
     private TextView artist;
@@ -151,6 +154,13 @@ public final class MediaPanelView extends FrameLayout {
         rebuild();
     }
 
+    /** Keeps every configured live element measurable while the screen-wide HOME editor is on. */
+    public void setGlobalEditPreview(boolean enabled) {
+        if (globalEditPreview == enabled) return;
+        globalEditPreview = enabled;
+        applySnapshot();
+    }
+
     @NonNull
     public MediaPanelConfig currentConfig() {
         return config.copy();
@@ -222,6 +232,8 @@ public final class MediaPanelView extends FrameLayout {
             MediaPanelConfig.Spec spec = MediaPanelConfig.spec(element.id);
             if (spec == null) continue;
             View view = buildElement(element, spec);
+            LauncherGlobalElementTag.attach(view, LauncherLayoutStore.MEDIA,
+                    element.id, spec.label);
             elementViews.put(element.id, view);
             if (layoutEditor != null) attachEditorDrag(view, element.id);
             grid.addView(view, elementLayout(element));
@@ -456,17 +468,20 @@ public final class MediaPanelView extends FrameLayout {
         if (artist != null) {
             applyMediaText(artist, artistValue,
                     config.element(MediaPanelConfig.ARTIST).marqueeEnabled);
-            setVisibilityIfChanged(artist, artistValue.isEmpty() ? View.GONE : View.VISIBLE);
+            setVisibilityIfChanged(artist, globalEditPreview || !artistValue.isEmpty()
+                    ? View.VISIBLE : View.GONE);
         }
         if (album != null) {
             applyMediaText(album, albumValue,
                     config.element(MediaPanelConfig.ALBUM).marqueeEnabled);
-            setVisibilityIfChanged(album, albumValue.isEmpty() ? View.GONE : View.VISIBLE);
+            setVisibilityIfChanged(album, globalEditPreview || !albumValue.isEmpty()
+                    ? View.VISIBLE : View.GONE);
         }
         if (application != null) {
             setTextIfChanged(application, applicationValue);
             setVisibilityIfChanged(application,
-                    applicationValue.isEmpty() ? View.GONE : View.VISIBLE);
+                    globalEditPreview || !applicationValue.isEmpty()
+                            ? View.VISIBLE : View.GONE);
         }
         if (artwork != null) {
             applyArtwork();
@@ -484,7 +499,8 @@ public final class MediaPanelView extends FrameLayout {
             View progressRoot = elementViews.get(MediaPanelConfig.PROGRESS);
             if (progressRoot != null) {
                 setVisibilityIfChanged(progressRoot,
-                        durationMs > 0L ? View.VISIBLE : View.GONE);
+                        globalEditPreview || durationMs > 0L
+                                ? View.VISIBLE : View.GONE);
             }
         }
         updateVolumeUi();
