@@ -129,6 +129,24 @@ public final class DriverPanelHa1084ContractTest {
         assertTrue(intentRules.contains("DriverPanelService.apply(this)"));
     }
 
+    @Test
+    public void serviceStartCannotBypassPermissionPausedOverlayRetry() throws Exception {
+        String service = read(widgetRoot().resolve("WidgetService.java"));
+
+        int onStart = service.indexOf("public int onStartCommand");
+        int create = service.indexOf("private void createOverlayView()", onStart);
+        assertTrue(onStart >= 0 && create > onStart);
+        String onStartBody = service.substring(onStart, create);
+        assertTrue(onStartBody.contains("&& !overlayAttachRetryScheduled\\n"
+                + "                && Permissions.allPermissionsGranted(this)"));
+
+        int createGuardEnd = service.indexOf("// Create the overlay view", create);
+        assertTrue(createGuardEnd > create);
+        String createGuard = service.substring(create, createGuardEnd);
+        assertTrue(createGuard.contains("|| overlayAttachRetryScheduled\\n"
+                + "                || !Permissions.allPermissionsGranted(this)) return;"));
+    }
+
     private static Path widgetRoot() {
         Path fromRoot = Paths.get("app", "src", "main", "java", "dezz", "status", "widget");
         return Files.isDirectory(fromRoot)
