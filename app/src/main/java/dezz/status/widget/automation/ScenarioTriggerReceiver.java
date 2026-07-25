@@ -49,8 +49,9 @@ public final class ScenarioTriggerReceiver extends BroadcastReceiver {
         }
 
         Preferences preferences = new Preferences(context);
-        if (!preferences.widgetEnabled.get()) {
-            Log.i(TAG, "Ignored trigger while the widget service is disabled");
+        if (!preferences.widgetEnabled.get()
+                && !preferences.driverPanelEnabled.get()) {
+            Log.i(TAG, "Ignored trigger while every integration surface is disabled");
             return;
         }
 
