@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 40915)
+Total output lines: 3453
+
 /*
  * Copyright © 2025-2026 Dezz (https://github.com/DezzK)
  *
@@ -43,6 +46,7 @@ import com.ecarx.xui.adaptapi.car.vehicle.IVehicle;
 import com.ecarx.xui.adaptapi.tpms.ITireState;
 import com.ecarx.xui.adaptapi.tpms.TPMS;
 import com.ecarx.xui.adaptapi.vehicle.VehicleSeat;
+import com.ecarx.xui.adaptapi.vehicle.VehicleZone;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -121,8 +125,9 @@ final class GeelyCarIntegration implements CarIntegration {
     private static final long CONTROL_PULSE_RETRY_MS = 200L;
     private static final int NO_ZONE = Integer.MIN_VALUE;
     private static final String FAN_CONTROL_ID = "climate.fan";
+    private static final String AIRFLOW_CONTROL_ID = "climate.airflow";
     /** ECARX front-row aggregate zone used by both manual and AUTO fan functions. */
-    private static final int FRONT_FAN_ZONE = 8;
+    private static final int FRONT_FAN_ZONE = VehicleZone.ZONE_ROW_1_ALL;
     /**
      * A short Binder failure may hide the AUTO bit while the ECU is still in AUTO. Reuse only a
      * recent confirmed mode; after this window an unresolved mode is UNKNOWN and no fan write is
@@ -622,11 +627,46 @@ final class GeelyCarIntegration implements CarIntegration {
 
     private static List<CarControlDescriptor.Option> fanOptions() {
         return Arrays.asList(option(IHvac.FAN_SPEED_OFF, "Выкл"),
-                option(IHvac.FAN_SPEED_LEVEL_1, "1"), option(IHvac.FAN_SPEED_LEVEL_2, "2"),
-                option(IHvac.FAN_SPEED_LEVEL_3, "3"), option(IHvac.FAN_SPEED_LEVEL_4, "4"),
-                option(IHvac.FAN_SPEED_LEVEL_5, "5"), option(IHvac.FAN_SPEED_LEVEL_6, "6"),
-                option(IHvac.FAN_SPEED_LEVEL_7, "7"), option(IHvac.FAN_SPEED_LEVEL_8, "8"),
-                option(IHvac.FAN_SPEED_LEVEL_9, "9"));
+                option(IHvac.FAN_SPEED_LEVEL_1, "1"),
+                option(IHvac.FAN_SPEED_LEVEL_3, "2"),
+                option(IHvac.FAN_SPEED_LEVEL_5, "3"),
+                option(IHvac.FAN_SPEED_LEVEL_7, "4"),
+                option(IHvac.FAN_SPEED_LEVEL_9, "5"));
+    }
+
+    /** Five evenly spaced UI positions over the exact ECARX manual raw range 1..9. */
+    static int manualFanDisplayLevel(int rawValue) {
+        if (rawValue < IHvac.FAN_SPEED_LEVEL_1 || rawValue > IHvac.FAN_SPEED_LEVEL_9) return 0;
+        int rawLevel = rawValue - IHvac.FAN_SPEED_LEVEL_1 + 1;
+        return Math.min(5, (rawLevel + 1) / 2);
+    }
+
+    static int manualFanValueForDisplayLevel(int displayLevel) {
+        switch (displayLevel) {
+            case 1: return IHvac.FAN_SPEED_LEVEL_1;
+            case 2: return IHvac.FAN_SPEED_LEVEL_3;
+            case 3: return IHvac.FAN_SPEED_LEVEL_5;
+            case 4: return IHvac.FAN_SPEED_LEVEL_7;
+            case 5: return IHvac.FAN_SPEED_LEVEL_9;
+            default: return IHvac.FAN_SPEED_OFF;
+        }
+    }
+
+    /**
+     * The seven manual outlet combinations exposed by ECARX
+     * {@link IHvac#HVAC_FUNC_BLOWING_MODE}. The SDK's Hvac implementation maps them to PA raw
+     * positions 1, 0, 4, 2, 5, 3 and 6 respectively; clients must use these public values rather
+     * than guessing the raw vehicle-property ordinals.
+     */
+    static List<CarControlDescriptor.Option> airflowDirectionOptions() {
+        return Arrays.asList(
+                option(IHvac.BLOWING_MODE_FACE, "Лицо"),
+                option(IHvac.BLOWING_MODE_LEG, "Ноги"),
+                option(IHvac.BLOWING_MODE_FACE_AND_LEG, "Лицо + ноги"),
+                option(IHvac.BLOWING_MODE_FRONT_WINDOW, "Стекло"),
+                option(IHvac.BLOWING_MODE_FACE_AND_FRONT_WINDOW, "Лицо + стекло"),
+                option(IHvac.BLOWING_MODE_LEG_AND_FRONT_WINDOW, "Ноги + стекло"),
+                option(IHvac.BLOWING_ALL, "Лицо + ноги + стекло"));
     }
 
     /**
@@ -673,7 +713,7 @@ final class GeelyCarIntegration implements CarIntegration {
     private static final ControlDefinition FAN_DEFINITION =
             new ControlDefinition(FAN_CONTROL_ID, "Скорость вентилятора", "Климат", "fan",
                     CarControlDescriptor.Kind.LEVELS, IHvac.HVAC_FUNC_FAN_SPEED,
-                    FRONT_FAN_ZONE, false, fanOptions(), 0, 9, 1, "", "#FF42A5F5");
+                    FRONT_FAN_ZONE, false, fanOptions(), 0, 5, 1, "", "#FF42A5F5");
 
     private static final ControlDefinition AUTO_FAN_DEFINITION =
             new ControlDefinition(FAN_CONTROL_ID, "Скорость вентилятора AUTO", "Климат", "fan",
@@ -719,6 +759,10 @@ final class GeelyCarIntegration implements CarIntegration {
                     IHvac.HVAC_FUNC_STEERING_WHEEL_HEAT, NO_ZONE, false,
                     wheelHeatOptions(), 0, 3, 1, "", "#FFFF9800"),
             FAN_DEFINITION,
+            new ControlDefinition(AIRFLOW_CONTROL_ID, "Направление обдува", "Климат",
+                    "airflow", CarControlDescriptor.Kind.OPTIONS,
+                    IHvac.HVAC_FUNC_BLOWING_MODE, FRONT_FAN_ZONE, false,
+                    airflowDirectionOptions(), 0, 0, 0, "", "#FF42A5F5"),
             new ControlDefinition("climate.temp_driver", "Температура водителя", "Климат",
                     "temperature", CarControlDescriptor.Kind.RANGE, IHvac.HVAC_FUNC_TEMP,
                     VehicleSeat.SEAT_ROW_1_LEFT, true, Collections.emptyList(),
@@ -1144,969 +1188,7 @@ final class GeelyCarIntegration implements CarIntegration {
         if (sensorType == 0) return false;
         FunctionStatus status = sensorSupportStatus(sensorType);
         // "notactive" still counts as supported: the sensor exists but is momentarily idle
-        // (e.g. ignition state) — the brick should be offered and will update when it wakes.
-        // "error" is what the SDK reports before its platform service has connected; the
-        // availability poll below re-checks and notifies once the true answer is known.
-        boolean supported = isSupported(status);
-        if (!supported && status == FunctionStatus.error) {
-            requestSensorRecovery(sensorType);
-        } else if (status == null) {
-            requestSensorRecovery(sensorType);
-        }
-        return supported;
-    }
-
-    @Override
-    public void setAvailabilityChangedListener(@Nullable Runnable listener) {
-        availabilityChangedListener = listener;
-        if (listener == null) mainHandler.post(this::pruneRecoveryRequests);
-    }
-
-    private void requestSensorRecovery(int sensorType) {
-        mainHandler.post(() -> {
-            if (!isSensorRecoveryDemanded(sensorType)) return;
-            recoverySensorTypes.add(sensorType);
-            startAvailabilityRecoveryCycle();
-        });
-    }
-
-    private void requestFuelCapacityRecovery() {
-        mainHandler.post(() -> {
-            if (!isMetricRecoveryDemanded(FUEL_CAPACITY_ID)) return;
-            recoveryFuelCapacity = true;
-            startAvailabilityRecoveryCycle();
-        });
-    }
-
-    private void startAvailabilityRecoveryCycle() {
-        scheduleAvailabilityPoll();
-    }
-
-    /** Called on main after a real value proves that this vendor path is healthy again. */
-    private void markTelemetryRecovered(String metricId) {
-        if (FUEL_CAPACITY_ID.equals(metricId)) {
-            recoveryFuelCapacity = false;
-        } else {
-            for (TelemetrySignal signal : TELEMETRY_SIGNALS) {
-                if (signal.id.equals(metricId)) {
-                    markSensorRecovered(signal.sensorType);
-                    break;
-                }
-            }
-        }
-        if (recoverySensorTypes.isEmpty() && !recoveryFuelCapacity
-                && !availabilityPollScheduled) {
-            availabilityPollAttempts = 0;
-        }
-    }
-
-    private void markSensorRecovered(int sensorType) {
-        recoverySensorTypes.remove(sensorType);
-        if (recoverySensorTypes.isEmpty() && !recoveryFuelCapacity
-                && !availabilityPollScheduled) {
-            availabilityPollAttempts = 0;
-        }
-    }
-
-    /**
-     * Exact-probe loop for paths which actually failed. Boot gets quick probes for one minute;
-     * unresolved paths then continue at a low frequency for the lifetime of the request. This is
-     * deliberate: an ignition/Binder service can appear much later than Android startup.
-     */
-    private void scheduleAvailabilityPoll() {
-        if (availabilityPollScheduled
-                || (recoverySensorTypes.isEmpty() && !recoveryFuelCapacity)) {
-            return;
-        }
-        availabilityPollScheduled = true;
-        long delay = availabilityPollDelayMillis(availabilityPollAttempts);
-        mainHandler.postDelayed(availabilityPollTask, delay);
-    }
-
-    private void runAvailabilityPoll() {
-        availabilityPollScheduled = false;
-        pruneRecoveryRequests();
-        if (recoverySensorTypes.isEmpty() && !recoveryFuelCapacity) return;
-        boolean slowProbe = availabilityPollAttempts >= AVAILABILITY_FAST_POLL_ATTEMPTS;
-        if (slowProbe) {
-            // A non-null proxy may belong to a service process which died. Force the slow
-            // health probe through newly resolved managers instead of trusting that proxy.
-            if (recoverySensorTypes.isEmpty()) {
-                invalidateCarInfoProxy();
-            } else {
-                invalidateCarServices();
-            }
-        }
-        if (availabilityPollAttempts < AVAILABILITY_FAST_POLL_ATTEMPTS) {
-            availabilityPollAttempts++;
-        }
-        boolean recovered = false;
-        for (Integer sensorType : new ArrayList<>(recoverySensorTypes)) {
-            FunctionStatus status = sensorSupportStatus(sensorType);
-            if (isDefinitive(status)) {
-                recoverySensorTypes.remove(sensorType);
-                recovered = true;
-            }
-        }
-        if (recoveryFuelCapacity && isDefinitive(fuelCapacitySupportStatus())) {
-            recoveryFuelCapacity = false;
-            recovered = true;
-        }
-        if (recovered && availabilityChangedListener != null) {
-            availabilityChangedListener.run();
-        }
-        if (!recoverySensorTypes.isEmpty() || recoveryFuelCapacity) {
-            scheduleAvailabilityPoll();
-        } else {
-            availabilityPollAttempts = 0;
-        }
-    }
-
-    /** Remove failed paths after their last brick/export subscription disappears. */
-    private void pruneRecoveryRequests() {
-        for (Integer sensorType : new ArrayList<>(recoverySensorTypes)) {
-            if (!isSensorRecoveryDemanded(sensorType)) recoverySensorTypes.remove(sensorType);
-        }
-        if (recoveryFuelCapacity && !isMetricRecoveryDemanded(FUEL_CAPACITY_ID)) {
-            recoveryFuelCapacity = false;
-        }
-        if (recoverySensorTypes.isEmpty() && !recoveryFuelCapacity) {
-            mainHandler.removeCallbacks(availabilityPollTask);
-            availabilityPollScheduled = false;
-            availabilityPollAttempts = 0;
-        }
-    }
-
-    private boolean isSensorRecoveryDemanded(int sensorType) {
-        for (BrickType type : requestedBrickTypes) {
-            if (sensorTypeFor(type) == sensorType) return true;
-        }
-        for (TelemetrySignal signal : TELEMETRY_SIGNALS) {
-            if (signal.sensorType == sensorType) return isMetricRecoveryDemanded(signal.id);
-        }
-        return false;
-    }
-
-    private boolean isMetricRecoveryDemanded(String metricId) {
-        synchronized (telemetryLock) {
-            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
-                if (!subscription.cancelled.get() && subscription.metricIds.contains(metricId)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /** Package-visible so the long-term recovery policy is covered without Android/Binder mocks. */
-    static long availabilityPollDelayMillis(int completedFastAttempts) {
-        return completedFastAttempts < AVAILABILITY_FAST_POLL_ATTEMPTS
-                ? AVAILABILITY_FAST_POLL_INTERVAL_MS : AVAILABILITY_SLOW_POLL_INTERVAL_MS;
-    }
-
-    @Override
-    public void subscribe(@NonNull BrickType type, @NonNull ValueListener listener) {
-        int sensorType = sensorTypeFor(type);
-        if (sensorType == 0) return;
-        requestedBrickTypes.add(type);
-        ISensor s = ensureSensors();
-        if (s == null) {
-            requestSensorRecovery(sensorType);
-            return;
-        }
-
-        Subscription previous = subscriptions.get(type);
-
-        // The listener closes over its own cancellation flag (not a map lookup — the vendor
-        // callback arrives on a binder thread and the map is main-thread-only). The gate drops
-        // deliveries already queued to the main handler when unsubscribe() wins the race —
-        // otherwise a stale reading would overwrite the placeholder reset and resurface when
-        // the brick is re-added later.
-        final AtomicBoolean cancelled = new AtomicBoolean(false);
-        Subscription subscription = new Subscription(s, new ISensor.ISensorListener() {
-            @Override
-            public void onSensorEventChanged(int changedType, int value) {
-            }
-
-            @Override
-            public void onSensorSupportChanged(int changedType, FunctionStatus status) {
-                long expectedOutdoorEpoch = type == BrickType.OUTDOOR_TEMP
-                        ? outdoorTemperatureFilter.epoch() : 0L;
-                if (changedType != sensorType || cancelled.get()) return;
-                if (isSupported(status)) {
-                    mainHandler.post(() -> emitInitialBrickValue(
-                            s, sensorType, type, listener, cancelled));
-                } else {
-                    if (type == BrickType.OUTDOOR_TEMP
-                            && status == FunctionStatus.notavailable) {
-                        resetOutdoorTemperatureIfCurrentSource(s, expectedOutdoorEpoch);
-                    }
-                    if (status == null || status == FunctionStatus.error) {
-                        requestSensorRecovery(sensorType);
-                    }
-                }
-            }
-
-            @Override
-            public void onSensorValueChanged(int changedType, float value) {
-                long expectedOutdoorEpoch = type == BrickType.OUTDOOR_TEMP
-                        ? outdoorTemperatureFilter.epoch() : 0L;
-                if (cancelled.get() || changedType != sensorType
-                        || !isPlausibleTemperature(value)
-                        || !isSensorCurrentlySupported(
-                                s, sensorType, type, expectedOutdoorEpoch)) return;
-                // Capture arrival time on the Binder callback thread. If the HU main thread is
-                // busy, several genuinely one-second-apart readings may be drained together;
-                // timing them inside the posted runnable would falsely collapse that whole batch
-                // into one sample.
-                long observedElapsedMillis = SystemClock.elapsedRealtime();
-                // The filter is integration-scoped and thread-safe. Accept the live sample before
-                // posting UI delivery: applyPreferences may replace/cancel this listener while
-                // the main queue is busy, but that harmless rebind must not discard a genuine
-                // current-session reading from the rolling window.
-                float filteredValue = filterBrickTemperature(
-                        type, value, observedElapsedMillis, expectedOutdoorEpoch, s);
-                if (!Float.isFinite(filteredValue)) return;
-                // AdaptAPI delivers on a binder thread; the contract is main-thread delivery.
-                mainHandler.post(() -> {
-                    if (cancelled.get()
-                            || (type == BrickType.OUTDOOR_TEMP
-                            && !isOutdoorTemperatureSourceCurrent(
-                                    s, expectedOutdoorEpoch))) return;
-                    markSensorRecovered(sensorType);
-                    listener.onValue(type, filteredValue);
-                });
-            }
-        }, cancelled);
-
-        // Register the replacement BEFORE dropping the old listener: if the vendor side
-        // transiently rejects the registration we keep the previous, still-working
-        // subscription instead of silently freezing the brick.
-        if (type == BrickType.OUTDOOR_TEMP) {
-            beginOutdoorTemperatureSourceRegistration(s);
-        }
-        try {
-            if (!s.registerListener(subscription.sensorListener, sensorType)) {
-                cancelled.set(true);
-                if (type == BrickType.OUTDOOR_TEMP) {
-                    cancelOutdoorTemperatureSourceRegistration(s);
-                }
-                Log.w(TAG, "registerListener rejected for " + type
-                        + (previous != null ? " — keeping previous subscription" : ""));
-                requestSensorRecovery(sensorType);
-                return;
-            }
-        } catch (Throwable t) {
-            cancelled.set(true);
-            if (type == BrickType.OUTDOOR_TEMP) {
-                cancelOutdoorTemperatureSourceRegistration(s);
-            }
-            invalidateSensorProxy(s);
-            Log.w(TAG, "registerListener failed for " + type
-                    + (previous != null ? " — keeping previous subscription" : ""), t);
-            requestSensorRecovery(sensorType);
-            return;
-        }
-        OutdoorSourceActivation outdoorActivation = type == BrickType.OUTDOOR_TEMP
-                ? activateOutdoorTemperatureSource(s) : null;
-        if (previous != null) {
-            previous.cancelled.set(true);
-            try {
-                previous.registrationSource.unregisterListener(previous.sensorListener);
-            } catch (Throwable t) {
-                Log.w(TAG, "unregisterListener (replace) failed for " + type, t);
-            }
-        }
-        subscriptions.put(type, subscription);
-
-        if (outdoorActivation != null && outdoorActivation.replayedSynchronousSample) {
-            // A few AdaptAPI implementations invoke the listener from inside registerListener().
-            // That sample was buffered until registration succeeded; deliver the current median
-            // directly instead of depending on the vendor cache also being valid.
-            mainHandler.post(() -> {
-                if (cancelled.get()) return;
-                float replayed = outdoorTemperatureMedianIfCurrentSource(
-                        s, outdoorActivation.epoch);
-                if (!Float.isFinite(replayed)) return;
-                markSensorRecovered(sensorType);
-                listener.onValue(type, replayed);
-            });
-            return;
-        }
-
-        // Read the vendor cache to recover indoor temperature immediately and to confirm sensor
-        // health. Outdoor smoothing deliberately does not seed a new session from this value:
-        // after HU boot getSensorLatestValue() may still belong to the previous ignition cycle.
-        emitInitialBrickValue(s, sensorType, type, listener, cancelled);
-    }
-
-    private void emitInitialBrickValue(ISensor source, int sensorType, BrickType type,
-                                       ValueListener listener, AtomicBoolean cancelled) {
-        long expectedOutdoorEpoch = type == BrickType.OUTDOOR_TEMP
-                ? outdoorTemperatureFilter.epoch() : 0L;
-        if (cancelled.get()) return;
-        FunctionStatus status = sensorSupportStatus(source, sensorType);
-        if (!isSupported(status)) {
-            if (type == BrickType.OUTDOOR_TEMP
-                    && status == FunctionStatus.notavailable) {
-                // Some OEM builds never emit onSensorSupportChanged. A definitive unavailable
-                // result from the synchronous rebind probe is still a real session boundary and
-                // must prevent the previous live window from resurfacing after recovery.
-                resetOutdoorTemperatureIfCurrentSource(source, expectedOutdoorEpoch);
-            }
-            if (status == null || status == FunctionStatus.error) {
-                requestSensorRecovery(sensorType);
-            }
-            return;
-        }
-        try {
-            float latest = source.getSensorLatestValue(sensorType);
-            if (isPlausibleTemperature(latest)) {
-                final float initialValue;
-                if (type == BrickType.OUTDOOR_TEMP) {
-                    // An ordinary listener replacement may reuse the already-current live window,
-                    // but an empty window waits for the first new onSensorValueChanged packet.
-                    // Thus startup averages contain exactly the 1..15 fresh samples received in
-                    // this sensor session, never a cached value from the previous drive.
-                    initialValue = outdoorTemperatureMedianIfCurrentSource(
-                            source, expectedOutdoorEpoch);
-                    if (!Float.isFinite(initialValue)) {
-                        mainHandler.post(() -> {
-                            if (!cancelled.get()
-                                    && isOutdoorTemperatureSourceCurrent(
-                                            source, expectedOutdoorEpoch)) {
-                                markSensorRecovered(sensorType);
-                            }
-                        });
-                        return;
-                    }
-                } else {
-                    initialValue = latest;
-                }
-                mainHandler.post(() -> {
-                    if (!cancelled.get()
-                            && (type != BrickType.OUTDOOR_TEMP
-                            || isOutdoorTemperatureSourceCurrent(
-                                    source, expectedOutdoorEpoch))) {
-                        markSensorRecovered(sensorType);
-                        listener.onValue(type, initialValue);
-                    }
-                });
-            } else if (isObviousFloatSentinel(latest)) {
-                requestSensorRecovery(sensorType);
-            }
-        } catch (Throwable t) {
-            invalidateSensorProxy(source);
-            Log.w(TAG, "getSensorLatestValue failed for " + type, t);
-            requestSensorRecovery(sensorType);
-        }
-    }
-
-    /** Temperature brick events are infrequent; re-check support before exposing a value. */
-    private boolean isSensorCurrentlySupported(ISensor source, int sensorType, BrickType type,
-                                               long expectedOutdoorEpoch) {
-        FunctionStatus status = sensorSupportStatus(source, sensorType);
-        if (status == null || status == FunctionStatus.error) {
-            requestSensorRecovery(sensorType);
-        } else if (type == BrickType.OUTDOOR_TEMP
-                && status == FunctionStatus.notavailable) {
-            resetOutdoorTemperatureIfCurrentSource(source, expectedOutdoorEpoch);
-        }
-        return isSupported(status);
-    }
-
-    /**
-     * Apply smoothing only to the built-in outside-temperature brick. The independent
-     * {@code ISensor.ambient_temp} telemetry stream intentionally remains raw so its subscribers
-     * cannot add samples to, throttle, or reset the widget's rolling window.
-     */
-    private float filterBrickTemperature(@NonNull BrickType type, float value,
-                                         long observedElapsedMillis, long expectedOutdoorEpoch,
-                                         @NonNull ISensor source) {
-        if (type != BrickType.OUTDOOR_TEMP) return value;
-        return offerOutdoorTemperatureIfCurrentSource(
-                value, observedElapsedMillis, expectedOutdoorEpoch, source);
-    }
-
-    /**
-     * Source identity and filter epoch form one atomic ownership check. Lock order is always this
-     * integration first and the rolling filter second, matching {@link #invalidateSensorProxy}.
-     */
-    private synchronized float offerOutdoorTemperatureIfCurrentSource(
-            float value, long observedElapsedMillis, long expectedEpoch,
-            @NonNull ISensor source) {
-        if (outdoorBrickSource != source) {
-            if (pendingOutdoorBrickSource == source) {
-                pendingOutdoorSample = value;
-                pendingOutdoorSampleElapsedMillis = observedElapsedMillis;
-                hasPendingOutdoorSample = true;
-            }
-            return Float.NaN;
-        }
-        return outdoorTemperatureFilter.offerIfEpoch(
-                value, observedElapsedMillis, expectedEpoch);
-    }
-
-    private synchronized float outdoorTemperatureMedianIfCurrentSource(
-            @NonNull ISensor source, long expectedEpoch) {
-        if (outdoorBrickSource != source
-                || outdoorTemperatureFilter.epoch() != expectedEpoch) {
-            return Float.NaN;
-        }
-        return outdoorTemperatureFilter.median();
-    }
-
-    private synchronized boolean isOutdoorTemperatureSourceCurrent(
-            @NonNull ISensor source, long expectedEpoch) {
-        return outdoorBrickSource == source
-                && outdoorTemperatureFilter.epoch() == expectedEpoch;
-    }
-
-    private synchronized void resetOutdoorTemperatureIfCurrentSource(
-            @NonNull ISensor source, long expectedEpoch) {
-        if (outdoorBrickSource == source) {
-            outdoorTemperatureFilter.resetIfEpoch(expectedEpoch);
-        }
-    }
-
-    @NonNull
-    private synchronized OutdoorSourceActivation activateOutdoorTemperatureSource(
-            @NonNull ISensor source) {
-        if (outdoorBrickSource != source) {
-            outdoorBrickSource = source;
-            outdoorTemperatureFilter.reset();
-        }
-        boolean replayed = false;
-        if (pendingOutdoorBrickSource == source) {
-            if (hasPendingOutdoorSample) {
-                outdoorTemperatureFilter.offer(
-                        pendingOutdoorSample, pendingOutdoorSampleElapsedMillis);
-                replayed = true;
-            }
-            clearPendingOutdoorTemperatureSource();
-        }
-        return new OutdoorSourceActivation(outdoorTemperatureFilter.epoch(), replayed);
-    }
-
-    private synchronized void beginOutdoorTemperatureSourceRegistration(
-            @NonNull ISensor source) {
-        clearPendingOutdoorTemperatureSource();
-        if (outdoorBrickSource != source) pendingOutdoorBrickSource = source;
-    }
-
-    private synchronized void cancelOutdoorTemperatureSourceRegistration(
-            @NonNull ISensor source) {
-        if (pendingOutdoorBrickSource == source) clearPendingOutdoorTemperatureSource();
-    }
-
-    private void clearPendingOutdoorTemperatureSource() {
-        pendingOutdoorBrickSource = null;
-        hasPendingOutdoorSample = false;
-        pendingOutdoorSample = 0f;
-        pendingOutdoorSampleElapsedMillis = 0L;
-    }
-
-    @Override
-    public void unsubscribe(@NonNull BrickType type) {
-        requestedBrickTypes.remove(type);
-        Subscription subscription = subscriptions.remove(type);
-        if (subscription != null) {
-            subscription.cancelled.set(true);
-            try {
-                subscription.registrationSource.unregisterListener(subscription.sensorListener);
-            } catch (Throwable t) {
-                Log.w(TAG, "unregisterListener failed for " + type, t);
-            }
-        }
-        if (type == BrickType.OUTDOOR_TEMP) {
-            synchronized (this) {
-                if (subscription == null
-                        || outdoorBrickSource == subscription.registrationSource) {
-                    outdoorBrickSource = null;
-                }
-                clearPendingOutdoorTemperatureSource();
-                outdoorTemperatureFilter.reset();
-            }
-        }
-        mainHandler.post(this::pruneRecoveryRequests);
-    }
-
-    @Override
-    public void subscribeTelemetry(@NonNull Set<String> metricIds,
-                                   @NonNull TelemetryListener listener) {
-        TelemetrySubscription next = new TelemetrySubscription(listener,
-                selectKnownTelemetryMetricIds(metricIds));
-        TelemetrySubscription previous;
-        synchronized (telemetryLock) {
-            previous = telemetrySubscriptions.put(listener, next);
-        }
-        if (previous != null) {
-            previous.cancelled.set(true);
-            mainHandler.post(this::pruneRecoveryRequests);
-        }
-        executeTelemetryTask(() -> {
-            if (previous != null) unregisterTelemetryVendorListeners(previous);
-            activateTelemetrySubscription(next);
-        });
-        mainHandler.post(this::reconcileBcmPolling);
-        mainHandler.post(this::reconcileSignalFallback);
-        mainHandler.post(this::reconcileAutoHoldReceiver);
-    }
-
-    @Override
-    public void unsubscribeTelemetry(@NonNull TelemetryListener listener) {
-        TelemetrySubscription removed;
-        synchronized (telemetryLock) {
-            removed = telemetrySubscriptions.remove(listener);
-        }
-        if (removed == null) return;
-        removed.cancelled.set(true);
-        executeTelemetryTask(() -> unregisterTelemetryVendorListeners(removed));
-        mainHandler.post(this::pruneRecoveryRequests);
-        mainHandler.post(this::reconcileBcmPolling);
-        mainHandler.post(this::reconcileSignalFallback);
-        mainHandler.post(this::reconcileAutoHoldReceiver);
-    }
-
-    private void activateTelemetrySubscription(TelemetrySubscription subscription) {
-        if (subscription.cancelled.get()) return;
-        boolean needsSensors = false;
-        boolean needsTires = false;
-        for (TelemetrySignal signal : TELEMETRY_SIGNALS) {
-            if (subscription.metricIds.contains(signal.id)) {
-                needsSensors = true;
-                break;
-            }
-        }
-        for (TireMetric metric : TIRE_METRICS) {
-            if (subscription.metricIds.contains(metric.id)) {
-                needsTires = true;
-                break;
-            }
-        }
-        ISensor source = needsSensors ? ensureSensors() : null;
-        if (source != null) {
-            for (TelemetrySignal signal : TELEMETRY_SIGNALS) {
-                if (subscription.cancelled.get()) break;
-                if (subscription.metricIds.contains(signal.id)) {
-                    registerTelemetrySignal(source, signal, subscription);
-                }
-            }
-        } else if (needsSensors) {
-            for (TelemetrySignal signal : TELEMETRY_SIGNALS) {
-                if (subscription.metricIds.contains(signal.id)) {
-                    requestSensorRecovery(signal.sensorType);
-                }
-            }
-        }
-        if (subscription.metricIds.contains(FUEL_CAPACITY_ID)) {
-            emitInitialFuelCapacity(subscription);
-        }
-        if (needsTires && !subscription.cancelled.get()) {
-            registerTireTelemetry(subscription);
-        }
-    }
-
-    private boolean hasBcmTelemetryDemand() {
-        synchronized (telemetryLock) {
-            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
-                if (subscription.cancelled.get()) continue;
-                for (BcmMetric metric : BCM_METRICS) {
-                    if (subscription.metricIds.contains(metric.id)) return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private boolean hasAutoHoldTelemetryDemand() {
-        synchronized (telemetryLock) {
-            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
-                if (!subscription.cancelled.get()
-                        && subscription.metricIds.contains(VehicleDerivedMetrics.AUTO_HOLD_ID)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private void reconcileSignalFallback() {
-        boolean needsGear = false;
-        boolean needsHighBeam = false;
-        synchronized (telemetryLock) {
-            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
-                if (subscription.cancelled.get()) continue;
-                if (subscription.metricIds.contains(GEAR_ID)
-                        || subscription.metricIds.contains(LOW_LEVEL_GEAR_ACTUAL_ID)
-                        || subscription.metricIds.contains(LOW_LEVEL_GEAR_MANUAL_ID)) {
-                    needsGear = true;
-                }
-                if (subscription.metricIds.contains(HIGH_BEAM_ID)) needsHighBeam = true;
-            }
-        }
-        if (!needsGear) {
-            lowLevelGearKnown = false;
-            lowLevelGearObservedMonoMillis = 0L;
-        }
-        if (!needsHighBeam) {
-            lowLevelHighBeamKnown = false;
-            lowLevelHighBeamObservedMonoMillis = 0L;
-        }
-        signalFallback.updateDemand(needsGear, needsHighBeam);
-    }
-
-    private void deliverLowLevelGear(int adaptGear, int actualGear, boolean manualMode) {
-        List<TelemetrySubscription> subscribers = currentTelemetrySubscribers();
-        for (TelemetrySubscription subscription : subscribers) {
-            if (subscription.metricIds.contains(GEAR_ID)) {
-                deliverTelemetry(subscription, GEAR_ID, "Передача", "", adaptGear);
-            }
-            if (actualGear > 0
-                    && subscription.metricIds.contains(LOW_LEVEL_GEAR_ACTUAL_ID)) {
-                deliverTelemetry(subscription, LOW_LEVEL_GEAR_ACTUAL_ID,
-                        "Фактическая передача", "", actualGear);
-            }
-            if (subscription.metricIds.contains(LOW_LEVEL_GEAR_MANUAL_ID)) {
-                deliverTelemetry(subscription, LOW_LEVEL_GEAR_MANUAL_ID,
-                        "Ручной режим коробки", "", manualMode ? 1 : 0);
-            }
-        }
-    }
-
-    private void deliverLowLevelHighBeam(int enabled) {
-        for (TelemetrySubscription subscription : currentTelemetrySubscribers()) {
-            if (subscription.metricIds.contains(HIGH_BEAM_ID)) {
-                deliverTelemetry(subscription, HIGH_BEAM_ID, "Дальний свет", "", enabled);
-            }
-        }
-    }
-
-    private List<TelemetrySubscription> currentTelemetrySubscribers() {
-        List<TelemetrySubscription> subscribers = new ArrayList<>();
-        synchronized (telemetryLock) {
-            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
-                if (!subscription.cancelled.get()) subscribers.add(subscription);
-            }
-        }
-        return subscribers;
-    }
-
-    /** Main-thread demand registration; the external broadcast itself is manifest-received. */
-    private void reconcileAutoHoldReceiver() {
-        if (!hasAutoHoldTelemetryDemand()) {
-            if (autoHoldReceiverRegistered) {
-                try { appContext.unregisterReceiver(autoHoldChangedReceiver); }
-                catch (IllegalArgumentException ignored) {}
-                autoHoldReceiverRegistered = false;
-            }
-            return;
-        }
-        if (!autoHoldReceiverRegistered) {
-            IntentFilter filter = new IntentFilter(AutoHoldStateRepository.ACTION_CHANGED);
-            try {
-                if (Build.VERSION.SDK_INT >= 33) {
-                    appContext.registerReceiver(autoHoldChangedReceiver, filter,
-                            Context.RECEIVER_NOT_EXPORTED);
-                } else {
-                    appContext.registerReceiver(autoHoldChangedReceiver, filter);
-                }
-                autoHoldReceiverRegistered = true;
-            } catch (RuntimeException error) {
-                Log.w(TAG, "Auto Hold state receiver registration failed", error);
-            }
-        }
-        // The manifest receiver may have run while the launcher/process was not visible.
-        deliverCurrentAutoHoldState();
-    }
-
-    private void deliverCurrentAutoHoldState() {
-        AutoHoldStateRepository.Snapshot current = AutoHoldStateRepository.read(appContext);
-        if (!current.available) return;
-        List<TelemetrySubscription> subscribers = new ArrayList<>();
-        synchronized (telemetryLock) {
-            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
-                if (!subscription.cancelled.get()
-                        && subscription.metricIds.contains(VehicleDerivedMetrics.AUTO_HOLD_ID)) {
-                    subscribers.add(subscription);
-                }
-            }
-        }
-        TelemetryValue sample = new TelemetryValue(VehicleDerivedMetrics.AUTO_HOLD_ID,
-                "Auto Hold", current.value ? 1d : 0d, "", current.observedAtMillis);
-        for (TelemetrySubscription subscription : subscribers) {
-            deliverTelemetry(subscription, sample);
-        }
-    }
-
-    /** Main-thread only: start immediately on first demand and fully stop after the last one. */
-    private void reconcileBcmPolling() {
-        if (!hasBcmTelemetryDemand()) {
-            mainHandler.removeCallbacks(bcmPollTask);
-            bcmPollScheduled = false;
-            executeTelemetryTask(bcmLastOnMillis::clear);
-            return;
-        }
-        if (!bcmPollScheduled && !bcmPollInFlight) {
-            bcmPollScheduled = true;
-            mainHandler.post(bcmPollTask);
-        }
-    }
-
-    private void scheduleNextBcmPoll() {
-        if (!hasBcmTelemetryDemand()) {
-            reconcileBcmPolling();
-            return;
-        }
-        if (!bcmPollScheduled && !bcmPollInFlight) {
-            bcmPollScheduled = true;
-            mainHandler.postDelayed(bcmPollTask, BCM_STATE_POLL_INTERVAL_MS);
-        }
-    }
-
-    private void pollBcmTelemetryOnce() {
-        List<TelemetrySubscription> subscribers = new ArrayList<>();
-        LinkedHashSet<String> demandedIds = new LinkedHashSet<>();
-        synchronized (telemetryLock) {
-            for (TelemetrySubscription subscription : telemetrySubscriptions.values()) {
-                if (subscription.cancelled.get()) continue;
-                boolean demanded = false;
-                for (BcmMetric metric : BCM_METRICS) {
-                    if (subscription.metricIds.contains(metric.id)) {
-                        demandedIds.add(metric.id);
-                        demanded = true;
-                    }
-                }
-                if (demanded) subscribers.add(subscription);
-            }
-        }
-        bcmLastOnMillis.keySet().retainAll(demandedIds);
-        if (demandedIds.isEmpty()) return;
-
-        ICarFunction source = ensureCarFunctions();
-        if (source == null) return;
-        long nowMillis = System.nanoTime() / 1_000_000L;
-        for (BcmMetric metric : BCM_METRICS) {
-            if (!demandedIds.contains(metric.id)) continue;
-            // On firmware where IBcm reports a constant/default value, mHUD obtains the real
-            // steady high-beam state from CarSignalManager. Once that path is known-good, do not
-            // let the lower-fidelity poll overwrite it.
-            if (metric.id.equals(HIGH_BEAM_ID) && isLowLevelHighBeamFresh()) continue;
-            final int raw;
-            try {
-                raw = source.getFunctionValue(metric.functionId);
-            } catch (UnsupportedOperationException ignored) {
-                continue;
-            } catch (Throwable t) {
-                invalidateFunctionProxy(source);
-                Log.w(TAG, "BCM telemetry read failed for " + metric.id, t);
-                return;
-            }
-            int binary = normalizeBcmBinaryValue(raw);
-            if (binary < 0) continue;
-            int stable = binary;
-            if (metric.turnSignal) {
-                Long lastOn = bcmLastOnMillis.get(metric.id);
-                if (binary == 1) {
-                    bcmLastOnMillis.put(metric.id, nowMillis);
-                } else {
-                    stable = stabilizeTurnSignalValue(binary,
-                            lastOn == null ? -1L : lastOn, nowMillis);
-                }
-            }
-            for (TelemetrySubscription subscription : subscribers) {
-                if (subscription.cancelled.get()
-                        || !subscription.metricIds.contains(metric.id)) continue;
-                Integer previous = subscription.lastBcmValues.put(metric.id, stable);
-                if (previous != null && previous == stable) continue;
-                deliverTelemetry(subscription, metric.id, metric.label, "", stable);
-            }
-        }
-    }
-
-    /** Only real off/on values are exposed; SDK unknown/error/default codes are ignored. */
-    static int normalizeBcmBinaryValue(int raw) {
-        if (raw == ICarFunction.COMMON_VALUE_OFF) return 0;
-        if (raw == ICarFunction.COMMON_VALUE_ON) return 1;
-        return -1;
-    }
-
-    /** Keep an active indicator lit across the lamp's normal dark half-cycle. */
-    static int stabilizeTurnSignalValue(int binary, long lastOnMillis, long nowMillis) {
-        if (binary == 1) return 1;
-        if (binary != 0) return -1;
-        return lastOnMillis >= 0L && nowMillis >= lastOnMillis
-                && nowMillis - lastOnMillis <= TURN_SIGNAL_OFF_HOLD_MS ? 1 : 0;
-    }
-
-    private void registerTelemetrySignal(ISensor source, TelemetrySignal signal,
-                                         TelemetrySubscription subscription) {
-        FunctionStatus initialStatus = sensorSupportStatus(source, signal.sensorType);
-        AtomicBoolean supported = new AtomicBoolean(isSupported(initialStatus));
-        if (!signal.probeWithoutSupport && !supported.get()
-                && (initialStatus == null || initialStatus == FunctionStatus.error)) {
-            requestSensorRecovery(signal.sensorType);
-        }
-        ISensor.ISensorListener vendorListener = new ISensor.ISensorListener() {
-            @Override public void onSensorEventChanged(int changedType, int value) {
-                if (subscription.cancelled.get() || changedType != signal.sensorType
-                        || !isValidTelemetryEventValue(value, signal.boundedTemperature)
-                        || isLowLevelGearPreferred(signal)) return;
-                supported.set(true);
-                // Several nominally numeric AdaptAPI signals (notably fluid/oil levels) are
-                // exposed through the integer event callback on some firmware revisions.
-                deliverTelemetry(subscription, signal.id, signal.label,
-                        signal.telemetryUnit, value);
-            }
-
-            @Override public void onSensorSupportChanged(int changedType, FunctionStatus status) {
-                if (changedType != signal.sensorType || subscription.cancelled.get()) return;
-                supported.set(isSupported(status));
-                if (!isSupported(status)) {
-                    if (!signal.probeWithoutSupport
-                            && (status == null || status == FunctionStatus.error)) {
-                        requestSensorRecovery(signal.sensorType);
-                    }
-                    return;
-                }
-                // A listener can be registered while ecarxcar_service is still starting. Seed it
-                // again when support becomes definitive so the initial snapshot is not lost just
-                // because the first getSensorLatestValue returned the boot sentinel.
-                executeTelemetryTask(() -> emitInitialSensorValue(
-                        source, signal, subscription, supported));
-            }
-
-            @Override public void onSensorValueChanged(int changedType, float value) {
-                if (subscription.cancelled.get() || changedType != signal.sensorType
-                        || signal.eventOnly
-                        || !isValidTelemetryValue(value, signal.boundedTemperature)
-                        || isLowLevelGearPreferred(signal)) return;
-                supported.set(true);
-                deliverTelemetry(subscription, signal.id, signal.label,
-                        signal.telemetryUnit, value);
-            }
-        };
-        try {
-            if (!source.registerListener(vendorListener, signal.sensorType)) {
-                Log.w(TAG, "telemetry registerListener rejected for " + signal.id);
-                requestSensorRecovery(signal.sensorType);
-                return;
-            }
-            subscription.vendorListeners.add(new VendorRegistration(source, vendorListener));
-            if (subscription.cancelled.get()) return;
-            emitInitialSensorValue(source, signal, subscription, supported);
-        } catch (Throwable t) {
-            invalidateSensorProxy(source);
-            Log.w(TAG, "telemetry subscription failed for " + signal.id, t);
-            requestSensorRecovery(signal.sensorType);
-        }
-    }
-
-    private void emitInitialSensorValue(ISensor source, TelemetrySignal signal,
-                                        TelemetrySubscription subscription,
-                                        AtomicBoolean supported) {
-        if (subscription.cancelled.get() || isLowLevelGearPreferred(signal)) return;
-        FunctionStatus status = sensorSupportStatus(source, signal.sensorType);
-        supported.set(isSupported(status));
-        if (!isSupported(status) && !signal.probeWithoutSupport) {
-            if (status == null || status == FunctionStatus.error) {
-                requestSensorRecovery(signal.sensorType);
-            }
-            return;
-        }
-        try {
-            if (signal.eventOnly) {
-                int latest = source.getSensorEvent(signal.sensorType);
-                if (isValidTelemetryEventValue(latest, signal.boundedTemperature)) {
-                    supported.set(true);
-                    deliverTelemetry(subscription, signal.id, signal.label,
-                            signal.telemetryUnit, latest);
-                } else if (!signal.probeWithoutSupport) {
-                    requestSensorRecovery(signal.sensorType);
-                }
-            } else {
-                float latest = source.getSensorLatestValue(signal.sensorType);
-                if (isValidTelemetryValue(latest, signal.boundedTemperature)) {
-                    supported.set(true);
-                    deliverTelemetry(subscription, signal.id, signal.label,
-                            signal.telemetryUnit, latest);
-                } else if (isObviousFloatSentinel(latest) && !signal.probeWithoutSupport) {
-                    requestSensorRecovery(signal.sensorType);
-                }
-            }
-        } catch (Throwable t) {
-            invalidateSensorProxy(source);
-            Log.w(TAG, "telemetry initial read failed for " + signal.id, t);
-            if (!signal.probeWithoutSupport) requestSensorRecovery(signal.sensorType);
-        }
-    }
-
-    private boolean isLowLevelGearPreferred(TelemetrySignal signal) {
-        return signal.id.equals(GEAR_ID) && isLowLevelGearFresh();
-    }
-
-    private boolean isLowLevelGearFresh() {
-        return lowLevelGearKnown
-                && isFreshLowLevelSample(lowLevelGearObservedMonoMillis, monotonicMillis());
-    }
-
-    private boolean isLowLevelHighBeamFresh() {
-        return lowLevelHighBeamKnown
-                && isFreshLowLevelSample(lowLevelHighBeamObservedMonoMillis, monotonicMillis());
-    }
-
-    static boolean isFreshLowLevelSample(long observedMonoMillis, long nowMonoMillis) {
-        return observedMonoMillis > 0L && nowMonoMillis >= observedMonoMillis
-                && nowMonoMillis - observedMonoMillis <= LOW_LEVEL_PRIORITY_TTL_MS;
-    }
-
-    private static long monotonicMillis() {
-        return SystemClock.elapsedRealtime();
-    }
-
-    private void registerTireTelemetry(TelemetrySubscription subscription) {
-        TPMS tpms;
-        try {
-            tpms = TPMS.create(appContext);
-            if (tpms == null) throw new IllegalStateException("TPMS.create returned null");
-        } catch (Throwable t) {
-            Log.w(TAG, "TPMS service unavailable", t);
-            return;
-        }
-        TPMS.ITireStateMonitor monitor = (tireId, state) -> {
-            if (subscription.cancelled.get() || state == null) return;
-            emitTireState(subscription, tireId, state);
-        };
-        try {
-            if (tpms.registerTireStateMonitor(monitor)) {
-                subscription.tpmsSource = tpms;
-                subscription.tireStateMonitor = monitor;
-            } else {
-                Log.w(TAG, "TPMS monitor registration was rejected");
-            }
-        } catch (Throwable t) {
-            Log.w(TAG, "TPMS subscription failed", t);
-            try {
-                tpms.unregisterTireStateMonitor(monitor);
-            } catch (Throwable ignored) {
-            }
-        }
-        // Some firmware exposes snapshots but rejects the monitor API. Initial values remain
-        // useful in that case and will be refreshed by the next launcher subscription.
-        for (int tireId : new int[] { TPMS.TIRE_ID_LEFT_FRONT, TPMS.TIRE_ID_RIGHT_FRONT,
-                TPMS.TIRE_ID_LEFT_REAR, TPMS.TIRE_ID_RIGHT_REAR }) {
-            if (subscription.cancelled.get()) break;
-            try {
-                ITireState state = tpms.getTireState(tireId);
-                if (state != null) emitTireState(subscription, tireId, state);
-            } catch (Throwable t) {
-                Log.w(TAG, "Initial TPMS read failed for tire " + tireId, t);
-            }
-        }
-    }
-
-    private void emitTireState(TelemetrySubscription subscription, int tireId,
-                               @NonNull ITireState state) {
+        // (e.g. ignition state) — the bri…10915 tokens truncated…                           @NonNull ITireState state) {
         for (TireMetric metric : TIRE_METRICS) {
             if (metric.tireId != tireId || !subscription.metricIds.contains(metric.id)) continue;
             try {
@@ -2241,6 +1323,28 @@ final class GeelyCarIntegration implements CarIntegration {
 
     private static boolean isAutoFanDefinition(@NonNull ControlDefinition definition) {
         return definition.functionId == IHvac.HVAC_FUNC_AUTO_FAN_SETTING;
+    }
+
+    private static boolean isManualFanDefinition(@NonNull ControlDefinition definition) {
+        return definition.functionId == IHvac.HVAC_FUNC_FAN_SPEED;
+    }
+
+    private static boolean isAirflowDefinition(@NonNull ControlDefinition definition) {
+        return AIRFLOW_CONTROL_ID.equals(definition.descriptor.id)
+                && definition.functionId == IHvac.HVAC_FUNC_BLOWING_MODE;
+    }
+
+    private static boolean isManualFanRuntimeValue(double value) {
+        if (!Double.isFinite(value)) return false;
+        int rounded = (int) Math.round(value);
+        return sameValue(value, rounded)
+                && rounded >= IHvac.FAN_SPEED_LEVEL_1
+                && rounded <= IHvac.FAN_SPEED_LEVEL_9;
+    }
+
+    private static boolean isPassiveAirflowRuntimeValue(double value) {
+        return sameValue(value, IHvac.BLOWING_MODE_OFF)
+                || sameValue(value, IHvac.BLOWING_MODE_AUTO_SWITCH);
     }
 
     private static boolean isFanRelatedFunction(int functionId) {
@@ -2771,6 +1875,16 @@ final class GeelyCarIntegration implements CarIntegration {
             label = String.format(java.util.Locale.ROOT, "%.1f%s", value,
                     definition.descriptor.unit);
             active = true;
+        } else if (isManualFanDefinition(definition)
+                && isManualFanRuntimeValue(value)) {
+            level = manualFanDisplayLevel((int) Math.round(value));
+            value = manualFanValueForDisplayLevel(level);
+            label = Integer.toString(level);
+            active = true;
+        } else if (isAirflowDefinition(definition)
+                && isPassiveAirflowRuntimeValue(value)) {
+            label = sameValue(value, IHvac.BLOWING_MODE_AUTO_SWITCH) ? "AUTO" : "Выкл";
+            active = value != 0;
         } else {
             label = Long.toString(Math.round(value));
             active = value != 0;
@@ -3188,6 +2302,10 @@ final class GeelyCarIntegration implements CarIntegration {
     private static Double commandTarget(ControlDefinition definition, CarControlCommand command,
                                         double current,
                                         List<CarControlDescriptor.Option> availableOptions) {
+        if (isManualFanDefinition(definition) && isManualFanRuntimeValue(current)) {
+            current = manualFanValueForDisplayLevel(
+                    manualFanDisplayLevel((int) Math.round(current)));
+        }
         switch (command.operation) {
             case SET:
                 if (definition.customFloat) {
@@ -3275,6 +2393,9 @@ final class GeelyCarIntegration implements CarIntegration {
             if (sameValue(value, ICarFunction.COMMON_VALUE_ERROR)
                     || sameValue(value, ICarFunction.COMMON_VALUE_NONE)
                     || sameValue(value, ICarFunction.COMMON_VALUE_UNKNOWN)) return false;
+            if (isManualFanDefinition(definition) && isManualFanRuntimeValue(value)) return true;
+            if (isAirflowDefinition(definition)
+                    && isPassiveAirflowRuntimeValue(value)) return true;
             if (!definition.descriptor.options.isEmpty()) {
                 for (CarControlDescriptor.Option option : definition.descriptor.options) {
                     if (sameValue(option.value, value)) return true;
@@ -3307,6 +2428,9 @@ final class GeelyCarIntegration implements CarIntegration {
         for (CarControlDescriptor.Option option : definition.descriptor.options) {
             if (sameValue(option.value, value)) return false;
         }
+        if (isManualFanDefinition(definition) && isManualFanRuntimeValue(value)) return false;
+        if (isAirflowDefinition(definition)
+                && isPassiveAirflowRuntimeValue(value)) return false;
         return true;
     }
 
