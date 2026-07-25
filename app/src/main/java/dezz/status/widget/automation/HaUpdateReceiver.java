@@ -8,8 +8,8 @@ import android.util.Log;
 
 import org.json.JSONException;
 
-import dezz.status.widget.Preferences;
 import dezz.status.widget.WidgetService;
+import dezz.status.widget.WidgetServiceStarter;
 
 /** Explicit-broadcast compatibility endpoint for Home Assistant Companion. */
 public final class HaUpdateReceiver extends BroadcastReceiver {
@@ -28,8 +28,8 @@ public final class HaUpdateReceiver extends BroadcastReceiver {
 
             if (WidgetService.isRunning()) {
                 WidgetService.getInstance().onAutomationStateChanged(update.scope, update.id);
-            } else if (new Preferences(context).widgetEnabled.get()) {
-                context.startForegroundService(new Intent(context, WidgetService.class));
+            } else {
+                WidgetServiceStarter.startIfNeeded(context);
             }
         } catch (JSONException | IllegalArgumentException e) {
             Log.w(TAG, "Ignored invalid HA update", e);
