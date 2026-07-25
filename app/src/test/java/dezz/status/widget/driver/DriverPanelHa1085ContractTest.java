@@ -190,7 +190,8 @@ public final class DriverPanelHa1085ContractTest {
         assertTrue(bootstrap.contains("preferences.widgetEnabled.get()")
                 && bootstrap.contains("preferences.driverPanelEnabled.get()"));
         assertTrue(starter.contains("!preferences.driverPanelEnabled.get()"));
-        assertTrue(service.contains("else if (prefs.driverPanelEnabled.get())"));
+        assertTrue(service.contains(
+                "else if (prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get())"));
         assertTrue(service.contains("runInitialIntegrationStartup()"));
         assertTrue(service.contains("detachStatusSurfaceRuntime(\"status row disabled\")"));
         assertTrue(service.contains("stopLocationTracking()"));
@@ -200,9 +201,12 @@ public final class DriverPanelHa1085ContractTest {
         assertTrue(service.contains("binding == null || prefs == null"
                 + " || !prefs.widgetEnabled.get()"));
         assertTrue(service.contains("void ensureEnabledRuntime()"));
-        assertTrue(service.contains("prefs.driverPanelEnabled.get() && !integrationsStarted"));
+        assertTrue(service.contains(
+                "(prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get())\n"
+                        + "                && !integrationsStarted"));
         assertTrue(service.contains("overlayAttachAttempts = 0;"));
-        assertTrue(service.contains("if (prefs.driverPanelEnabled.get()) {\n"
+        assertTrue(service.contains(
+                "if (prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get()) {\n"
                 + "                ensureEnabledRuntime();"));
         assertTrue(service.contains("|| !Permissions.allPermissionsGranted(this)) return;"));
         assertTrue(service.contains("if (integrationsStarted)"));
