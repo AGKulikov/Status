@@ -137,13 +137,13 @@ public final class DriverPanelHa1084ContractTest {
         int create = service.indexOf("private void createOverlayView()", onStart);
         assertTrue(onStart >= 0 && create > onStart);
         String onStartBody = service.substring(onStart, create);
-        assertTrue(onStartBody.contains("&& !overlayAttachRetryScheduled\\n"
+        assertTrue(onStartBody.contains("&& !overlayAttachRetryScheduled\n"
                 + "                && Permissions.allPermissionsGranted(this)"));
 
         int createGuardEnd = service.indexOf("// Create the overlay view", create);
         assertTrue(createGuardEnd > create);
         String createGuard = service.substring(create, createGuardEnd);
-        assertTrue(createGuard.contains("|| overlayAttachRetryScheduled\\n"
+        assertTrue(createGuard.contains("|| overlayAttachRetryScheduled\n"
                 + "                || !Permissions.allPermissionsGranted(this)) return;"));
     }
 
