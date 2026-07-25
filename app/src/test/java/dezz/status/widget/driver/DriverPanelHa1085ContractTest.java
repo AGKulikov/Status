@@ -40,7 +40,7 @@ public final class DriverPanelHa1085ContractTest {
         assertTrue(overlay.contains("SmartHomeShortcutStatePolicy.resolveValue("));
         assertTrue(overlay.contains("addConnectorValueListener("));
         assertTrue(settings.contains("actionPicker.showLong(shortcut)"));
-        assertTrue(settings.contains("Подробный климат в обычной ячейке"));
+        assertFalse(settings.contains("Подробный климат в обычной ячейке"));
     }
 
     @Test
