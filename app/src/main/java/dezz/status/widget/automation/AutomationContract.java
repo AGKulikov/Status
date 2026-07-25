@@ -52,6 +52,7 @@ public final class AutomationContract {
     public static final String SCOPE_POPUP = "popup";
     public static final String SCOPE_OVERLAY = "overlay";
     public static final String SCOPE_DRIVER = "driver";
+    public static final String SCOPE_HUD = "hud";
 
     private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,127}");
 
@@ -73,6 +74,7 @@ public final class AutomationContract {
             case SCOPE_POPUP:
             case SCOPE_OVERLAY:
             case SCOPE_DRIVER:
+            case SCOPE_HUD:
                 return scope;
             default:
                 throw new IllegalArgumentException("Invalid automation scope: " + raw);
