@@ -231,6 +231,7 @@ public final class PhoneConnectorController {
     @Nullable private Runnable gattReconnectTask;
     @Nullable private Runnable ancsPublicationRetryTask;
     @Nullable private Runnable stockConnectionTask;
+    @Nullable private Runnable oemGattRefreshTask;
     private int ancsPublicationRetryCount;
     private int stockConnectionAttempt;
     private boolean stockConnectionRequestInProgress;
@@ -673,6 +674,13 @@ public final class PhoneConnectorController {
                                         applyOemHeadsetPower(
                                                 token, callbackAddress, rawPower)));
                             }
+                        }, (callbackAddress, change) -> {
+                            Handler handler = worker;
+                            if (handler != null) {
+                                handler.post(() -> runIfCurrent(token, () ->
+                                        handleOemDeviceStateChange(
+                                                token, callbackAddress, change)));
+                            }
                         });
         if (created == null) return;
         boolean accepted;
@@ -693,6 +701,40 @@ public final class PhoneConnectorController {
         hfpBatteryUpdatedAt = SystemClock.elapsedRealtime();
         refreshBatteryValues();
         publishSnapshot(token);
+    }
+
+    private void handleOemDeviceStateChange(
+            long token,
+            @NonNull String address,
+            @NonNull PhoneOemConnectionBridge.DeviceStateChange change) {
+        if (!address.equalsIgnoreCase(selectedAddress)
+                || config == null || !config.ancsNeeded() || ancsReady) return;
+        Handler handler = worker;
+        if (handler == null) return;
+        Runnable previous = oemGattRefreshTask;
+        if (previous != null) handler.removeCallbacks(previous);
+        Runnable refresh = () -> runIfCurrent(token, () -> {
+            oemGattRefreshTask = null;
+            if (!address.equalsIgnoreCase(selectedAddress)
+                    || config == null || !config.ancsNeeded() || ancsReady) return;
+            BluetoothGatt expected = gatt;
+            forceDirectGatt = true;
+            ancsPublicationRetryCount = 0;
+            if (expected == null) {
+                ancsStatus = "connecting";
+                ensureGatt(token);
+            } else {
+                refreshGattCache(expected);
+                scheduleGattReconnect(token,
+                        "ECARX selected-phone state changed: " + change.name(),
+                        "services_changed");
+            }
+            publishSnapshot(token);
+        });
+        oemGattRefreshTask = refresh;
+        // Let the stock owner finish writing its paired-device/UUID database before reopening
+        // Android 9's GATT client. Repeated callbacks collapse into this one clean refresh.
+        handler.postDelayed(refresh, 900L);
     }
 
     private void replaceOemPowerObservation(
@@ -2168,6 +2210,7 @@ public final class PhoneConnectorController {
         cancelGattReconnect();
         cancelAncsPublicationRetry();
         cancelStockConnectionRequest();
+        cancelOemGattRefresh();
     }
 
     private void cancelDeviceRescan() {
@@ -2188,6 +2231,12 @@ public final class PhoneConnectorController {
         stockConnectionTask = null;
         stockConnectionAttempt = 0;
         stockConnectionRequestInProgress = false;
+    }
+
+    private void cancelOemGattRefresh() {
+        Runnable task = oemGattRefreshTask;
+        if (task != null && worker != null) worker.removeCallbacks(task);
+        oemGattRefreshTask = null;
     }
 
     private void scheduleAncsPublicationRetry(long token,
