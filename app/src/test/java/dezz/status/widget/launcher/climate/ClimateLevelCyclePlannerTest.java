@@ -6,7 +6,9 @@
 package dezz.status.widget.launcher.climate;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -78,9 +80,9 @@ public final class ClimateLevelCyclePlannerTest {
                 fan, AUTO_NORMAL, 1, true));
         assertTarget(AUTO_HIGHER, ClimateLevelCyclePlanner.nextStepperTarget(
                 fan, AUTO_HIGH, 1, true));
-        assertTarget(AUTO_QUIETER, ClimateLevelCyclePlanner.nextStepperTarget(
-                fan, AUTO_HIGHER, 1, true));
         assertTarget(AUTO_HIGHER, ClimateLevelCyclePlanner.nextStepperTarget(
+                fan, AUTO_HIGHER, 1, true));
+        assertTarget(AUTO_QUIETER, ClimateLevelCyclePlanner.nextStepperTarget(
                 fan, AUTO_QUIETER, -1, true));
     }
 
@@ -97,6 +99,24 @@ public final class ClimateLevelCyclePlannerTest {
                 option(AUTO_NORMAL, "AUTO · обычно"));
         assertTarget(LEVEL_2, ClimateLevelCyclePlanner.nextStepperTarget(
                 fan, LEVEL_2, 1, true));
+    }
+
+    @Test
+    public void everyVisibleLevelOneDecrementRequestsClimatePowerOff() {
+        List<CarControlDescriptor.Option> fan = Arrays.asList(
+                option(OFF, "Выкл"), option(LEVEL_1, "1"), option(LEVEL_2, "2"),
+                option(AUTO_QUIETER, "AUTO · тише"),
+                option(AUTO_NORMAL, "AUTO · обычно"));
+        assertTrue(ClimateLevelCyclePlanner.shouldPowerOffClimateOnFanDecrease(
+                fan, LEVEL_1, -1));
+        assertTrue(ClimateLevelCyclePlanner.shouldPowerOffClimateOnFanDecrease(
+                fan, AUTO_QUIETER, -1));
+        assertFalse(ClimateLevelCyclePlanner.shouldPowerOffClimateOnFanDecrease(
+                fan, LEVEL_1, 1));
+        assertFalse(ClimateLevelCyclePlanner.shouldPowerOffClimateOnFanDecrease(
+                fan, LEVEL_2, -1));
+        assertFalse(ClimateLevelCyclePlanner.shouldPowerOffClimateOnFanDecrease(
+                fan, AUTO_NORMAL, -1));
     }
 
     private static void assertCycle(ClimatePanelConfig.LevelCycleOrder order,
