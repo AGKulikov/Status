@@ -22,9 +22,10 @@ public final class WidgetServiceStarter {
     private WidgetServiceStarter() {}
 
     /**
-     * Starts the status overlay only when the user left it enabled and Android currently exposes
-     * all required permissions. A temporarily unavailable locked-boot AppOp is deliberately not
-     * persisted as an opt-out: USER_UNLOCKED or the next HOME start will retry safely.
+     * Starts the shared integration host when either the status overlay or driver panel needs it.
+     * With only the driver panel enabled the service stays headless and supplies live connector
+     * values/scenarios. A temporarily unavailable locked-boot AppOp is deliberately not persisted
+     * as an opt-out: USER_UNLOCKED or the next HOME start will retry safely.
      */
     public static boolean startIfNeeded(@NonNull Context context) {
         return attemptStart(applicationContext(context), -1);
@@ -58,7 +59,8 @@ public final class WidgetServiceStarter {
                 return true;
             }
             Preferences preferences = new Preferences(app);
-            if (!preferences.widgetEnabled.get()) {
+            if (!preferences.widgetEnabled.get()
+                    && !preferences.driverPanelEnabled.get()) {
                 cancelPendingRetry(app);
                 return false;
             }
