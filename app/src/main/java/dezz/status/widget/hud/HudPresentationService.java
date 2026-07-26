@@ -12,6 +12,7 @@ import android.hardware.display.DisplayManager;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.Display;
@@ -38,6 +39,7 @@ public final class HudPresentationService extends Service
     private static final String TAG = "HudPresentation";
     private static final String CHANNEL_ID = "HudDisplayChannel";
     private static final int NOTIFICATION_ID = 0x485544;
+    private static final long SYSTEM_SURFACE_RETRY_MS = 60_000L;
     @Nullable private static volatile HudPresentationService instance;
     @NonNull private static volatile String runtimeDetail = "HUD не запущен";
 
@@ -49,6 +51,8 @@ public final class HudPresentationService extends Service
     private HudRuntimeData data;
     private HudOverlayWindow overlayWindow;
     private HudPresentation presentation;
+    private HudSystemSurfaceWindow systemSurfaceWindow;
+    private long systemSurfaceRetryAfter;
     @Nullable private String shownUniqueId;
 
     public static void apply(@NonNull Context context) {
@@ -86,6 +90,9 @@ public final class HudPresentationService extends Service
     public static void notifyAutomationChanged(@NonNull Context context) {
         HudPresentationService current = instance;
         if (current != null) current.main.post(() -> {
+            if (current.systemSurfaceWindow != null) {
+                current.systemSurfaceWindow.invalidateHud();
+            }
             if (current.overlayWindow != null) current.overlayWindow.invalidateHud();
             if (current.presentation != null) current.presentation.invalidateHud();
         });
@@ -110,8 +117,10 @@ public final class HudPresentationService extends Service
             }
         }
         data = new HudRuntimeData(this, config, () -> {
+            HudSystemSurfaceWindow currentSystemSurface = systemSurfaceWindow;
             HudOverlayWindow currentOverlay = overlayWindow;
             HudPresentation current = presentation;
+            if (currentSystemSurface != null) currentSystemSurface.invalidateHud();
             if (currentOverlay != null) currentOverlay.invalidateHud();
             if (current != null) current.invalidateHud();
         });
@@ -185,29 +194,26 @@ public final class HudPresentationService extends Service
             return;
         }
         String identity = candidate.uniqueId + "|" + candidate.id;
-        if ((overlayWindow != null || presentation != null)
+        if ((systemSurfaceWindow != null || overlayWindow != null || presentation != null)
                 && identity.equals(shownUniqueId)) {
+            if (systemSurfaceWindow != null) systemSurfaceWindow.updateConfig(config);
             if (overlayWindow != null) overlayWindow.updateConfig(config);
             if (presentation != null) presentation.updateConfig(config);
-            runtimeDetail = "HUD: " + candidate.name + " · ID " + candidate.id
-                    + " · поверхность " + candidate.width + "×" + candidate.height
-                    + " · окно 728×190 @ (0,720)"
-                    + (overlayWindow != null ? " · overlay" : " · presentation");
+            runtimeDetail = runtimeDetail(candidate);
             updateNotification(runtimeDetail);
             return;
         }
         dismissPresentation("display selection changed");
+        systemSurfaceRetryAfter = 0L;
         Display display = HudDisplaySelector.display(candidate);
         if (display == null || !display.isValid()) return;
         try {
-            showOnDisplay(display);
             shownUniqueId = identity;
-            runtimeDetail = "HUD: " + candidate.name + " · ID " + candidate.id
-                    + " · поверхность " + candidate.width + "×" + candidate.height
-                    + " · окно 728×190 @ (0,720)"
-                    + (overlayWindow != null ? " · overlay" : " · presentation");
+            showOnDisplay(display);
+            runtimeDetail = runtimeDetail(candidate);
             updateNotification(runtimeDetail);
         } catch (RuntimeException failure) {
+            systemSurfaceWindow = null;
             presentation = null;
             shownUniqueId = null;
             runtimeDetail = "HUD найден, но окно пока недоступно";
@@ -217,6 +223,61 @@ public final class HudPresentationService extends Service
     }
 
     private void showOnDisplay(@NonNull Display display) {
+        showWindowManagerFallback(display);
+        if (SystemClock.elapsedRealtime() < systemSurfaceRetryAfter) return;
+        try {
+            HudSystemSurfaceWindow window = HudSystemSurfaceWindow.show(
+                    this, display, config, data, new HudSystemSurfaceWindow.Listener() {
+                        @Override
+                        public void onReady(@NonNull HudSystemSurfaceWindow readyWindow) {
+                            if (systemSurfaceWindow != readyWindow
+                                    || shownUniqueId == null) {
+                                readyWindow.dismiss();
+                                return;
+                            }
+                            // The direct surface already contains an acknowledged full frame.
+                            // Remove the lower WindowManager duplicate without exposing OEM HUD.
+                            dismissFallbackOnly("system HUD surface ready");
+                            runtimeDetail = "HUD: ID " + display.getDisplayId()
+                                    + " · системный слой " + readyWindow.layerStack()
+                                    + " · штатные машинка и скорость перекрыты"
+                                    + " · окно 728×190 @ (0,720)";
+                            updateNotification(runtimeDetail);
+                        }
+
+                        @Override
+                        public void onFailed(@NonNull HudSystemSurfaceWindow failedWindow,
+                                             @NonNull String detail) {
+                            if (systemSurfaceWindow != failedWindow) return;
+                            systemSurfaceWindow = null;
+                            failedWindow.dismiss();
+                            systemSurfaceRetryAfter = SystemClock.elapsedRealtime()
+                                    + SYSTEM_SURFACE_RETRY_MS;
+                            if (overlayWindow == null && presentation == null
+                                    && display.isValid() && shownUniqueId != null) {
+                                try {
+                                    showWindowManagerFallback(display);
+                                } catch (RuntimeException fallbackFailure) {
+                                    Log.w(TAG, "Could not restore HUD fallback",
+                                            fallbackFailure);
+                                }
+                            }
+                            runtimeDetail = "HUD: обычный overlay; системная маска недоступна — "
+                                    + detail;
+                            updateNotification(runtimeDetail);
+                        }
+                    });
+            systemSurfaceWindow = window;
+        } catch (RuntimeException failure) {
+            systemSurfaceWindow = null;
+            systemSurfaceRetryAfter = SystemClock.elapsedRealtime()
+                    + SYSTEM_SURFACE_RETRY_MS;
+            Log.w(TAG, "Could not start direct HUD surface; keeping WindowManager fallback",
+                    failure);
+        }
+    }
+
+    private void showWindowManagerFallback(@NonNull Display display) {
         if (Settings.canDrawOverlays(this)) {
             try {
                 overlayWindow = HudOverlayWindow.show(this, display, config, data);
@@ -233,6 +294,20 @@ public final class HudPresentationService extends Service
         presentation = fallback;
     }
 
+    private void dismissFallbackOnly(@NonNull String reason) {
+        HudOverlayWindow currentOverlay = overlayWindow;
+        HudPresentation current = presentation;
+        overlayWindow = null;
+        presentation = null;
+        if (currentOverlay != null) currentOverlay.dismiss();
+        if (current != null) {
+            try { current.dismiss(); }
+            catch (RuntimeException failure) {
+                Log.w(TAG, "Could not dismiss HUD fallback: " + reason, failure);
+            }
+        }
+    }
+
     @NonNull
     private HudPresentation createPresentation(@NonNull Display display) {
         HudPresentation next = new HudPresentation(
@@ -247,11 +322,14 @@ public final class HudPresentationService extends Service
     }
 
     private void dismissPresentation(@NonNull String reason) {
+        HudSystemSurfaceWindow currentSystemSurface = systemSurfaceWindow;
         HudOverlayWindow currentOverlay = overlayWindow;
         HudPresentation current = presentation;
+        systemSurfaceWindow = null;
         overlayWindow = null;
         presentation = null;
         shownUniqueId = null;
+        if (currentSystemSurface != null) currentSystemSurface.dismiss();
         if (currentOverlay != null) currentOverlay.dismiss();
         if (current != null) {
             try { current.dismiss(); }
@@ -259,6 +337,23 @@ public final class HudPresentationService extends Service
                 Log.w(TAG, "Could not dismiss HUD presentation: " + reason, failure);
             }
         }
+    }
+
+    @NonNull
+    private String runtimeDetail(@NonNull HudDisplaySelector.Candidate candidate) {
+        String mode;
+        if (systemSurfaceWindow != null) {
+            mode = systemSurfaceWindow.isReady()
+                    ? "системный SurfaceFlinger-слой " + systemSurfaceWindow.layerStack()
+                    : "системная маска запускается";
+        } else if (overlayWindow != null) {
+            mode = "overlay";
+        } else {
+            mode = "presentation";
+        }
+        return "HUD: " + candidate.name + " · ID " + candidate.id
+                + " · поверхность " + candidate.width + "×" + candidate.height
+                + " · окно 728×190 @ (0,720) · " + mode;
     }
 
     private void createNotificationChannel() {
