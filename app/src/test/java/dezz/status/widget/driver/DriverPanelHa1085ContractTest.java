@@ -111,7 +111,9 @@ public final class DriverPanelHa1085ContractTest {
         assertTrue(information.contains("content.stop()"));
         assertTrue(information.contains(
                 "content.setFixedCellBackgroundColor(shortcut.backgroundColor)"));
-        assertTrue(overlay.contains("information.add(shortcut)"));
+        assertTrue(overlay.contains("List<LauncherShortcutStore.Shortcut> topInformation"));
+        assertTrue(overlay.contains("List<LauncherShortcutStore.Shortcut> bottomInformation"));
+        assertTrue(overlay.contains("? bottomInformation : topInformation).add(shortcut)"));
         assertTrue(overlay.contains("new InformationShortcutView("));
         assertTrue(settings(widget).contains("Показывать значок слева"));
         assertTrue(infoView.contains("value.setSingleLine(false)"));
