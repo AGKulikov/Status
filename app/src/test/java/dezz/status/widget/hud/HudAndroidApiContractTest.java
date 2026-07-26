@@ -43,6 +43,8 @@ public final class HudAndroidApiContractTest {
         assertTrue(client.contains("display.getDisplayId() == HudViewportPolicy.VERIFIED_DISPLAY_ID"));
         assertTrue(client.contains("? 1 : Math.max(0, display.getDisplayId())"));
         assertTrue(client.contains("pendingFrame.getAndSet(null)"));
+        assertTrue(client.contains("runLongRunningCommand"));
+        assertFalse(client.contains(">/dev/null 2>&1 &)"));
         assertTrue(service.contains("showWindowManagerFallback(display)"));
         assertTrue(service.contains("dismissFallbackOnly(\"system HUD surface ready\")"));
         assertTrue(service.contains("systemSurfaceRetryAfter"));
