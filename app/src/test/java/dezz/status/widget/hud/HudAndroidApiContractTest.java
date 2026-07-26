@@ -41,12 +41,14 @@ public final class HudAndroidApiContractTest {
         assertTrue(bridge.contains("FRAME_TIMEOUT_MS = 5_000"));
         assertFalse(bridge.contains("import android.view.SurfaceControl"));
         assertTrue(client.contains("display.getDisplayId() == HudViewportPolicy.VERIFIED_DISPLAY_ID"));
-        assertTrue(client.contains("? 1 : Math.max(0, display.getDisplayId())"));
+        assertTrue(client.contains("? HudViewportPolicy.VERIFIED_LAYER_STACK"));
+        assertFalse(client.contains("? 1 : Math.max(0, display.getDisplayId())"));
         assertTrue(client.contains("pendingFrame.getAndSet(null)"));
         assertTrue(client.contains("runLongRunningCommand"));
         assertFalse(client.contains(">/dev/null 2>&1 &)"));
         assertTrue(service.contains("showWindowManagerFallback(display)"));
-        assertTrue(service.contains("dismissFallbackOnly(\"system HUD surface ready\")"));
+        assertFalse(service.contains("dismissFallbackOnly(\"system HUD surface ready\")"));
+        assertTrue(service.contains("кадр принят SurfaceFlinger"));
         assertTrue(service.contains("systemSurfaceRetryAfter"));
     }
 
