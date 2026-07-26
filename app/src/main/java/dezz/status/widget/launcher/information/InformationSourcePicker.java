@@ -24,7 +24,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -335,34 +334,73 @@ public final class InformationSourcePicker {
 
     @NonNull
     private List<Choice> phoneChoices() {
+        Map<String, ConnectorValue> liveValues = new LinkedHashMap<>();
         WidgetService service = WidgetService.getInstance();
-        if (service == null) return Collections.emptyList();
+        if (service != null) {
+            for (ConnectorValue value : service.connectorValueSnapshot()) {
+                if (value.connectorType != ConnectorType.PHONE || !value.readable) continue;
+                // Transport identity and collection values are intentionally not one-line tiles.
+                if (!PhoneInformationSourcePolicy.selectable(value.resourceId)) continue;
+                liveValues.put(value.resourceId, value);
+            }
+        }
+
         List<Choice> choices = new ArrayList<>();
-        for (ConnectorValue value : service.connectorValueSnapshot()) {
-            if (value.connectorType != ConnectorType.PHONE || !value.readable) continue;
-            // Transport identity and collection values are intentionally not one-line tiles.
-            if (!PhoneInformationSourcePolicy.selectable(value.resourceId)) continue;
+        Map<String, Boolean> catalogResources = new LinkedHashMap<>();
+        for (PhoneInformationSourcePolicy.Source source :
+                PhoneInformationSourcePolicy.catalog()) {
+            catalogResources.put(source.resourceId, true);
+            ConnectorValue live = liveValues.get(source.resourceId);
+            Object displayValue = live == null ? null
+                    : PhoneInformationSourcePolicy.displayValue(live, source.valuePath);
+            choices.add(phoneChoice(source.resourceId, source.valuePath, source.label,
+                    source.valueType, source.unit, source.searchHint, live, displayValue));
+        }
+
+        // Preserve forward compatibility: a future scalar PHONE resource is immediately
+        // selectable even before this static catalog learns a friendlier label.
+        for (ConnectorValue value : liveValues.values()) {
+            if (catalogResources.containsKey(value.resourceId)) continue;
+            if (value.rawValue instanceof Map<?, ?> || value.rawValue instanceof List<?>
+                    || "object".equalsIgnoreCase(value.valueType)
+                    || "list".equalsIgnoreCase(value.valueType)) {
+                continue;
+            }
             String label = first(string(value.attributes.get("friendly_name")),
                     string(value.attributes.get("name")), phoneLabel(value.resourceId));
-            String hint = value.valueType + " " + value.unit + " iphone phone "
-                    + value.resourceId;
-            SourceBinding binding = new SourceBinding(ConnectorType.PHONE,
-                    value.connectorId, value.resourceId,
-                    PhoneInformationSourcePolicy.valuePath(value.resourceId),
-                    SourceBinding.PRESENTATION_AUTO, value.unit);
-            InformationPanelConfig.Item item = InformationPanelConfig.Item.connector(
-                    binding, label, value.unit, hint);
+            String valuePath = PhoneInformationSourcePolicy.valuePath(value.resourceId);
             Object displayValue = PhoneInformationSourcePolicy.displayValue(value);
-            choices.add(new Choice(item,
-                    label + "\nТелефон · " + value.resourceId
-                            + (value.fresh ? " · сейчас: " + display(displayValue)
-                            : " · ожидает актуальное значение"),
-                    label + " " + value.resourceId + " " + hint + " "
-                            + displayValue + " " + value.attributes));
+            choices.add(phoneChoice(value.resourceId, valuePath, label, value.valueType,
+                    value.unit, value.valueType, value, displayValue));
         }
         choices.sort(Comparator.comparing(value -> value.label,
                 String.CASE_INSENSITIVE_ORDER));
         return choices;
+    }
+
+    @NonNull
+    private Choice phoneChoice(@NonNull String resourceId, @NonNull String valuePath,
+                               @NonNull String label, @NonNull String valueType,
+                               @NonNull String unit, @NonNull String searchHint,
+                               @Nullable ConnectorValue live, @Nullable Object displayValue) {
+        String connectorId = live == null
+                ? SourceBinding.DEFAULT_CONNECTOR_ID : live.connectorId;
+        String hint = valueType + " " + unit + " iphone phone " + resourceId + " "
+                + valuePath + " " + searchHint;
+        SourceBinding binding = new SourceBinding(ConnectorType.PHONE,
+                connectorId, resourceId, valuePath,
+                SourceBinding.PRESENTATION_AUTO, unit);
+        InformationPanelConfig.Item item = InformationPanelConfig.Item.connector(
+                binding, label, unit, hint);
+        boolean current = live != null && live.fresh && live.available
+                && live.readable && displayValue != null;
+        String pathSuffix = valuePath.isEmpty() ? "" : " · " + valuePath;
+        return new Choice(item,
+                label + "\nТелефон · " + resourceId + pathSuffix
+                        + (current ? " · сейчас: " + display(displayValue)
+                        : " · ожидает актуальное значение"),
+                label + " " + resourceId + " " + hint + " "
+                        + displayValue + " " + (live == null ? "" : live.attributes));
     }
 
     @NonNull

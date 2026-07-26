@@ -114,6 +114,7 @@
     <string name="brick_title_bluetooth">Bluetooth</string>
     <string name="brick_title_indoor_temp">Cabin temperature</string>
     <string name="brick_title_outdoor_temp">Outside temperature</string>
+    <string name="brick_title_phone_status">iPhone statuses</string>
     <string name="show_bluetooth_device_count_badge">Show connected device count badge</string>
     <string name="brick_font_size">Font size</string>
     <string name="brick_size">Size</string>
@@ -289,6 +290,23 @@
     <string name="phone_messages_subtitle">Receive Apple Messages notifications through ANCS and device-qualified Bluetooth MAP events, when available</string>
     <string name="phone_text_title">Include notification and message text</string>
     <string name="phone_text_subtitle">Show titles and message text; turn off for private summaries only</string>
+
+    <string name="phone_section_status_bar">Status row</string>
+    <string name="phone_status_items_title">Persistent iPhone status blocks</string>
+    <string name="phone_status_items_none">No status blocks selected</string>
+    <string name="phone_status_items_summary">%1$d blocks selected</string>
+    <string name="phone_status_items_choose">Choose status blocks</string>
+    <string name="phone_status_items_hint">Add “iPhone statuses” in the status-row editor, then choose which current values are shown here.</string>
+    <string name="phone_status_notification_title">Show new notifications in the status row</string>
+    <string name="phone_status_notification_subtitle">Temporarily replace Now Playing with live ANCS; the element is added automatically and selecting topic or text enables reading it</string>
+    <string name="phone_status_notification_fields_title">Notification fields</string>
+    <string name="phone_status_notification_fields_summary">%1$d fields selected</string>
+    <string name="phone_status_notification_fields_choose">Choose notification fields</string>
+    <string name="phone_status_notification_fields_required">Select at least one notification field.</string>
+    <string name="phone_status_notification_duration_title">Display duration</string>
+    <string name="phone_status_notification_duration_value">%1$d seconds</string>
+    <string name="phone_status_notification_duration_prompt">Seconds from 1 to 120</string>
+    <string name="phone_status_notification_duration_invalid">Enter a value from 1 to 120 seconds.</string>
 
     <string name="phone_section_sprut">Sprut.hub presence</string>
     <string name="phone_sprut_enable_title">Export iPhone presence</string>

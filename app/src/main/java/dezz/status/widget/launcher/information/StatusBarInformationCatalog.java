@@ -35,6 +35,7 @@ public final class StatusBarInformationCatalog {
                 "Температура в салоне", "°C"));
         result.add(vehicle(BrickType.OUTDOOR_TEMP, "ISensor.ambient_temp",
                 "Температура за бортом", "°C"));
+        result.add(system(BrickType.PHONE_STATUS, "Статусы iPhone", ""));
         return result;
     }
 
@@ -98,6 +99,8 @@ public final class StatusBarInformationCatalog {
                 return "temperature";
             case DATE:
                 return "calendar";
+            case PHONE_STATUS:
+                return "phone_notification";
             case TIME:
             default:
                 return "notification";

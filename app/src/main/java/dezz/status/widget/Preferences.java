@@ -469,6 +469,8 @@ public class Preferences {
     public final TextBrickPrefs outdoorTemp = new TextBrickPrefs(this, "outdoorTemp", 40);
     /** Layout-level settings for the dynamic HA row. Child text styles live in haMainBricksJson. */
     public final TextBrickPrefs homeAssistant = new TextBrickPrefs(this, "homeAssistant", 40);
+    /** Shared text appearance for the selected iPhone scalar blocks in the status row. */
+    public final TextBrickPrefs phoneStatus = new TextBrickPrefs(this, "phoneStatus", 20);
 
     // Home Assistant / automation configuration. JSON arrays are versioned by their model
     // classes and therefore automatically participate in the existing settings export/import.
@@ -654,6 +656,18 @@ public class Preferences {
             "phoneMessagesEnabled", false);
     public final Bool phoneIncludeNotificationText = new Bool(this,
             "phoneIncludeNotificationText", false);
+    /** Ordered comma-separated ids rendered inside the PHONE_STATUS status-row brick. */
+    public final Str phoneStatusBarItems = new Str(this, "phoneStatusItems",
+            "connected,battery.level,network.type,network.signal");
+    /** Whether a newly received real-time ANCS event temporarily replaces Now Playing. */
+    public final Bool phoneStatusBarNotificationsEnabled = new Bool(this,
+            "phoneNotificationTickerEnabled", false);
+    /** How long the temporary notification presentation remains visible. */
+    public final Int phoneStatusBarNotificationSeconds = new Int(this,
+            "phoneNotificationTickerSeconds", 10);
+    /** Ordered notification fields used by the temporary status-row presentation. */
+    public final Str phoneStatusBarNotificationFields = new Str(this,
+            "phoneNotificationTickerFields", "application,topic,text");
     /** Optional writable Sprut.hub boolean characteristic reflecting phone presence. */
     public final Bool phoneSprutPresenceEnabled = new Bool(this,
             "phoneSprutPresenceEnabled", false);
@@ -695,6 +709,8 @@ public class Preferences {
                 return outdoorTemp;
             case HOME_ASSISTANT:
                 return homeAssistant;
+            case PHONE_STATUS:
+                return phoneStatus;
             default:
                 return null;
         }
@@ -896,6 +912,7 @@ public class Preferences {
             case INDOOR_TEMP: return "indoorTemp";
             case OUTDOOR_TEMP: return "outdoorTemp";
             case HOME_ASSISTANT: return "homeAssistant";
+            case PHONE_STATUS: return "phoneStatus";
             default: return null;
         }
     }

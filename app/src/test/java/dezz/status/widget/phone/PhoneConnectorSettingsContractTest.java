@@ -27,6 +27,10 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("\"phoneNotificationsEnabled\", true"));
         assertTrue(source.contains("\"phoneMessagesEnabled\", false"));
         assertTrue(source.contains("\"phoneIncludeNotificationText\", false"));
+        assertTrue(source.contains("\"phoneStatusItems\""));
+        assertTrue(source.contains("\"phoneNotificationTickerEnabled\", false"));
+        assertTrue(source.contains("\"phoneNotificationTickerSeconds\", 10"));
+        assertTrue(source.contains("\"phoneNotificationTickerFields\""));
         assertTrue(source.contains("\"phoneSprutPresenceEnabled\", false"));
         assertTrue(source.contains("\"phoneSprutPresencePath\", \"\""));
         assertTrue(source.substring(source.indexOf("SECRET_PREFERENCE_KEYS"),
@@ -118,6 +122,17 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("value.path().stableId()"));
         assertTrue(source.contains("selectedSprutPath = \"\""));
         assertFalse(source.contains("PhoneConnectorController"));
+        assertTrue(source.contains("chooseStatusItems()"));
+        assertTrue(source.contains("chooseNotificationFields()"));
+        assertTrue(source.contains("chooseNotificationDuration()"));
+        assertTrue(source.contains("requested < 1 || requested > 120"));
+        assertTrue(source.contains("selectedNotificationFields.isEmpty()"));
+        assertTrue(source.contains(
+                "selectedNotificationFields.contains(PhoneStatusBarPolicy.FIELD_TOPIC)"));
+        assertTrue(source.contains("includeNotificationText.setChecked(true)"));
+        assertTrue(source.contains("order.add(BrickType.MEDIA)"));
+        assertTrue(source.contains(
+                "preferences.phoneStatusBarNotificationsEnabled.set("));
     }
 
     @Test
@@ -167,6 +182,12 @@ public final class PhoneConnectorSettingsContractTest {
             assertTrue(source.contains("name=\"phone_diag_last_app\""));
             assertTrue(source.contains("name=\"phone_test_ancs\""));
             assertTrue(source.contains("name=\"phone_test_choose_source\""));
+            assertTrue(source.contains("name=\"phone_status_items_title\""));
+            assertTrue(source.contains("name=\"phone_status_notification_title\""));
+            assertTrue(source.contains(
+                    "name=\"phone_status_notification_duration_title\""));
+            assertTrue(source.contains(
+                    "name=\"phone_status_notification_fields_required\""));
             assertFalse(source.contains("name=\"phone_allow_sms\""));
             assertFalse(source.contains("name=\"phone_sms_permission_granted\""));
         }

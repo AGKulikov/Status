@@ -89,6 +89,7 @@ import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -106,6 +107,7 @@ import dezz.status.widget.automation.ScenarioTriggerReceiver;
 import dezz.status.widget.ha.HaBrickConfig;
 import dezz.status.widget.ha.HaBrickConfigStore;
 import dezz.status.widget.integration.ConnectorActionDispatcher;
+import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.IntentScenarioController;
@@ -120,6 +122,7 @@ import dezz.status.widget.ha.api.HaEntityCatalog;
 import dezz.status.widget.ha.api.HaWebSocketConnector;
 import dezz.status.widget.mqtt.MqttController;
 import dezz.status.widget.phone.PhoneConnectorController;
+import dezz.status.widget.phone.PhoneStatusBarPolicy;
 import dezz.status.widget.phone.PhoneSprutPresenceExporter;
 import dezz.status.widget.popup.PopupOverlayController;
 import dezz.status.widget.popup.PopupOverlayManager;
@@ -220,6 +223,8 @@ public class WidgetService extends Service {
     // One repaint per second is visually sufficient for a compact status-row progress line and
     // halves MediaSession polling/layout invalidation versus HA1048 on low-end head units.
     private static final long MEDIA_PROGRESS_TICK_MS = 1_000L;
+    /** More than the connector cache, so removing the newest item can never replay an older one. */
+    private static final int MAX_OBSERVED_PHONE_NOTIFICATIONS = 128;
     /** Gap between the play/pause indicator and the text it precedes, as a fraction of that
      *  text's size — same rationale as the icon's own size: it must track the font sliders. */
     private static final float STATE_ICON_GAP_RATIO = 0.25f;
@@ -298,6 +303,33 @@ public class WidgetService extends Service {
     private final AtomicBoolean crossSourceRuleRefreshScheduled = new AtomicBoolean();
     private final ConnectorValueRegistry.Listener crossSourceRuleListener =
             changedValues -> scheduleCrossSourceRuleRefresh();
+    /** Latest immutable PHONE snapshot projected into the configurable status-row brick. */
+    private final Map<String, ConnectorValue> phoneStatusValues = new LinkedHashMap<>();
+    @Nullable
+    private PhoneStatusBarPolicy.NotificationPresentation activePhoneNotification;
+    private final Set<String> observedPhoneNotificationKeys = new LinkedHashSet<>();
+    private long activePhoneNotificationExpiresAt;
+    private int mediaDurationVisibilityBeforePhoneNotification = View.GONE;
+    private int mediaProgressVisibilityBeforePhoneNotification = View.GONE;
+    private final ConnectorValueRegistry.Listener phoneStatusListener =
+            changedValues -> postPhoneValuesChanged(new ArrayList<>(changedValues));
+    private final Runnable phoneNotificationExpiry = new Runnable() {
+        @Override public void run() {
+            if (destroyed || activePhoneNotification == null) return;
+            long remaining = activePhoneNotificationExpiresAt
+                    - android.os.SystemClock.elapsedRealtime();
+            if (remaining > 0L) {
+                mainHandler.postDelayed(this, remaining);
+                return;
+            }
+            clearPhoneStatusNotification(true);
+            if (binding != null) {
+                updateMediaInfo();
+                applyBrickVisibility(currentBrickSet());
+            }
+            schedulePopupRefresh();
+        }
+    };
     private final Runnable crossSourceRuleRefresh = () -> {
         crossSourceRuleRefreshScheduled.set(false);
         if (destroyed) return;
@@ -312,6 +344,10 @@ public class WidgetService extends Service {
     private void scheduleCrossSourceRuleRefresh() {
         if (destroyed || !crossSourceRuleRefreshScheduled.compareAndSet(false, true)) return;
         mainHandler.postDelayed(crossSourceRuleRefresh, 50L);
+    }
+
+    private void postPhoneValuesChanged(@NonNull List<ConnectorValue> immutableCopy) {
+        mainHandler.post(() -> onPhoneValuesChanged(immutableCopy));
     }
 
     private WindowManager windowManager;
@@ -676,6 +712,7 @@ public class WidgetService extends Service {
         automationStates = new AutomationStateStore(this);
         connectorValues = new ConnectorValueRegistry();
         connectorValues.addListener(crossSourceRuleListener);
+        connectorValues.addListener(phoneStatusListener);
         // A value persisted before ignition-off is useful context, but it is not authoritative
         // after a new process starts. Each connector promotes only values returned by its fresh
         // startup snapshot/retained replay, preventing a missed offline change from looking live.
@@ -1164,6 +1201,7 @@ public class WidgetService extends Service {
         applyIndoorTempBrickSettings();
         applyOutdoorTempBrickSettings();
         renderHomeAssistantBricks(true);
+        renderPhoneStatusBricks(true);
         applyBrickVisibility(bricksSet);
 
         binding.overlayContainer.setPadding(
@@ -1360,6 +1398,11 @@ public class WidgetService extends Service {
         }
         if (binding == null) return;
 
+        if (!prefs.phoneStatusBarNotificationsEnabled.get()
+                && activePhoneNotification != null) {
+            clearPhoneStatusNotification(true);
+        }
+
         // Configuration changes are comparatively rare. Cache the parsed document here so
         // frequent connector packets only update existing views and in-memory states.
         if (haConfigs != null) configuredMainBricks = haConfigs.loadMain();
@@ -1402,6 +1445,7 @@ public class WidgetService extends Service {
         applyIndoorTempBrickSettings();
         applyOutdoorTempBrickSettings();
         renderHomeAssistantBricks(true);
+        renderPhoneStatusBricks(true);
 
         applyBrickVisibility(bricksSet);
         applyOverlayPosition();
@@ -1479,7 +1523,11 @@ public class WidgetService extends Service {
             enableMediaTracking();
         } else {
             disableMediaTracking();
-            binding.mediaContainer.setVisibility(View.GONE);
+            if (isPhoneNotificationActive()) {
+                renderPhoneStatusNotification();
+            } else {
+                binding.mediaContainer.setVisibility(View.GONE);
+            }
         }
 
         // Car temperature bricks — one subscription per brick through the flavor's
@@ -1845,6 +1893,8 @@ public class WidgetService extends Service {
                 return binding.outdoorTempText;
             case HOME_ASSISTANT:
                 return binding.homeAssistantContainer;
+            case PHONE_STATUS:
+                return binding.phoneStatusContainer;
             default:
                 return null;
         }
@@ -1978,6 +2028,188 @@ public class WidgetService extends Service {
             container.setTranslationY(prefs.homeAssistant.adjustY.get());
             container.setAlpha(prefs.homeAssistant.contentAlpha.get() / 255f);
         }
+    }
+
+    /** Applies one immutable PHONE registry burst on the main thread. */
+    private void onPhoneValuesChanged(@NonNull List<ConnectorValue> changedValues) {
+        if (destroyed || prefs == null) return;
+        ConnectorValue latestNotification = null;
+        ConnectorValue notificationItems = null;
+        boolean phoneValueChanged = false;
+        boolean sessionEnded = false;
+        for (ConnectorValue value : changedValues) {
+            if (value == null || value.connectorType != ConnectorType.PHONE) continue;
+            phoneStatusValues.put(value.resourceId, value);
+            phoneValueChanged = true;
+            if ("connected".equals(value.resourceId)
+                    && Boolean.FALSE.equals(value.rawValue)) {
+                sessionEnded = true;
+            }
+            if ("notifications.latest".equals(value.resourceId)) {
+                latestNotification = value;
+            } else if ("notifications.items".equals(value.resourceId)) {
+                notificationItems = value;
+            }
+        }
+        if (!phoneValueChanged) return;
+        if (sessionEnded) observedPhoneNotificationKeys.clear();
+
+        if (latestNotification != null) {
+            // Observe the delivery even while status-row notifications are disabled. Enabling
+            // the preference later must not replay whatever happened to be the last phone item.
+            String latestKey = PhoneStatusBarPolicy.notificationKey(
+                    latestNotification.rawValue);
+            boolean latestIsNew = latestKey != null
+                    && !observedPhoneNotificationKeys.contains(latestKey);
+            rememberPhoneNotificationItems(notificationItems);
+            rememberPhoneNotificationKey(latestKey);
+            if (latestIsNew) {
+                if (prefs.phoneStatusBarNotificationsEnabled.get()) {
+                    Set<String> selected = PhoneStatusBarPolicy.parseIds(
+                            prefs.phoneStatusBarNotificationFields.get(),
+                            PhoneStatusBarPolicy.notificationFieldIds());
+                    PhoneStatusBarPolicy.NotificationPresentation presentation =
+                            PhoneStatusBarPolicy.notification(latestNotification, selected);
+                    if (presentation != null) showPhoneStatusNotification(presentation);
+                }
+            }
+        }
+
+        if (binding != null) {
+            renderPhoneStatusBricks();
+            applyBrickVisibility(currentBrickSet());
+        }
+        schedulePopupRefresh();
+    }
+
+    private void rememberPhoneNotificationItems(@Nullable ConnectorValue value) {
+        if (value == null || !(value.rawValue instanceof List<?>)) return;
+        for (Object item : (List<?>) value.rawValue) {
+            rememberPhoneNotificationKey(PhoneStatusBarPolicy.notificationKey(item));
+        }
+    }
+
+    private void rememberPhoneNotificationKey(@Nullable String key) {
+        if (TextUtils.isEmpty(key)) return;
+        observedPhoneNotificationKeys.add(key);
+        while (observedPhoneNotificationKeys.size() > MAX_OBSERVED_PHONE_NOTIFICATIONS) {
+            java.util.Iterator<String> oldest = observedPhoneNotificationKeys.iterator();
+            if (!oldest.hasNext()) break;
+            oldest.next();
+            oldest.remove();
+        }
+    }
+
+    /** Reconciles the selectable scalar iPhone values without owning another BLE connection. */
+    private void renderPhoneStatusBricks() {
+        renderPhoneStatusBricks(false);
+    }
+
+    private void renderPhoneStatusBricks(boolean forceStyle) {
+        if (binding == null || prefs == null) return;
+        LinearLayout container = binding.phoneStatusContainer;
+        Set<String> selected = PhoneStatusBarPolicy.parseIds(
+                prefs.phoneStatusBarItems.get(), PhoneStatusBarPolicy.statusIds());
+
+        Map<String, OutlineTextView> existing = new LinkedHashMap<>();
+        for (int index = 0; index < container.getChildCount(); index++) {
+            View child = container.getChildAt(index);
+            Object tag = child.getTag();
+            if (child instanceof OutlineTextView && tag instanceof String) {
+                existing.put((String) tag, (OutlineTextView) child);
+            }
+        }
+
+        List<OutlineTextView> desired = new ArrayList<>();
+        for (PhoneStatusBarPolicy.StatusItem item : PhoneStatusBarPolicy.statusItems()) {
+            if (!selected.contains(item.id)) continue;
+            String value = PhoneStatusBarPolicy.display(
+                    item, phoneStatusValues.get(item.resourceId));
+            if (TextUtils.isEmpty(value)) continue;
+
+            OutlineTextView view = existing.remove(item.id);
+            boolean created = view == null;
+            if (created) {
+                view = new OutlineTextView(themedContext != null ? themedContext : this);
+                view.setTag(item.id);
+                view.setSingleLine(true);
+                view.setIncludeFontPadding(false);
+                view.setContentDescription(item.label);
+                LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT);
+                layout.gravity = Gravity.CENTER_VERTICAL;
+                view.setLayoutParams(layout);
+            }
+            if (created || forceStyle) applyPhoneStatusTextStyle(view);
+            String rendered = desired.isEmpty() ? value : " · " + value;
+            setTextIfChanged(view, rendered);
+            desired.add(view);
+        }
+
+        for (OutlineTextView obsolete : existing.values()) {
+            container.removeView(obsolete);
+        }
+        for (int index = 0; index < desired.size(); index++) {
+            OutlineTextView view = desired.get(index);
+            if (index < container.getChildCount() && container.getChildAt(index) == view) continue;
+            ViewGroup.LayoutParams layout = view.getLayoutParams();
+            if (view.getParent() == container) container.removeView(view);
+            container.addView(view, index, layout);
+        }
+        if (forceStyle) {
+            applyHorizontalMargins(container, prefs.phoneStatus.marginStart.get(),
+                    prefs.phoneStatus.marginEnd.get());
+            container.setTranslationY(prefs.phoneStatus.adjustY.get());
+            container.setAlpha(prefs.phoneStatus.contentAlpha.get() / 255f);
+        }
+    }
+
+    private void applyPhoneStatusTextStyle(@NonNull OutlineTextView view) {
+        view.setTextColor(ContextCompat.getColor(themedContext, R.color.text_primary));
+        view.setOutlineColor(textOutlineColor(prefs.phoneStatus.outlineAlpha.get()));
+        view.setOutlineWidth(prefs.phoneStatus.outlineWidth.get());
+        view.setTypeface(Fonts.resolve(this, prefs.phoneStatus.fontFamily.get(),
+                prefs.phoneStatus.fontBold.get(), prefs.phoneStatus.fontItalic.get()));
+        view.setTextSize(TypedValue.COMPLEX_UNIT_PX, prefs.phoneStatus.fontSize.get());
+    }
+
+    private boolean hasVisiblePhoneStatusValues() {
+        if (binding == null) return false;
+        for (int index = 0; index < binding.phoneStatusContainer.getChildCount(); index++) {
+            View child = binding.phoneStatusContainer.getChildAt(index);
+            if (child.getVisibility() == View.VISIBLE
+                    && child instanceof android.widget.TextView
+                    && !TextUtils.isEmpty(((android.widget.TextView) child).getText())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @NonNull
+    private String joinedVisibleText(@NonNull LinearLayout container) {
+        StringBuilder result = new StringBuilder();
+        for (int index = 0; index < container.getChildCount(); index++) {
+            View child = container.getChildAt(index);
+            if (child.getVisibility() != View.VISIBLE
+                    || !(child instanceof android.widget.TextView)) continue;
+            CharSequence text = ((android.widget.TextView) child).getText();
+            if (TextUtils.isEmpty(text)) continue;
+            result.append(text);
+        }
+        return result.toString();
+    }
+
+    @NonNull
+    private OutlineTextView firstPhoneStatusTextView() {
+        if (binding != null) {
+            for (int index = 0; index < binding.phoneStatusContainer.getChildCount(); index++) {
+                View child = binding.phoneStatusContainer.getChildAt(index);
+                if (child instanceof OutlineTextView) return (OutlineTextView) child;
+            }
+        }
+        return binding.timeText;
     }
 
     private void applyDateBrickSettings() {
@@ -2275,6 +2507,8 @@ public class WidgetService extends Service {
                 && car.isBrickSupported(BrickType.OUTDOOR_TEMP);
         boolean homeAssistantActive = bricksSet.contains(BrickType.HOME_ASSISTANT)
                 && binding.homeAssistantContainer.getChildCount() > 0;
+        boolean phoneStatusActive = bricksSet.contains(BrickType.PHONE_STATUS)
+                && hasVisiblePhoneStatusValues();
         BrickTarget[] targets = {
                 resolveTarget(BrickType.TIME, bricksSet.contains(BrickType.TIME),
                         binding.timeText, prefs.time.contentAlpha.get()),
@@ -2292,15 +2526,20 @@ public class WidgetService extends Service {
                         binding.outdoorTempText, prefs.outdoorTemp.contentAlpha.get()),
                 resolveTarget(BrickType.HOME_ASSISTANT, homeAssistantActive,
                         binding.homeAssistantContainer, prefs.homeAssistant.contentAlpha.get()),
+                resolveTarget(BrickType.PHONE_STATUS, phoneStatusActive,
+                        binding.phoneStatusContainer, prefs.phoneStatus.contentAlpha.get()),
         };
 
         // Media has the extra session gate, so we build its BrickTarget here. In particular, the
         // deferred post-boot integration refresh must not make an empty mediaContainer visible
         // after enableMediaTracking already hid it: only real active media may occupy the row.
-        boolean mediaSessionActive = pickActiveMediaController() != null;
+        boolean phoneNotificationActive = isPhoneNotificationActive();
+        boolean mediaSessionActive = phoneNotificationActive
+                || pickActiveMediaController() != null;
         boolean mediaShouldBeGone = !bricksSet.contains(BrickType.MEDIA)
                 || !isRemotelyVisible(BrickType.MEDIA) || !mediaSessionActive;
-        boolean mediaHiddenByApp = !mediaShouldBeGone && isBrickHiddenByApp(BrickType.MEDIA);
+        boolean mediaHiddenByApp = !mediaShouldBeGone
+                && isBrickHiddenByApp(BrickType.MEDIA);
         BrickTarget mediaTarget;
         if (mediaShouldBeGone) {
             mediaTarget = new BrickTarget(binding.mediaContainer, View.GONE, 1f);
@@ -2459,6 +2698,10 @@ public class WidgetService extends Service {
                 }
                 return new PopupOverlayController.BuiltinValue(text.toString(), "#FFFFFFFF", null,
                         binding.homeAssistantContainer.getVisibility() == View.VISIBLE);
+            case "builtin.phone_status":
+                return new PopupOverlayController.BuiltinValue(
+                        joinedVisibleText(binding.phoneStatusContainer), "#FFFFFFFF",
+                        "phone", binding.phoneStatusContainer.getVisibility() == View.VISIBLE);
             default:
                 return null;
         }
@@ -2710,6 +2953,10 @@ public class WidgetService extends Service {
                 }
             }
         }
+        if (bricks.contains(BrickType.PHONE_STATUS)) {
+            h = Math.max(h, textLineHeight(
+                    firstPhoneStatusTextView(), prefs.phoneStatus.fontSize.get()));
+        }
         return h;
     }
 
@@ -2818,8 +3065,113 @@ public class WidgetService extends Service {
         updateMediaInfo();
     }
 
+    private void showPhoneStatusNotification(
+            @NonNull PhoneStatusBarPolicy.NotificationPresentation presentation) {
+        boolean replacingPresentation = activePhoneNotification != null;
+        if (!replacingPresentation && binding != null) {
+            mediaDurationVisibilityBeforePhoneNotification =
+                    binding.mediaDurationText.getVisibility();
+            mediaProgressVisibilityBeforePhoneNotification =
+                    binding.mediaProgressBar.getVisibility();
+        }
+        if (binding != null) {
+            // A second notification can have identical text. Force a fresh marquee cycle for
+            // the new delivery instead of continuing halfway through the previous one.
+            binding.mediaTitleText.setMarqueeText("");
+        }
+        activePhoneNotification = presentation;
+        int seconds = Math.max(1, Math.min(120,
+                prefs.phoneStatusBarNotificationSeconds.get()));
+        activePhoneNotificationExpiresAt = android.os.SystemClock.elapsedRealtime()
+                + seconds * 1_000L;
+        mainHandler.removeCallbacks(phoneNotificationExpiry);
+        mainHandler.postDelayed(phoneNotificationExpiry, seconds * 1_000L);
+        if (binding != null) renderPhoneStatusNotification();
+    }
+
+    private boolean isPhoneNotificationActive() {
+        return activePhoneNotification != null && prefs != null
+                && prefs.phoneStatusBarNotificationsEnabled.get()
+                && android.os.SystemClock.elapsedRealtime()
+                < activePhoneNotificationExpiresAt;
+    }
+
+    private void clearPhoneStatusNotification(boolean restoreMediaVisibility) {
+        mainHandler.removeCallbacks(phoneNotificationExpiry);
+        activePhoneNotification = null;
+        activePhoneNotificationExpiresAt = 0L;
+        if (binding != null) {
+            // Clearing the alert must also stop the custom marquee when MEDIA is disabled or
+            // removed. In that path updateMediaInfo() is intentionally not called.
+            binding.mediaAppText.setMarqueeText("");
+            binding.mediaTitleText.setMarqueeText("");
+            binding.mediaTitleText.setMarqueeEnabled(prefs.media.marqueeEnabled.get());
+        }
+        if (restoreMediaVisibility && binding != null) {
+            binding.mediaDurationText.setVisibility(
+                    mediaDurationVisibilityBeforePhoneNotification);
+            binding.mediaProgressBar.setVisibility(
+                    mediaProgressVisibilityBeforePhoneNotification);
+        }
+    }
+
+    @NonNull
+    private String activePhoneNotificationText() {
+        PhoneStatusBarPolicy.NotificationPresentation presentation =
+                activePhoneNotification;
+        if (presentation == null) return "";
+        if (presentation.application.isEmpty()) return presentation.text;
+        String details = presentation.text;
+        if (presentation.application.equals(presentation.topic)) {
+            details = presentation.body;
+        }
+        if (details.isEmpty()) return presentation.application;
+        return presentation.application + " · " + details;
+    }
+
+    /**
+     * Temporarily reuses the configured Now Playing geometry. This is presentation-only:
+     * MediaSession callbacks and playback continue while the ANCS text occupies the rows.
+     */
+    private void renderPhoneStatusNotification() {
+        if (binding == null || !isPhoneNotificationActive()) return;
+        PhoneStatusBarPolicy.NotificationPresentation presentation =
+                activePhoneNotification;
+        if (presentation == null) return;
+
+        stopMediaProgressTicker();
+        binding.mediaStateIcon.setVisibility(View.GONE);
+        binding.mediaDurationText.setVisibility(View.GONE);
+        binding.mediaProgressBar.setVisibility(View.GONE);
+
+        binding.mediaSourceRow.setVisibility(View.GONE);
+        binding.mediaTitleRow.setVisibility(View.VISIBLE);
+        binding.mediaAppText.setMarqueeText("");
+        binding.mediaTitleText.setMarqueeEnabled(true);
+        binding.mediaTitleText.setMarqueeText(activePhoneNotificationText());
+
+        LinearLayout.LayoutParams titleLayout =
+                (LinearLayout.LayoutParams) binding.mediaTitleRow.getLayoutParams();
+        if (titleLayout.topMargin != 0) {
+            titleLayout.topMargin = 0;
+            binding.mediaTitleRow.setLayoutParams(titleLayout);
+        }
+
+        // Visibility remains solely owned by applyBrickVisibility(). In particular, the
+        // notification may not bypass remote visibility or the current app's hide rule.
+        schedulePopupRefresh();
+    }
+
     private void updateMediaInfo() {
         if (binding == null) return;
+        if (isPhoneNotificationActive()) {
+            renderPhoneStatusNotification();
+            return;
+        }
+        // Restore every view property temporarily changed by the ANCS presentation before
+        // rendering the current MediaSession snapshot.
+        binding.mediaStateIcon.setVisibility(View.VISIBLE);
+        binding.mediaTitleText.setMarqueeEnabled(prefs.media.marqueeEnabled.get());
         boolean mainMediaRequested = currentBrickSet().contains(BrickType.MEDIA)
                 && isRemotelyVisible(BrickType.MEDIA);
         boolean mainMediaHidden = mainMediaRequested && isBrickHiddenByApp(BrickType.MEDIA);
@@ -2833,6 +3185,8 @@ public class WidgetService extends Service {
                 && !popupMediaRequested && !driverMediaRequested) {
             binding.mediaContainer.setVisibility(View.GONE);
             stopMediaProgressTicker();
+            binding.mediaAppText.setMarqueeText("");
+            binding.mediaTitleText.setMarqueeText("");
             lastMediaSubtitle = null;
             schedulePopupRefresh();
             return;
@@ -2841,6 +3195,8 @@ public class WidgetService extends Service {
         if (playing == null) {
             binding.mediaContainer.setVisibility(View.GONE);
             stopMediaProgressTicker();
+            binding.mediaAppText.setMarqueeText("");
+            binding.mediaTitleText.setMarqueeText("");
             lastMediaSubtitle = null;
             schedulePopupRefresh();
             return;
@@ -3827,7 +4183,14 @@ public class WidgetService extends Service {
 
         // Unregister derived listeners first. Connector shutdown emits synchronous stale events;
         // with the guards above and no scenario/popup listeners left, none can recreate a window.
-        if (connectorValues != null) connectorValues.removeListener(crossSourceRuleListener);
+        if (connectorValues != null) {
+            connectorValues.removeListener(phoneStatusListener);
+            connectorValues.removeListener(crossSourceRuleListener);
+        }
+        phoneStatusValues.clear();
+        observedPhoneNotificationKeys.clear();
+        activePhoneNotification = null;
+        activePhoneNotificationExpiresAt = 0L;
         crossSourceRuleRefreshScheduled.set(false);
         synchronized (automationUiLock) {
             pendingAutomationUi.clear();
@@ -4006,6 +4369,11 @@ public class WidgetService extends Service {
             case OUTDOOR_TEMP:
                 text = String.valueOf(binding.outdoorTempText.getText());
                 known = !text.isEmpty() && !TEMP_PLACEHOLDER.equals(text);
+                active = known;
+                break;
+            case PHONE_STATUS:
+                text = joinedVisibleText(binding.phoneStatusContainer);
+                known = !text.isEmpty();
                 active = known;
                 break;
             default:

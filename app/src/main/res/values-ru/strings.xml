@@ -112,6 +112,7 @@
     <string name="brick_title_bluetooth">Bluetooth</string>
     <string name="brick_title_indoor_temp">Температура в салоне</string>
     <string name="brick_title_outdoor_temp">Температура за бортом</string>
+    <string name="brick_title_phone_status">Статусы iPhone</string>
     <string name="show_bluetooth_device_count_badge">Показывать число подключённых устройств</string>
     <string name="brick_font_size">Размер шрифта</string>
     <string name="brick_size">Размер</string>
@@ -284,6 +285,23 @@
     <string name="phone_messages_subtitle">Получать сообщения Apple через ANCS и события Bluetooth MAP с подтверждённым устройством, если они доступны</string>
     <string name="phone_text_title">Показывать текст уведомлений и сообщений</string>
     <string name="phone_text_subtitle">Отображать заголовки и текст; выключите, чтобы оставить только приватные сводки</string>
+
+    <string name="phone_section_status_bar">Статусная строка</string>
+    <string name="phone_status_items_title">Постоянные блоки статусов iPhone</string>
+    <string name="phone_status_items_none">Статусы не выбраны</string>
+    <string name="phone_status_items_summary">Выбрано блоков: %1$d</string>
+    <string name="phone_status_items_choose">Выбрать блоки статусов</string>
+    <string name="phone_status_items_hint">Добавьте элемент «Статусы iPhone» в редакторе статусной строки, а здесь выберите, какие актуальные значения в нём показывать.</string>
+    <string name="phone_status_notification_title">Показывать новые уведомления в статусной строке</string>
+    <string name="phone_status_notification_subtitle">Временно заменять трек новым уведомлением ANCS; элемент «Воспроизведение» добавится автоматически, а выбор темы или текста включит их чтение</string>
+    <string name="phone_status_notification_fields_title">Поля уведомления</string>
+    <string name="phone_status_notification_fields_summary">Выбрано полей: %1$d</string>
+    <string name="phone_status_notification_fields_choose">Выбрать поля уведомления</string>
+    <string name="phone_status_notification_fields_required">Выберите хотя бы одно поле уведомления.</string>
+    <string name="phone_status_notification_duration_title">Время показа</string>
+    <string name="phone_status_notification_duration_value">%1$d сек.</string>
+    <string name="phone_status_notification_duration_prompt">Введите от 1 до 120 секунд</string>
+    <string name="phone_status_notification_duration_invalid">Введите значение от 1 до 120 секунд.</string>
 
     <string name="phone_section_sprut">Присутствие в Sprut.hub</string>
     <string name="phone_sprut_enable_title">Передавать присутствие iPhone</string>

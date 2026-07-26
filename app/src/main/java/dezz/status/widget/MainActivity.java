@@ -297,6 +297,8 @@ public class MainActivity extends AppCompatActivity {
                 return getString(R.string.brick_title_outdoor_temp);
             case HOME_ASSISTANT:
                 return getString(R.string.brick_title_home_assistant);
+            case PHONE_STATUS:
+                return getString(R.string.brick_title_phone_status);
             default:
                 return "";
         }

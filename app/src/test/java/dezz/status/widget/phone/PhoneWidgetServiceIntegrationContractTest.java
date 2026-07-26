@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class PhoneWidgetServiceIntegrationContractTest {
@@ -107,6 +108,82 @@ public class PhoneWidgetServiceIntegrationContractTest {
         assertTrue(widgetServiceEntry.contains("android:stopWithTask=\"false\""));
     }
 
+    @Test
+    public void oneRegistryListenerProjectsSelectablePhoneStatusValues() throws Exception {
+        String source = readService();
+
+        assertTrue(source.contains("connectorValues.addListener(phoneStatusListener)"));
+        assertTrue(source.contains("connectorValues.removeListener(phoneStatusListener)"));
+        assertTrue(source.contains("value.connectorType != ConnectorType.PHONE"));
+        assertTrue(source.contains("renderPhoneStatusBricks()"));
+        assertTrue(source.contains("PhoneStatusBarPolicy.parseIds("));
+        assertTrue(source.contains("PhoneStatusBarPolicy.display("));
+        assertFalse(source.contains("new IphoneAncsTransport"));
+    }
+
+    @Test
+    public void latestRealTimeNotificationTemporarilyReusesMediaWithoutPlaybackControl()
+            throws Exception {
+        String source = readService();
+        int renderStart = source.indexOf("private void renderPhoneStatusNotification()");
+        int renderEnd = source.indexOf("private void updateMediaInfo()", renderStart);
+        String render = source.substring(renderStart, renderEnd);
+        int expiryStart = source.indexOf("private final Runnable phoneNotificationExpiry");
+        int expiryEnd = source.indexOf("private final Runnable crossSourceRuleRefresh",
+                expiryStart);
+        String expiry = source.substring(expiryStart, expiryEnd);
+
+        assertTrue(source.contains("\"notifications.latest\".equals(value.resourceId)"));
+        assertTrue(source.contains("observedPhoneNotificationKeys"));
+        assertTrue(source.contains("rememberPhoneNotificationItems(notificationItems)"));
+        assertTrue(source.contains("prefs.phoneStatusBarNotificationsEnabled.get()"));
+        assertTrue(source.contains("prefs.phoneStatusBarNotificationSeconds.get()"));
+        assertTrue(source.contains("Math.max(1, Math.min(120,"));
+        assertTrue(render.contains("binding.mediaStateIcon.setVisibility(View.GONE)"));
+        assertTrue(render.contains("binding.mediaDurationText.setVisibility(View.GONE)"));
+        assertTrue(render.contains("binding.mediaProgressBar.setVisibility(View.GONE)"));
+        assertTrue(render.contains("binding.mediaTitleText.setMarqueeEnabled(true)"));
+        assertTrue(expiry.contains("clearPhoneStatusNotification(true)"));
+        assertTrue(expiry.contains("updateMediaInfo();"));
+        assertFalse(render.contains("getTransportControls"));
+        assertFalse(render.contains(".pause("));
+        assertFalse(render.contains(".stop("));
+    }
+
+    @Test
+    public void phoneTickerHonorsMediaHideRulesAndDoesNotLeakToOtherSurfaces()
+            throws Exception {
+        String source = readService();
+        String visibility = between(source, "private void applyBrickVisibility(",
+                "private void applyBrickTarget(");
+        String render = between(source, "private void renderPhoneStatusNotification()",
+                "private void updateMediaInfo()");
+        String popup = between(source,
+                "private PopupOverlayController.BuiltinValue popupBuiltinValue(",
+                "private static PopupOverlayController.BuiltinValue popupTextValue(");
+        String snapshot = between(source,
+                "public StatusBrickSnapshot statusBrickSnapshot(",
+                "public List<ConnectorValue> connectorValueSnapshot()");
+
+        assertTrue(visibility.contains("!isRemotelyVisible(BrickType.MEDIA)"));
+        assertTrue(visibility.contains("isBrickHiddenByApp(BrickType.MEDIA)"));
+        assertFalse(render.contains("mediaContainer.setVisibility(View.VISIBLE)"));
+        assertFalse(popup.contains("activePhoneNotificationText()"));
+        assertFalse(snapshot.contains("activePhoneNotificationText()"));
+    }
+
+    @Test
+    public void clearingTickerStopsItsMarqueeEvenWhenMediaWasRemoved() throws Exception {
+        String source = readService();
+        String clear = between(source, "private void clearPhoneStatusNotification(",
+                "private String activePhoneNotificationText()");
+
+        assertTrue(clear.contains("binding.mediaAppText.setMarqueeText(\"\")"));
+        assertTrue(clear.contains("binding.mediaTitleText.setMarqueeText(\"\")"));
+        assertTrue(clear.contains(
+                "binding.mediaTitleText.setMarqueeEnabled(prefs.media.marqueeEnabled.get())"));
+    }
+
     private static String readService() throws Exception {
         return readWidgetSource("WidgetService.java");
     }
@@ -135,5 +212,14 @@ public class PhoneWidgetServiceIntegrationContractTest {
             offset += needle.length();
         }
         return count;
+    }
+
+    private static String between(String source, String start, String end) {
+        int from = source.indexOf(start);
+        int to = source.indexOf(end, Math.max(0, from + start.length()));
+        if (from < 0 || to < 0 || to <= from) {
+            throw new AssertionError("Missing source range: " + start + " -> " + end);
+        }
+        return source.substring(from, to);
     }
 }

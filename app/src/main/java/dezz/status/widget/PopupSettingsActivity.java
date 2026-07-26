@@ -637,6 +637,7 @@ public final class PopupSettingsActivity extends AppCompatActivity {
             case INDOOR_TEMP: return "Температура в салоне";
             case OUTDOOR_TEMP: return "Температура снаружи";
             case HOME_ASSISTANT: return "Устройства умного дома";
+            case PHONE_STATUS: return "Статусы iPhone";
             default: return type.name();
         }
     }

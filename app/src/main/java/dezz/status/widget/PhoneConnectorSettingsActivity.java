@@ -18,9 +18,11 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
+import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -41,6 +43,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -48,6 +51,7 @@ import java.util.Set;
 
 import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.ConnectorValue;
+import dezz.status.widget.phone.PhoneStatusBarPolicy;
 import dezz.status.widget.settings.SettingsBackNavigation;
 import dezz.status.widget.sprut.SprutActionValue;
 import dezz.status.widget.sprut.SprutCatalog;
@@ -73,8 +77,12 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     private MaterialSwitch notificationsEnabled;
     private MaterialSwitch messagesEnabled;
     private MaterialSwitch includeNotificationText;
+    private MaterialSwitch statusBarNotificationsEnabled;
     private MaterialSwitch sprutPresenceEnabled;
     private TextView selectedDeviceValue;
+    private TextView selectedStatusItemsValue;
+    private TextView selectedNotificationFieldsValue;
+    private TextView notificationDurationValue;
     private TextView selectedSprutPathValue;
     private TextView diagnostics;
     private final Handler diagnosticsHandler = new Handler(Looper.getMainLooper());
@@ -88,6 +96,9 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     };
     @NonNull private String selectedDeviceAddress = "";
     @NonNull private String selectedSprutPath = "";
+    @NonNull private final Set<String> selectedStatusItems = new LinkedHashSet<>();
+    @NonNull private final Set<String> selectedNotificationFields = new LinkedHashSet<>();
+    private int notificationDurationSeconds = 10;
     @NonNull private SprutCatalog sprutCatalog = SprutCatalog.empty();
 
     @Override
@@ -96,6 +107,14 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         preferences = new Preferences(this);
         selectedDeviceAddress = clean(preferences.phoneDeviceAddress.get());
         selectedSprutPath = clean(preferences.phoneSprutPresencePath.get());
+        selectedStatusItems.addAll(PhoneStatusBarPolicy.parseIds(
+                preferences.phoneStatusBarItems.get(),
+                PhoneStatusBarPolicy.statusIds()));
+        selectedNotificationFields.addAll(PhoneStatusBarPolicy.parseIds(
+                preferences.phoneStatusBarNotificationFields.get(),
+                PhoneStatusBarPolicy.notificationFieldIds()));
+        notificationDurationSeconds = boundedNotificationDuration(
+                preferences.phoneStatusBarNotificationSeconds.get());
         View screen = buildScreen();
         setContentView(screen);
         SettingsBackNavigation.install(this, screen);
@@ -191,6 +210,74 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         notificationsEnabled.setOnCheckedChangeListener((button, checked) ->
                 refreshDiagnostics());
 
+        page.addView(sectionTitle(getString(R.string.phone_section_status_bar)),
+                topMargin(24));
+        LinearLayout statusBarRows = column();
+        LinearLayout statusItemsRow = clickableRow(this::chooseStatusItems);
+        LinearLayout statusItemsLabels = column();
+        statusItemsLabels.addView(text(getString(R.string.phone_status_items_title),
+                17, Typeface.NORMAL), matchWrap());
+        selectedStatusItemsValue = secondary("", 14);
+        statusItemsLabels.addView(selectedStatusItemsValue, topMargin(3));
+        statusItemsRow.addView(statusItemsLabels, weighted());
+        TextView statusItemsDisclosure = text("›", 30, Typeface.NORMAL);
+        statusItemsDisclosure.setTextColor(color(R.color.settings_tertiary_text));
+        statusItemsRow.addView(statusItemsDisclosure, wrapWrap());
+        statusBarRows.addView(statusItemsRow, matchWrap());
+
+        statusBarNotificationsEnabled = new MaterialSwitch(this);
+        statusBarNotificationsEnabled.setChecked(
+                preferences.phoneStatusBarNotificationsEnabled.get());
+        addSwitchRow(statusBarRows, statusBarNotificationsEnabled,
+                R.string.phone_status_notification_title,
+                R.string.phone_status_notification_subtitle, true);
+        statusBarNotificationsEnabled.setOnCheckedChangeListener((button, checked) -> {
+            if (!checked) return;
+            // The ticker is a PHONE/ANCS consumer, so make its two upstream switches explicit
+            // instead of letting the user save a configuration that can never emit a value.
+            connectorEnabled.setChecked(true);
+            notificationsEnabled.setChecked(true);
+        });
+
+        LinearLayout notificationFieldsRow =
+                clickableRow(this::chooseNotificationFields);
+        LinearLayout notificationFieldsLabels = column();
+        notificationFieldsLabels.addView(text(
+                getString(R.string.phone_status_notification_fields_title),
+                17, Typeface.NORMAL), matchWrap());
+        selectedNotificationFieldsValue = secondary("", 14);
+        notificationFieldsLabels.addView(selectedNotificationFieldsValue, topMargin(3));
+        notificationFieldsRow.addView(notificationFieldsLabels, weighted());
+        TextView notificationFieldsDisclosure = text("›", 30, Typeface.NORMAL);
+        notificationFieldsDisclosure.setTextColor(
+                color(R.color.settings_tertiary_text));
+        notificationFieldsRow.addView(notificationFieldsDisclosure, wrapWrap());
+        statusBarRows.addView(separator(), separatorParams());
+        statusBarRows.addView(notificationFieldsRow, matchWrap());
+
+        LinearLayout notificationDurationRow =
+                clickableRow(this::chooseNotificationDuration);
+        LinearLayout notificationDurationLabels = column();
+        notificationDurationLabels.addView(text(
+                getString(R.string.phone_status_notification_duration_title),
+                17, Typeface.NORMAL), matchWrap());
+        notificationDurationValue = secondary("", 14);
+        notificationDurationLabels.addView(notificationDurationValue, topMargin(3));
+        notificationDurationRow.addView(notificationDurationLabels, weighted());
+        TextView notificationDurationDisclosure = text("›", 30, Typeface.NORMAL);
+        notificationDurationDisclosure.setTextColor(
+                color(R.color.settings_tertiary_text));
+        notificationDurationRow.addView(notificationDurationDisclosure, wrapWrap());
+        statusBarRows.addView(separator(), separatorParams());
+        statusBarRows.addView(notificationDurationRow, matchWrap());
+
+        page.addView(card(statusBarRows), topMargin(7));
+        TextView statusItemsHint =
+                secondary(getString(R.string.phone_status_items_hint), 13);
+        statusItemsHint.setPadding(dp(8), 0, dp(8), 0);
+        page.addView(statusItemsHint, topMargin(8));
+        refreshStatusBarSummaries();
+
         page.addView(sectionTitle(getString(R.string.phone_section_sprut)), topMargin(24));
         LinearLayout sprutRows = column();
         sprutPresenceEnabled = new MaterialSwitch(this);
@@ -257,6 +344,133 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         row.addView(toggle, wrapWrap());
         row.setOnClickListener(view -> toggle.setChecked(!toggle.isChecked()));
         parent.addView(row, matchWrap());
+    }
+
+    private void chooseStatusItems() {
+        List<PhoneStatusBarPolicy.StatusItem> items =
+                PhoneStatusBarPolicy.statusItems();
+        String[] labels = new String[items.size()];
+        boolean[] checked = new boolean[items.size()];
+        Set<String> working = new LinkedHashSet<>(selectedStatusItems);
+        for (int index = 0; index < items.size(); index++) {
+            PhoneStatusBarPolicy.StatusItem item = items.get(index);
+            labels[index] = item.label;
+            checked[index] = working.contains(item.id);
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.phone_status_items_choose)
+                .setMultiChoiceItems(labels, checked, (dialog, which, selected) -> {
+                    String id = items.get(which).id;
+                    if (selected) {
+                        working.add(id);
+                    } else {
+                        working.remove(id);
+                    }
+                })
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    selectedStatusItems.clear();
+                    selectedStatusItems.addAll(PhoneStatusBarPolicy.parseIds(
+                            PhoneStatusBarPolicy.serializeIds(
+                                    working, PhoneStatusBarPolicy.statusIds()),
+                            PhoneStatusBarPolicy.statusIds()));
+                    refreshStatusBarSummaries();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void chooseNotificationFields() {
+        List<PhoneStatusBarPolicy.NotificationField> fields =
+                PhoneStatusBarPolicy.notificationFields();
+        String[] labels = new String[fields.size()];
+        boolean[] checked = new boolean[fields.size()];
+        Set<String> working = new LinkedHashSet<>(selectedNotificationFields);
+        for (int index = 0; index < fields.size(); index++) {
+            PhoneStatusBarPolicy.NotificationField field = fields.get(index);
+            labels[index] = field.label;
+            checked[index] = working.contains(field.id);
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.phone_status_notification_fields_choose)
+                .setMultiChoiceItems(labels, checked, (dialog, which, selected) -> {
+                    String id = fields.get(which).id;
+                    if (selected) {
+                        working.add(id);
+                    } else {
+                        working.remove(id);
+                    }
+                })
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    selectedNotificationFields.clear();
+                    selectedNotificationFields.addAll(PhoneStatusBarPolicy.parseIds(
+                            PhoneStatusBarPolicy.serializeIds(
+                                    working,
+                                    PhoneStatusBarPolicy.notificationFieldIds()),
+                            PhoneStatusBarPolicy.notificationFieldIds()));
+                    refreshStatusBarSummaries();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void chooseNotificationDuration() {
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setSingleLine(true);
+        input.setText(String.valueOf(notificationDurationSeconds));
+        input.setSelectAllOnFocus(true);
+        input.setHint(R.string.phone_status_notification_duration_prompt);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.phone_status_notification_duration_title)
+                .setMessage(R.string.phone_status_notification_duration_prompt)
+                .setView(input)
+                .setPositiveButton(android.R.string.ok, null)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(
+                android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener(view -> {
+            int requested;
+            try {
+                requested = Integer.parseInt(clean(input.getText().toString()));
+            } catch (NumberFormatException invalid) {
+                input.setError(getString(
+                        R.string.phone_status_notification_duration_invalid));
+                return;
+            }
+            if (requested < 1 || requested > 120) {
+                input.setError(getString(
+                        R.string.phone_status_notification_duration_invalid));
+                return;
+            }
+            notificationDurationSeconds = requested;
+            refreshStatusBarSummaries();
+            dialog.dismiss();
+        }));
+        dialog.show();
+    }
+
+    private void refreshStatusBarSummaries() {
+        if (selectedStatusItemsValue != null) {
+            selectedStatusItemsValue.setText(selectedStatusItems.isEmpty()
+                    ? getString(R.string.phone_status_items_none)
+                    : getString(R.string.phone_status_items_summary,
+                            selectedStatusItems.size()));
+        }
+        if (selectedNotificationFieldsValue != null) {
+            selectedNotificationFieldsValue.setText(getString(
+                    R.string.phone_status_notification_fields_summary,
+                    selectedNotificationFields.size()));
+        }
+        if (notificationDurationValue != null) {
+            notificationDurationValue.setText(getString(
+                    R.string.phone_status_notification_duration_value,
+                    notificationDurationSeconds));
+        }
+    }
+
+    private static int boundedNotificationDuration(int seconds) {
+        return Math.max(1, Math.min(120, seconds));
     }
 
     private void chooseBondedDevice() {
@@ -813,6 +1027,23 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     }
 
     private boolean persistSettings(boolean showConfirmation) {
+        if (statusBarNotificationsEnabled.isChecked()) {
+            connectorEnabled.setChecked(true);
+            notificationsEnabled.setChecked(true);
+            if (selectedNotificationFields.isEmpty()) {
+                Toast.makeText(this,
+                        R.string.phone_status_notification_fields_required,
+                        Toast.LENGTH_LONG).show();
+                return false;
+            }
+            if (selectedNotificationFields.contains(PhoneStatusBarPolicy.FIELD_TOPIC)
+                    || selectedNotificationFields.contains(
+                    PhoneStatusBarPolicy.FIELD_TEXT)) {
+                // Selecting sensitive fields is an explicit opt-in to the existing connector
+                // privacy switch. App-only ticker mode remains privacy-safe.
+                includeNotificationText.setChecked(true);
+            }
+        }
         if (connectorEnabled.isChecked() && selectedDeviceAddress.isEmpty()) {
             Toast.makeText(this, R.string.phone_choose_required,
                     Toast.LENGTH_LONG).show();
@@ -838,6 +1069,22 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         preferences.phoneNotificationsEnabled.set(notificationsEnabled.isChecked());
         preferences.phoneMessagesEnabled.set(messagesEnabled.isChecked());
         preferences.phoneIncludeNotificationText.set(includeNotificationText.isChecked());
+        preferences.phoneStatusBarItems.set(PhoneStatusBarPolicy.serializeIds(
+                selectedStatusItems, PhoneStatusBarPolicy.statusIds()));
+        preferences.phoneStatusBarNotificationsEnabled.set(
+                statusBarNotificationsEnabled.isChecked());
+        preferences.phoneStatusBarNotificationFields.set(
+                PhoneStatusBarPolicy.serializeIds(selectedNotificationFields,
+                        PhoneStatusBarPolicy.notificationFieldIds()));
+        preferences.phoneStatusBarNotificationSeconds.set(
+                boundedNotificationDuration(notificationDurationSeconds));
+        if (statusBarNotificationsEnabled.isChecked()) {
+            List<BrickType> order = BrickType.parseOrder(preferences.brickOrder.get());
+            if (!order.contains(BrickType.MEDIA)) {
+                order.add(BrickType.MEDIA);
+                preferences.brickOrder.set(BrickType.serializeOrder(order));
+            }
+        }
         preferences.phoneSprutPresenceEnabled.set(sprutPresenceEnabled.isChecked());
         preferences.phoneSprutPresencePath.set(selectedSprutPath);
 

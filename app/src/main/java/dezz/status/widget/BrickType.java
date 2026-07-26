@@ -32,7 +32,13 @@ public enum BrickType {
     // the name is persisted in brickOrder / hideSource prefs.
     TIME, DATE, MEDIA, WIFI, GPS, BLUETOOTH, INDOOR_TEMP, OUTDOOR_TEMP,
     /** Dynamic row containing any number of independently configured HA text bricks. */
-    HOME_ASSISTANT;
+    HOME_ASSISTANT,
+    /**
+     * Dynamic row containing the user-selected scalar values of the exact paired iPhone.
+     *
+     * <p>Keep this appended: enum ordinals are RecyclerView stable ids in existing installs.</p>
+     */
+    PHONE_STATUS;
 
     /** Stable id used by Home Assistant/MQTT visibility commands. Never derive this from ordinal. */
     public String automationId() {
@@ -46,6 +52,7 @@ public enum BrickType {
             case INDOOR_TEMP: return "builtin.indoor_temp";
             case OUTDOOR_TEMP: return "builtin.outdoor_temp";
             case HOME_ASSISTANT: return "builtin.home_assistant";
+            case PHONE_STATUS: return "builtin.phone_status";
             default: throw new IllegalStateException("Unknown brick type " + this);
         }
     }

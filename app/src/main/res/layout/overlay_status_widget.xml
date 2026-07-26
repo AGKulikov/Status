@@ -240,6 +240,19 @@
         android:orientation="horizontal"
         android:visibility="gone"
         tools:visibility="visible" />
+
+    <!-- One first-class status-row brick whose children are the scalar iPhone values selected
+         in Phone settings. The controller still owns one exact-device boundary; this view only
+         projects the current ConnectorValue snapshot and never starts another Bluetooth client. -->
+    <LinearLayout
+        android:id="@+id/phoneStatusContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        tools:visibility="visible" />
     </dezz.status.widget.BufferingLinearLayout>
 
 </FrameLayout>

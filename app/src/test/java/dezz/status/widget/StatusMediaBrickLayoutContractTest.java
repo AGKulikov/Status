@@ -68,7 +68,10 @@ public final class StatusMediaBrickLayoutContractTest {
         String visibility = service.substring(visibilityStart, visibilityEnd);
 
         assertTrue(visibility.contains(
-                "boolean mediaSessionActive = pickActiveMediaController() != null"));
+                "boolean phoneNotificationActive = isPhoneNotificationActive()"));
+        assertTrue(visibility.contains(
+                "boolean mediaSessionActive = phoneNotificationActive"));
+        assertTrue(visibility.contains("|| pickActiveMediaController() != null"));
         assertTrue(visibility.contains("|| !mediaSessionActive"));
     }
 
@@ -109,6 +112,16 @@ public final class StatusMediaBrickLayoutContractTest {
         assertTrue(reconcile > visibleGate);
     }
 
+    @Test public void hiddenOrEmptyMediaStopsCustomMarqueeTicks() throws IOException {
+        String service = source();
+        int updateStart = service.indexOf("private void updateMediaInfo()");
+        int updateEnd = service.indexOf("private static String formatTrackDuration(", updateStart);
+        String update = service.substring(updateStart, updateEnd);
+
+        assertTrue(count(update, "binding.mediaAppText.setMarqueeText(\"\")") >= 2);
+        assertTrue(count(update, "binding.mediaTitleText.setMarqueeText(\"\")") >= 2);
+    }
+
     private static String source() throws IOException {
         Path fromRoot = Paths.get("app", "src", "main", "java", "dezz", "status", "widget",
                 "WidgetService.java");
@@ -116,5 +129,15 @@ public final class StatusMediaBrickLayoutContractTest {
                 "WidgetService.java");
         Path file = Files.isRegularFile(fromRoot) ? fromRoot : fromApp;
         return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+    }
+
+    private static int count(String source, String needle) {
+        int result = 0;
+        int offset = 0;
+        while ((offset = source.indexOf(needle, offset)) >= 0) {
+            result++;
+            offset += needle.length();
+        }
+        return result;
     }
 }
