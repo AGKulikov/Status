@@ -17,7 +17,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
-import android.widget.HorizontalScrollView;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -42,6 +42,8 @@ public final class HudLabActivity extends Activity implements HudLabController.L
     private static final int AMBER = Color.rgb(176, 116, 28);
 
     private final List<Button> commandButtons = new ArrayList<>();
+    private final List<Button> tabButtons = new ArrayList<>();
+    private final List<View> tabPages = new ArrayList<>();
     private HudLabController controller;
     private TextView connectionBadge;
     private TextView snapshotView;
@@ -103,22 +105,17 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         warning.setPadding(dp(10), dp(5), dp(10), dp(8));
         root.addView(warning);
 
-        HorizontalScrollView horizontal = new HorizontalScrollView(this);
-        horizontal.setFillViewport(true);
-        horizontal.setHorizontalScrollBarEnabled(false);
+        root.addView(buildTabBar(), new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
 
-        LinearLayout columns = new LinearLayout(this);
-        columns.setOrientation(LinearLayout.HORIZONTAL);
-        columns.setPadding(0, 0, 0, dp(4));
-        horizontal.addView(columns, new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-
-        columns.addView(buildStatusColumn(), weightedColumn(1.18f, 0, dp(6)));
-        columns.addView(buildActivationColumn(), weightedColumn(0.92f, dp(6), dp(6)));
-        columns.addView(buildExperimentColumn(), weightedColumn(1.0f, dp(6), 0));
-
-        root.addView(horizontal, new LinearLayout.LayoutParams(
+        FrameLayout pages = new FrameLayout(this);
+        addTabPage(pages, buildElementsTab());
+        addTabPage(pages, buildMaskTab());
+        addTabPage(pages, buildActivationTab());
+        addTabPage(pages, buildStatusTab());
+        root.addView(pages, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        selectTab(0);
         return root;
     }
 
@@ -131,7 +128,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         close.setOnClickListener(view -> finish());
         header.addView(close, fixedButton(dp(130)));
 
-        TextView title = text("HUD Lab 0.1", 23, TEXT, true);
+        TextView title = text("HUD Lab 0.2", 23, TEXT, true);
         title.setPadding(dp(16), 0, dp(18), 0);
         header.addView(title);
 
@@ -153,7 +150,92 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         return header;
     }
 
-    private View buildStatusColumn() {
+    private View buildTabBar() {
+        LinearLayout tabs = new LinearLayout(this);
+        tabs.setOrientation(LinearLayout.HORIZONTAL);
+        tabs.setPadding(0, 0, 0, dp(5));
+        addTabButton(tabs, "ШТАТНЫЕ ЭЛЕМЕНТЫ", 0);
+        addTabButton(tabs, "VISUAL MASK", 1);
+        addTabButton(tabs, "КАНАЛЫ HUD", 2);
+        addTabButton(tabs, "СТАТУС И ЖУРНАЛ", 3);
+        return tabs;
+    }
+
+    private void addTabButton(LinearLayout parent, String label, int index) {
+        Button tab = button(label, CARD_BORDER, true);
+        tab.setTextSize(12);
+        tab.setOnClickListener(view -> selectTab(index));
+        tabButtons.add(tab);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(39), 1f);
+        if (index > 0) params.leftMargin = dp(5);
+        parent.addView(tab, params);
+    }
+
+    private void addTabPage(FrameLayout parent, View page) {
+        page.setVisibility(View.GONE);
+        tabPages.add(page);
+        parent.addView(page, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+    private void selectTab(int index) {
+        for (int position = 0; position < tabPages.size(); position++) {
+            boolean selected = position == index;
+            tabPages.get(position).setVisibility(selected ? View.VISIBLE : View.GONE);
+            tabButtons.get(position).setBackgroundTintList(
+                    ColorStateList.valueOf(selected ? BLUE : CARD_BORDER));
+        }
+    }
+
+    private View buildElementsTab() {
+        LinearLayout body = columnBody();
+        body.addView(sectionTitle("Отдельное скрытие штатного содержимого HUD"));
+        body.addView(note(
+                "Это новый путь ECARX Settings API, не использовавшийся в HUD Lab 0.1. "
+                        + "Он не выключает питание HUD и не запускает нашу панель. "
+                        + "После нажатия смотрите результат и значение support/value во вкладке «Статус»."));
+
+        body.addView(label("Машинка и дорожное окружение · DISPLAY_DRIVE_ENVIRONMENT"));
+        body.addView(commandPair("СКРЫТЬ МАШИНКУ", RED,
+                () -> controller.setDisplayDriveEnvironment(false),
+                "ПОКАЗАТЬ МАШИНКУ", GREEN,
+                () -> controller.setDisplayDriveEnvironment(true)));
+
+        body.addView(label("Скорость и информация безопасности · DISPLAY_SAFETY"));
+        body.addView(commandPair("СКРЫТЬ СКОРОСТЬ", RED,
+                () -> controller.setDisplaySafety(false),
+                "ПОКАЗАТЬ СКОРОСТЬ", GREEN,
+                () -> controller.setDisplaySafety(true)));
+
+        body.addView(label("Обе искомые категории одной командой"));
+        body.addView(commandPair("СКРЫТЬ ОБЕ", RED,
+                () -> controller.setPrimaryDisplayElements(false),
+                "ПОКАЗАТЬ ОБЕ", GREEN,
+                () -> controller.setPrimaryDisplayElements(true)));
+
+        body.addView(label("Остальные отдельные категории"));
+        body.addView(commandPair("МЕДИА OFF", AMBER,
+                () -> controller.setDisplayMedia(false),
+                "МЕДИА ON", BLUE,
+                () -> controller.setDisplayMedia(true)));
+        body.addView(commandPair("НАВИГАЦИЯ OFF", AMBER,
+                () -> controller.setDisplayNavigation(false),
+                "НАВИГАЦИЯ ON", BLUE,
+                () -> controller.setDisplayNavigation(true)));
+        body.addView(commandPair("ТЕЛЕФОН OFF", AMBER,
+                () -> controller.setDisplayBtPhone(false),
+                "ТЕЛЕФОН ON", BLUE,
+                () -> controller.setDisplayBtPhone(true)));
+
+        body.addView(singleCommand("ВОССТАНОВИТЬ ВСЕ ПЯТЬ КАТЕГОРИЙ", GREEN,
+                () -> controller.restoreAllDisplayElements()));
+        body.addView(note(
+                "Если SDK ответит notavailable/accepted=false, команда на этой прошивке "
+                        + "не связана с DIM. Это диагностический результат, а не успешное скрытие."));
+        return scroll(body);
+    }
+
+    private View buildStatusTab() {
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.VERTICAL);
         body.setPadding(dp(12), dp(10), dp(12), dp(10));
@@ -178,12 +260,13 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         return scroll(body);
     }
 
-    private View buildActivationColumn() {
+    private View buildActivationTab() {
         LinearLayout body = columnBody();
-        body.addView(sectionTitle("1. Каналы включения HUD"));
+        body.addView(sectionTitle("Полное включение HUD и режимы — не искомое скрытие"));
         body.addView(note(
-                "Проверяйте по одному каналу. Settings API и VFHUD отображены отдельно, "
-                        + "хотя в этой версии SDK Settings вызывает VFHUD внутри."));
+                "Эти команды сохранены только для диагностики и восстановления. "
+                        + "OFF здесь может погасить HUD целиком; машинку и скорость отдельно "
+                        + "они, как уже подтверждено тестом, не скрывают."));
 
         body.addView(label("AdaptAPI SETTING_FUNC_HUD_ACTIVE"));
         body.addView(commandPair("OFF", RED,
@@ -213,21 +296,25 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         body.addView(note(
                 "«ВСЁ ON» — быстрый возврат штатных запросов после эксперимента. "
                         + "Публикацию нашей панели этот стенд не запускает."));
-        return scroll(body);
-    }
-
-    private View buildExperimentColumn() {
-        LinearLayout body = columnBody();
-        body.addView(sectionTitle("2. Режимы и visual mask"));
-        body.addView(note(
-                "Текущий режим по вашему дампу — IntellDrv (1). Сначала проверьте Simple (3), "
-                        + "затем visual mask: это отдельный необработанный сигнал к DIM."));
 
         body.addView(label("VFHUD CB_HUD_DispModSet"));
         body.addView(modeGrid(false));
 
         body.addView(label("Прямой DIM HudDispModSetgReq · PEN=1"));
         body.addView(modeGrid(true));
+        body.addView(note(
+                "Режимы: 0 IntellGuide, 1 IntellDrive, 2 AR, 3 Simple. "
+                        + "Они не являются переключателями машинки или скорости."));
+        return scroll(body);
+    }
+
+    private View buildMaskTab() {
+        LinearLayout body = columnBody();
+        body.addView(sectionTitle("Низкоуровневая visual mask — уже проверенный эксперимент"));
+        body.addView(note(
+                "F00–F19 и PEN не скрыли штатные машинку и скорость на вашей прошивке. "
+                        + "Оставлено для точечных сравнений и возврата значений, но это больше "
+                        + "не основной путь поиска."));
 
         body.addView(label("HUD VisFctSetgReq: 20 функций"));
         body.addView(commandPair("Все 0", RED, () -> controller.setAllVisualFunctions(0),
@@ -258,6 +345,14 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                         + "считанное исходное состояние."));
 
         return scroll(body);
+    }
+
+    private View singleCommand(String label, int color, Runnable action) {
+        LinearLayout row = new LinearLayout(this);
+        row.setPadding(0, dp(3), 0, dp(8));
+        row.addView(commandButton(label, color, action), new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
+        return row;
     }
 
     private View modeGrid(boolean directDim) {
@@ -407,14 +502,6 @@ public final class HudLabActivity extends Activity implements HudLabController.L
 
     private LinearLayout.LayoutParams fixedButton(int width) {
         return new LinearLayout.LayoutParams(width, dp(46));
-    }
-
-    private LinearLayout.LayoutParams weightedColumn(float weight, int left, int right) {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.MATCH_PARENT, weight);
-        params.leftMargin = left;
-        params.rightMargin = right;
-        return params;
     }
 
     private int dp(int value) {
