@@ -416,8 +416,13 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Switch showGrid = switchView("Показывать сетку в редакторе", config.showGrid);
         Switch free = switchView("Свободное перемещение между линиями", config.freeMovement);
         Switch maskStockHud = switchView(
-                "Перекрывать штатный HUD непрозрачным чёрным фоном",
+                "Скрывать штатные машинку и скорость системной HUD-маской",
                 config.maskStockHud);
+        TextView maskHint = text(
+                "Для элементов ecarx_daemon используется отдельный SurfaceFlinger-слой. "
+                        + "Он запускается через настроенный локальный ADB/Telnet; "
+                        + "при недоступности автоматически остаётся обычный overlay.",
+                12, 0xFFB8C0CC);
         Switch snow = switchView("Снежный режим", config.snowMode);
         Switch sync = switchView("Один цвет для всех элементов", config.syncElementColors);
         Switch autostart = switchView("Запускать HUD после перезагрузки",
@@ -425,6 +430,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         form.addView(showGrid, marginTop(8));
         form.addView(free);
         form.addView(maskStockHud);
+        form.addView(maskHint);
         form.addView(snow);
         form.addView(sync);
         form.addView(autostart);
