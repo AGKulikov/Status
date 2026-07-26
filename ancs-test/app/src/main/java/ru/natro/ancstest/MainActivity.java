@@ -158,7 +158,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         header.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView title = new TextView(this);
-        title.setText("KX11 ANCS TEST v3");
+        title.setText("KX11 ANCS TEST v4");
         title.setTextColor(Color.WHITE);
         title.setTextSize(20);
         title.setTypeface(Typeface.DEFAULT_BOLD);
@@ -391,7 +391,9 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
                 + " d2d9e4b3…f01 запишите ASCII ANCS или прочитайте значение.");
         onLog("5) SECURE ATT OK доказывает шифрование BLE-link."
                 + " После ANCS READY отправьте новое уведомление.");
-        onLog("6) Входящий peer без команды PAIR не используется и не может заменить verified peer.");
+        onLog("6) Если ANCS отсутствует, дождитесь PROXY SNIFFER READY"
+                + " и только затем отправьте новое уведомление.");
+        onLog("7) Входящий peer без команды PAIR не используется и не может заменить verified peer.");
     }
 
     private int dp(int value) {

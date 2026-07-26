@@ -63,6 +63,8 @@ public final class BluetoothDiagnostics {
             UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
     private static final UUID SERVICE_CHANGED =
             UUID.fromString("00002a05-0000-1000-8000-00805f9b34fb");
+    private static final UUID ECARX_PROXY_SERVICE =
+            UUID.fromString("61555e49-79c5-4d1f-b591-d97975f5e3e5");
 
     private static final int GATT_SUCCESS = BluetoothGatt.GATT_SUCCESS;
     private static final int STATUS_INSUFFICIENT_AUTHENTICATION = 5;
@@ -160,6 +162,7 @@ public final class BluetoothDiagnostics {
     private enum DescriptorStage {
         NONE,
         SERVICE_CHANGED,
+        PROXY,
         DATA_SOURCE,
         NOTIFICATION_SOURCE
     }
@@ -222,6 +225,8 @@ public final class BluetoothDiagnostics {
     private final BluetoothAdapter adapter;
     private final LinkedHashMap<String, Candidate> candidates = new LinkedHashMap<>();
     private final ArrayDeque<Request> requests = new ArrayDeque<>();
+    private final ArrayDeque<BluetoothGattCharacteristic> proxyNotifyQueue =
+            new ArrayDeque<>();
     private final Map<Long, AncsProtocol.Event> events = new HashMap<>();
     private final Map<String, String> appNames = new HashMap<>();
 
@@ -259,6 +264,8 @@ public final class BluetoothDiagnostics {
     private BluetoothGattCharacteristic dataSource;
     private BluetoothGattCharacteristic controlPoint;
     private BluetoothGattCharacteristic serviceChanged;
+    private BluetoothGattCharacteristic proxyActiveCharacteristic;
+    private boolean proxySnifferReady;
     private Request activeRequest;
     private AncsProtocol.NotificationAccumulator notificationAccumulator;
     private AncsProtocol.AppNameAccumulator appNameAccumulator;
@@ -925,7 +932,7 @@ public final class BluetoothDiagnostics {
                 DIAGNOSTIC_CHARACTERISTIC,
                 BluetoothGattCharacteristic.PROPERTY_READ,
                 BluetoothGattCharacteristic.PERMISSION_READ);
-        information.setValue("KX11 ANCS Test v3".getBytes(StandardCharsets.UTF_8));
+        information.setValue("KX11 ANCS Test v4".getBytes(StandardCharsets.UTF_8));
 
         BluetoothGattCharacteristic control = new BluetoothGattCharacteristic(
                 CONTROL_CHARACTERISTIC,
@@ -1144,16 +1151,20 @@ public final class BluetoothDiagnostics {
         BluetoothGattService generic = callbackGatt.getService(GENERIC_ATTRIBUTE_SERVICE);
         serviceChanged = generic == null ? null : generic.getCharacteristic(SERVICE_CHANGED);
         if (serviceChanged == null) {
-            log("Service Changed 0x2A05 отсутствует; используйте «Обновить GATT»");
+            log("Service Changed 0x2A05 отсутствует; перехожу к ECARX proxy sniffer");
+            startProxySnifferIfAvailable(callbackGatt);
             return;
         }
         descriptorStage = DescriptorStage.SERVICE_CHANGED;
-        subscribe(callbackGatt, serviceChanged, true);
+        if (!subscribe(callbackGatt, serviceChanged, true)) {
+            descriptorStage = DescriptorStage.NONE;
+            startProxySnifferIfAvailable(callbackGatt);
+        }
     }
 
-    private void subscribe(BluetoothGatt callbackGatt,
-                           BluetoothGattCharacteristic characteristic,
-                           boolean indication) {
+    private boolean subscribe(BluetoothGatt callbackGatt,
+                              BluetoothGattCharacteristic characteristic,
+                              boolean indication) {
         boolean local;
         try {
             local = callbackGatt.setCharacteristicNotification(characteristic, true);
@@ -1161,7 +1172,7 @@ public final class BluetoothDiagnostics {
             descriptorStage = DescriptorStage.NONE;
             state("SUBSCRIBE_EXCEPTION");
             log("setCharacteristicNotification exception: " + failure);
-            return;
+            return false;
         }
         BluetoothGattDescriptor cccd =
                 characteristic.getDescriptor(AncsProtocol.CLIENT_CONFIGURATION);
@@ -1169,7 +1180,7 @@ public final class BluetoothDiagnostics {
                 + "=" + local + "; CCCD=" + (cccd != null));
         if (!local || cccd == null) {
             state("SUBSCRIBE_LOCAL_FAILED");
-            return;
+            return false;
         }
         cccd.setValue(indication
                 ? BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
@@ -1181,13 +1192,86 @@ public final class BluetoothDiagnostics {
             descriptorStage = DescriptorStage.NONE;
             state("CCCD_WRITE_EXCEPTION");
             log("writeDescriptor exception: " + failure);
-            return;
+            return false;
         }
         log("writeDescriptor " + shortUuid(characteristic.getUuid())
                 + " started=" + started);
         if (!started) {
             descriptorStage = DescriptorStage.NONE;
             state("CCCD_START_FAILED");
+        }
+        return started;
+    }
+
+    private void startProxySnifferIfAvailable(BluetoothGatt callbackGatt) {
+        if (callbackGatt != gatt) return;
+        BluetoothGattService proxy = callbackGatt.getService(ECARX_PROXY_SERVICE);
+        if (proxy == null) {
+            state("ЖДУ SERVICE CHANGED / ANCS");
+            log("ECARX proxy service " + ECARX_PROXY_SERVICE
+                    + " отсутствует; остаюсь ждать Service Changed");
+            return;
+        }
+        if (proxySnifferReady) {
+            state("PROXY SNIFFER READY · ОТПРАВЬТЕ УВЕДОМЛЕНИЕ");
+            log("ECARX proxy notify-каналы уже подписаны");
+            return;
+        }
+
+        proxyNotifyQueue.clear();
+        for (BluetoothGattCharacteristic characteristic : proxy.getCharacteristics()) {
+            int properties = characteristic.getProperties();
+            boolean notifiable =
+                    (properties & BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0
+                            || (properties
+                            & BluetoothGattCharacteristic.PROPERTY_INDICATE) != 0;
+            BluetoothGattDescriptor cccd =
+                    characteristic.getDescriptor(AncsProtocol.CLIENT_CONFIGURATION);
+            log("ECARX PROXY CHAR " + characteristic.getUuid()
+                    + " props=0x" + Integer.toHexString(properties)
+                    + " notifyOrIndicate=" + notifiable
+                    + " CCCD=" + (cccd != null));
+            if (notifiable && cccd != null) {
+                proxyNotifyQueue.add(characteristic);
+            }
+        }
+        if (proxyNotifyQueue.isEmpty()) {
+            state("PROXY SERVICE · НЕТ NOTIFY-КАНАЛОВ");
+            log("ECARX proxy найден, но подписываться не на что");
+            return;
+        }
+        log("ECARX proxy sniffer: последовательно подписываюсь на "
+                + proxyNotifyQueue.size() + " notify/indicate характеристик");
+        subscribeNextProxyCharacteristic(callbackGatt);
+    }
+
+    private void subscribeNextProxyCharacteristic(BluetoothGatt callbackGatt) {
+        if (callbackGatt != gatt) return;
+        BluetoothGattCharacteristic characteristic = proxyNotifyQueue.poll();
+        if (characteristic == null) {
+            proxyActiveCharacteristic = null;
+            descriptorStage = DescriptorStage.NONE;
+            proxySnifferReady = true;
+            state("PROXY SNIFFER READY · ОТПРАВЬТЕ УВЕДОМЛЕНИЕ");
+            log("Все ECARX proxy notify-каналы включены. "
+                    + "Отправьте новое уведомление на заблокированный iPhone");
+            return;
+        }
+        proxyActiveCharacteristic = characteristic;
+        int properties = characteristic.getProperties();
+        boolean indication =
+                (properties & BluetoothGattCharacteristic.PROPERTY_NOTIFY) == 0
+                        && (properties
+                        & BluetoothGattCharacteristic.PROPERTY_INDICATE) != 0;
+        descriptorStage = DescriptorStage.PROXY;
+        log("PROXY subscribe " + characteristic.getUuid()
+                + " mode=" + (indication ? "INDICATE" : "NOTIFY"));
+        if (!subscribe(callbackGatt, characteristic, indication)) {
+            log("PROXY subscribe start failed: " + characteristic.getUuid()
+                    + "; перехожу к следующему каналу");
+            proxyActiveCharacteristic = null;
+            descriptorStage = DescriptorStage.NONE;
+            main.post(() -> subscribeNextProxyCharacteristic(callbackGatt));
         }
     }
 
@@ -1198,6 +1282,17 @@ public final class BluetoothDiagnostics {
                 ? null : descriptor.getCharacteristic().getUuid();
         log("onDescriptorWrite " + shortUuid(characteristicUuid)
                 + " status=" + status + " stage=" + descriptorStage);
+        if (descriptorStage == DescriptorStage.PROXY) {
+            if (status == GATT_SUCCESS) {
+                log("PROXY CCCD OK: " + characteristicUuid);
+            } else {
+                log("PROXY CCCD FAILED_" + status + ": " + characteristicUuid);
+            }
+            proxyActiveCharacteristic = null;
+            descriptorStage = DescriptorStage.NONE;
+            subscribeNextProxyCharacteristic(callbackGatt);
+            return;
+        }
         if (status != GATT_SUCCESS) {
             state("CCCD_FAILED_" + status);
             if (isAuthorizationError(status)) {
@@ -1209,8 +1304,8 @@ public final class BluetoothDiagnostics {
 
         if (descriptorStage == DescriptorStage.SERVICE_CHANGED) {
             descriptorStage = DescriptorStage.NONE;
-            state("ЖДУ SERVICE CHANGED / ANCS");
             log("Service Changed indication включена");
+            startProxySnifferIfAvailable(callbackGatt);
         } else if (descriptorStage == DescriptorStage.DATA_SOURCE) {
             descriptorStage = DescriptorStage.NOTIFICATION_SOURCE;
             subscribe(callbackGatt, notificationSource, false);
@@ -1237,7 +1332,43 @@ public final class BluetoothDiagnostics {
             handleNotificationSource(value);
         } else if (AncsProtocol.DATA_SOURCE.equals(uuid)) {
             handleDataSource(value);
+        } else if (characteristic.getService() != null
+                && ECARX_PROXY_SERVICE.equals(characteristic.getService().getUuid())) {
+            handleProxyData(characteristic, value);
         }
+    }
+
+    private void handleProxyData(BluetoothGattCharacteristic characteristic, byte[] value) {
+        String hex = AdvertisementParser.hex(value, 512);
+        String ascii = printableAscii(value);
+        String uuid = characteristic.getUuid().toString();
+        state("PROXY DATA RECEIVED · " + shortUuid(characteristic.getUuid()));
+        log("ECARX PROXY DATA uuid=" + uuid
+                + " len=" + (value == null ? 0 : value.length)
+                + " hex=" + hex
+                + " ascii=`" + ascii + "`");
+        String timestamp = new SimpleDateFormat(
+                "HH:mm:ss.SSS", Locale.US).format(new Date());
+        listener.onNotification(new NotificationItem(
+                android.os.SystemClock.elapsedRealtime(),
+                0,
+                0,
+                "ecarx.proxy." + uuid,
+                "ECARX proxy raw",
+                shortUuid(characteristic.getUuid()),
+                "HEX: " + hex + "\nASCII: " + ascii,
+                timestamp));
+    }
+
+    private static String printableAscii(byte[] value) {
+        if (value == null || value.length == 0) return "";
+        StringBuilder result = new StringBuilder(value.length);
+        for (byte item : value) {
+            int unsigned = item & 0xff;
+            result.append(unsigned >= 32 && unsigned <= 126
+                    ? (char) unsigned : '.');
+        }
+        return result.toString();
     }
 
     private void handleNotificationSource(byte[] value) {
@@ -1411,6 +1542,9 @@ public final class BluetoothDiagnostics {
         dataSource = null;
         controlPoint = null;
         serviceChanged = null;
+        proxyNotifyQueue.clear();
+        proxyActiveCharacteristic = null;
+        proxySnifferReady = false;
         descriptorStage = DescriptorStage.NONE;
         gattReady = false;
         discoveryPending = false;
@@ -1773,7 +1907,7 @@ public final class BluetoothDiagnostics {
                             + " bond=" + bondLabel(safeBondState(device))));
                     if (DIAGNOSTIC_CHARACTERISTIC.equals(uuid)) {
                         sendGattReadResponse(device, requestId, offset,
-                                "KX11 ANCS Test v3".getBytes(StandardCharsets.UTF_8));
+                                "KX11 ANCS Test v4".getBytes(StandardCharsets.UTF_8));
                         return;
                     }
                     if (SECURE_CHARACTERISTIC.equals(uuid)) {
