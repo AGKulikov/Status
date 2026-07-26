@@ -9,6 +9,8 @@ import org.junit.Test;
 
 public final class HudViewportPolicyTest {
     @Test public void verifiedMhudPlaneHasExactHardwareCoordinates() {
+        assertEquals(2, HudViewportPolicy.VERIFIED_DISPLAY_ID);
+        assertEquals(2, HudViewportPolicy.VERIFIED_LAYER_STACK);
         assertEquals(728, HudViewportPolicy.SAFE_WIDTH);
         assertEquals(190, HudViewportPolicy.SAFE_HEIGHT);
         assertEquals(0, HudViewportPolicy.SAFE_LEFT);
