@@ -393,6 +393,11 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 + HudViewportPolicy.SAFE_WIDTH + "×" + HudViewportPolicy.SAFE_HEIGHT
                 + " px, X=" + HudViewportPolicy.SAFE_LEFT
                 + ", Y=" + HudViewportPolicy.SAFE_TOP + ".\n"
+                + "Отдельная маска штатного HUD: "
+                + HudViewportPolicy.STOCK_MASK_WIDTH + "×"
+                + HudViewportPolicy.STOCK_MASK_HEIGHT
+                + " px, X=" + HudViewportPolicy.STOCK_MASK_LEFT
+                + ", Y=" + HudViewportPolicy.STOCK_MASK_TOP + ".\n"
                 + "Полная поверхность выбранного Display ID проверяется во время работы. "
                 + "Панель и каждый виджет жёстко обрезаются по этой области.",
                 13, 0xFFFFCC66);
@@ -419,9 +424,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 "Скрывать штатные машинку и скорость системной HUD-маской",
                 config.maskStockHud);
         TextView maskHint = text(
-                "Для элементов ecarx_daemon используется отдельный SurfaceFlinger-слой. "
-                        + "Он запускается через настроенный локальный ADB/Telnet; "
-                        + "при недоступности автоматически остаётся обычный overlay.",
+                "Непрозрачная маска закрывает dump-проверенную область штатного "
+                        + "com.ecarx.hud, а виджеты рисуются отдельным слоем выше. "
+                        + "Оба слоя запускаются через локальный ADB/Telnet и проверяются "
+                        + "в живом списке SurfaceFlinger.",
                 12, 0xFFB8C0CC);
         Switch snow = switchView("Снежный режим", config.snowMode);
         Switch sync = switchView("Один цвет для всех элементов", config.syncElementColors);
