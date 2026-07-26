@@ -235,12 +235,14 @@ public final class HudPresentationService extends Service
                                 readyWindow.dismiss();
                                 return;
                             }
-                            // The direct surface already contains an acknowledged full frame.
-                            // Remove the lower WindowManager duplicate without exposing OEM HUD.
-                            dismissFallbackOnly("system HUD surface ready");
+                            // Keep the lower WindowManager copy alive as a fail-safe. It is
+                            // visually hidden by the identical direct surface when SurfaceFlinger
+                            // presents correctly, but prevents the custom panel from disappearing
+                            // if an OEM compositor accepts a buffer on the wrong physical output.
+                            // The direct opaque frame still masks the stock HUD.
                             runtimeDetail = "HUD: ID " + display.getDisplayId()
                                     + " · системный слой " + readyWindow.layerStack()
-                                    + " · штатные машинка и скорость перекрыты"
+                                    + " · кадр принят SurfaceFlinger"
                                     + " · окно 728×190 @ (0,720)";
                             updateNotification(runtimeDetail);
                         }
@@ -292,20 +294,6 @@ public final class HudPresentationService extends Service
         HudPresentation fallback = createPresentation(display);
         fallback.show();
         presentation = fallback;
-    }
-
-    private void dismissFallbackOnly(@NonNull String reason) {
-        HudOverlayWindow currentOverlay = overlayWindow;
-        HudPresentation current = presentation;
-        overlayWindow = null;
-        presentation = null;
-        if (currentOverlay != null) currentOverlay.dismiss();
-        if (current != null) {
-            try { current.dismiss(); }
-            catch (RuntimeException failure) {
-                Log.w(TAG, "Could not dismiss HUD fallback: " + reason, failure);
-            }
-        }
     }
 
     @NonNull
