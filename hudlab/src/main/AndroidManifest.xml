@@ -21,6 +21,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".HudCoverActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:noHistory="false"
+            android:screenOrientation="landscape"
+            android:taskAffinity="dezz.status.hudlab.cover"
+            android:theme="@style/Theme.HudLab" />
     </application>
 
 </manifest>
