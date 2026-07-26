@@ -2,16 +2,20 @@ package ru.natro.ancstest;
 
 import android.Manifest;
 import android.app.Activity;
-import android.bluetooth.BluetoothDevice;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.location.LocationManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -39,7 +43,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public final class MainActivity extends Activity implements BluetoothDiagnostics.Listener {
+public final class MainActivity extends Activity
+        implements AncsForegroundService.UiListener {
     private static final int REQUEST_LOCATION = 1001;
     private static final int MAX_LOG_LINES = 500;
     private static final int MAX_NOTIFICATION_ROWS = 80;
@@ -49,6 +54,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
     private TextView selectedView;
     private TextView logView;
     private ScrollView logScroll;
+    private Button autoButton;
     private ArrayAdapter<String> candidateAdapter;
     private ArrayAdapter<String> notificationAdapter;
     private final List<BluetoothDiagnostics.Candidate> candidates = new ArrayList<>();
@@ -73,7 +79,8 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         rebuildNotificationsNow();
     };
 
-    private BluetoothDiagnostics diagnostics;
+    private AncsForegroundService service;
+    private boolean serviceBound;
     private BluetoothDiagnostics.Candidate selectedCandidate;
     private boolean startScanAfterPermission;
     private boolean startIphoneAfterPermission;
@@ -82,18 +89,84 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         buildUi();
-        diagnostics = new BluetoothDiagnostics(this, this);
-        appendInstruction();
-        diagnostics.publishCapabilities();
+        Intent serviceIntent = AncsForegroundService.startIntent(this);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
         ensureLocationPermission(false);
     }
 
     @Override
+    protected void onStart() {
+        super.onStart();
+        bindService(AncsForegroundService.startIntent(this),
+                serviceConnection, Context.BIND_AUTO_CREATE);
+    }
+
+    @Override
+    protected void onStop() {
+        if (serviceBound) {
+            service.unregisterUiListener(this);
+            unbindService(serviceConnection);
+            serviceBound = false;
+            service = null;
+        }
+        super.onStop();
+    }
+
+    @Override
     protected void onDestroy() {
-        if (diagnostics != null) diagnostics.close();
         ui.removeCallbacks(logFlusher);
         ui.removeCallbacks(notificationFlusher);
         super.onDestroy();
+    }
+
+    private final ServiceConnection serviceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder binder) {
+            AncsForegroundService.LocalBinder local =
+                    (AncsForegroundService.LocalBinder) binder;
+            service = local.getService();
+            serviceBound = true;
+            service.registerUiListener(MainActivity.this);
+            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                    == PackageManager.PERMISSION_GRANTED && locationEnabled()) {
+                service.onLocationPermissionAvailable();
+            }
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            serviceBound = false;
+            service = null;
+            onState("СЕРВИС ОТКЛЮЧЁН");
+        }
+    };
+
+    @Override
+    public void onReset() {
+        ui.removeCallbacks(notificationFlusher);
+        notificationFlushScheduled = false;
+        notifications.clear();
+        if (notificationAdapter != null) rebuildNotificationsNow();
+        ui.removeCallbacks(logFlusher);
+        logFlushScheduled = false;
+        logLines.clear();
+        if (logView != null) logView.setText("");
+        appendInstruction();
+    }
+
+    @Override
+    public void onAutoModeChanged(boolean enabled, String verifiedPeer) {
+        if (autoButton != null) {
+            autoButton.setText(enabled
+                    ? "Автоподключение: ВКЛ"
+                    : "Автоподключение: ВЫКЛ");
+        }
+        selectedView.setText("Сохранённый iPhone: " + verifiedPeer
+                + " · музыка/звонки остаются в штатном Classic Bluetooth");
     }
 
     @Override
@@ -134,8 +207,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         candidateAdapter.notifyDataSetChanged();
         if (selectedPosition >= 0) {
             selectedView.setText("Только для диагностики scan: " + selectedCandidate.name
-                    + " · " + selectedCandidate.address
-                    + "; ANCS всегда использует verified GATT-server peer");
+                    + " · " + selectedCandidate.address);
         }
     }
 
@@ -177,6 +249,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         } else if (granted && shouldStart) {
             ensureLocationPermission(true);
         }
+        if (granted && service != null) service.onLocationPermissionAvailable();
     }
 
     private void buildUi() {
@@ -190,7 +263,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         header.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView title = new TextView(this);
-        title.setText("KX11 ANCS TEST v8");
+        title.setText("KX11 ANCS TEST v9");
         title.setTextColor(Color.WHITE);
         title.setTextSize(20);
         title.setTypeface(Typeface.DEFAULT_BOLD);
@@ -208,7 +281,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         root.addView(header);
 
         selectedView = new TextView(this);
-        selectedView.setText("GPS-style: iPhone рекламирует, магнитола подключается первой");
+        selectedView.setText("Подключение к foreground-service…");
         selectedView.setTextColor(Color.rgb(207, 216, 220));
         selectedView.setTextSize(13);
         selectedView.setPadding(0, dp(5), 0, dp(4));
@@ -218,19 +291,30 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         buttonScroll.setHorizontalScrollBarEnabled(true);
         LinearLayout buttons = new LinearLayout(this);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
-        addButton(buttons, "Подключить iPhone BLE",
+        autoButton = addButton(buttons, "Автоподключение: …",
+                view -> withService(value ->
+                        value.setAutoEnabled(!value.isAutomaticEnabled())));
+        addButton(buttons, "Переподключить",
+                view -> withService(AncsForegroundService::manualReconnect));
+        addButton(buttons, "Helper bootstrap",
                 view -> ensureIphonePeripheralPermission());
-        addButton(buttons, "Возможности", view -> diagnostics.publishCapabilities());
+        addButton(buttons, "Возможности",
+                view -> withService(AncsForegroundService::publishCapabilities));
         addButton(buttons, "BLE scan", view -> ensureLocationPermission(true));
-        addButton(buttons, "Стоп scan", view -> diagnostics.stopScan());
+        addButton(buttons, "Стоп scan",
+                view -> withService(AncsForegroundService::stopScan));
         addButton(buttons, "Старый входящий тест",
-                view -> diagnostics.startIncomingConnectionTest());
-        addButton(buttons, "Стоп рекламы", view -> diagnostics.stopAdvertising());
+                view -> withService(AncsForegroundService::startIncomingConnectionTest));
+        addButton(buttons, "Стоп рекламы",
+                view -> withService(AncsForegroundService::stopAdvertising));
         addButton(buttons, "Same-peer attach",
-                view -> diagnostics.connect(null));
-        addButton(buttons, "Явно связать LE", view -> diagnostics.requestBond());
-        addButton(buttons, "Повторить discovery", view -> diagnostics.refreshAndReconnect());
-        addButton(buttons, "Отключить", view -> diagnostics.disconnect());
+                view -> withService(AncsForegroundService::samePeerAttach));
+        addButton(buttons, "Явно связать LE",
+                view -> withService(AncsForegroundService::requestBond));
+        addButton(buttons, "Повторить discovery",
+                view -> withService(AncsForegroundService::repeatDiscovery));
+        addButton(buttons, "Отключить",
+                view -> withService(AncsForegroundService::disconnectManually));
         addButton(buttons, "Копировать лог", view -> copyLog());
         addButton(buttons, "Сохранить лог", view -> saveLog());
         addButton(buttons, "Очистить", view -> clearOutput());
@@ -261,8 +345,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
                                                int position, long id) -> {
             selectedCandidate = candidates.get(position);
             selectedView.setText("Только для диагностики scan: " + selectedCandidate.name
-                    + " · " + selectedCandidate.address
-                    + "; ANCS всегда использует verified GATT-server peer");
+                    + " · " + selectedCandidate.address);
             onLog("Выбрано устройство: " + selectedCandidate.displayText()
                     .replace('\n', ' '));
             if (!selectedCandidate.rawAdvertisement.isEmpty()) {
@@ -326,7 +409,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         return panel;
     }
 
-    private void addButton(LinearLayout parent, String title, View.OnClickListener listener) {
+    private Button addButton(LinearLayout parent, String title, View.OnClickListener listener) {
         Button button = new Button(this);
         button.setText(title);
         button.setTextSize(12);
@@ -337,6 +420,20 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         params.setMargins(0, 0, dp(5), 0);
         parent.addView(button, params);
+        return button;
+    }
+
+    private interface ServiceAction {
+        void run(AncsForegroundService service);
+    }
+
+    private void withService(ServiceAction action) {
+        AncsForegroundService active = service;
+        if (active == null) {
+            Toast.makeText(this, "Сервис ещё подключается", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        action.run(active);
     }
 
     private void ensureLocationPermission(boolean startAfterGrant) {
@@ -352,7 +449,11 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
                         Toast.LENGTH_LONG).show();
                 return;
             }
-            if (startAfterGrant) diagnostics.startScan();
+            if (startAfterGrant) {
+                withService(AncsForegroundService::startDiagnosticScan);
+            } else if (service != null) {
+                service.onLocationPermissionAvailable();
+            }
             return;
         }
         startIphoneAfterPermission = false;
@@ -374,7 +475,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
                         Toast.LENGTH_LONG).show();
                 return;
             }
-            diagnostics.startIphonePeripheralClientTest();
+            withService(AncsForegroundService::startHelperBootstrap);
             return;
         }
         startScanAfterPermission = false;
@@ -455,28 +556,21 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
     }
 
     private void clearOutput() {
-        ui.removeCallbacks(notificationFlusher);
-        notificationFlushScheduled = false;
-        notifications.clear();
-        rebuildNotificationsNow();
-        ui.removeCallbacks(logFlusher);
-        logFlushScheduled = false;
-        logLines.clear();
-        logView.setText("");
-        appendInstruction();
+        withService(AncsForegroundService::clearCachedOutput);
     }
 
     private void appendInstruction() {
-        onLog("1) На iPhone установите Helper v4 и нажмите"
-                + " «Рекламировать iPhone по BLE».");
-        onLog("2) На магнитоле нажмите «Подключить iPhone BLE»."
-                + " Это GPS-style: Android сканирует UUID и сам вызывает connectGatt.");
-        onLog("3) В системных настройках отдельное BLE-подключение создавать не надо;"
+        onLog("1) Авто-режим работает в foreground-service и не закрывает BLE"
+                + " при выходе из этого экрана.");
+        onLog("2) После первого ANCS READY сервис сохраняет verified iPhone."
+                + " Далее после загрузки он делает прямой connectGatt(autoConnect=true)"
+                + " без scan и без запущенного Helper.");
+        onLog("3) Helper v4 нужен только для первой привязки или аварийного fallback:"
+                + " нажмите «Helper bootstrap» и включите рекламу на iPhone.");
+        onLog("4) В системных настройках отдельное BLE-подключение создавать не надо;"
                 + " Classic Bluetooth для музыки/звонков можно оставить.");
-        onLog("4) v8 сначала подписывается прямо на ANCS; служебный SECURE test"
-                + " используется только если сервис 7905… отсутствует.");
-        onLog("5) Если появится системный pairing-запрос, подтвердите его."
-                + " В журнале будут variant и точная причина отказа bond.");
+        onLog("5) Если ANCS нет в первом discovery ежедневного соединения,"
+                + " сервис ждёт Service Changed и не требует D2D PAIR/SECURE.");
         onLog("6) После ANCS READY отправьте на iPhone одно новое уведомление."
                 + " Очередь ограничена и замедлена, чтобы ECARX UI не зависал.");
     }

@@ -31,8 +31,6 @@ import android.os.Looper;
 import android.os.ParcelUuid;
 import android.util.Log;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
@@ -76,6 +74,7 @@ public final class BluetoothDiagnostics {
     private static final long CONNECT_TIMEOUT_MS = 5_000L;
     private static final long GPS_CONNECT_TIMEOUT_MS = 15_000L;
     private static final long GPS_SCAN_TIMEOUT_MS = 30_000L;
+    private static final long AUTO_ANCS_WAIT_TIMEOUT_MS = 60_000L;
     private static final long GPS_POST_SECURE_DISCOVERY_DELAY_MS = 800L;
     private static final long DISCOVERY_TIMEOUT_MS = 15_000L;
     private static final long ANCS_REQUEST_GAP_MS = 120L;
@@ -245,6 +244,7 @@ public final class BluetoothDiagnostics {
     private boolean secureAttConfirmed;
     private boolean gattClientConnected;
     private boolean iphonePeripheralMode;
+    private boolean helperBootstrapMode;
     private boolean iphoneConnectStarted;
     private boolean iphonePairAttempted;
     private boolean iphonePairWritePending;
@@ -283,6 +283,7 @@ public final class BluetoothDiagnostics {
     private Runnable nextClientAttempt;
     private Runnable scanTimeout;
     private Runnable ancsBondRetry;
+    private Runnable autoAncsWaitTimeout;
     private boolean candidatePublishScheduled;
     private long lastCandidatePublishAt;
     private final Runnable candidatePublisher = () -> {
@@ -320,7 +321,7 @@ public final class BluetoothDiagnostics {
         advertiser = adapter.getBluetoothLeAdvertiser();
         log("BLE scanner: " + (scanner != null));
         log("BLE advertiser: " + (advertiser != null));
-        log("Service Solicitation API/backport: " + hasSolicitationBuilderMethod());
+        log("Автоматический GPS-style путь использует только публичные BLE API");
         addBondedDevices();
         state(adapter.isEnabled() ? "ГОТОВО К ТЕСТУ" : "BLUETOOTH_OFF");
     }
@@ -360,16 +361,26 @@ public final class BluetoothDiagnostics {
      * established incoming peripheral-role link.
      */
     public void startIphonePeripheralClientTest() {
+        startIphoneHelperFallback();
+    }
+
+    /**
+     * One-time bootstrap/recovery path. Daily automatic operation should use
+     * {@link #connectSavedIphone(String)} and does not require the Helper to be running.
+     */
+    public void startIphoneHelperFallback() {
         if (!ensureAdapter()) return;
         stopScan();
         stopAdvertising();
         disconnect();
         resetVerifiedPeerSession();
         iphonePeripheralMode = true;
+        helperBootstrapMode = true;
 
         scanner = adapter.getBluetoothLeScanner();
         if (scanner == null) {
             iphonePeripheralMode = false;
+            helperBootstrapMode = false;
             state("GPS-STYLE · SCAN UNAVAILABLE");
             log("BluetoothLeScanner недоступен");
             return;
@@ -384,10 +395,10 @@ public final class BluetoothDiagnostics {
         try {
             scanner.startScan(Collections.singletonList(filter), settings, scanCallback);
             scanning = true;
-            state("ИЩУ KX11-IPHONE · GPS-STYLE");
-            log("v8: Android работает BLE central, как HWGPS/GPSTether");
+            state("FALLBACK · ОТКРОЙТЕ IPHONE HELPER V4");
+            log("v9 bootstrap: Android работает BLE central, как HWGPS/GPSTether");
             log("Фильтр scan: service " + DIAGNOSTIC_SERVICE
-                    + "; стандартное BLE-подключение в настройках не используется");
+                    + "; этот scan нужен только для bootstrap/аварийного восстановления");
             scanTimeout = () -> {
                 if (!iphonePeripheralMode || !scanning || iphoneConnectStarted) return;
                 stopScan();
@@ -399,9 +410,54 @@ public final class BluetoothDiagnostics {
             main.postDelayed(scanTimeout, GPS_SCAN_TIMEOUT_MS);
         } catch (RuntimeException failure) {
             iphonePeripheralMode = false;
+            helperBootstrapMode = false;
             state("GPS-STYLE · SCAN EXCEPTION");
             log("startScan exception: " + failure);
         }
+    }
+
+    /**
+     * Daily path after a successful bootstrap. It addresses the peer saved after ANCS READY and
+     * starts Android's public background GATT connection without scanning for the Helper service.
+     */
+    public boolean connectSavedIphone(String address) {
+        if (!ensureAdapter()) return false;
+        if (address == null || address.trim().isEmpty()) return false;
+        final BluetoothDevice device;
+        try {
+            device = adapter.getRemoteDevice(address.trim());
+        } catch (IllegalArgumentException invalidAddress) {
+            log("Saved peer address invalid: `" + address + "`");
+            return false;
+        }
+        if (iphonePeripheralMode && !helperBootstrapMode && gatt != null
+                && activeClientTarget != null && sameDevice(activeClientTarget, device)
+                && (clientConnectInFlight || gattClientConnected)) {
+            log("Saved-peer autoConnect уже зарегистрирован для "
+                    + safeAddress(device) + "; дубликат connectGatt не создаю"
+                    + " connected=" + gattClientConnected
+                    + " inFlight=" + clientConnectInFlight);
+            state(gattReady
+                    ? "ANCS READY · ОТПРАВЬТЕ УВЕДОМЛЕНИЕ"
+                    : "АВТО · SAVED PEER УЖЕ ЗАРЕГИСТРИРОВАН");
+            return true;
+        }
+
+        stopScan();
+        stopAdvertising();
+        disconnect();
+        resetVerifiedPeerSession();
+        iphonePeripheralMode = true;
+        helperBootstrapMode = false;
+        iphoneConnectStarted = true;
+        if (!claimVerifiedPeer(device)) {
+            iphonePeripheralMode = false;
+            state("AUTO · SAVED PEER CONFLICT");
+            return false;
+        }
+        connectIphonePeripheral(device, true,
+                "saved verified peer; без scan и без Helper service");
+        return gatt != null;
     }
 
     public void stopScan() {
@@ -417,10 +473,7 @@ public final class BluetoothDiagnostics {
         state("СКАНИРОВАНИЕ ОСТАНОВЛЕНО");
     }
 
-    /**
-     * Opens a connectable GATT server. Android 9 first tries an OEM solicitation backport; when
-     * absent it advertises a diagnostic service so LightBlue on iPhone can connect manually.
-     */
+    /** Legacy comparison test. It uses only a normal public diagnostic advertisement. */
     public void startIncomingConnectionTest() {
         if (!ensureAdapter()) return;
         stopAdvertising();
@@ -434,18 +487,14 @@ public final class BluetoothDiagnostics {
         }
 
         AdvertiseData.Builder primary = new AdvertiseData.Builder()
-                .setIncludeTxPowerLevel(false);
-        solicitationAdvertising = addSolicitationWithReflection(primary);
-        if (solicitationAdvertising) {
-            log("Используется ANCS Service Solicitation через OEM/backport API");
-        } else {
-            primary.addServiceUuid(new ParcelUuid(DIAGNOSTIC_SERVICE));
-            log("Android 9 не умеет AD type 0x15. Запускаю обычную diagnostic-рекламу");
-            log("На iPhone откройте LightBlue, найдите UUID "
-                    + DIAGNOSTIC_SERVICE + " и нажмите Connect");
-            log("В CONTROL " + CONTROL_CHARACTERISTIC
-                    + " запишите ASCII PAIR; только после этого peer будет подтверждён");
-        }
+                .setIncludeTxPowerLevel(false)
+                .addServiceUuid(new ParcelUuid(DIAGNOSTIC_SERVICE));
+        solicitationAdvertising = false;
+        log("Запускаю обычную diagnostic-рекламу через публичный Android API");
+        log("На iPhone откройте LightBlue, найдите UUID "
+                + DIAGNOSTIC_SERVICE + " и нажмите Connect");
+        log("В CONTROL " + CONTROL_CHARACTERISTIC
+                + " запишите ASCII PAIR; только после этого peer будет подтверждён");
 
         preparedAdvertiseSettings = new AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
@@ -454,16 +503,9 @@ public final class BluetoothDiagnostics {
                 .setTimeout(0)
                 .build();
         preparedAdvertiseData = primary.build();
-        AdvertiseData.Builder scanResponse = new AdvertiseData.Builder();
-        if (solicitationAdvertising) {
-            // The iPhone helper scans for the diagnostic UUID. Keep it in the scan
-            // response because ANCS solicitation plus another 128-bit UUID does not
-            // fit in the 31-byte primary advertising packet.
-            scanResponse.addServiceUuid(new ParcelUuid(DIAGNOSTIC_SERVICE));
-        } else {
-            scanResponse.setIncludeDeviceName(true);
-        }
-        preparedScanResponse = scanResponse.build();
+        preparedScanResponse = new AdvertiseData.Builder()
+                .setIncludeDeviceName(true)
+                .build();
         advertisingDesired = true;
         state("ЗАПУСК GATT SERVER");
         openGattServer();
@@ -497,24 +539,29 @@ public final class BluetoothDiagnostics {
             log("Найденный iPhone не совпал с peer текущей test-session");
             return;
         }
+        connectIphonePeripheral(device, false,
+                "Helper-filtered scan; Android создаёт bootstrap BLE link первым");
+    }
 
+    private void connectIphonePeripheral(BluetoothDevice device, boolean autoConnect,
+                                         String reason) {
         clearAncsRuntime();
         clearIphonePeripheralRuntime(false);
         iphonePeripheralMode = true;
         iphoneConnectStarted = true;
         activeClientTarget = device;
-        activeClientAutoConnect = false;
+        activeClientAutoConnect = autoConnect;
         clientConnectInFlight = true;
-        state("ПОДКЛЮЧАЮ IPHONE · GPS-STYLE");
-        log("Найдена реклама KX11-iPhone: " + safeName(device)
-                + " " + safeAddress(device)
-                + " RSSI peer type=" + typeLabel(safeType(device))
+        state(autoConnect
+                ? "АВТО · SAVED PEER CONNECTING"
+                : "ПОДКЛЮЧАЮ IPHONE · HELPER FALLBACK");
+        log("iPhone target: " + safeName(device) + " " + safeAddress(device)
+                + " type=" + typeLabel(safeType(device))
                 + " bond=" + bondLabel(safeBondState(device)));
-        log("Единственный connectGatt(autoConnect=false, TRANSPORT_LE) — "
-                + "точно как GPS-клиент; Android создаёт BLE link первым");
+        log("connectGatt(autoConnect=" + autoConnect + ", TRANSPORT_LE) · " + reason);
 
         try {
-            gatt = device.connectGatt(context, false, gattCallback,
+            gatt = device.connectGatt(context, autoConnect, gattCallback,
                     BluetoothDevice.TRANSPORT_LE);
             if (gatt == null) {
                 clientConnectInFlight = false;
@@ -522,17 +569,25 @@ public final class BluetoothDiagnostics {
                 log("connectGatt вернул null");
                 return;
             }
+            if (autoConnect) {
+                connectTimeout = null;
+                log("autoConnect=true зарегистрирован как долгоживущий background GATT; "
+                        + "локальный timeout не закрывает его, повторный вызов блокируется");
+                return;
+            }
             BluetoothGatt expected = gatt;
+            long timeoutMs = GPS_CONNECT_TIMEOUT_MS;
             connectTimeout = () -> {
                 if (gatt != expected || !clientConnectInFlight) return;
                 clientConnectInFlight = false;
                 state("GPS-STYLE · CONNECT TIMEOUT");
-                log("Нет callback подключения за " + GPS_CONNECT_TIMEOUT_MS
-                        + " ms · target=" + safeAddress(expected.getDevice()));
+                log("Нет callback подключения за " + timeoutMs
+                        + " ms · target=" + safeAddress(expected.getDevice())
+                        + " autoConnect=" + autoConnect);
                 closeClientGatt(expected);
                 clearAncsRuntime();
             };
-            main.postDelayed(connectTimeout, GPS_CONNECT_TIMEOUT_MS);
+            main.postDelayed(connectTimeout, timeoutMs);
         } catch (RuntimeException failure) {
             clientConnectInFlight = false;
             state("GPS-STYLE · CONNECT EXCEPTION");
@@ -670,6 +725,7 @@ public final class BluetoothDiagnostics {
         iphoneSecureCharacteristic = null;
         if (clearMode) {
             iphonePeripheralMode = false;
+            helperBootstrapMode = false;
             iphoneConnectStarted = false;
         }
     }
@@ -678,6 +734,18 @@ public final class BluetoothDiagnostics {
         synchronized (verifiedPeerLock) {
             return verifiedPeer;
         }
+    }
+
+    public String getVerifiedPeerAddress() {
+        return safeAddress(getVerifiedPeer());
+    }
+
+    public String getVerifiedPeerName() {
+        return safeName(getVerifiedPeer());
+    }
+
+    public boolean isAncsReady() {
+        return gattReady && gattClientConnected && gatt != null;
     }
 
     /**
@@ -966,7 +1034,7 @@ public final class BluetoothDiagnostics {
                 DIAGNOSTIC_CHARACTERISTIC,
                 BluetoothGattCharacteristic.PROPERTY_READ,
                 BluetoothGattCharacteristic.PERMISSION_READ);
-        information.setValue("KX11 ANCS Test v8".getBytes(StandardCharsets.UTF_8));
+        information.setValue("KX11 ANCS Test v9".getBytes(StandardCharsets.UTF_8));
 
         BluetoothGattCharacteristic control = new BluetoothGattCharacteristic(
                 CONTROL_CHARACTERISTIC,
@@ -1046,63 +1114,6 @@ public final class BluetoothDiagnostics {
             } catch (RuntimeException ignored) {
             }
         }
-    }
-
-    private boolean hasSolicitationBuilderMethod() {
-        try {
-            AdvertiseData.Builder.class.getMethod(
-                    "addServiceSolicitationUuid", ParcelUuid.class);
-            return true;
-        } catch (NoSuchMethodException missing) {
-            for (Method method : AdvertiseData.Builder.class.getDeclaredMethods()) {
-                if ("addServiceSolicitationUuid".equals(method.getName())
-                        && method.getParameterTypes().length == 1) return true;
-            }
-            return false;
-        }
-    }
-
-    private boolean addSolicitationWithReflection(AdvertiseData.Builder builder) {
-        ParcelUuid ancs = new ParcelUuid(AncsProtocol.SERVICE);
-        try {
-            Method method;
-            try {
-                method = AdvertiseData.Builder.class.getMethod(
-                        "addServiceSolicitationUuid", ParcelUuid.class);
-            } catch (NoSuchMethodException publicMethodMissing) {
-                method = AdvertiseData.Builder.class.getDeclaredMethod(
-                        "addServiceSolicitationUuid", ParcelUuid.class);
-                method.setAccessible(true);
-            }
-            method.invoke(builder, ancs);
-            return true;
-        } catch (Throwable unavailable) {
-            log("ANCS solicitation API отсутствует: "
-                    + rootCause(unavailable).getClass().getSimpleName());
-        }
-
-        // Some OEM builds backport the field but keep the Builder method hidden.
-        try {
-            Field field = AdvertiseData.Builder.class
-                    .getDeclaredField("mServiceSolicitationUuids");
-            field.setAccessible(true);
-            Object current = field.get(builder);
-            if (current == null && List.class.isAssignableFrom(field.getType())) {
-                current = new ArrayList<ParcelUuid>();
-                field.set(builder, current);
-            }
-            if (current instanceof List) {
-                @SuppressWarnings("unchecked")
-                List<ParcelUuid> values = (List<ParcelUuid>) current;
-                values.add(ancs);
-                log("ANCS solicitation добавлена через OEM Builder field");
-                return true;
-            }
-        } catch (Throwable unavailable) {
-            log("OEM solicitation field отсутствует/заблокирован: "
-                    + rootCause(unavailable).getClass().getSimpleName());
-        }
-        return false;
     }
 
     private void discoverServices(BluetoothGatt callbackGatt) {
@@ -1218,6 +1229,31 @@ public final class BluetoothDiagnostics {
         }, GPS_POST_SECURE_DISCOVERY_DELAY_MS);
     }
 
+    private void scheduleAutoAncsWaitTimeout(BluetoothGatt expected) {
+        if (helperBootstrapMode || expected == null || expected != gatt
+                || autoAncsWaitTimeout != null) {
+            return;
+        }
+        autoAncsWaitTimeout = () -> {
+            autoAncsWaitTimeout = null;
+            if (helperBootstrapMode || expected != gatt || !gattClientConnected || gattReady) {
+                return;
+            }
+            state("AUTO · ANCS WAIT TIMEOUT");
+            log("ANCS/Service Changed не появились за " + AUTO_ANCS_WAIT_TIMEOUT_MS
+                    + " ms; закрываю daily GATT перед reconnect backoff");
+            disconnect();
+        };
+        main.postDelayed(autoAncsWaitTimeout, AUTO_ANCS_WAIT_TIMEOUT_MS);
+        log("ANCS wait watchdog=" + AUTO_ANCS_WAIT_TIMEOUT_MS
+                + " ms; Helper fallback внутри active daily link не запускается");
+    }
+
+    private void cancelAutoAncsWaitTimeout() {
+        if (autoAncsWaitTimeout != null) main.removeCallbacks(autoAncsWaitTimeout);
+        autoAncsWaitTimeout = null;
+    }
+
     private void handleServices(BluetoothGatt callbackGatt, int status) {
         if (callbackGatt != gatt) return;
         cancelDiscoveryTimeout();
@@ -1239,6 +1275,7 @@ public final class BluetoothDiagnostics {
 
         BluetoothGattService ancs = callbackGatt.getService(AncsProtocol.SERVICE);
         if (ancs != null) {
+            cancelAutoAncsWaitTimeout();
             iphoneAncsSeen = iphonePeripheralMode;
             if (gattReady) {
                 log("ANCS уже READY; повторный discovery проигнорирован");
@@ -1275,16 +1312,23 @@ public final class BluetoothDiagnostics {
             return;
         }
 
-        if (iphonePeripheralMode && !iphoneSecureConfirmed) {
+        if (iphonePeripheralMode && helperBootstrapMode && !iphoneSecureConfirmed) {
             log("ANCS в первом discovery отсутствует; только теперь запускаю "
-                    + "fallback SECURE test");
+                    + "fallback SECURE test Helper");
             startIphonePeripheralSecurity(callbackGatt);
             return;
         }
 
-        state(iphonePeripheralMode
-                ? "GPS-LINK OK · ANCS НЕ ОПУБЛИКОВАН"
-                : "CONNECTED · ANCS НЕ НАЙДЕН");
+        if (iphonePeripheralMode && !helperBootstrapMode) {
+            state("AUTO LINK OK · ЖДУ SERVICE CHANGED / ANCS");
+            log("Saved-peer daily link не требует D2D diagnostic service. "
+                    + "PAIR/SECURE Helper не запускаются; жду Service Changed");
+            scheduleAutoAncsWaitTimeout(callbackGatt);
+        } else {
+            state(iphonePeripheralMode
+                    ? "GPS-LINK OK · ANCS НЕ ОПУБЛИКОВАН"
+                    : "CONNECTED · ANCS НЕ НАЙДЕН");
+        }
         log("Сервис ANCS 7905… отсутствует на этом BLE link"
                 + (iphonePeripheralMode
                 ? " после прямого Android-central подключения"
@@ -1297,7 +1341,9 @@ public final class BluetoothDiagnostics {
         serviceChanged = generic == null ? null : generic.getCharacteristic(SERVICE_CHANGED);
         if (serviceChanged == null) {
             log("Service Changed 0x2A05 отсутствует; остаюсь ждать ANCS");
-            state(iphonePeripheralMode
+            state(iphonePeripheralMode && !helperBootstrapMode
+                    ? "AUTO LINK OK · ANCS/2A05 ПОКА НЕТ"
+                    : iphonePeripheralMode
                     ? "GPS-LINK OK · ANCS/2A05 НЕТ"
                     : "ЖДУ ANCS НА SAME-PEER LINK");
             return;
@@ -1305,7 +1351,9 @@ public final class BluetoothDiagnostics {
         descriptorStage = DescriptorStage.SERVICE_CHANGED;
         if (!subscribe(callbackGatt, serviceChanged, true)) {
             descriptorStage = DescriptorStage.NONE;
-            state(iphonePeripheralMode
+            state(iphonePeripheralMode && !helperBootstrapMode
+                    ? "AUTO LINK OK · ЖДУ ANCS"
+                    : iphonePeripheralMode
                     ? "GPS-LINK OK · ANCS НЕ ОПУБЛИКОВАН"
                     : "ЖДУ ANCS НА SAME-PEER LINK");
         }
@@ -1357,6 +1405,11 @@ public final class BluetoothDiagnostics {
         if (callbackGatt != gatt) return;
         UUID characteristicUuid = descriptor.getCharacteristic() == null
                 ? null : descriptor.getCharacteristic().getUuid();
+        if (!descriptorMatchesStage(descriptorStage, characteristicUuid)) {
+            log("Игнорирую устаревший onDescriptorWrite "
+                    + shortUuid(characteristicUuid) + " stage=" + descriptorStage);
+            return;
+        }
         log("onDescriptorWrite " + shortUuid(characteristicUuid)
                 + " status=" + status + " stage=" + descriptorStage);
         if (status != GATT_SUCCESS) {
@@ -1392,7 +1445,9 @@ public final class BluetoothDiagnostics {
         if (descriptorStage == DescriptorStage.SERVICE_CHANGED) {
             descriptorStage = DescriptorStage.NONE;
             log("Service Changed indication включена");
-            state(iphonePeripheralMode
+            state(iphonePeripheralMode && !helperBootstrapMode
+                    ? "AUTO LINK OK · ЖДУ SERVICE CHANGED / ANCS"
+                    : iphonePeripheralMode
                     ? "GPS-LINK OK · ЖДУ SERVICE CHANGED"
                     : "ЖДУ SERVICE CHANGED / ANCS");
         } else if (descriptorStage == DescriptorStage.DATA_SOURCE) {
@@ -1405,6 +1460,7 @@ public final class BluetoothDiagnostics {
         } else if (descriptorStage == DescriptorStage.NOTIFICATION_SOURCE) {
             descriptorStage = DescriptorStage.NONE;
             gattReady = true;
+            cancelAutoAncsWaitTimeout();
             state("ANCS READY · ОТПРАВЬТЕ УВЕДОМЛЕНИЕ");
             log("Обе ANCS-подписки успешно включены");
             sendNextRequest();
@@ -1419,12 +1475,44 @@ public final class BluetoothDiagnostics {
         log("onCharacteristicChanged " + shortUuid(uuid)
                 + " bytes=" + AdvertisementParser.hex(value, 80));
         if (SERVICE_CHANGED.equals(uuid)) {
-            log("Получен Service Changed; повторяю discovery");
+            if (iphonePeripheralMode && !helperBootstrapMode) {
+                log("Daily GATT получил Service Changed; на ECARX безопаснее закрыть "
+                        + "текущий client и выполнить новый saved-peer connect через backoff");
+                state("AUTO · SERVICE CHANGED · RECONNECT");
+                disconnect();
+                return;
+            }
+            log("Получен Service Changed; сбрасываю старые ANCS handles/очередь "
+                    + "и повторяю discovery");
+            clearAncsRuntime();
             main.postDelayed(() -> discoverServices(callbackGatt), 400L);
         } else if (AncsProtocol.NOTIFICATION_SOURCE.equals(uuid)) {
-            handleNotificationSource(value);
+            if (gattReady) {
+                handleNotificationSource(value);
+            } else {
+                log("Игнорирую Notification Source до актуального ANCS READY");
+            }
         } else if (AncsProtocol.DATA_SOURCE.equals(uuid)) {
-            handleDataSource(value);
+            if (gattReady) {
+                handleDataSource(value);
+            } else {
+                log("Игнорирую Data Source до актуального ANCS READY");
+            }
+        }
+    }
+
+    private static boolean descriptorMatchesStage(DescriptorStage stage, UUID uuid) {
+        if (stage == null || uuid == null) return false;
+        switch (stage) {
+            case SERVICE_CHANGED:
+                return SERVICE_CHANGED.equals(uuid);
+            case DATA_SOURCE:
+                return AncsProtocol.DATA_SOURCE.equals(uuid);
+            case NOTIFICATION_SOURCE:
+                return AncsProtocol.NOTIFICATION_SOURCE.equals(uuid);
+            case NONE:
+            default:
+                return false;
         }
     }
 
@@ -1568,25 +1656,12 @@ public final class BluetoothDiagnostics {
             return;
         }
         boolean started = false;
-        // Prefer explicit LE transport when an OEM Android 9 build exposes the hidden overload.
         try {
-            Method method = BluetoothDevice.class.getDeclaredMethod("createBond", int.class);
-            method.setAccessible(true);
-            Object result = method.invoke(device, BluetoothDevice.TRANSPORT_LE);
-            started = result instanceof Boolean && (Boolean) result;
-            log("createBond(TRANSPORT_LE) via reflection=" + started);
-        } catch (Throwable unavailable) {
-            log("createBond(TRANSPORT_LE) недоступен: "
-                    + rootCause(unavailable).getClass().getSimpleName());
+            started = device.createBond();
+        } catch (RuntimeException failure) {
+            log("createBond exception: " + failure);
         }
-        if (!started) {
-            try {
-                started = device.createBond();
-            } catch (RuntimeException failure) {
-                log("createBond exception: " + failure);
-            }
-            log("createBond()=" + started);
-        }
+        log("createBond() public API=" + started);
         if (started) leBondAttemptObserved = true;
         state(started ? "BONDING · ПОДТВЕРДИТЕ НА IPHONE" : "BOND_START_FAILED");
     }
@@ -1618,6 +1693,7 @@ public final class BluetoothDiagnostics {
     private void clearAncsRuntime() {
         if (requestTimeout != null) main.removeCallbacks(requestTimeout);
         if (ancsBondRetry != null) main.removeCallbacks(ancsBondRetry);
+        cancelAutoAncsWaitTimeout();
         cancelConnectTimeout();
         cancelDiscoveryTimeout();
         requestTimeout = null;
@@ -1797,14 +1873,6 @@ public final class BluetoothDiagnostics {
             case BluetoothDevice.BOND_BONDING: return "BONDING";
             default: return "NONE";
         }
-    }
-
-    private static Throwable rootCause(Throwable error) {
-        Throwable current = error;
-        while (current.getCause() != null && current.getCause() != current) {
-            current = current.getCause();
-        }
-        return current;
     }
 
     private static String value(Map<String, String> values, String key) {
@@ -2000,7 +2068,7 @@ public final class BluetoothDiagnostics {
                             + " bond=" + bondLabel(safeBondState(device))));
                     if (DIAGNOSTIC_CHARACTERISTIC.equals(uuid)) {
                         sendGattReadResponse(device, requestId, offset,
-                            "KX11 ANCS Test v8".getBytes(StandardCharsets.UTF_8));
+                            "KX11 ANCS Test v9".getBytes(StandardCharsets.UTF_8));
                         return;
                     }
                     if (SECURE_CHARACTERISTIC.equals(uuid)) {
@@ -2115,8 +2183,16 @@ public final class BluetoothDiagnostics {
             discoverServices(callbackGatt);
         } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
             cancelConnectTimeout();
-            clientConnectInFlight = false;
             gattClientConnected = false;
+            if (activeClientAutoConnect) {
+                clientConnectInFlight = true;
+                clearAncsRuntime();
+                state("AUTO · ЖДУ SAVED PEER");
+                log("STATE_DISCONNECTED status=0 на long-lived autoConnect; "
+                        + "BluetoothGatt оставлен зарегистрированным для фонового reconnect");
+                return;
+            }
+            clientConnectInFlight = false;
             state("GPS-STYLE · IPHONE DISCONNECTED");
             closeClientGatt(callbackGatt);
             clearAncsRuntime();
@@ -2297,12 +2373,10 @@ public final class BluetoothDiagnostics {
                     BluetoothDevice.BOND_NONE);
             int previous = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE,
                     BluetoothDevice.BOND_NONE);
-            int reason = intent.getIntExtra(
-                    "android.bluetooth.device.extra.REASON", -1);
             log("BOND " + safeAddress(device) + ": "
                     + bondLabel(previous) + " → " + bondLabel(state)
                     + (state == BluetoothDevice.BOND_NONE && previous == BluetoothDevice.BOND_BONDING
-                    ? " · reason=" + reason + " (" + bondFailureReasonLabel(reason) + ")"
+                    ? " · системный bond завершён без BOND_BONDED"
                     : ""));
             updateCandidate(device, -127, false, "", "bond event");
             if (state == BluetoothDevice.BOND_BONDING) {
@@ -2349,8 +2423,7 @@ public final class BluetoothDiagnostics {
                 state(iphoneAncsSeen
                         ? "ANCS · LE BOND FAILED"
                         : "VERIFIED PEER · LE BOND FAILED");
-                log("LE bonding завершился неуспешно · reason=" + reason
-                        + " (" + bondFailureReasonLabel(reason) + ")");
+                log("LE bonding завершился неуспешно");
             }
         }
     };
@@ -2366,21 +2439,6 @@ public final class BluetoothDiagnostics {
             case 6: return "OOB CONSENT";
             case 7: return "PIN 16 DIGITS";
             default: return "UNKNOWN " + variant;
-        }
-    }
-
-    private static String bondFailureReasonLabel(int reason) {
-        switch (reason) {
-            case 1: return "AUTH FAILED";
-            case 2: return "AUTH REJECTED";
-            case 3: return "AUTH CANCELED";
-            case 4: return "REMOTE DEVICE DOWN";
-            case 5: return "DISCOVERY IN PROGRESS";
-            case 6: return "AUTH TIMEOUT";
-            case 7: return "REPEATED ATTEMPTS";
-            case 8: return "REMOTE AUTH CANCELED";
-            case 9: return "REMOVED";
-            default: return "UNKNOWN";
         }
     }
 
