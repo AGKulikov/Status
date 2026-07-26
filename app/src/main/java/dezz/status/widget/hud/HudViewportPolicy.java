@@ -4,14 +4,12 @@ package dezz.status.widget.hud;
 import androidx.annotation.NonNull;
 
 /**
- * Fixed OEM HUD plane used by mHUD 6.1 on the supported head unit.
+ * Fixed OEM HUD planes on the supported ECARX head unit.
  *
- * <p>The mHUD editor is a 1760x720 preview. Before a widget is sent to its external
- * {@code Presentation}, mHUD maps it to a 728x190 coordinate plane and adds a fixed 720 pixel
- * vertical offset. The total external display size is supplied by Android at runtime; it is not
- * hard-coded in the reference APK. Consequently 728x910 is the minimum surface which can contain
- * the complete HUD plane, while the only area this app is allowed to touch is
- * {@code [0,720]-[728,910]}.</p>
+ * <p>The editable widget plane remains the exact 728x190 area used by mHUD 6.1. A supplied
+ * SurfaceFlinger/window dump also shows that the stock {@code com.ecarx.hud/.hud.HomeActivity}
+ * surface is cropped to {@code [0,720]-[808,986]} on display 2. The latter is used only by the
+ * optional opaque mask: widgets can never escape the smaller safe plane.</p>
  */
 public final class HudViewportPolicy {
     public static final int VERIFIED_DISPLAY_ID = 2;
@@ -38,8 +36,16 @@ public final class HudViewportPolicy {
     public static final int SAFE_RIGHT = SAFE_LEFT + SAFE_WIDTH;
     public static final int SAFE_BOTTOM = SAFE_TOP + SAFE_HEIGHT;
 
-    public static final int MIN_SURFACE_WIDTH = SAFE_RIGHT;
-    public static final int MIN_SURFACE_HEIGHT = SAFE_BOTTOM;
+    /** Dump-verified visible footprint of the stock car and speed HomeActivity on display 2. */
+    public static final int STOCK_MASK_LEFT = 0;
+    public static final int STOCK_MASK_TOP = 720;
+    public static final int STOCK_MASK_WIDTH = 808;
+    public static final int STOCK_MASK_HEIGHT = 266;
+    public static final int STOCK_MASK_RIGHT = STOCK_MASK_LEFT + STOCK_MASK_WIDTH;
+    public static final int STOCK_MASK_BOTTOM = STOCK_MASK_TOP + STOCK_MASK_HEIGHT;
+
+    public static final int MIN_SURFACE_WIDTH = Math.max(SAFE_RIGHT, STOCK_MASK_RIGHT);
+    public static final int MIN_SURFACE_HEIGHT = Math.max(SAFE_BOTTOM, STOCK_MASK_BOTTOM);
 
     private HudViewportPolicy() {}
 
@@ -54,6 +60,16 @@ public final class HudViewportPolicy {
         int bottom = Math.max(0, Math.min(SAFE_BOTTOM, surfaceHeight));
         int left = Math.max(0, Math.min(SAFE_LEFT, right));
         int top = Math.max(0, Math.min(SAFE_TOP, bottom));
+        return new Bounds(left, top, right, bottom);
+    }
+
+    /** Returns the stock-HUD mask intersection without widening the editable widget plane. */
+    @NonNull
+    public static Bounds clipStockMaskToSurface(int surfaceWidth, int surfaceHeight) {
+        int right = Math.max(0, Math.min(STOCK_MASK_RIGHT, surfaceWidth));
+        int bottom = Math.max(0, Math.min(STOCK_MASK_BOTTOM, surfaceHeight));
+        int left = Math.max(0, Math.min(STOCK_MASK_LEFT, right));
+        int top = Math.max(0, Math.min(STOCK_MASK_TOP, bottom));
         return new Bounds(left, top, right, bottom);
     }
 
