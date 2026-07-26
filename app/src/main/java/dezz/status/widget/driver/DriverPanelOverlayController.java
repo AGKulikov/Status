@@ -56,6 +56,7 @@ import dezz.status.widget.WidgetAccessibilityService;
 import dezz.status.widget.WidgetService;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.launcher.HighResolutionAppIconLoader;
+import dezz.status.widget.launcher.AppUninstallLauncher;
 import dezz.status.widget.launcher.InformationShortcutView;
 import dezz.status.widget.launcher.LauncherAppCatalog;
 import dezz.status.widget.launcher.LauncherAppTileRenderer;
@@ -1317,6 +1318,11 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                     Toast.makeText(context, "Не удалось открыть " + app.label,
                             Toast.LENGTH_SHORT).show();
                 }
+            });
+            tile.setOnLongClickListener(view -> {
+                close.run();
+                AppUninstallLauncher.request(context, app);
+                return true;
             });
             return tile;
         }
