@@ -24,6 +24,8 @@ public final class HudOverlayContractTest {
         assertTrue(viewport.contains("SAFE_TOP = 720"));
         assertTrue(viewport.contains("SAFE_WIDTH = 728"));
         assertTrue(viewport.contains("SAFE_HEIGHT = 190"));
+        assertTrue(viewport.contains("STOCK_MASK_WIDTH = 808"));
+        assertTrue(viewport.contains("STOCK_MASK_HEIGHT = 266"));
         assertTrue(canvas.contains("canvas.clipRect(geometry.safeClip)"));
         assertTrue(canvas.contains("config.maskStockHud && !editor"));
         assertTrue(canvas.contains("paint.setColor(Color.BLACK)"));
@@ -51,13 +53,14 @@ public final class HudOverlayContractTest {
     @Test
     public void oldLayoutsMigrateToAnEnabledStockHudMask() throws IOException {
         String config = source("dezz/status/widget/hud/HudPanelConfig.java");
-        assertTrue(config.contains("SCHEMA_VERSION = 3"));
+        assertTrue(config.contains("SCHEMA_VERSION = 4"));
         assertTrue(config.contains(
                 "public int displayId = HudViewportPolicy.VERIFIED_DISPLAY_ID"));
         assertTrue(config.contains(
                 "displayId = HudViewportPolicy.VERIFIED_DISPLAY_ID"));
         assertTrue(config.contains("public boolean maskStockHud = true"));
-        assertTrue(config.contains("source.optBoolean(\"maskStockHud\", true)"));
+        assertTrue(config.contains(
+                "schema < 4 || source.optBoolean(\"maskStockHud\", true)"));
     }
 
     private static String source(String relative) throws IOException {
