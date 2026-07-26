@@ -111,30 +111,16 @@ public final class HudDisplaySelector {
     }
 
     /**
-     * Once configured, the exact OEM numeric id is authoritative. It is intentionally unsafe to
-     * fall through to another external screen when that id is temporarily absent: on a composite
-     * head unit that could place HUD content on the passenger or central display.
-     *
-     * <p>A unique id can be used only by an imported legacy configuration which has no numeric
-     * id. With no saved identity there is no automatic target; the user must choose a display
-     * from the list that exposes its live id and dimensions.</p>
+     * The supplied ECARX dump establishes displayId=2 as a vehicle constant. Saved/imported IDs
+     * and array positions are deliberately ignored: if ID 2 is absent, output waits instead of
+     * ever falling through to the central, passenger or cluster display.
      */
     public static int preferredIndex(@NonNull List<Candidate> candidates,
                                      @Nullable String savedUniqueId, int savedId) {
-        if (savedId >= 0) {
-            for (int index = 0; index < candidates.size(); index++) {
-                Candidate item = candidates.get(index);
-                if (!item.defaultDisplay && item.id == savedId) return index;
-            }
-            return -1;
-        }
-        String unique = safe(savedUniqueId);
-        if (!unique.isEmpty()) {
-            for (int index = 0; index < candidates.size(); index++) {
-                Candidate item = candidates.get(index);
-                if (!item.defaultDisplay && unique.equals(item.uniqueId)) return index;
-            }
-            return -1;
+        for (int index = 0; index < candidates.size(); index++) {
+            Candidate item = candidates.get(index);
+            if (!item.defaultDisplay
+                    && item.id == HudViewportPolicy.VERIFIED_DISPLAY_ID) return index;
         }
         return -1;
     }
@@ -153,8 +139,12 @@ public final class HudDisplaySelector {
 
     public static void remember(@NonNull HudPanelConfig config,
                                 @NonNull Candidate candidate) {
+        if (candidate.defaultDisplay
+                || candidate.id != HudViewportPolicy.VERIFIED_DISPLAY_ID) {
+            throw new IllegalArgumentException("Only verified ECARX display ID 2 is HUD");
+        }
         config.displayUniqueId = candidate.uniqueId;
-        config.displayId = candidate.id;
+        config.displayId = HudViewportPolicy.VERIFIED_DISPLAY_ID;
         config.displayName = candidate.name;
         config.displayWidth = candidate.width;
         config.displayHeight = candidate.height;

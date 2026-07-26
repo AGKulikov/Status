@@ -35,6 +35,7 @@ import java.util.Map;
 import dezz.status.widget.launcher.media.MediaPanelConfig;
 import dezz.status.widget.launcher.media.MediaPanelConfigStore;
 import dezz.status.widget.launcher.media.MediaPanelView;
+import dezz.status.widget.launcher.MediaPlaybackHistoryStore;
 import dezz.status.widget.launcher.panels.PanelEditScheduler;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
@@ -118,6 +119,31 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         addButton(settings, "Расположение элементов внутри блока на HOME…", v ->
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_MEDIA_CONTENT, true)));
+
+        addTitle(settings, "После загрузки магнитолы");
+        MaterialSwitch autoResume = new MaterialSwitch(this);
+        autoResume.setText("Продолжать музыку из последнего плеера");
+        autoResume.setTextSize(16);
+        autoResume.setMinHeight(dp(50));
+        autoResume.setChecked(preferences.launcherMediaAutoResumeEnabled.get());
+        autoResume.setOnCheckedChangeListener((button, checked) ->
+                preferences.launcherMediaAutoResumeEnabled.set(checked));
+        settings.addView(autoResume, new LinearLayout.LayoutParams(match(), wrap()));
+        MediaPlaybackHistoryStore.Snapshot playbackHistory =
+                MediaPlaybackHistoryStore.read(this);
+        String remembered = playbackHistory.packageName.isEmpty()
+                ? "пока не определён"
+                : applicationLabel(playbackHistory.packageName) + " · "
+                + (playbackHistory.wasPlaying ? "играл" : "был на паузе");
+        addHint(settings, "Последний плеер: " + remembered + ". После загрузки отправляется "
+                + "безопасная команда PLAY именно этому приложению и только если перед "
+                + "выключением оно играло. Тот же трек и очередь восстанавливает сам плеер.");
+        addSlider(settings, "Задержка команды",
+                Math.max(0, Math.min(60,
+                        preferences.launcherMediaAutoResumeDelaySeconds.get())),
+                0, 60,
+                preferences.launcherMediaAutoResumeDelaySeconds::set,
+                value -> value + " с");
 
         addTitle(settings, "Сетка");
         addHint(settings, "Число столбцов и строк задаёт размер ячейки внутри фактического "
@@ -297,6 +323,14 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
                         return config.element(element.id).scalePercent;
                     },
                     selected -> selected + "%");
+            if (MediaPanelConfig.PROGRESS.equals(element.id)) {
+                addElementSlider(card, "Толщина полосы", element.progressBarHeightDp, 2, 40,
+                        selected -> {
+                            config.setProgressBarHeightDp(selected);
+                            return config.element(MediaPanelConfig.PROGRESS).progressBarHeightDp;
+                        },
+                        selected -> selected + " dp");
+            }
             if (MediaPanelConfig.supportsMarquee(element.id)) {
                 MaterialSwitch marquee = new MaterialSwitch(this);
                 marquee.setText("Прокручивать длинный текст");
@@ -499,6 +533,17 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), dp(62));
         lp.topMargin = dp(6);
         parent.addView(button, lp);
+    }
+
+    @NonNull
+    private String applicationLabel(@NonNull String packageName) {
+        try {
+            CharSequence label = getPackageManager().getApplicationLabel(
+                    getPackageManager().getApplicationInfo(packageName, 0));
+            return label == null ? packageName : label.toString();
+        } catch (Exception ignored) {
+            return packageName;
+        }
     }
 
     @NonNull

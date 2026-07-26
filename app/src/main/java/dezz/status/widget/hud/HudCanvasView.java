@@ -50,6 +50,8 @@ public final class HudCanvasView extends View {
     @NonNull private HudPanelConfig config;
     @NonNull private final HudRuntimeData data;
     private final boolean editor;
+    /** True when WindowManager already cropped this View to the physical 728x190 HUD plane. */
+    private final boolean localHudViewport;
     @Nullable private final EditorListener editorListener;
     @Nullable private String selectedId;
     @Nullable private HudElementConfig dragging;
@@ -68,10 +70,18 @@ public final class HudCanvasView extends View {
     public HudCanvasView(@NonNull Context context, @NonNull HudPanelConfig config,
                          @NonNull HudRuntimeData data, boolean editor,
                          @Nullable EditorListener editorListener) {
+        this(context, config, data, editor, editorListener, false);
+    }
+
+    HudCanvasView(@NonNull Context context, @NonNull HudPanelConfig config,
+                  @NonNull HudRuntimeData data, boolean editor,
+                  @Nullable EditorListener editorListener,
+                  boolean localHudViewport) {
         super(context);
         this.config = config;
         this.data = data;
         this.editor = editor;
+        this.localHudViewport = localHudViewport;
         this.editorListener = editorListener;
         // A black full-screen View would overwrite neighbouring planes of the composite display.
         setBackgroundColor(editor ? Color.BLACK : Color.TRANSPARENT);
@@ -178,6 +188,15 @@ public final class HudCanvasView extends View {
     }
 
     private void drawPanelBackground(Canvas canvas, Geometry geometry) {
+        if (config.maskStockHud && !editor) {
+            // Opaque pixels are required here: alpha or CLEAR would let the OEM HUD layer show
+            // through. The hard clip established by onDraw prevents this mask from touching the
+            // cluster and DIM regions that share displayId=2.
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.BLACK);
+            canvas.drawRect(geometry.content, paint);
+            return;
+        }
         if ("TRANSPARENT".equals(config.backgroundMode) && !editor) {
             // Canvas.drawColor observes the hard clip established by onDraw.
             canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
@@ -765,8 +784,22 @@ public final class HudCanvasView extends View {
                     content.height() / config.gridRows);
         }
 
-        // Presentation coordinates are physical pixels, exactly as in mHUD 6.1. Never scale or
-        // center this plane: doing so could make it overlap another panel in the virtual display.
+        if (localHudViewport) {
+            // WindowManager already enforces the dump-verified 728x190 surface. Coordinates are
+            // local here, while the grid and every element keep exactly one physical pixel per
+            // configured pixel.
+            RectF content = new RectF(0f, 0f,
+                    HudViewportPolicy.SAFE_WIDTH, HudViewportPolicy.SAFE_HEIGHT);
+            RectF safeClip = new RectF(0f, 0f,
+                    Math.min(width, HudViewportPolicy.SAFE_WIDTH),
+                    Math.min(height, HudViewportPolicy.SAFE_HEIGHT));
+            return new Geometry(1f, content, safeClip,
+                    HudViewportPolicy.SAFE_WIDTH / (float) config.gridColumns,
+                    HudViewportPolicy.SAFE_HEIGHT / (float) config.gridRows);
+        }
+
+        // Presentation fallback coordinates are physical pixels, exactly as in mHUD 6.1. Never
+        // scale or center this plane: doing so could overlap another panel in the virtual display.
         RectF content = new RectF(HudViewportPolicy.SAFE_LEFT, HudViewportPolicy.SAFE_TOP,
                 HudViewportPolicy.SAFE_RIGHT, HudViewportPolicy.SAFE_BOTTOM);
         HudViewportPolicy.Bounds clipped = HudViewportPolicy.clipToSurface(

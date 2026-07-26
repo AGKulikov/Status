@@ -63,6 +63,9 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.HOME" />
         </intent>
+        <intent>
+            <action android:name="android.intent.action.MEDIA_BUTTON" />
+        </intent>
     </queries>
 
     <application
@@ -332,6 +335,12 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".launcher.MediaAutoResumeReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="false" />
 
         <!-- Explicit broadcasts sent by Home Assistant Companion. MQTT is the primary transport,
              but this stable action remains supported for compatibility and manual testing. -->

@@ -932,6 +932,9 @@ public final class LauncherActivity extends AppCompatActivity {
                 frame.setCardElevation(0);
                 frame.setRadius(0);
                 frame.setPreserveAspectRatio(appearance.preserveAspectRatio);
+                frame.setOnClickListener(view -> {
+                    if (editMode) showLauncherWidgetEditor(id, label);
+                });
                 frame.setContent(proxy);
                 FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                         geometry.width, geometry.height);
@@ -995,7 +998,10 @@ public final class LauncherActivity extends AppCompatActivity {
                 : globalElementFrames.entrySet()) {
             LauncherGlobalElementProxyView proxy = globalElementProxies.get(entry.getKey());
             View source = globalElementSources.get(entry.getKey());
+            LauncherGlobalElementLayoutStore.Appearance appearance =
+                    globalElementLayoutStore.getAppearance(entry.getKey());
             boolean visible = source != null
+                    && !appearance.hidden
                     && (editMode || proxy != null && proxy.sourceIsShown());
             entry.getValue().setVisibility(visible ? View.VISIBLE : View.GONE);
             entry.getValue().setEditMode(editMode, snap);
@@ -1043,6 +1049,23 @@ public final class LauncherActivity extends AppCompatActivity {
                 + "Режим «Вписать» показывает содержимое целиком и не деформирует его.");
         hint.setPadding(0, 0, 0, dp(8));
         form.addView(hint);
+
+        if ((LauncherLayoutStore.MEDIA + "/" + MediaPanelConfig.PROGRESS).equals(id)) {
+            TextView progressSettings = text(17, Color.WHITE, true);
+            progressSettings.setText("Полоса прогресса");
+            form.addView(progressSettings, widgetEditorSection());
+            MediaPanelConfig mediaConfig = new MediaPanelConfigStore(preferences).load();
+            addWidgetEditorSlider(form, "Толщина полосы", 2, 40,
+                    mediaConfig.element(MediaPanelConfig.PROGRESS).progressBarHeightDp,
+                    " dp", value -> {
+                        MediaPanelConfig updated =
+                                new MediaPanelConfigStore(preferences).load();
+                        updated.setProgressBarHeightDp(value);
+                        new MediaPanelConfigStore(preferences).save(updated);
+                        if (mediaPanel != null) mediaPanel.reloadConfig();
+                        workspace.postDelayed(this::syncGlobalElements, 32L);
+                    });
+        }
 
         MaterialSwitch preserve = new MaterialSwitch(this);
         preserve.setText("Сохранять пропорции при изменении размера");
@@ -1230,20 +1253,35 @@ public final class LauncherActivity extends AppCompatActivity {
                         .setView(scroll)
                         .setPositiveButton("Готово", null)
                         .setNeutralButton("Сбросить", null)
+                        .setNegativeButton("Удалить", null)
                         .create();
-        editor.setOnShowListener(ignored -> editor.getButton(
-                androidx.appcompat.app.AlertDialog.BUTTON_NEUTRAL)
-                .setOnClickListener(view -> new androidx.appcompat.app.AlertDialog.Builder(this)
-                        .setTitle("Сбросить настройки виджета?")
-                        .setMessage("Положение и размер сохранятся; оформление и действие "
-                                + "вернутся к исходным.")
-                        .setPositiveButton("Сбросить", (dialog, which) -> {
-                            saveLauncherWidgetAppearance(id,
-                                    new LauncherGlobalElementLayoutStore.Appearance());
-                            editor.dismiss();
-                        })
-                        .setNegativeButton("Отмена", null)
-                        .show()));
+        editor.setOnShowListener(ignored -> {
+            editor.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEUTRAL)
+                    .setOnClickListener(view -> new androidx.appcompat.app.AlertDialog.Builder(this)
+                            .setTitle("Сбросить настройки виджета?")
+                            .setMessage("Положение и размер сохранятся; оформление и действие "
+                                    + "вернутся к исходным.")
+                            .setPositiveButton("Сбросить", (dialog, which) -> {
+                                saveLauncherWidgetAppearance(id,
+                                        new LauncherGlobalElementLayoutStore.Appearance());
+                                editor.dismiss();
+                            })
+                            .setNegativeButton("Отмена", null)
+                            .show());
+            editor.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE)
+                    .setOnClickListener(view -> new androidx.appcompat.app.AlertDialog.Builder(this)
+                            .setTitle("Удалить виджет с HOME?")
+                            .setMessage("Его настройки и положение сохранятся. Вернуть виджет "
+                                    + "можно кнопкой «＋ Виджет».")
+                            .setPositiveButton("Удалить", (dialog, which) -> {
+                                appearance.hidden = true;
+                                saveLauncherWidgetAppearance(id, appearance);
+                                refreshGlobalElementVisibility();
+                                editor.dismiss();
+                            })
+                            .setNegativeButton("Отмена", null)
+                            .show());
+        });
         editor.show();
     }
 
@@ -1260,55 +1298,260 @@ public final class LauncherActivity extends AppCompatActivity {
     }
 
     private void showLauncherWidgetCatalog() {
-        String[] entries = {
-                "Кнопка приложения или действие",
-                "Избранное приложение",
-                "Часы и дата",
-                "Медиа: обложка, текст и управление",
-                "Информационный статус",
-                "Навигация",
-                "Климат",
-                "Данные автомобиля"
-        };
+        List<String> entries = new ArrayList<>();
+        List<Runnable> actions = new ArrayList<>();
+        if (hasRemovedLauncherWidgets()) {
+            entries.add("Вернуть удалённый виджет…");
+            actions.add(this::showRemovedLauncherWidgets);
+        }
+        entries.add("Новая кнопка приложения или действие…");
+        actions.add(() -> startActivity(new Intent(this,
+                LauncherShortcutSettingsActivity.class)
+                .putExtra(LauncherShortcutSettingsActivity.EXTRA_ADD_NEW, true)));
+        entries.add("Избранное приложение…");
+        actions.add(this::showFavoriteAppWidgetCatalog);
+        entries.add("Часы или дата…");
+        actions.add(() -> showSimpleWidgetCatalog(LauncherLayoutStore.CLOCK,
+                "Добавить часы или дату"));
+        entries.add("Элемент медиаплеера…");
+        actions.add(this::showMediaWidgetCatalog);
+        entries.add("Информационный статус…");
+        actions.add(() -> {
+            preferences.launcherInformationVisible.set(true);
+            startActivity(new Intent(this, InformationPanelSettingsActivity.class));
+        });
+        entries.add("Элемент навигации…");
+        actions.add(this::showNavigationWidgetCatalog);
+        entries.add("Элемент климата…");
+        actions.add(this::showClimateWidgetCatalog);
+        entries.add("Данные автомобиля или умного дома…");
+        actions.add(() -> {
+            preferences.launcherVehicleInfoVisible.set(true);
+            startActivity(new Intent(this, VehicleInfoPanelSettingsActivity.class));
+        });
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Добавить виджет")
-                .setMessage("После добавления новый элемент появляется на HOME как независимый "
-                        + "виджет. Долгое нажатие открывает его глубокие настройки.")
-                .setItems(entries, (dialog, which) -> {
-                    Intent intent;
-                    switch (which) {
-                        case 0:
-                            intent = new Intent(this, LauncherShortcutSettingsActivity.class);
-                            break;
-                        case 1:
-                            intent = new Intent(this, FavoriteAppsSettingsActivity.class);
-                            break;
-                        case 2:
-                            intent = new Intent(this, PanelElementSettingsActivity.class)
-                                    .putExtra(PanelElementSettingsActivity.EXTRA_PANEL_ID,
-                                            LauncherLayoutStore.CLOCK);
-                            break;
-                        case 3:
-                            intent = new Intent(this, MediaPanelSettingsActivity.class);
-                            break;
-                        case 4:
-                            intent = new Intent(this, InformationPanelSettingsActivity.class);
-                            break;
-                        case 5:
-                            intent = new Intent(this, NavigationPanelSettingsActivity.class);
-                            break;
-                        case 6:
-                            intent = new Intent(this, ClimatePanelSettingsActivity.class);
-                            break;
-                        case 7:
-                        default:
-                            intent = new Intent(this, VehicleInfoPanelSettingsActivity.class);
-                            break;
-                    }
-                    startActivity(intent);
+                .setItems(entries.toArray(new String[0]),
+                        (dialog, which) -> actions.get(which).run())
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private boolean hasRemovedLauncherWidgets() {
+        if (globalElementLayoutStore == null) return false;
+        for (String id : globalElementFrames.keySet()) {
+            if (globalElementLayoutStore.getAppearance(id).hidden) return true;
+        }
+        return false;
+    }
+
+    private void showRemovedLauncherWidgets() {
+        List<String> ids = new ArrayList<>();
+        List<String> labels = new ArrayList<>();
+        for (String id : globalElementFrames.keySet()) {
+            if (!globalElementLayoutStore.getAppearance(id).hidden) continue;
+            ids.add(id);
+            View source = globalElementSources.get(id);
+            LauncherGlobalElementTag tag = source == null
+                    ? null : LauncherGlobalElementTag.from(source);
+            labels.add(tag == null ? id : tag.label);
+        }
+        if (ids.isEmpty()) {
+            Toast.makeText(this, "Удалённых виджетов нет", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Вернуть виджет")
+                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
+                    String id = ids.get(which);
+                    LauncherGlobalElementLayoutStore.Appearance appearance =
+                            globalElementLayoutStore.getAppearance(id);
+                    appearance.hidden = false;
+                    saveLauncherWidgetAppearance(id, appearance);
+                    refreshGlobalElementVisibility();
+                    Toast.makeText(this, "Виджет возвращён на прежнее место",
+                            Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Отмена", null)
                 .show();
+    }
+
+    private void showFavoriteAppWidgetCatalog() {
+        List<AppEntry> all = appCatalog == null
+                ? Collections.emptyList() : appCatalog.all();
+        List<AppEntry> available = new ArrayList<>();
+        for (AppEntry app : all) {
+            if (!favoriteAppsConfigStore.contains(app.packageName)) available.add(app);
+        }
+        if (available.isEmpty()) {
+            Toast.makeText(this, all.isEmpty()
+                    ? "Список приложений ещё загружается"
+                    : "Все приложения уже добавлены", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        List<String> labels = new ArrayList<>();
+        for (AppEntry app : available) labels.add(app.label + "\n" + app.packageName);
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Добавить приложение")
+                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
+                    favoriteAppsConfigStore.add(available.get(which).packageName);
+                    PanelElementConfigStore.Panel panel =
+                            panelElementStore.load(LauncherLayoutStore.APPS);
+                    panel.setEnabled(PanelElementConfigStore.APPS_GRID, true);
+                    panelElementStore.save(panel);
+                    preferences.launcherAppsVisible.set(true);
+                    replacePanelContent(LauncherLayoutStore.APPS, buildAppsPanel());
+                    setPanelVisibility(LauncherLayoutStore.APPS, true);
+                    refreshFavorites();
+                    refreshGlobalElementsAfterWidgetChange();
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void showSimpleWidgetCatalog(@NonNull String panelId, @NonNull String title) {
+        List<PanelElementConfigStore.Definition> definitions =
+                PanelElementConfigStore.definitions(panelId);
+        PanelElementConfigStore.Panel current = panelElementStore.load(panelId);
+        List<PanelElementConfigStore.Definition> available = new ArrayList<>();
+        for (PanelElementConfigStore.Definition definition : definitions) {
+            if (!current.isEnabled(definition.id)) available.add(definition);
+        }
+        if (available.isEmpty()) {
+            Toast.makeText(this, "Все элементы уже добавлены", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String[] labels = new String[available.size()];
+        for (int index = 0; index < available.size(); index++) {
+            labels[index] = available.get(index).label;
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(title)
+                .setItems(labels, (dialog, which) -> {
+                    PanelElementConfigStore.Panel updated = panelElementStore.load(panelId);
+                    updated.setEnabled(available.get(which).id, true);
+                    panelElementStore.save(updated);
+                    if (LauncherLayoutStore.CLOCK.equals(panelId)) {
+                        preferences.launcherClockVisible.set(true);
+                        replacePanelContent(panelId, buildClockPanel());
+                    } else if (LauncherLayoutStore.APPS.equals(panelId)) {
+                        preferences.launcherAppsVisible.set(true);
+                        replacePanelContent(panelId, buildAppsPanel());
+                    }
+                    setPanelVisibility(panelId, true);
+                    refreshGlobalElementsAfterWidgetChange();
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void showMediaWidgetCatalog() {
+        MediaPanelConfig current = new MediaPanelConfigStore(preferences).load();
+        List<MediaPanelConfig.Spec> available = new ArrayList<>();
+        for (MediaPanelConfig.Spec spec : MediaPanelConfig.SPECS) {
+            if (!current.element(spec.id).enabled) available.add(spec);
+        }
+        if (available.isEmpty()) {
+            Toast.makeText(this, "Все элементы медиаплеера уже добавлены",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String[] labels = new String[available.size()];
+        for (int index = 0; index < available.size(); index++) {
+            labels[index] = available.get(index).label;
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Добавить элемент медиаплеера")
+                .setItems(labels, (dialog, which) -> {
+                    MediaPanelConfig updated =
+                            new MediaPanelConfigStore(preferences).load();
+                    if (!updated.setEnabled(available.get(which).id, true)) {
+                        Toast.makeText(this, "На сетке медиаплеера нет свободного места",
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    new MediaPanelConfigStore(preferences).save(updated);
+                    preferences.launcherMediaVisible.set(true);
+                    if (mediaPanel != null) mediaPanel.reloadConfig();
+                    setPanelVisibility(LauncherLayoutStore.MEDIA, true);
+                    refreshGlobalElementsAfterWidgetChange();
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void showNavigationWidgetCatalog() {
+        NavigationPanelConfig current = navigationPanelConfigStore.load();
+        List<NavigationPanelConfig.Spec> available = new ArrayList<>();
+        for (NavigationPanelConfig.Spec spec : NavigationPanelConfig.SPECS) {
+            if (!current.element(spec.id).enabled) available.add(spec);
+        }
+        if (available.isEmpty()) {
+            Toast.makeText(this, "Все элементы навигации уже добавлены",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String[] labels = new String[available.size()];
+        for (int index = 0; index < available.size(); index++) {
+            labels[index] = available.get(index).label;
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Добавить элемент навигации")
+                .setItems(labels, (dialog, which) -> {
+                    NavigationPanelConfig updated = navigationPanelConfigStore.load();
+                    if (!updated.setEnabled(available.get(which).id, true)) {
+                        Toast.makeText(this, "На сетке навигации нет свободного места",
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    navigationPanelConfigStore.save(updated);
+                    preferences.launcherNavigationVisible.set(true);
+                    replacePanelContent(LauncherLayoutStore.NAVIGATION,
+                            buildCombinedNavigationPanel());
+                    setPanelVisibility(LauncherLayoutStore.NAVIGATION, true);
+                    updateNavigation();
+                    refreshGlobalElementsAfterWidgetChange();
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void showClimateWidgetCatalog() {
+        ClimatePanelConfig current = new ClimatePanelConfigStore(preferences).load();
+        List<ClimatePanelConfig.Element> available = new ArrayList<>();
+        for (ClimatePanelConfig.Element element : ClimatePanelConfig.ELEMENTS) {
+            if (!current.isElementEnabled(element.id)) available.add(element);
+        }
+        if (available.isEmpty()) {
+            Toast.makeText(this, "Все элементы климата уже добавлены",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String[] labels = new String[available.size()];
+        for (int index = 0; index < available.size(); index++) {
+            labels[index] = available.get(index).label;
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Добавить элемент климата")
+                .setItems(labels, (dialog, which) -> {
+                    ClimatePanelConfig updated =
+                            new ClimatePanelConfigStore(preferences).load();
+                    updated.setElementEnabled(available.get(which).id, true);
+                    new ClimatePanelConfigStore(preferences).save(updated);
+                    preferences.launcherClimateVisible.set(true);
+                    if (climatePanel != null) climatePanel.reloadConfig();
+                    setPanelVisibility(LauncherLayoutStore.CLIMATE, true);
+                    refreshGlobalElementsAfterWidgetChange();
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void refreshGlobalElementsAfterWidgetChange() {
+        workspace.postDelayed(() -> {
+            syncGlobalElements();
+            refreshGlobalElementVisibility();
+        }, 48L);
     }
 
     private void addWidgetEditorSlider(

@@ -53,6 +53,7 @@ import dezz.status.widget.launcher.SmartHomeShortcutPicker;
 import dezz.status.widget.launcher.InformationShortcutView;
 import dezz.status.widget.launcher.information.InformationIconPolicy;
 import dezz.status.widget.launcher.information.InformationSourcePicker;
+import dezz.status.widget.launcher.information.InformationShortcutDefaults;
 import dezz.status.widget.driver.DriverFavoritesPanelConfig;
 import dezz.status.widget.driver.DriverFavoritesPanelStore;
 import dezz.status.widget.launcher.routes.FavoriteRouteConfig;
@@ -867,6 +868,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
             value.showTitle = true;
             value.showState = true;
             value.hasLongAction = false;
+            InformationShortcutDefaults.apply(preferences, item, value);
             editAppearance(value);
         }).show();
     }

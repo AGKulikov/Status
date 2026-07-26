@@ -30,9 +30,9 @@ import dezz.status.widget.R;
  * Canonical application list used by HOME and every runtime "all applications" surface.
  *
  * <p>Runtime “All applications” surfaces include every enabled
- * {@link Intent#CATEGORY_LAUNCHER} activity, including OEM/system apps such as the stock Phone.
- * Settings pickers use {@link InstalledAppCatalog} when they also need disabled or non-launcher
- * packages as action targets.</p>
+ * {@link Intent#CATEGORY_LAUNCHER} activity and, for packages without one, a safe exported OEM
+ * screen discovered by {@link InstalledAppCatalog}. This is important on ECARX builds where
+ * stock applications such as Phone have no conventional launcher category.</p>
  */
 public final class LauncherAppCatalog {
     public static final class App {
@@ -86,6 +86,17 @@ public final class LauncherAppCatalog {
             if (!components.add(component.flattenToString())) continue;
             apps.add(new App(String.valueOf(info.loadLabel(manager)),
                     info.activityInfo.packageName, component, systemApp));
+        }
+        if (includeSystem) {
+            // ECARX exposes some user-facing system screens without CATEGORY_LAUNCHER.
+            // InstalledAppCatalog accepts only enabled exported activities without a protected
+            // permission, so these screens can be shown without inventing an OEM package name.
+            for (InstalledAppCatalog.App installed : InstalledAppCatalog.load(context)) {
+                if (!installed.launchable() || installed.component == null) continue;
+                if (!components.add(installed.component.flattenToString())) continue;
+                apps.add(new App(installed.label, installed.packageName,
+                        installed.component, installed.system));
+            }
         }
         apps.sort(Comparator.comparing(value -> value.label.toLowerCase(Locale.ROOT)));
         return apps;

@@ -531,6 +531,12 @@ public class Preferences {
             "launcherHomeOpensWindowedNavigator", false);
     public final Bool launcherAppsVisible = new Bool(this, "launcherAppsVisible", true);
     public final Bool launcherMediaVisible = new Bool(this, "launcherMediaVisible", true);
+    /** Resume the exact player remembered before shutdown; remains opt-in on every upgrade. */
+    public final Bool launcherMediaAutoResumeEnabled = new Bool(this,
+            "launcherMediaAutoResumeEnabled", false);
+    /** Delay lets ECARX finish restoring its audio/player services; mSaver's proven default is 5s. */
+    public final Int launcherMediaAutoResumeDelaySeconds = new Int(this,
+            "launcherMediaAutoResumeDelaySeconds", 5);
     public final Bool launcherClockVisible = new Bool(this, "launcherClockVisible", true);
     public final Bool launcherNavigationVisible = new Bool(this, "launcherNavigationVisible", true);
     public final Bool launcherActionsVisible = new Bool(this, "launcherActionsVisible", true);

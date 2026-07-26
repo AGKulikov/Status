@@ -17,4 +17,17 @@ public final class ClimatePowerStatePolicy {
     public static boolean isConfirmedOff(boolean powerKnown, boolean powerActive) {
         return powerKnown && !powerActive;
     }
+
+    /**
+     * Some ECARX variants never expose a usable HVAC_FUNC_POWER value. A confirmed stopped fan or
+     * confirmed BLOWING_MODE_OFF is their observable master-off state. Direct power remains
+     * authoritative whenever it is known, so a delayed child callback cannot turn an explicitly
+     * active climate system off in the UI.
+     */
+    public static boolean isConfirmedOff(boolean powerKnown, boolean powerActive,
+                                         boolean fanKnown, boolean fanActive,
+                                         boolean airflowKnown, boolean airflowActive) {
+        if (powerKnown) return !powerActive;
+        return (fanKnown && !fanActive) || (airflowKnown && !airflowActive);
+    }
 }

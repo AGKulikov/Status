@@ -5,8 +5,23 @@
 
 package dezz.status.widget.settings;
 
-/** Pure geometry policy shared by the settings hub and local JVM tests. */
+/**
+ * Pure geometry policy shared by the settings hub and local JVM tests.
+ *
+ * <p>The primary regression profile comes from the user's ECARX display dump: the built-in
+ * display is 1920x720 at logical 160 dpi; after the permanent 160 px left rail and 64 px top
+ * system inset an ordinary Activity receives 1760x656 dp. Keep these constants explicit so new
+ * settings UI is checked against the actual wide/low head unit instead of a phone portrait.</p>
+ */
 public final class SettingsResponsiveLayoutPolicy {
+    public static final int TARGET_PHYSICAL_WIDTH_PX = 1920;
+    public static final int TARGET_PHYSICAL_HEIGHT_PX = 720;
+    public static final int TARGET_LOGICAL_DENSITY_DPI = 160;
+    public static final int TARGET_SYSTEM_LEFT_INSET_PX = 160;
+    public static final int TARGET_SYSTEM_TOP_INSET_PX = 64;
+    public static final int TARGET_APP_WIDTH_DP = 1760;
+    public static final int TARGET_APP_HEIGHT_DP = 656;
+
     public static final int MIN_SPLIT_WIDTH_DP = 760;
     public static final int MIN_CONTENT_WIDTH_DP = 420;
     public static final int MIN_SIDEBAR_WIDTH_DP = 260;

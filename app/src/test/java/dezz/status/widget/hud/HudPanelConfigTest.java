@@ -27,7 +27,7 @@ public final class HudPanelConfigTest {
         assertEquals(0, value.offsetY);
     }
 
-    @Test public void exactDisplayIdentityAndMeasuredSurfaceRoundTrip() throws Exception {
+    @Test public void importedOtherDisplayCannotOverrideVerifiedHudId() throws Exception {
         HudPanelConfig value = HudPanelConfig.defaults();
         value.displayId = 4;
         value.displayUniqueId = "local:hud";
@@ -37,10 +37,10 @@ public final class HudPanelConfigTest {
 
         HudPanelConfig restored = HudPanelConfig.fromJson(value.toJson().toString());
 
-        assertEquals(4, restored.displayId);
-        assertEquals("local:hud", restored.displayUniqueId);
-        assertEquals(728, restored.displayWidth);
-        assertEquals(910, restored.displayHeight);
+        assertEquals(HudViewportPolicy.VERIFIED_DISPLAY_ID, restored.displayId);
+        assertEquals("", restored.displayUniqueId);
+        assertEquals(0, restored.displayWidth);
+        assertEquals(0, restored.displayHeight);
         assertFalse(restored.elements.isEmpty());
     }
 }

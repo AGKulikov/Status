@@ -12,6 +12,7 @@ import android.hardware.display.DisplayManager;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.Display;
 
@@ -46,6 +47,7 @@ public final class HudPresentationService extends Service
     private HudPanelConfig config;
     private DisplayManager displayManager;
     private HudRuntimeData data;
+    private HudOverlayWindow overlayWindow;
     private HudPresentation presentation;
     @Nullable private String shownUniqueId;
 
@@ -84,6 +86,7 @@ public final class HudPresentationService extends Service
     public static void notifyAutomationChanged(@NonNull Context context) {
         HudPresentationService current = instance;
         if (current != null) current.main.post(() -> {
+            if (current.overlayWindow != null) current.overlayWindow.invalidateHud();
             if (current.presentation != null) current.presentation.invalidateHud();
         });
     }
@@ -107,7 +110,9 @@ public final class HudPresentationService extends Service
             }
         }
         data = new HudRuntimeData(this, config, () -> {
+            HudOverlayWindow currentOverlay = overlayWindow;
             HudPresentation current = presentation;
+            if (currentOverlay != null) currentOverlay.invalidateHud();
             if (current != null) current.invalidateHud();
         });
         data.start();
@@ -180,11 +185,14 @@ public final class HudPresentationService extends Service
             return;
         }
         String identity = candidate.uniqueId + "|" + candidate.id;
-        if (presentation != null && identity.equals(shownUniqueId)) {
-            presentation.updateConfig(config);
+        if ((overlayWindow != null || presentation != null)
+                && identity.equals(shownUniqueId)) {
+            if (overlayWindow != null) overlayWindow.updateConfig(config);
+            if (presentation != null) presentation.updateConfig(config);
             runtimeDetail = "HUD: " + candidate.name + " · ID " + candidate.id
                     + " · поверхность " + candidate.width + "×" + candidate.height
-                    + " · безопасная область 728×190 @ (0,720)";
+                    + " · окно 728×190 @ (0,720)"
+                    + (overlayWindow != null ? " · overlay" : " · presentation");
             updateNotification(runtimeDetail);
             return;
         }
@@ -192,19 +200,12 @@ public final class HudPresentationService extends Service
         Display display = HudDisplaySelector.display(candidate);
         if (display == null || !display.isValid()) return;
         try {
-            HudPresentation next = new HudPresentation(this, display, config, data);
-            next.setOnDismissListener(dialog -> {
-                if (presentation == next) {
-                    presentation = null;
-                    shownUniqueId = null;
-                }
-            });
-            next.show();
-            presentation = next;
+            showOnDisplay(display);
             shownUniqueId = identity;
             runtimeDetail = "HUD: " + candidate.name + " · ID " + candidate.id
                     + " · поверхность " + candidate.width + "×" + candidate.height
-                    + " · безопасная область 728×190 @ (0,720)";
+                    + " · окно 728×190 @ (0,720)"
+                    + (overlayWindow != null ? " · overlay" : " · presentation");
             updateNotification(runtimeDetail);
         } catch (RuntimeException failure) {
             presentation = null;
@@ -215,10 +216,43 @@ public final class HudPresentationService extends Service
         }
     }
 
+    private void showOnDisplay(@NonNull Display display) {
+        if (Settings.canDrawOverlays(this)) {
+            try {
+                overlayWindow = HudOverlayWindow.show(this, display, config, data);
+                presentation = null;
+                return;
+            } catch (RuntimeException overlayFailure) {
+                overlayWindow = null;
+                Log.w(TAG, "Exact HUD application overlay unavailable; using Presentation",
+                        overlayFailure);
+            }
+        }
+        HudPresentation fallback = createPresentation(display);
+        fallback.show();
+        presentation = fallback;
+    }
+
+    @NonNull
+    private HudPresentation createPresentation(@NonNull Display display) {
+        HudPresentation next = new HudPresentation(
+                this, display, config, data);
+        next.setOnDismissListener(dialog -> {
+            if (presentation == next) {
+                presentation = null;
+                shownUniqueId = null;
+            }
+        });
+        return next;
+    }
+
     private void dismissPresentation(@NonNull String reason) {
+        HudOverlayWindow currentOverlay = overlayWindow;
         HudPresentation current = presentation;
+        overlayWindow = null;
         presentation = null;
         shownUniqueId = null;
+        if (currentOverlay != null) currentOverlay.dismiss();
         if (current != null) {
             try { current.dismiss(); }
             catch (RuntimeException failure) {

@@ -281,7 +281,7 @@ public final class MediaPanelView extends FrameLayout {
                 application.setContentDescription("Музыкальное приложение");
                 return application;
             case MediaPanelConfig.PROGRESS:
-                return progressElement(element.scalePercent);
+                return progressElement(element.scalePercent, element.progressBarHeightDp);
             case MediaPanelConfig.PREVIOUS:
                 return button(R.drawable.ic_media_previous, "Предыдущий трек",
                         controls == null || layoutEditor != null
@@ -305,7 +305,7 @@ public final class MediaPanelView extends FrameLayout {
     }
 
     @NonNull
-    private View progressElement(int scalePercent) {
+    private View progressElement(int scalePercent, int progressBarHeightDp) {
         LinearLayout root = new LinearLayout(getContext());
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER_VERTICAL);
@@ -324,7 +324,8 @@ public final class MediaPanelView extends FrameLayout {
         progress.setProgressBackgroundTintList(ColorStateList.valueOf(
                 withAlpha(color(config.secondaryColor, Color.LTGRAY), 95)));
         root.addView(progress, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, Math.max(dp(5), dp(7) * scalePercent / 100)));
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(Math.max(2, Math.min(40, progressBarHeightDp)))));
         return root;
     }
 

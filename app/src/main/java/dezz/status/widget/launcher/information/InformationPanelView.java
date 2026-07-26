@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothProfile;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.net.ConnectivityManager;
@@ -34,6 +35,8 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
+import androidx.core.widget.ImageViewCompat;
 
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -49,6 +52,9 @@ import java.util.Map;
 import java.util.Set;
 
 import dezz.status.widget.Fonts;
+import dezz.status.widget.BrickType;
+import dezz.status.widget.OutlineImageView;
+import dezz.status.widget.StatusBrickSnapshot;
 import dezz.status.widget.WidgetService;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarTelemetryDescriptor;
@@ -361,13 +367,13 @@ public final class InformationPanelView extends FrameLayout {
         background.setCornerRadius(Math.max(4f, config.cornerRadiusPx * .48f));
         tile.setBackground(background);
 
-        ImageView icon = new ImageView(getContext());
+        OutlineImageView icon = new OutlineImageView(getContext());
         icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         String resolvedIconKey = resolvedIconKey(item);
         icon.setImageDrawable(LauncherIconResolver.resolvePreset(getContext(),
                 resolvedIconKey, item.iconColor));
         icon.setContentDescription(item.displayLabel());
-        int iconSize = scaledDp(32, item.scalePercent);
+        int iconSize = scaledDp(item.iconSizePx, item.scalePercent);
         LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(iconSize, iconSize);
         iconLp.rightMargin = scaledDp(9, item.scalePercent);
         tile.addView(icon, iconLp);
@@ -391,6 +397,7 @@ public final class InformationPanelView extends FrameLayout {
         value.setSingleLine(false);
         value.setMaxLines(Integer.MAX_VALUE);
         value.setEllipsize(null);
+        value.setVisibility(item.showValue ? View.VISIBLE : View.GONE);
         texts.addView(label, new LinearLayout.LayoutParams(match(), wrap()));
         texts.addView(value, new LinearLayout.LayoutParams(match(), wrap()));
         tile.addView(texts, new LinearLayout.LayoutParams(0, wrap(), 1f));
@@ -409,18 +416,16 @@ public final class InformationPanelView extends FrameLayout {
             ItemViews views = itemViews.get(item.id);
             if (views == null) continue;
             Value value = resolve(item);
-            String iconKey = resolvedIconKey(item);
-            if (!iconKey.equals(views.resolvedIconKey)) {
-                views.icon.setImageDrawable(LauncherIconResolver.resolvePreset(
-                        getContext(), iconKey, item.iconColor));
-                views.resolvedIconKey = iconKey;
-            }
+            StatusBrickSnapshot status = statusSnapshot(item);
+            applyIcon(item, views, value, status);
             views.tile.setVisibility(editorPreviewMode || InformationValuePolicy.isVisible(
                     item.visibility, value.known, value.active) ? View.VISIBLE : View.INVISIBLE);
             views.label.setText(item.displayLabel());
             views.value.setText(value.known ? value.display : "—");
             views.value.setAlpha(value.known ? 1f : .48f);
-            views.icon.setAlpha(value.known ? (value.active ? 1f : .58f) : .28f);
+            float configuredAlpha = item.iconAlpha / 255f;
+            views.icon.setAlpha(configuredAlpha
+                    * (value.known ? (value.active ? 1f : .58f) : .28f));
             views.background.setColor(fixedCellBackgroundColor == null
                     ? (value.known && value.active
                     ? Color.argb(82, 84, 168, 255)
@@ -429,6 +434,45 @@ public final class InformationPanelView extends FrameLayout {
             views.tile.setContentDescription(item.displayLabel() + ": "
                     + (value.known ? value.display : "нет актуальных данных"));
         }
+    }
+
+    private void applyIcon(@NonNull InformationPanelConfig.Item item,
+                           @NonNull ItemViews views,
+                           @NonNull Value value,
+                           @Nullable StatusBrickSnapshot status) {
+        if (item.useStatusIconStyle && status != null && status.iconResource != 0) {
+            String statusKey = "status:" + status.iconResource;
+            if (!statusKey.equals(views.resolvedIconKey)) {
+                views.icon.setImageResource(status.iconResource);
+                views.resolvedIconKey = statusKey;
+            }
+            ImageViewCompat.setImageTintList(views.icon,
+                    ColorStateList.valueOf(status.iconTint));
+            views.icon.setOutlineColor(status.outlineColor);
+            views.icon.setOutlineWidth(status.outlineWidth);
+            views.icon.setBadgeText(status.badgeText,
+                    status.badgeBackground, status.badgeForeground);
+            views.icon.setBadgeDrawable(status.badgeDrawableResource == 0 ? null
+                    : ContextCompat.getDrawable(getContext(),
+                    status.badgeDrawableResource));
+            return;
+        }
+        // Switching away from the exact status-bar style must also remove its semantic tint.
+        // ImageViewCompat keeps that ColorStateList on the view and would otherwise recolour the
+        // regular preset selected by the driver.
+        ImageViewCompat.setImageTintList(views.icon, null);
+        String iconKey = resolvedIconKey(item);
+        if (!iconKey.equals(views.resolvedIconKey)) {
+            views.icon.setImageDrawable(LauncherIconResolver.resolvePreset(
+                    getContext(), iconKey, item.iconColor));
+            views.resolvedIconKey = iconKey;
+        }
+        views.icon.setOutlineColor(withAlpha(
+                color(item.iconColor, Color.WHITE), item.iconOutlineAlpha));
+        views.icon.setOutlineWidth(item.iconOutlineAlpha == 0
+                ? 0 : item.iconOutlineWidth);
+        views.icon.setBadgeText(null, 0, 0);
+        views.icon.setBadgeDrawable(null);
     }
 
     @NonNull
@@ -493,6 +537,11 @@ public final class InformationPanelView extends FrameLayout {
 
     @NonNull
     private Value resolveSystem(@NonNull InformationPanelConfig.Item item) {
+        StatusBrickSnapshot status = statusSnapshot(item);
+        if (status != null) {
+            return new Value(status.known, status.active,
+                    status.text.isEmpty() ? "—" : status.text);
+        }
         switch (item.sourceId) {
             case "system.time":
                 return Value.known(DateFormat.getTimeFormat(getContext()).format(new Date()), true);
@@ -547,6 +596,15 @@ public final class InformationPanelView extends FrameLayout {
             default:
                 return Value.unknown();
         }
+    }
+
+    @Nullable
+    private StatusBrickSnapshot statusSnapshot(
+            @NonNull InformationPanelConfig.Item item) {
+        BrickType type = StatusBarInformationCatalog.type(item);
+        if (type == null) return null;
+        WidgetService service = WidgetService.getInstance();
+        return service == null ? null : service.statusBrickSnapshot(type);
     }
 
     @NonNull
@@ -723,6 +781,10 @@ public final class InformationPanelView extends FrameLayout {
         catch (IllegalArgumentException ignored) { return fallback; }
     }
 
+    private static int withAlpha(int color, int alpha) {
+        return (color & 0x00FFFFFF) | (Math.max(0, Math.min(255, alpha)) << 24);
+    }
+
     private static int match() { return ViewGroup.LayoutParams.MATCH_PARENT; }
     private static int wrap() { return ViewGroup.LayoutParams.WRAP_CONTENT; }
 
@@ -740,13 +802,13 @@ public final class InformationPanelView extends FrameLayout {
 
     private static final class ItemViews {
         final View tile;
-        final ImageView icon;
+        final OutlineImageView icon;
         final TextView label;
         final TextView value;
         final GradientDrawable background;
         @NonNull String resolvedIconKey;
 
-        ItemViews(View tile, ImageView icon, TextView label, TextView value,
+        ItemViews(View tile, OutlineImageView icon, TextView label, TextView value,
                   GradientDrawable background, @NonNull String resolvedIconKey) {
             this.tile = tile;
             this.icon = icon;

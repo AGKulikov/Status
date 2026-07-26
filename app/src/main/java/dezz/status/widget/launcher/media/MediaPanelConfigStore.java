@@ -19,7 +19,8 @@ import dezz.status.widget.Preferences;
 
 /** Versioned persistence for the visual media-panel editor. */
 public final class MediaPanelConfigStore {
-    public static final int SCHEMA_VERSION = 4;
+    public static final int SCHEMA_VERSION = 5;
+    private static final int ELEMENT_GRID_SCHEMA_VERSION = 4;
     private static final int LEGACY_FLOW_SCHEMA_VERSION = 1;
     private static final int FIXED_GRID_SCHEMA_VERSION = 2;
     private static final int VARIABLE_GRID_SCHEMA_VERSION = 3;
@@ -41,7 +42,8 @@ public final class MediaPanelConfigStore {
         try {
             JSONObject root = new JSONObject(raw);
             int version = root.optInt("version", 0);
-            if (version != SCHEMA_VERSION && version != VARIABLE_GRID_SCHEMA_VERSION
+            if (version != SCHEMA_VERSION && version != ELEMENT_GRID_SCHEMA_VERSION
+                    && version != VARIABLE_GRID_SCHEMA_VERSION
                     && version != FIXED_GRID_SCHEMA_VERSION
                     && version != LEGACY_FLOW_SCHEMA_VERSION) return value;
             if (version >= VARIABLE_GRID_SCHEMA_VERSION) {
@@ -78,6 +80,10 @@ public final class MediaPanelConfigStore {
                     value.setScale(id, item.optInt("scalePercent", element.scalePercent));
                     value.setMarqueeEnabled(id,
                             item.optBoolean("marqueeEnabled", element.marqueeEnabled));
+                    if (MediaPanelConfig.PROGRESS.equals(id)) {
+                        value.setProgressBarHeightDp(item.optInt("progressBarHeightDp",
+                                element.progressBarHeightDp));
+                    }
                     // Applying moves in array order also makes hand-edited/imported JSON robust
                     // against duplicate or sparse order numbers.
                     value.element(id).order = item.optInt("order", index);
@@ -138,6 +144,9 @@ public final class MediaPanelConfigStore {
                 item.put("order", element.order);
                 item.put("scalePercent", element.scalePercent);
                 item.put("marqueeEnabled", element.marqueeEnabled);
+                if (MediaPanelConfig.PROGRESS.equals(element.id)) {
+                    item.put("progressBarHeightDp", element.progressBarHeightDp);
+                }
                 item.put("column", element.column);
                 item.put("row", element.row);
                 item.put("columnSpan", element.columnSpan);

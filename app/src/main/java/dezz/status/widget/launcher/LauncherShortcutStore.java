@@ -65,7 +65,7 @@ public final class LauncherShortcutStore {
         @NonNull public String activeIconColor = "#FFFFB300";
         public boolean useVehicleStateColor = true;
         public boolean showState = true;
-        /** Driver climate tile occupies two slots and shows AUTO/airflow when enabled. */
+        /** Driver climate tile adds AUTO/airflow when enabled; temperature and scale stay basic. */
         public boolean extendedClimateInfo = false;
         public int iconSizePx = 54;
         public int dividerThicknessPx = 2;
@@ -87,6 +87,17 @@ public final class LauncherShortcutStore {
         public int informationPaddingTopPx = 7;
         public int informationPaddingRightPx = 10;
         public int informationPaddingBottomPx = 7;
+        /** INFO only: empty means a standalone row; equal arbitrary names share one row. */
+        @NonNull public String informationGroup = "";
+        /** INFO only: 0 = above driver controls, 1 = below driver controls. */
+        public int informationPlacement = 0;
+        public boolean informationShowValue = true;
+        public int informationIconSizePx = 32;
+        public int informationIconAlpha = 255;
+        public int informationIconOutlineAlpha = 0;
+        public int informationIconOutlineWidth = 0;
+        /** Status-bar sources can reuse their live icon family, semantic colour and badges. */
+        public boolean informationUseStatusIconStyle = false;
         /** Driver Favorites only: dismiss the owning compact panel after either action. */
         public boolean closeFavoritePanelAfterAction = false;
         public boolean enabled = true;
@@ -137,6 +148,14 @@ public final class LauncherShortcutStore {
             value.informationPaddingTopPx = informationPaddingTopPx;
             value.informationPaddingRightPx = informationPaddingRightPx;
             value.informationPaddingBottomPx = informationPaddingBottomPx;
+            value.informationGroup = informationGroup;
+            value.informationPlacement = informationPlacement;
+            value.informationShowValue = informationShowValue;
+            value.informationIconSizePx = informationIconSizePx;
+            value.informationIconAlpha = informationIconAlpha;
+            value.informationIconOutlineAlpha = informationIconOutlineAlpha;
+            value.informationIconOutlineWidth = informationIconOutlineWidth;
+            value.informationUseStatusIconStyle = informationUseStatusIconStyle;
             value.closeFavoritePanelAfterAction = closeFavoritePanelAfterAction;
             value.enabled = enabled;
             return value;
@@ -412,7 +431,21 @@ public final class LauncherShortcutStore {
                 value.informationPaddingRightPx);
         value.informationPaddingBottomPx = clampInformationPadding(
                 value.informationPaddingBottomPx);
+        value.informationGroup = value.informationGroup == null
+                ? "" : value.informationGroup.trim();
+        value.informationPlacement = value.informationPlacement == 1 ? 1 : 0;
+        value.informationIconSizePx = Math.max(12,
+                Math.min(MAX_ICON_SIZE_PX, value.informationIconSizePx));
+        value.informationIconAlpha = clampByte(value.informationIconAlpha);
+        value.informationIconOutlineAlpha = clampByte(
+                value.informationIconOutlineAlpha);
+        value.informationIconOutlineWidth = Math.max(0,
+                Math.min(24, value.informationIconOutlineWidth));
         return value;
+    }
+
+    private static int clampByte(int value) {
+        return Math.max(0, Math.min(255, value));
     }
 
     private static int clampInformationPadding(int value) {
@@ -456,6 +489,17 @@ public final class LauncherShortcutStore {
                 .put("informationPaddingTopPx", value.informationPaddingTopPx)
                 .put("informationPaddingRightPx", value.informationPaddingRightPx)
                 .put("informationPaddingBottomPx", value.informationPaddingBottomPx)
+                .put("informationGroup", value.informationGroup)
+                .put("informationPlacement", value.informationPlacement)
+                .put("informationShowValue", value.informationShowValue)
+                .put("informationIconSizePx", value.informationIconSizePx)
+                .put("informationIconAlpha", value.informationIconAlpha)
+                .put("informationIconOutlineAlpha",
+                        value.informationIconOutlineAlpha)
+                .put("informationIconOutlineWidth",
+                        value.informationIconOutlineWidth)
+                .put("informationUseStatusIconStyle",
+                        value.informationUseStatusIconStyle)
                 .put("closeFavoritePanelAfterAction",
                         value.closeFavoritePanelAfterAction)
                 .put("enabled", value.enabled);
@@ -530,6 +574,20 @@ public final class LauncherShortcutStore {
                     json.optInt("informationPaddingRightPx", 10);
             value.informationPaddingBottomPx =
                     json.optInt("informationPaddingBottomPx", 7);
+            value.informationGroup = json.optString("informationGroup", "");
+            value.informationPlacement = json.optInt("informationPlacement", 0);
+            value.informationShowValue =
+                    json.optBoolean("informationShowValue", true);
+            value.informationIconSizePx =
+                    json.optInt("informationIconSizePx", 32);
+            value.informationIconAlpha =
+                    json.optInt("informationIconAlpha", 255);
+            value.informationIconOutlineAlpha =
+                    json.optInt("informationIconOutlineAlpha", 0);
+            value.informationIconOutlineWidth =
+                    json.optInt("informationIconOutlineWidth", 0);
+            value.informationUseStatusIconStyle =
+                    json.optBoolean("informationUseStatusIconStyle", false);
             value.closeFavoritePanelAfterAction =
                     json.optBoolean("closeFavoritePanelAfterAction", false);
             value.enabled = json.optBoolean("enabled", true);

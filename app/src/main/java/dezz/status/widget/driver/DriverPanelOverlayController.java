@@ -681,39 +681,40 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         root.setPadding(0, geometry.contentTop, 0,
                 Math.max(0, screenHeight - geometry.contentBottom));
         int gap = Math.max(0, profile.itemGapPx.get());
-        List<LauncherShortcutStore.Shortcut> information = new ArrayList<>();
+        List<LauncherShortcutStore.Shortcut> topInformation = new ArrayList<>();
+        List<LauncherShortcutStore.Shortcut> bottomInformation = new ArrayList<>();
         List<LauncherShortcutStore.Shortcut> controls = new ArrayList<>();
         for (LauncherShortcutStore.Shortcut shortcut : shortcuts) {
-            if (shortcut.kind == LauncherShortcutStore.Kind.INFO) information.add(shortcut);
+            if (shortcut.kind == LauncherShortcutStore.Kind.INFO) {
+                (shortcut.informationPlacement == 1
+                        ? bottomInformation : topInformation).add(shortcut);
+            }
             else controls.add(shortcut);
         }
         int availableHeight = Math.max(1, geometry.contentBottom - geometry.contentTop);
-        if (!information.isEmpty()) {
-            ScrollView scroll = new ScrollView(context);
-            scroll.setFillViewport(false);
-            scroll.setVerticalScrollBarEnabled(information.size() > 3);
-            LinearLayout host = new LinearLayout(context);
-            host.setOrientation(LinearLayout.VERTICAL);
-            int informationContentHeight = 0;
-            for (LauncherShortcutStore.Shortcut shortcut : information) {
-                View tile = shortcutButton(context, shortcut, false);
-                int tileHeight = informationTileHeight(context, shortcut);
-                int tileGap = Math.max(0,
-                        shortcut.gapAfterPx < 0 ? gap : shortcut.gapAfterPx);
-                LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, tileHeight);
-                tileParams.setMargins(4, 0, 4, tileGap);
-                host.addView(tile, tileParams);
-                informationContentHeight += tileHeight + tileGap;
-            }
-            scroll.addView(host, new ScrollView.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-            int maximumInfoHeight = controls.isEmpty()
-                    ? availableHeight : Math.max(dp(context, 64),
-                    Math.round(availableHeight * .40f));
-            int infoHeight = Math.min(maximumInfoHeight, informationContentHeight);
-            root.addView(scroll, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, infoHeight)));
+        InformationSection topSection = buildInformationSection(
+                context, topInformation, gap);
+        InformationSection bottomSection = buildInformationSection(
+                context, bottomInformation, gap);
+        int desiredInformationHeight = topSection.desiredHeight
+                + bottomSection.desiredHeight;
+        int informationBudget = desiredInformationHeight <= 0 ? 0
+                : controls.isEmpty() ? availableHeight
+                : Math.max(dp(context, 64), Math.round(availableHeight * .48f));
+        int topHeight;
+        int bottomHeight;
+        if (desiredInformationHeight <= informationBudget) {
+            topHeight = topSection.desiredHeight;
+            bottomHeight = bottomSection.desiredHeight;
+        } else {
+            topHeight = desiredInformationHeight == 0 ? 0
+                    : Math.round(informationBudget
+                    * (topSection.desiredHeight / (float) desiredInformationHeight));
+            bottomHeight = informationBudget - topHeight;
+        }
+        if (topSection.view != null && topHeight > 0) {
+            root.addView(topSection.view, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, topHeight));
         }
         LinearLayout controlHost = new LinearLayout(context);
         controlHost.setOrientation(LinearLayout.VERTICAL);
@@ -740,6 +741,10 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             root.addView(controlHost, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         }
+        if (bottomSection.view != null && bottomHeight > 0) {
+            root.addView(bottomSection.view, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, bottomHeight));
+        }
         WindowManager.LayoutParams params = segmentParams(
                 type, screenHeight, screenWidth, profile);
         manager.addView(root, params);
@@ -747,6 +752,55 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 + " screenWidth=" + screenWidth + " width=" + params.width
                 + " x=" + params.x + " side=" + profile.side.get());
         panelWindows.add(new AttachedWindow(root, params, manager));
+    }
+
+    @NonNull
+    private InformationSection buildInformationSection(
+            @NonNull Context context,
+            @NonNull List<LauncherShortcutStore.Shortcut> information,
+            int panelGap) {
+        if (information.isEmpty()) return new InformationSection(null, 0);
+        LinkedHashMap<String, List<LauncherShortcutStore.Shortcut>> rows =
+                new LinkedHashMap<>();
+        for (LauncherShortcutStore.Shortcut shortcut : information) {
+            String group = shortcut.informationGroup.trim();
+            // Empty groups are intentionally unique; every named group is unlimited and may mix
+            // status-bar, vehicle, phone and smart-home information sources.
+            String key = group.isEmpty() ? "\u0000" + shortcut.id : group;
+            rows.computeIfAbsent(key, ignored -> new ArrayList<>()).add(shortcut);
+        }
+
+        ScrollView scroll = new ScrollView(context);
+        scroll.setFillViewport(false);
+        scroll.setVerticalScrollBarEnabled(rows.size() > 3);
+        LinearLayout host = new LinearLayout(context);
+        host.setOrientation(LinearLayout.VERTICAL);
+        int contentHeight = 0;
+        for (List<LauncherShortcutStore.Shortcut> rowItems : rows.values()) {
+            LinearLayout row = new LinearLayout(context);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            int rowHeight = 0;
+            int rowGap = 0;
+            for (LauncherShortcutStore.Shortcut shortcut : rowItems) {
+                View tile = shortcutButton(context, shortcut, false);
+                rowHeight = Math.max(rowHeight, informationTileHeight(context, shortcut));
+                rowGap = Math.max(rowGap, Math.max(0,
+                        shortcut.gapAfterPx < 0 ? panelGap : shortcut.gapAfterPx));
+                LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(
+                        0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+                tileParams.setMargins(dp(context, 2), 0, dp(context, 2), 0);
+                row.addView(tile, tileParams);
+            }
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, rowHeight);
+            rowParams.bottomMargin = rowGap;
+            host.addView(row, rowParams);
+            contentHeight += rowHeight + rowGap;
+        }
+        scroll.addView(host, new ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return new InformationSection(scroll, contentHeight);
     }
 
     private void registerFavoriteAnchors(
@@ -769,11 +823,24 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             @NonNull LauncherShortcutStore.Shortcut shortcut) {
         float scaledDensity = context.getResources().getDisplayMetrics().scaledDensity;
         int text = Math.round((shortcut.informationValueTextSizeSp
+                * (shortcut.informationShowValue ? 1 : 0)
                 + (shortcut.showTitle ? shortcut.informationLabelTextSizeSp : 0))
                 * scaledDensity);
         int padding = dp(context, shortcut.informationPaddingTopPx
                 + shortcut.informationPaddingBottomPx);
-        return Math.max(dp(context, 48), text + padding + dp(context, 8));
+        int icon = shortcut.informationIconSizePx + padding;
+        return Math.max(dp(context, 40),
+                Math.max(icon, text + padding + dp(context, 8)));
+    }
+
+    private static final class InformationSection {
+        @Nullable final ScrollView view;
+        final int desiredHeight;
+
+        InformationSection(@Nullable ScrollView view, int desiredHeight) {
+            this.view = view;
+            this.desiredHeight = desiredHeight;
+        }
     }
 
     @NonNull
@@ -813,7 +880,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         @Nullable ImageView stateIcon = null;
         if (stockClimate) {
             icon = new DriverClimateShortcutView(context, CarIntegrations.get(appContext),
-                    shortcut.iconColor, true);
+                    shortcut.iconColor, shortcut.extendedClimateInfo);
         } else {
             ImageView image = new ImageView(context);
             image.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -984,6 +1051,9 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             int type, int width, int height, int x, int y, @NonNull String title) {
         int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                 | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                // Without this flag Android routes the outside tap only to the underlying app,
+                // so the favorite root never receives ACTION_OUTSIDE and remains stuck open.
+                | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
                 | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                 | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
                 | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;

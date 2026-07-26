@@ -94,6 +94,9 @@ public final class LauncherIconResolver {
             new Preset("phone_notification", "Уведомление телефона"),
             new Preset("car", "Автомобиль"),
             new Preset("location", "Местоположение"),
+            new Preset("status_wifi", "Wi‑Fi статусной строки"),
+            new Preset("status_gps", "GPS статусной строки"),
+            new Preset("status_bluetooth", "Bluetooth статусной строки"),
             new Preset("devices", "Умный дом"),
             new Preset("scenario", "Сценарий"),
             new Preset("edit", "Изменить"),
@@ -209,6 +212,9 @@ public final class LauncherIconResolver {
             case "phone_notification": return R.drawable.ic_phone_app_notification;
             case "car": return R.drawable.ic_smart_car;
             case "location": return R.drawable.ic_smart_location;
+            case "status_wifi": return R.drawable.ic_status_wifi_internet;
+            case "status_gps": return R.drawable.ic_status_gps_good;
+            case "status_bluetooth": return R.drawable.ic_status_bt_connected;
             case "devices": return R.drawable.ic_section_widget;
             case "scenario": return R.drawable.ic_section_content;
             case "edit": return R.drawable.ic_drag_handle;

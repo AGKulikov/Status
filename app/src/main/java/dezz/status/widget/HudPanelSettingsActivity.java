@@ -163,7 +163,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         });
         row.addView(enabled);
 
-        Button display = button("Дисплей");
+        Button display = button("HUD · ID 2");
         display.setOnClickListener(view -> chooseDisplay());
         row.addView(display);
         Button add = button("+ Элемент");
@@ -209,16 +209,18 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         List<HudDisplaySelector.Candidate> available = HudDisplaySelector.available(this);
         ArrayList<HudDisplaySelector.Candidate> external = new ArrayList<>();
         for (HudDisplaySelector.Candidate item : available) {
-            if (!item.defaultDisplay) external.add(item);
+            if (!item.defaultDisplay
+                    && item.id == HudViewportPolicy.VERIFIED_DISPLAY_ID) {
+                external.add(item);
+            }
         }
         if (external.isEmpty()) {
             new AlertDialog.Builder(this)
-                    .setTitle("HUD-дисплей не найден")
-                    .setMessage("Android сейчас сообщает только основной дисплей. Включите HUD "
-                            + "и откройте этот список ещё раз — будет сохранён его точный "
-                            + "числовой Display ID.")
-                    .setPositiveButton("Ввести ID", (dialog, which) -> enterDisplayId())
-                    .setNegativeButton("Отмена", null).show();
+                    .setTitle("HUD · Display ID 2")
+                    .setMessage("В дампе магнитолы HUD подтверждён как постоянный Display ID 2 "
+                            + "с поверхностью 1920×1080. Сейчас Android его не сообщает; "
+                            + "приложение безопасно ждёт именно ID 2 и не перейдёт на другой экран.")
+                    .setPositiveButton("Понятно", null).show();
             return;
         }
         String[] labels = new String[external.size()];
@@ -230,57 +232,14 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 selected = index;
             }
         }
-        new AlertDialog.Builder(this).setTitle("Физический HUD-дисплей")
+        new AlertDialog.Builder(this).setTitle("Подтверждённый HUD · ID 2")
                 .setSingleChoiceItems(labels, selected, (dialog, which) -> {
                     HudDisplaySelector.remember(config, external.get(which));
                     persist(false);
                     dialog.dismiss();
                     updateStatus();
                 })
-                .setNeutralButton("Снять привязку", (dialog, which) -> {
-                    config.displayUniqueId = "";
-                    config.displayId = -1;
-                    config.displayName = "";
-                    config.displayWidth = 0;
-                    config.displayHeight = 0;
-                    persist(false);
-                })
-                .setPositiveButton("Ввести ID", (dialog, which) -> enterDisplayId())
                 .setNegativeButton("Отмена", null).show();
-    }
-
-    private void enterDisplayId() {
-        LinearLayout form = column();
-        form.setPadding(dp(20), dp(4), dp(20), dp(4));
-        EditText id = field(form, "Числовой Display ID HUD",
-                config.displayId > 0 ? Integer.toString(config.displayId) : "", true);
-        TextView warning = text("ID 0 — основной экран и запрещён для HUD. После сохранения "
-                + "приложение будет ждать именно этот ID и не переключится на другой дисплей.",
-                12, 0xFFFFCC66);
-        form.addView(warning, marginTop(8));
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Постоянный ID HUD")
-                .setView(form)
-                .setPositiveButton("Сохранить", null)
-                .setNegativeButton("Отмена", null)
-                .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(view -> {
-                    int value = integer(id, -1);
-                    if (value <= 0 || value > 65_535) {
-                        id.setError("Введите ID от 1 до 65535");
-                        return;
-                    }
-                    config.displayId = value;
-                    config.displayUniqueId = "";
-                    config.displayName = "Display ID " + value;
-                    config.displayWidth = 0;
-                    config.displayHeight = 0;
-                    persist(false);
-                    updateStatus();
-                    dialog.dismiss();
-                }));
-        dialog.show();
     }
 
     private void addElement() {
@@ -456,12 +415,16 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 Integer.toString(config.navigationHideDelaySeconds), true);
         Switch showGrid = switchView("Показывать сетку в редакторе", config.showGrid);
         Switch free = switchView("Свободное перемещение между линиями", config.freeMovement);
+        Switch maskStockHud = switchView(
+                "Перекрывать штатный HUD непрозрачным чёрным фоном",
+                config.maskStockHud);
         Switch snow = switchView("Снежный режим", config.snowMode);
         Switch sync = switchView("Один цвет для всех элементов", config.syncElementColors);
         Switch autostart = switchView("Запускать HUD после перезагрузки",
                 preferences.hudPanelAutostart.get());
         form.addView(showGrid, marginTop(8));
         form.addView(free);
+        form.addView(maskStockHud);
         form.addView(snow);
         form.addView(sync);
         form.addView(autostart);
@@ -499,6 +462,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                             integer(navDelay, config.navigationHideDelaySeconds);
                     config.showGrid = showGrid.isChecked();
                     config.freeMovement = free.isChecked();
+                    config.maskStockHud = maskStockHud.isChecked();
                     config.snowMode = snow.isChecked();
                     config.syncElementColors = sync.isChecked();
                     preferences.hudPanelAutostart.set(autostart.isChecked());
@@ -591,10 +555,11 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
 
     private void updateStatus() {
         if (status == null) return;
-        String selectedDisplay = config.displayId < 0
-                ? "Display ID не выбран" : config.displayName + " · ID " + config.displayId
-                + " · " + config.displayUniqueId + " · "
-                + config.displayWidth + "×" + config.displayHeight;
+        String selectedDisplay = "Display ID " + HudViewportPolicy.VERIFIED_DISPLAY_ID
+                + (config.displayName.isEmpty() ? "" : " · " + config.displayName)
+                + (config.displayUniqueId.isEmpty() ? "" : " · " + config.displayUniqueId)
+                + (config.displayWidth <= 0 || config.displayHeight <= 0 ? ""
+                : " · " + config.displayWidth + "×" + config.displayHeight);
         status.setText((preferences.hudPanelEnabled.get() ? "Включён" : "Выключен")
                 + " · " + selectedDisplay + "\n"
                 + HudPresentationService.runtimeDetail());

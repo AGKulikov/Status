@@ -99,6 +99,13 @@ public final class InformationPanelConfigStore {
                     item.enabled = encoded.optBoolean("enabled", true);
                     item.showIcon = encoded.optBoolean("showIcon", true);
                     item.showLabel = encoded.optBoolean("showLabel", true);
+                    item.showValue = encoded.optBoolean("showValue", true);
+                    item.useStatusIconStyle =
+                            encoded.optBoolean("useStatusIconStyle", false);
+                    item.iconSizePx = encoded.optInt("iconSizePx", 32);
+                    item.iconAlpha = encoded.optInt("iconAlpha", 255);
+                    item.iconOutlineAlpha = encoded.optInt("iconOutlineAlpha", 0);
+                    item.iconOutlineWidth = encoded.optInt("iconOutlineWidth", 0);
                     item.column = encoded.optInt("column", 0);
                     item.row = encoded.optInt("row", 0);
                     item.columnSpan = encoded.optInt("columnSpan", 1);
@@ -162,6 +169,12 @@ public final class InformationPanelConfigStore {
             encoded.put("enabled", item.enabled);
             encoded.put("showIcon", item.showIcon);
             encoded.put("showLabel", item.showLabel);
+            encoded.put("showValue", item.showValue);
+            encoded.put("useStatusIconStyle", item.useStatusIconStyle);
+            encoded.put("iconSizePx", item.iconSizePx);
+            encoded.put("iconAlpha", item.iconAlpha);
+            encoded.put("iconOutlineAlpha", item.iconOutlineAlpha);
+            encoded.put("iconOutlineWidth", item.iconOutlineWidth);
             encoded.put("column", item.column);
             encoded.put("row", item.row);
             encoded.put("columnSpan", item.columnSpan);

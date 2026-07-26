@@ -18,6 +18,7 @@ public final class HudAndroidApiContractTest {
         assertFalse(source.contains("display.getUniqueId()"));
         assertTrue(source.contains("Display.class.getMethod(\"getUniqueId\")"));
         assertTrue(source.contains("Numeric displayId remains authoritative"));
+        assertTrue(source.contains("HudViewportPolicy.VERIFIED_DISPLAY_ID"));
     }
 
     @Test public void updateStatusDoesNotDependOnDisabledBuildConfigGeneration()

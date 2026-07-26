@@ -91,6 +91,12 @@ public final class InformationShortcutView extends FrameLayout {
         item.labelColor = shortcut.textColor;
         item.showIcon = !"none".equalsIgnoreCase(shortcut.icon);
         item.showLabel = shortcut.showTitle;
+        item.showValue = shortcut.informationShowValue;
+        item.iconSizePx = shortcut.informationIconSizePx;
+        item.iconAlpha = shortcut.informationIconAlpha;
+        item.iconOutlineAlpha = shortcut.informationIconOutlineAlpha;
+        item.iconOutlineWidth = shortcut.informationIconOutlineWidth;
+        item.useStatusIconStyle = shortcut.informationUseStatusIconStyle;
         item.labelTextSizeSp = shortcut.informationLabelTextSizeSp;
         item.valueTextSizeSp = shortcut.informationValueTextSizeSp;
         item.fontFamily = shortcut.informationFontFamily;

@@ -14,6 +14,9 @@ import androidx.annotation.NonNull;
  * {@code [0,720]-[728,910]}.</p>
  */
 public final class HudViewportPolicy {
+    public static final int VERIFIED_DISPLAY_ID = 2;
+    public static final int VERIFIED_DISPLAY_WIDTH = 1920;
+    public static final int VERIFIED_DISPLAY_HEIGHT = 1080;
     public static final int REFERENCE_EDITOR_WIDTH = 1760;
     public static final int REFERENCE_EDITOR_HEIGHT = 720;
     public static final int REFERENCE_EDITOR_HUD_TOP = 130;

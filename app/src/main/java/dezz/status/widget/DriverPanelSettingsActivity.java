@@ -46,6 +46,7 @@ import dezz.status.widget.launcher.InstalledAppCatalog;
 import dezz.status.widget.launcher.LauncherIconResolver;
 import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.launcher.ShortcutActionPicker;
+import dezz.status.widget.launcher.information.StatusBarInformationCatalog;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
@@ -453,6 +454,21 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             body.addView(informationAppearance, topMargin(dp(8)));
         }
 
+        if (liveClimate) {
+            MaterialSwitch extendedClimate = new MaterialSwitch(this);
+            extendedClimate.setText(
+                    "Расширенная информация: AUTO и пиктограмма обдува");
+            extendedClimate.setTextColor(Color.WHITE);
+            extendedClimate.setChecked(shortcut.extendedClimateInfo);
+            extendedClimate.setOnCheckedChangeListener((button, checked) -> {
+                shortcut.extendedClimateInfo = checked;
+                store.upsert(shortcut);
+                refreshPreview();
+                applyPanel();
+            });
+            body.addView(extendedClimate, topMargin(dp(8)));
+        }
+
         MaterialButton longAction = compactButton(shortcut.hasLongAction
                 ? "Удержание: " + longActionLabel(shortcut)
                 : "Удержание: не назначено");
@@ -639,6 +655,86 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         });
         form.addView(text, rowParams());
 
+        MaterialButton placement = compactButton("Расположение: "
+                + (shortcut.informationPlacement == 1
+                ? "снизу панели" : "сверху панели"));
+        placement.setOnClickListener(view -> new AlertDialog.Builder(this)
+                .setTitle("Расположение информационного элемента")
+                .setItems(new String[]{"Сверху панели водителя",
+                                "Снизу панели водителя"},
+                        (dialog, which) -> {
+                            shortcut.informationPlacement = which;
+                            placement.setText("Расположение: "
+                                    + (which == 1 ? "снизу панели" : "сверху панели"));
+                            persistInformationAppearance(shortcut);
+                        })
+                .show());
+        form.addView(placement, rowParams());
+
+        MaterialButton group = compactButton(informationGroupLabel(shortcut));
+        group.setOnClickListener(view -> {
+            EditText input = new EditText(this);
+            input.setSingleLine(true);
+            input.setHint("Например: Связь или Верхний ряд");
+            input.setText(shortcut.informationGroup);
+            input.setSelection(input.length());
+            new AlertDialog.Builder(this)
+                    .setTitle("Горизонтальная группа")
+                    .setMessage("Одинаковое произвольное имя объединяет любые "
+                            + "информационные элементы в один ряд. Пустое имя — отдельная строка.")
+                    .setView(input)
+                    .setPositiveButton("Применить", (dialog, which) -> {
+                        shortcut.informationGroup =
+                                input.getText().toString().trim();
+                        group.setText(informationGroupLabel(shortcut));
+                        persistInformationAppearance(shortcut);
+                    })
+                    .setNeutralButton("Без группы", (dialog, which) -> {
+                        shortcut.informationGroup = "";
+                        group.setText(informationGroupLabel(shortcut));
+                        persistInformationAppearance(shortcut);
+                    })
+                    .setNegativeButton("Отмена", null)
+                    .show();
+        });
+        form.addView(group, rowParams());
+
+        addSwitch(form, "Показывать значение",
+                shortcut.informationShowValue, checked -> {
+                    shortcut.informationShowValue = checked;
+                    persistInformationAppearance(shortcut);
+                });
+
+        if (StatusBarInformationCatalog.typeForTarget(shortcut.target) != null) {
+            addSwitch(form, "Иконка, цвет, обводка и бейдж как в статусной строке",
+                    shortcut.informationUseStatusIconStyle, checked -> {
+                        shortcut.informationUseStatusIconStyle = checked;
+                        persistInformationAppearance(shortcut);
+                    });
+        }
+
+        title(form, "Информационная иконка");
+        slider(form, "Размер иконки", 12, 320,
+                shortcut.informationIconSizePx, " px", value -> {
+                    shortcut.informationIconSizePx = value;
+                    persistInformationAppearance(shortcut);
+                });
+        slider(form, "Прозрачность иконки", 0, 255,
+                shortcut.informationIconAlpha, "", value -> {
+                    shortcut.informationIconAlpha = value;
+                    persistInformationAppearance(shortcut);
+                });
+        slider(form, "Прозрачность обводки", 0, 255,
+                shortcut.informationIconOutlineAlpha, "", value -> {
+                    shortcut.informationIconOutlineAlpha = value;
+                    persistInformationAppearance(shortcut);
+                });
+        slider(form, "Толщина обводки", 0, 24,
+                shortcut.informationIconOutlineWidth, " px", value -> {
+                    shortcut.informationIconOutlineWidth = value;
+                    persistInformationAppearance(shortcut);
+                });
+
         slider(form, "Размер подписи", 8, 72,
                 shortcut.informationLabelTextSizeSp, " sp", value -> {
                     shortcut.informationLabelTextSizeSp = value;
@@ -751,6 +847,14 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         return value <= 0 ? "сверху" : value == 1 ? "по центру" : "снизу";
     }
 
+    @NonNull
+    private static String informationGroupLabel(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        return shortcut.informationGroup.trim().isEmpty()
+                ? "Группа: отдельная строка"
+                : "Группа: " + shortcut.informationGroup.trim();
+    }
+
     private void chooseIcon(@NonNull LauncherShortcutStore.Shortcut shortcut) {
         List<LauncherIconResolver.Preset> presets = LauncherIconResolver.presets();
         String[] labels = new String[presets.size()];
@@ -828,7 +932,8 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             if (value.kind == LauncherShortcutStore.Kind.BUILTIN
                     && LauncherShortcutStore.Builtin.STOCK_CLIMATE.key.equals(value.target)) {
                 DriverClimateShortcutView climate = new DriverClimateShortcutView(
-                        this, CarIntegrations.get(this), value.iconColor, true);
+                        this, CarIntegrations.get(this), value.iconColor,
+                        value.extendedClimateInfo);
                 climate.showPreviewSample();
                 icon = climate;
             } else {

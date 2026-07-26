@@ -909,6 +909,7 @@ public final class LauncherMediaController {
         if (position <= 0L && supplement != null) {
             position = supplement.currentPosition(System.currentTimeMillis());
         }
+        MediaPlaybackHistoryStore.record(context, content.packageName, playback.playing);
         listener.onMediaChanged(new Snapshot(title.isEmpty() ? "Неизвестный трек" : title,
                 artist, album, application, artworkBitmap, duration, position, playback.playing, true,
                 volume));

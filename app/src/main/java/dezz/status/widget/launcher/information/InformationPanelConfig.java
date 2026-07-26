@@ -66,6 +66,13 @@ public final class InformationPanelConfig {
         public boolean enabled;
         public boolean showIcon;
         public boolean showLabel;
+        public boolean showValue;
+        /** Reuse the live status-bar icon family, semantic tint, outline and badge. */
+        public boolean useStatusIconStyle;
+        public int iconSizePx;
+        public int iconAlpha;
+        public int iconOutlineAlpha;
+        public int iconOutlineWidth;
         public int column;
         public int row;
         public int columnSpan;
@@ -106,6 +113,12 @@ public final class InformationPanelConfig {
             enabled = true;
             showIcon = true;
             showLabel = true;
+            showValue = true;
+            useStatusIconStyle = false;
+            iconSizePx = 32;
+            iconAlpha = 255;
+            iconOutlineAlpha = 0;
+            iconOutlineWidth = 0;
             column = 0;
             row = 0;
             columnSpan = 1;
@@ -166,6 +179,12 @@ public final class InformationPanelConfig {
             value.enabled = enabled;
             value.showIcon = showIcon;
             value.showLabel = showLabel;
+            value.showValue = showValue;
+            value.useStatusIconStyle = useStatusIconStyle;
+            value.iconSizePx = iconSizePx;
+            value.iconAlpha = iconAlpha;
+            value.iconOutlineAlpha = iconOutlineAlpha;
+            value.iconOutlineWidth = iconOutlineWidth;
             value.column = column;
             value.row = row;
             value.columnSpan = columnSpan;
@@ -211,6 +230,10 @@ public final class InformationPanelConfig {
             fontFamily = Fonts.findByKey(fontFamily).key;
             horizontalAlignment = clamp(horizontalAlignment, 0, 2);
             verticalAlignment = clamp(verticalAlignment, 0, 2);
+            iconSizePx = clamp(iconSizePx, 12, 320);
+            iconAlpha = clamp(iconAlpha, 0, 255);
+            iconOutlineAlpha = clamp(iconOutlineAlpha, 0, 255);
+            iconOutlineWidth = clamp(iconOutlineWidth, 0, 24);
             paddingLeftPx = clamp(paddingLeftPx, 0, 96);
             paddingTopPx = clamp(paddingTopPx, 0, 96);
             paddingRightPx = clamp(paddingRightPx, 0, 96);

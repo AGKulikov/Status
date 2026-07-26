@@ -30,6 +30,12 @@ public final class LauncherGlobalElementContractTest {
         assertTrue(activity.contains("Сохранять пропорции"));
         assertTrue(activity.contains("Поведение при нажатии"));
         assertTrue(activity.contains("showLauncherWidgetCatalog"));
+        assertTrue(activity.contains("frame.setOnClickListener"));
+        assertTrue(activity.contains(".setNegativeButton(\"Удалить\""));
+        assertTrue(activity.contains("Вернуть удалённый виджет"));
+        assertTrue(activity.contains("updated.setProgressBarHeightDp(value)"));
+        assertTrue(activity.contains("Новая кнопка приложения или действие"));
+        assertTrue(activity.contains("updated.setEnabled(available.get(which).id, true)"));
         String proxy = read("launcher/LauncherGlobalElementProxyView.java");
         assertTrue(proxy.contains("ScaleMode.STRETCH"));
         assertTrue(proxy.contains("Math.min(widthScale, heightScale)"));

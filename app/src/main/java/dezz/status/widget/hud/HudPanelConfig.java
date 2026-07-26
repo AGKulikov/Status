@@ -15,12 +15,13 @@ import java.util.Set;
 
 /** Versioned, exportable HUD layout and presentation settings. */
 public final class HudPanelConfig {
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 3;
     public static final int MAX_ELEMENTS = 512;
     public static final int MAX_JSON_CHARS = 1_048_576;
 
     @NonNull public String displayUniqueId = "";
-    public int displayId = -1;
+    /** Verified ECARX hardware constant: local:2 is the composite display containing the HUD. */
+    public int displayId = HudViewportPolicy.VERIFIED_DISPLAY_ID;
     @NonNull public String displayName = "";
     public int displayWidth;
     public int displayHeight;
@@ -41,6 +42,14 @@ public final class HudPanelConfig {
     public boolean showGrid = true;
     public boolean freeMovement;
     @NonNull public String backgroundMode = "TRANSPARENT";
+    /**
+     * Paints an opaque black mask inside the verified HUD viewport before drawing widgets.
+     *
+     * <p>Display 2 is a composite 1920x1080 surface shared by the cluster, DIM and HUD. The mask
+     * must therefore remain clipped to {@link HudViewportPolicy}; a full-display black surface
+     * would also blank the other OEM displays.</p>
+     */
+    public boolean maskStockHud = true;
     public boolean snowMode;
     public int globalBrightness = 100;
     @NonNull public String globalTextColor = "#FFFFFFFF";
@@ -101,7 +110,15 @@ public final class HudPanelConfig {
         offsetY = 0;
         gridColumns = clamp(gridColumns, 4, 200);
         gridRows = clamp(gridRows, 2, 100);
-        displayId = clamp(displayId, -1, 65_535);
+        // Display 2 is a vehicle constant in the supplied ECARX dump. Never allow an imported or
+        // hand-edited layout to target the central, passenger or cluster display accidentally.
+        if (displayId != HudViewportPolicy.VERIFIED_DISPLAY_ID) {
+            displayUniqueId = "";
+            displayName = "";
+            displayWidth = 0;
+            displayHeight = 0;
+        }
+        displayId = HudViewportPolicy.VERIFIED_DISPLAY_ID;
         displayWidth = clamp(displayWidth, 0, 16_384);
         displayHeight = clamp(displayHeight, 0, 16_384);
         displayUniqueId = bounded(displayUniqueId, 512);
@@ -152,7 +169,8 @@ public final class HudPanelConfig {
         out.put("offsetX", offsetX).put("offsetY", offsetY);
         out.put("gridColumns", gridColumns).put("gridRows", gridRows);
         out.put("showGrid", showGrid).put("freeMovement", freeMovement);
-        out.put("backgroundMode", backgroundMode).put("snowMode", snowMode);
+        out.put("backgroundMode", backgroundMode);
+        out.put("maskStockHud", maskStockHud).put("snowMode", snowMode);
         out.put("globalBrightness", globalBrightness);
         out.put("globalTextColor", globalTextColor).put("globalUnitColor", globalUnitColor);
         out.put("syncElementColors", syncElementColors);
@@ -180,7 +198,8 @@ public final class HudPanelConfig {
             }
             HudPanelConfig out = new HudPanelConfig();
             out.displayUniqueId = source.optString("displayUniqueId", "");
-            out.displayId = source.optInt("displayId", -1);
+            out.displayId = source.optInt(
+                    "displayId", HudViewportPolicy.VERIFIED_DISPLAY_ID);
             out.displayName = source.optString("displayName", "");
             out.displayWidth = source.optInt("displayWidth", 0);
             out.displayHeight = source.optInt("displayHeight", 0);
@@ -195,6 +214,9 @@ public final class HudPanelConfig {
             out.showGrid = source.optBoolean("showGrid", true);
             out.freeMovement = source.optBoolean("freeMovement", false);
             out.backgroundMode = source.optString("backgroundMode", "TRANSPARENT");
+            // Old layouts predate the OEM-HUD mask. Enable it during migration so the stock
+            // arrows and signs do not remain visible below the custom panel.
+            out.maskStockHud = source.optBoolean("maskStockHud", true);
             out.snowMode = source.optBoolean("snowMode", false);
             out.globalBrightness = source.optInt("globalBrightness", 100);
             out.globalTextColor = source.optString("globalTextColor", "#FFFFFFFF");

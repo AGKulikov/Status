@@ -29,6 +29,17 @@ public final class DriverPanelPost1117ContractTest {
         assertTrue(climate.contains("AIRFLOW_WINDSHIELD"));
         assertTrue(climate.contains("AIRFLOW_FACE"));
         assertTrue(climate.contains("AIRFLOW_LEGS"));
+        assertTrue(climate.contains("R.drawable.ic_driver_airflow_face"));
+        assertTrue(climate.contains("R.drawable.ic_driver_airflow_feet"));
+        assertTrue(climate.contains("R.drawable.ic_driver_airflow_windshield"));
+        assertFalse(climate.contains("drawDirectionArrow"));
+        String settings = read("DriverPanelSettingsActivity.java");
+        String overlay = read("driver/DriverPanelOverlayController.java");
+        assertTrue(settings.contains(
+                "Расширенная информация: AUTO и пиктограмма обдува"));
+        assertTrue(settings.contains("extendedClimate.setChecked(shortcut.extendedClimateInfo)"));
+        assertTrue(overlay.contains(
+                "shortcut.iconColor, shortcut.extendedClimateInfo"));
     }
 
     @Test
@@ -44,6 +55,8 @@ public final class DriverPanelPost1117ContractTest {
         assertTrue(overlay.contains("screenWidth, screenWidth, false"));
         assertTrue(catalog.contains("if (hidden.isEmpty()) return loadIncludingSystem(context)"));
         assertTrue(catalog.contains("for (App app : loadIncludingSystem(context))"));
+        assertTrue(catalog.contains("InstalledAppCatalog.load(context)"));
+        assertTrue(catalog.contains("installed.launchable()"));
         assertFalse(launcher.contains("if (!app.systemApp"));
         assertTrue(settings.contains("LauncherAppCatalog.loadIncludingSystem(this)"));
     }
@@ -76,6 +89,13 @@ public final class DriverPanelPost1117ContractTest {
                 "panelOnRight ? panelX - width : panelX + physicalWidth"));
         assertTrue(overlay.contains("FLAG_WATCH_OUTSIDE_TOUCH"));
         assertTrue(overlay.contains("MotionEvent.ACTION_OUTSIDE"));
+        int compact = overlay.indexOf(
+                "private static WindowManager.LayoutParams compactDrawerParams(");
+        int allApps = overlay.indexOf(
+                "private static WindowManager.LayoutParams allAppsOverlayParams(", compact);
+        assertTrue(compact >= 0 && allApps > compact);
+        assertTrue(overlay.substring(compact, allApps)
+                .contains("FLAG_WATCH_OUTSIDE_TOUCH"));
         assertTrue(overlay.contains("background.setCornerRadii(panelOnRight"));
     }
 

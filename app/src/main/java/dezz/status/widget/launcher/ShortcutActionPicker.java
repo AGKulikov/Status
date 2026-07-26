@@ -35,6 +35,7 @@ import dezz.status.widget.driver.DriverFavoritesPanelStore;
 import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.launcher.information.InformationIconPolicy;
 import dezz.status.widget.launcher.information.InformationPanelConfig;
+import dezz.status.widget.launcher.information.InformationShortcutDefaults;
 import dezz.status.widget.launcher.information.InformationSourcePicker;
 import dezz.status.widget.launcher.routes.FavoriteRouteConfig;
 import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
@@ -132,6 +133,7 @@ public final class ShortcutActionPicker {
             value.showState = true;
             value.showTitle = true;
             value.hasLongAction = false;
+            InformationShortcutDefaults.apply(preferences, item, value);
             save(value);
         }).show();
     }

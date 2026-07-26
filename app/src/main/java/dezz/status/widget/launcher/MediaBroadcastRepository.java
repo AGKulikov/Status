@@ -390,6 +390,8 @@ final class MediaBroadcastRepository {
                             ? decodeArtwork(context, effective) : null;
                     saveNow(context, effective, artworkAction, sourceSignature,
                             trackSignature, artwork);
+                    MediaPlaybackHistoryStore.record(context, effective.packageName,
+                            effective.playing);
                 } finally {
                     if (artwork != null && !artwork.isRecycled()) artwork.recycle();
                 }

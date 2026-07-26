@@ -76,7 +76,11 @@ public class DriverPanelOverlayContractTest {
         assertFalse(climateSource.contains("drawFanGlyph"));
         assertTrue(climateSource.contains("drawText(\"AUTO\""));
         assertTrue(climateSource.contains("drawBars(canvas, width * .12f"));
-        assertTrue(climateSource.contains("Automotive seated-person airflow pictogram"));
+        assertTrue(climateSource.contains("Official AOSP Automotive HVAC vectors"));
+        assertTrue(climateSource.contains("R.drawable.ic_driver_airflow_face"));
+        assertTrue(climateSource.contains("R.drawable.ic_driver_airflow_feet"));
+        assertTrue(climateSource.contains("R.drawable.ic_driver_airflow_windshield"));
+        assertFalse(climateSource.contains("drawDirectionArrow"));
         assertTrue(climateSource.contains("AIRFLOW = \"climate.airflow\""));
         assertTrue(climateSource.contains("boolean expanded = detailed;"));
         assertTrue(climateSource.contains("primarySize * .58f"));

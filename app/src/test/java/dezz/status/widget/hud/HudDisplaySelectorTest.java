@@ -12,24 +12,29 @@ public final class HudDisplaySelectorTest {
     private static final List<HudDisplaySelector.Candidate> DISPLAYS = Arrays.asList(
             new HudDisplaySelector.Candidate(0, "main", "Main",
                     1760, 720, false, true),
-            new HudDisplaySelector.Candidate(2, "passenger", "Passenger",
-                    1760, 720, true, false),
-            new HudDisplaySelector.Candidate(4, "hud", "HUD",
-                    728, 910, true, false));
+            new HudDisplaySelector.Candidate(2, "local:2", "ECARX composite HUD",
+                    1920, 1080, true, false),
+            new HudDisplaySelector.Candidate(4, "local:4", "Passenger",
+                    1920, 720, true, false));
 
-    @Test public void numericIdIsAuthoritativeEvenWhenUniqueIdPointsElsewhere() {
-        assertEquals(2, HudDisplaySelector.preferredIndex(DISPLAYS, "passenger", 4));
+    @Test public void verifiedIdIsAuthoritativeEvenWhenSavedIdentityPointsElsewhere() {
+        assertEquals(1, HudDisplaySelector.preferredIndex(DISPLAYS, "local:4", 2));
     }
 
-    @Test public void missingConfiguredIdNeverFallsThroughToAnotherScreen() {
-        assertEquals(-1, HudDisplaySelector.preferredIndex(DISPLAYS, "passenger", 7));
+    @Test public void importedOtherIdStillResolvesOnlyVerifiedHud() {
+        assertEquals(1, HudDisplaySelector.preferredIndex(DISPLAYS, "local:4", 7));
     }
 
-    @Test public void noConfiguredIdentityNeverGuessesByArrayPosition() {
-        assertEquals(-1, HudDisplaySelector.preferredIndex(DISPLAYS, "", -1));
+    @Test public void noSavedIdentityStillUsesVerifiedVehicleConstant() {
+        assertEquals(1, HudDisplaySelector.preferredIndex(DISPLAYS, "", -1));
     }
 
-    @Test public void legacyUniqueIdWorksOnlyWithoutNumericId() {
-        assertEquals(2, HudDisplaySelector.preferredIndex(DISPLAYS, "hud", -1));
+    @Test public void matchingLegacyIdentityAlsoResolvesVerifiedHud() {
+        assertEquals(1, HudDisplaySelector.preferredIndex(DISPLAYS, "local:2", -1));
+    }
+
+    @Test public void absenceOfDisplayTwoNeverFallsThroughToPassengerScreen() {
+        assertEquals(-1, HudDisplaySelector.preferredIndex(
+                Arrays.asList(DISPLAYS.get(0), DISPLAYS.get(2)), "local:4", 4));
     }
 }

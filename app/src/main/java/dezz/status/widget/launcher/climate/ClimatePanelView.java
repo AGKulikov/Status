@@ -673,8 +673,14 @@ public final class ClimatePanelView extends FrameLayout {
     private boolean isClimateConfirmedOff() {
         CarControlState power = states.get(ClimatePanelConfig.POWER);
         boolean known = isFresh(power) && power.available && power.known;
+        CarControlState fan = states.get(ClimatePanelConfig.FAN);
+        boolean fanKnown = isFresh(fan) && fan.available && fan.known;
+        CarControlState airflow = states.get("climate.airflow");
+        boolean airflowKnown = isFresh(airflow) && airflow.available && airflow.known;
         return ClimatePowerStatePolicy.isConfirmedOff(
-                known, known && power.active);
+                known, known && power.active,
+                fanKnown, fanKnown && fan.active,
+                airflowKnown, airflowKnown && airflow.active);
     }
 
     @NonNull
@@ -705,6 +711,10 @@ public final class ClimatePanelView extends FrameLayout {
         CarControlState power = states.get(ClimatePanelConfig.POWER);
         if (isFresh(power) && power.available && power.known) {
             connectionLabel.setText(power.active ? "Климат включён" : "Климат выключен");
+            return;
+        }
+        if (isClimateConfirmedOff()) {
+            connectionLabel.setText("Климат выключен");
             return;
         }
         boolean online = false;

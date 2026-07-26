@@ -14,6 +14,21 @@ import org.junit.Test;
 /** Boundary tests for compact and split-pane settings layouts. */
 public final class SettingsResponsiveLayoutPolicyTest {
     @Test
+    public void verifiedHeadUnitProfileRemainsThePrimaryLandscapeTarget() {
+        assertEquals(1920, SettingsResponsiveLayoutPolicy.TARGET_PHYSICAL_WIDTH_PX);
+        assertEquals(720, SettingsResponsiveLayoutPolicy.TARGET_PHYSICAL_HEIGHT_PX);
+        assertEquals(160, SettingsResponsiveLayoutPolicy.TARGET_LOGICAL_DENSITY_DPI);
+        assertEquals(1760, SettingsResponsiveLayoutPolicy.TARGET_APP_WIDTH_DP);
+        assertEquals(656, SettingsResponsiveLayoutPolicy.TARGET_APP_HEIGHT_DP);
+        assertTrue(SettingsResponsiveLayoutPolicy.useSplitPane(
+                SettingsResponsiveLayoutPolicy.TARGET_APP_WIDTH_DP));
+        assertTrue(SettingsResponsiveLayoutPolicy.TARGET_APP_WIDTH_DP
+                - SettingsResponsiveLayoutPolicy.sidebarWidthDp(
+                        SettingsResponsiveLayoutPolicy.TARGET_APP_WIDTH_DP)
+                >= SettingsResponsiveLayoutPolicy.MIN_CONTENT_WIDTH_DP);
+    }
+
+    @Test
     public void splitPaneStartsAtExactMinimumWidth() {
         assertFalse(SettingsResponsiveLayoutPolicy.useSplitPane(
                 SettingsResponsiveLayoutPolicy.MIN_SPLIT_WIDTH_DP - 1));

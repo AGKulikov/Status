@@ -16,6 +16,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.Editable;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.Gravity;
@@ -236,7 +237,7 @@ public final class SettingsHubActivity extends AppCompatActivity {
         sidebar.setBackgroundColor(color(R.color.settings_sidebar_background));
 
         hubBackButton = buildBackButton();
-        sidebar.addView(hubBackButton, new LinearLayout.LayoutParams(dp(124), dp(46)));
+        sidebar.addView(hubBackButton, new LinearLayout.LayoutParams(wrap(), dp(50)));
         TextView title = text("Настройки", 32, Typeface.BOLD);
         sidebar.addView(title, topMargin(4));
         TextView version = secondary("Status Widget · " + VersionGetter.getAppVersionName(this), 13);
@@ -263,7 +264,7 @@ public final class SettingsHubActivity extends AppCompatActivity {
         LinearLayout header = column();
         header.setPadding(dp(18), dp(14), dp(18), dp(8));
         hubBackButton = buildBackButton();
-        header.addView(hubBackButton, new LinearLayout.LayoutParams(dp(124), dp(46)));
+        header.addView(hubBackButton, new LinearLayout.LayoutParams(wrap(), dp(50)));
         TextView title = text("Настройки", 30, Typeface.BOLD);
         header.addView(title, topMargin(3));
         search = searchField();
@@ -910,8 +911,14 @@ public final class SettingsHubActivity extends AppCompatActivity {
         button.setAllCaps(false);
         button.setText("Назад");
         button.setTextSize(15);
+        button.setSingleLine(true);
+        button.setMaxLines(1);
+        button.setEllipsize(TextUtils.TruncateAt.END);
+        button.setMinWidth(dp(148));
+        button.setMinHeight(dp(50));
         button.setGravity(Gravity.CENTER);
         button.setIconResource(R.drawable.ic_arrow_back);
+        button.setIconPadding(dp(7));
         button.setIconTint(ColorStateList.valueOf(color(R.color.settings_accent)));
         button.setTextColor(color(R.color.settings_accent));
         button.setBackgroundTintList(ColorStateList.valueOf(

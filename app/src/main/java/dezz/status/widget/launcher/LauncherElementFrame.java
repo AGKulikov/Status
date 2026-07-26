@@ -15,6 +15,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -49,6 +50,8 @@ public final class LauncherElementFrame extends MaterialCardView {
     private int downY;
     private int downWidth;
     private int downHeight;
+    private final int touchSlop;
+    private boolean movedSinceDown;
     private LauncherPanelResizeMath.Corner resizeCorner =
             LauncherPanelResizeMath.Corner.NONE;
 
@@ -57,6 +60,7 @@ public final class LauncherElementFrame extends MaterialCardView {
         super(context);
         this.elementId = elementId;
         this.listener = listener;
+        touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
         minimumWidthPx = dp(160);
         minimumHeightPx = dp(96);
 
@@ -154,6 +158,7 @@ public final class LauncherElementFrame extends MaterialCardView {
                 downY = lp.topMargin;
                 downWidth = getWidth();
                 downHeight = getHeight();
+                movedSinceDown = false;
                 resizeCorner = LauncherPanelResizeMath.cornerAt(
                         event.getX(), event.getY(), getWidth(), getHeight(), dp(64));
                 if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
@@ -161,6 +166,9 @@ public final class LauncherElementFrame extends MaterialCardView {
             case MotionEvent.ACTION_MOVE:
                 int dx = Math.round(event.getRawX() - downRawX);
                 int dy = Math.round(event.getRawY() - downRawY);
+                if (Math.abs(dx) > touchSlop || Math.abs(dy) > touchSlop) {
+                    movedSinceDown = true;
+                }
                 if (resizeCorner != LauncherPanelResizeMath.Corner.NONE) {
                     View parent = (View) getParent();
                     LauncherPanelResizeMath.Rect start =
@@ -194,7 +202,9 @@ public final class LauncherElementFrame extends MaterialCardView {
                 listener.onGeometryChanged(elementId, lp.leftMargin, lp.topMargin,
                         Math.max(1, lp.width), Math.max(1, lp.height));
                 resizeCorner = LauncherPanelResizeMath.Corner.NONE;
-                performClick();
+                if (event.getActionMasked() == MotionEvent.ACTION_UP && !movedSinceDown) {
+                    performClick();
+                }
                 return true;
             default:
                 return true;

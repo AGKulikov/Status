@@ -79,6 +79,8 @@ public final class LauncherGlobalElementLayoutStore {
         public int verticalAlignment = -1;
         @NonNull public String backgroundColor = "#00000000";
         public int cornerRadiusPx;
+        /** Recoverable removal from the actual HOME canvas. */
+        public boolean hidden;
         @NonNull public TapAction tapAction = TapAction.INHERIT;
         @NonNull public String appComponent = "";
 
@@ -101,6 +103,7 @@ public final class LauncherGlobalElementLayoutStore {
             value.verticalAlignment = verticalAlignment;
             value.backgroundColor = backgroundColor;
             value.cornerRadiusPx = cornerRadiusPx;
+            value.hidden = hidden;
             value.tapAction = tapAction;
             value.appComponent = appComponent;
             return value;
@@ -264,6 +267,7 @@ public final class LauncherGlobalElementLayoutStore {
         value.verticalAlignment = encoded.optInt("verticalAlignment", -1);
         value.backgroundColor = encoded.optString("backgroundColor", "#00000000");
         value.cornerRadiusPx = encoded.optInt("cornerRadiusPx", 0);
+        value.hidden = encoded.optBoolean("hidden", false);
         try {
             value.tapAction = TapAction.valueOf(
                     encoded.optString("tapAction", TapAction.INHERIT.name()));
@@ -297,6 +301,7 @@ public final class LauncherGlobalElementLayoutStore {
                 .put("verticalAlignment", value.verticalAlignment)
                 .put("backgroundColor", value.backgroundColor)
                 .put("cornerRadiusPx", value.cornerRadiusPx)
+                .put("hidden", value.hidden)
                 .put("tapAction", value.tapAction.name())
                 .put("appComponent", value.appComponent);
     }
