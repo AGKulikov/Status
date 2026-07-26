@@ -3,10 +3,12 @@
  */
 package dezz.status.hudlab;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -31,6 +33,7 @@ import java.util.Locale;
  * A compact, independent test console for the physical ECARX HUD.
  */
 public final class HudLabActivity extends Activity implements HudLabController.Listener {
+    private static final int REQUEST_STORAGE = 401;
     private static final int BG = Color.rgb(9, 12, 18);
     private static final int CARD = Color.rgb(19, 25, 36);
     private static final int CARD_BORDER = Color.rgb(45, 58, 78);
@@ -49,8 +52,11 @@ public final class HudLabActivity extends Activity implements HudLabController.L
     private TextView snapshotView;
     private TextView logView;
     private TextView visualIndexView;
+    private TextView exportStatusView;
+    private Button exportButton;
     private int visualIndex;
     private String fullStatus = "";
+    private String lastDumpPath = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,6 +82,21 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         controller = null;
         if (current != null) current.close();
         super.onDestroy();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                                           int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQUEST_STORAGE) return;
+        if (grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            exportSystemDump();
+        } else {
+            exportStatusView.setText(
+                    "Нет доступа к общему Download. Разрешите доступ к файлам и повторите.");
+            Toast.makeText(this, "Доступ к файлам не выдан", Toast.LENGTH_LONG).show();
+        }
     }
 
     @Override
@@ -109,6 +130,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
 
         FrameLayout pages = new FrameLayout(this);
+        addTabPage(pages, buildSystemDumpTab());
         addTabPage(pages, buildElementsTab());
         addTabPage(pages, buildMaskTab());
         addTabPage(pages, buildActivationTab());
@@ -128,7 +150,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         close.setOnClickListener(view -> finish());
         header.addView(close, fixedButton(dp(130)));
 
-        TextView title = text("HUD Lab 0.2", 23, TEXT, true);
+        TextView title = text("HUD Lab 0.3", 23, TEXT, true);
         title.setPadding(dp(16), 0, dp(18), 0);
         header.addView(title);
 
@@ -154,10 +176,11 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
         tabs.setPadding(0, 0, 0, dp(5));
-        addTabButton(tabs, "ШТАТНЫЕ ЭЛЕМЕНТЫ", 0);
-        addTabButton(tabs, "VISUAL MASK", 1);
-        addTabButton(tabs, "КАНАЛЫ HUD", 2);
-        addTabButton(tabs, "СТАТУС И ЖУРНАЛ", 3);
+        addTabButton(tabs, "СИСТЕМНЫЙ ДАМП", 0);
+        addTabButton(tabs, "ФЛАГИ 0.2", 1);
+        addTabButton(tabs, "VISUAL MASK", 2);
+        addTabButton(tabs, "КАНАЛЫ HUD", 3);
+        addTabButton(tabs, "СТАТУС", 4);
         return tabs;
     }
 
@@ -185,6 +208,104 @@ public final class HudLabActivity extends Activity implements HudLabController.L
             tabButtons.get(position).setBackgroundTintList(
                     ColorStateList.valueOf(selected ? BLUE : CARD_BORDER));
         }
+    }
+
+    private View buildSystemDumpTab() {
+        LinearLayout body = columnBody();
+        body.addView(sectionTitle("Экспорт фактической реализации HUD этой прошивки"));
+        body.addView(note(
+                "HUD Lab 0.2 подтвердил: DISPLAY_DRIVE_ENVIRONMENT и DISPLAY_SAFETY "
+                        + "присутствуют в SDK, но магнитола отвечает accepted=false. "
+                        + "Повторять эти команды больше не нужно."));
+        body.addView(note(
+                "Кнопка ниже соберёт в один ZIP установленные системные APK HUD, DIMProtocol, "
+                        + "PowerSomeIP, AdaptAPI, OpenAPI и читаемые ECARX/Geely framework-JAR. "
+                        + "Личные данные приложений не читаются, настройки не меняются."));
+
+        exportButton = button("СОБРАТЬ ZIP В DOWNLOAD", BLUE, false);
+        exportButton.setOnClickListener(view -> requestSystemDump());
+        LinearLayout.LayoutParams exportParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(54));
+        exportParams.topMargin = dp(14);
+        body.addView(exportButton, exportParams);
+
+        exportStatusView = text(
+                "ZIP будет сохранён в Download/HudLabDump. После завершения пришлите его сюда.",
+                14, TEXT, false);
+        exportStatusView.setTextIsSelectable(true);
+        exportStatusView.setPadding(0, dp(14), 0, dp(10));
+        body.addView(exportStatusView);
+
+        Button copyPath = button("КОПИРОВАТЬ ПУТЬ К ZIP", CARD_BORDER, false);
+        copyPath.setOnClickListener(view -> copyDumpPath());
+        body.addView(copyPath, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
+
+        body.addView(note(
+                "Экспорт можно выполнить без подключения ноутбука и без root. "
+                        + "На Android 9 при первом запуске потребуется разрешить доступ к файлам."));
+        return scroll(body);
+    }
+
+    private void requestSystemDump() {
+        if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                    REQUEST_STORAGE);
+            return;
+        }
+        exportSystemDump();
+    }
+
+    private void exportSystemDump() {
+        if (exportButton == null || !exportButton.isEnabled()) return;
+        exportButton.setEnabled(false);
+        exportButton.setAlpha(0.55f);
+        exportStatusView.setText(
+                "Собираю системные пакеты и библиотеки… Не закрывайте HUD Lab.");
+
+        Thread worker = new Thread(() -> {
+            try {
+                HudSystemDumpExporter.Result result =
+                        HudSystemDumpExporter.export(getApplicationContext());
+                runOnUiThread(() -> {
+                    lastDumpPath = result.file.getAbsolutePath();
+                    exportStatusView.setText(result.summary()
+                            + "\n\nПришлите этот ZIP в чат целиком.");
+                    restoreExportButton();
+                    Toast.makeText(this, "Системный дамп HUD готов",
+                            Toast.LENGTH_LONG).show();
+                });
+            } catch (Throwable failure) {
+                runOnUiThread(() -> {
+                    String message = failure.getMessage();
+                    exportStatusView.setText("Ошибка экспорта: "
+                            + failure.getClass().getSimpleName()
+                            + (message == null ? "" : "\n" + message));
+                    restoreExportButton();
+                    Toast.makeText(this, "Не удалось собрать ZIP",
+                            Toast.LENGTH_LONG).show();
+                });
+            }
+        }, "hud-system-export");
+        worker.start();
+    }
+
+    private void restoreExportButton() {
+        exportButton.setEnabled(true);
+        exportButton.setAlpha(1f);
+    }
+
+    private void copyDumpPath() {
+        if (lastDumpPath.isEmpty()) {
+            Toast.makeText(this, "Сначала соберите ZIP", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ClipboardManager clipboard =
+                (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard == null) return;
+        clipboard.setPrimaryClip(ClipData.newPlainText("HUD Lab dump", lastDumpPath));
+        Toast.makeText(this, "Путь скопирован", Toast.LENGTH_SHORT).show();
     }
 
     private View buildElementsTab() {
