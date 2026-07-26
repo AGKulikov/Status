@@ -15,8 +15,8 @@ android {
         minSdk 28
         //noinspection ExpiredTargetSdkVersion
         targetSdkVersion 28
-        versionCode 11
-        versionName "0.11"
+        versionCode 13
+        versionName "0.13"
         setProperty("archivesBaseName", "hud-lab-${versionName}")
     }
 
