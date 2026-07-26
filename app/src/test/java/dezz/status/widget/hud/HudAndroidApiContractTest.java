@@ -29,6 +29,25 @@ public final class HudAndroidApiContractTest {
         assertTrue(source.contains("getPackageInfo(context.getPackageName(), 0).versionName"));
     }
 
+    @Test public void systemHudMaskLivesAboveEcarxDaemonAndHasSafeFallback()
+            throws Exception {
+        String bridge = read("HudSurfaceBridgeMain.java");
+        String client = read("HudSystemSurfaceWindow.java");
+        String service = read("HudPresentationService.java");
+
+        assertTrue(bridge.contains("SURFACE_LAYER = Integer.MAX_VALUE - 1"));
+        assertTrue(bridge.contains("setLayerStack"));
+        assertTrue(bridge.contains("width <= 0 || height <= 0"));
+        assertTrue(bridge.contains("FRAME_TIMEOUT_MS = 5_000"));
+        assertFalse(bridge.contains("import android.view.SurfaceControl"));
+        assertTrue(client.contains("display.getDisplayId() == HudViewportPolicy.VERIFIED_DISPLAY_ID"));
+        assertTrue(client.contains("? 1 : Math.max(0, display.getDisplayId())"));
+        assertTrue(client.contains("pendingFrame.getAndSet(null)"));
+        assertTrue(service.contains("showWindowManagerFallback(display)"));
+        assertTrue(service.contains("dismissFallbackOnly(\"system HUD surface ready\")"));
+        assertTrue(service.contains("systemSurfaceRetryAfter"));
+    }
+
     private static String read(String name) throws Exception {
         Path fromRoot = Paths.get("app", "src", "main", "java", "dezz", "status",
                 "widget", "hud", name);
