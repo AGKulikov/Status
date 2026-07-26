@@ -207,6 +207,8 @@ public class DriverPanelOverlayContractTest {
         assertTrue(controller.contains("grid.setPadding(dp(context, 16), dp(context, 16),"));
         assertTrue(controller.contains("title.setText(\"Все приложения\")"));
         assertTrue(controller.contains("FavoriteAppsConfigStore"));
+        assertTrue(controller.contains("tile.setOnLongClickListener(view ->"));
+        assertTrue(controller.contains("AppUninstallLauncher.request(context, app)"));
 
         assertTrue(launcher.contains("LauncherAppCatalog.loadIncludingSystem(context)"));
         assertTrue(launcher.contains("appCatalog.allVisible()"));
