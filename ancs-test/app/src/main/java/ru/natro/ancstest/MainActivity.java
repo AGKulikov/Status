@@ -132,8 +132,9 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         }
         candidateAdapter.notifyDataSetChanged();
         if (selectedPosition >= 0) {
-            selectedView.setText("Выбрано: " + selectedCandidate.name
-                    + " · " + selectedCandidate.address);
+            selectedView.setText("Только для диагностики scan: " + selectedCandidate.name
+                    + " · " + selectedCandidate.address
+                    + "; ANCS всегда использует verified GATT-server peer");
         }
     }
 
@@ -182,7 +183,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         header.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView title = new TextView(this);
-        title.setText("KX11 ANCS TEST v5");
+        title.setText("KX11 ANCS TEST v6");
         title.setTextColor(Color.WHITE);
         title.setTextSize(20);
         title.setTypeface(Typeface.DEFAULT_BOLD);
@@ -200,7 +201,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         root.addView(header);
 
         selectedView = new TextView(this);
-        selectedView.setText("PAIR/SECURE = verified; ANCS target = correlation hypothesis");
+        selectedView.setText("PAIR/SECURE = verified; ANCS = тот же BLE/ATT link");
         selectedView.setTextColor(Color.rgb(207, 216, 220));
         selectedView.setTextSize(13);
         selectedView.setPadding(0, dp(5), 0, dp(4));
@@ -215,10 +216,10 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         addButton(buttons, "Стоп scan", view -> diagnostics.stopScan());
         addButton(buttons, "Ждать iPhone", view -> diagnostics.startIncomingConnectionTest());
         addButton(buttons, "Стоп рекламы", view -> diagnostics.stopAdvertising());
-        addButton(buttons, "Подключить target",
-                view -> diagnostics.connect(selectedCandidate));
+        addButton(buttons, "Same-peer attach",
+                view -> diagnostics.connect(null));
         addButton(buttons, "LE bonding verified", view -> diagnostics.requestBond());
-        addButton(buttons, "Обновить GATT", view -> diagnostics.refreshAndReconnect());
+        addButton(buttons, "Повторить discovery", view -> diagnostics.refreshAndReconnect());
         addButton(buttons, "Отключить", view -> diagnostics.disconnect());
         addButton(buttons, "Копировать лог", view -> copyLog());
         addButton(buttons, "Сохранить лог", view -> saveLog());
@@ -249,8 +250,9 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         candidateList.setOnItemClickListener((AdapterView<?> parent, View view,
                                                int position, long id) -> {
             selectedCandidate = candidates.get(position);
-            selectedView.setText("Выбрано: " + selectedCandidate.name
-                    + " · " + selectedCandidate.address);
+            selectedView.setText("Только для диагностики scan: " + selectedCandidate.name
+                    + " · " + selectedCandidate.address
+                    + "; ANCS всегда использует verified GATT-server peer");
             onLog("Выбрано устройство: " + selectedCandidate.displayText()
                     .replace('\n', ' '));
             if (!selectedCandidate.rawAdvertisement.isEmpty()) {
@@ -439,11 +441,12 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
                 + " и в CONTROL d2d9e4b2…f01 запишите ASCII PAIR.");
         onLog("4) Подтвердите запросы iPhone. Затем в SECURE"
                 + " d2d9e4b3…f01 запишите ASCII ANCS или прочитайте значение.");
-        onLog("5) SECURE ATT OK доказывает шифрование BLE-link."
-                + " После ANCS READY отправьте новое уведомление.");
-        onLog("6) Сервис ECARX GPSTether 61555e49… — это GPS, а не ANCS;"
-                + " v5 к его потоку не подписывается.");
-        onLog("7) Входящий peer без команды PAIR не используется и не может заменить verified peer.");
+        onLog("5) После первого SECURE ATT OK v6 регистрирует GATT client"
+                + " на том же verified peer: autoConnect=true, TRANSPORT_LE.");
+        onLog("6) Если за 5 секунд нет успеха, выполняется ровно один direct"
+                + " fallback через 500 мс. MTU не запрашивается; discovery начинается сразу.");
+        onLog("7) После ANCS READY отправьте на iPhone новое уведомление."
+                + " Другие адреса и GPSTether в v6 не используются.");
     }
 
     private int dp(int value) {

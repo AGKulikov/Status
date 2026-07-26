@@ -31,15 +31,15 @@ jobs:
       - name: Build and test standalone APK
         run: |
           chmod +x ./gradlew
-          ./gradlew -p ancs-test clean testDebugUnitTest assembleDebug --stacktrace
+          ./gradlew -p ancs-test clean testDebugUnitTest lintDebug assembleDebug --stacktrace
 
       - name: Rename APK
-        run: cp ancs-test/app/build/outputs/apk/debug/app-debug.apk KX11-ANCS-Test-v5.apk
+        run: cp ancs-test/app/build/outputs/apk/debug/app-debug.apk KX11-ANCS-Test-v6.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KX11-ANCS-Test-v5
-          path: KX11-ANCS-Test-v5.apk
+          name: KX11-ANCS-Test-v6
+          path: KX11-ANCS-Test-v6.apk
           if-no-files-found: error
 
       - name: Package iPhone helper source

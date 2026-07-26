@@ -28,6 +28,7 @@ import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelUuid;
+import android.util.Log;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -39,7 +40,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -63,24 +63,17 @@ public final class BluetoothDiagnostics {
             UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
     private static final UUID SERVICE_CHANGED =
             UUID.fromString("00002a05-0000-1000-8000-00805f9b34fb");
-    /**
-     * ECARX GPSTether: a continuous GNSS/time/satellite stream. It is not Apple ANCS and must
-     * never be treated as an iPhone notification source.
-     */
-    private static final UUID ECARX_GPS_TETHER_SERVICE =
-            UUID.fromString("61555e49-79c5-4d1f-b591-d97975f5e3e5");
-
+    private static final String LOG_TAG = "KX11ANCS";
     private static final int GATT_SUCCESS = BluetoothGatt.GATT_SUCCESS;
     private static final int STATUS_INSUFFICIENT_AUTHENTICATION = 5;
     private static final int STATUS_INSUFFICIENT_AUTHORIZATION = 8;
     private static final int STATUS_INSUFFICIENT_KEY_SIZE = 12;
     private static final int STATUS_INSUFFICIENT_ENCRYPTION = 15;
     private static final long REQUEST_TIMEOUT_MS = 10_000L;
-    private static final long CONNECT_TIMEOUT_MS = 15_000L;
+    private static final long CONNECT_TIMEOUT_MS = 5_000L;
     private static final long DISCOVERY_TIMEOUT_MS = 15_000L;
-    private static final long SERVER_LINK_CORRELATION_WINDOW_MS = 500L;
     private static final long SECURE_TO_CLIENT_CONNECT_DELAY_MS = 400L;
-    private static final long CLIENT_RETRY_DELAY_MS = 450L;
+    private static final long DIRECT_FALLBACK_DELAY_MS = 500L;
     private static final long CANDIDATE_UI_INTERVAL_MS = 500L;
     private static final int MAX_CANDIDATES = 150;
 
@@ -202,20 +195,16 @@ public final class BluetoothDiagnostics {
     }
 
     /**
-     * One peer observed by this app's GATT-server role. The record is intentionally scoped to
-     * one explicit test session: Bluetooth addresses exposed for the peripheral and central
-     * roles may differ, and timing correlation is only a diagnostic hypothesis.
+     * One peer observed by this app's GATT-server role. The exact BluetoothDevice delivered by
+     * this callback is reused for the ANCS GATT-client registration on the same ATT link.
      */
     private static final class GattServerPeer {
-        final String key;
         final long sessionGeneration;
         BluetoothDevice device;
         long connectedAtElapsedMs;
-        long lastStateAtElapsedMs;
         boolean connected;
 
-        GattServerPeer(String key, long sessionGeneration, BluetoothDevice device) {
-            this.key = key;
+        GattServerPeer(long sessionGeneration, BluetoothDevice device) {
             this.sessionGeneration = sessionGeneration;
             this.device = device;
         }
@@ -240,13 +229,11 @@ public final class BluetoothDiagnostics {
     private BluetoothDevice verifiedPeer;
     private final LinkedHashMap<String, GattServerPeer> gattServerPeers =
             new LinkedHashMap<>();
-    private final Set<String> attemptedClientTransports = new HashSet<>();
     private long sessionGeneration;
-    private BluetoothDevice correlatedClientPeer;
-    private String correlatedClientPeerKey = "";
-    private long correlatedSessionGeneration = -1L;
     private boolean clientConnectInFlight;
-    private int activeClientTransport = BluetoothDevice.TRANSPORT_AUTO;
+    private boolean activeClientAutoConnect;
+    private boolean backgroundAttachAttempted;
+    private boolean directFallbackAttempted;
     private boolean secureAttConfirmed;
     private boolean gattClientConnected;
     private boolean scanning;
@@ -265,12 +252,10 @@ public final class BluetoothDiagnostics {
     private BluetoothGattCharacteristic dataSource;
     private BluetoothGattCharacteristic controlPoint;
     private BluetoothGattCharacteristic serviceChanged;
-    private volatile boolean gpsTetherPacketIgnoredLogged;
     private Request activeRequest;
     private AncsProtocol.NotificationAccumulator notificationAccumulator;
     private AncsProtocol.AppNameAccumulator appNameAccumulator;
     private Runnable requestTimeout;
-    private Runnable mtuFallback;
     private Runnable connectTimeout;
     private Runnable discoveryTimeout;
     private Runnable secureConnectStart;
@@ -363,7 +348,6 @@ public final class BluetoothDiagnostics {
         stopAdvertising();
         disconnect();
         resetVerifiedPeerSession();
-        gpsTetherPacketIgnoredLogged = false;
         advertiser = adapter.getBluetoothLeAdvertiser();
         if (advertiser == null) {
             state("ADVERTISER_UNAVAILABLE");
@@ -410,7 +394,6 @@ public final class BluetoothDiagnostics {
     public void stopAdvertising() {
         boolean shouldStopFramework =
                 advertising || advertisingPending || advertisingDesired;
-        invalidateCorrelation("GATT server остановлен");
         advertisingDesired = false;
         advertising = false;
         advertisingPending = false;
@@ -428,17 +411,22 @@ public final class BluetoothDiagnostics {
 
     public void connect(Candidate candidate) {
         if (!secureAttConfirmed) {
-            log("Ручной connect отложен: сначала нужен SECURE ATT OK от verified peer");
+            log("Same-peer attach отложен: сначала нужен SECURE ATT OK от verified peer");
             return;
         }
-        if (!establishOrValidateCorrelation("ручной connect")) return;
-        if (candidate != null && candidate.device != null
-                && !sameDevice(candidate.device, correlatedClientPeer)) {
-            log("Выбранный peer не совпадает с единственной correlation hypothesis; "
-                    + "произвольный connectGatt запрещён");
+        BluetoothGatt current = gatt;
+        if (current != null && gattClientConnected) {
+            discoverServices(current);
             return;
         }
-        tryNextClientAttempt("ручной connect");
+        if (!backgroundAttachAttempted) {
+            startSamePeerAttach(true, "ручной запуск");
+        } else if (nextClientAttempt != null) {
+            log("Единственный direct fallback уже запланирован после ошибки background attach");
+        } else {
+            log("Ручной повтор заблокирован: fallback запускается только автоматически "
+                    + "после timeout/status failure первой попытки");
+        }
     }
 
     public void requestBond() {
@@ -458,28 +446,18 @@ public final class BluetoothDiagnostics {
     public void refreshAndReconnect() {
         BluetoothGatt current = gatt;
         if (current != null && gattClientConnected) {
-            try {
-                Method refresh = current.getClass().getMethod("refresh");
-                Object result = refresh.invoke(current);
-                log("GATT cache refresh: " + result);
-            } catch (Throwable unavailable) {
-                log("GATT cache refresh недоступен: "
-                        + unavailable.getClass().getSimpleName());
-            }
-            main.postDelayed(() -> {
-                if (gatt == current && gattClientConnected) discoverServices(current);
-            }, 400L);
+            log("Повторный discoverServices на текущем same-peer GATT client");
+            discoverServices(current);
             return;
         }
         if (!secureAttConfirmed) {
             log("Обновление GATT отложено: сначала нужен SECURE ATT OK");
             return;
         }
-        tryNextClientAttempt("ручной переход к следующей разрешённой попытке");
+        connect(null);
     }
 
     public void disconnect() {
-        invalidateCorrelation("ручное отключение");
         cancelClientAttemptCallbacks();
         clearAncsRuntime();
         gattClientConnected = false;
@@ -533,16 +511,15 @@ public final class BluetoothDiagnostics {
         cancelClientAttemptCallbacks();
         sessionGeneration++;
         gattServerPeers.clear();
-        attemptedClientTransports.clear();
-        correlatedClientPeer = null;
-        correlatedClientPeerKey = "";
-        correlatedSessionGeneration = -1L;
         activeClientTarget = null;
+        activeClientAutoConnect = false;
+        backgroundAttachAttempted = false;
+        directFallbackAttempted = false;
         clientConnectInFlight = false;
         secureAttConfirmed = false;
         gattClientConnected = false;
         log("Новая GATT-server session=" + sessionGeneration
-                + "; прежняя address correlation очищена");
+                + "; verified peer и две v6-попытки очищены");
     }
 
     private BluetoothDevice getVerifiedPeer() {
@@ -587,9 +564,9 @@ public final class BluetoothDiagnostics {
         state("VERIFIED PEER · ЗАПРОС LE BOND");
         log("PAIR принят. VERIFIED PEER: " + safeName(device)
                 + " " + safeAddress(device)
+                + " objectId=" + System.identityHashCode(device)
                 + " type=" + typeLabel(safeType(device))
                 + " bond=" + bondLabel(safeBondState(device)));
-        establishOrValidateCorrelation("PAIR");
         if (safeBondState(device) == BluetoothDevice.BOND_BONDED) {
             log("PAIR: verified peer уже BOND_BONDED; ждём SECURE ATT OK. "
                     + "Ранний reverse connect запрещён");
@@ -606,19 +583,18 @@ public final class BluetoothDiagnostics {
         }
         boolean first = !secureAttConfirmed;
         secureAttConfirmed = true;
-        state("SECURE ATT OK · ПРОВЕРЯЮ ANCS");
+        state("SECURE ATT OK · SAME-PEER ATTACH");
         log("SECURE ATT OK · " + operation + " · peer=" + safeAddress(device)
                 + (first ? " · encrypted characteristic confirmed" : " · повтор"));
-        BluetoothGatt current = gatt;
-        if (gattClientConnected && current != null) {
-            main.postDelayed(() -> {
-                if (gatt == current && gattClientConnected) {
-                    discoverServices(current);
-                }
-            }, 350L);
+        if (!first) {
+            log("Повторный SECURE ATT OK не создаёт новую connectGatt-попытку");
             return;
         }
-        if (!establishOrValidateCorrelation("SECURE ATT OK")) return;
+        if (findConnectedServerPeer(device) == null) {
+            state("VERIFIED SERVER LINK LOST");
+            log("Same-peer attach отменён: verified GATT-server link уже не активен");
+            return;
+        }
         scheduleSecureClientStart();
     }
 
@@ -626,15 +602,16 @@ public final class BluetoothDiagnostics {
         if (secureConnectStart != null || clientConnectInFlight || gattClientConnected) return;
         secureConnectStart = () -> {
             secureConnectStart = null;
-            tryNextClientAttempt("SECURE ATT OK + "
+            startSamePeerAttach(true, "первый SECURE ATT OK + "
                     + SECURE_TO_CLIENT_CONNECT_DELAY_MS + " ms");
         };
         main.postDelayed(secureConnectStart, SECURE_TO_CLIENT_CONNECT_DELAY_MS);
-        log("ANCS client connect запланирован через "
+        log("Same-peer ANCS client attach запланирован через "
                 + SECURE_TO_CLIENT_CONNECT_DELAY_MS + " ms после SECURE ATT OK");
     }
 
-    private void tryNextClientAttempt(String reason) {
+    private void startSamePeerAttach(boolean autoConnect, String reason) {
+        if (!ensureAdapter()) return;
         if (!secureAttConfirmed) {
             log("connectGatt не запущен: SECURE ATT ещё не подтверждён");
             return;
@@ -643,86 +620,86 @@ public final class BluetoothDiagnostics {
             log("connectGatt уже активен; новая попытка пропущена · " + reason);
             return;
         }
-        if (!establishOrValidateCorrelation(reason)) return;
-        BluetoothDevice target = correlatedClientPeer;
-        String targetKey = correlatedClientPeerKey;
-        int transport;
-        if (!attemptedClientTransports.contains(attemptKey(targetKey,
-                BluetoothDevice.TRANSPORT_LE))) {
-            transport = BluetoothDevice.TRANSPORT_LE;
-        } else if (!attemptedClientTransports.contains(attemptKey(targetKey,
-                BluetoothDevice.TRANSPORT_AUTO))) {
-            transport = BluetoothDevice.TRANSPORT_AUTO;
-        } else {
-            state("CLIENT TARGETS EXHAUSTED");
-            log("Для correlation target " + safeAddress(target)
-                    + " уже выполнены ровно по одной попытке TRANSPORT_LE и TRANSPORT_AUTO; "
-                    + "verified ATT peer " + safeAddress(getVerifiedPeer())
-                    + " намеренно не используется как clientGattPeer");
+        BluetoothDevice device = getVerifiedPeer();
+        if (device == null) {
+            state("NO VERIFIED PEER");
+            log("Same-peer attach отменён: verified peer отсутствует");
             return;
         }
-        connectClientTargetOnce(target, transport, reason);
-    }
-
-    private void connectClientTargetOnce(BluetoothDevice device, int transport, String reason) {
-        if (!ensureAdapter()) return;
-        if (!isCurrentCorrelatedClientPeer(device)) {
-            log("connectGatt отменён: target больше не является действующей "
-                    + "correlation hypothesis");
+        GattServerPeer serverLink = findConnectedServerPeer(device);
+        if (serverLink == null) {
+            state("VERIFIED SERVER LINK LOST");
+            log("Same-peer attach отменён: exact verified GATT-server link "
+                    + safeAddress(device) + " не активен");
             return;
+        }
+        if (autoConnect) {
+            if (backgroundAttachAttempted) {
+                log("Повтор autoConnect=true заблокирован");
+                return;
+            }
+            backgroundAttachAttempted = true;
+        } else {
+            if (!backgroundAttachAttempted) {
+                log("Direct fallback запрещён до единственной background attach-попытки");
+                return;
+            }
+            if (directFallbackAttempted) {
+                log("Повтор autoConnect=false заблокирован");
+                return;
+            }
+            directFallbackAttempted = true;
         }
         clearAncsRuntime();
         gattClientConnected = false;
-        BluetoothGatt previous = gatt;
-        gatt = null;
-        if (previous != null) {
-            try {
-                previous.disconnect();
-            } catch (RuntimeException ignored) {
-            }
-            try {
-                previous.close();
-            } catch (RuntimeException ignored) {
-            }
-        }
-        String key = correlatedClientPeerKey;
-        String attempt = attemptKey(key, transport);
-        if (!attemptedClientTransports.add(attempt)) {
-            log("Повтор transport-попытки заблокирован: " + attempt);
-            return;
-        }
         activeClientTarget = device;
-        activeClientTransport = transport;
+        activeClientAutoConnect = autoConnect;
         clientConnectInFlight = true;
         String address = safeAddress(device);
-        state("GATT CONNECTING");
-        log("connectGatt " + transportLabel(transport) + ": "
+        long linkAgeMs = Math.max(0L, android.os.SystemClock.elapsedRealtime()
+                - serverLink.connectedAtElapsedMs);
+        state(autoConnect
+                ? "SAME-PEER ATTACH · BACKGROUND"
+                : "SAME-PEER ATTACH · DIRECT FALLBACK");
+        log("connectGatt(autoConnect=" + autoConnect + ", TRANSPORT_LE): "
                 + safeName(device) + " " + address + " · " + reason
                 + " · bond=" + bondLabel(safeBondState(device))
                 + " · type=" + typeLabel(safeType(device))
-                + " · CORRELATION HYPOTHESIS ONLY, NOT VERIFIED IDENTITY");
+                + " · objectId=" + System.identityHashCode(device)
+                + " · verifiedServerLinkAgeMs=" + linkAgeMs
+                + " · EXACT SAME VERIFIED BluetoothDevice");
         try {
-            gatt = device.connectGatt(context, false, gattCallback,
-                    transport);
+            gatt = device.connectGatt(context, autoConnect, gattCallback,
+                    BluetoothDevice.TRANSPORT_LE);
             if (gatt == null) {
                 clientConnectInFlight = false;
                 activeClientTarget = null;
                 state("CONNECT_GATT_RETURNED_NULL");
                 log("connectGatt вернул null");
-                scheduleNextClientAttempt("connectGatt returned null");
+                if (autoConnect) {
+                    scheduleDirectFallback("connectGatt(autoConnect=true) returned null");
+                } else {
+                    state("V6 ATTEMPTS EXHAUSTED");
+                }
             } else {
                 BluetoothGatt expected = gatt;
+                boolean expectedAutoConnect = autoConnect;
                 connectTimeout = () -> {
-                    if (gatt != expected) return;
+                    if (gatt != expected || !clientConnectInFlight) return;
                     clientConnectInFlight = false;
                     state("CONNECT_TIMEOUT");
                     log("Нет callback успешного GATT-подключения за "
                             + CONNECT_TIMEOUT_MS + " ms · target="
                             + safeAddress(expected.getDevice())
-                            + " transport=" + transportLabel(activeClientTransport));
+                            + " autoConnect=" + expectedAutoConnect
+                            + " transport=TRANSPORT_LE");
                     closeClientGatt(expected);
                     clearAncsRuntime();
-                    scheduleNextClientAttempt("timeout");
+                    if (expectedAutoConnect) {
+                        scheduleDirectFallback("background attach timeout");
+                    } else {
+                        state("V6 ATTEMPTS EXHAUSTED");
+                    }
                 };
                 main.postDelayed(connectTimeout, CONNECT_TIMEOUT_MS);
             }
@@ -731,19 +708,24 @@ public final class BluetoothDiagnostics {
             activeClientTarget = null;
             state("CONNECT_EXCEPTION");
             log("connectGatt exception: " + failure);
-            scheduleNextClientAttempt("connect exception");
+            if (autoConnect) {
+                scheduleDirectFallback("background attach exception");
+            } else {
+                state("V6 ATTEMPTS EXHAUSTED");
+            }
         }
     }
 
-    private void scheduleNextClientAttempt(String reason) {
-        if (!secureAttConfirmed || nextClientAttempt != null) return;
+    private void scheduleDirectFallback(String reason) {
+        if (!secureAttConfirmed || !backgroundAttachAttempted || directFallbackAttempted
+                || nextClientAttempt != null) return;
         nextClientAttempt = () -> {
             nextClientAttempt = null;
-            tryNextClientAttempt("fallback after " + reason);
+            startSamePeerAttach(false, "единственный fallback после " + reason);
         };
-        main.postDelayed(nextClientAttempt, CLIENT_RETRY_DELAY_MS);
-        log("Следующая разрешённая transport-попытка через "
-                + CLIENT_RETRY_DELAY_MS + " ms · " + reason);
+        main.postDelayed(nextClientAttempt, DIRECT_FALLBACK_DELAY_MS);
+        log("Единственный direct fallback autoConnect=false через "
+                + DIRECT_FALLBACK_DELAY_MS + " ms · " + reason);
     }
 
     private void cancelClientAttemptCallbacks() {
@@ -751,86 +733,6 @@ public final class BluetoothDiagnostics {
         if (nextClientAttempt != null) main.removeCallbacks(nextClientAttempt);
         secureConnectStart = null;
         nextClientAttempt = null;
-    }
-
-    private boolean establishOrValidateCorrelation(String reason) {
-        BluetoothDevice verified = getVerifiedPeer();
-        if (verified == null) {
-            log("CORRELATION NONE: verified ATT peer отсутствует · " + reason);
-            return false;
-        }
-        GattServerPeer verifiedLink = findConnectedServerPeer(verified);
-        if (verifiedLink == null) {
-            invalidateCorrelation("verified ATT GATT-server link не активен");
-            log("CORRELATION NONE: нет активной GATT SERVER LINK записи verified peer "
-                    + safeAddress(verified) + " в session=" + sessionGeneration);
-            return false;
-        }
-
-        List<GattServerPeer> matches = new ArrayList<>();
-        for (GattServerPeer peer : gattServerPeers.values()) {
-            if (peer.sessionGeneration != sessionGeneration || !peer.connected) continue;
-            if (sameDevice(peer.device, verified)) continue;
-            int type = safeType(peer.device);
-            if (type == BluetoothDevice.DEVICE_TYPE_CLASSIC) continue;
-            if (isKnownGpsTether(peer.device)) {
-                log("CORRELATION REJECTED: " + safeAddress(peer.device)
-                        + " имеет имя GPSTether и не является iPhone ANCS endpoint");
-                continue;
-            }
-            long delta = Math.abs(peer.connectedAtElapsedMs
-                    - verifiedLink.connectedAtElapsedMs);
-            if (delta <= SERVER_LINK_CORRELATION_WINDOW_MS) matches.add(peer);
-        }
-
-        if (matches.size() != 1) {
-            invalidateCorrelation(matches.isEmpty()
-                    ? "нет unique non-classic server-link alias"
-                    : "server-link alias неоднозначен: " + matches.size());
-            state(matches.isEmpty() ? "CORRELATION NONE" : "CORRELATION AMBIGUOUS");
-            log("CORRELATION не создана: требуется ровно один другой "
-                    + "UNKNOWN/LE/DUAL peer в пределах ±"
-                    + SERVER_LINK_CORRELATION_WINDOW_MS + " ms от verified link; найдено "
-                    + matches.size() + " · " + correlationPeerList(matches));
-            return false;
-        }
-
-        GattServerPeer selected = matches.get(0);
-        if (correlatedClientPeer != null
-                && correlatedSessionGeneration == sessionGeneration
-                && sameDevice(correlatedClientPeer, selected.device)) {
-            return true;
-        }
-        if (correlatedClientPeer != null) {
-            invalidateCorrelation("unique alias изменился");
-        }
-        correlatedClientPeer = selected.device;
-        correlatedClientPeerKey = selected.key;
-        correlatedSessionGeneration = sessionGeneration;
-        long delta = selected.connectedAtElapsedMs - verifiedLink.connectedAtElapsedMs;
-        state("CORRELATION HYPOTHESIS");
-        log("CORRELATION HYPOTHESIS ONLY: session=" + sessionGeneration
-                + " verifiedAttPeer=" + safeAddress(verified)
-                + " clientGattPeer=" + safeAddress(selected.device)
-                + " deltaMs=" + delta
-                + " type=" + typeLabel(safeType(selected.device))
-                + " trigger=" + reason
-                + ". Это временная корреляция двух GATT SERVER LINK, "
-                + "а не доказательство общей identity");
-        return true;
-    }
-
-    private boolean isCurrentCorrelatedClientPeer(BluetoothDevice device) {
-        if (device == null || correlatedClientPeer == null
-                || correlatedSessionGeneration != sessionGeneration
-                || !sameDevice(device, correlatedClientPeer)) {
-            return false;
-        }
-        GattServerPeer record = gattServerPeers.get(correlatedClientPeerKey);
-        return record != null
-                && record.sessionGeneration == sessionGeneration
-                && record.connected
-                && sameDevice(record.device, device);
     }
 
     private GattServerPeer findConnectedServerPeer(BluetoothDevice device) {
@@ -850,11 +752,10 @@ public final class BluetoothDiagnostics {
         String key = deviceKey(device);
         GattServerPeer peer = gattServerPeers.get(key);
         if (peer == null || peer.sessionGeneration != sessionGeneration) {
-            peer = new GattServerPeer(key, sessionGeneration, device);
+            peer = new GattServerPeer(sessionGeneration, device);
             gattServerPeers.put(key, peer);
         }
         peer.device = device;
-        peer.lastStateAtElapsedMs = now;
         if (status == GATT_SUCCESS && newState == BluetoothProfile.STATE_CONNECTED) {
             if (!peer.connected) peer.connectedAtElapsedMs = now;
             peer.connected = true;
@@ -863,16 +764,11 @@ public final class BluetoothDiagnostics {
         }
     }
 
-    private void invalidateCorrelation(String reason) {
-        BluetoothDevice previous = correlatedClientPeer;
-        if (previous == null) return;
+    private void handleVerifiedServerLinkDisconnected(BluetoothDevice device) {
         cancelClientAttemptCallbacks();
-        correlatedClientPeer = null;
-        correlatedClientPeerKey = "";
-        correlatedSessionGeneration = -1L;
-        log("CORRELATION INVALIDATED: clientGattPeer=" + safeAddress(previous)
-                + " · " + reason);
-        if (activeClientTarget != null && sameDevice(activeClientTarget, previous)) {
+        log("VERIFIED GATT SERVER LINK disconnected: " + safeAddress(device)
+                + "; pending same-peer client attach остановлен");
+        if (activeClientTarget != null && sameDevice(activeClientTarget, device)) {
             BluetoothGatt current = gatt;
             gatt = null;
             gattClientConnected = false;
@@ -892,31 +788,11 @@ public final class BluetoothDiagnostics {
         }
     }
 
-    private static String correlationPeerList(List<GattServerPeer> peers) {
-        if (peers.isEmpty()) return "[]";
-        StringBuilder result = new StringBuilder("[");
-        for (int index = 0; index < peers.size(); index++) {
-            if (index > 0) result.append(", ");
-            GattServerPeer peer = peers.get(index);
-            result.append(safeAddress(peer.device))
-                    .append('/').append(typeLabel(safeType(peer.device)));
-        }
-        return result.append(']').toString();
-    }
-
     private static String deviceKey(BluetoothDevice device) {
         String address = safeAddress(device);
         return address.isEmpty()
                 ? "identity:" + System.identityHashCode(device)
                 : "address:" + address.toUpperCase(Locale.US);
-    }
-
-    private static String attemptKey(String targetKey, int transport) {
-        return targetKey + "|transport=" + transport;
-    }
-
-    private static String transportLabel(int transport) {
-        return transport == BluetoothDevice.TRANSPORT_LE ? "TRANSPORT_LE" : "TRANSPORT_AUTO";
     }
 
     private void openGattServer() {
@@ -938,7 +814,7 @@ public final class BluetoothDiagnostics {
                 DIAGNOSTIC_CHARACTERISTIC,
                 BluetoothGattCharacteristic.PROPERTY_READ,
                 BluetoothGattCharacteristic.PERMISSION_READ);
-        information.setValue("KX11 ANCS Test v5".getBytes(StandardCharsets.UTF_8));
+        information.setValue("KX11 ANCS Test v6".getBytes(StandardCharsets.UTF_8));
 
         BluetoothGattCharacteristic control = new BluetoothGattCharacteristic(
                 CONTROL_CHARACTERISTIC,
@@ -1079,7 +955,6 @@ public final class BluetoothDiagnostics {
 
     private void discoverServices(BluetoothGatt callbackGatt) {
         if (callbackGatt != gatt) return;
-        cancelMtuFallback();
         if (discoveryPending) {
             log("discoverServices уже выполняется");
             return;
@@ -1133,10 +1008,6 @@ public final class BluetoothDiagnostics {
         if (ancs == null) {
             state("CONNECTED · ANCS НЕ НАЙДЕН");
             log("Сервис ANCS 7905… отсутствует на этом BLE link");
-            if (callbackGatt.getService(ECARX_GPS_TETHER_SERVICE) != null) {
-                rejectGpsTetherTarget(callbackGatt);
-                return;
-            }
             subscribeServiceChangedIfAvailable(callbackGatt);
             return;
         }
@@ -1162,13 +1033,13 @@ public final class BluetoothDiagnostics {
         serviceChanged = generic == null ? null : generic.getCharacteristic(SERVICE_CHANGED);
         if (serviceChanged == null) {
             log("Service Changed 0x2A05 отсутствует; остаюсь ждать ANCS");
-            rejectGpsTetherTargetIfPresent(callbackGatt);
+            state("ЖДУ ANCS НА SAME-PEER LINK");
             return;
         }
         descriptorStage = DescriptorStage.SERVICE_CHANGED;
         if (!subscribe(callbackGatt, serviceChanged, true)) {
             descriptorStage = DescriptorStage.NONE;
-            rejectGpsTetherTargetIfPresent(callbackGatt);
+            state("ЖДУ ANCS НА SAME-PEER LINK");
         }
     }
 
@@ -1211,27 +1082,6 @@ public final class BluetoothDiagnostics {
             state("CCCD_START_FAILED");
         }
         return started;
-    }
-
-    private void rejectGpsTetherTargetIfPresent(BluetoothGatt callbackGatt) {
-        if (callbackGatt != gatt) return;
-        if (callbackGatt.getService(ECARX_GPS_TETHER_SERVICE) == null) {
-            state("ЖДУ SERVICE CHANGED / ANCS");
-            log("Ни ANCS, ни известный GPSTether на этом link не обнаружены");
-            return;
-        }
-        rejectGpsTetherTarget(callbackGatt);
-    }
-
-    private void rejectGpsTetherTarget(BluetoothGatt callbackGatt) {
-        if (callbackGatt != gatt) return;
-        gpsTetherPacketIgnoredLogged = true;
-        state("GPSTETHER НАЙДЕН · ЭТО НЕ IPHONE/ANCS");
-        log("Сервис " + ECARX_GPS_TETHER_SERVICE
-                + " идентифицирован как ECARX GPSTether (GNSS/UTC/спутники)");
-        log("К notify-каналам GPSTether не подписываюсь: их поток 8–10 Гц"
-                + " не содержит уведомления iPhone");
-        invalidateCorrelation("адрес оказался ECARX GPSTether, а не iPhone ANCS endpoint");
     }
 
     private void handleDescriptorWrite(BluetoothGatt callbackGatt,
@@ -1441,7 +1291,6 @@ public final class BluetoothDiagnostics {
 
     private void clearAncsRuntime() {
         if (requestTimeout != null) main.removeCallbacks(requestTimeout);
-        cancelMtuFallback();
         cancelConnectTimeout();
         cancelDiscoveryTimeout();
         requestTimeout = null;
@@ -1457,11 +1306,6 @@ public final class BluetoothDiagnostics {
         descriptorStage = DescriptorStage.NONE;
         gattReady = false;
         discoveryPending = false;
-    }
-
-    private void cancelMtuFallback() {
-        if (mtuFallback != null) main.removeCallbacks(mtuFallback);
-        mtuFallback = null;
     }
 
     private void cancelConnectTimeout() {
@@ -1557,7 +1401,9 @@ public final class BluetoothDiagnostics {
 
     private void log(String message) {
         String time = new SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(new Date());
-        listener.onLog(time + "  " + message);
+        String line = time + "  " + message;
+        Log.i(LOG_TAG, line);
+        listener.onLog(line);
     }
 
     private static boolean isAuthorizationError(int status) {
@@ -1589,10 +1435,6 @@ public final class BluetoothDiagnostics {
         } catch (RuntimeException denied) {
             return "";
         }
-    }
-
-    private static boolean isKnownGpsTether(BluetoothDevice device) {
-        return safeName(device).toLowerCase(Locale.US).contains("gpstether");
     }
 
     private static int safeType(BluetoothDevice device) {
@@ -1780,6 +1622,7 @@ public final class BluetoothDiagnostics {
                         recordGattServerPeer(device, status, newState);
                         log("GATT SERVER LINK: session=" + sessionGeneration
                                 + " peer=" + safeAddress(device)
+                                + " objectId=" + System.identityHashCode(device)
                                 + " status=" + status + " newState=" + newState
                                 + " type=" + typeLabel(safeType(device))
                                 + " bond=" + bondLabel(safeBondState(device)));
@@ -1789,18 +1632,10 @@ public final class BluetoothDiagnostics {
                             state("GATT SERVER LINK · В LIGHTBLUE ЗАПИШИТЕ PAIR");
                             log("Peer станет verified только после "
                                     + "ASCII PAIR в CONTROL " + CONTROL_CHARACTERISTIC);
-                            BluetoothDevice verified = getVerifiedPeer();
-                            if (verified != null
-                                    && establishOrValidateCorrelation(
-                                    "GATT SERVER LINK connected")
-                                    && secureAttConfirmed) {
-                                scheduleSecureClientStart();
-                            }
                         } else if (newState == BluetoothProfile.STATE_DISCONNECTED
-                                && (sameDevice(device, correlatedClientPeer)
-                                || isVerifiedPeer(device))) {
-                            invalidateCorrelation("GATT SERVER LINK disconnected: "
-                                    + safeAddress(device));
+                                && isVerifiedPeer(device)) {
+                            state("VERIFIED SERVER LINK DISCONNECTED");
+                            handleVerifiedServerLinkDisconnected(device);
                         }
                     });
                 }
@@ -1820,7 +1655,7 @@ public final class BluetoothDiagnostics {
                             + " bond=" + bondLabel(safeBondState(device))));
                     if (DIAGNOSTIC_CHARACTERISTIC.equals(uuid)) {
                         sendGattReadResponse(device, requestId, offset,
-                                "KX11 ANCS Test v5".getBytes(StandardCharsets.UTF_8));
+                                "KX11 ANCS Test v6".getBytes(StandardCharsets.UTF_8));
                         return;
                     }
                     if (SECURE_CHARACTERISTIC.equals(uuid)) {
@@ -1912,61 +1747,55 @@ public final class BluetoothDiagnostics {
         @Override
         public void onConnectionStateChange(BluetoothGatt callbackGatt,
                                             int status, int newState) {
-            main.post(() -> {
+            // A busy diagnostic UI must not let the 5 s timeout overtake a connection callback
+            // that the Bluetooth stack has already delivered.
+            main.postAtFrontOfQueue(() -> {
                 if (callbackGatt != gatt) return;
                 log("onConnectionStateChange status=" + status
                         + " newState=" + newState
                         + " device=" + safeAddress(callbackGatt.getDevice())
-                        + " transport=" + transportLabel(activeClientTransport));
+                        + " objectId=" + System.identityHashCode(callbackGatt.getDevice())
+                        + " autoConnect=" + activeClientAutoConnect
+                        + " transport=TRANSPORT_LE");
                 if (status != GATT_SUCCESS) {
+                    boolean attachWasInFlight = clientConnectInFlight;
+                    boolean failedBackgroundAttach =
+                            attachWasInFlight && activeClientAutoConnect;
                     cancelConnectTimeout();
                     clientConnectInFlight = false;
                     gattClientConnected = false;
                     state("GATT CONNECTION FAILED · status=" + status);
                     closeClientGatt(callbackGatt);
                     clearAncsRuntime();
-                    if (status == 133) {
-                        scheduleNextClientAttempt("status=133");
+                    if (failedBackgroundAttach) {
+                        scheduleDirectFallback("background attach status=" + status);
+                    } else if (attachWasInFlight) {
+                        state("V6 ATTEMPTS EXHAUSTED");
                     }
                 } else if (newState == BluetoothProfile.STATE_CONNECTED) {
                     cancelConnectTimeout();
                     clientConnectInFlight = false;
                     gattClientConnected = true;
-                    state("GATT CONNECTED");
-                    boolean mtu = false;
-                    try {
-                        mtu = callbackGatt.requestMtu(185);
-                    } catch (RuntimeException failure) {
-                        log("requestMtu exception: " + failure);
-                    }
-                    log("requestMtu(185)=" + mtu);
-                    if (!mtu) discoverServices(callbackGatt);
-                    else {
-                        mtuFallback = () -> {
-                            mtuFallback = null;
-                        if (callbackGatt == gatt && !gattReady) {
-                            discoverServices(callbackGatt);
-                        }
-                        };
-                        main.postDelayed(mtuFallback, 1_500L);
-                    }
+                    state("SAME-PEER GATT CONNECTED");
+                    log("GATT client зарегистрирован на exact verified peer; "
+                            + "discoverServices сразу, без requestMtu");
+                    discoverServices(callbackGatt);
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    boolean attachWasInFlight = clientConnectInFlight;
+                    boolean failedBackgroundAttach =
+                            attachWasInFlight && activeClientAutoConnect;
                     cancelConnectTimeout();
+                    clientConnectInFlight = false;
                     gattClientConnected = false;
                     state("GATT DISCONNECTED · status=" + status);
                     closeClientGatt(callbackGatt);
                     clearAncsRuntime();
+                    if (failedBackgroundAttach) {
+                        scheduleDirectFallback("background attach disconnected");
+                    } else if (attachWasInFlight) {
+                        state("V6 ATTEMPTS EXHAUSTED");
+                    }
                 }
-            });
-        }
-
-        @Override
-        public void onMtuChanged(BluetoothGatt callbackGatt, int mtu, int status) {
-            main.post(() -> {
-                if (callbackGatt != gatt) return;
-                log("onMtuChanged mtu=" + mtu + " status=" + status);
-                cancelMtuFallback();
-                discoverServices(callbackGatt);
             });
         }
 
@@ -1984,20 +1813,6 @@ public final class BluetoothDiagnostics {
         @Override
         public void onCharacteristicChanged(BluetoothGatt callbackGatt,
                                             BluetoothGattCharacteristic characteristic) {
-            BluetoothGattService service = characteristic.getService();
-            if (service != null
-                    && ECARX_GPS_TETHER_SERVICE.equals(service.getUuid())) {
-                if (!gpsTetherPacketIgnoredLogged) {
-                    gpsTetherPacketIgnoredLogged = true;
-                    main.post(() -> {
-                        if (callbackGatt != gatt) return;
-                        state("GPSTETHER ПОТОК ИГНОРИРУЕТСЯ · НЕ ANCS");
-                        log("Получен пакет GPSTether, но он отброшен до UI"
-                                + " и не считается уведомлением iPhone");
-                    });
-                }
-                return;
-            }
             byte[] copy = characteristic.getValue() == null
                     ? null : characteristic.getValue().clone();
             main.post(() -> {

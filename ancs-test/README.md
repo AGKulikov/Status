@@ -1,4 +1,4 @@
-# KX11 ANCS Test v5
+# KX11 ANCS Test v6
 
 Независимое диагностическое приложение для Geely Monjaro KX11 / ECARX Android 9.
 Оно не использует код, настройки, package name или данные основного приложения Status.
@@ -7,123 +7,86 @@
 - Минимальный Android: 8.0
 - Целевое устройство: Android 9 / API 28
 
-## Что проверяет приложение
+## Что изменено в v6
 
-1. Наличие BLE scanner, advertiser и GATT server в ECARX/nFore.
-2. Список bonded-устройств, их Bluetooth type и реальный адрес.
-3. Нефильтрованное BLE-сканирование и сырые advertising packets.
-4. Наличие ANCS Service Solicitation с AD type `0x15`.
-5. Поддержку `addServiceSolicitationUuid()` или её OEM-backport в прошивке ECARX.
-6. Входящее BLE-подключение к GATT server без автоматического признания peer как iPhone.
-7. Явное подтверждение нужного peer командой `PAIR` из LightBlue.
-8. LE bonding и реальное шифрование ATT через encrypted-характеристику.
-9. Временную корреляцию двух GATT-server адресов одной сессии: если рядом с
-   verified ATT peer есть ровно один другой UNKNOWN/LE/DUAL peer, подключившийся
-   в пределах 500 мс, он становится только гипотезой `clientGattPeer`.
-   После `SECURE ATT OK` выполняется ровно одна попытка `TRANSPORT_LE`, а при
-   status 133/таймауте — одна запасная `TRANSPORT_AUTO`.
-10. Наличие ANCS, последовательные CCCD-подписки, Notification Source,
-    Data Source, Control Point, AppIdentifier и DisplayName.
-11. Распознавание фирменного сервиса
-    `61555e49-79c5-4d1f-b591-d97975f5e3e5` как ECARX `GPSTether`, а не ANCS.
-    Версия v5 не подписывается на его непрерывный GNSS-поток и не считает его
-    пакеты уведомлениями iPhone.
-12. Ограниченные UI-буферы и пакетную отрисовку журнала, чтобы диагностический
-    экран не зависал даже при частых BLE callback.
+Версия v6 проверяет, может ли Android 9 зарегистрировать GATT client на уже
+существующем входящем BLE/ATT-соединении iPhone:
 
-## Диагностические характеристики v5
+1. iPhone подключается к GATT server магнитолы.
+2. ASCII `PAIR` фиксирует точный `BluetoothDevice` из
+   `BluetoothGattServerCallback` как `verified peer`.
+3. Зашифрованный доступ к SECURE подтверждает `SECURE ATT OK`.
+4. После первого успешного SECURE приложение выполняет одну попытку:
+   `verifiedPeer.connectGatt(context, true, callback, TRANSPORT_LE)`.
+5. Если за 5 секунд нет успешного callback или получен ошибочный status,
+   через 500 мс выполняется ровно один fallback с `autoConnect=false`.
+6. При подключении сразу вызывается `discoverServices()`, без `requestMtu()`.
 
-| Назначение | UUID | Действие в LightBlue |
+Другие адреса, временная корреляция, `TRANSPORT_AUTO`, GPSTether и циклы
+переподключения в v6 не используются. GATT server и BLE-реклама не закрываются
+во время двух клиентских попыток.
+
+## Диагностические характеристики
+
+| Назначение | UUID | Действие на iPhone |
 | --- | --- | --- |
-| INFO | `d2d9e4b1-47f1-4e44-a8bb-a932fd5a2f01` | Прочитать название теста |
+| INFO | `d2d9e4b1-47f1-4e44-a8bb-a932fd5a2f01` | Прочитать `KX11 ANCS Test v6` |
 | CONTROL | `d2d9e4b2-47f1-4e44-a8bb-a932fd5a2f01` | Записать ASCII `PAIR` |
 | SECURE | `d2d9e4b3-47f1-4e44-a8bb-a932fd5a2f01` | После pairing записать ASCII `ANCS` или прочитать |
 
-CONTROL открыт только для запуска теста. SECURE требует encrypted read/write. Поэтому
-`SECURE ATT OK` означает, что проверен именно зашифрованный BLE-link, а не только
-наличие старого Classic bond.
+SECURE требует encrypted read/write. Поэтому `SECURE ATT OK` подтверждает
+шифрование текущего BLE-link, а не только наличие старого Classic bond.
 
 ## Как тестировать
 
-1. Установите APK на магнитолу.
-2. Разрешите геолокацию — Android 9 требует её для BLE-сканирования.
-3. Нажмите **Ждать iPhone**.
-4. Если приложение сообщает `ANCS SOLICITATION REQUESTED`, разблокируйте iPhone и
-   подтвердите появившийся запрос сопряжения/уведомлений.
-   Это означает, что приложение запросило ANCS-рекламу через OEM API; наличие
-   настоящего AD type `0x15` нужно подтвердить вторым BLE-сканером.
-5. Если приложение сообщает `DIAGNOSTIC ADV ACTIVE`, откройте на iPhone
-   **KX11 ANCS Helper** из каталога `ios-ancs-helper`. Он подключается с системной
-   опцией `CBConnectPeripheralOptionRequiresANCS: true`, автоматически отправляет
-   `PAIR` и читает SECURE. Это предпочтительный тест для системного разрешения ANCS.
-6. LightBlue можно использовать как запасной транспортный тест: найдите устройство
-   с сервисом `d2d9e4b0-47f1-4e44-a8bb-a932fd5a2f01`, нажмите **Connect**,
-   откройте CONTROL `d2d9e4b2-47f1-4e44-a8bb-a932fd5a2f01`
-   и запишите ASCII `PAIR`. Только этот callback фиксирует verified peer; другие
-   входящие BLE-подключения игнорируются.
-7. Подтвердите системный запрос LE pairing на iPhone. После `BOND_BONDED` откройте
-   SECURE `d2d9e4b3-47f1-4e44-a8bb-a932fd5a2f01` и запишите ASCII `ANCS`
-   либо выполните Read. Успех отображается как `SECURE ATT OK`.
-8. Только после состояния `ANCS READY` отправьте на iPhone новое уведомление.
-   Состояние `GPSTETHER НАЙДЕН · ЭТО НЕ IPHONE/ANCS` означает, что временная
-   корреляция выбрала внутренний GPS-канал ECARX; v5 его отвергает.
-9. **BLE scan** — отдельная проверка сканера. iPhone там обычно не отображается:
-   ANCS solicitation рекламирует аксессуар, то есть магнитола.
-10. Если тест не проходит, нажмите **Сохранить лог**. Файл создаётся в каталоге
-   приложения и его можно забрать через ADB.
+1. Установите APK на магнитолу и нажмите **Ждать iPhone**.
+2. На iPhone откройте **KX11 ANCS Helper**. Он подключается с системной опцией
+   `CBConnectPeripheralOptionRequiresANCS`, отправляет `PAIR` и проверяет SECURE.
+3. Подтвердите системные запросы pairing/ANCS на iPhone.
+4. Дождитесь одного из результатов:
+   - `ANCS READY` — сервис найден и обе подписки включены;
+   - `CONNECTED · ANCS НЕ НАЙДЕН` — GATT client присоединился, но iOS не
+     опубликовала ANCS на этом link;
+   - `V6 ATTEMPTS EXHAUSTED` — обе разрешённые регистрации GATT client завершились
+     без успеха.
+5. Только после `ANCS READY` создайте на iPhone новое уведомление.
 
-## Основные результаты
+LightBlue можно использовать как ручной транспортный тест: подключитесь к
+service `d2d9e4b0-47f1-4e44-a8bb-a932fd5a2f01`, запишите `PAIR` в CONTROL, затем
+после bonding прочитайте SECURE или запишите в него `ANCS`.
 
-| Состояние | Значение |
-| --- | --- |
-| `SCAN_FAILED_2/3/4/5` | Проблема регистрации BLE scanner или ограничение ECARX |
-| `ADVERTISER_UNAVAILABLE` | Встроенный стек не отдаёт Peripheral/advertiser mode |
-| `DIAGNOSTIC ADV ACTIVE` | Обычная реклама работает, но публичного ANCS solicitation API нет |
-| `ANCS SOLICITATION REQUESTED` | В прошивке найден API/backport; наличие `0x15` в эфире ещё нужно проверить |
-| `GATT SERVER LINK` | Есть входящий BLE-link; сырые read/write и его время записываются в лог |
-| `VERIFIED PEER` | iPhone helper/LightBlue прислал `PAIR`; только этот peer участвует в тесте |
-| `LE BOND BONDED` | Завершено BLE-сопряжение именно verified peer |
-| `SECURE ATT OK` | Encrypted read/write реально прошёл |
-| `CORRELATION HYPOTHESIS` | Найден ровно один временно связанный non-classic адрес; это не доказательство identity |
-| `CORRELATION AMBIGUOUS/NONE` | Уникального адреса для безопасного reverse connect нет |
-| `CLIENT TARGETS EXHAUSTED` | По одной попытке LE и AUTO исчерпаны; verified адрес намеренно не повторяется |
-| `GATT CONNECTED` | Получен реальный BLE peer и открыт GATT client |
-| `CONNECTED · ANCS НЕ НАЙДЕН` | На этом link iPhone не опубликовал ANCS |
-| `GPSTETHER НАЙДЕН · ЭТО НЕ IPHONE/ANCS` | Выбран внутренний GNSS-канал ECARX; он отвергнут и отключён |
-| `GPSTETHER ПОТОК ИГНОРИРУЕТСЯ` | Пакет GPS отброшен до UI и не создаёт ложную карточку уведомления |
-| `CCCD_FAILED_5/8/12/15` | Нужны LE bonding, шифрование или разрешение уведомлений |
-| `ANCS READY` | Транспорт, discovery и обе ANCS-подписки работают |
+## Логи
 
-## Важное ограничение Android 9
+Журнал виден в интерфейсе и одновременно пишется в logcat с тегом `KX11ANCS`.
 
-Публичный метод Android `AdvertiseData.Builder.addServiceSolicitationUuid()` появился
-только в API 31. На API 28 приложение пытается обнаружить OEM-backport через reflection.
-Обычный `addServiceUuid()` не является заменой, поскольку создаёт другой тип BLE-рекламы.
+```sh
+adb logcat -v threadtime KX11ANCS:I BluetoothGatt:V BluetoothGattServer:V '*:S'
+```
 
-## Корреляция адресов v5
+Ключевая строка первой попытки:
 
-Адрес, приславший `PAIR` и успешно прошедший encrypted SECURE read/write, остаётся
-единственным `verifiedAttPeer` и единственной целью bonding. Другой адрес
-UNKNOWN/LE/DUAL может быть выбран как `clientGattPeer` только когда он одновременно
-подключён к GATT server в той же тестовой сессии, отличается от verified peer,
-попал в окно ±500 мс и является единственным таким кандидатом.
-Устройство с именем `GPSTether` всегда исключается до `connectGatt`.
+```text
+connectGatt(autoConnect=true, TRANSPORT_LE) ... EXACT SAME VERIFIED BluetoothDevice
+```
 
-Эта связь всегда помечается в логе как `CORRELATION HYPOTHESIS ONLY`: совпадение
-по времени не доказывает, что оба адреса принадлежат одному iPhone. Reverse
-`connectGatt` запускается только через 400 мс после `SECURE ATT OK`; alias никогда
-не bondится. При разрыве server-link или начале новой сессии соответствие
-аннулируется.
+Успешный путь:
 
-## Почему `61555e49…` больше не проверяется как ANCS proxy
+```text
+SAME-PEER GATT CONNECTED
+discoverServices accepted=true
+ANCS READY
+```
 
-Поток характеристики `fdc51f94-f80e-40fa-8746-b847757800d1` оказался GNSS:
-40-байтные кадры содержат дату, UTC-время и координаты, а 119-байтный кадр
-содержит счётчик и таблицу спутников. Частота потока около 8–10 Гц. В v4 каждый
-такой callback ошибочно создавал карточку «уведомления» и немедленно перерисовывал
-весь журнал, из-за чего UI зависал.
+Для доказательства, что новая регистрация использовала тот же физический
+ACL/ATT-link, нужен Bluetooth HCI snoop: в нём не должно появляться нового
+`LE Create Connection` между SECURE и `onConnectionStateChange`.
 
-В v5 сервис помечен как `GPSTether`, его CCCD не включаются, а случайный пакет
-отбрасывается до постановки задачи в главный UI-поток. Журнал ограничен 500
-строками, список событий — 80 элементами, обе панели обновляются не чаще четырёх
-раз в секунду.
+## Ограничение Android 9
+
+Публичный `AdvertiseData.Builder.addServiceSolicitationUuid()` появился позже
+API 28. Приложение проверяет OEM/backport через reflection; если его нет,
+запускает обычную диагностическую connectable-рекламу. Такая реклама сама по
+себе не заменяет ANCS Service Solicitation с AD type `0x15`.
+
+Интерфейс хранит не более 500 строк журнала и 80 уведомлений и обновляет панели
+не чаще четырёх раз в секунду, чтобы серия BLE callback не блокировала экран.
