@@ -66,7 +66,10 @@ public final class StatusMediaHeightContractTest {
         String visibility = source.substring(start, end);
 
         assertTrue(visibility.contains(
-                "boolean mediaSessionActive = pickActiveMediaController() != null"));
+                "boolean phoneNotificationActive = isPhoneNotificationActive()"));
+        assertTrue(visibility.contains(
+                "boolean mediaSessionActive = phoneNotificationActive"));
+        assertTrue(visibility.contains("|| pickActiveMediaController() != null"));
         assertTrue(visibility.contains("|| !mediaSessionActive"));
     }
 
