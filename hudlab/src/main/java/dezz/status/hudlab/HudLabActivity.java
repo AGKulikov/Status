@@ -53,10 +53,13 @@ public final class HudLabActivity extends Activity implements HudLabController.L
     private TextView logView;
     private TextView visualIndexView;
     private TextView visualPenView;
+    private TextView profileSearchModeView;
+    private TextView profileSearchStatusView;
     private TextView exportStatusView;
     private Button exportButton;
     private int visualIndex;
     private int visualPen = 1;
+    private int profileSearchMode;
     private String fullStatus = "";
     private String lastDumpPath = "";
 
@@ -109,6 +112,9 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         connectionBadge.setTextColor(connected ? Color.rgb(102, 231, 156)
                 : Color.rgb(255, 192, 92));
         fullStatus = snapshot + "\nСОБЫТИЯ\n" + eventLog;
+        if (profileSearchStatusView != null) {
+            profileSearchStatusView.setText(findStatusLine(snapshot, "Поиск 01:"));
+        }
         setCommandsEnabled(connected);
     }
 
@@ -154,7 +160,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         close.setOnClickListener(view -> finish());
         header.addView(close, fixedButton(dp(130)));
 
-        TextView title = text("HUD Lab 0.10", 23, TEXT, true);
+        TextView title = text("HUD Lab 0.11", 23, TEXT, true);
         title.setPadding(dp(16), 0, dp(18), 0);
         header.addView(title);
 
@@ -180,7 +186,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
         tabs.setPadding(0, 0, 0, dp(5));
-        addTabButton(tabs, "10 НОВЫХ ПУТЕЙ", 0);
+        addTabButton(tabs, "01 + СКОРОСТЬ", 0);
         addTabButton(tabs, "СИСТЕМНЫЙ ДАМП", 1);
         addTabButton(tabs, "DISPLAY_*", 2);
         addTabButton(tabs, "MASK", 3);
@@ -315,13 +321,68 @@ public final class HudLabActivity extends Activity implements HudLabController.L
 
     private View buildNewPathsTab() {
         LinearLayout body = columnBody();
-        body.addView(sectionTitle("10 независимых путей из вашего системного дампа"));
+        body.addView(sectionTitle("Точный поиск внутри подтверждённого способа 01"));
         body.addView(note(
-                "Приоритет: 04 → 05 → 06 → 10 → 03 → остальные. "
-                        + "В `com.ecarx.hud` нет графики машинки и скорости: их рисует "
-                        + "нижний DIM/native-слой. Поэтому здесь только новые CEM, ProfileTransfer "
-                        + "и Driver-HMI каналы. После каждой проверки можно нажать общий откат."));
+                "Вы подтвердили, что ProfileTransfer действительно меняет штатный HUD: "
+                        + "в отдельных режимах исчезает машинка, а скорость перемещается. "
+                        + "Выберите ниже режим, в котором машинки уже нет, затем запустите "
+                        + "поэлементный перебор. Каждая комбинация держится на HUD 3,6 секунды."));
 
+        body.addView(label("Режим 01, внутри которого искать отдельный слой скорости"));
+        body.addView(commandRow(BLUE,
+                new String[]{"0 GUIDE", "1 DRIVE", "2 AR", "3 SIMPLE"},
+                new Runnable[]{
+                        () -> selectProfileSearchMode(0),
+                        () -> selectProfileSearchMode(1),
+                        () -> selectProfileSearchMode(2),
+                        () -> selectProfileSearchMode(3)
+                }));
+        profileSearchModeView = text("Выбран режим поиска: 0 GUIDE", 16, TEXT, true);
+        profileSearchModeView.setPadding(dp(8), dp(5), dp(8), dp(8));
+        body.addView(profileSearchModeView);
+
+        body.addView(label("Шаг 1 · активный профиль (PEN)"));
+        body.addView(commandPair("СКАН: ВСЕ 1, ПО ОДНОМУ OFF", AMBER,
+                () -> controller.startProfileVisualScan(profileSearchMode, true, false),
+                "СКАН: ВСЕ 0, ПО ОДНОМУ ON", AMBER,
+                () -> controller.startProfileVisualScan(profileSearchMode, false, false)));
+
+        body.addView(label("Шаг 2 · ProfAll, если активный PEN не дал результата"));
+        body.addView(commandPair("PROFALL: ПО ОДНОМУ OFF", RED,
+                () -> controller.startProfileVisualScan(profileSearchMode, true, true),
+                "PROFALL: ПО ОДНОМУ ON", RED,
+                () -> controller.startProfileVisualScan(profileSearchMode, false, true)));
+
+        body.addView(commandPair("СТОП — СКОРОСТЬ ИСЧЕЗЛА", GREEN,
+                () -> controller.markProfileVisualScanFound(),
+                "ОСТАНОВИТЬ И ВОССТАНОВИТЬ", BLUE,
+                () -> controller.restoreProfileVisualSearch()));
+        profileSearchStatusView = text("Поиск 01: не запущен", 15,
+                Color.rgb(255, 214, 125), true);
+        profileSearchStatusView.setTypeface(Typeface.MONOSPACE);
+        profileSearchStatusView.setPadding(dp(8), dp(5), dp(8), dp(12));
+        body.addView(profileSearchStatusView);
+        body.addView(note(
+                "Как только скорость полностью исчезнет, сразу нажмите зелёную кнопку. "
+                        + "Текущая комбинация останется на HUD, а её mode, PEN и Fxx будут "
+                        + "зафиксированы в журнале. Если первый перебор закончился без эффекта, "
+                        + "запустите инверсный, затем ProfAll."));
+
+        body.addView(sectionTitle("Точные дополнительные состояния из системного ECARX Navi API"));
+        body.addView(note(
+                "Это не случайные значения. Системный NaviInteraction отправляет их в соседний "
+                        + "VFHUD CB33260: 4 — перестроение маршрута, 5 — въезд в тоннель, "
+                        + "6 — выезд из тоннеля. Проверьте HUD после каждого нажатия; обратная "
+                        + "связь отображается как PA33894."));
+        body.addView(commandRow(AMBER,
+                new String[]{"4 REROUTING", "5 TUNNEL ENTER", "6 TUNNEL END"},
+                new Runnable[]{
+                        () -> controller.setVfDisplayMode(4),
+                        () -> controller.setVfDisplayMode(5),
+                        () -> controller.setVfDisplayMode(6)
+                }));
+
+        body.addView(sectionTitle("Ручная проверка и прежние диагностические пути"));
         body.addView(label("01 · ProfileTransfer HUD mode · CB33278 / PA33937"));
         body.addView(commandRow(BLUE,
                 new String[]{"0 GUIDE", "1 DRIVE", "2 AR", "3 SIMPLE", "ОТКАТ"},
@@ -448,6 +509,41 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                         + "в предварительно считанном полном сообщении. Исходный blob сохраняется "
                         + "до первой записи и восстанавливается побайтно."));
         return scroll(body);
+    }
+
+    private void selectProfileSearchMode(int mode) {
+        profileSearchMode = mode;
+        if (profileSearchModeView != null) {
+            String label;
+            switch (mode) {
+                case 0:
+                    label = "0 GUIDE";
+                    break;
+                case 1:
+                    label = "1 DRIVE";
+                    break;
+                case 2:
+                    label = "2 AR";
+                    break;
+                case 3:
+                    label = "3 SIMPLE";
+                    break;
+                default:
+                    label = Integer.toString(mode);
+                    break;
+            }
+            profileSearchModeView.setText("Выбран режим поиска: " + label);
+        }
+        if (controller != null) controller.setProfileTransferMode(mode);
+    }
+
+    private static String findStatusLine(String status, String prefix) {
+        if (status == null || status.isEmpty()) return prefix + " —";
+        String[] lines = status.split("\\n");
+        for (String line : lines) {
+            if (line.startsWith(prefix)) return line;
+        }
+        return prefix + " —";
     }
 
     private View buildElementsTab() {
