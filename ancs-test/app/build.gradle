@@ -10,8 +10,8 @@ android {
         applicationId "ru.natro.ancstest"
         minSdk 26
         targetSdk 28
-        versionCode 6
-        versionName "6.0"
+        versionCode 7
+        versionName "7.0"
 
         testInstrumentationRunner "android.test.InstrumentationTestRunner"
     }

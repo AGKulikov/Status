@@ -2,54 +2,32 @@ import CoreBluetooth
 import UIKit
 
 final class ViewController: UIViewController {
-    private enum LinkPhase {
-        case idle
-        case scanning
-        case connecting
-        case cancellingForReconnect
-        case reconnectDelay
-        case connected
-    }
-
     private let serviceUUID = CBUUID(string: "D2D9E4B0-47F1-4E44-A8BB-A932FD5A2F01")
-    private let pairUUID = CBUUID(string: "D2D9E4B2-47F1-4E44-A8BB-A932FD5A2F01")
+    private let infoUUID = CBUUID(string: "D2D9E4B1-47F1-4E44-A8BB-A932FD5A2F01")
+    private let controlUUID = CBUUID(string: "D2D9E4B2-47F1-4E44-A8BB-A932FD5A2F01")
     private let secureUUID = CBUUID(string: "D2D9E4B3-47F1-4E44-A8BB-A932FD5A2F01")
 
     private let statusLabel = UILabel()
     private let logView = UITextView()
     private let startButton = UIButton(type: .system)
-    private let secureButton = UIButton(type: .system)
-    private let disconnectButton = UIButton(type: .system)
+    private let stopButton = UIButton(type: .system)
 
-    private var central: CBCentralManager!
-    private var peripheral: CBPeripheral?
-    private var pairCharacteristic: CBCharacteristic?
-    private var secureCharacteristic: CBCharacteristic?
-    private var scanningRequested = true
-    private var secureAttempts = 0
-    private var sessionGeneration = 0
-    private var pendingSecureWork: DispatchWorkItem?
-    private var phase: LinkPhase = .idle
-    private var connectAttempt = 0
-    private var ancsBootstrapReconnectUsed = false
-    private var serviceDatabaseReconnectUsed = false
-    private var pendingReconnect = false
-    private var reconnectReason = ""
-    private var pendingCharacteristicDiscoveries = 0
-    private var connectTimeoutWork: DispatchWorkItem?
-    private var authorizationGraceWork: DispatchWorkItem?
-    private var cancelWatchdogWork: DispatchWorkItem?
-    private var reconnectDelayWork: DispatchWorkItem?
+    private var peripheralManager: CBPeripheralManager!
+    private var publishRequested = true
+    private var servicePublished = false
+    private var infoCharacteristic: CBMutableCharacteristic?
+    private var controlCharacteristic: CBMutableCharacteristic?
+    private var secureCharacteristic: CBMutableCharacteristic?
 
     override func viewDidLoad() {
         super.viewDidLoad()
         buildInterface()
-        append("На магнитоле сначала нажмите «Ждать iPhone».")
-        append("Приложение подключится с системным флагом RequiresANCS.")
-        central = CBCentralManager(
+        append("v4 работает как GPSTether: iPhone рекламирует BLE-сервис.")
+        append("На магнитоле нажмите «Подключить iPhone BLE».")
+        peripheralManager = CBPeripheralManager(
             delegate: self,
             queue: .main,
-            options: [CBCentralManagerOptionShowPowerAlertKey: true]
+            options: [CBPeripheralManagerOptionShowPowerAlertKey: true]
         )
     }
 
@@ -57,7 +35,7 @@ final class ViewController: UIViewController {
         view.backgroundColor = UIColor(red: 0.05, green: 0.08, blue: 0.12, alpha: 1)
 
         let titleLabel = UILabel()
-        titleLabel.text = "KX11 ANCS HELPER v3"
+        titleLabel.text = "KX11 ANCS HELPER v4"
         titleLabel.font = .boldSystemFont(ofSize: 24)
         titleLabel.textColor = .white
 
@@ -70,15 +48,19 @@ final class ViewController: UIViewController {
         statusLabel.clipsToBounds = true
         statusLabel.heightAnchor.constraint(equalToConstant: 42).isActive = true
 
-        configureButton(startButton, title: "Найти магнитолу", action: #selector(startTapped))
-        configureButton(secureButton, title: "Повторить защищённый тест", action: #selector(secureTapped))
-        configureButton(disconnectButton, title: "Отключиться", action: #selector(disconnectTapped))
-        secureButton.isEnabled = false
-        disconnectButton.isEnabled = false
+        configureButton(
+            startButton,
+            title: "Рекламировать iPhone по BLE",
+            action: #selector(startTapped)
+        )
+        configureButton(
+            stopButton,
+            title: "Остановить BLE-рекламу",
+            action: #selector(stopTapped)
+        )
+        stopButton.isEnabled = false
 
-        let buttonStack = UIStackView(arrangedSubviews: [
-            startButton, secureButton, disconnectButton
-        ])
+        let buttonStack = UIStackView(arrangedSubviews: [startButton, stopButton])
         buttonStack.axis = .vertical
         buttonStack.spacing = 8
 
@@ -98,10 +80,22 @@ final class ViewController: UIViewController {
         view.addSubview(stack)
 
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
-            stack.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 16),
-            stack.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
-            stack.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16)
+            stack.topAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.topAnchor,
+                constant: 16
+            ),
+            stack.leadingAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.leadingAnchor,
+                constant: 16
+            ),
+            stack.trailingAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.trailingAnchor,
+                constant: -16
+            ),
+            stack.bottomAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.bottomAnchor,
+                constant: -16
+            )
         ])
     }
 
@@ -115,250 +109,91 @@ final class ViewController: UIViewController {
     }
 
     @objc private func startTapped() {
-        scanningRequested = true
-        startScanIfPossible()
+        publishRequested = true
+        publishServiceIfPossible()
     }
 
-    @objc private func secureTapped() {
-        secureAttempts = 0
-        runSecureTest()
+    @objc private func stopTapped() {
+        publishRequested = false
+        peripheralManager.stopAdvertising()
+        peripheralManager.removeAllServices()
+        clearPublishedService()
+        setStatus("ОСТАНОВЛЕНО", color: .systemGray)
+        startButton.isEnabled = true
+        stopButton.isEnabled = false
+        append("BLE-реклама и локальный GATT-сервис остановлены")
     }
 
-    @objc private func disconnectTapped() {
-        scanningRequested = false
-        central.stopScan()
-        if let peripheral {
-            central.cancelPeripheralConnection(peripheral)
-        }
-        resetConnection(resetRetryBudget: true)
-        setStatus("ОТКЛЮЧЕНО", color: .systemGray)
-    }
-
-    private func startScanIfPossible() {
-        guard central.state == .poweredOn else {
-            append("Bluetooth пока не готов: \(central.state.rawValue)")
+    private func publishServiceIfPossible() {
+        guard peripheralManager.state == .poweredOn else {
+            append("Bluetooth пока не готов: \(peripheralManager.state.rawValue)")
             return
         }
-        if let peripheral {
-            central.cancelPeripheralConnection(peripheral)
-        }
-        resetConnection(resetRetryBudget: true)
-        central.stopScan()
-        phase = .scanning
-        central.scanForPeripherals(
-            withServices: [serviceUUID],
-            options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
+
+        peripheralManager.stopAdvertising()
+        peripheralManager.removeAllServices()
+        clearPublishedService()
+
+        let info = CBMutableCharacteristic(
+            type: infoUUID,
+            properties: [.read],
+            value: nil,
+            permissions: [.readable]
         )
-        setStatus("ПОИСК МАГНИТОЛЫ", color: .systemBlue)
-        append("Сканирую service \(serviceUUID.uuidString)")
-    }
-
-    private func connect(_ discovered: CBPeripheral) {
-        central.stopScan()
-        peripheral = discovered
-        discovered.delegate = self
-        beginConnect(discovered, reason: "найдена diagnostic-реклама")
-    }
-
-    private func beginConnect(_ target: CBPeripheral, reason: String) {
-        cancelConnectionWork()
-        phase = .connecting
-        connectAttempt += 1
-        setStatus("ПОДКЛЮЧЕНИЕ", color: .systemOrange)
-        append("Найдена магнитола: \(target.name ?? "без имени")")
-        append("Connect #\(connectAttempt) с RequiresANCS=true · \(reason)")
-        central.connect(
-            target,
-            options: [CBConnectPeripheralOptionRequiresANCS: true]
+        let control = CBMutableCharacteristic(
+            type: controlUUID,
+            properties: [.write, .writeWithoutResponse],
+            value: nil,
+            permissions: [.writeable]
         )
-        let timeout = connectAttempt == 1 ? 40.0 : 15.0
-        scheduleConnectTimeout(after: timeout, for: target)
+        let secure = CBMutableCharacteristic(
+            type: secureUUID,
+            properties: [.read, .write],
+            value: nil,
+            permissions: [
+                .readable,
+                .writeable,
+                .readEncryptionRequired,
+                .writeEncryptionRequired
+            ]
+        )
+        let service = CBMutableService(type: serviceUUID, primary: true)
+        service.characteristics = [info, control, secure]
+
+        infoCharacteristic = info
+        controlCharacteristic = control
+        secureCharacteristic = secure
+        setStatus("ПУБЛИКАЦИЯ GATT", color: .systemOrange)
+        append("Добавляю service \(serviceUUID.uuidString)")
+        append("SECURE требует encrypted read/write и должен инициировать LE bonding")
+        peripheralManager.add(service)
     }
 
-    private func scheduleConnectTimeout(after delay: TimeInterval, for target: CBPeripheral) {
-        connectTimeoutWork?.cancel()
-        let expectedGeneration = sessionGeneration
-        let expectedIdentifier = target.identifier
-        let expectedAttempt = connectAttempt
-        let work = DispatchWorkItem { [weak self] in
-            guard let self,
-                  self.sessionGeneration == expectedGeneration,
-                  self.peripheral?.identifier == expectedIdentifier,
-                  self.connectAttempt == expectedAttempt,
-                  self.phase == .connecting else {
-                return
-            }
-            if target.ancsAuthorized && !self.ancsBootstrapReconnectUsed {
-                self.ancsBootstrapReconnectUsed = true
-                self.beginInternalReconnect(
-                    target,
-                    reason: "ANCS уже разрешён, но didConnect не получен"
-                )
-            } else {
-                self.append("CONNECT TIMEOUT #\(expectedAttempt)")
-                self.setStatus("GATT CONNECT TIMEOUT", color: .systemRed)
-                self.central.cancelPeripheralConnection(target)
-                self.resetConnection()
-            }
-        }
-        connectTimeoutWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
-    }
-
-    private func scheduleAuthorizationReconnect(for target: CBPeripheral) {
-        authorizationGraceWork?.cancel()
-        let expectedGeneration = sessionGeneration
-        let expectedIdentifier = target.identifier
-        let expectedAttempt = connectAttempt
-        let work = DispatchWorkItem { [weak self] in
-            guard let self,
-                  self.sessionGeneration == expectedGeneration,
-                  self.peripheral?.identifier == expectedIdentifier,
-                  self.connectAttempt == expectedAttempt,
-                  self.phase == .connecting else {
-                return
-            }
-            self.beginInternalReconnect(
-                target,
-                reason: "ANCS разрешён до didConnect"
-            )
-        }
-        authorizationGraceWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: work)
-    }
-
-    private func beginInternalReconnect(_ target: CBPeripheral, reason: String) {
-        guard isCurrent(target),
-              phase == .connecting || phase == .connected,
-              !pendingReconnect else {
-            return
-        }
-        cancelConnectionWork()
-        pendingReconnect = true
-        reconnectReason = reason
-        phase = .cancellingForReconnect
-        setStatus("ПЕРЕПОДКЛЮЧЕНИЕ", color: .systemOrange)
-        append("\(reason); отменяю текущую попытку перед reconnect")
-        central.cancelPeripheralConnection(target)
-
-        let expectedGeneration = sessionGeneration
-        let expectedIdentifier = target.identifier
-        let work = DispatchWorkItem { [weak self] in
-            guard let self,
-                  self.sessionGeneration == expectedGeneration,
-                  self.peripheral?.identifier == expectedIdentifier,
-                  self.phase == .cancellingForReconnect else {
-                return
-            }
-            self.pendingReconnect = false
-            self.append("Cancel callback не получен за 4 с; нажмите «Найти магнитолу»")
-            self.setStatus("ОЖИДАНИЕ CANCEL TIMEOUT", color: .systemRed)
-        }
-        cancelWatchdogWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0, execute: work)
-    }
-
-    private func scheduleReconnectAfterCancel(for target: CBPeripheral) {
-        cancelWatchdogWork?.cancel()
-        cancelWatchdogWork = nil
-        phase = .reconnectDelay
-        pairCharacteristic = nil
+    private func clearPublishedService() {
+        servicePublished = false
+        infoCharacteristic = nil
+        controlCharacteristic = nil
         secureCharacteristic = nil
-        pendingCharacteristicDiscoveries = 0
-        secureAttempts = 0
-        secureButton.isEnabled = false
+    }
 
-        let expectedGeneration = sessionGeneration
-        let expectedIdentifier = target.identifier
-        let reason = reconnectReason
-        let work = DispatchWorkItem { [weak self] in
-            guard let self,
-                  self.sessionGeneration == expectedGeneration,
-                  self.peripheral?.identifier == expectedIdentifier,
-                  self.phase == .reconnectDelay else {
-                return
-            }
-            self.pendingReconnect = false
-            self.beginConnect(target, reason: "автоповтор после \(reason)")
+    private func startAdvertising() {
+        guard publishRequested, servicePublished else { return }
+        peripheralManager.startAdvertising([
+            CBAdvertisementDataServiceUUIDsKey: [serviceUUID],
+            CBAdvertisementDataLocalNameKey: "KX11-iPhone"
+        ])
+        setStatus("ЗАПУСК BLE-РЕКЛАМЫ", color: .systemOrange)
+        append("Рекламирую UUID \(serviceUUID.uuidString)")
+    }
+
+    private func responseData(for characteristic: CBCharacteristic) -> Data? {
+        if characteristic.uuid == infoUUID {
+            return Data("KX11 iPhone Peripheral v4".utf8)
         }
-        reconnectDelayWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
-    }
-
-    private func scheduleServiceDatabaseReconnect(for target: CBPeripheral) {
-        guard !serviceDatabaseReconnectUsed else {
-            append("CONTROL отсутствует и после повтора; перезапустите тест на магнитоле")
-            setStatus("CONTROL НЕ НАЙДЕН", color: .systemRed)
-            return
+        if characteristic.uuid == secureUUID {
+            return Data("SECURE IPHONE OK".utf8)
         }
-        serviceDatabaseReconnectUsed = true
-        beginInternalReconnect(
-            target,
-            reason: "iOS получила старую GATT-базу без CONTROL"
-        )
-    }
-
-    private func cancelConnectionWork() {
-        connectTimeoutWork?.cancel()
-        authorizationGraceWork?.cancel()
-        cancelWatchdogWork?.cancel()
-        reconnectDelayWork?.cancel()
-        connectTimeoutWork = nil
-        authorizationGraceWork = nil
-        cancelWatchdogWork = nil
-        reconnectDelayWork = nil
-    }
-
-    private func runSecureTest() {
-        guard let peripheral, let secureCharacteristic else {
-            append("Защищённая характеристика ещё не найдена")
-            return
-        }
-        secureAttempts += 1
-        append("SECURE ATT: попытка чтения \(secureAttempts)")
-        peripheral.readValue(for: secureCharacteristic)
-    }
-
-    private func scheduleSecureTest(after delay: TimeInterval, for peripheral: CBPeripheral) {
-        pendingSecureWork?.cancel()
-        let expectedGeneration = sessionGeneration
-        let expectedIdentifier = peripheral.identifier
-        let work = DispatchWorkItem { [weak self] in
-            guard let self,
-                  self.sessionGeneration == expectedGeneration,
-                  self.peripheral?.identifier == expectedIdentifier else {
-                return
-            }
-            self.runSecureTest()
-        }
-        pendingSecureWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
-    }
-
-    private func isCurrent(_ callbackPeripheral: CBPeripheral) -> Bool {
-        peripheral?.identifier == callbackPeripheral.identifier
-    }
-
-    private func resetConnection(resetRetryBudget: Bool = false) {
-        cancelConnectionWork()
-        pendingSecureWork?.cancel()
-        pendingSecureWork = nil
-        sessionGeneration += 1
-        phase = .idle
-        peripheral = nil
-        pairCharacteristic = nil
-        secureCharacteristic = nil
-        secureAttempts = 0
-        pendingCharacteristicDiscoveries = 0
-        pendingReconnect = false
-        reconnectReason = ""
-        if resetRetryBudget {
-            connectAttempt = 0
-            ancsBootstrapReconnectUsed = false
-            serviceDatabaseReconnectUsed = false
-        }
-        secureButton.isEnabled = false
-        disconnectButton.isEnabled = false
+        return nil
     }
 
     private func setStatus(_ text: String, color: UIColor) {
@@ -380,193 +215,97 @@ final class ViewController: UIViewController {
     }
 }
 
-extension ViewController: CBCentralManagerDelegate {
-    func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        append("CoreBluetooth state=\(central.state.rawValue)")
-        guard central.state == .poweredOn else {
+extension ViewController: CBPeripheralManagerDelegate {
+    func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
+        append("CBPeripheralManager state=\(peripheral.state.rawValue)")
+        guard peripheral.state == .poweredOn else {
             setStatus("BLUETOOTH НЕДОСТУПЕН", color: .systemRed)
             return
         }
-        if scanningRequested {
-            startScanIfPossible()
-        } else {
-            setStatus("ГОТОВО", color: .systemGreen)
+        setStatus("ГОТОВО К РЕКЛАМЕ", color: .systemGreen)
+        if publishRequested {
+            publishServiceIfPossible()
         }
     }
 
-    func centralManager(
-        _ central: CBCentralManager,
-        didDiscover peripheral: CBPeripheral,
-        advertisementData: [String: Any],
-        rssi RSSI: NSNumber
-    ) {
-        guard self.peripheral == nil else { return }
-        append("didDiscover RSSI=\(RSSI)")
-        connect(peripheral)
-    }
-
-    func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        guard isCurrent(peripheral) else { return }
-        if phase == .cancellingForReconnect {
-            append("Поздний didConnect во время cancel; продолжаю отмену")
-            central.cancelPeripheralConnection(peripheral)
-            return
-        }
-        guard phase == .connecting else {
-            append("didConnect проигнорирован в неожиданной фазе \(phase)")
-            return
-        }
-        cancelConnectionWork()
-        phase = .connected
-        pendingReconnect = false
-        setStatus("BLE ПОДКЛЮЧЁН", color: .systemGreen)
-        disconnectButton.isEnabled = true
-        append("didConnect; ancsAuthorized=\(peripheral.ancsAuthorized)")
-        peripheral.discoverServices([serviceUUID])
-    }
-
-    func centralManager(
-        _ central: CBCentralManager,
-        didFailToConnect peripheral: CBPeripheral,
+    func peripheralManager(
+        _ peripheral: CBPeripheralManager,
+        didAdd service: CBService,
         error: Error?
     ) {
-        guard isCurrent(peripheral) else { return }
-        append("didFailToConnect: \(error?.localizedDescription ?? "unknown")")
-        if phase == .cancellingForReconnect, pendingReconnect {
-            scheduleReconnectAfterCancel(for: peripheral)
+        if let error {
+            append("didAdd service error: \(error.localizedDescription)")
+            setStatus("ОШИБКА GATT SERVICE", color: .systemRed)
             return
         }
-        setStatus("ОШИБКА ПОДКЛЮЧЕНИЯ", color: .systemRed)
-        resetConnection()
+        servicePublished = true
+        append("GATT service опубликован")
+        startAdvertising()
     }
 
-    func centralManager(
-        _ central: CBCentralManager,
-        didDisconnectPeripheral peripheral: CBPeripheral,
+    func peripheralManagerDidStartAdvertising(
+        _ peripheral: CBPeripheralManager,
         error: Error?
     ) {
-        guard isCurrent(peripheral) else { return }
-        append("didDisconnect: \(error?.localizedDescription ?? "без ошибки")")
-        if phase == .cancellingForReconnect, pendingReconnect {
-            scheduleReconnectAfterCancel(for: peripheral)
+        if let error {
+            append("Advertising error: \(error.localizedDescription)")
+            setStatus("ОШИБКА BLE-РЕКЛАМЫ", color: .systemRed)
             return
         }
-        setStatus("ОТКЛЮЧЕНО", color: .systemGray)
-        resetConnection()
+        setStatus("IPHONE BLE РЕКЛАМИРУЕТСЯ", color: .systemGreen)
+        startButton.isEnabled = false
+        stopButton.isEnabled = true
+        append("Android должен найти KX11-iPhone и сам вызвать connectGatt")
     }
 
-    func centralManager(
-        _ central: CBCentralManager,
-        didUpdateANCSAuthorizationFor peripheral: CBPeripheral
+    func peripheralManager(
+        _ peripheral: CBPeripheralManager,
+        didReceiveRead request: CBATTRequest
     ) {
-        guard isCurrent(peripheral) else { return }
-        append("ANCS authorization changed: \(peripheral.ancsAuthorized)")
-        if peripheral.ancsAuthorized, phase == .connecting {
-            setStatus("ANCS РАЗРЕШЁН · ЖДУ GATT", color: .systemOrange)
-            if !ancsBootstrapReconnectUsed {
-                ancsBootstrapReconnectUsed = true
-                scheduleAuthorizationReconnect(for: peripheral)
-            }
-        } else {
-            setStatus(
-                peripheral.ancsAuthorized ? "ANCS РАЗРЕШЁН" : "ANCS НЕ РАЗРЕШЁН",
-                color: peripheral.ancsAuthorized ? .systemGreen : .systemOrange
+        let central = request.central.identifier.uuidString
+        append(
+            "READ \(request.characteristic.uuid.uuidString) "
+                + "central=\(central) offset=\(request.offset)"
+        )
+        guard let fullValue = responseData(for: request.characteristic) else {
+            peripheral.respond(to: request, withResult: .requestNotSupported)
+            return
+        }
+        guard request.offset >= 0, request.offset <= fullValue.count else {
+            peripheral.respond(to: request, withResult: .invalidOffset)
+            return
+        }
+        request.value = fullValue.subdata(in: request.offset..<fullValue.count)
+        peripheral.respond(to: request, withResult: .success)
+        if request.characteristic.uuid == secureUUID {
+            setStatus("SECURE READ · BLE ЗАШИФРОВАН", color: .systemGreen)
+            append("SECURE IPHONE OK: Android прочитал encrypted characteristic")
+        }
+    }
+
+    func peripheralManager(
+        _ peripheral: CBPeripheralManager,
+        didReceiveWrite requests: [CBATTRequest]
+    ) {
+        for request in requests {
+            let central = request.central.identifier.uuidString
+            let text = request.value.flatMap {
+                String(data: $0, encoding: .utf8)
+            } ?? ""
+            append(
+                "WRITE \(request.characteristic.uuid.uuidString) "
+                    + "central=\(central) value=`\(text)`"
             )
-        }
-    }
-}
-
-extension ViewController: CBPeripheralDelegate {
-    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        guard isCurrent(peripheral) else { return }
-        if let error {
-            append("didDiscoverServices error: \(error.localizedDescription)")
-            return
-        }
-        let services = peripheral.services ?? []
-        append("Найдено GATT services: \(services.count)")
-        let diagnosticServices = services.filter { $0.uuid == serviceUUID }
-        pendingCharacteristicDiscoveries = diagnosticServices.count
-        guard !diagnosticServices.isEmpty else {
-            append("Diagnostic service отсутствует; пробую обновить GATT-базу")
-            scheduleServiceDatabaseReconnect(for: peripheral)
-            return
-        }
-        for service in diagnosticServices {
-            peripheral.discoverCharacteristics([pairUUID, secureUUID], for: service)
-        }
-    }
-
-    func peripheral(
-        _ peripheral: CBPeripheral,
-        didDiscoverCharacteristicsFor service: CBService,
-        error: Error?
-    ) {
-        guard isCurrent(peripheral) else { return }
-        if let error {
-            append("didDiscoverCharacteristics error: \(error.localizedDescription)")
-        } else {
-            for characteristic in service.characteristics ?? [] {
-                append("CHAR \(characteristic.uuid.uuidString) props=\(characteristic.properties.rawValue)")
-                if characteristic.uuid == pairUUID {
-                    pairCharacteristic = characteristic
-                } else if characteristic.uuid == secureUUID {
-                    secureCharacteristic = characteristic
-                }
+            if request.characteristic.uuid == controlUUID, text.uppercased() == "PAIR" {
+                peripheral.respond(to: request, withResult: .success)
+                setStatus("ANDROID ПОДКЛЮЧЁН", color: .systemGreen)
+            } else if request.characteristic.uuid == secureUUID,
+                      text.uppercased() == "ANCS" {
+                peripheral.respond(to: request, withResult: .success)
+                setStatus("SECURE WRITE · BLE ЗАШИФРОВАН", color: .systemGreen)
+            } else {
+                peripheral.respond(to: request, withResult: .requestNotSupported)
             }
-        }
-        pendingCharacteristicDiscoveries = max(0, pendingCharacteristicDiscoveries - 1)
-        guard pendingCharacteristicDiscoveries == 0 else { return }
-        guard let pairCharacteristic else {
-            append("CONTROL characteristic не найдена — вероятен старый GATT-кэш")
-            scheduleServiceDatabaseReconnect(for: peripheral)
-            return
-        }
-        secureButton.isEnabled = secureCharacteristic != nil
-        append("Пишу PAIR в CONTROL; магнитола зафиксирует именно этот iPhone")
-        peripheral.writeValue(Data("PAIR".utf8), for: pairCharacteristic, type: .withResponse)
-    }
-
-    func peripheral(
-        _ peripheral: CBPeripheral,
-        didWriteValueFor characteristic: CBCharacteristic,
-        error: Error?
-    ) {
-        guard isCurrent(peripheral) else { return }
-        if let error {
-            append("WRITE \(characteristic.uuid.uuidString) error: \(error.localizedDescription)")
-            return
-        }
-        append("WRITE \(characteristic.uuid.uuidString) OK")
-        if characteristic.uuid == pairUUID {
-            scheduleSecureTest(after: 0.8, for: peripheral)
-        }
-    }
-
-    func peripheral(
-        _ peripheral: CBPeripheral,
-        didUpdateValueFor characteristic: CBCharacteristic,
-        error: Error?
-    ) {
-        guard isCurrent(peripheral) else { return }
-        if let error {
-            append("READ \(characteristic.uuid.uuidString) error: \(error.localizedDescription)")
-            if characteristic.uuid == secureUUID, secureAttempts < 3 {
-                scheduleSecureTest(after: 1.5, for: peripheral)
-            }
-            return
-        }
-        let text = characteristic.value.flatMap {
-            String(data: $0, encoding: .utf8)
-        } ?? ""
-        if characteristic.uuid == secureUUID {
-            append("SECURE ATT OK · BLE link зашифрован · value=\(text)")
-            setStatus(
-                peripheral.ancsAuthorized ? "ANCS РАЗРЕШЁН" : "BLE ЗАШИФРОВАН",
-                color: .systemGreen
-            )
-        } else {
-            append("READ \(characteristic.uuid.uuidString) OK · value=\(text)")
         }
     }
 }

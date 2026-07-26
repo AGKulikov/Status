@@ -21,9 +21,9 @@
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>NSBluetoothAlwaysUsageDescription</key>
-    <string>Подключение к тестовому BLE-сервису магнитолы KX11 и запрос разрешения ANCS.</string>
+    <string>Реклама тестового BLE-сервиса iPhone для прямого подключения магнитолы KX11.</string>
     <key>NSBluetoothPeripheralUsageDescription</key>
-    <string>Подключение к тестовому BLE-сервису магнитолы KX11.</string>
+    <string>Реклама тестового BLE-сервиса iPhone для магнитолы KX11.</string>
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
     <key>UILaunchScreen</key>
@@ -38,7 +38,7 @@
     </array>
     <key>UIBackgroundModes</key>
     <array>
-        <string>bluetooth-central</string>
+        <string>bluetooth-peripheral</string>
     </array>
 </dict>
 </plist>

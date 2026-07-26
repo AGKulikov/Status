@@ -76,6 +76,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
     private BluetoothDiagnostics diagnostics;
     private BluetoothDiagnostics.Candidate selectedCandidate;
     private boolean startScanAfterPermission;
+    private boolean startIphoneAfterPermission;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -168,8 +169,14 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
                 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
         onLog("Разрешение геолокации для BLE scan: " + granted);
         boolean shouldStart = startScanAfterPermission;
+        boolean shouldStartIphone = startIphoneAfterPermission;
         startScanAfterPermission = false;
-        if (granted && shouldStart) ensureLocationPermission(true);
+        startIphoneAfterPermission = false;
+        if (granted && shouldStartIphone) {
+            ensureIphonePeripheralPermission();
+        } else if (granted && shouldStart) {
+            ensureLocationPermission(true);
+        }
     }
 
     private void buildUi() {
@@ -183,7 +190,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         header.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView title = new TextView(this);
-        title.setText("KX11 ANCS TEST v6");
+        title.setText("KX11 ANCS TEST v7");
         title.setTextColor(Color.WHITE);
         title.setTextSize(20);
         title.setTypeface(Typeface.DEFAULT_BOLD);
@@ -201,7 +208,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         root.addView(header);
 
         selectedView = new TextView(this);
-        selectedView.setText("PAIR/SECURE = verified; ANCS = тот же BLE/ATT link");
+        selectedView.setText("GPS-style: iPhone рекламирует, магнитола подключается первой");
         selectedView.setTextColor(Color.rgb(207, 216, 220));
         selectedView.setTextSize(13);
         selectedView.setPadding(0, dp(5), 0, dp(4));
@@ -211,10 +218,13 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         buttonScroll.setHorizontalScrollBarEnabled(true);
         LinearLayout buttons = new LinearLayout(this);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
+        addButton(buttons, "Подключить iPhone BLE",
+                view -> ensureIphonePeripheralPermission());
         addButton(buttons, "Возможности", view -> diagnostics.publishCapabilities());
         addButton(buttons, "BLE scan", view -> ensureLocationPermission(true));
         addButton(buttons, "Стоп scan", view -> diagnostics.stopScan());
-        addButton(buttons, "Ждать iPhone", view -> diagnostics.startIncomingConnectionTest());
+        addButton(buttons, "Старый входящий тест",
+                view -> diagnostics.startIncomingConnectionTest());
         addButton(buttons, "Стоп рекламы", view -> diagnostics.stopAdvertising());
         addButton(buttons, "Same-peer attach",
                 view -> diagnostics.connect(null));
@@ -345,7 +355,30 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
             if (startAfterGrant) diagnostics.startScan();
             return;
         }
+        startIphoneAfterPermission = false;
         startScanAfterPermission = startAfterGrant;
+        requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                REQUEST_LOCATION);
+    }
+
+    private void ensureIphonePeripheralPermission() {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+            boolean locationEnabled = locationEnabled();
+            onLog("Location services для GPS-style BLE scan: " + locationEnabled);
+            if (!locationEnabled) {
+                onState("LOCATION_OFF");
+                onLog("Включите геолокацию Android 9 — без неё BLE scan заблокирован");
+                Toast.makeText(this,
+                        "Для поиска iPhone по BLE включите геолокацию",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+            diagnostics.startIphonePeripheralClientTest();
+            return;
+        }
+        startScanAfterPermission = false;
+        startIphoneAfterPermission = true;
         requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                 REQUEST_LOCATION);
     }
@@ -434,19 +467,17 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
     }
 
     private void appendInstruction() {
-        onLog("1) Нажмите «Возможности», затем «Ждать iPhone».");
-        onLog("2) На iPhone откройте KX11 ANCS Helper — он подключится"
-                + " с RequiresANCS и сам отправит PAIR.");
-        onLog("3) Если используется LightBlue: подключитесь к service d2d9e4b0…f01"
-                + " и в CONTROL d2d9e4b2…f01 запишите ASCII PAIR.");
-        onLog("4) Подтвердите запросы iPhone. Затем в SECURE"
-                + " d2d9e4b3…f01 запишите ASCII ANCS или прочитайте значение.");
-        onLog("5) После первого SECURE ATT OK v6 регистрирует GATT client"
-                + " на том же verified peer: autoConnect=true, TRANSPORT_LE.");
-        onLog("6) Если за 5 секунд нет успеха, выполняется ровно один direct"
-                + " fallback через 500 мс. MTU не запрашивается; discovery начинается сразу.");
-        onLog("7) После ANCS READY отправьте на iPhone новое уведомление."
-                + " Другие адреса и GPSTether в v6 не используются.");
+        onLog("1) На iPhone установите Helper v4 и нажмите"
+                + " «Рекламировать iPhone по BLE».");
+        onLog("2) На магнитоле нажмите «Подключить iPhone BLE»."
+                + " Это GPS-style: Android сканирует UUID и сам вызывает connectGatt.");
+        onLog("3) В системных настройках отдельное BLE-подключение создавать не надо;"
+                + " Classic Bluetooth для музыки/звонков можно оставить.");
+        onLog("4) Если появится запрос сопряжения, подтвердите его на обоих устройствах.");
+        onLog("5) Ждите SECURE IPHONE OK, затем один из результатов:"
+                + " ANCS READY либо GPS-LINK OK · ANCS НЕ ОПУБЛИКОВАН.");
+        onLog("6) После ANCS READY отправьте на iPhone одно новое уведомление."
+                + " Очередь ограничена и замедлена, чтобы ECARX UI не зависал.");
     }
 
     private int dp(int value) {
