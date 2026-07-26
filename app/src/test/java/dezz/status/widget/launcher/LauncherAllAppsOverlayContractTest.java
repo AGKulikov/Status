@@ -27,6 +27,10 @@ public final class LauncherAllAppsOverlayContractTest {
         assertTrue(method.contains("TYPE_APPLICATION_OVERLAY"));
         assertTrue(method.indexOf("dialogWindow.setType(") < method.indexOf("dialog.show()"));
         assertTrue(method.contains("dismissAllAppsDialog()"));
+        assertTrue(method.contains("AppUninstallLauncher.request("));
+        assertTrue(method.contains("setOnItemLongClickListener"));
+        assertTrue(method.contains("lastAppCatalogLoadElapsed = 0L"));
+        assertTrue(!method.contains("appCatalog.toggleFavorite(entry.packageName)"));
     }
 
     @Test public void overlayDialogIsReleasedWhenLauncherStops() throws IOException {
