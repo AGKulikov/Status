@@ -54,6 +54,10 @@ public final class BluetoothDiagnostics {
             UUID.fromString("d2d9e4b0-47f1-4e44-a8bb-a932fd5a2f01");
     private static final UUID DIAGNOSTIC_CHARACTERISTIC =
             UUID.fromString("d2d9e4b1-47f1-4e44-a8bb-a932fd5a2f01");
+    private static final UUID CONTROL_CHARACTERISTIC =
+            UUID.fromString("d2d9e4b2-47f1-4e44-a8bb-a932fd5a2f01");
+    private static final UUID SECURE_CHARACTERISTIC =
+            UUID.fromString("d2d9e4b3-47f1-4e44-a8bb-a932fd5a2f01");
     private static final UUID GENERIC_ATTRIBUTE_SERVICE =
             UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
     private static final UUID SERVICE_CHANGED =
@@ -202,6 +206,11 @@ public final class BluetoothDiagnostics {
     private BluetoothGattServer gattServer;
     private BluetoothGatt gatt;
     private BluetoothDevice activeDevice;
+    private final Object verifiedPeerLock = new Object();
+    private BluetoothDevice verifiedPeer;
+    private boolean verifiedConnectAttempted;
+    private boolean secureAttConfirmed;
+    private boolean gattClientConnected;
     private boolean scanning;
     private boolean advertising;
     private boolean advertisingDesired;
@@ -311,6 +320,8 @@ public final class BluetoothDiagnostics {
     public void startIncomingConnectionTest() {
         if (!ensureAdapter()) return;
         stopAdvertising();
+        disconnect();
+        resetVerifiedPeerSession();
         advertiser = adapter.getBluetoothLeAdvertiser();
         if (advertiser == null) {
             state("ADVERTISER_UNAVAILABLE");
@@ -328,6 +339,8 @@ public final class BluetoothDiagnostics {
             log("Android 9 не умеет AD type 0x15. Запускаю обычную diagnostic-рекламу");
             log("На iPhone откройте LightBlue, найдите UUID "
                     + DIAGNOSTIC_SERVICE + " и нажмите Connect");
+            log("В CONTROL " + CONTROL_CHARACTERISTIC
+                    + " запишите ASCII PAIR; только после этого peer будет подтверждён");
         }
 
         preparedAdvertiseSettings = new AdvertiseSettings.Builder()
@@ -337,9 +350,16 @@ public final class BluetoothDiagnostics {
                 .setTimeout(0)
                 .build();
         preparedAdvertiseData = primary.build();
-        preparedScanResponse = new AdvertiseData.Builder()
-                .setIncludeDeviceName(true)
-                .build();
+        AdvertiseData.Builder scanResponse = new AdvertiseData.Builder();
+        if (solicitationAdvertising) {
+            // The iPhone helper scans for the diagnostic UUID. Keep it in the scan
+            // response because ANCS solicitation plus another 128-bit UUID does not
+            // fit in the 31-byte primary advertising packet.
+            scanResponse.addServiceUuid(new ParcelUuid(DIAGNOSTIC_SERVICE));
+        } else {
+            scanResponse.setIncludeDeviceName(true);
+        }
+        preparedScanResponse = scanResponse.build();
         advertisingDesired = true;
         state("ЗАПУСК GATT SERVER");
         openGattServer();
@@ -365,24 +385,34 @@ public final class BluetoothDiagnostics {
 
     public void connect(Candidate candidate) {
         if (candidate == null || candidate.device == null) {
-            log("Сначала выберите устройство");
+            log("Сначала подтвердите peer командой PAIR в LightBlue");
             return;
         }
-        connect(candidate.device, "выбрано в списке");
+        if (!isVerifiedPeer(candidate.device)) {
+            log("Подключение отклонено: выбранный peer не подтверждён командой PAIR");
+            return;
+        }
+        connectVerifiedOnce("подтверждённый peer выбран в списке");
     }
 
     public void requestBond() {
-        if (activeDevice == null) {
-            log("Нет активного BLE-устройства для bonding");
+        BluetoothDevice device = getVerifiedPeer();
+        if (device == null) {
+            log("Нет verified peer: сначала запишите ASCII PAIR в CONTROL через LightBlue");
             return;
         }
-        requestBond(activeDevice);
+        activeDevice = device;
+        if (safeBondState(device) == BluetoothDevice.BOND_BONDED) {
+            connectVerifiedOnce("ручной запрос: verified peer уже bonded");
+        } else {
+            requestBond(device);
+        }
     }
 
     public void refreshAndReconnect() {
-        final BluetoothDevice device = activeDevice;
+        final BluetoothDevice device = getVerifiedPeer();
         if (device == null) {
-            log("Нет активного устройства");
+            log("Нет verified peer: сначала запишите ASCII PAIR в CONTROL через LightBlue");
             return;
         }
         if (gatt != null) {
@@ -396,11 +426,14 @@ public final class BluetoothDiagnostics {
             }
         }
         disconnect();
-        main.postDelayed(() -> connect(device, "повтор после refresh"), 1_200L);
+        verifiedConnectAttempted = false;
+        main.postDelayed(() -> connectVerifiedOnce("ручной повтор после refresh"), 1_200L);
     }
 
     public void disconnect() {
         clearAncsRuntime();
+        gattClientConnected = false;
+        verifiedConnectAttempted = false;
         BluetoothGatt old = gatt;
         gatt = null;
         if (old != null) {
@@ -420,6 +453,7 @@ public final class BluetoothDiagnostics {
         stopScan();
         stopAdvertising();
         disconnect();
+        resetVerifiedPeerSession();
         main.removeCallbacks(candidatePublisher);
         try {
             context.unregisterReceiver(bondReceiver);
@@ -441,10 +475,130 @@ public final class BluetoothDiagnostics {
         }
     }
 
+    private void resetVerifiedPeerSession() {
+        synchronized (verifiedPeerLock) {
+            verifiedPeer = null;
+        }
+        activeDevice = null;
+        verifiedConnectAttempted = false;
+        secureAttConfirmed = false;
+        gattClientConnected = false;
+    }
+
+    private BluetoothDevice getVerifiedPeer() {
+        synchronized (verifiedPeerLock) {
+            return verifiedPeer;
+        }
+    }
+
+    /**
+     * The first valid PAIR command fixes the peer for the whole test session. A later callback
+     * from another device must never replace it.
+     */
+    private boolean claimVerifiedPeer(BluetoothDevice device) {
+        if (device == null) return false;
+        synchronized (verifiedPeerLock) {
+            if (verifiedPeer == null) {
+                verifiedPeer = device;
+                return true;
+            }
+            return sameDevice(verifiedPeer, device);
+        }
+    }
+
+    private boolean isVerifiedPeer(BluetoothDevice device) {
+        return sameDevice(getVerifiedPeer(), device);
+    }
+
+    private static boolean sameDevice(BluetoothDevice first, BluetoothDevice second) {
+        if (first == null || second == null) return false;
+        if (first.equals(second)) return true;
+        String firstAddress = safeAddress(first);
+        String secondAddress = safeAddress(second);
+        return !firstAddress.isEmpty()
+                && firstAddress.equalsIgnoreCase(secondAddress);
+    }
+
+    private void connectVerifiedOnce(String reason) {
+        BluetoothDevice device = getVerifiedPeer();
+        if (device == null) {
+            log("connectGatt не запущен: verified peer отсутствует");
+            return;
+        }
+        if (verifiedConnectAttempted) {
+            log("connectGatt к verified peer уже запускался; повтор пропущен · " + reason);
+            return;
+        }
+        activeDevice = device;
+        connect(device, reason);
+    }
+
+    private void handlePairCommand(BluetoothDevice device) {
+        if (!isVerifiedPeer(device)) {
+            log("PAIR callback проигнорирован: peer не совпадает с verified peer");
+            return;
+        }
+        activeDevice = device;
+        state("VERIFIED PEER · ЗАПРОС LE BOND");
+        log("PAIR принят. VERIFIED PEER: " + safeName(device)
+                + " " + safeAddress(device)
+                + " type=" + typeLabel(safeType(device))
+                + " bond=" + bondLabel(safeBondState(device)));
+        if (safeBondState(device) == BluetoothDevice.BOND_BONDED) {
+            connectVerifiedOnce("PAIR из CONTROL: verified peer уже bonded");
+        } else {
+            requestBond(device);
+            log("connectGatt отложен до BOND_BONDED или SECURE ATT OK");
+        }
+    }
+
+    private void handleSecureAttSuccess(BluetoothDevice device, String operation) {
+        if (!isVerifiedPeer(device)) {
+            log("SECURE callback проигнорирован: это не verified peer");
+            return;
+        }
+        boolean first = !secureAttConfirmed;
+        secureAttConfirmed = true;
+        activeDevice = device;
+        state("SECURE ATT OK · ПРОВЕРЯЮ ANCS");
+        log("SECURE ATT OK · " + operation + " · peer=" + safeAddress(device)
+                + (first ? " · encrypted characteristic confirmed" : " · повтор"));
+        connectVerifiedOnce("SECURE ATT OK");
+        BluetoothGatt current = gatt;
+        if (gattClientConnected && current != null
+                && sameDevice(current.getDevice(), device)) {
+            main.postDelayed(() -> {
+                if (gatt == current && gattClientConnected) {
+                    discoverServices(current);
+                }
+            }, 350L);
+        }
+    }
+
     private void connect(BluetoothDevice device, String reason) {
         if (!ensureAdapter()) return;
-        disconnect();
+        if (!isVerifiedPeer(device)) {
+            log("connectGatt отменён: peer не подтверждён командой PAIR");
+            return;
+        }
+        // Close only the previous client role. Calling public disconnect() here would
+        // reset the retry guard that belongs to the new attempt.
+        clearAncsRuntime();
+        gattClientConnected = false;
+        BluetoothGatt previous = gatt;
+        gatt = null;
+        if (previous != null) {
+            try {
+                previous.disconnect();
+            } catch (RuntimeException ignored) {
+            }
+            try {
+                previous.close();
+            } catch (RuntimeException ignored) {
+            }
+        }
         activeDevice = device;
+        verifiedConnectAttempted = true;
         String address = safeAddress(device);
         state("GATT CONNECTING");
         log("connectGatt LE: " + safeName(device) + " " + address + " · " + reason
@@ -454,6 +608,7 @@ public final class BluetoothDiagnostics {
             gatt = device.connectGatt(context, false, gattCallback,
                     BluetoothDevice.TRANSPORT_LE);
             if (gatt == null) {
+                verifiedConnectAttempted = false;
                 state("CONNECT_GATT_RETURNED_NULL");
                 log("connectGatt вернул null");
             } else {
@@ -469,6 +624,7 @@ public final class BluetoothDiagnostics {
                 main.postDelayed(connectTimeout, CONNECT_TIMEOUT_MS);
             }
         } catch (RuntimeException failure) {
+            verifiedConnectAttempted = false;
             state("CONNECT_EXCEPTION");
             log("connectGatt exception: " + failure);
         }
@@ -489,12 +645,38 @@ public final class BluetoothDiagnostics {
         }
         BluetoothGattService service = new BluetoothGattService(
                 DIAGNOSTIC_SERVICE, BluetoothGattService.SERVICE_TYPE_PRIMARY);
-        BluetoothGattCharacteristic characteristic = new BluetoothGattCharacteristic(
+        BluetoothGattCharacteristic information = new BluetoothGattCharacteristic(
                 DIAGNOSTIC_CHARACTERISTIC,
                 BluetoothGattCharacteristic.PROPERTY_READ,
                 BluetoothGattCharacteristic.PERMISSION_READ);
-        characteristic.setValue("KX11 ANCS Test".getBytes(StandardCharsets.UTF_8));
-        service.addCharacteristic(characteristic);
+        information.setValue("KX11 ANCS Test v2".getBytes(StandardCharsets.UTF_8));
+
+        BluetoothGattCharacteristic control = new BluetoothGattCharacteristic(
+                CONTROL_CHARACTERISTIC,
+                BluetoothGattCharacteristic.PROPERTY_WRITE
+                        | BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
+                BluetoothGattCharacteristic.PERMISSION_WRITE);
+
+        BluetoothGattCharacteristic secure = new BluetoothGattCharacteristic(
+                SECURE_CHARACTERISTIC,
+                BluetoothGattCharacteristic.PROPERTY_READ
+                        | BluetoothGattCharacteristic.PROPERTY_WRITE,
+                BluetoothGattCharacteristic.PERMISSION_READ_ENCRYPTED
+                        | BluetoothGattCharacteristic.PERMISSION_WRITE_ENCRYPTED);
+        secure.setValue("SECURE ATT OK".getBytes(StandardCharsets.UTF_8));
+
+        boolean informationAdded = service.addCharacteristic(information);
+        boolean controlAdded = service.addCharacteristic(control);
+        boolean secureAdded = service.addCharacteristic(secure);
+        log("Diagnostic characteristics: INFO=" + informationAdded
+                + " CONTROL=" + controlAdded + " SECURE=" + secureAdded);
+        if (!informationAdded || !controlAdded || !secureAdded) {
+            state("GATT_CHARACTERISTIC_ADD_FAILED");
+            advertisingDesired = false;
+            clearPreparedAdvertising();
+            closeGattServer();
+            return;
+        }
         boolean accepted = gattServer.addService(service);
         log("GATT server открыт; add diagnostic service=" + accepted);
         if (!accepted) {
@@ -902,9 +1084,17 @@ public final class BluetoothDiagnostics {
 
     private void requestBond(BluetoothDevice device) {
         if (device == null) return;
+        if (!isVerifiedPeer(device)) {
+            log("Bonding отклонён: peer не подтверждён командой PAIR");
+            return;
+        }
         int state = safeBondState(device);
         if (state == BluetoothDevice.BOND_BONDED) {
-            log("Устройство уже BOND_BONDED. На iPhone проверьте «Показывать уведомления»");
+            log("Verified peer уже BOND_BONDED. Проверьте SECURE characteristic");
+            return;
+        }
+        if (state == BluetoothDevice.BOND_BONDING) {
+            log("LE bonding verified peer уже выполняется");
             return;
         }
         boolean started = false;
@@ -967,7 +1157,11 @@ public final class BluetoothDiagnostics {
 
     private void closeClientGatt(BluetoothGatt callbackGatt) {
         if (callbackGatt == null) return;
-        if (gatt == callbackGatt) gatt = null;
+        if (gatt == callbackGatt) {
+            gatt = null;
+            gattClientConnected = false;
+            verifiedConnectAttempted = false;
+        }
         try {
             callbackGatt.close();
         } catch (RuntimeException ignored) {
@@ -1200,6 +1394,42 @@ public final class BluetoothDiagnostics {
         }
     };
 
+    private void sendGattServerResponse(BluetoothDevice device, int requestId,
+                                        int status, int offset, byte[] value) {
+        BluetoothGattServer server = gattServer;
+        if (server == null) return;
+        try {
+            boolean sent = server.sendResponse(device, requestId, status, offset, value);
+            if (!sent) {
+                main.post(() -> log("GATT server sendResponse=false status=" + status
+                        + " peer=" + safeAddress(device)));
+            }
+        } catch (RuntimeException failure) {
+            main.post(() -> log("GATT server sendResponse exception: " + failure));
+        }
+    }
+
+    private void sendGattReadResponse(BluetoothDevice device, int requestId,
+                                      int offset, byte[] fullValue) {
+        if (offset < 0 || offset > fullValue.length) {
+            sendGattServerResponse(device, requestId,
+                    BluetoothGatt.GATT_INVALID_OFFSET, 0, null);
+            return;
+        }
+        byte[] response = offset == fullValue.length
+                ? new byte[0]
+                : AdvertisementParser.copyOfRange(fullValue, offset, fullValue.length);
+        sendGattServerResponse(device, requestId,
+                BluetoothGatt.GATT_SUCCESS, offset, response);
+    }
+
+    private static String asciiCommand(byte[] value) {
+        if (value == null) return "";
+        return new String(value, StandardCharsets.UTF_8)
+                .trim()
+                .toUpperCase(Locale.US);
+    }
+
     private final BluetoothGattServerCallback gattServerCallback =
             new BluetoothGattServerCallback() {
                 @Override
@@ -1230,8 +1460,9 @@ public final class BluetoothDiagnostics {
                         updateCandidate(device, -127, false, "", "incoming");
                         if (status == GATT_SUCCESS
                                 && newState == BluetoothProfile.STATE_CONNECTED) {
-                            state("IPHONE ПОДКЛЮЧИЛСЯ · GATT CLIENT START");
-                            connect(device, "входящее соединение к GATT server");
+                            state("INCOMING LINK · В LIGHTBLUE ЗАПИШИТЕ PAIR");
+                            log("Auto-connect отключён. Peer станет verified только после "
+                                    + "ASCII PAIR в CONTROL " + CONTROL_CHARACTERISTIC);
                         }
                     });
                 }
@@ -1240,20 +1471,79 @@ public final class BluetoothDiagnostics {
                 public void onCharacteristicReadRequest(BluetoothDevice device,
                                                         int requestId, int offset,
                                                         BluetoothGattCharacteristic characteristic) {
-                    byte[] full = "KX11 ANCS Test".getBytes(StandardCharsets.UTF_8);
-                    if (offset > full.length) {
-                        if (gattServer != null) {
-                            gattServer.sendResponse(device, requestId,
-                                    BluetoothGatt.GATT_INVALID_OFFSET, offset, null);
-                        }
+                    UUID uuid = characteristic == null ? null : characteristic.getUuid();
+                    if (DIAGNOSTIC_CHARACTERISTIC.equals(uuid)) {
+                        sendGattReadResponse(device, requestId, offset,
+                                "KX11 ANCS Test v2".getBytes(StandardCharsets.UTF_8));
                         return;
                     }
-                    byte[] response = offset == full.length
-                            ? new byte[0]
-                            : AdvertisementParser.copyOfRange(full, offset, full.length);
-                    if (gattServer != null) {
-                        gattServer.sendResponse(device, requestId,
-                                BluetoothGatt.GATT_SUCCESS, offset, response);
+                    if (SECURE_CHARACTERISTIC.equals(uuid)) {
+                        if (!isVerifiedPeer(device)) {
+                            sendGattServerResponse(device, requestId,
+                                    STATUS_INSUFFICIENT_AUTHORIZATION, 0, null);
+                            main.post(() -> log("SECURE READ отклонён: peer не verified · "
+                                    + safeAddress(device)));
+                            return;
+                        }
+                        sendGattReadResponse(device, requestId, offset,
+                                "SECURE ATT OK".getBytes(StandardCharsets.UTF_8));
+                        main.post(() -> handleSecureAttSuccess(device, "READ"));
+                        return;
+                    }
+                    sendGattServerResponse(device, requestId,
+                            BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, 0, null);
+                }
+
+                @Override
+                public void onCharacteristicWriteRequest(
+                        BluetoothDevice device, int requestId,
+                        BluetoothGattCharacteristic characteristic,
+                        boolean preparedWrite, boolean responseNeeded,
+                        int offset, byte[] value) {
+                    UUID uuid = characteristic == null ? null : characteristic.getUuid();
+                    int status = BluetoothGatt.GATT_SUCCESS;
+                    Runnable successAction = null;
+
+                    if (preparedWrite) {
+                        status = BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED;
+                    } else if (offset != 0) {
+                        status = BluetoothGatt.GATT_INVALID_OFFSET;
+                    } else if (CONTROL_CHARACTERISTIC.equals(uuid)) {
+                        String command = asciiCommand(value);
+                        if (!"PAIR".equals(command)) {
+                            status = BluetoothGatt.GATT_FAILURE;
+                            main.post(() -> log("CONTROL command отклонена: `" + command
+                                    + "`; ожидается ASCII PAIR"));
+                        } else if (!claimVerifiedPeer(device)) {
+                            status = STATUS_INSUFFICIENT_AUTHORIZATION;
+                            main.post(() -> log("PAIR отклонён: verified peer уже зафиксирован, "
+                                    + "чужой callback " + safeAddress(device)
+                                    + " его не заменит"));
+                        } else {
+                            successAction = () -> handlePairCommand(device);
+                        }
+                    } else if (SECURE_CHARACTERISTIC.equals(uuid)) {
+                        String command = asciiCommand(value);
+                        if (!isVerifiedPeer(device)) {
+                            status = STATUS_INSUFFICIENT_AUTHORIZATION;
+                            main.post(() -> log("SECURE WRITE отклонён: peer не verified · "
+                                    + safeAddress(device)));
+                        } else if (!"ANCS".equals(command)) {
+                            status = BluetoothGatt.GATT_FAILURE;
+                            main.post(() -> log("SECURE command отклонена: `" + command
+                                    + "`; ожидается ASCII ANCS"));
+                        } else {
+                            successAction = () -> handleSecureAttSuccess(device, "WRITE");
+                        }
+                    } else {
+                        status = BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED;
+                    }
+
+                    if (responseNeeded) {
+                        sendGattServerResponse(device, requestId, status, 0, null);
+                    }
+                    if (status == BluetoothGatt.GATT_SUCCESS && successAction != null) {
+                        main.post(successAction);
                     }
                 }
             };
@@ -1270,6 +1560,7 @@ public final class BluetoothDiagnostics {
                 if (status == GATT_SUCCESS
                         && newState == BluetoothProfile.STATE_CONNECTED) {
                     cancelConnectTimeout();
+                    gattClientConnected = true;
                     state("GATT CONNECTED");
                     boolean mtu = false;
                     try {
@@ -1290,11 +1581,13 @@ public final class BluetoothDiagnostics {
                     }
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     cancelConnectTimeout();
+                    gattClientConnected = false;
                     state("GATT DISCONNECTED · status=" + status);
                     closeClientGatt(callbackGatt);
                     clearAncsRuntime();
                 } else if (status != GATT_SUCCESS) {
                     cancelConnectTimeout();
+                    gattClientConnected = false;
                     state("GATT CONNECTION FAILED · status=" + status);
                     closeClientGatt(callbackGatt);
                     clearAncsRuntime();
@@ -1356,6 +1649,11 @@ public final class BluetoothDiagnostics {
             BluetoothDevice device =
                     intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
             if (device == null) return;
+            if (!isVerifiedPeer(device)) {
+                log("BOND event проигнорирован для non-verified peer: "
+                        + safeAddress(device));
+                return;
+            }
             int state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE,
                     BluetoothDevice.BOND_NONE);
             int previous = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE,
@@ -1363,11 +1661,23 @@ public final class BluetoothDiagnostics {
             log("BOND " + safeAddress(device) + ": "
                     + bondLabel(previous) + " → " + bondLabel(state));
             updateCandidate(device, -127, false, "", "bond event");
-            if (activeDevice != null
-                    && safeAddress(activeDevice).equalsIgnoreCase(safeAddress(device))
-                    && state == BluetoothDevice.BOND_BONDED) {
-                state("BOND_BONDED · ПОВТОР GATT");
-                main.postDelayed(() -> connect(device, "после LE bonding"), 800L);
+            if (state == BluetoothDevice.BOND_BONDING) {
+                state("VERIFIED PEER · LE BONDING");
+            } else if (state == BluetoothDevice.BOND_BONDED) {
+                activeDevice = device;
+                state("VERIFIED PEER · LE BOND BONDED");
+                connectVerifiedOnce("verified peer BOND_BONDED");
+                BluetoothGatt current = gatt;
+                if (gattClientConnected && current != null
+                        && sameDevice(current.getDevice(), device)) {
+                    main.postDelayed(() -> {
+                        if (gatt == current && gattClientConnected) {
+                            discoverServices(current);
+                        }
+                    }, 800L);
+                }
+            } else if (previous == BluetoothDevice.BOND_BONDING) {
+                state("VERIFIED PEER · LE BOND FAILED");
             }
         }
     };

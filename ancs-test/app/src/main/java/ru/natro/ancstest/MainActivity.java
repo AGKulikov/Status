@@ -158,7 +158,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         header.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView title = new TextView(this);
-        title.setText("KX11 ANCS TEST");
+        title.setText("KX11 ANCS TEST v2");
         title.setTextColor(Color.WHITE);
         title.setTextSize(20);
         title.setTypeface(Typeface.DEFAULT_BOLD);
@@ -176,7 +176,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         root.addView(header);
 
         selectedView = new TextView(this);
-        selectedView.setText("Устройство не выбрано");
+        selectedView.setText("LightBlue: CONTROL → PAIR, затем SECURE → ANCS");
         selectedView.setTextColor(Color.rgb(207, 216, 220));
         selectedView.setTextSize(13);
         selectedView.setPadding(0, dp(5), 0, dp(4));
@@ -191,8 +191,9 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         addButton(buttons, "Стоп scan", view -> diagnostics.stopScan());
         addButton(buttons, "Ждать iPhone", view -> diagnostics.startIncomingConnectionTest());
         addButton(buttons, "Стоп рекламы", view -> diagnostics.stopAdvertising());
-        addButton(buttons, "Подключить", view -> diagnostics.connect(selectedCandidate));
-        addButton(buttons, "LE bonding", view -> diagnostics.requestBond());
+        addButton(buttons, "Подключить verified",
+                view -> diagnostics.connect(selectedCandidate));
+        addButton(buttons, "LE bonding verified", view -> diagnostics.requestBond());
         addButton(buttons, "Обновить GATT", view -> diagnostics.refreshAndReconnect());
         addButton(buttons, "Отключить", view -> diagnostics.disconnect());
         addButton(buttons, "Копировать лог", view -> copyLog());
@@ -382,11 +383,15 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
 
     private void appendInstruction() {
         onLog("1) Нажмите «Возможности», затем «Ждать iPhone».");
-        onLog("2) Подтвердите входящее BLE-сопряжение и доступ к уведомлениям на iPhone.");
-        onLog("3) Если в журнале нет ANCS solicitation API, на iPhone откройте LightBlue,"
-                + " найдите service d2d9e4b0… и вручную нажмите Connect.");
-        onLog("4) После состояния ANCS READY отправьте на iPhone новое уведомление.");
-        onLog("5) BLE scan — отдельная проверка сканера; сам iPhone там обычно не виден.");
+        onLog("2) На iPhone откройте KX11 ANCS Helper — он подключится"
+                + " с RequiresANCS и сам отправит PAIR.");
+        onLog("3) Если используется LightBlue: подключитесь к service d2d9e4b0…f01"
+                + " и в CONTROL d2d9e4b2…f01 запишите ASCII PAIR.");
+        onLog("4) Подтвердите запросы iPhone. Затем в SECURE"
+                + " d2d9e4b3…f01 запишите ASCII ANCS или прочитайте значение.");
+        onLog("5) SECURE ATT OK доказывает шифрование BLE-link."
+                + " После ANCS READY отправьте новое уведомление.");
+        onLog("6) Входящий peer без команды PAIR не используется и не может заменить verified peer.");
     }
 
     private int dp(int value) {
