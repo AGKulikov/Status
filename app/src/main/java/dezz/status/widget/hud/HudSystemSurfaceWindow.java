@@ -59,7 +59,7 @@ final class HudSystemSurfaceWindow {
     @NonNull private final Handler main = new Handler(Looper.getMainLooper());
     @NonNull private final ExecutorService io =
             Executors.newSingleThreadExecutor(daemonThreadFactory());
-    @NonNull private final AtomicReference<byte[]> pendingFrame = new AtomicReference<>();
+    @NonNull private final AtomicReference<FramePacket> pendingFrame = new AtomicReference<>();
     @NonNull private final AtomicBoolean drainScheduled = new AtomicBoolean();
     @NonNull private final HudCanvasView canvas;
     @NonNull private final Bitmap bitmap = Bitmap.createBitmap(
@@ -71,10 +71,12 @@ final class HudSystemSurfaceWindow {
     private final int port;
     private final int layerStack;
     private final int displayId;
+    @NonNull private final String surfaceName;
 
     private volatile Socket socket;
     private volatile DataInputStream input;
     private volatile DataOutputStream output;
+    private volatile boolean maskStockHud;
     private boolean connected;
     private boolean ready;
     private boolean dismissed;
@@ -98,6 +100,8 @@ final class HudSystemSurfaceWindow {
         this.listener = listener;
         displayId = display.getDisplayId();
         layerStack = resolveLayerStack(display);
+        surfaceName = "status_widget_hud_d" + displayId;
+        maskStockHud = config.maskStockHud;
         nonce = randomHex(16);
         port = reserveLoopbackPort();
         Context displayContext = appContext.createDisplayContext(display);
@@ -124,6 +128,7 @@ final class HudSystemSurfaceWindow {
 
     void updateConfig(@NonNull HudPanelConfig config) {
         if (dismissed) return;
+        maskStockHud = config.maskStockHud;
         canvas.updateConfig(config);
         invalidateHud();
     }
@@ -141,6 +146,14 @@ final class HudSystemSurfaceWindow {
 
     int layerStack() {
         return layerStack;
+    }
+
+    @NonNull String surfaceName() {
+        return surfaceName;
+    }
+
+    boolean maskEnabled() {
+        return maskStockHud;
     }
 
     void dismiss() {
@@ -249,7 +262,7 @@ final class HudSystemSurfaceWindow {
             fail("не удалось подготовить HUD-кадр");
             return;
         }
-        pendingFrame.set(encoded.toByteArray());
+        pendingFrame.set(new FramePacket(encoded.toByteArray(), maskStockHud));
         scheduleDrain();
     }
 
@@ -261,15 +274,16 @@ final class HudSystemSurfaceWindow {
     private void drainFrames() {
         try {
             while (!dismissed) {
-                byte[] frame = pendingFrame.getAndSet(null);
-                if (frame == null) break;
+                FramePacket packet = pendingFrame.getAndSet(null);
+                if (packet == null) break;
                 DataOutputStream currentOutput = output;
                 DataInputStream currentInput = input;
                 if (currentOutput == null || currentInput == null) {
                     throw new IllegalStateException("HUD bridge socket is closed");
                 }
-                currentOutput.writeInt(frame.length);
-                currentOutput.write(frame);
+                currentOutput.writeInt(packet.encoded.length);
+                currentOutput.writeBoolean(packet.maskEnabled);
+                currentOutput.write(packet.encoded);
                 currentOutput.flush();
                 if (currentInput.readUnsignedByte() != FRAME_OK) {
                     throw new IllegalStateException("HUD bridge rejected a frame");
@@ -321,7 +335,11 @@ final class HudSystemSurfaceWindow {
                 + " " + HudViewportPolicy.SAFE_TOP
                 + " " + HudViewportPolicy.SAFE_WIDTH
                 + " " + HudViewportPolicy.SAFE_HEIGHT
-                + " status_widget_hud_d" + displayId
+                + " " + HudViewportPolicy.STOCK_MASK_LEFT
+                + " " + HudViewportPolicy.STOCK_MASK_TOP
+                + " " + HudViewportPolicy.STOCK_MASK_WIDTH
+                + " " + HudViewportPolicy.STOCK_MASK_HEIGHT
+                + " " + surfaceName
                 + " </dev/null 2>&1";
     }
 
@@ -403,5 +421,15 @@ final class HudSystemSurfaceWindow {
             thread.setDaemon(true);
             return thread;
         };
+    }
+
+    private static final class FramePacket {
+        @NonNull final byte[] encoded;
+        final boolean maskEnabled;
+
+        FramePacket(@NonNull byte[] encoded, boolean maskEnabled) {
+            this.encoded = encoded;
+            this.maskEnabled = maskEnabled;
+        }
     }
 }
