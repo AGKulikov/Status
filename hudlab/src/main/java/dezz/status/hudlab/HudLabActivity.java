@@ -53,11 +53,13 @@ public final class HudLabActivity extends Activity implements HudLabController.L
     private TextView logView;
     private TextView visualIndexView;
     private TextView visualPenView;
+    private TextView heldProbeIndexView;
     private TextView profileSearchModeView;
     private TextView profileSearchStatusView;
     private TextView exportStatusView;
     private Button exportButton;
     private int visualIndex;
+    private int heldProbeIndex;
     private int visualPen = 1;
     private int profileSearchMode;
     private String fullStatus = "";
@@ -129,8 +131,8 @@ public final class HudLabActivity extends Activity implements HudLabController.L
 
         TextView warning = text(
                 "Экспериментальный стенд: используйте только на стоящей машине. "
-                        + "Команды выполняются только по нажатию. Сначала пробуйте transient-варианты; "
-                        + "сохранение профиля и ProfileTransfer apply вынесены в отдельные кнопки.",
+                        + "Команды выполняются только по нажатию. Поиск F00–F19 не сохраняется "
+                        + "автоматически и не перезагружает HUD.",
                 14, Color.rgb(255, 199, 98), false);
         warning.setPadding(dp(10), dp(5), dp(10), dp(8));
         root.addView(warning);
@@ -160,7 +162,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         close.setOnClickListener(view -> finish());
         header.addView(close, fixedButton(dp(130)));
 
-        TextView title = text("HUD Lab 0.11", 23, TEXT, true);
+        TextView title = text("HUD Lab 0.14", 23, TEXT, true);
         title.setPadding(dp(16), 0, dp(18), 0);
         header.addView(title);
 
@@ -230,7 +232,8 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                         + "Повторять эти команды больше не нужно."));
         body.addView(note(
                 "Кнопка ниже соберёт в один ZIP установленные системные APK HUD, DIMProtocol, "
-                        + "PowerSomeIP, AdaptAPI, OpenAPI и читаемые ECARX/Geely framework-JAR. "
+                        + "PowerSomeIP, AdaptAPI, OpenAPI, читаемые ECARX/Geely framework-JAR, "
+                        + "низкоуровневые IPCP/VHAL/UART/LIN/LVDS/MCU-файлы и журнал HUD Lab. "
                         + "Личные данные приложений не читаются, настройки не меняются."));
 
         exportButton = button("СОБРАТЬ ZIP В DOWNLOAD", BLUE, false);
@@ -278,7 +281,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         Thread worker = new Thread(() -> {
             try {
                 HudSystemDumpExporter.Result result =
-                        HudSystemDumpExporter.export(getApplicationContext());
+                        HudSystemDumpExporter.export(getApplicationContext(), fullStatus);
                 runOnUiThread(() -> {
                     lastDumpPath = result.file.getAbsolutePath();
                     exportStatusView.setText(result.summary()
@@ -341,13 +344,53 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         profileSearchModeView.setPadding(dp(8), dp(5), dp(8), dp(8));
         body.addView(profileSearchModeView);
 
-        body.addView(label("Шаг 1 · активный профиль (PEN)"));
+        body.addView(label("Ручной фиксированный тест · активный профиль"));
+        LinearLayout heldSelector = new LinearLayout(this);
+        heldSelector.setOrientation(LinearLayout.HORIZONTAL);
+        heldSelector.setGravity(Gravity.CENTER_VERTICAL);
+        heldSelector.addView(commandButton("− F", CARD_BORDER, this::previousHeldProbe),
+                new LinearLayout.LayoutParams(0, dp(46), 1f));
+        heldProbeIndexView = text("F00", 18, TEXT, true);
+        heldProbeIndexView.setGravity(Gravity.CENTER);
+        heldSelector.addView(heldProbeIndexView,
+                new LinearLayout.LayoutParams(dp(86), dp(46)));
+        heldSelector.addView(commandButton("+ F", CARD_BORDER, this::nextHeldProbe),
+                new LinearLayout.LayoutParams(0, dp(46), 1f));
+        body.addView(heldSelector);
+        body.addView(commandPair("ВСЕ 1 → ВЫБРАННАЯ OFF", AMBER,
+                () -> controller.applyHeldVisualProbe(
+                        profileSearchMode, heldProbeIndex, true, false),
+                "ВСЕ 0 → ВЫБРАННАЯ ON", AMBER,
+                () -> controller.applyHeldVisualProbe(
+                        profileSearchMode, heldProbeIndex, false, false)));
+        body.addView(commandPair("ACTIVE PEN: ВСЕ 1", GREEN,
+                () -> controller.applyHeldVisualBaseline(profileSearchMode, 1, false),
+                "ACTIVE PEN: ВСЕ 0", RED,
+                () -> controller.applyHeldVisualBaseline(profileSearchMode, 0, false)));
+        body.addView(note(
+                "Каждое нажатие сначала отправляет полный baseline, затем полный 20-полевой "
+                        + "вектор выбранной пробы. Результат остаётся до следующего нажатия. "
+                        + "В журнал пишется точный protobuf, а не условное «SUCCESS». "
+                        + "Если ProfPenSts1 недоступен, версия 0.14 безопасно использует "
+                        + "активный профиль PA33845 как PEN (в вашем дампе это профиль 13)."));
+
+        body.addView(label("ProfAll (PEN=15) · только явный запасной вариант"));
+        body.addView(commandPair("PROFALL: ВЫБРАННАЯ OFF", RED,
+                () -> controller.applyHeldVisualProbe(
+                        profileSearchMode, heldProbeIndex, true, true),
+                "PROFALL: ВСЕ 1", GREEN,
+                () -> controller.applyHeldVisualBaseline(profileSearchMode, 1, true)));
+        body.addView(note(
+                "ProfAll затрагивает все профили и не включается автоматически. Используйте "
+                        + "его только если тот же Fxx на активном PEN не дал эффекта."));
+
+        body.addView(label("Быстрый автоматический проход · по 3,6 секунды"));
         body.addView(commandPair("СКАН: ВСЕ 1, ПО ОДНОМУ OFF", AMBER,
                 () -> controller.startProfileVisualScan(profileSearchMode, true, false),
                 "СКАН: ВСЕ 0, ПО ОДНОМУ ON", AMBER,
                 () -> controller.startProfileVisualScan(profileSearchMode, false, false)));
 
-        body.addView(label("Шаг 2 · ProfAll, если активный PEN не дал результата"));
+        body.addView(label("Автопроход ProfAll · только после активного PEN"));
         body.addView(commandPair("PROFALL: ПО ОДНОМУ OFF", RED,
                 () -> controller.startProfileVisualScan(profileSearchMode, true, true),
                 "PROFALL: ПО ОДНОМУ ON", RED,
@@ -486,11 +529,9 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                         () -> controller.restoreVehicleModelClear()
                 }));
 
-        body.addView(sectionTitle("Откат, применение и дополнительный профильный путь"));
-        body.addView(commandPair("ПЕРЕЗАГРУЗИТЬ АКТИВНЫЙ ПРОФИЛЬ", GREEN,
-                () -> controller.reloadActiveProfile(),
-                "ПРИМЕНИТЬ PROFILETRANSFER", AMBER,
-                () -> controller.pulseProfileTransferApply()));
+        body.addView(sectionTitle("Откат и сохранение только подтверждённого результата"));
+        body.addView(singleCommand("ПЕРЕЗАГРУЗИТЬ АКТИВНЫЙ ПРОФИЛЬ", GREEN,
+                () -> controller.reloadActiveProfile()));
         body.addView(note(
                 "04/05/09 отправляются transient и сами в память не записываются. "
                         + "«Перезагрузить активный профиль» возвращает сохранённую штатную "
@@ -498,16 +539,10 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                         + "визуального подтверждения на HUD."));
         body.addView(singleCommand("СОХРАНИТЬ ТЕКУЩИЙ НАЙДЕННЫЙ ВАРИАНТ (29892 0→1)",
                 AMBER, () -> controller.persistCurrentProfileSettings()));
-
-        body.addView(label("Дополнительно · полный cloud-profile RMW с точным backup"));
-        body.addView(commandPair("ПРОБА HUD-БАЙТОВ 0/3/9", RED,
-                () -> controller.setCloudProfileHudCandidate(),
-                "ВОССТАНОВИТЬ ИСХОДНЫЙ BLOB", GREEN,
-                () -> controller.restoreCloudProfile()));
         body.addView(note(
-                "Cloud-profile путь меняет только vfhudbyte0 и profiletransferbyte3/9 "
-                        + "в предварительно считанном полном сообщении. Исходный blob сохраняется "
-                        + "до первой записи и восстанавливается побайтно."));
+                "Сохранение 29892 не используется во время поиска: связь этого общего сигнала "
+                        + "с HUD-mask не доказана. Нажимайте его только после повторного "
+                        + "визуального подтверждения найденного Fxx."));
         return scroll(body);
     }
 
@@ -805,6 +840,20 @@ public final class HudLabActivity extends Activity implements HudLabController.L
     private void nextVisualIndex() {
         visualIndex = (visualIndex + 1) % 20;
         updateVisualIndex();
+    }
+
+    private void previousHeldProbe() {
+        heldProbeIndex = (heldProbeIndex + 19) % 20;
+        updateHeldProbe();
+    }
+
+    private void nextHeldProbe() {
+        heldProbeIndex = (heldProbeIndex + 1) % 20;
+        updateHeldProbe();
+    }
+
+    private void updateHeldProbe() {
+        heldProbeIndexView.setText(String.format(Locale.ROOT, "F%02d", heldProbeIndex));
     }
 
     private void updateVisualIndex() {

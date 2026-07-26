@@ -15,6 +15,7 @@ import com.ecarx.xui.adaptapi.ECarXCarProxy;
 import com.ecarx.xui.adaptapi.FunctionStatus;
 import com.ecarx.xui.adaptapi.car.base.CarFunction;
 import com.ecarx.xui.adaptapi.car.vehicle.IHUD;
+import com.google.protobuf.nano.MessageNano;
 
 import java.lang.reflect.Field;
 import java.text.SimpleDateFormat;
@@ -53,7 +54,7 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     private static final int ZONE_ALL = Integer.MIN_VALUE;
     private static final long REFRESH_MS = 1_200L;
     private static final long PROFILE_VISUAL_SCAN_STEP_MS = 3_600L;
-    private static final int MAX_LOG_LINES = 70;
+    private static final int MAX_LOG_LINES = 180;
     private static final String PREFS = "hud_lab_backups";
     private static final String BACKUP_PROFILE_TRANSFER_MODE = "profile_transfer_mode";
     private static final String BACKUP_VEHICLE_MODEL = "vehicle_model";
@@ -410,6 +411,86 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         });
     }
 
+    /**
+     * Applies one complete F00-F19 probe and leaves it active until another explicit command.
+     *
+     * <p>The all-profiles PEN is never added implicitly; it is used only when the caller
+     * explicitly selected the ProfAll action in the UI.</p>
+     */
+    void applyHeldVisualProbe(int mode, int index, boolean oneOff, boolean allProfiles) {
+        if (index < 0 || index >= visualFunctions.length) return;
+        worker.post(() -> {
+            if (closed) return;
+            stopProfileVisualScanInternal();
+            try {
+                ECarXCarProfiletransferManager manager = requireProfileTransfer();
+                rememberIntOnce(BACKUP_PROFILE_TRANSFER_MODE, readProfileTransferMode());
+                ApiResult modeWrite = manager.CB_HudDispModSetgReq(mode);
+                SystemClock.sleep(220L);
+
+                profileVisualScanMode = mode;
+                profileVisualScanOneOff = oneOff;
+                profileVisualScanPen = allProfiles ? 15 : activePen();
+                profileVisualScanAppliedIndex = index;
+                visualPen = profileVisualScanPen;
+
+                // First establish a known complete baseline, then send the complete probe vector.
+                Arrays.fill(visualFunctions, ON);
+                sendVisualMask();
+                SystemClock.sleep(100L);
+                Arrays.fill(visualFunctions, oneOff ? ON : OFF);
+                visualFunctions[index] = oneOff ? OFF : ON;
+                sendVisualMask();
+
+                String held = "01+MASK РУЧНОЙ: mode=" + modeName(mode)
+                        + ", PEN=" + profileVisualScanPen
+                        + ", " + scanPatternName(oneOff)
+                        + ", держим F" + twoDigits(index)
+                        + "=" + (oneOff ? OFF : ON)
+                        + ", CB33278=" + result(modeWrite);
+                lastCommand = held;
+                appendLog(held);
+            } catch (Throwable failure) {
+                lastCommand = "01+MASK РУЧНОЙ: ERROR " + shortFailure(failure);
+                appendLog(lastCommand);
+            }
+            publishSnapshot();
+        });
+    }
+
+    /** Applies and holds a complete all-zero or all-one baseline for one explicit PEN scope. */
+    void applyHeldVisualBaseline(int mode, int value, boolean allProfiles) {
+        int normalized = value == 0 ? OFF : ON;
+        worker.post(() -> {
+            if (closed) return;
+            stopProfileVisualScanInternal();
+            try {
+                ECarXCarProfiletransferManager manager = requireProfileTransfer();
+                rememberIntOnce(BACKUP_PROFILE_TRANSFER_MODE, readProfileTransferMode());
+                ApiResult modeWrite = manager.CB_HudDispModSetgReq(mode);
+                SystemClock.sleep(220L);
+
+                profileVisualScanMode = mode;
+                profileVisualScanPen = allProfiles ? 15 : activePen();
+                profileVisualScanAppliedIndex = -1;
+                visualPen = profileVisualScanPen;
+                Arrays.fill(visualFunctions, normalized);
+                sendVisualMask();
+
+                String held = "01+MASK BASELINE: mode=" + modeName(mode)
+                        + ", PEN=" + profileVisualScanPen
+                        + ", все F=" + normalized
+                        + ", CB33278=" + result(modeWrite);
+                lastCommand = held;
+                appendLog(held);
+            } catch (Throwable failure) {
+                lastCommand = "01+MASK BASELINE: ERROR " + shortFailure(failure);
+                appendLog(lastCommand);
+            }
+            publishSnapshot();
+        });
+    }
+
     void markProfileVisualScanFound() {
         worker.post(() -> {
             if (closed) return;
@@ -731,7 +812,10 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             field.setInt(request, visualFunctions[index]);
         }
         request.hudVisFctSetgReqPen = visualPen;
+        byte[] protobuf = MessageNano.toByteArray(request);
         requireSignals().setHudVisFctSetgReq(request);
+        appendLog("TX signal30816 / VHAL 0x21707860 · "
+                + visualMaskDescription() + " · protobuf=" + hex(protobuf));
     }
 
     private void publishSnapshot() {
@@ -868,12 +952,38 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     }
 
     private int activePen() throws Exception {
-        int pen = requireSignals().getProfPenSts1();
-        if (pen < 1 || pen > 13) {
-            throw new IllegalStateException("PEN=" + pen
-                    + " не является активным профилем (ожидалось 1…13)");
+        int signalPen = -1;
+        Throwable signalFailure = null;
+        try {
+            signalPen = requireSignals().getProfPenSts1();
+        } catch (Throwable failure) {
+            signalFailure = failure;
         }
-        return pen;
+        if (isProfilePen(signalPen)) return signalPen;
+
+        int profilePen;
+        try {
+            profilePen = activeProfile();
+        } catch (Throwable profileFailure) {
+            String signalDetail = signalFailure == null
+                    ? Integer.toString(signalPen)
+                    : shortFailure(signalFailure);
+            throw new IllegalStateException("активный PEN недоступен: ProfPenSts1="
+                    + signalDetail + ", PA33845=" + shortFailure(profileFailure),
+                    profileFailure);
+        }
+        if (isProfilePen(profilePen)) return profilePen;
+
+        String signalDetail = signalFailure == null
+                ? Integer.toString(signalPen)
+                : shortFailure(signalFailure);
+        throw new IllegalStateException("активный PEN недоступен: ProfPenSts1="
+                + signalDetail + ", PA33845=" + profilePen
+                + " (ожидалось 1…13)");
+    }
+
+    private static boolean isProfilePen(int value) {
+        return value >= 1 && value <= 13;
     }
 
     private int activeProfile() throws Exception {
@@ -885,7 +995,21 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
 
     private String readActivePen() {
         try {
-            return Integer.toString(activePen());
+            int signalPen;
+            try {
+                signalPen = requireSignals().getProfPenSts1();
+            } catch (Throwable failure) {
+                int profilePen = activeProfile();
+                return profilePen + " (PA33845 fallback; ProfPenSts1="
+                        + shortFailure(failure) + ")";
+            }
+            if (isProfilePen(signalPen)) return signalPen + " (ProfPenSts1)";
+            int profilePen = activeProfile();
+            if (isProfilePen(profilePen)) {
+                return profilePen + " (PA33845 fallback; ProfPenSts1="
+                        + signalPen + ")";
+            }
+            return "ERROR ProfPenSts1=" + signalPen + ", PA33845=" + profilePen;
         } catch (Throwable failure) {
             return "ERROR " + shortFailure(failure);
         }
@@ -1106,6 +1230,14 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         String message = failure.getMessage();
         return message == null || message.trim().isEmpty()
                 ? type : type + ": " + message.trim();
+    }
+
+    private static String hex(byte[] value) {
+        StringBuilder out = new StringBuilder(value.length * 2);
+        for (byte item : value) {
+            out.append(String.format(Locale.ROOT, "%02x", item & 0xff));
+        }
+        return out.toString();
     }
 
     private static final class HudDisplayFunction {
