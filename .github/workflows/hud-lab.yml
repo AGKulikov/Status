@@ -95,7 +95,7 @@ jobs:
           BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
           echo "$BADGING"
           echo "$BADGING" | grep -F \
-            "package: name='dezz.status.hudlab' versionCode='2' versionName='0.2'"
+            "package: name='dezz.status.hudlab' versionCode='3' versionName='0.3'"
           echo "$BADGING" | grep -F "sdkVersion:'28'"
           echo "$BADGING" | grep -F "targetSdkVersion:'28'"
           if echo "$BADGING" | grep -Fq "application-debuggable"; then
@@ -118,7 +118,7 @@ jobs:
       - name: Upload signed HUD Lab APK
         uses: actions/upload-artifact@v4
         with:
-          name: hud-lab-0.2-release-candidate
+          name: hud-lab-0.3-release-candidate
           path: |
             hudlab/build/outputs/apk/release/*.apk
             hudlab/build/outputs/apk/release/*.sha256
