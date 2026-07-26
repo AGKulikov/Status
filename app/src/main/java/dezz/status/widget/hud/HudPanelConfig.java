@@ -15,7 +15,7 @@ import java.util.Set;
 
 /** Versioned, exportable HUD layout and presentation settings. */
 public final class HudPanelConfig {
-    public static final int SCHEMA_VERSION = 3;
+    public static final int SCHEMA_VERSION = 4;
     public static final int MAX_ELEMENTS = 512;
     public static final int MAX_JSON_CHARS = 1_048_576;
 
@@ -43,11 +43,11 @@ public final class HudPanelConfig {
     public boolean freeMovement;
     @NonNull public String backgroundMode = "TRANSPARENT";
     /**
-     * Paints an opaque black mask inside the verified HUD viewport before drawing widgets.
+     * Paints an opaque black mask below the custom widgets.
      *
-     * <p>Display 2 is a composite 1920x1080 surface shared by the cluster, DIM and HUD. The mask
-     * must therefore remain clipped to {@link HudViewportPolicy}; a full-display black surface
-     * would also blank the other OEM displays.</p>
+     * <p>The editable panel stays 728x190. The direct SurfaceFlinger bridge uses the separately
+     * dump-verified 808x266 stock HomeActivity footprint so the car and speed are covered without
+     * blanking the rest of the 1920x1080 composite display.</p>
      */
     public boolean maskStockHud = true;
     public boolean snowMode;
@@ -214,9 +214,10 @@ public final class HudPanelConfig {
             out.showGrid = source.optBoolean("showGrid", true);
             out.freeMovement = source.optBoolean("freeMovement", false);
             out.backgroundMode = source.optString("backgroundMode", "TRANSPARENT");
-            // Old layouts predate the OEM-HUD mask. Enable it during migration so the stock
-            // arrows and signs do not remain visible below the custom panel.
-            out.maskStockHud = source.optBoolean("maskStockHud", true);
+            // Schema 4 splits the 728x190 widget plane from the larger dump-verified stock-HUD
+            // mask. Force the corrected mask on once during migration; after the migrated
+            // document is saved the user can still disable it explicitly.
+            out.maskStockHud = schema < 4 || source.optBoolean("maskStockHud", true);
             out.snowMode = source.optBoolean("snowMode", false);
             out.globalBrightness = source.optInt("globalBrightness", 100);
             out.globalTextColor = source.optString("globalTextColor", "#FFFFFFFF");
