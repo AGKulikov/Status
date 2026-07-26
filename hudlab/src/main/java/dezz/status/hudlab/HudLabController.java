@@ -1082,6 +1082,12 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
                 return "2 AR";
             case 3:
                 return "3 Simple";
+            case 4:
+                return "4 Rerouting";
+            case 5:
+                return "5 TunnelEnter";
+            case 6:
+                return "6 TunnelEnd";
             default:
                 return Integer.toString(mode);
         }
