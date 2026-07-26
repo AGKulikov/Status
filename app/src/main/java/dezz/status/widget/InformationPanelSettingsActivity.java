@@ -313,40 +313,59 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
         toggles.addView(showLabel);
         form.addView(toggles);
 
+        LinearLayout actions = new LinearLayout(this);
+        actions.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        actions.setPadding(dp(8), dp(8), dp(8), dp(8));
+        MaterialButton cancel = button("Отмена");
+        MaterialButton save = button("Сохранить");
+        LinearLayout.LayoutParams cancelParams =
+                new LinearLayout.LayoutParams(wrap(), dp(52));
+        cancelParams.leftMargin = dp(8);
+        actions.addView(cancel, cancelParams);
+        LinearLayout.LayoutParams saveParams =
+                new LinearLayout.LayoutParams(wrap(), dp(52));
+        saveParams.leftMargin = dp(8);
+        actions.addView(save, saveParams);
+
+        LinearLayout dialogBody = column();
+        int screenHeight = getResources().getDisplayMetrics().heightPixels;
+        int formHeight = Math.max(dp(180), Math.min(dp(620), screenHeight - dp(240)));
+        scroll.setFillViewport(true);
+        dialogBody.addView(scroll, new LinearLayout.LayoutParams(match(), formHeight));
+        dialogBody.addView(actions, new LinearLayout.LayoutParams(match(), dp(68)));
+
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(item.sourceLabel)
                 .setMessage("Источник доступен только для чтения: нажатие на статус не отправляет "
                         + "команду.")
-                .setView(scroll)
-                .setPositiveButton("Применить", null)
-                .setNegativeButton(android.R.string.cancel, null)
+                .setView(dialogBody)
                 .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(v -> {
-                    try {
-                        item.labelOverride = label.getText().toString().trim();
-                        item.unitOverride = unit.getText().toString().trim();
-                        item.valueColor = valueColor[0];
-                        item.labelColor = labelColor[0];
-                        item.iconColor = iconColor[0];
-                        item.iconKey = iconKeys.get(icon.getSelectedItemPosition());
-                        item.visibility = InformationPanelConfig.Visibility.values()[
-                                visibility.getSelectedItemPosition()];
-                        item.column = positive(column, "Столбец") - 1;
-                        item.row = positive(row, "Строка") - 1;
-                        item.columnSpan = positive(columnSpan, "Ширина");
-                        item.rowSpan = positive(rowSpan, "Высота");
-                        item.scalePercent = InformationPanelConfig.MIN_SCALE
-                                + scale.getProgress();
-                        item.enabled = enabled.isChecked();
-                        item.showIcon = showIcon.isChecked();
-                        item.showLabel = showLabel.isChecked();
-                        changed(true);
-                        dialog.dismiss();
-                    } catch (IllegalArgumentException error) {
-                        Toast.makeText(this, error.getMessage(), Toast.LENGTH_SHORT).show();
-                    }
-                }));
+        cancel.setOnClickListener(v -> dialog.dismiss());
+        save.setOnClickListener(v -> {
+            try {
+                item.labelOverride = label.getText().toString().trim();
+                item.unitOverride = unit.getText().toString().trim();
+                item.valueColor = valueColor[0];
+                item.labelColor = labelColor[0];
+                item.iconColor = iconColor[0];
+                item.iconKey = iconKeys.get(icon.getSelectedItemPosition());
+                item.visibility = InformationPanelConfig.Visibility.values()[
+                        visibility.getSelectedItemPosition()];
+                item.column = positive(column, "Столбец") - 1;
+                item.row = positive(row, "Строка") - 1;
+                item.columnSpan = positive(columnSpan, "Ширина");
+                item.rowSpan = positive(rowSpan, "Высота");
+                item.scalePercent = InformationPanelConfig.MIN_SCALE
+                        + scale.getProgress();
+                item.enabled = enabled.isChecked();
+                item.showIcon = showIcon.isChecked();
+                item.showLabel = showLabel.isChecked();
+                changed(true);
+                dialog.dismiss();
+            } catch (IllegalArgumentException error) {
+                Toast.makeText(this, error.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
         dialog.show();
     }
 
