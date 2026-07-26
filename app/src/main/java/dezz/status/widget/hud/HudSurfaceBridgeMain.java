@@ -40,7 +40,7 @@ public final class HudSurfaceBridgeMain {
     private static final int FRAME_OK = 1;
     private static final int STOP = -1;
     private static final int MAX_FRAME_BYTES = 4 * 1024 * 1024;
-    private static final int ACCEPT_TIMEOUT_MS = 5_000;
+    private static final int ACCEPT_TIMEOUT_MS = 15_000;
     private static final int FRAME_TIMEOUT_MS = 5_000;
     private static final int SURFACE_LAYER = Integer.MAX_VALUE - 1;
 
