@@ -107,7 +107,9 @@ public final class PhoneConnectorSettingsContractTest {
         String source = javaSource("PhoneConnectorSettingsActivity.java");
 
         assertTrue(source.contains("SettingsBackNavigation.install(this, screen)"));
-        assertTrue(source.contains("if (service != null) service.applyPreferences()"));
+        assertTrue(source.contains("if (service != null) {"));
+        assertTrue(source.contains("service.applyPreferences();"));
+        assertTrue(source.contains("WidgetServiceStarter.startIfNeeded(this);"));
         assertTrue(source.contains("chooseSprutAccessory()"));
         assertTrue(source.contains("chooseSprutService("));
         assertTrue(source.contains("chooseSprutCharacteristic("));
