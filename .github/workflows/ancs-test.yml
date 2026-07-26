@@ -1,0 +1,42 @@
+name: Build standalone KX11 ANCS Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/ancs-test-app
+    paths:
+      - "ancs-test/**"
+      - ".github/workflows/ancs-test.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Build and test standalone APK
+        run: |
+          chmod +x ./gradlew
+          ./gradlew -p ancs-test clean testDebugUnitTest assembleDebug --stacktrace
+
+      - name: Rename APK
+        run: cp ancs-test/app/build/outputs/apk/debug/app-debug.apk KX11-ANCS-Test-v1.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KX11-ANCS-Test-v1
+          path: KX11-ANCS-Test-v1.apk
+          if-no-files-found: error
