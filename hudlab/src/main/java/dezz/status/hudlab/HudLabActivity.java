@@ -368,6 +368,20 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                         + "зафиксированы в журнале. Если первый перебор закончился без эффекта, "
                         + "запустите инверсный, затем ProfAll."));
 
+        body.addView(sectionTitle("Точные дополнительные состояния из системного ECARX Navi API"));
+        body.addView(note(
+                "Это не случайные значения. Системный NaviInteraction отправляет их в соседний "
+                        + "VFHUD CB33260: 4 — перестроение маршрута, 5 — въезд в тоннель, "
+                        + "6 — выезд из тоннеля. Проверьте HUD после каждого нажатия; обратная "
+                        + "связь отображается как PA33894."));
+        body.addView(commandRow(AMBER,
+                new String[]{"4 REROUTING", "5 TUNNEL ENTER", "6 TUNNEL END"},
+                new Runnable[]{
+                        () -> controller.setVfDisplayMode(4),
+                        () -> controller.setVfDisplayMode(5),
+                        () -> controller.setVfDisplayMode(6)
+                }));
+
         body.addView(sectionTitle("Ручная проверка и прежние диагностические пути"));
         body.addView(label("01 · ProfileTransfer HUD mode · CB33278 / PA33937"));
         body.addView(commandRow(BLUE,
