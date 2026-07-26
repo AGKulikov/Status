@@ -123,7 +123,8 @@ public final class HudLabActivity extends Activity implements HudLabController.L
 
         TextView warning = text(
                 "Экспериментальный стенд: используйте только на стоящей машине. "
-                        + "Автоматических команд, перезагрузки HUD и остановки системных приложений нет.",
+                        + "Команды выполняются только по нажатию. Сначала пробуйте transient-варианты; "
+                        + "сохранение профиля и ProfileTransfer apply вынесены в отдельные кнопки.",
                 14, Color.rgb(255, 199, 98), false);
         warning.setPadding(dp(10), dp(5), dp(10), dp(8));
         root.addView(warning);
@@ -132,6 +133,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
 
         FrameLayout pages = new FrameLayout(this);
+        addTabPage(pages, buildNewPathsTab());
         addTabPage(pages, buildSystemDumpTab());
         addTabPage(pages, buildElementsTab());
         addTabPage(pages, buildMaskTab());
@@ -152,7 +154,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         close.setOnClickListener(view -> finish());
         header.addView(close, fixedButton(dp(130)));
 
-        TextView title = text("HUD Lab 0.5", 23, TEXT, true);
+        TextView title = text("HUD Lab 0.10", 23, TEXT, true);
         title.setPadding(dp(16), 0, dp(18), 0);
         header.addView(title);
 
@@ -178,11 +180,12 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
         tabs.setPadding(0, 0, 0, dp(5));
-        addTabButton(tabs, "СИСТЕМНЫЙ ДАМП", 0);
-        addTabButton(tabs, "ФЛАГИ 0.2", 1);
-        addTabButton(tabs, "VISUAL MASK", 2);
-        addTabButton(tabs, "КАНАЛЫ HUD", 3);
-        addTabButton(tabs, "СТАТУС", 4);
+        addTabButton(tabs, "10 НОВЫХ ПУТЕЙ", 0);
+        addTabButton(tabs, "СИСТЕМНЫЙ ДАМП", 1);
+        addTabButton(tabs, "DISPLAY_*", 2);
+        addTabButton(tabs, "MASK", 3);
+        addTabButton(tabs, "КАНАЛЫ", 4);
+        addTabButton(tabs, "СТАТУС", 5);
         return tabs;
     }
 
@@ -308,6 +311,143 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         if (clipboard == null) return;
         clipboard.setPrimaryClip(ClipData.newPlainText("HUD Lab dump", lastDumpPath));
         Toast.makeText(this, "Путь скопирован", Toast.LENGTH_SHORT).show();
+    }
+
+    private View buildNewPathsTab() {
+        LinearLayout body = columnBody();
+        body.addView(sectionTitle("10 независимых путей из вашего системного дампа"));
+        body.addView(note(
+                "Приоритет: 04 → 05 → 06 → 10 → 03 → остальные. "
+                        + "В `com.ecarx.hud` нет графики машинки и скорости: их рисует "
+                        + "нижний DIM/native-слой. Поэтому здесь только новые CEM, ProfileTransfer "
+                        + "и Driver-HMI каналы. После каждой проверки можно нажать общий откат."));
+
+        body.addView(label("01 · ProfileTransfer HUD mode · CB33278 / PA33937"));
+        body.addView(commandRow(BLUE,
+                new String[]{"0 GUIDE", "1 DRIVE", "2 AR", "3 SIMPLE", "ОТКАТ"},
+                new Runnable[]{
+                        () -> controller.setProfileTransferMode(0),
+                        () -> controller.setProfileTransferMode(1),
+                        () -> controller.setProfileTransferMode(2),
+                        () -> controller.setProfileTransferMode(3),
+                        () -> controller.restoreProfileTransferMode()
+                }));
+
+        body.addView(label("02 · CEM HUD mode с реальным активным PEN · signal 30814"));
+        body.addView(commandRow(BLUE,
+                new String[]{"0 GUIDE", "1 DRIVE", "2 AR", "3 SIMPLE"},
+                new Runnable[]{
+                        () -> controller.setActiveProfileDimMode(0),
+                        () -> controller.setActiveProfileDimMode(1),
+                        () -> controller.setActiveProfileDimMode(2),
+                        () -> controller.setActiveProfileDimMode(3)
+                }));
+
+        body.addView(label("03 · Visual mask с реальным активным PEN · signal 30816"));
+        body.addView(commandPair("ВСЕ F00–F19 = 0", RED,
+                () -> controller.setActiveProfileVisualMask(true),
+                "ВСЕ F00–F19 = 1", GREEN,
+                () -> controller.setActiveProfileVisualMask(false)));
+
+        body.addView(label("04 · Driver HMI background · signal 30805 · значения 0…5"));
+        body.addView(commandRow(AMBER,
+                new String[]{"BG 0", "BG 1", "BG 2", "BG 3", "BG 4", "BG 5"},
+                new Runnable[]{
+                        () -> controller.setDriverHmiBackground(0),
+                        () -> controller.setDriverHmiBackground(1),
+                        () -> controller.setDriverHmiBackground(2),
+                        () -> controller.setDriverHmiBackground(3),
+                        () -> controller.setDriverHmiBackground(4),
+                        () -> controller.setDriverHmiBackground(5)
+                }));
+
+        body.addView(label("05 · Driver HMI user interface · signal 30807 · default/variants 1…9"));
+        body.addView(commandRow(AMBER,
+                new String[]{"UI 0", "UI 1", "UI 2", "UI 3", "UI 4"},
+                new Runnable[]{
+                        () -> controller.setDriverHmiInterface(0),
+                        () -> controller.setDriverHmiInterface(1),
+                        () -> controller.setDriverHmiInterface(2),
+                        () -> controller.setDriverHmiInterface(3),
+                        () -> controller.setDriverHmiInterface(4)
+                }));
+        body.addView(commandRow(AMBER,
+                new String[]{"UI 5", "UI 6", "UI 7", "UI 8", "UI 9"},
+                new Runnable[]{
+                        () -> controller.setDriverHmiInterface(5),
+                        () -> controller.setDriverHmiInterface(6),
+                        () -> controller.setDriverHmiInterface(7),
+                        () -> controller.setDriverHmiInterface(8),
+                        () -> controller.setDriverHmiInterface(9)
+                }));
+
+        body.addView(label("06 · DIM information layer · signal 30792"));
+        body.addView(commandRow(AMBER,
+                new String[]{"0 INFO OFF", "1 INFO ON", "2 PARTIAL", "3 WELCOME"},
+                new Runnable[]{
+                        () -> controller.setMultimediaInformationMode(0),
+                        () -> controller.setMultimediaInformationMode(1),
+                        () -> controller.setMultimediaInformationMode(2),
+                        () -> controller.setMultimediaInformationMode(3)
+                }));
+
+        body.addView(label("07 · Individual DIM theme · signal 30785"));
+        body.addView(commandPair("INDIVIDUAL OFF", RED,
+                () -> controller.setIndividualTheme(false),
+                "INDIVIDUAL ON", GREEN,
+                () -> controller.setIndividualTheme(true)));
+
+        body.addView(label("08 · HMI theme renderer · signal 30787"));
+        body.addView(commandRow(BLUE,
+                new String[]{"0 NIGHT", "1 DAY", "2 AUTO", "3 RESERVED"},
+                new Runnable[]{
+                        () -> controller.setHmiThemeMode(0),
+                        () -> controller.setHmiThemeMode(1),
+                        () -> controller.setHmiThemeMode(2),
+                        () -> controller.setHmiThemeMode(3)
+                }));
+
+        body.addView(label("09 · Driver display template · signal 30803 / feedback 30873"));
+        body.addView(commandRow(BLUE,
+                new String[]{"0 COMFORT", "1 ECO", "2 DYNAMIC"},
+                new Runnable[]{
+                        () -> controller.setDriverDisplayTheme(0),
+                        () -> controller.setDriverDisplayTheme(1),
+                        () -> controller.setDriverDisplayTheme(2)
+                }));
+
+        body.addView(label("10 · Vehicle model clear · CB33284 / PA33943"));
+        body.addView(commandRow(RED,
+                new String[]{"CLEAR 0", "CLEAR 1", "ТОЧНЫЙ ОТКАТ"},
+                new Runnable[]{
+                        () -> controller.setVehicleModelClear(false),
+                        () -> controller.setVehicleModelClear(true),
+                        () -> controller.restoreVehicleModelClear()
+                }));
+
+        body.addView(sectionTitle("Откат, применение и дополнительный профильный путь"));
+        body.addView(commandPair("ПЕРЕЗАГРУЗИТЬ АКТИВНЫЙ ПРОФИЛЬ", GREEN,
+                () -> controller.reloadActiveProfile(),
+                "ПРИМЕНИТЬ PROFILETRANSFER", AMBER,
+                () -> controller.pulseProfileTransferApply()));
+        body.addView(note(
+                "04/05/09 отправляются transient и сами в память не записываются. "
+                        + "«Перезагрузить активный профиль» возвращает сохранённую штатную "
+                        + "компоновку. Сохранение найденного варианта выполняйте только после "
+                        + "визуального подтверждения на HUD."));
+        body.addView(singleCommand("СОХРАНИТЬ ТЕКУЩИЙ НАЙДЕННЫЙ ВАРИАНТ (29892 0→1)",
+                AMBER, () -> controller.persistCurrentProfileSettings()));
+
+        body.addView(label("Дополнительно · полный cloud-profile RMW с точным backup"));
+        body.addView(commandPair("ПРОБА HUD-БАЙТОВ 0/3/9", RED,
+                () -> controller.setCloudProfileHudCandidate(),
+                "ВОССТАНОВИТЬ ИСХОДНЫЙ BLOB", GREEN,
+                () -> controller.restoreCloudProfile()));
+        body.addView(note(
+                "Cloud-profile путь меняет только vfhudbyte0 и profiletransferbyte3/9 "
+                        + "в предварительно считанном полном сообщении. Исходный blob сохраняется "
+                        + "до первой записи и восстанавливается побайтно."));
+        return scroll(body);
     }
 
     private View buildElementsTab() {
@@ -531,6 +671,24 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         rightParams.leftMargin = dp(4);
         row.addView(left, leftParams);
         row.addView(right, rightParams);
+        return row;
+    }
+
+    private View commandRow(int color, String[] labels, Runnable[] actions) {
+        if (labels.length != actions.length || labels.length == 0) {
+            throw new IllegalArgumentException("labels/actions");
+        }
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, 0, 0, dp(7));
+        for (int index = 0; index < labels.length; index++) {
+            Button button = commandButton(labels[index], color, actions[index]);
+            LinearLayout.LayoutParams params =
+                    new LinearLayout.LayoutParams(0, dp(48), 1f);
+            if (index > 0) params.leftMargin = dp(4);
+            if (index + 1 < labels.length) params.rightMargin = dp(4);
+            row.addView(button, params);
+        }
         return row;
     }
 
