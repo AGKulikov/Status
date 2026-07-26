@@ -48,6 +48,24 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     private static final int ZONE_ALL = Integer.MIN_VALUE;
     private static final long REFRESH_MS = 1_200L;
     private static final int MAX_LOG_LINES = 70;
+    private static final HudDisplayFunction DISPLAY_SAFETY =
+            new HudDisplayFunction("SAFETY", IHUD.SETTING_FUNC_HUD_DISPLAY_SAFETY);
+    private static final HudDisplayFunction DISPLAY_MEDIA =
+            new HudDisplayFunction("MEDIA", IHUD.SETTING_FUNC_HUD_DISPLAY_MEIDA);
+    private static final HudDisplayFunction DISPLAY_NAVIGATION =
+            new HudDisplayFunction("NAVI", IHUD.SETTING_FUNC_HUD_DISPLAY_NAVI);
+    private static final HudDisplayFunction DISPLAY_BT_PHONE =
+            new HudDisplayFunction("BTPHONE", IHUD.SETTING_FUNC_HUD_DISPLAY_BTPHONE);
+    private static final HudDisplayFunction DISPLAY_DRIVE_ENVIRONMENT =
+            new HudDisplayFunction("DRIVE_ENVIRONMENT",
+                    IHUD.SETTING_FUNC_HUD_DISPLAY_DRIVE_ENVIRONMENT);
+    private static final HudDisplayFunction[] DISPLAY_FUNCTIONS = {
+            DISPLAY_DRIVE_ENVIRONMENT,
+            DISPLAY_SAFETY,
+            DISPLAY_MEDIA,
+            DISPLAY_NAVIGATION,
+            DISPLAY_BT_PHONE
+    };
 
     private final Context appContext;
     private final Listener listener;
@@ -130,6 +148,35 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
 
     void refreshNow() {
         worker.post(this::publishSnapshot);
+    }
+
+    void setDisplayDriveEnvironment(boolean enabled) {
+        setDisplayFunction(DISPLAY_DRIVE_ENVIRONMENT, enabled);
+    }
+
+    void setDisplaySafety(boolean enabled) {
+        setDisplayFunction(DISPLAY_SAFETY, enabled);
+    }
+
+    void setDisplayMedia(boolean enabled) {
+        setDisplayFunction(DISPLAY_MEDIA, enabled);
+    }
+
+    void setDisplayNavigation(boolean enabled) {
+        setDisplayFunction(DISPLAY_NAVIGATION, enabled);
+    }
+
+    void setDisplayBtPhone(boolean enabled) {
+        setDisplayFunction(DISPLAY_BT_PHONE, enabled);
+    }
+
+    void setPrimaryDisplayElements(boolean enabled) {
+        setDisplayFunctions("DRIVE_ENVIRONMENT + SAFETY", enabled,
+                DISPLAY_DRIVE_ENVIRONMENT, DISPLAY_SAFETY);
+    }
+
+    void restoreAllDisplayElements() {
+        setDisplayFunctions("все пять DISPLAY_*", true, DISPLAY_FUNCTIONS);
     }
 
     void setSettingsActive(boolean enabled) {
@@ -217,6 +264,23 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
 
     String currentVisualMask() {
         return visualMaskDescription();
+    }
+
+    private void setDisplayFunction(HudDisplayFunction function, boolean enabled) {
+        setDisplayFunctions(function.label, enabled, function);
+    }
+
+    private void setDisplayFunctions(String label, boolean enabled,
+                                     HudDisplayFunction... functions) {
+        runCommand("HUD DISPLAY " + label + "=" + value(enabled), () -> {
+            StringBuilder result = new StringBuilder();
+            for (HudDisplayFunction function : functions) {
+                if (result.length() > 0) result.append(", ");
+                result.append(function.label).append('=')
+                        .append(setFunctionValue(function.functionId, enabled));
+            }
+            return "accepted[" + result + ']';
+        });
     }
 
     @Override
@@ -320,6 +384,14 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         out.append("  HUD_AR_ENGINE 0x").append(Integer.toHexString(IHUD.SETTING_FUNC_HUD_AR_ENGINE))
                 .append(": ").append(readFunction(IHUD.SETTING_FUNC_HUD_AR_ENGINE)).append("\n\n");
 
+        out.append("Selective HUD content (новый путь)\n");
+        for (HudDisplayFunction function : DISPLAY_FUNCTIONS) {
+            out.append("  ").append(function.label).append(" 0x")
+                    .append(Integer.toHexString(function.functionId)).append(": ")
+                    .append(readFunction(function.functionId)).append('\n');
+        }
+        out.append('\n');
+
         out.append("VFHUD public attributes\n");
         out.append("  PA_VF_HUD_ActvSts: ").append(readPaHudActive()).append('\n');
         out.append("  PA_VF_HUD_ARActvSts: ").append(readPaArActive()).append('\n');
@@ -349,12 +421,21 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         CarFunction functions = carFunction;
         if (functions == null) return "—";
         try {
-            FunctionStatus status = functions.isFunctionSupported(functionId, ZONE_ALL);
+            FunctionStatus status;
+            try {
+                status = functions.isFunctionSupported(functionId, ZONE_ALL);
+            } catch (Throwable zonedFailure) {
+                status = functions.isFunctionSupported(functionId);
+            }
             String values;
             try {
                 values = Arrays.toString(functions.getSupportedFunctionValue(functionId, ZONE_ALL));
-            } catch (Throwable ignored) {
-                values = "?";
+            } catch (Throwable zonedFailure) {
+                try {
+                    values = Arrays.toString(functions.getSupportedFunctionValue(functionId));
+                } catch (Throwable ignored) {
+                    values = "?";
+                }
             }
             String current;
             try {
@@ -502,5 +583,15 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         String message = failure.getMessage();
         return message == null || message.trim().isEmpty()
                 ? type : type + ": " + message.trim();
+    }
+
+    private static final class HudDisplayFunction {
+        final String label;
+        final int functionId;
+
+        HudDisplayFunction(String label, int functionId) {
+            this.label = label;
+            this.functionId = functionId;
+        }
     }
 }
