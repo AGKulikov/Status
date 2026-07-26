@@ -343,10 +343,12 @@ final class HudSystemSurfaceWindow {
         } catch (Throwable ignored) {
             // Numeric Display ID remains authoritative; the verified ECARX mapping is below.
         }
-        // The supplied SurfaceFlinger dump maps Android displayId=2 to layerStack=1. The fallback
-        // is deliberately device-specific instead of guessing that display ID equals layer stack.
+        // Hidden-API reflection is blocked on the user's Android 9 firmware. The supplied ECARX
+        // dump maps Android displayId=2 (local:2) to layerStack=2. Keep that hardware mapping
+        // explicit so a successful bridge can never render on the neighbouring HDMI stack.
         return display.getDisplayId() == HudViewportPolicy.VERIFIED_DISPLAY_ID
-                ? 1 : Math.max(0, display.getDisplayId());
+                ? HudViewportPolicy.VERIFIED_LAYER_STACK
+                : Math.max(0, display.getDisplayId());
     }
 
     private static int reserveLoopbackPort() {
