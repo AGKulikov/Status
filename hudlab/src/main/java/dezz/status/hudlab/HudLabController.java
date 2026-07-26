@@ -236,8 +236,19 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
 
     void setAllVisualFunctions(int value) {
         int normalized = value == 0 ? OFF : ON;
-        runCommand("HUD visual mask: все=" + normalized, () -> {
+        runCommand("HUD visual mask: PEN=" + visualPen + ", все=" + normalized, () -> {
             Arrays.fill(visualFunctions, normalized);
+            sendVisualMask();
+            return visualMaskDescription();
+        });
+    }
+
+    void setAllVisualFunctionsForPen(int pen, int value) {
+        int normalizedPen = Math.max(0, Math.min(15, pen));
+        int normalizedValue = value == 0 ? OFF : ON;
+        runCommand("HUD visual mask: PEN=" + normalizedPen + ", все=" + normalizedValue, () -> {
+            visualPen = normalizedPen;
+            Arrays.fill(visualFunctions, normalizedValue);
             sendVisualMask();
             return visualMaskDescription();
         });
@@ -254,7 +265,7 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     }
 
     void setVisualPen(int pen) {
-        int normalized = pen == 0 ? OFF : ON;
+        int normalized = Math.max(0, Math.min(15, pen));
         runCommand("HUD visual PEN=" + normalized, () -> {
             visualPen = normalized;
             sendVisualMask();
