@@ -561,10 +561,10 @@ public final class InformationPanelView extends FrameLayout {
                 Intent battery = getContext().registerReceiver(null,
                         new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
                 if (battery == null) return Value.unknown();
-                int status = battery.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
-                if (status < 0) return Value.unknown();
-                boolean charging = status == BatteryManager.BATTERY_STATUS_CHARGING
-                        || status == BatteryManager.BATTERY_STATUS_FULL;
+                int batteryStatus = battery.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+                if (batteryStatus < 0) return Value.unknown();
+                boolean charging = batteryStatus == BatteryManager.BATTERY_STATUS_CHARGING
+                        || batteryStatus == BatteryManager.BATTERY_STATUS_FULL;
                 return Value.known(charging ? "Заряжается" : "Не заряжается", charging);
             }
             case "system.bluetooth":
