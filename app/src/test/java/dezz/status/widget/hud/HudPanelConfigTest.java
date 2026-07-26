@@ -3,6 +3,7 @@ package dezz.status.widget.hud;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -42,5 +43,17 @@ public final class HudPanelConfigTest {
         assertEquals(0, restored.displayWidth);
         assertEquals(0, restored.displayHeight);
         assertFalse(restored.elements.isEmpty());
+    }
+
+    @Test public void schemaThreeForcesCorrectedStockMaskOnOnce() {
+        HudPanelConfig migrated = HudPanelConfig.fromJson(
+                "{\"schema\":3,\"maskStockHud\":false,\"elements\":[]}");
+        assertTrue(migrated.maskStockHud);
+    }
+
+    @Test public void schemaFourPreservesAnExplicitlyDisabledMask() {
+        HudPanelConfig current = HudPanelConfig.fromJson(
+                "{\"schema\":4,\"maskStockHud\":false,\"elements\":[]}");
+        assertFalse(current.maskStockHud);
     }
 }
