@@ -1,25 +1,34 @@
-# KX11 ANCS Test v7
+# KX11 ANCS Test v8
 
 Отдельное диагностическое приложение для ECARX/Geely KX11 на Android 9.
 Основное приложение автомобиля оно не изменяет.
 
-## Что проверяет v7
+## Что проверяет v8
 
 Версия v6 доказала, что iPhone разрешает ANCS и создаёт зашифрованный LE-link,
 но ECARX не может поздно прикрепить Android GATT-клиент к входящему соединению:
 обычный `connectGatt()` завершается `status=133`.
 
-В v7 направление подключения развёрнуто, как в HWGPS/GPSTether:
+Версия v7 доказала, что направление подключения как у HWGPS/GPSTether
+работает: Android сам создаёт BLE-link, а системный ANCS `7905F431…`
+виден уже при первом GATT discovery.
+
+В v8 убрана лишняя блокировка ANCS служебным `SECURE`-чтением:
 
 1. iPhone Helper v4 публикует и рекламирует bootstrap GATT service
    `D2D9E4B0-47F1-4E44-A8BB-A932FD5A2F01`.
 2. Магнитола сканирует только этот UUID.
 3. Магнитола сама вызывает
    `connectGatt(false, callback, BluetoothDevice.TRANSPORT_LE)`.
-4. APK пишет `PAIR` и читает encrypted characteristic
-   `D2D9E4B3-47F1-4E44-A8BB-A932FD5A2F01`.
-5. После `SECURE IPHONE OK` APK повторяет discovery, подписывается на
-   Service Changed `0x2A05` и ищет ANCS `7905F431-B5CE-4E99-A40F-4B1E122D00D0`.
+4. APK сразу ищет ANCS `7905F431-B5CE-4E99-A40F-4B1E122D00D0`.
+5. Если ANCS найден, APK последовательно включает CCCD Data Source и
+   Notification Source. Именно защищённая ANCS-операция запускает системную
+   авторизацию/LE pairing.
+6. Служебные `PAIR`/`SECURE` используются только как fallback, если ANCS
+   отсутствует.
+7. APK логирует `ACTION_PAIRING_REQUEST`, pairing variant/key, код
+   `GATT_AUTH_FAIL (0x89)` и hidden bond failure reason. После успешного
+   `BOND_BONDED` подписка повторяется один раз.
 
 ## Как тестировать
 
@@ -30,8 +39,12 @@
 5. Если появится запрос LE-сопряжения, подтвердите его.
 6. Дождитесь одного из результатов:
    - `ANCS READY` — рабочее направление найдено;
-   - `GPS-LINK OK · ANCS НЕ ОПУБЛИКОВАН` — bootstrap работает, но iOS не
-     публикует ANCS в обратной GAP-роли;
+   - `ANCS AUTH FAIL ... · НУЖЕН LE BOND` — iOS потребовал системное
+     сопряжение;
+   - `ANCS · LE BOND FAILED` — SMP/pairing не завершился; журнал покажет
+     reason;
+   - `GPS-LINK OK · ANCS НЕ ОПУБЛИКОВАН` — fallback-link работает, но ANCS
+     отсутствует;
    - `GPS-STYLE FAILED` — ECARX не создал даже обычный central link.
 7. Только после `ANCS READY` отправьте на iPhone одно новое уведомление.
 
@@ -40,7 +53,7 @@ Bluetooth-соединение iPhone для звонков и музыки мо
 
 ## Защита от зависания
 
-ANCS может сразу прислать список уже активных уведомлений. v7:
+ANCS может сразу прислать список уже активных уведомлений. v8:
 
 - ограничивает очередь запросов атрибутов 24 элементами;
 - обрабатывает их последовательно с паузой;

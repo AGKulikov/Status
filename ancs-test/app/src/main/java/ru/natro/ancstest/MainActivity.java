@@ -101,7 +101,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         statusView.setText(state);
         if (state.contains("READY") || state.contains("ГОТОВО")) {
             statusView.setBackgroundColor(Color.rgb(27, 94, 32));
-        } else if (state.contains("FAILED") || state.contains("NO_")
+        } else if (state.contains("FAIL") || state.contains("NO_")
                 || state.contains("ERROR") || state.contains("НЕ НАЙДЕН")) {
             statusView.setBackgroundColor(Color.rgb(183, 28, 28));
         } else {
@@ -190,7 +190,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         header.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView title = new TextView(this);
-        title.setText("KX11 ANCS TEST v7");
+        title.setText("KX11 ANCS TEST v8");
         title.setTextColor(Color.WHITE);
         title.setTextSize(20);
         title.setTypeface(Typeface.DEFAULT_BOLD);
@@ -228,7 +228,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         addButton(buttons, "Стоп рекламы", view -> diagnostics.stopAdvertising());
         addButton(buttons, "Same-peer attach",
                 view -> diagnostics.connect(null));
-        addButton(buttons, "LE bonding verified", view -> diagnostics.requestBond());
+        addButton(buttons, "Явно связать LE", view -> diagnostics.requestBond());
         addButton(buttons, "Повторить discovery", view -> diagnostics.refreshAndReconnect());
         addButton(buttons, "Отключить", view -> diagnostics.disconnect());
         addButton(buttons, "Копировать лог", view -> copyLog());
@@ -473,9 +473,10 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
                 + " Это GPS-style: Android сканирует UUID и сам вызывает connectGatt.");
         onLog("3) В системных настройках отдельное BLE-подключение создавать не надо;"
                 + " Classic Bluetooth для музыки/звонков можно оставить.");
-        onLog("4) Если появится запрос сопряжения, подтвердите его на обоих устройствах.");
-        onLog("5) Ждите SECURE IPHONE OK, затем один из результатов:"
-                + " ANCS READY либо GPS-LINK OK · ANCS НЕ ОПУБЛИКОВАН.");
+        onLog("4) v8 сначала подписывается прямо на ANCS; служебный SECURE test"
+                + " используется только если сервис 7905… отсутствует.");
+        onLog("5) Если появится системный pairing-запрос, подтвердите его."
+                + " В журнале будут variant и точная причина отказа bond.");
         onLog("6) После ANCS READY отправьте на iPhone одно новое уведомление."
                 + " Очередь ограничена и замедлена, чтобы ECARX UI не зависал.");
     }

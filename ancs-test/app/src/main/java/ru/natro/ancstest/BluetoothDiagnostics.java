@@ -70,6 +70,8 @@ public final class BluetoothDiagnostics {
     private static final int STATUS_INSUFFICIENT_AUTHORIZATION = 8;
     private static final int STATUS_INSUFFICIENT_KEY_SIZE = 12;
     private static final int STATUS_INSUFFICIENT_ENCRYPTION = 15;
+    /** Android/AOSP GATT_AUTH_FAIL (0x89): SMP/encryption could not be completed. */
+    private static final int STATUS_GATT_AUTH_FAIL = 0x89;
     private static final long REQUEST_TIMEOUT_MS = 10_000L;
     private static final long CONNECT_TIMEOUT_MS = 5_000L;
     private static final long GPS_CONNECT_TIMEOUT_MS = 15_000L;
@@ -249,6 +251,11 @@ public final class BluetoothDiagnostics {
     private boolean iphoneSecureReadPending;
     private boolean iphoneSecureConfirmed;
     private boolean iphonePostSecureDiscoveryScheduled;
+    private boolean iphoneAncsSeen;
+    private boolean ancsRetryAfterBond;
+    private boolean ancsAuthorizationFailureSeen;
+    private boolean leBondAttemptObserved;
+    private int ancsBondRetryCount;
     private boolean scanning;
     private boolean advertising;
     private boolean advertisingDesired;
@@ -275,6 +282,7 @@ public final class BluetoothDiagnostics {
     private Runnable secureConnectStart;
     private Runnable nextClientAttempt;
     private Runnable scanTimeout;
+    private Runnable ancsBondRetry;
     private boolean candidatePublishScheduled;
     private long lastCandidatePublishAt;
     private final Runnable candidatePublisher = () -> {
@@ -288,8 +296,10 @@ public final class BluetoothDiagnostics {
         this.listener = listener;
         this.manager = (BluetoothManager) this.context.getSystemService(Context.BLUETOOTH_SERVICE);
         this.adapter = manager == null ? null : manager.getAdapter();
-        this.context.registerReceiver(bondReceiver,
-                new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED));
+        IntentFilter bondFilter =
+                new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+        bondFilter.addAction(BluetoothDevice.ACTION_PAIRING_REQUEST);
+        this.context.registerReceiver(bondReceiver, bondFilter);
     }
 
     public void publishCapabilities() {
@@ -375,7 +385,7 @@ public final class BluetoothDiagnostics {
             scanner.startScan(Collections.singletonList(filter), settings, scanCallback);
             scanning = true;
             state("ИЩУ KX11-IPHONE · GPS-STYLE");
-            log("v7: Android работает BLE central, как HWGPS/GPSTether");
+            log("v8: Android работает BLE central, как HWGPS/GPSTether");
             log("Фильтр scan: service " + DIAGNOSTIC_SERVICE
                     + "; стандартное BLE-подключение в настройках не используется");
             scanTimeout = () -> {
@@ -553,12 +563,11 @@ public final class BluetoothDiagnostics {
     public void requestBond() {
         BluetoothDevice device = getVerifiedPeer();
         if (device == null) {
-            log("Нет verified peer: сначала запишите ASCII PAIR в CONTROL через LightBlue");
+            log("Нет активного verified peer: сначала подключите iPhone BLE");
             return;
         }
         if (safeBondState(device) == BluetoothDevice.BOND_BONDED) {
-            log("Verified peer уже BOND_BONDED. Проверьте SECURE characteristic; "
-                    + "reverse connect до SECURE не запускается");
+            log("Активный iPhone BLE peer уже BOND_BONDED");
         } else {
             requestBond(device);
         }
@@ -653,6 +662,11 @@ public final class BluetoothDiagnostics {
         iphoneSecureReadPending = false;
         iphoneSecureConfirmed = false;
         iphonePostSecureDiscoveryScheduled = false;
+        iphoneAncsSeen = false;
+        ancsRetryAfterBond = false;
+        ancsAuthorizationFailureSeen = false;
+        leBondAttemptObserved = false;
+        ancsBondRetryCount = 0;
         iphoneSecureCharacteristic = null;
         if (clearMode) {
             iphonePeripheralMode = false;
@@ -952,7 +966,7 @@ public final class BluetoothDiagnostics {
                 DIAGNOSTIC_CHARACTERISTIC,
                 BluetoothGattCharacteristic.PROPERTY_READ,
                 BluetoothGattCharacteristic.PERMISSION_READ);
-        information.setValue("KX11 ANCS Test v7".getBytes(StandardCharsets.UTF_8));
+        information.setValue("KX11 ANCS Test v8".getBytes(StandardCharsets.UTF_8));
 
         BluetoothGattCharacteristic control = new BluetoothGattCharacteristic(
                 CONTROL_CHARACTERISTIC,
@@ -1223,38 +1237,59 @@ public final class BluetoothDiagnostics {
             }
         }
 
+        BluetoothGattService ancs = callbackGatt.getService(AncsProtocol.SERVICE);
+        if (ancs != null) {
+            iphoneAncsSeen = iphonePeripheralMode;
+            if (gattReady) {
+                log("ANCS уже READY; повторный discovery проигнорирован");
+                return;
+            }
+            if (descriptorStage != DescriptorStage.NONE) {
+                log("ANCS-подписка уже выполняется: " + descriptorStage);
+                return;
+            }
+            if (iphonePeripheralMode && !iphoneSecureConfirmed) {
+                state("ANCS НАЙДЕН · SECURE TEST ПРОПУЩЕН");
+                log("ANCS 7905… опубликован уже в первом discovery. "
+                        + "PAIR/SECURE D2D…B3 не выполняются");
+            }
+
+            notificationSource = ancs.getCharacteristic(AncsProtocol.NOTIFICATION_SOURCE);
+            dataSource = ancs.getCharacteristic(AncsProtocol.DATA_SOURCE);
+            controlPoint = ancs.getCharacteristic(AncsProtocol.CONTROL_POINT);
+            if (notificationSource == null || dataSource == null || controlPoint == null) {
+                state("ANCS_INCOMPLETE");
+                log("ANCS найден, но обязательные для теста характеристики отсутствуют"
+                        + " NS=" + (notificationSource != null)
+                        + " DS=" + (dataSource != null)
+                        + " CP=" + (controlPoint != null));
+                return;
+            }
+            state("ANCS-FIRST · ПОДПИСКА DATA SOURCE");
+            log("ANCS найден. Подписываюсь Data Source → Notification Source; "
+                    + "это настоящая защищённая операция ANCS");
+            descriptorStage = DescriptorStage.DATA_SOURCE;
+            if (!subscribe(callbackGatt, dataSource, false)) {
+                descriptorStage = DescriptorStage.NONE;
+            }
+            return;
+        }
+
         if (iphonePeripheralMode && !iphoneSecureConfirmed) {
+            log("ANCS в первом discovery отсутствует; только теперь запускаю "
+                    + "fallback SECURE test");
             startIphonePeripheralSecurity(callbackGatt);
             return;
         }
 
-        BluetoothGattService ancs = callbackGatt.getService(AncsProtocol.SERVICE);
-        if (ancs == null) {
-            state(iphonePeripheralMode
-                    ? "GPS-LINK OK · ANCS НЕ ОПУБЛИКОВАН"
-                    : "CONNECTED · ANCS НЕ НАЙДЕН");
-            log("Сервис ANCS 7905… отсутствует на этом BLE link"
-                    + (iphonePeripheralMode
-                    ? " после прямого Android-central подключения и SECURE IPHONE OK"
-                    : ""));
-            subscribeServiceChangedIfAvailable(callbackGatt);
-            return;
-        }
-
-        notificationSource = ancs.getCharacteristic(AncsProtocol.NOTIFICATION_SOURCE);
-        dataSource = ancs.getCharacteristic(AncsProtocol.DATA_SOURCE);
-        controlPoint = ancs.getCharacteristic(AncsProtocol.CONTROL_POINT);
-        if (notificationSource == null || dataSource == null || controlPoint == null) {
-            state("ANCS_INCOMPLETE");
-            log("ANCS найден, но обязательные для теста характеристики отсутствуют"
-                    + " NS=" + (notificationSource != null)
-                    + " DS=" + (dataSource != null)
-                    + " CP=" + (controlPoint != null));
-            return;
-        }
-        log("ANCS найден. Подписываюсь Data Source → Notification Source");
-        descriptorStage = DescriptorStage.DATA_SOURCE;
-        subscribe(callbackGatt, dataSource, false);
+        state(iphonePeripheralMode
+                ? "GPS-LINK OK · ANCS НЕ ОПУБЛИКОВАН"
+                : "CONNECTED · ANCS НЕ НАЙДЕН");
+        log("Сервис ANCS 7905… отсутствует на этом BLE link"
+                + (iphonePeripheralMode
+                ? " после прямого Android-central подключения"
+                : ""));
+        subscribeServiceChangedIfAvailable(callbackGatt);
     }
 
     private void subscribeServiceChangedIfAvailable(BluetoothGatt callbackGatt) {
@@ -1325,10 +1360,31 @@ public final class BluetoothDiagnostics {
         log("onDescriptorWrite " + shortUuid(characteristicUuid)
                 + " status=" + status + " stage=" + descriptorStage);
         if (status != GATT_SUCCESS) {
-            state("CCCD_FAILED_" + status);
+            DescriptorStage failedStage = descriptorStage;
+            descriptorStage = DescriptorStage.NONE;
             if (isAuthorizationError(status)) {
-                log("Требуется LE bonding/шифрование и разрешение уведомлений на iPhone");
-                requestBond(getVerifiedPeer());
+                ancsRetryAfterBond = true;
+                ancsAuthorizationFailureSeen = true;
+                int bondState = safeBondState(callbackGatt.getDevice());
+                state("ANCS AUTH FAIL 0x"
+                        + Integer.toHexString(status).toUpperCase(Locale.US)
+                        + " · НУЖЕН LE BOND");
+                log("ANCS CCCD " + failedStage + " требует authorization; status="
+                        + status + " (0x"
+                        + Integer.toHexString(status).toUpperCase(Locale.US)
+                        + "), bond=" + bondLabel(bondState));
+                if (bondState == BluetoothDevice.BOND_BONDED) {
+                    scheduleAncsRetryAfterBond(callbackGatt,
+                            "CCCD вернул auth error уже после BOND_BONDED");
+                } else if (!leBondAttemptObserved) {
+                    log("Системный стек ещё не сообщил BONDING; "
+                            + "запускаю одну явную LE bond-попытку");
+                    requestBond(callbackGatt.getDevice());
+                } else {
+                    log("LE bond уже запускался; автоматический цикл pairing не повторяю");
+                }
+            } else {
+                state("CCCD_FAILED_" + status);
             }
             return;
         }
@@ -1340,8 +1396,12 @@ public final class BluetoothDiagnostics {
                     ? "GPS-LINK OK · ЖДУ SERVICE CHANGED"
                     : "ЖДУ SERVICE CHANGED / ANCS");
         } else if (descriptorStage == DescriptorStage.DATA_SOURCE) {
+            state("DATA SOURCE OK · ПОДПИСКА NOTIFICATION SOURCE");
+            log("Data Source CCCD включён; включаю Notification Source");
             descriptorStage = DescriptorStage.NOTIFICATION_SOURCE;
-            subscribe(callbackGatt, notificationSource, false);
+            if (!subscribe(callbackGatt, notificationSource, false)) {
+                descriptorStage = DescriptorStage.NONE;
+            }
         } else if (descriptorStage == DescriptorStage.NOTIFICATION_SOURCE) {
             descriptorStage = DescriptorStage.NONE;
             gattReady = true;
@@ -1495,12 +1555,12 @@ public final class BluetoothDiagnostics {
     private void requestBond(BluetoothDevice device) {
         if (device == null) return;
         if (!isVerifiedPeer(device)) {
-            log("Bonding отклонён: peer не подтверждён командой PAIR");
+            log("Bonding отклонён: устройство не является verified peer текущей сессии");
             return;
         }
         int state = safeBondState(device);
         if (state == BluetoothDevice.BOND_BONDED) {
-            log("Verified peer уже BOND_BONDED. Проверьте SECURE characteristic");
+            log("Verified peer уже BOND_BONDED");
             return;
         }
         if (state == BluetoothDevice.BOND_BONDING) {
@@ -1527,14 +1587,41 @@ public final class BluetoothDiagnostics {
             }
             log("createBond()=" + started);
         }
+        if (started) leBondAttemptObserved = true;
         state(started ? "BONDING · ПОДТВЕРДИТЕ НА IPHONE" : "BOND_START_FAILED");
+    }
+
+    private void scheduleAncsRetryAfterBond(BluetoothGatt expected, String reason) {
+        if (!ancsRetryAfterBond || expected == null || expected != gatt
+                || !gattClientConnected || ancsBondRetry != null) {
+            return;
+        }
+        if (ancsBondRetryCount >= 1) {
+            ancsRetryAfterBond = false;
+            state("ANCS AUTH FAILED ПОСЛЕ BOND");
+            log("Повтор ANCS-подписки уже использован; новый цикл не запускаю");
+            return;
+        }
+        ancsBondRetryCount++;
+        ancsBondRetry = () -> {
+            ancsBondRetry = null;
+            if (gatt != expected || !gattClientConnected) return;
+            ancsRetryAfterBond = false;
+            descriptorStage = DescriptorStage.NONE;
+            log("Повторяю discovery/ANCS-подписку после bond · " + reason);
+            discoverServices(expected);
+        };
+        main.postDelayed(ancsBondRetry, 800L);
+        log("ANCS retry #" + ancsBondRetryCount + " запланирован через 800 ms · " + reason);
     }
 
     private void clearAncsRuntime() {
         if (requestTimeout != null) main.removeCallbacks(requestTimeout);
+        if (ancsBondRetry != null) main.removeCallbacks(ancsBondRetry);
         cancelConnectTimeout();
         cancelDiscoveryTimeout();
         requestTimeout = null;
+        ancsBondRetry = null;
         requests.clear();
         events.clear();
         activeRequest = null;
@@ -1651,7 +1738,8 @@ public final class BluetoothDiagnostics {
         return status == STATUS_INSUFFICIENT_AUTHENTICATION
                 || status == STATUS_INSUFFICIENT_AUTHORIZATION
                 || status == STATUS_INSUFFICIENT_KEY_SIZE
-                || status == STATUS_INSUFFICIENT_ENCRYPTION;
+                || status == STATUS_INSUFFICIENT_ENCRYPTION
+                || status == STATUS_GATT_AUTH_FAIL;
     }
 
     private static String shortUuid(UUID uuid) {
@@ -1912,7 +2000,7 @@ public final class BluetoothDiagnostics {
                             + " bond=" + bondLabel(safeBondState(device))));
                     if (DIAGNOSTIC_CHARACTERISTIC.equals(uuid)) {
                         sendGattReadResponse(device, requestId, offset,
-                                "KX11 ANCS Test v7".getBytes(StandardCharsets.UTF_8));
+                            "KX11 ANCS Test v8".getBytes(StandardCharsets.UTF_8));
                         return;
                     }
                     if (SECURE_CHARACTERISTIC.equals(uuid)) {
@@ -2006,8 +2094,14 @@ public final class BluetoothDiagnostics {
             cancelConnectTimeout();
             clientConnectInFlight = false;
             gattClientConnected = false;
-            state("GPS-STYLE FAILED · status=" + status);
-            log("Прямое Android-central подключение завершилось ошибкой " + status);
+            if (status == 19 && ancsAuthorizationFailureSeen) {
+                state("ANCS PAIRING FAILED · IPHONE CLOSED LINK");
+                log("iPhone закрыл BLE link (status=19/0x13) после неуспешной "
+                        + "ANCS authorization/SMP");
+            } else {
+                state("GPS-STYLE FAILED · status=" + status);
+                log("Прямое Android-central подключение завершилось ошибкой " + status);
+            }
             closeClientGatt(callbackGatt);
             clearAncsRuntime();
             return;
@@ -2163,7 +2257,11 @@ public final class BluetoothDiagnostics {
                 } else if (isAuthorizationError(status)) {
                     state("GPS-LINK · НУЖЕН LE BOND");
                     log("SECURE требует шифрование; запускаю bonding на текущем BLE link");
-                    requestBond(callbackGatt.getDevice());
+                    if (!leBondAttemptObserved) {
+                        requestBond(callbackGatt.getDevice());
+                    } else {
+                        log("LE bond уже запускался; повтор SECURE pairing не запускаю");
+                    }
                 } else {
                     state("GPS-LINK · SECURE READ FAILED " + status);
                 }
@@ -2182,14 +2280,33 @@ public final class BluetoothDiagnostics {
                         + safeAddress(device));
                 return;
             }
+            if (BluetoothDevice.ACTION_PAIRING_REQUEST.equals(intent.getAction())) {
+                int variant = intent.getIntExtra(
+                        BluetoothDevice.EXTRA_PAIRING_VARIANT, -1);
+                int key = intent.getIntExtra(BluetoothDevice.EXTRA_PAIRING_KEY, -1);
+                leBondAttemptObserved = true;
+                state("PAIRING REQUEST · " + pairingVariantLabel(variant));
+                log("ACTION_PAIRING_REQUEST peer=" + safeAddress(device)
+                        + " variant=" + variant + " (" + pairingVariantLabel(variant) + ")"
+                        + (key >= 0 ? " key=" + String.format(Locale.US, "%06d", key) : ""));
+                log("Подтвердите системный запрос на магнитоле и iPhone; "
+                        + "приложение не перехватывает broadcast");
+                return;
+            }
             int state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE,
                     BluetoothDevice.BOND_NONE);
             int previous = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE,
                     BluetoothDevice.BOND_NONE);
+            int reason = intent.getIntExtra(
+                    "android.bluetooth.device.extra.REASON", -1);
             log("BOND " + safeAddress(device) + ": "
-                    + bondLabel(previous) + " → " + bondLabel(state));
+                    + bondLabel(previous) + " → " + bondLabel(state)
+                    + (state == BluetoothDevice.BOND_NONE && previous == BluetoothDevice.BOND_BONDING
+                    ? " · reason=" + reason + " (" + bondFailureReasonLabel(reason) + ")"
+                    : ""));
             updateCandidate(device, -127, false, "", "bond event");
             if (state == BluetoothDevice.BOND_BONDING) {
+                leBondAttemptObserved = true;
                 state(iphonePeripheralMode
                         ? "GPS-LINK · LE BONDING"
                         : "VERIFIED PEER · LE BONDING");
@@ -2199,14 +2316,22 @@ public final class BluetoothDiagnostics {
                         : "VERIFIED PEER · LE BOND BONDED");
                 BluetoothGatt current = gatt;
                 if (iphonePeripheralMode) {
-                    log("BOND_BONDED подтверждён на GPS-style link; "
-                            + "повторяю encrypted SECURE read");
-                    if (gattClientConnected && current != null) {
-                        main.postDelayed(() -> {
-                            if (gatt == current && gattClientConnected) {
-                                readIphoneSecure(current);
-                            }
-                        }, 800L);
+                    if (iphoneAncsSeen) {
+                        log("BOND_BONDED подтверждён на ANCS-first link");
+                        if (ancsRetryAfterBond && gattClientConnected && current != null) {
+                            scheduleAncsRetryAfterBond(current,
+                                    "получен BOND_BONDED");
+                        }
+                    } else {
+                        log("BOND_BONDED подтверждён на fallback GPS-style link; "
+                                + "повторяю encrypted SECURE read");
+                        if (gattClientConnected && current != null) {
+                            main.postDelayed(() -> {
+                                if (gatt == current && gattClientConnected) {
+                                    readIphoneSecure(current);
+                                }
+                            }, 800L);
+                        }
                     }
                 } else {
                     log("BOND_BONDED подтверждён; reverse connect всё ещё ждёт "
@@ -2220,10 +2345,44 @@ public final class BluetoothDiagnostics {
                     }, 800L);
                 }
             } else if (previous == BluetoothDevice.BOND_BONDING) {
-                state("VERIFIED PEER · LE BOND FAILED");
+                ancsRetryAfterBond = false;
+                state(iphoneAncsSeen
+                        ? "ANCS · LE BOND FAILED"
+                        : "VERIFIED PEER · LE BOND FAILED");
+                log("LE bonding завершился неуспешно · reason=" + reason
+                        + " (" + bondFailureReasonLabel(reason) + ")");
             }
         }
     };
+
+    private static String pairingVariantLabel(int variant) {
+        switch (variant) {
+            case 0: return "PIN";
+            case 1: return "PASSKEY";
+            case 2: return "PASSKEY CONFIRMATION";
+            case 3: return "CONSENT";
+            case 4: return "DISPLAY PASSKEY";
+            case 5: return "DISPLAY PIN";
+            case 6: return "OOB CONSENT";
+            case 7: return "PIN 16 DIGITS";
+            default: return "UNKNOWN " + variant;
+        }
+    }
+
+    private static String bondFailureReasonLabel(int reason) {
+        switch (reason) {
+            case 1: return "AUTH FAILED";
+            case 2: return "AUTH REJECTED";
+            case 3: return "AUTH CANCELED";
+            case 4: return "REMOTE DEVICE DOWN";
+            case 5: return "DISCOVERY IN PROGRESS";
+            case 6: return "AUTH TIMEOUT";
+            case 7: return "REPEATED ATTEMPTS";
+            case 8: return "REMOTE AUTH CANCELED";
+            case 9: return "REMOVED";
+            default: return "UNKNOWN";
+        }
+    }
 
     private static String scanError(int code) {
         switch (code) {
