@@ -11,6 +11,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
@@ -30,14 +32,18 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 public final class MainActivity extends Activity implements BluetoothDiagnostics.Listener {
     private static final int REQUEST_LOCATION = 1001;
-    private static final int MAX_LOG_LINES = 1_200;
+    private static final int MAX_LOG_LINES = 500;
+    private static final int MAX_NOTIFICATION_ROWS = 80;
+    private static final long UI_FLUSH_INTERVAL_MS = 250L;
 
     private TextView statusView;
     private TextView selectedView;
@@ -50,7 +56,22 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
     private final LinkedHashMap<Long, BluetoothDiagnostics.NotificationItem> notifications =
             new LinkedHashMap<>();
     private final List<String> notificationRows = new ArrayList<>();
-    private final ArrayList<String> logLines = new ArrayList<>();
+    private final ArrayDeque<String> logLines = new ArrayDeque<>();
+    private final Handler ui = new Handler(Looper.getMainLooper());
+    private boolean logFlushScheduled;
+    private boolean notificationFlushScheduled;
+    private final Runnable logFlusher = () -> {
+        logFlushScheduled = false;
+        if (logView == null) return;
+        logView.setText(TextUtils.join("\n", logLines));
+        if (logScroll != null) {
+            logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
+        }
+    };
+    private final Runnable notificationFlusher = () -> {
+        notificationFlushScheduled = false;
+        rebuildNotificationsNow();
+    };
 
     private BluetoothDiagnostics diagnostics;
     private BluetoothDiagnostics.Candidate selectedCandidate;
@@ -69,6 +90,8 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
     @Override
     protected void onDestroy() {
         if (diagnostics != null) diagnostics.close();
+        ui.removeCallbacks(logFlusher);
+        ui.removeCallbacks(notificationFlusher);
         super.onDestroy();
     }
 
@@ -87,10 +110,9 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
 
     @Override
     public void onLog(String line) {
-        logLines.add(line);
-        while (logLines.size() > MAX_LOG_LINES) logLines.remove(0);
-        logView.setText(TextUtils.join("\n", logLines));
-        logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
+        logLines.addLast(line);
+        while (logLines.size() > MAX_LOG_LINES) logLines.removeFirst();
+        scheduleLogFlush();
     }
 
     @Override
@@ -117,8 +139,10 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
 
     @Override
     public void onNotification(BluetoothDiagnostics.NotificationItem item) {
+        notifications.remove(item.uid);
         notifications.put(item.uid, item);
-        rebuildNotifications();
+        trimNotifications();
+        scheduleNotificationFlush();
     }
 
     @Override
@@ -131,7 +155,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
                     old.uid, old.eventId, old.categoryId, old.appIdentifier,
                     displayName, old.title, old.message, old.date));
         }
-        rebuildNotifications();
+        scheduleNotificationFlush();
     }
 
     @Override
@@ -158,7 +182,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         header.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView title = new TextView(this);
-        title.setText("KX11 ANCS TEST v4");
+        title.setText("KX11 ANCS TEST v5");
         title.setTextColor(Color.WHITE);
         title.setTextSize(20);
         title.setTypeface(Typeface.DEFAULT_BOLD);
@@ -252,7 +276,8 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         LinearLayout.LayoutParams notificationsParams = new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.MATCH_PARENT, 1.15f);
         notificationsParams.setMargins(dp(8), 0, 0, 0);
-        content.addView(panel("Уведомления iPhone", notificationList), notificationsParams);
+        content.addView(panel("ANCS / диагностические события", notificationList),
+                notificationsParams);
 
         logView = new TextView(this);
         logView.setTextSize(11);
@@ -336,7 +361,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         }
     }
 
-    private void rebuildNotifications() {
+    private void rebuildNotificationsNow() {
         notificationRows.clear();
         List<BluetoothDiagnostics.NotificationItem> values =
                 new ArrayList<>(notifications.values());
@@ -344,6 +369,27 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
             notificationRows.add(values.get(index).displayText());
         }
         notificationAdapter.notifyDataSetChanged();
+    }
+
+    private void trimNotifications() {
+        while (notifications.size() > MAX_NOTIFICATION_ROWS) {
+            Iterator<Long> iterator = notifications.keySet().iterator();
+            if (!iterator.hasNext()) break;
+            iterator.next();
+            iterator.remove();
+        }
+    }
+
+    private void scheduleLogFlush() {
+        if (logFlushScheduled) return;
+        logFlushScheduled = true;
+        ui.postDelayed(logFlusher, UI_FLUSH_INTERVAL_MS);
+    }
+
+    private void scheduleNotificationFlush() {
+        if (notificationFlushScheduled) return;
+        notificationFlushScheduled = true;
+        ui.postDelayed(notificationFlusher, UI_FLUSH_INTERVAL_MS);
     }
 
     private void copyLog() {
@@ -374,8 +420,12 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
     }
 
     private void clearOutput() {
+        ui.removeCallbacks(notificationFlusher);
+        notificationFlushScheduled = false;
         notifications.clear();
-        rebuildNotifications();
+        rebuildNotificationsNow();
+        ui.removeCallbacks(logFlusher);
+        logFlushScheduled = false;
         logLines.clear();
         logView.setText("");
         appendInstruction();
@@ -391,8 +441,8 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
                 + " d2d9e4b3…f01 запишите ASCII ANCS или прочитайте значение.");
         onLog("5) SECURE ATT OK доказывает шифрование BLE-link."
                 + " После ANCS READY отправьте новое уведомление.");
-        onLog("6) Если ANCS отсутствует, дождитесь PROXY SNIFFER READY"
-                + " и только затем отправьте новое уведомление.");
+        onLog("6) Сервис ECARX GPSTether 61555e49… — это GPS, а не ANCS;"
+                + " v5 к его потоку не подписывается.");
         onLog("7) Входящий peer без команды PAIR не используется и не может заменить verified peer.");
     }
 
