@@ -16,4 +16,5 @@
  */
 
 include ':app'
+include ':hudlab'
 rootProject.name = "Status Widget HA"
