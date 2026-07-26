@@ -52,10 +52,11 @@ public final class HudLabActivity extends Activity implements HudLabController.L
     private TextView snapshotView;
     private TextView logView;
     private TextView visualIndexView;
+    private TextView visualPenView;
     private TextView exportStatusView;
-    private TextView coverStatusView;
     private Button exportButton;
     private int visualIndex;
+    private int visualPen = 1;
     private String fullStatus = "";
     private String lastDumpPath = "";
 
@@ -151,7 +152,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         close.setOnClickListener(view -> finish());
         header.addView(close, fixedButton(dp(130)));
 
-        TextView title = text("HUD Lab 0.4", 23, TEXT, true);
+        TextView title = text("HUD Lab 0.5", 23, TEXT, true);
         title.setPadding(dp(16), 0, dp(18), 0);
         header.addView(title);
 
@@ -213,25 +214,6 @@ public final class HudLabActivity extends Activity implements HudLabController.L
 
     private View buildSystemDumpTab() {
         LinearLayout body = columnBody();
-        body.addView(sectionTitle("Замещение штатного Activity на физическом HUD"));
-        body.addView(note(
-                "Из системного APK установлено: штатный com.ecarx.hud запускает HomeActivity "
-                        + "на Display ID 2, windowing mode 5, split position 1. "
-                        + "Эта проверка запускает на том же дисплее полностью чёрный Activity — "
-                        + "не Presentation — и не меняет питание HUD или настройки автомобиля."));
-
-        body.addView(commandPair("ЗАПУСТИТЬ ЧЁРНЫЙ HUD-ACTIVITY", RED,
-                this::startHudCover,
-                "УБРАТЬ ЧЁРНЫЙ HUD-ACTIVITY", GREEN,
-                this::stopHudCover));
-
-        coverStatusView = text(
-                "Замещение выключено. Эта функция не связана с публикацией панели Status Widget.",
-                14, TEXT, false);
-        coverStatusView.setTextIsSelectable(true);
-        coverStatusView.setPadding(0, dp(10), 0, dp(18));
-        body.addView(coverStatusView);
-
         body.addView(sectionTitle("Экспорт фактической реализации HUD этой прошивки"));
         body.addView(note(
                 "HUD Lab 0.2 подтвердил: DISPLAY_DRIVE_ENVIRONMENT и DISPLAY_SAFETY "
@@ -265,20 +247,6 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                 "Экспорт можно выполнить без подключения ноутбука и без root. "
                         + "На Android 9 при первом запуске потребуется разрешить доступ к файлам."));
         return scroll(body);
-    }
-
-    private void startHudCover() {
-        HudDisplayCover.Result result = HudDisplayCover.start(this);
-        coverStatusView.setText(result.message);
-        Toast.makeText(this, result.success ? "HUD-Activity запущен" : "Ошибка запуска",
-                Toast.LENGTH_LONG).show();
-    }
-
-    private void stopHudCover() {
-        HudDisplayCover.stop(this);
-        coverStatusView.setText(
-                "Команда закрытия отправлена. Штатный HUD должен снова стать видимым.");
-        Toast.makeText(this, "HUD-Activity закрывается", Toast.LENGTH_SHORT).show();
     }
 
     private void requestSystemDump() {
@@ -465,11 +433,11 @@ public final class HudLabActivity extends Activity implements HudLabController.L
 
     private View buildMaskTab() {
         LinearLayout body = columnBody();
-        body.addView(sectionTitle("Низкоуровневая visual mask — уже проверенный эксперимент"));
+        body.addView(sectionTitle("Низкоуровневая visual mask · профили PEN 0–15"));
         body.addView(note(
-                "F00–F19 и PEN не скрыли штатные машинку и скорость на вашей прошивке. "
-                        + "Оставлено для точечных сравнений и возврата значений, но это больше "
-                        + "не основной путь поиска."));
+                "PEN в ECARX — идентификатор профиля, а не Android-дисплей. Ранее стенд "
+                        + "ошибочно сводил PEN только к 0/1. PEN=15 означает ProfAll и позволяет "
+                        + "проверить маску сразу для всех профилей."));
 
         body.addView(label("HUD VisFctSetgReq: 20 функций"));
         body.addView(commandPair("Все 0", RED, () -> controller.setAllVisualFunctions(0),
@@ -492,12 +460,28 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                 "Выбранную ON", GREEN,
                 () -> controller.setVisualFunction(visualIndex, 1)));
 
-        body.addView(commandPair("PEN 0", AMBER, () -> controller.setVisualPen(0),
-                "PEN 1", BLUE, () -> controller.setVisualPen(1)));
+        LinearLayout penSelector = new LinearLayout(this);
+        penSelector.setOrientation(LinearLayout.HORIZONTAL);
+        penSelector.setGravity(Gravity.CENTER_VERTICAL);
+        Button previousPen = commandButton("− PEN", CARD_BORDER, this::previousVisualPen);
+        penSelector.addView(previousPen, new LinearLayout.LayoutParams(0, dp(46), 1f));
+        visualPenView = text("PEN 1", 17, TEXT, true);
+        visualPenView.setGravity(Gravity.CENTER);
+        penSelector.addView(visualPenView, new LinearLayout.LayoutParams(dp(150), dp(46)));
+        Button nextPen = commandButton("+ PEN", CARD_BORDER, this::nextVisualPen);
+        penSelector.addView(nextPen, new LinearLayout.LayoutParams(0, dp(46), 1f));
+        body.addView(penSelector);
+
+        body.addView(singleCommand("Применить выбранный PEN", BLUE,
+                () -> controller.setVisualPen(visualPen)));
+        body.addView(commandPair("ProfAll (15): ВСЕ 0", RED,
+                () -> setProfAllMask(0),
+                "ProfAll (15): ВСЕ 1", GREEN,
+                () -> setProfAllMask(1)));
         body.addView(note(
-                "Начальная локальная маска стенда: все 1, PEN=1. SDK не даёт getter для этой "
-                        + "маски, поэтому «Все 1» — предполагаемый возврат видимости, а не "
-                        + "считанное исходное состояние."));
+                "Сначала нажмите «ProfAll: ВСЕ 0» и проверьте HUD. Для возврата сразу нажмите "
+                        + "«ProfAll: ВСЕ 1». SDK не даёт getter маски, поэтому ВСЕ 1 — "
+                        + "предполагаемое восстановление, а не считанная заводская конфигурация."));
 
         return scroll(body);
     }
@@ -571,6 +555,27 @@ public final class HudLabActivity extends Activity implements HudLabController.L
 
     private void updateVisualIndex() {
         visualIndexView.setText(String.format(Locale.ROOT, "F%02d", visualIndex));
+    }
+
+    private void previousVisualPen() {
+        visualPen = (visualPen + 15) % 16;
+        updateVisualPen();
+    }
+
+    private void nextVisualPen() {
+        visualPen = (visualPen + 1) % 16;
+        updateVisualPen();
+    }
+
+    private void updateVisualPen() {
+        visualPenView.setText(visualPen == 15 ? "PEN 15 · ProfAll"
+                : String.format(Locale.ROOT, "PEN %d", visualPen));
+    }
+
+    private void setProfAllMask(int value) {
+        visualPen = 15;
+        updateVisualPen();
+        controller.setAllVisualFunctionsForPen(15, value);
     }
 
     private void setCommandsEnabled(boolean enabled) {
