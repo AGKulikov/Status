@@ -21,7 +21,7 @@ public class DriverPanelOverlayContractTest {
                     + "DriverPanelOverlayController.java");
         }
         String source = read(controller);
-        assertTrue(source.contains("enabled.size(),"));
+        assertTrue(source.contains("interactiveCount,"));
         assertTrue(source.contains("false);"));
         assertTrue(source.contains("setPanelTouchable(false)"));
         assertTrue(source.contains("FLAG_NOT_TOUCHABLE"));
@@ -29,7 +29,12 @@ public class DriverPanelOverlayContractTest {
         assertTrue(source.contains("\"input tap \" + target.x + \" \" + target.y"));
         assertFalse(source.contains("shortcuts.subList"));
         assertTrue(source.contains("windowContext(display, attachedType)"));
-        assertTrue(source.contains("fullScreenParams(attachedType)"));
+        assertFalse(source.contains("fullScreenParams(attachedType)"));
+        assertTrue(source.contains("metrics.widthPixels - physicalWidth"));
+        assertTrue(source.contains("int drawerLeft = profile.side.get() == 0 ? physicalWidth : 0"));
+        assertTrue(source.contains("compactDrawerParams("));
+        assertTrue(source.contains("allAppsOverlayParams("));
+        assertTrue(source.contains("root.setOnClickListener(view -> dismissAllApps())"));
         assertTrue(source.contains("root.setPadding(0, geometry.contentTop, 0,"));
         assertTrue(source.contains("screenHeight - geometry.contentBottom"));
         assertTrue(source.contains("width, Math.max(1, screenHeight), type"));
@@ -42,7 +47,8 @@ public class DriverPanelOverlayContractTest {
         assertTrue(source.contains("background.setCornerRadii(panelCornerRadii("));
         assertTrue(source.contains("Math.max(dp(context, 20), profile.cornerRadiusPx.get())"));
         assertTrue(source.contains("DriverPanelLayoutPolicy.referencePanelWidth("));
-        assertFalse(source.contains("geometry.contentBottom - geometry.contentTop"));
+        assertTrue(source.contains(
+                "geometry.contentBottom - geometry.contentTop"));
         int fallbackStart = source.indexOf("private void fallbackStockClimateTap");
         int fallbackEnd = source.indexOf("private void dismissAllApps", fallbackStart);
         assertTrue(fallbackStart >= 0);
@@ -67,8 +73,22 @@ public class DriverPanelOverlayContractTest {
         String climateSource = read(climateView);
         assertTrue(climateSource.contains("fanKnown && fanActive"));
         assertTrue(climateSource.contains("if (!showFan) return;"));
+        assertFalse(climateSource.contains("drawFanGlyph"));
         assertTrue(climateSource.contains("drawText(\"AUTO\""));
+        assertTrue(climateSource.contains("drawBars(canvas, width * .12f"));
+        assertTrue(climateSource.contains("Official AOSP Automotive HVAC vectors"));
+        assertTrue(climateSource.contains("R.drawable.ic_driver_airflow_face"));
+        assertTrue(climateSource.contains("R.drawable.ic_driver_airflow_feet"));
+        assertTrue(climateSource.contains("R.drawable.ic_driver_airflow_windshield"));
+        assertFalse(climateSource.contains("drawDirectionArrow"));
         assertTrue(climateSource.contains("AIRFLOW = \"climate.airflow\""));
+        assertTrue(climateSource.contains("boolean expanded = detailed;"));
+        assertTrue(climateSource.contains("primarySize * .58f"));
+        assertTrue(climateSource.contains("AIRFLOW_WINDSHIELD"));
+        assertTrue(climateSource.contains("AIRFLOW_FACE"));
+        assertTrue(climateSource.contains("AIRFLOW_LEGS"));
+        assertTrue(source.contains("private static boolean isExpandedClimate("));
+        assertTrue(source.contains("// HA1085 keeps the detailed climate tile"));
         assertTrue(source.contains("DriverPanelLayoutPolicy.shortcutWeight(expandedClimate)"));
         assertTrue(source.contains("DriverPanelLayoutPolicy.shortcutIconHeight("));
         assertTrue(source.contains("button.setSoundEffectsEnabled(false)"));
@@ -100,7 +120,7 @@ public class DriverPanelOverlayContractTest {
     }
 
     @Test
-    public void oldAndNewPanelProfilesRemainIndependent() throws Exception {
+    public void legacyProfileMigratesIntoOneCurrentDriverPanel() throws Exception {
         String root = System.getProperty("user.dir");
         Path preferences = Paths.get(root, "src/main/java/dezz/status/widget/Preferences.java");
         if (!Files.exists(preferences)) {
@@ -121,19 +141,22 @@ public class DriverPanelOverlayContractTest {
         assertTrue(preferencesSource.contains(
                 "prefix + \"BackgroundColor\", \"#FF13171C\""));
         assertTrue(preferencesSource.contains(
-                "public final Int driverPanelSide = driverPanelOld.side;"));
+                "public final Int driverPanelSide = driverPanelNew.side;"));
         assertTrue(preferencesSource.contains(
-                "public final Str driverPanelShortcutsJson = driverPanelOld.shortcutsJson;"));
+                "public final Str driverPanelShortcutsJson = driverPanelNew.shortcutsJson;"));
         assertTrue(preferencesSource.contains(
-                "? driverPanelNew : driverPanelOld;"));
+                "return driverPanelNew;"));
+        assertTrue(preferencesSource.contains("migrateUnifiedDriverPanelIfNeeded()"));
+        assertTrue(preferencesSource.contains("\"driverPanelUnifiedHa1085\""));
+        assertTrue(preferencesSource.contains(
+                "// A full backup made by HA1084 may still select the legacy driver profile"));
 
         Path settings = preferences.resolveSibling("DriverPanelSettingsActivity.java");
         String settingsSource = read(settings);
-        assertTrue(settingsSource.contains("MaterialButtonToggleGroup"));
-        assertTrue(settingsSource.contains("compactButton(\"Старая\")"));
-        assertTrue(settingsSource.contains("compactButton(\"Новая\")"));
-        assertTrue(settingsSource.contains(
-                "preferences.driverPanelStyle.set(selected.key);"));
+        assertFalse(settingsSource.contains("MaterialButtonToggleGroup"));
+        assertFalse(settingsSource.contains("compactButton(\"Старая\")"));
+        assertFalse(settingsSource.contains(
+                "preferences.driverPanelStyle.set("));
         assertTrue(settingsSource.contains("AppleColorPickerDialog.Options.opaque()"));
         assertFalse(settingsSource.contains("\"Цвет и прозрачность панели\""));
         assertTrue(settingsSource.contains(
@@ -184,10 +207,12 @@ public class DriverPanelOverlayContractTest {
         assertTrue(controller.contains("grid.setPadding(dp(context, 16), dp(context, 16),"));
         assertTrue(controller.contains("title.setText(\"Все приложения\")"));
         assertTrue(controller.contains("FavoriteAppsConfigStore"));
+        assertTrue(controller.contains("tile.setOnLongClickListener(view ->"));
+        assertTrue(controller.contains("AppUninstallLauncher.request(context, app)"));
 
         assertTrue(launcher.contains("LauncherAppCatalog.loadIncludingSystem(context)"));
         assertTrue(launcher.contains("appCatalog.allVisible()"));
-        assertTrue(launcher.contains("if (!app.systemApp"));
+        assertFalse(launcher.contains("if (!app.systemApp"));
         assertTrue(launcher.contains("LauncherAppTileRenderer.render("));
         assertTrue(catalog.contains("Intent.CATEGORY_LAUNCHER"));
         assertTrue(catalog.contains("queryIntentActivities(query, 0)"));

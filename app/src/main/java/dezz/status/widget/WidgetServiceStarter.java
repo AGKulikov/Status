@@ -60,7 +60,8 @@ public final class WidgetServiceStarter {
             }
             Preferences preferences = new Preferences(app);
             if (!preferences.widgetEnabled.get()
-                    && !preferences.driverPanelEnabled.get()) {
+                    && !preferences.driverPanelEnabled.get()
+                    && !preferences.hudPanelEnabled.get()) {
                 cancelPendingRetry(app);
                 return false;
             }

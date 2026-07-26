@@ -5,6 +5,7 @@ import androidx.annotation.NonNull;
 
 import java.util.Locale;
 
+import dezz.status.widget.BrickType;
 import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.launcher.SmartHomeIconResolver;
 
@@ -15,6 +16,8 @@ public final class InformationIconPolicy {
     @NonNull
     public static String resolve(@NonNull InformationPanelConfig.Item item) {
         if (!"auto".equalsIgnoreCase(item.iconKey)) return item.iconKey;
+        BrickType statusBrick = StatusBarInformationCatalog.type(item);
+        if (statusBrick != null) return StatusBarInformationCatalog.fallbackIcon(statusBrick);
         if (item.sourceKind == InformationPanelConfig.SourceKind.CONNECTOR) {
             String domain = "";
             if (item.binding != null) {

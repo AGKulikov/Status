@@ -17,8 +17,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import dezz.status.widget.Fonts;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.car.CarControlCommand;
+import dezz.status.widget.driver.DriverFavoritesPanelConfig;
 import dezz.status.widget.integration.SourceBinding;
 
 /** Versioned, ordered collection of user-created HOME icons. */
@@ -27,9 +29,8 @@ public final class LauncherShortcutStore {
     public static final int MIN_ICON_SIZE_PX = 24;
     public static final int MAX_ICON_SIZE_PX = 320;
     public static final int MAX_DRIVER_PANEL_SHORTCUTS = 10;
-    public static final int MAX_DRIVER_FAVORITES = 48;
 
-    public enum Kind { APP, BUILTIN, RULE, INTENT, CAR }
+    public enum Kind { APP, BUILTIN, RULE, INTENT, CAR, INFO, DIVIDER }
 
     public static final class Shortcut {
         @NonNull public String id = UUID.randomUUID().toString();
@@ -42,6 +43,7 @@ public final class LauncherShortcutStore {
         /** CAR command kept separate from the stable control ID in target. */
         @NonNull public CarControlCommand.Operation command = CarControlCommand.Operation.TOGGLE;
         public double commandValue = 0;
+        @NonNull public List<Double> commandCycleValues = new ArrayList<>();
         /** app = original application icon; otherwise one of LauncherIconResolver preset keys. */
         @NonNull public String icon = "apps";
         /** False means a connector may refresh the suggested icon; true preserves user choice. */
@@ -58,16 +60,46 @@ public final class LauncherShortcutStore {
         @NonNull public String longPackageName = "";
         @NonNull public CarControlCommand.Operation longCommand = CarControlCommand.Operation.TOGGLE;
         public double longCommandValue = 0;
+        @NonNull public List<Double> longCommandCycleValues = new ArrayList<>();
         @NonNull public String activeBackgroundColor = "#CC374151";
         @NonNull public String activeIconColor = "#FFFFB300";
         public boolean useVehicleStateColor = true;
         public boolean showState = true;
-        /** Driver climate tile occupies two slots and shows AUTO/airflow when enabled. */
+        /** Driver climate tile adds AUTO/airflow when enabled; temperature and scale stay basic. */
         public boolean extendedClimateInfo = false;
         public int iconSizePx = 54;
+        public int dividerThicknessPx = 2;
+        /** -1 inherits the panel-wide value; otherwise this button owns its following gap. */
+        public int gapAfterPx = -1;
         public int columnSpan = 1;
         public int rowSpan = 1;
         public boolean showTitle = true;
+        /** INFO only: independently styled label/value text on the driver rail and Favorites. */
+        public int informationLabelTextSizeSp = 11;
+        public int informationValueTextSizeSp = 20;
+        @NonNull public String informationFontFamily = Fonts.DEFAULT_KEY;
+        public boolean informationTextBold = true;
+        public boolean informationTextItalic = false;
+        /** 0=start/top, 1=center, 2=end/bottom. */
+        public int informationHorizontalAlignment = 0;
+        public int informationVerticalAlignment = 1;
+        public int informationPaddingLeftPx = 10;
+        public int informationPaddingTopPx = 7;
+        public int informationPaddingRightPx = 10;
+        public int informationPaddingBottomPx = 7;
+        /** INFO only: empty means a standalone row; equal arbitrary names share one row. */
+        @NonNull public String informationGroup = "";
+        /** INFO only: 0 = above driver controls, 1 = below driver controls. */
+        public int informationPlacement = 0;
+        public boolean informationShowValue = true;
+        public int informationIconSizePx = 32;
+        public int informationIconAlpha = 255;
+        public int informationIconOutlineAlpha = 0;
+        public int informationIconOutlineWidth = 0;
+        /** Status-bar sources can reuse their live icon family, semantic colour and badges. */
+        public boolean informationUseStatusIconStyle = false;
+        /** Driver Favorites only: dismiss the owning compact panel after either action. */
+        public boolean closeFavoritePanelAfterAction = false;
         public boolean enabled = true;
 
         @NonNull
@@ -80,6 +112,7 @@ public final class LauncherShortcutStore {
             value.packageName = packageName;
             value.command = command;
             value.commandValue = commandValue;
+            value.commandCycleValues = new ArrayList<>(commandCycleValues);
             value.icon = icon;
             value.iconCustomized = iconCustomized;
             value.stateBinding = stateBinding;
@@ -92,15 +125,38 @@ public final class LauncherShortcutStore {
             value.longPackageName = longPackageName;
             value.longCommand = longCommand;
             value.longCommandValue = longCommandValue;
+            value.longCommandCycleValues = new ArrayList<>(longCommandCycleValues);
             value.activeBackgroundColor = activeBackgroundColor;
             value.activeIconColor = activeIconColor;
             value.useVehicleStateColor = useVehicleStateColor;
             value.showState = showState;
             value.extendedClimateInfo = extendedClimateInfo;
             value.iconSizePx = iconSizePx;
+            value.dividerThicknessPx = dividerThicknessPx;
+            value.gapAfterPx = gapAfterPx;
             value.columnSpan = columnSpan;
             value.rowSpan = rowSpan;
             value.showTitle = showTitle;
+            value.informationLabelTextSizeSp = informationLabelTextSizeSp;
+            value.informationValueTextSizeSp = informationValueTextSizeSp;
+            value.informationFontFamily = informationFontFamily;
+            value.informationTextBold = informationTextBold;
+            value.informationTextItalic = informationTextItalic;
+            value.informationHorizontalAlignment = informationHorizontalAlignment;
+            value.informationVerticalAlignment = informationVerticalAlignment;
+            value.informationPaddingLeftPx = informationPaddingLeftPx;
+            value.informationPaddingTopPx = informationPaddingTopPx;
+            value.informationPaddingRightPx = informationPaddingRightPx;
+            value.informationPaddingBottomPx = informationPaddingBottomPx;
+            value.informationGroup = informationGroup;
+            value.informationPlacement = informationPlacement;
+            value.informationShowValue = informationShowValue;
+            value.informationIconSizePx = informationIconSizePx;
+            value.informationIconAlpha = informationIconAlpha;
+            value.informationIconOutlineAlpha = informationIconOutlineAlpha;
+            value.informationIconOutlineWidth = informationIconOutlineWidth;
+            value.informationUseStatusIconStyle = informationUseStatusIconStyle;
+            value.closeFavoritePanelAfterAction = closeFavoritePanelAfterAction;
             value.enabled = enabled;
             return value;
         }
@@ -113,6 +169,7 @@ public final class LauncherShortcutStore {
         STOCK_CLIMATE("stock_climate", "Штатный климат", "climate"),
         ALL_APPS("all_apps", "Все приложения", "apps"),
         FAVORITES("favorites", "Избранное", "work"),
+        FAVORITE_ROUTE("favorite_route", "Избранная точка", "navigation"),
         MAPS_WINDOW("maps_window", "Карты в окне", "navigation"),
         MAPS_FULL("maps_full", "Карты на весь экран", "navigation"),
         NAVIGATOR_WINDOW("navigator_window", "Навигатор в окне", "navigation"),
@@ -140,9 +197,50 @@ public final class LauncherShortcutStore {
         }
 
         public static Builtin fromKey(String key) {
+            if (isDriverFavoritesTarget(key)) return FAVORITES;
+            if (isFavoriteRouteTarget(key)) return FAVORITE_ROUTE;
             for (Builtin value : values()) if (value.key.equals(key)) return value;
             return ALL_APPS;
         }
+    }
+
+    private static final String DRIVER_FAVORITES_TARGET_PREFIX = "favorites:";
+    private static final String FAVORITE_ROUTE_TARGET_PREFIX = "route:";
+
+    @NonNull
+    public static String driverFavoritesTarget(@NonNull String panelId) {
+        String id = panelId.trim();
+        if (id.isEmpty()) id = DriverFavoritesPanelConfig.DEFAULT_ID;
+        return DRIVER_FAVORITES_TARGET_PREFIX + id;
+    }
+
+    public static boolean isDriverFavoritesTarget(@Nullable String target) {
+        return Builtin.FAVORITES.key.equals(target)
+                || (target != null && target.startsWith(DRIVER_FAVORITES_TARGET_PREFIX));
+    }
+
+    @NonNull
+    public static String driverFavoritesPanelId(@Nullable String target) {
+        if (target != null && target.startsWith(DRIVER_FAVORITES_TARGET_PREFIX)) {
+            String id = target.substring(DRIVER_FAVORITES_TARGET_PREFIX.length()).trim();
+            if (!id.isEmpty()) return id;
+        }
+        return DriverFavoritesPanelConfig.DEFAULT_ID;
+    }
+
+    @NonNull
+    public static String favoriteRouteTarget(@NonNull String routeId) {
+        return FAVORITE_ROUTE_TARGET_PREFIX + routeId.trim();
+    }
+
+    public static boolean isFavoriteRouteTarget(@Nullable String target) {
+        return target != null && target.startsWith(FAVORITE_ROUTE_TARGET_PREFIX);
+    }
+
+    @NonNull
+    public static String favoriteRouteId(@Nullable String target) {
+        return isFavoriteRouteTarget(target)
+                ? target.substring(FAVORITE_ROUTE_TARGET_PREFIX.length()).trim() : "";
     }
 
     private final Preferences preferences;
@@ -181,8 +279,14 @@ public final class LauncherShortcutStore {
     @NonNull
     public static LauncherShortcutStore forDriverFavorites(
             @NonNull Preferences preferences) {
+        return forDriverFavorites(preferences, DriverFavoritesPanelConfig.DEFAULT_ID);
+    }
+
+    @NonNull
+    public static LauncherShortcutStore forDriverFavorites(
+            @NonNull Preferences preferences, @NonNull String panelId) {
         return new LauncherShortcutStore(preferences,
-                preferences.driverFavoritesShortcutsJson, false, true);
+                preferences.driverFavoritesShortcuts(panelId), false, true);
     }
 
     public void load() {
@@ -222,18 +326,40 @@ public final class LauncherShortcutStore {
         return result;
     }
 
-    public void upsert(@NonNull Shortcut value) {
+    /**
+     * Adds or replaces one item.
+     *
+     * @return {@code false} only when a new interactive driver-rail button would exceed the
+     * ten-button safety limit. Read-only information tiles and dividers remain unlimited.
+     */
+    public boolean upsert(@NonNull Shortcut value) {
         for (int index = 0; index < shortcuts.size(); index++) {
             if (shortcuts.get(index).id.equals(value.id)) {
+                if (driverPanel && isInteractive(value)
+                        && !isInteractive(shortcuts.get(index))
+                        && interactiveCount(shortcuts) >= MAX_DRIVER_PANEL_SHORTCUTS) {
+                    return false;
+                }
                 shortcuts.set(index, sanitize(value.copy()));
                 save();
-                return;
+                return true;
             }
         }
-        if (driverPanel && shortcuts.size() >= MAX_DRIVER_PANEL_SHORTCUTS) return;
-        if (driverFavorites && shortcuts.size() >= MAX_DRIVER_FAVORITES) return;
+        if (driverPanel && isInteractive(value)
+                && interactiveCount(shortcuts) >= MAX_DRIVER_PANEL_SHORTCUTS) return false;
         shortcuts.add(sanitize(value.copy()));
         save();
+        return true;
+    }
+
+    private static int interactiveCount(@NonNull List<Shortcut> values) {
+        int result = 0;
+        for (Shortcut value : values) if (isInteractive(value)) result++;
+        return result;
+    }
+
+    public static boolean isInteractive(@NonNull Shortcut value) {
+        return value.kind != Kind.INFO && value.kind != Kind.DIVIDER;
     }
 
     public void remove(@NonNull String id) {
@@ -277,13 +403,53 @@ public final class LauncherShortcutStore {
                 ? "#FFFFB300" : value.activeIconColor.trim();
         if (!Double.isFinite(value.commandValue)) value.commandValue = 0;
         if (!Double.isFinite(value.longCommandValue)) value.longCommandValue = 0;
+        value.commandCycleValues = sanitizeCycleValues(value.commandCycleValues);
+        value.longCommandCycleValues = sanitizeCycleValues(value.longCommandCycleValues);
         value.iconSizePx = Math.max(MIN_ICON_SIZE_PX,
                 Math.min(MAX_ICON_SIZE_PX, value.iconSizePx));
+        value.dividerThicknessPx = Math.max(1, Math.min(20, value.dividerThicknessPx));
+        value.gapAfterPx = Math.max(-1, Math.min(80, value.gapAfterPx));
         value.columnSpan = Math.max(1,
                 Math.min(LauncherActionsGridConfig.MAX_COLUMNS, value.columnSpan));
         value.rowSpan = Math.max(1,
                 Math.min(LauncherActionsGridConfig.MAX_ROWS, value.rowSpan));
+        value.informationLabelTextSizeSp = Math.max(8,
+                Math.min(72, value.informationLabelTextSizeSp));
+        value.informationValueTextSizeSp = Math.max(8,
+                Math.min(96, value.informationValueTextSizeSp));
+        value.informationFontFamily = Fonts.findByKey(
+                value.informationFontFamily).key;
+        value.informationHorizontalAlignment = Math.max(0,
+                Math.min(2, value.informationHorizontalAlignment));
+        value.informationVerticalAlignment = Math.max(0,
+                Math.min(2, value.informationVerticalAlignment));
+        value.informationPaddingLeftPx = clampInformationPadding(
+                value.informationPaddingLeftPx);
+        value.informationPaddingTopPx = clampInformationPadding(
+                value.informationPaddingTopPx);
+        value.informationPaddingRightPx = clampInformationPadding(
+                value.informationPaddingRightPx);
+        value.informationPaddingBottomPx = clampInformationPadding(
+                value.informationPaddingBottomPx);
+        value.informationGroup = value.informationGroup == null
+                ? "" : value.informationGroup.trim();
+        value.informationPlacement = value.informationPlacement == 1 ? 1 : 0;
+        value.informationIconSizePx = Math.max(12,
+                Math.min(MAX_ICON_SIZE_PX, value.informationIconSizePx));
+        value.informationIconAlpha = clampByte(value.informationIconAlpha);
+        value.informationIconOutlineAlpha = clampByte(
+                value.informationIconOutlineAlpha);
+        value.informationIconOutlineWidth = Math.max(0,
+                Math.min(24, value.informationIconOutlineWidth));
         return value;
+    }
+
+    private static int clampByte(int value) {
+        return Math.max(0, Math.min(255, value));
+    }
+
+    private static int clampInformationPadding(int value) {
+        return Math.max(0, Math.min(96, value));
     }
 
     private static JSONObject toJson(Shortcut value) throws JSONException {
@@ -291,6 +457,7 @@ public final class LauncherShortcutStore {
                 .put("id", value.id).put("title", value.title).put("kind", value.kind.name())
                 .put("target", value.target).put("packageName", value.packageName)
                 .put("command", value.command.name()).put("commandValue", value.commandValue)
+                .put("commandCycleValues", cycleValuesToJson(value.commandCycleValues))
                 .put("icon", value.icon).put("backgroundColor", value.backgroundColor)
                 .put("iconCustomized", value.iconCustomized)
                 .put("iconColor", value.iconColor).put("textColor", value.textColor)
@@ -298,13 +465,43 @@ public final class LauncherShortcutStore {
                 .put("longTarget", value.longTarget).put("longPackageName", value.longPackageName)
                 .put("longCommand", value.longCommand.name())
                 .put("longCommandValue", value.longCommandValue)
+                .put("longCommandCycleValues", cycleValuesToJson(value.longCommandCycleValues))
                 .put("activeBackgroundColor", value.activeBackgroundColor)
                 .put("activeIconColor", value.activeIconColor)
                 .put("useVehicleStateColor", value.useVehicleStateColor)
                 .put("showState", value.showState)
                 .put("extendedClimateInfo", value.extendedClimateInfo)
-                .put("iconSizePx", value.iconSizePx).put("columnSpan", value.columnSpan)
+                .put("iconSizePx", value.iconSizePx)
+                .put("dividerThicknessPx", value.dividerThicknessPx)
+                .put("gapAfterPx", value.gapAfterPx)
+                .put("columnSpan", value.columnSpan)
                 .put("rowSpan", value.rowSpan).put("showTitle", value.showTitle)
+                .put("informationLabelTextSizeSp", value.informationLabelTextSizeSp)
+                .put("informationValueTextSizeSp", value.informationValueTextSizeSp)
+                .put("informationFontFamily", value.informationFontFamily)
+                .put("informationTextBold", value.informationTextBold)
+                .put("informationTextItalic", value.informationTextItalic)
+                .put("informationHorizontalAlignment",
+                        value.informationHorizontalAlignment)
+                .put("informationVerticalAlignment",
+                        value.informationVerticalAlignment)
+                .put("informationPaddingLeftPx", value.informationPaddingLeftPx)
+                .put("informationPaddingTopPx", value.informationPaddingTopPx)
+                .put("informationPaddingRightPx", value.informationPaddingRightPx)
+                .put("informationPaddingBottomPx", value.informationPaddingBottomPx)
+                .put("informationGroup", value.informationGroup)
+                .put("informationPlacement", value.informationPlacement)
+                .put("informationShowValue", value.informationShowValue)
+                .put("informationIconSizePx", value.informationIconSizePx)
+                .put("informationIconAlpha", value.informationIconAlpha)
+                .put("informationIconOutlineAlpha",
+                        value.informationIconOutlineAlpha)
+                .put("informationIconOutlineWidth",
+                        value.informationIconOutlineWidth)
+                .put("informationUseStatusIconStyle",
+                        value.informationUseStatusIconStyle)
+                .put("closeFavoritePanelAfterAction",
+                        value.closeFavoritePanelAfterAction)
                 .put("enabled", value.enabled);
         if (value.stateBinding != null && value.stateBinding.isBound()) {
             json.put("stateBinding", value.stateBinding.toJson());
@@ -323,6 +520,8 @@ public final class LauncherShortcutStore {
             value.command = CarControlCommand.Operation.valueOf(json.optString(
                     "command", CarControlCommand.Operation.TOGGLE.name()));
             value.commandValue = json.optDouble("commandValue", 0);
+            value.commandCycleValues = cycleValuesFromJson(
+                    json.optJSONArray("commandCycleValues"));
             value.icon = json.optString("icon", "apps");
             value.iconCustomized = json.has("iconCustomized")
                     ? json.optBoolean("iconCustomized", false)
@@ -340,20 +539,91 @@ public final class LauncherShortcutStore {
             value.longCommand = CarControlCommand.Operation.valueOf(json.optString(
                     "longCommand", CarControlCommand.Operation.TOGGLE.name()));
             value.longCommandValue = json.optDouble("longCommandValue", 0);
+            value.longCommandCycleValues = cycleValuesFromJson(
+                    json.optJSONArray("longCommandCycleValues"));
             value.activeBackgroundColor = json.optString("activeBackgroundColor", "#CC374151");
             value.activeIconColor = json.optString("activeIconColor", "#FFFFB300");
             value.useVehicleStateColor = json.optBoolean("useVehicleStateColor", true);
             value.showState = json.optBoolean("showState", true);
             value.extendedClimateInfo = json.optBoolean("extendedClimateInfo", false);
             value.iconSizePx = json.optInt("iconSizePx", 54);
+            value.dividerThicknessPx = json.optInt("dividerThicknessPx", 2);
+            value.gapAfterPx = json.optInt("gapAfterPx", -1);
             value.columnSpan = json.optInt("columnSpan", 1);
             value.rowSpan = json.optInt("rowSpan", 1);
             value.showTitle = json.optBoolean("showTitle", true);
+            value.informationLabelTextSizeSp =
+                    json.optInt("informationLabelTextSizeSp", 11);
+            value.informationValueTextSizeSp =
+                    json.optInt("informationValueTextSizeSp", 20);
+            value.informationFontFamily = json.optString(
+                    "informationFontFamily", Fonts.DEFAULT_KEY);
+            value.informationTextBold =
+                    json.optBoolean("informationTextBold", true);
+            value.informationTextItalic =
+                    json.optBoolean("informationTextItalic", false);
+            value.informationHorizontalAlignment =
+                    json.optInt("informationHorizontalAlignment", 0);
+            value.informationVerticalAlignment =
+                    json.optInt("informationVerticalAlignment", 1);
+            value.informationPaddingLeftPx =
+                    json.optInt("informationPaddingLeftPx", 10);
+            value.informationPaddingTopPx =
+                    json.optInt("informationPaddingTopPx", 7);
+            value.informationPaddingRightPx =
+                    json.optInt("informationPaddingRightPx", 10);
+            value.informationPaddingBottomPx =
+                    json.optInt("informationPaddingBottomPx", 7);
+            value.informationGroup = json.optString("informationGroup", "");
+            value.informationPlacement = json.optInt("informationPlacement", 0);
+            value.informationShowValue =
+                    json.optBoolean("informationShowValue", true);
+            value.informationIconSizePx =
+                    json.optInt("informationIconSizePx", 32);
+            value.informationIconAlpha =
+                    json.optInt("informationIconAlpha", 255);
+            value.informationIconOutlineAlpha =
+                    json.optInt("informationIconOutlineAlpha", 0);
+            value.informationIconOutlineWidth =
+                    json.optInt("informationIconOutlineWidth", 0);
+            value.informationUseStatusIconStyle =
+                    json.optBoolean("informationUseStatusIconStyle", false);
+            value.closeFavoritePanelAfterAction =
+                    json.optBoolean("closeFavoritePanelAfterAction", false);
             value.enabled = json.optBoolean("enabled", true);
             return sanitize(value);
         } catch (IllegalArgumentException ignored) {
             return null;
         }
+    }
+
+    @NonNull
+    private static List<Double> sanitizeCycleValues(@Nullable List<Double> source) {
+        List<Double> result = new ArrayList<>();
+        if (source == null) return result;
+        for (Double value : source) {
+            if (value == null || !Double.isFinite(value) || result.contains(value)) continue;
+            result.add(value);
+        }
+        return result;
+    }
+
+    @NonNull
+    private static JSONArray cycleValuesToJson(@Nullable List<Double> source) {
+        JSONArray result = new JSONArray();
+        for (Double value : sanitizeCycleValues(source)) result.put(value);
+        return result;
+    }
+
+    @NonNull
+    private static List<Double> cycleValuesFromJson(@Nullable JSONArray source) {
+        List<Double> result = new ArrayList<>();
+        if (source == null) return result;
+        for (int index = 0; index < source.length(); index++) {
+            double value = source.optDouble(index, Double.NaN);
+            if (Double.isFinite(value) && !result.contains(value)) result.add(value);
+        }
+        return result;
     }
 
     @NonNull

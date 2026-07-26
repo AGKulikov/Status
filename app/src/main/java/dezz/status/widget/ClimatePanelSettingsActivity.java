@@ -257,8 +257,8 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
         updateCompactPositionInfo();
         updateModeSettings(preferences.climatePanelMode.get());
 
-        addTitle(settings, "Панель внутри HOME");
-        MaterialSwitch visible = addSwitch(settings, "Показывать панель на HOME",
+        addTitle(settings, "Блок внутри HOME");
+        MaterialSwitch visible = addSwitch(settings, "Показывать блок на HOME",
                 preferences.launcherClimateVisible.get(),
                 value -> preferences.launcherClimateVisible.set(value));
         visible.setChecked(preferences.launcherClimateVisible.get());
@@ -266,7 +266,7 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
         addButton(settings, "Размер и положение на HOME…", v ->
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_MODE, true)));
-        addHint(settings, "В редакторе HOME панель перемещается целиком. Маркер в правом нижнем углу меняет её ширину и высоту в пикселях.");
+        addHint(settings, "В редакторе HOME блок перемещается целиком. Маркер в правом нижнем углу меняет его ширину и высоту в пикселях.");
 
         addTitle(settings, "Оформление");
         addColor(settings, "Фон", () -> config.backgroundColor,
@@ -286,7 +286,7 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
         addSlider(settings, "Прозрачность неактивных плиток", config.inactiveTileAlpha, 0, 220,
                 value -> config.inactiveTileAlpha = value,
                 value -> Math.round(value * 100f / 255f) + "%");
-        addSlider(settings, "Общий масштаб панели", config.scalePercent, 60, 160,
+        addSlider(settings, "Общий масштаб блока", config.scalePercent, 60, 160,
                 value -> config.scalePercent = value, value -> value + "%");
         addColor(settings, "Активный цвет", () -> config.accentColor,
                 value -> config.accentColor = value);
@@ -309,7 +309,7 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
 
         addButton(settings, "Вернуть оформление по умолчанию", v ->
                 new AlertDialog.Builder(this)
-                        .setTitle("Сбросить климатическую панель?")
+                        .setTitle("Сбросить климатический блок?")
                         .setMessage("Оформление и выбор элементов вернутся к исходным. Размер и положение на HOME сохранятся.")
                         .setPositiveButton("Сбросить", (dialog, which) -> {
                             flushLiveUpdate();

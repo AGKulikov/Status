@@ -373,7 +373,7 @@ public class Preferences {
         }
     }
 
-    /** Stock Monjaro driver-panel generation selected by the user. */
+    /** Persisted generation marker retained only for one-time HA1084 migration. */
     public enum DriverPanelStyle {
         OLD("old"),
         NEW("new");
@@ -393,9 +393,9 @@ public class Preferences {
     /**
      * One complete, independently persisted driver-panel profile.
      *
-     * <p>The old profile deliberately keeps every HA1082 storage key unchanged. The new profile
-     * uses the additive {@code driverPanelNew*} namespace, so selecting another generation never
-     * overwrites the user's dimensions, appearance or ordered buttons.</p>
+     * <p>The old profile deliberately keeps every HA1082 storage key unchanged for migration.
+     * HA1085 exposes and runs only the current profile in the additive
+     * {@code driverPanelNew*} namespace.</p>
      */
     public static final class DriverPanelProfile {
         @NonNull public final DriverPanelStyle style;
@@ -505,6 +505,9 @@ public class Preferences {
     // Geometry is stored as versioned JSON because launcher elements are independent rectangles
     // (x/y/width/height) and the set will grow as new panels are added.
     public final Str launcherLayoutJson = new Str(this, "launcherLayoutJson", "");
+    /** Screen-wide geometry of individual HOME elements after migration from panel-local grids. */
+    public final Str launcherGlobalElementsJson = new Str(this,
+            "launcherGlobalElementsJson", "");
     public final Str launcherFavoritePackages = new Str(this, "launcherFavoritePackages", "");
     /** Per-application HOME icon/label sizes; selection and order remain in the legacy list. */
     public final Str launcherFavoriteAppsAppearanceJson = new Str(this,
@@ -523,8 +526,17 @@ public class Preferences {
     public final Bool launcherShowGrid = new Bool(this, "launcherShowGrid", true);
     public final Int launcherSnapPx = new Int(this, "launcherSnapPx", 20);
     public final Bool launcherImmersive = new Bool(this, "launcherImmersive", true);
+    /** Explicit HOME chain requested for ECARX: HOME -> our launcher -> windowed Navigator. */
+    public final Bool launcherHomeOpensWindowedNavigator = new Bool(this,
+            "launcherHomeOpensWindowedNavigator", false);
     public final Bool launcherAppsVisible = new Bool(this, "launcherAppsVisible", true);
     public final Bool launcherMediaVisible = new Bool(this, "launcherMediaVisible", true);
+    /** Resume the exact player remembered before shutdown; remains opt-in on every upgrade. */
+    public final Bool launcherMediaAutoResumeEnabled = new Bool(this,
+            "launcherMediaAutoResumeEnabled", false);
+    /** Delay lets ECARX finish restoring its audio/player services; mSaver's proven default is 5s. */
+    public final Int launcherMediaAutoResumeDelaySeconds = new Int(this,
+            "launcherMediaAutoResumeDelaySeconds", 5);
     public final Bool launcherClockVisible = new Bool(this, "launcherClockVisible", true);
     public final Bool launcherNavigationVisible = new Bool(this, "launcherNavigationVisible", true);
     public final Bool launcherActionsVisible = new Bool(this, "launcherActionsVisible", true);
@@ -578,31 +590,40 @@ public class Preferences {
     public final Int climateButtonY = new Int(this, "climateButtonY", 300);
     public final Bool climateButtonLocked = new Bool(this, "climateButtonLocked", false);
     public final Str launcherShortcutsJson = new Str(this, "launcherShortcutsJson", "");
-    // Optional replacement for either generation of the Monjaro driver rail. Enabled state and
-    // selected style are global; every dimension, appearance value and button collection below is
-    // profile-local. Missing driverPanelStyle intentionally resolves to OLD so an HA1082 upgrade
-    // continues using the existing driverPanel* values without a destructive copy migration.
+    // Current Monjaro driver rail plus the read-only legacy profile used by one-time migration.
     public final Bool driverPanelEnabled = new Bool(this, "driverPanelEnabled", false);
     public final Str driverPanelStyle = new Str(this, "driverPanelStyle",
-            DriverPanelStyle.OLD.key);
+            DriverPanelStyle.NEW.key);
     public final DriverPanelProfile driverPanelOld = new DriverPanelProfile(
             this, DriverPanelStyle.OLD, "driverPanel", 120);
     public final DriverPanelProfile driverPanelNew = new DriverPanelProfile(
             this, DriverPanelStyle.NEW, "driverPanelNew", 150);
-    // Source-compatible aliases for the original HA1082 profile and its exact on-disk keys.
+    // Source-compatible aliases now point at the only user-visible current profile.
     /** 0 = left/start edge, 1 = right/end edge. */
-    public final Int driverPanelSide = driverPanelOld.side;
-    public final Int driverPanelWidthPx = driverPanelOld.widthPx;
-    public final Int driverPanelTopPaddingPx = driverPanelOld.topPaddingPx;
-    public final Int driverPanelBottomPaddingPx = driverPanelOld.bottomPaddingPx;
-    public final Int driverPanelItemGapPx = driverPanelOld.itemGapPx;
-    public final Int driverPanelCornerRadiusPx = driverPanelOld.cornerRadiusPx;
-    public final Str driverPanelBackgroundColor = driverPanelOld.backgroundColor;
-    /** Separate ordered OLD-profile collection; never aliases the HOME action grid. */
-    public final Str driverPanelShortcutsJson = driverPanelOld.shortcutsJson;
+    public final Int driverPanelSide = driverPanelNew.side;
+    public final Int driverPanelWidthPx = driverPanelNew.widthPx;
+    public final Int driverPanelTopPaddingPx = driverPanelNew.topPaddingPx;
+    public final Int driverPanelBottomPaddingPx = driverPanelNew.bottomPaddingPx;
+    public final Int driverPanelItemGapPx = driverPanelNew.itemGapPx;
+    public final Int driverPanelCornerRadiusPx = driverPanelNew.cornerRadiusPx;
+    public final Str driverPanelBackgroundColor = driverPanelNew.backgroundColor;
+    /** Ordered collection for the unified current driver panel. */
+    public final Str driverPanelShortcutsJson = driverPanelNew.shortcutsJson;
     /** Independent fully customizable drawer opened from a driver-panel Favorites shortcut. */
     public final Str driverFavoritesShortcutsJson = new Str(this,
             "driverFavoritesShortcutsJson", "");
+    /** Unlimited independently addressable compact Favorites panels. */
+    public final Str driverFavoritesPanelsJson = new Str(this,
+            "driverFavoritesPanelsJson", "");
+    /** Last panel edited in settings; does not control runtime visibility. */
+    public final Str driverFavoritesSelectedPanelId = new Str(this,
+            "driverFavoritesSelectedPanelId", "favorites_default");
+    /** Independent multi-display HUD surface. The JSON document contains the selected display,
+     * grid, global presentation options and an unlimited ordered element collection. */
+    public final Bool hudPanelEnabled = new Bool(this, "hudPanelEnabled", false);
+    /** Restore the HUD presentation after boot/package replacement while the master switch is on. */
+    public final Bool hudPanelAutostart = new Bool(this, "hudPanelAutostart", true);
+    public final Str hudPanelConfigJson = new Str(this, "hudPanelConfigJson", "");
     /** Additive cell positions for action/smart-home icons; shortcut actions stay untouched. */
     public final Str launcherActionsGridJson = new Str(this, "launcherActionsGridJson", "");
     public final Int launcherAppsColumns = new Int(this, "launcherAppsColumns", 3);
@@ -765,17 +786,63 @@ public class Preferences {
         final Context deviceContext = context.getApplicationContext().createDeviceProtectedStorageContext();
         prefs = deviceContext.getSharedPreferences(context.getPackageName() + "_preferences", Context.MODE_PRIVATE);
         migrateLegacyPrefsIfNeeded();
+        migrateUnifiedDriverPanelIfNeeded();
     }
 
     @NonNull
     public DriverPanelStyle activeDriverPanelStyle() {
-        return DriverPanelStyle.fromKey(driverPanelStyle.get());
+        return DriverPanelStyle.NEW;
     }
 
     @NonNull
     public DriverPanelProfile activeDriverPanelProfile() {
-        return activeDriverPanelStyle() == DriverPanelStyle.NEW
-                ? driverPanelNew : driverPanelOld;
+        return driverPanelNew;
+    }
+
+    /** HA1085 removes the obsolete old/new selector while preserving the profile in active use. */
+    private void migrateUnifiedDriverPanelIfNeeded() {
+        if (prefs.getBoolean("driverPanelUnifiedHa1085", false)) return;
+        DriverPanelStyle selected = DriverPanelStyle.fromKey(
+                prefs.getString(driverPanelStyle.key, DriverPanelStyle.OLD.key));
+        SharedPreferences.Editor editor = prefs.edit();
+        if (selected == DriverPanelStyle.OLD) {
+            editor.putInt(driverPanelNew.side.key, driverPanelOld.side.get());
+            editor.putInt(driverPanelNew.widthPx.key,
+                    Math.max(DriverPanelLayoutPolicyCompat.NEW_MIN_WIDTH,
+                            driverPanelOld.widthPx.get()));
+            editor.putInt(driverPanelNew.topPaddingPx.key,
+                    driverPanelOld.topPaddingPx.get());
+            editor.putInt(driverPanelNew.bottomPaddingPx.key,
+                    driverPanelOld.bottomPaddingPx.get());
+            editor.putInt(driverPanelNew.itemGapPx.key, driverPanelOld.itemGapPx.get());
+            editor.putInt(driverPanelNew.cornerRadiusPx.key,
+                    driverPanelOld.cornerRadiusPx.get());
+            editor.putString(driverPanelNew.backgroundColor.key,
+                    driverPanelOld.backgroundColor.get());
+            editor.putString(driverPanelNew.shortcutsJson.key,
+                    driverPanelOld.shortcutsJson.get());
+        }
+        editor.putString(driverPanelStyle.key, DriverPanelStyle.NEW.key)
+                .putBoolean("driverPanelUnifiedHa1085", true)
+                .commit();
+    }
+
+    /** Avoids a common-to-driver package dependency for the fixed new-panel minimum. */
+    private static final class DriverPanelLayoutPolicyCompat {
+        static final int NEW_MIN_WIDTH = 150;
+    }
+
+    /** HA1084's single document remains the default panel; later panels get isolated documents. */
+    @NonNull
+    public Str driverFavoritesShortcuts(@Nullable String panelId) {
+        String id = panelId == null ? "" : panelId.trim();
+        if (id.isEmpty() || "favorites_default".equals(id)) {
+            return driverFavoritesShortcutsJson;
+        }
+        if (!id.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}")) {
+            throw new IllegalArgumentException("Invalid Favorites panel id");
+        }
+        return new Str(this, "driverFavoritesShortcutsJson." + id, "");
     }
 
     /**
@@ -1049,5 +1116,8 @@ public class Preferences {
         editor.commit();
         // The file may be from the legacy (pre-brick) schema — re-run migration so it adapts.
         migrateLegacyPrefsIfNeeded();
+        // A full backup made by HA1084 may still select the legacy driver profile and does not
+        // contain HA1085's migration marker. Preserve that active profile after import too.
+        migrateUnifiedDriverPanelIfNeeded();
     }
 }

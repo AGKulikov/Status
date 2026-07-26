@@ -50,4 +50,9 @@
     <color name="settings_warning">#FF9500</color>
     <color name="settings_purple">#AF52DE</color>
     <color name="settings_indigo">#5856D6</color>
+    <!-- High-contrast OFF state: the control remains visibly a switch on a white settings card. -->
+    <color name="settings_switch_track_off">#FF9A9AA1</color>
+    <color name="settings_switch_track_disabled">#66787880</color>
+    <color name="settings_switch_thumb_off">#FFFFFFFF</color>
+    <color name="settings_switch_thumb_disabled">#FFCECED3</color>
 </resources>

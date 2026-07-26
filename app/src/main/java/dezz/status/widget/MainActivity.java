@@ -99,6 +99,10 @@ public class MainActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
 
         applyWindowInsets();
+        // This editor owns its live status-overlay inset calculation below. Only normalize its
+        // legacy text Back control here so the Russian label never wraps on the 1920x720 unit.
+        dezz.status.widget.settings.SettingsBackNavigation.normalizeBackControls(
+                this, binding.getRoot());
 
         binding.sectionGeneral.aboutButton.setOnClickListener(v ->
                 startActivity(new Intent(this, AboutActivity.class)));

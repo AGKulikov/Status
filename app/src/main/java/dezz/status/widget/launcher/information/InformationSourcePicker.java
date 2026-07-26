@@ -69,6 +69,7 @@ public final class InformationSourcePicker {
 
     public void show() {
         String[] sources = {
+                "Статусная строка",
                 "Автомобиль и магнитола",
                 "Home Assistant",
                 "MQTT",
@@ -78,14 +79,27 @@ public final class InformationSourcePicker {
         new AlertDialog.Builder(activity)
                 .setTitle("Источник статуса")
                 .setItems(sources, (dialog, which) -> {
-                    if (which == 0) showInternal();
-                    else if (which == 1) showHomeAssistant();
-                    else if (which == 2) showMqtt();
-                    else if (which == 3) showSprut();
+                    if (which == 0) showStatusBar();
+                    else if (which == 1) showInternal();
+                    else if (which == 2) showHomeAssistant();
+                    else if (which == 3) showMqtt();
+                    else if (which == 4) showSprut();
                     else showPhone();
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
+    }
+
+    private void showStatusBar() {
+        List<Choice> choices = new ArrayList<>();
+        for (InformationPanelConfig.Item item : StatusBarInformationCatalog.items()) {
+            choices.add(new Choice(item,
+                    item.displayLabel() + "\nСтатусная строка",
+                    item.displayLabel() + " " + item.sourceId + " "
+                            + item.sourceTypeHint));
+        }
+        showSearch("Элементы статусной строки", "Название элемента", choices,
+                "Элементы статусной строки недоступны.");
     }
 
     private void showInternal() {
@@ -118,6 +132,10 @@ public final class InformationSourcePicker {
                 "battery level"));
         result.add(system("system.battery.charging", "Питание магнитолы", "",
                 "battery charging"));
+        result.add(system("system.bluetooth", "Bluetooth", "",
+                "bluetooth connected devices"));
+        result.add(system("system.wifi", "Wi‑Fi", "",
+                "wifi ssid signal"));
         result.add(system("system.network", "Сетевое подключение", "",
                 "network wifi"));
         result.add(system("system.storage.free", "Свободная память", "ГБ",

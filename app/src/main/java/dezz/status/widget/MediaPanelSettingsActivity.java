@@ -35,6 +35,7 @@ import java.util.Map;
 import dezz.status.widget.launcher.media.MediaPanelConfig;
 import dezz.status.widget.launcher.media.MediaPanelConfigStore;
 import dezz.status.widget.launcher.media.MediaPanelView;
+import dezz.status.widget.launcher.MediaPlaybackHistoryStore;
 import dezz.status.widget.launcher.panels.PanelEditScheduler;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
@@ -63,7 +64,7 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         store = new MediaPanelConfigStore(preferences);
         config = store.load();
         editScheduler = PanelEditScheduler.onMainThread(this::updatePreviewNow, this::saveNow);
-        setTitle("Медиапанель");
+        setTitle("Медиаблок");
         installContent();
     }
 
@@ -100,28 +101,53 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         settings.setPadding(dp(10), 0, dp(22), dp(28));
         settingsScroll.addView(settings, new ScrollView.LayoutParams(match(), wrap()));
 
-        addTitle(settings, "Медиапанель");
+        addTitle(settings, "Медиаблок");
         addHint(settings, "Расположение и размер элементов можно менять и здесь, в живом "
-                + "предпросмотре справа, и прямо на фактической панели HOME. Точные ползунки, "
+                + "предпросмотре справа, и прямо в фактическом блоке HOME. Точные ползунки, "
                 + "состав элементов, оформление и прокрутка текста остаются синхронизированы.");
         MaterialSwitch panelVisible = new MaterialSwitch(this);
-        panelVisible.setText("Показывать медиапанель на HOME");
+        panelVisible.setText("Показывать медиаблок на HOME");
         panelVisible.setTextSize(16);
         panelVisible.setMinHeight(dp(50));
         panelVisible.setChecked(preferences.launcherMediaVisible.get());
         panelVisible.setOnCheckedChangeListener((button, checked) ->
                 preferences.launcherMediaVisible.set(checked));
         settings.addView(panelVisible, new LinearLayout.LayoutParams(match(), wrap()));
-        addButton(settings, "Размер и положение панели на HOME…", v ->
+        addButton(settings, "Размер и положение блока на HOME…", v ->
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_MODE, true)));
-        addButton(settings, "Расположение элементов внутри панели на HOME…", v ->
+        addButton(settings, "Расположение элементов внутри блока на HOME…", v ->
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_MEDIA_CONTENT, true)));
 
+        addTitle(settings, "После загрузки магнитолы");
+        MaterialSwitch autoResume = new MaterialSwitch(this);
+        autoResume.setText("Продолжать музыку из последнего плеера");
+        autoResume.setTextSize(16);
+        autoResume.setMinHeight(dp(50));
+        autoResume.setChecked(preferences.launcherMediaAutoResumeEnabled.get());
+        autoResume.setOnCheckedChangeListener((button, checked) ->
+                preferences.launcherMediaAutoResumeEnabled.set(checked));
+        settings.addView(autoResume, new LinearLayout.LayoutParams(match(), wrap()));
+        MediaPlaybackHistoryStore.Snapshot playbackHistory =
+                MediaPlaybackHistoryStore.read(this);
+        String remembered = playbackHistory.packageName.isEmpty()
+                ? "пока не определён"
+                : applicationLabel(playbackHistory.packageName) + " · "
+                + (playbackHistory.wasPlaying ? "играл" : "был на паузе");
+        addHint(settings, "Последний плеер: " + remembered + ". После загрузки отправляется "
+                + "безопасная команда PLAY именно этому приложению и только если перед "
+                + "выключением оно играло. Тот же трек и очередь восстанавливает сам плеер.");
+        addSlider(settings, "Задержка команды",
+                Math.max(0, Math.min(60,
+                        preferences.launcherMediaAutoResumeDelaySeconds.get())),
+                0, 60,
+                preferences.launcherMediaAutoResumeDelaySeconds::set,
+                value -> value + " с");
+
         addTitle(settings, "Сетка");
         addHint(settings, "Число столбцов и строк задаёт размер ячейки внутри фактического "
-                + "размера панели. Если выбранная сетка не вмещает включённые элементы, "
+                + "размера блока. Если выбранная сетка не вмещает включённые элементы, "
                 + "приложение сохранит последний корректный размер.");
         addGridSlider(settings, "Столбцы", config.gridColumns,
                 MediaPanelConfig.MIN_GRID_COLUMNS, MediaPanelConfig.MAX_GRID_COLUMNS,
@@ -147,7 +173,7 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         settings.addView(elementList, new LinearLayout.LayoutParams(match(), wrap()));
         rebuildElementControls();
 
-        addTitle(settings, "Панель");
+        addTitle(settings, "Блок");
         addSlider(settings, "Расстояние между элементами", config.spacingPx, 0, 48,
                 value -> config.spacingPx = value, value -> value + " px");
         addSlider(settings, "Внутренний отступ", config.contentPaddingPx, 0, 64,
@@ -181,10 +207,10 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         addColor(settings, "Тонкая рамка", () -> config.outlineColor,
                 value -> config.outlineColor = value);
 
-        addButton(settings, "Вернуть медиапанель по умолчанию", v ->
+        addButton(settings, "Вернуть медиаблок по умолчанию", v ->
                 new AlertDialog.Builder(this)
-                        .setTitle("Сбросить медиапанель?")
-                        .setMessage("Состав, порядок, размеры и оформление вернутся к исходным. Положение панели на HOME сохранится.")
+                        .setTitle("Сбросить медиаблок?")
+                        .setMessage("Состав, порядок, размеры и оформление вернутся к исходным. Положение блока на HOME сохранится.")
                         .setPositiveButton("Сбросить", (dialog, which) -> {
                             store.reset();
                             config = store.load();
@@ -297,6 +323,14 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
                         return config.element(element.id).scalePercent;
                     },
                     selected -> selected + "%");
+            if (MediaPanelConfig.PROGRESS.equals(element.id)) {
+                addElementSlider(card, "Толщина полосы", element.progressBarHeightDp, 2, 40,
+                        selected -> {
+                            config.setProgressBarHeightDp(selected);
+                            return config.element(MediaPanelConfig.PROGRESS).progressBarHeightDp;
+                        },
+                        selected -> selected + " dp");
+            }
             if (MediaPanelConfig.supportsMarquee(element.id)) {
                 MaterialSwitch marquee = new MaterialSwitch(this);
                 marquee.setText("Прокручивать длинный текст");
@@ -499,6 +533,17 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), dp(62));
         lp.topMargin = dp(6);
         parent.addView(button, lp);
+    }
+
+    @NonNull
+    private String applicationLabel(@NonNull String packageName) {
+        try {
+            CharSequence label = getPackageManager().getApplicationLabel(
+                    getPackageManager().getApplicationInfo(packageName, 0));
+            return label == null ? packageName : label.toString();
+        } catch (Exception ignored) {
+            return packageName;
+        }
     }
 
     @NonNull

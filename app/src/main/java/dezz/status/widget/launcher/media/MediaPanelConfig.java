@@ -60,6 +60,8 @@ public final class MediaPanelConfig {
         public int scalePercent;
         /** Scroll overflowing title/artist/album text; short text remains stationary. */
         public boolean marqueeEnabled;
+        /** Progress widget's independently adjustable bar thickness. */
+        public int progressBarHeightDp;
         public int column;
         public int row;
         public int columnSpan;
@@ -73,6 +75,7 @@ public final class MediaPanelConfig {
             this.order = order;
             this.scalePercent = scalePercent;
             this.marqueeEnabled = marqueeEnabled;
+            this.progressBarHeightDp = PROGRESS.equals(id) ? 7 : 0;
             this.column = column;
             this.row = row;
             this.columnSpan = columnSpan;
@@ -80,8 +83,10 @@ public final class MediaPanelConfig {
         }
 
         @NonNull private Element copy() {
-            return new Element(id, enabled, order, scalePercent, marqueeEnabled,
+            Element value = new Element(id, enabled, order, scalePercent, marqueeEnabled,
                     column, row, columnSpan, rowSpan);
+            value.progressBarHeightDp = progressBarHeightDp;
+            return value;
         }
     }
 
@@ -179,6 +184,11 @@ public final class MediaPanelConfig {
     public void setMarqueeEnabled(@NonNull String id, boolean enabled) {
         Element value = elements.get(id);
         if (value != null && supportsMarquee(id)) value.marqueeEnabled = enabled;
+    }
+
+    public void setProgressBarHeightDp(int heightDp) {
+        Element value = elements.get(PROGRESS);
+        if (value != null) value.progressBarHeightDp = heightDp;
     }
 
     public boolean setPosition(@NonNull String id, int column, int row) {
@@ -347,6 +357,11 @@ public final class MediaPanelConfig {
             if (element != null) {
                 element.scalePercent = clamp(element.scalePercent, 45, 220);
                 if (!supportsMarquee(element.id)) element.marqueeEnabled = false;
+                if (PROGRESS.equals(element.id)) {
+                    element.progressBarHeightDp = clamp(element.progressBarHeightDp, 2, 40);
+                } else {
+                    element.progressBarHeightDp = 0;
+                }
                 normalizePlacement(element);
             }
         }

@@ -29,6 +29,7 @@ import java.util.List;
 import dezz.status.widget.climate.ClimatePanelService;
 import dezz.status.widget.climate.ScreenReservationStateStore;
 import dezz.status.widget.driver.DriverPanelService;
+import dezz.status.widget.hud.HudPresentationService;
 import dezz.status.widget.shell.PrivilegedShell;
 
 /**
@@ -65,7 +66,8 @@ public final class AppRuntimeBootstrap {
                                   @NonNull Preferences preferences) {
         Context appContext = context.getApplicationContext();
         boolean integrationHostRequired = preferences.widgetEnabled.get()
-                || preferences.driverPanelEnabled.get();
+                || preferences.driverPanelEnabled.get()
+                || preferences.hudPanelEnabled.get();
         WidgetService runningHost = WidgetService.getInstance();
         if (integrationHostRequired) {
             if (runningHost != null) {
@@ -90,6 +92,14 @@ public final class AppRuntimeBootstrap {
                 DriverPanelService.apply(appContext);
             } catch (RuntimeException error) {
                 Log.w(TAG, "Could not reconcile driver panel service", error);
+            }
+        }
+
+        if (preferences.hudPanelEnabled.get()) {
+            try {
+                HudPresentationService.apply(appContext);
+            } catch (RuntimeException error) {
+                Log.w(TAG, "Could not reconcile HUD display service", error);
             }
         }
 

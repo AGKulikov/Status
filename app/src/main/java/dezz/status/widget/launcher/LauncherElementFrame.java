@@ -15,6 +15,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -38,13 +39,19 @@ public final class LauncherElementFrame extends MaterialCardView {
     private final ImageView[] resizeHandles = new ImageView[4];
     private final GeometryListener listener;
     private boolean editMode;
+    private boolean contentTouchBlocked;
+    private boolean preserveAspectRatio;
     private int snapPx = 20;
+    private int minimumWidthPx;
+    private int minimumHeightPx;
     private float downRawX;
     private float downRawY;
     private int downX;
     private int downY;
     private int downWidth;
     private int downHeight;
+    private final int touchSlop;
+    private boolean movedSinceDown;
     private LauncherPanelResizeMath.Corner resizeCorner =
             LauncherPanelResizeMath.Corner.NONE;
 
@@ -53,6 +60,9 @@ public final class LauncherElementFrame extends MaterialCardView {
         super(context);
         this.elementId = elementId;
         this.listener = listener;
+        touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
+        minimumWidthPx = dp(160);
+        minimumHeightPx = dp(96);
 
         setRadius(dp(24));
         setCardElevation(dp(5));
@@ -111,24 +121,44 @@ public final class LauncherElementFrame extends MaterialCardView {
         setClickable(enabled);
     }
 
+    /** Prevents the invisible legacy source panel from receiving touches behind global proxies. */
+    public void setContentTouchBlocked(boolean blocked) {
+        contentTouchBlocked = blocked;
+        if (blocked) setClickable(false);
+    }
+
+    /** Individual labels and icons may be much smaller than the old whole-panel minimum. */
+    public void setMinimumGeometryPx(int width, int height) {
+        minimumWidthPx = Math.max(1, width);
+        minimumHeightPx = Math.max(1, height);
+    }
+
+    public void setPreserveAspectRatio(boolean preserve) {
+        preserveAspectRatio = preserve;
+    }
+
     @Override
     public boolean onInterceptTouchEvent(MotionEvent event) {
+        if (contentTouchBlocked) return true;
         return editMode || super.onInterceptTouchEvent(event);
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        if (contentTouchBlocked) return false;
         if (!editMode) return super.onTouchEvent(event);
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) getLayoutParams();
         if (lp == null) return false;
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                bringToFront();
                 downRawX = event.getRawX();
                 downRawY = event.getRawY();
                 downX = lp.leftMargin;
                 downY = lp.topMargin;
                 downWidth = getWidth();
                 downHeight = getHeight();
+                movedSinceDown = false;
                 resizeCorner = LauncherPanelResizeMath.cornerAt(
                         event.getX(), event.getY(), getWidth(), getHeight(), dp(64));
                 if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
@@ -136,14 +166,24 @@ public final class LauncherElementFrame extends MaterialCardView {
             case MotionEvent.ACTION_MOVE:
                 int dx = Math.round(event.getRawX() - downRawX);
                 int dy = Math.round(event.getRawY() - downRawY);
+                if (Math.abs(dx) > touchSlop || Math.abs(dy) > touchSlop) {
+                    movedSinceDown = true;
+                }
                 if (resizeCorner != LauncherPanelResizeMath.Corner.NONE) {
                     View parent = (View) getParent();
-                    LauncherPanelResizeMath.Rect resized = LauncherPanelResizeMath.resize(
-                            resizeCorner,
+                    LauncherPanelResizeMath.Rect start =
                             new LauncherPanelResizeMath.Rect(
-                                    downX, downY, downX + downWidth, downY + downHeight),
-                            dx, dy, parent.getWidth(), parent.getHeight(),
-                            dp(160), dp(96), snapPx);
+                                    downX, downY, downX + downWidth, downY + downHeight);
+                    LauncherPanelResizeMath.Rect resized = preserveAspectRatio
+                            ? LauncherPanelResizeMath.resizeKeepingAspect(
+                                    resizeCorner, start, dx, dy,
+                                    parent.getWidth(), parent.getHeight(),
+                                    minimumWidthPx, minimumHeightPx, snapPx,
+                                    downWidth / (float) Math.max(1, downHeight))
+                            : LauncherPanelResizeMath.resize(
+                                    resizeCorner, start, dx, dy,
+                                    parent.getWidth(), parent.getHeight(),
+                                    minimumWidthPx, minimumHeightPx, snapPx);
                     lp.leftMargin = resized.left;
                     lp.topMargin = resized.top;
                     lp.width = resized.width();
@@ -162,7 +202,9 @@ public final class LauncherElementFrame extends MaterialCardView {
                 listener.onGeometryChanged(elementId, lp.leftMargin, lp.topMargin,
                         Math.max(1, lp.width), Math.max(1, lp.height));
                 resizeCorner = LauncherPanelResizeMath.Corner.NONE;
-                performClick();
+                if (event.getActionMasked() == MotionEvent.ACTION_UP && !movedSinceDown) {
+                    performClick();
+                }
                 return true;
             default:
                 return true;
@@ -211,7 +253,7 @@ public final class LauncherElementFrame extends MaterialCardView {
             case TOP_RIGHT: return "Изменить размер за правый верхний угол";
             case BOTTOM_LEFT: return "Изменить размер за левый нижний угол";
             case BOTTOM_RIGHT: return "Изменить размер за правый нижний угол";
-            default: return "Изменить размер панели";
+            default: return "Изменить размер блока";
         }
     }
 

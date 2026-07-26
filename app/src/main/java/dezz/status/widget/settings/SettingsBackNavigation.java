@@ -6,10 +6,12 @@
 package dezz.status.widget.settings;
 
 import android.content.res.ColorStateList;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -32,6 +34,14 @@ import dezz.status.widget.WidgetService;
  * untouched.  It also accounts for the app's own status-row overlay.</p>
  */
 public final class SettingsBackNavigation {
+    /**
+     * The head unit's primary display is 1920x720 and commonly runs an enlarged font scale.
+     * 116dp was not enough for the Russian label plus the icon at that scale and wrapped the last
+     * letter onto a second line. Keep a single, touch-friendly geometry on every settings page.
+     */
+    private static final int BACK_BUTTON_MIN_WIDTH_DP = 148;
+    private static final int BACK_BUTTON_HEIGHT_DP = 50;
+
     private interface SafeInsetListener {
         void onExtraTopChanged(int extraTop);
     }
@@ -57,7 +67,9 @@ public final class SettingsBackNavigation {
         back.setText("Назад");
         back.setTextSize(15);
         back.setGravity(Gravity.CENTER);
+        makeTextBackButtonSafe(activity, back);
         back.setIconResource(R.drawable.ic_arrow_back);
+        back.setIconPadding(dp(activity, 7));
         back.setIconTint(ColorStateList.valueOf(
                 ContextCompat.getColor(activity, R.color.settings_accent)));
         back.setTextColor(ContextCompat.getColor(activity, R.color.settings_accent));
@@ -74,11 +86,12 @@ public final class SettingsBackNavigation {
         back.setOnClickListener(view -> activity.finish());
 
         FrameLayout.LayoutParams buttonParams = new FrameLayout.LayoutParams(
-                dp(activity, 116), dp(activity, 48), Gravity.TOP | Gravity.START);
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                dp(activity, BACK_BUTTON_HEIGHT_DP), Gravity.TOP | Gravity.START);
         buttonParams.leftMargin = dp(activity, 14);
         activity.addContentView(back, buttonParams);
 
-        trackSafeTop(activity, content, baseTop, dp(activity, 64), extra -> {
+        trackSafeTop(activity, content, baseTop, dp(activity, 66), extra -> {
             ViewGroup.LayoutParams raw = back.getLayoutParams();
             if (raw instanceof FrameLayout.LayoutParams) {
                 FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) raw;
@@ -95,7 +108,66 @@ public final class SettingsBackNavigation {
      */
     public static void applySafeTopInset(@NonNull AppCompatActivity activity,
                                          @NonNull View content) {
+        normalizeBackControls(activity, content);
         trackSafeTop(activity, content, content.getPaddingTop(), 0, null);
+    }
+
+    /**
+     * Applies the 1920x720-safe Back geometry without changing a screen's inset handling.
+     *
+     * <p>The legacy status editor already composes the system and live-overlay insets itself, so
+     * it uses this method instead of {@link #applySafeTopInset(AppCompatActivity, View)}.</p>
+     */
+    public static void normalizeBackControls(@NonNull AppCompatActivity activity,
+                                             @NonNull View content) {
+        normalizeExistingBackButtons(activity, content);
+    }
+
+    /**
+     * Normalizes legacy layout/programmatic Back buttons too. A number of older screens own their
+     * toolbar instead of calling {@link #install}; applying this from their existing safe-inset
+     * call prevents a fixed 96-120dp width from wrapping under the head unit's font scale.
+     */
+    private static void normalizeExistingBackButtons(@NonNull AppCompatActivity activity,
+                                                     @NonNull View root) {
+        if (root instanceof TextView) {
+            TextView textView = (TextView) root;
+            CharSequence text = textView.getText();
+            String label = text == null ? "" : text.toString().trim();
+            boolean backLabel = label.toLowerCase(java.util.Locale.ROOT).contains("назад")
+                    || label.equalsIgnoreCase("back")
+                    || label.startsWith("←")
+                    || label.startsWith("‹");
+            if (textView instanceof android.widget.Button && backLabel) {
+                makeTextBackButtonSafe(activity, textView);
+                ViewGroup.LayoutParams params = textView.getLayoutParams();
+                int minimumWidth = dp(activity, BACK_BUTTON_MIN_WIDTH_DP);
+                int minimumHeight = dp(activity, BACK_BUTTON_HEIGHT_DP);
+                if (params != null && params.width > 0 && params.width < minimumWidth) {
+                    params.width = minimumWidth;
+                }
+                if (params != null && params.height > 0 && params.height < minimumHeight) {
+                    params.height = minimumHeight;
+                }
+                if (params != null) textView.setLayoutParams(params);
+            }
+        }
+        if (!(root instanceof ViewGroup)) return;
+        ViewGroup group = (ViewGroup) root;
+        for (int index = 0; index < group.getChildCount(); index++) {
+            normalizeExistingBackButtons(activity, group.getChildAt(index));
+        }
+    }
+
+    private static void makeTextBackButtonSafe(@NonNull AppCompatActivity activity,
+                                               @NonNull TextView button) {
+        button.setSingleLine(true);
+        button.setMaxLines(1);
+        button.setEllipsize(TextUtils.TruncateAt.END);
+        button.setMinWidth(dp(activity, BACK_BUTTON_MIN_WIDTH_DP));
+        button.setMinHeight(dp(activity, BACK_BUTTON_HEIGHT_DP));
+        button.setMinimumWidth(dp(activity, BACK_BUTTON_MIN_WIDTH_DP));
+        button.setMinimumHeight(dp(activity, BACK_BUTTON_HEIGHT_DP));
     }
 
     private static void trackSafeTop(@NonNull AppCompatActivity activity,

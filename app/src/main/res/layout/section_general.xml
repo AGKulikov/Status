@@ -40,10 +40,15 @@
                 android:id="@+id/detailBackButton"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="wrap_content"
-                android:layout_height="48dp"
+                android:layout_height="50dp"
                 android:layout_marginEnd="@dimen/optionsMarginSmall"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:minWidth="148dp"
+                android:singleLine="true"
                 android:text="Назад"
-                app:icon="@drawable/ic_arrow_back" />
+                app:icon="@drawable/ic_arrow_back"
+                app:iconPadding="7dp" />
 
             <ImageView
                 android:layout_width="@dimen/sectionHeaderIconSize"

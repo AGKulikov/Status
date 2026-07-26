@@ -55,6 +55,8 @@ public final class SettingsBackNavigationContractTest {
             {"HomeAssistantSettingsActivity.java",
                     "back.setContentDescription(\"Назад\")",
                     "back.setOnClickListener(view -> finish())"},
+            {"HudPanelSettingsActivity.java", "Button back = button(\"←\")",
+                    "back.setOnClickListener(view -> finish())"},
             {"IntentScenarioSettingsActivity.java", "back.setContentDescription(\"Назад\")",
                     "back.setOnClickListener(view -> finish())"},
             {"LauncherShortcutSettingsActivity.java", "back.setText(\"←  Назад\")",
@@ -80,6 +82,7 @@ public final class SettingsBackNavigationContractTest {
             "AppSelectionActivity.java",
             "AutomationSettingsActivity.java",
             "HomeAssistantSettingsActivity.java",
+            "HudPanelSettingsActivity.java",
             "IntentScenarioSettingsActivity.java",
             "LauncherShortcutSettingsActivity.java",
             "MqttSettingsActivity.java",
@@ -145,6 +148,12 @@ public final class SettingsBackNavigationContractTest {
         assertTrue(source.contains("back.setContentDescription(\"Назад\")"));
         assertTrue(source.contains("back.setOnClickListener(view -> activity.finish())"));
         assertTrue(source.contains("activity.addContentView(back, buttonParams)"));
+        assertTrue(source.contains("BACK_BUTTON_MIN_WIDTH_DP = 148"));
+        assertTrue(source.contains("button.setSingleLine(true)"));
+        assertTrue(source.contains("TextUtils.TruncateAt.END"));
+        assertTrue(source.contains("ViewGroup.LayoutParams.WRAP_CONTENT"));
+        assertTrue(source.contains("normalizeBackControls(activity, content)"));
+        assertTrue(source.contains("normalizeExistingBackButtons(activity, content)"));
     }
 
     @Test
@@ -178,6 +187,8 @@ public final class SettingsBackNavigationContractTest {
         assertTrue(helper.contains("content.postDelayed(updater[0], 750L)"));
 
         String legacyStatusEditor = javaSource("MainActivity.java");
+        assertTrue(legacyStatusEditor.contains(
+                "SettingsBackNavigation.normalizeBackControls("));
         assertTrue(legacyStatusEditor.contains("updateStatusBarPadding(h)"));
         assertTrue(legacyStatusEditor.contains(
                 "Math.max(0, widgetHeight - systemTopInset)"));
@@ -203,6 +214,8 @@ public final class SettingsBackNavigationContractTest {
         assertTrue(layout("section_general.xml").contains(
                 "android:id=\"@+id/detailBackButton\""));
         assertTrue(layout("section_general.xml").contains("android:text=\"Назад\""));
+        assertTrue(layout("section_general.xml").contains("android:singleLine=\"true\""));
+        assertTrue(layout("section_general.xml").contains("android:minWidth=\"148dp\""));
     }
 
     @Test
@@ -231,6 +244,8 @@ public final class SettingsBackNavigationContractTest {
         assertTrue(source.contains(".putExtra(EXTRA_SHOW_BACK, true)"));
         assertTrue(source.contains("buildBackButton()"));
         assertTrue(source.contains("button.setText(\"Назад\")"));
+        assertTrue(source.contains("new LinearLayout.LayoutParams(wrap(), dp(50))"));
+        assertTrue(source.contains("button.setSingleLine(true)"));
         assertTrue(source.contains("button.setVisibility(showBack ? View.VISIBLE : View.GONE)"));
     }
 

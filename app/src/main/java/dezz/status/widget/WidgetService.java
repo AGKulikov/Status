@@ -111,6 +111,10 @@ import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.IntentScenarioController;
 import dezz.status.widget.integration.LocalScenarioController;
 import dezz.status.widget.driver.DriverPanelService;
+import dezz.status.widget.hud.HudPresentationService;
+import dezz.status.widget.launcher.LauncherShortcutStore;
+import dezz.status.widget.launcher.MediaPlaybackHistoryStore;
+import dezz.status.widget.launcher.information.StatusBarInformationCatalog;
 import dezz.status.widget.ha.api.HaApiController;
 import dezz.status.widget.ha.api.HaEntityCatalog;
 import dezz.status.widget.ha.api.HaWebSocketConnector;
@@ -275,6 +279,13 @@ public class WidgetService extends Service {
                 }
             }
         }
+        if (changed.containsKey(AutomationContract.SCOPE_DRIVER)
+                && prefs != null && prefs.driverPanelEnabled.get()) {
+            DriverPanelService.apply(this);
+        }
+        if (changed.containsKey(AutomationContract.SCOPE_HUD)) {
+            HudPresentationService.notifyAutomationChanged(this);
+        }
         // Popup windows have an independent WindowManager lifecycle. A failed/retrying status-row
         // attachment must not discard their connector updates.
         if (WidgetService.this.binding == null) return;
@@ -316,7 +327,7 @@ public class WidgetService extends Service {
             // Location AppOps are shared with the status row but are not required by the
             // independently attached driver rail or its HA/MQTT/Sprut live-state host. Keep that
             // host alive while the status surface waits for permissions to be restored.
-            if (prefs.driverPanelEnabled.get()) {
+            if (prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get()) {
                 ensureEnabledRuntime();
             } else {
                 stopSelf();
@@ -763,7 +774,9 @@ public class WidgetService extends Service {
                         for (String target : targets) {
                             if (target.startsWith(AutomationContract.SCOPE_DRIVER + "|")) {
                                 DriverPanelService.apply(this);
-                                break;
+                            }
+                            if (target.startsWith(AutomationContract.SCOPE_HUD + "|")) {
+                                HudPresentationService.notifyAutomationChanged(this);
                             }
                         }
                     });
@@ -799,9 +812,9 @@ public class WidgetService extends Service {
 
         if (prefs.widgetEnabled.get()) {
             createOverlayView();
-        } else if (prefs.driverPanelEnabled.get()) {
-            // The driver rail is an independent UI surface. Keep HA/MQTT/Sprut and scenarios
-            // alive without attaching the status-row window when only that rail is enabled.
+        } else if (prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get()) {
+            // Driver and HUD surfaces are independent. Keep HA/MQTT/Sprut and scenarios alive
+            // without attaching the status-row window when only either one is enabled.
             runInitialIntegrationStartup();
         } else {
             stopSelf();
@@ -830,6 +843,7 @@ public class WidgetService extends Service {
         // driver rail once after that consolidated evaluation so boot-time visibility/action
         // overrides are already reflected in its very first stable configuration.
         if (prefs.driverPanelEnabled.get()) DriverPanelService.apply(this);
+        if (prefs.hudPanelEnabled.get()) HudPresentationService.notifyAutomationChanged(this);
         mainHandler.removeCallbacks(automationFreshnessTick);
         mainHandler.postDelayed(automationFreshnessTick, 30_000L);
     }
@@ -1083,7 +1097,8 @@ public class WidgetService extends Service {
             }
             // A transient status-row rejection must not freeze live smart-home state on the
             // independently attached driver rail while we wait for WindowManager's retry.
-            if (prefs.driverPanelEnabled.get() && !integrationsStarted) {
+            if ((prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get())
+                    && !integrationsStarted) {
                 runInitialIntegrationStartup();
             }
             return;
@@ -1278,7 +1293,8 @@ public class WidgetService extends Service {
      */
     void ensureEnabledRuntime() {
         if (destroyed || prefs == null) return;
-        if (prefs.driverPanelEnabled.get() && !integrationsStarted) {
+        if ((prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get())
+                && !integrationsStarted) {
             runInitialIntegrationStartup();
         }
         if (prefs.widgetEnabled.get() && binding == null && !overlayAttachRetryScheduled
@@ -1301,7 +1317,8 @@ public class WidgetService extends Service {
         if (!statusSurfaceEnabled) {
             detachStatusSurfaceRuntime("status row disabled");
         }
-        if (!statusSurfaceEnabled && !prefs.driverPanelEnabled.get()) {
+        if (!statusSurfaceEnabled && !prefs.driverPanelEnabled.get()
+                && !prefs.hudPanelEnabled.get()) {
             stopSelf();
             return;
         }
@@ -1355,8 +1372,10 @@ public class WidgetService extends Service {
         List<BrickType> bricks = BrickType.parseOrder(prefs.brickOrder.get());
         Set<BrickType> bricksSet = EnumSet.noneOf(BrickType.class);
         bricksSet.addAll(bricks);
-        Set<BrickType> trackingSet = EnumSet.copyOf(bricksSet);
+        Set<BrickType> trackingSet = EnumSet.noneOf(BrickType.class);
+        trackingSet.addAll(bricksSet);
         trackingSet.addAll(popupBuiltinTypes());
+        trackingSet.addAll(driverInformationBrickTypes());
 
         // The content-change LayoutTransition only makes sense in floating mode, where the
         // widget's own width animates as brick content grows/shrinks. In status-bar mode the
@@ -2598,6 +2617,19 @@ public class WidgetService extends Service {
         return set;
     }
 
+    @NonNull
+    private Set<BrickType> driverInformationBrickTypes() {
+        Set<BrickType> result = EnumSet.noneOf(BrickType.class);
+        if (prefs == null || !prefs.driverPanelEnabled.get()) return result;
+        for (LauncherShortcutStore.Shortcut shortcut :
+                LauncherShortcutStore.forDriverPanel(prefs).all()) {
+            if (!shortcut.enabled || shortcut.kind != LauncherShortcutStore.Kind.INFO) continue;
+            BrickType type = StatusBarInformationCatalog.typeForTarget(shortcut.target);
+            if (type != null) result.add(type);
+        }
+        return result;
+    }
+
     /**
      * Computes the tallest brick height (in pixels) over all bricks currently in
      * {@code brickOrder}, regardless of per-app visibility. Used as the widget's minimum height so
@@ -2793,7 +2825,10 @@ public class WidgetService extends Service {
                 && prefs.hideKeepsSpaceFor(BrickType.MEDIA).get();
         boolean mainMediaVisible = mainMediaRequested && !mainMediaHidden;
         boolean popupMediaRequested = isPopupBuiltinRequested(BrickType.MEDIA);
-        if (!mainMediaVisible && !mainMediaKeepsSpace && !popupMediaRequested) {
+        boolean driverMediaRequested =
+                driverInformationBrickTypes().contains(BrickType.MEDIA);
+        if (!mainMediaVisible && !mainMediaKeepsSpace
+                && !popupMediaRequested && !driverMediaRequested) {
             binding.mediaContainer.setVisibility(View.GONE);
             stopMediaProgressTicker();
             lastMediaSubtitle = null;
@@ -2833,6 +2868,12 @@ public class WidgetService extends Service {
             subtitle = getString(R.string.media_unknown_track);
         }
         PlaybackState playbackState = playing.getPlaybackState();
+        if (playbackState != null
+                && (playbackState.getState() == PlaybackState.STATE_PLAYING
+                || playbackState.getState() == PlaybackState.STATE_PAUSED)) {
+            MediaPlaybackHistoryStore.record(this, playing.getPackageName(),
+                    playbackState.getState() == PlaybackState.STATE_PLAYING);
+        }
         // Pause shape only for an actual PAUSED; transient states (buffering / seeking) keep the
         // play shape so the icon doesn't flicker every time the user scrubs.
         // Players republish PlaybackState continuously (Yandex Music every second), and
@@ -3882,6 +3923,148 @@ public class WidgetService extends Service {
         return Math.max(root.getHeight(), root.getMeasuredHeight());
     }
 
+    /**
+     * Current status-bar brick presentation for same-process secondary surfaces.
+     *
+     * <p>This is deliberately a read-only snapshot: the driver panel reuses the exact selected
+     * icon family, semantic state colour, outline and badge without registering a second set of
+     * Bluetooth, GNSS, connectivity, media or vehicle listeners.</p>
+     */
+    @Nullable
+    public StatusBrickSnapshot statusBrickSnapshot(@NonNull BrickType type) {
+        if (destroyed || prefs == null || binding == null) return null;
+        String text = "";
+        int iconResource = 0;
+        int iconTint = ContextCompat.getColor(
+                themedContext != null ? themedContext : this, R.color.text_primary);
+        int outlineColor = ContextCompat.getColor(
+                themedContext != null ? themedContext : this, R.color.text_outline);
+        int outlineWidth = 0;
+        String badgeText = null;
+        int badgeBackground = 0;
+        int badgeForeground = ContextCompat.getColor(
+                themedContext != null ? themedContext : this, R.color.text_outline)
+                | 0xFF000000;
+        int badgeDrawableResource = 0;
+        boolean known = true;
+        boolean active = true;
+
+        int iconType = -1;
+        int state = 0;
+        Preferences.IconBrickPrefs iconPrefs = null;
+        switch (type) {
+            case TIME:
+                text = timeFormat.format(new Date());
+                break;
+            case DATE:
+                text = String.valueOf(binding.dateText.getText());
+                known = !text.trim().isEmpty();
+                break;
+            case MEDIA:
+                text = lastMediaSubtitle == null ? "" : lastMediaSubtitle;
+                known = !text.isEmpty();
+                active = known;
+                break;
+            case WIFI:
+                iconType = ICON_TYPE_WIFI;
+                state = wifiState.ordinal();
+                iconPrefs = prefs.wifi;
+                active = wifiState == WiFiState.INTERNET
+                        || wifiState == WiFiState.LIMITED_INTERNET;
+                switch (wifiState) {
+                    case INTERNET: text = "Интернет"; break;
+                    case LIMITED_INTERNET: text = "Ограниченная сеть"; break;
+                    case NO_INTERNET: text = "Без интернета"; break;
+                    case OFF:
+                    default: text = "Wi‑Fi выключен"; break;
+                }
+                break;
+            case GPS:
+                iconType = ICON_TYPE_GNSS;
+                state = gnssState.ordinal();
+                iconPrefs = prefs.gps;
+                active = gnssState == GnssState.GOOD;
+                text = gnssState == GnssState.GOOD ? "GPS"
+                        : gnssState == GnssState.BAD ? "Нет фиксации" : "GPS выключен";
+                break;
+            case BLUETOOTH:
+                iconType = ICON_TYPE_BT;
+                state = bluetoothState.ordinal();
+                iconPrefs = prefs.bluetooth;
+                active = bluetoothState == BluetoothState.CONNECTED;
+                text = bluetoothState == BluetoothState.CONNECTED
+                        ? "Подключено" : bluetoothState == BluetoothState.NO_DEVICE
+                        ? "Нет устройств" : "Bluetooth выключен";
+                break;
+            case INDOOR_TEMP:
+                text = String.valueOf(binding.indoorTempText.getText());
+                known = !text.isEmpty() && !TEMP_PLACEHOLDER.equals(text);
+                active = known;
+                break;
+            case OUTDOOR_TEMP:
+                text = String.valueOf(binding.outdoorTempText.getText());
+                known = !text.isEmpty() && !TEMP_PLACEHOLDER.equals(text);
+                active = known;
+                break;
+            default:
+                return null;
+        }
+
+        if (iconType >= 0 && iconPrefs != null) {
+            int designIndex = Math.min(Math.max(0, prefs.iconDesign.get()),
+                    ICON_DESIGNS.length - 1);
+            int[][] design = ICON_DESIGNS[designIndex];
+            state = Math.min(Math.max(0, state), design[iconType].length - 1);
+            iconResource = design[iconType][state];
+            int[] colorResources = iconType == ICON_TYPE_WIFI ? WIFI_STATE_COLOR_RES
+                    : iconType == ICON_TYPE_GNSS ? GNSS_STATE_COLOR_RES : BT_STATE_COLOR_RES;
+            if (Math.min(Math.max(0, prefs.iconStyle.get()), 1) == STYLE_COLOR) {
+                iconTint = ContextCompat.getColor(
+                        themedContext != null ? themedContext : this, colorResources[state]);
+            }
+            int outlineAlpha = iconPrefs.outlineAlpha.get();
+            outlineWidth = outlineAlpha <= 0 ? 0 : iconPrefs.outlineWidth.get();
+            outlineColor = (outlineColor & 0x00FFFFFF)
+                    | (Math.min(255, Math.max(0, outlineAlpha)) << 24);
+            int styleBackground = iconTint;
+
+            if (iconType == ICON_TYPE_WIFI
+                    && state == WiFiState.LIMITED_INTERNET.ordinal()) {
+                badgeDrawableResource = R.drawable.ic_badge_ru_flag;
+            } else if (iconType == ICON_TYPE_GNSS && prefs.gps.showSatelliteBadge.get()
+                    && android.os.SystemClock.uptimeMillis() - satellitesCountTimestamp
+                    < GNSSSHARE_SATELLITE_STATUS_TIMEOUT_MS) {
+                boolean deadReckoning = (gnssModeFlags & GNSSSHARE_MODE_DR) != 0;
+                boolean spoofDetected = (gnssModeFlags & GNSSSHARE_MODE_SPOOF) != 0;
+                if (deadReckoning) badgeText = getString(R.string.gnss_dr_badge);
+                else if (spoofDetected) badgeText = getString(R.string.gnss_spoof_badge);
+                else if (satellitesCount > 0) badgeText = String.valueOf(satellitesCount);
+                if (badgeText != null) {
+                    if (spoofDetected) {
+                        badgeBackground = ContextCompat.getColor(this, R.color.status_error);
+                        badgeForeground = ContextCompat.getColor(
+                                this, R.color.status_badge_text);
+                    } else if (deadReckoning) {
+                        badgeBackground = ContextCompat.getColor(this, R.color.status_warning);
+                        badgeForeground = ContextCompat.getColor(
+                                this, R.color.status_badge_text);
+                    } else {
+                        badgeBackground = styleBackground;
+                    }
+                }
+            } else if (iconType == ICON_TYPE_BT
+                    && prefs.bluetooth.showDeviceCountBadge.get()
+                    && bluetoothState == BluetoothState.CONNECTED
+                    && !btConnectedAddrs.isEmpty()) {
+                badgeText = String.valueOf(btConnectedAddrs.size());
+                badgeBackground = styleBackground;
+            }
+        }
+        return new StatusBrickSnapshot(text, iconResource, iconTint,
+                outlineColor, outlineWidth, badgeText, badgeBackground, badgeForeground,
+                badgeDrawableResource, known, active);
+    }
+
     /** Immutable read-only connector snapshot for settings/catalog pickers. */
     @NonNull
     public List<ConnectorValue> connectorValueSnapshot() {
@@ -3912,6 +4095,14 @@ public class WidgetService extends Service {
         if (current != null) current.removeListener(listener);
     }
 
+    /** Complete scenario/broadcast presentation state for one external HUD element. */
+    @NonNull
+    public AutomationState hudAutomationState(@NonNull String automationId) {
+        AutomationStateStore current = automationStates;
+        return current == null ? AutomationState.missing() : current.get(
+                AutomationContract.SCOPE_HUD, automationId);
+    }
+
     /** Scenario-resolved visibility for one driver-panel shortcut. */
     public boolean driverShortcutVisible(@NonNull String shortcutId, boolean defaultValue) {
         AutomationStateStore current = automationStates;
@@ -3925,6 +4116,14 @@ public class WidgetService extends Service {
         AutomationStateStore current = automationStates;
         return current == null ? defaultValue : current.effectiveActionEnabled(
                 AutomationContract.SCOPE_DRIVER, shortcutId, defaultValue);
+    }
+
+    /** Explicit automation decision for one transient Favorites panel; null preserves manual UI. */
+    @Nullable
+    public Boolean driverFavoritePanelVisibility(@NonNull String panelId) {
+        AutomationStateStore current = automationStates;
+        return current == null ? null : current.explicitVisibility(
+                AutomationContract.SCOPE_DRIVER, panelId);
     }
 
     private static Rect getBounds(View view) {

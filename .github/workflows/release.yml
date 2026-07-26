@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    branches: ['release/v2.8.2-ha1084']
+    branches: ['release/v*']
     tags: ['v*']
   workflow_dispatch:
     inputs:

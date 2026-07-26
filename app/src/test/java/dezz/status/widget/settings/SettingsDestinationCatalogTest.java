@@ -31,6 +31,7 @@ public final class SettingsDestinationCatalogTest {
             "dezz.status.widget.FavoriteAppsSettingsActivity",
             "dezz.status.widget.FavoriteRoutesSettingsActivity",
             "dezz.status.widget.HomeAssistantSettingsActivity",
+            "dezz.status.widget.HudPanelSettingsActivity",
             "dezz.status.widget.InformationPanelSettingsActivity",
             "dezz.status.widget.IntentScenarioSettingsActivity",
             "dezz.status.widget.LauncherSettingsActivity",

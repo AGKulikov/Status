@@ -36,7 +36,7 @@ public final class SettingsDestinationCatalog {
         STATUS("status", "Строка состояния",
                 "Положение, состав и оформление верхней строки", "status"),
         HOME("home", "Домашний экран",
-                "HOME, компоновка и содержимое панелей", "home"),
+                "HOME, компоновка и содержимое блоков", "home"),
         PANELS("panels", "Панели",
                 "Медиа, навигация, климат, датчики и быстрые действия", "panels"),
         SMART_HOME("smart_home", "Умный дом",
@@ -134,13 +134,13 @@ public final class SettingsDestinationCatalog {
                 "home", "dezz.status.widget.LauncherSettingsActivity",
                 "лаунчер", "домашний экран", "фон", "сетка", "полноэкранный"));
         values.add(action("home_layout", Group.HOME, "Компоновка на реальном HOME",
-                "Перетаскивание и изменение размера панелей за любой угол",
+                "Перетаскивание и изменение размера блоков за любой угол",
                 "layout", ACTION_EDIT_HOME_LAYOUT,
-                "редактор", "размер", "позиция", "панель", "сетка"));
-        values.add(activity("home_panel_content", Group.HOME, "Состав панелей",
-                "Порядок, видимость и масштаб элементов внутри панелей",
+                "редактор", "размер", "позиция", "блок", "панель", "сетка"));
+        values.add(activity("home_panel_content", Group.HOME, "Состав блоков",
+                "Порядок, видимость и масштаб элементов внутри блоков",
                 "panels", "dezz.status.widget.PanelElementSettingsActivity",
-                "содержимое", "элементы", "порядок", "масштаб"));
+                "содержимое", "элементы", "порядок", "масштаб", "блоки"));
 
         values.add(activity("panel_apps", Group.PANELS, "Избранные приложения",
                 "Список, порядок, подписи и размеры иконок приложений",
@@ -151,7 +151,7 @@ public final class SettingsDestinationCatalog {
                 "apps", "dezz.status.widget.AllAppsSettingsActivity",
                 "все приложения", "лаунчер", "панель водителя", "иконки",
                 "масштаб", "расстояние", "столбцы", "скрыть", "показать"));
-        values.add(activity("panel_media", Group.PANELS, "Медиапанель",
+        values.add(activity("panel_media", Group.PANELS, "Медиаблок",
                 "Сетка, элементы, бегущие строки, обложка, громкость и цвета",
                 "media", "dezz.status.widget.MediaPanelSettingsActivity",
                 "музыка", "трек", "альбом", "артист", "обложка", "громкость", "яндекс"));
@@ -171,7 +171,12 @@ public final class SettingsDestinationCatalog {
                 "Внутренние датчики, вычисляемые показатели, подписи и цвета",
                 "vehicle", "dezz.status.widget.VehicleInfoPanelSettingsActivity",
                 "hud", "телеметрия", "топливо", "температура", "датчики"));
-        values.add(activity("panel_information", Group.PANELS, "Панель «Информация»",
+        values.add(activity("panel_hud", Group.PANELS, "Отдельный HUD-дисплей",
+                "Живой редактор с сеткой, стабильный ID дисплея, навигация, автомобиль и умный дом",
+                "hud", "dezz.status.widget.HudPanelSettingsActivity",
+                "hud", "проекция", "внешний дисплей", "стрелки", "светофоры",
+                "полосы", "телеметрия", "умный дом", "сценарии", "сетка"));
+        values.add(activity("panel_information", Group.PANELS, "Блок «Информация»",
                 "Своя сетка статусов автомобиля, магнитолы и устройств умного дома",
                 "information", "dezz.status.widget.InformationPanelSettingsActivity",
                 "датчики", "статусы", "сетка", "home assistant", "sprut", "mqtt",
@@ -184,17 +189,17 @@ public final class SettingsDestinationCatalog {
                 "настройки", "редактирование",
                 "столбцы", "ряды", "показывать", "скрыть"));
         values.add(activity("driver_panel", Group.PANELS, "Панель водителя",
-                "Старая или новая боковая панель: независимые настройки, до 10 кнопок, Домой, Назад и штатный климат",
+                "Единая боковая панель: до 10 кнопок, Домой, Назад и штатный климат",
                 "apps", "dezz.status.widget.DriverPanelSettingsActivity",
-                "панель водителя", "старая панель", "новая панель",
+                "панель водителя",
                 "системные приложения", "домой",
                 "назад", "климат", "оверлей", "10 кнопок", "размер иконок"));
         values.add(activity("driver_favorites", Group.PANELS,
-                "Избранное панели водителя",
-                "Своя сетка приложений, действий автомобиля, климата и устройств умного дома",
+                "Избранное водителя",
+                "Неограниченные привязанные к кнопкам панели: сетка, границы, действия и автоматизация",
                 "apps", "dezz.status.widget.DriverFavoritesSettingsActivity",
                 "избранное", "панель водителя", "приложения", "умный дом",
-                "дворники", "климат", "долгое нажатие"));
+                "дворники", "климат", "долгое нажатие", "границы", "автоматизация"));
         values.add(activity("panel_popup", Group.PANELS, "Плавающие панели",
                 "Независимые оверлеи, сетка, размер, положение и плитки",
                 "popup", "dezz.status.widget.PopupSettingsActivity",

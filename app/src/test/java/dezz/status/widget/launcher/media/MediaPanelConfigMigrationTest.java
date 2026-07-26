@@ -57,6 +57,7 @@ public final class MediaPanelConfigMigrationTest {
         MediaPanelConfig source = new MediaPanelConfig();
         assertTrue(source.setGridSize(16, 8));
         source.setMarqueeEnabled(MediaPanelConfig.TITLE, false);
+        source.setProgressBarHeightDp(19);
         MediaPanelConfig restored = MediaPanelConfigStore.decode(
                 MediaPanelConfigStore.encode(source).toString());
         assertEquals(16, restored.gridColumns);
@@ -66,6 +67,8 @@ public final class MediaPanelConfigMigrationTest {
         assertEquals(source.element(MediaPanelConfig.PLAY_PAUSE).row,
                 restored.element(MediaPanelConfig.PLAY_PAUSE).row);
         assertFalse(restored.element(MediaPanelConfig.TITLE).marqueeEnabled);
+        assertEquals(19,
+                restored.element(MediaPanelConfig.PROGRESS).progressBarHeightDp);
     }
 
     @Test public void versionThreeDefaultsMarqueeOnForOverflowingText() {
@@ -75,5 +78,18 @@ public final class MediaPanelConfigMigrationTest {
                 + "\"columnSpan\":5,\"rowSpan\":1}]}";
         MediaPanelConfig restored = MediaPanelConfigStore.decode(versionThree);
         assertTrue(restored.element(MediaPanelConfig.TITLE).marqueeEnabled);
+    }
+
+    @Test public void versionFourGetsAUsableProgressThicknessWithoutLosingPlacement() {
+        String versionFour = "{\"version\":4,\"gridColumns\":12,\"gridRows\":6,"
+                + "\"elements\":[{\"id\":\"media.progress\",\"enabled\":true,\"order\":0,"
+                + "\"scalePercent\":100,\"column\":2,\"row\":3,"
+                + "\"columnSpan\":6,\"rowSpan\":1}]}";
+        MediaPanelConfig restored = MediaPanelConfigStore.decode(versionFour);
+        assertEquals(7,
+                restored.element(MediaPanelConfig.PROGRESS).progressBarHeightDp);
+        assertEquals(2, restored.element(MediaPanelConfig.PROGRESS).column);
+        assertEquals(3, restored.element(MediaPanelConfig.PROGRESS).row);
+        assertEquals(6, restored.element(MediaPanelConfig.PROGRESS).columnSpan);
     }
 }

@@ -36,6 +36,8 @@ public final class DriverPanelService extends Service {
             "ru.natro.statuswidget.action.DRIVER_PANEL_STOCK_CLIMATE";
     public static final String ACTION_FAVORITES =
             "ru.natro.statuswidget.action.DRIVER_PANEL_FAVORITES";
+    public static final String EXTRA_FAVORITES_PANEL_ID =
+            "ru.natro.statuswidget.extra.DRIVER_FAVORITES_PANEL_ID";
 
     private static final String CHANNEL_ID = "DriverPanelChannel";
     private static final int NOTIFICATION_ID = 1007;
@@ -66,7 +68,14 @@ public final class DriverPanelService extends Service {
     }
 
     public static void showFavorites(@NonNull Context context) {
-        start(context, ACTION_FAVORITES);
+        showFavorites(context, DriverFavoritesPanelConfig.DEFAULT_ID);
+    }
+
+    public static void showFavorites(@NonNull Context context, @NonNull String panelId) {
+        ContextCompat.startForegroundService(context,
+                new Intent(context, DriverPanelService.class)
+                        .setAction(ACTION_FAVORITES)
+                        .putExtra(EXTRA_FAVORITES_PANEL_ID, panelId));
     }
 
     public static void onNavigationBarStatus(@NonNull Context context, boolean hidden) {
@@ -121,7 +130,12 @@ public final class DriverPanelService extends Service {
         if (controller != null) {
             boolean refreshed = controller.setNavigationHidden(navigationHidden);
             if (ACTION_STOCK_CLIMATE.equals(action)) controller.triggerStockClimate();
-            else if (ACTION_FAVORITES.equals(action)) controller.showFavorites();
+            else if (ACTION_FAVORITES.equals(action)) {
+                String panelId = intent == null ? DriverFavoritesPanelConfig.DEFAULT_ID
+                        : intent.getStringExtra(EXTRA_FAVORITES_PANEL_ID);
+                controller.showFavorites(panelId == null
+                        ? DriverFavoritesPanelConfig.DEFAULT_ID : panelId, null);
+            }
             else if (ACTION_RAISE.equals(action)) controller.raise();
             else if (!refreshed) controller.applyPreferences();
         }

@@ -69,6 +69,42 @@ public final class GeelyClimateControlReliabilityTest {
                 GeelyCarIntegration.controlCommandKey(cycle));
     }
 
+    @Test public void selectedCycleKeepsUserOrderAndFiltersUnsupportedModes() {
+        List<CarControlDescriptor.Option> available = Arrays.asList(
+                new CarControlDescriptor.Option(0, "Выкл"),
+                new CarControlDescriptor.Option(1, "Комфорт"),
+                new CarControlDescriptor.Option(2, "Спорт"),
+                new CarControlDescriptor.Option(3, "Эко"));
+        List<Double> selected = Arrays.asList(3d, 99d, 1d);
+
+        assertEquals(Double.valueOf(1d),
+                GeelyCarIntegration.cycleTarget(available, selected, 3d));
+        assertEquals(Double.valueOf(3d),
+                GeelyCarIntegration.cycleTarget(available, selected, 1d));
+        assertEquals(Double.valueOf(3d),
+                GeelyCarIntegration.cycleTarget(available, selected, 2d));
+        assertNull(GeelyCarIntegration.cycleTarget(
+                available, Collections.singletonList(99d), 1d));
+    }
+
+    @Test public void cycleCommandDeduplicationIncludesTheSelectedModes() {
+        CarControlCommand first = new CarControlCommand("drive.mode",
+                CarControlCommand.Operation.CYCLE, 0,
+                Arrays.asList(1d, 2d, 1d, null, Double.NaN));
+        CarControlCommand otherOrder = new CarControlCommand("drive.mode",
+                CarControlCommand.Operation.CYCLE, 0, Arrays.asList(2d, 1d));
+
+        assertEquals(Arrays.asList(1d, 2d), first.cycleValues);
+        assertNotEquals(GeelyCarIntegration.controlCommandKey(first),
+                GeelyCarIntegration.controlCommandKey(otherOrder));
+        try {
+            first.cycleValues.add(3d);
+            throw new AssertionError("Cycle values must be immutable");
+        } catch (UnsupportedOperationException expected) {
+            // Expected.
+        }
+    }
+
     @Test public void successRequiresActualReadBackToMatchTarget() {
         assertTrue(GeelyCarIntegration.isControlCommandConfirmed(2d, 2d));
         assertTrue(GeelyCarIntegration.isControlCommandConfirmed(22.5001d, 22.5d));
@@ -92,7 +128,7 @@ public final class GeelyClimateControlReliabilityTest {
                 GeelyCarIntegration.fanFunctionIdForMode(true));
     }
 
-    @Test public void manualFanPresentsFivePositionsAcrossTheFullEcarxOneToNineRange() {
+    @Test public void manualFanPresentsAllNineEcarxPositions() {
         int[] rawValues = {
                 IHvac.FAN_SPEED_LEVEL_1, IHvac.FAN_SPEED_LEVEL_2,
                 IHvac.FAN_SPEED_LEVEL_3, IHvac.FAN_SPEED_LEVEL_4,
@@ -100,21 +136,29 @@ public final class GeelyClimateControlReliabilityTest {
                 IHvac.FAN_SPEED_LEVEL_7, IHvac.FAN_SPEED_LEVEL_8,
                 IHvac.FAN_SPEED_LEVEL_9
         };
-        int[] visible = {1, 1, 2, 2, 3, 3, 4, 4, 5};
+        int[] visible = {1, 2, 3, 4, 5, 6, 7, 8, 9};
         for (int index = 0; index < rawValues.length; index++) {
             assertEquals(visible[index],
                     GeelyCarIntegration.manualFanDisplayLevel(rawValues[index]));
         }
         assertEquals(IHvac.FAN_SPEED_LEVEL_1,
                 GeelyCarIntegration.manualFanValueForDisplayLevel(1));
-        assertEquals(IHvac.FAN_SPEED_LEVEL_3,
+        assertEquals(IHvac.FAN_SPEED_LEVEL_2,
                 GeelyCarIntegration.manualFanValueForDisplayLevel(2));
-        assertEquals(IHvac.FAN_SPEED_LEVEL_5,
+        assertEquals(IHvac.FAN_SPEED_LEVEL_3,
                 GeelyCarIntegration.manualFanValueForDisplayLevel(3));
-        assertEquals(IHvac.FAN_SPEED_LEVEL_7,
+        assertEquals(IHvac.FAN_SPEED_LEVEL_4,
                 GeelyCarIntegration.manualFanValueForDisplayLevel(4));
-        assertEquals(IHvac.FAN_SPEED_LEVEL_9,
+        assertEquals(IHvac.FAN_SPEED_LEVEL_5,
                 GeelyCarIntegration.manualFanValueForDisplayLevel(5));
+        assertEquals(IHvac.FAN_SPEED_LEVEL_6,
+                GeelyCarIntegration.manualFanValueForDisplayLevel(6));
+        assertEquals(IHvac.FAN_SPEED_LEVEL_7,
+                GeelyCarIntegration.manualFanValueForDisplayLevel(7));
+        assertEquals(IHvac.FAN_SPEED_LEVEL_8,
+                GeelyCarIntegration.manualFanValueForDisplayLevel(8));
+        assertEquals(IHvac.FAN_SPEED_LEVEL_9,
+                GeelyCarIntegration.manualFanValueForDisplayLevel(9));
     }
 
     @Test public void airflowUsesExactSevenAdaptApiValuesAndFrontAggregateZone()
@@ -256,12 +300,12 @@ public final class GeelyClimateControlReliabilityTest {
         assertTrue(panel.contains("Нет ответа от автомобиля. Состояние обновляется"));
     }
 
-    @Test public void compactFanTileHasNoCaptionAndLevelOneDecreaseUsesHvacPower()
+    @Test public void compactFanTileHasNoCaptionAndClimateStateAlwaysIncludesHvacPower()
             throws IOException {
         String panel = climatePanelSource();
         assertTrue(panel.contains(
                 "if (!ClimatePanelConfig.FAN.equals(id)) center.addView(title)"));
-        assertTrue(panel.contains("if (ids.contains(ClimatePanelConfig.FAN))"));
+        assertTrue(panel.contains("if (!ids.isEmpty())"));
         assertTrue(panel.contains(
                 "executeBound(id, ClimatePanelConfig.POWER,"));
     }

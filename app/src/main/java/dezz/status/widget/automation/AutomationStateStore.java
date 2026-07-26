@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -68,6 +69,30 @@ public final class AutomationStateStore {
         }
     }
 
+    /**
+     * Returns only an explicitly supplied visibility decision.
+     *
+     * <p>This is used by transient driver Favorites panels: missing automation state must preserve
+     * what the driver opened manually, while an explicit false must close it.</p>
+     */
+    @Nullable
+    public synchronized Boolean explicitVisibility(String scope, String id) {
+        String storageKey = key(scope, id);
+        JSONObject override = scenarioOverrides.get(storageKey);
+        if (override != null && override.has("visible")) {
+            return AutomationContract.parseBoolean(override.opt("visible"));
+        }
+        String raw = prefs.getString(storageKey, null);
+        if (raw == null) return null;
+        try {
+            JSONObject state = new JSONObject(raw);
+            return state.optBoolean("_visible_explicit", false) && state.has("visible")
+                    ? AutomationContract.parseBoolean(state.opt("visible")) : null;
+        } catch (JSONException ignored) {
+            return null;
+        }
+    }
+
     /** Interaction with a caller-defined default, using scenario overrides before retained data. */
     public synchronized boolean effectiveActionEnabled(String scope, String id,
                                                        boolean defaultValue) {
@@ -121,6 +146,7 @@ public final class AutomationStateStore {
         if (patch.has("enabled") && !patch.has("action_enabled")) {
             merged.put("action_enabled", AutomationContract.parseBoolean(patch.opt("enabled")));
         }
+        if (patch.has("visible")) merged.put("_visible_explicit", true);
         if (!patch.has("text")) {
             if (patch.has("state")) merged.put("text", String.valueOf(patch.opt("state")));
             else if (patch.has("value")) merged.put("text", String.valueOf(patch.opt("value")));

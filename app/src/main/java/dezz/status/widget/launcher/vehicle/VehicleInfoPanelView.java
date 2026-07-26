@@ -39,6 +39,8 @@ import java.util.Set;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarTelemetryDescriptor;
 import dezz.status.widget.car.EcarxSignalDecoder;
+import dezz.status.widget.launcher.LauncherGlobalElementTag;
+import dezz.status.widget.launcher.LauncherLayoutStore;
 import dezz.status.widget.launcher.NavigationDataRepository;
 
 /**
@@ -361,6 +363,8 @@ public final class VehicleInfoPanelView extends FrameLayout {
     @NonNull
     private View buildMetricTile(@NonNull VehicleInfoPanelConfig.Metric metric) {
         LinearLayout tile = new LinearLayout(getContext());
+        LauncherGlobalElementTag.attach(tile, LauncherLayoutStore.VEHICLE_INFO,
+                metric.id, resolveLabel(metric));
         tile.setOrientation(LinearLayout.VERTICAL);
         tile.setGravity(Gravity.CENTER_VERTICAL);
         int vertical = scaledDp(11, metric.scalePercent);

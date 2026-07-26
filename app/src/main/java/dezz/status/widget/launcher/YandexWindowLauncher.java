@@ -16,6 +16,10 @@ import androidx.annotation.Nullable;
 /** Starts the special floating-window entry points used by the head-unit Yandex builds. */
 public final class YandexWindowLauncher {
     public enum Product { MAPS, NAVIGATOR }
+    public static final String EXTRA_STAGED_PRODUCT =
+            "dezz.status.widget.extra.YANDEX_STAGED_PRODUCT";
+    public static final String EXTRA_STAGED_FULLSCREEN =
+            "dezz.status.widget.extra.YANDEX_STAGED_FULLSCREEN";
 
     private static final String MAPS_PACKAGE = "ru.yandex.yandexmaps";
     private static final String NAVIGATOR_PACKAGE = "ru.yandex.yandexnavi";
@@ -49,6 +53,28 @@ public final class YandexWindowLauncher {
     };
 
     private YandexWindowLauncher() {}
+
+    /**
+     * Makes Status Widget HOME the task directly under a floating Yandex window.
+     *
+     * <p>Driver-panel and automation launches run from a Service context. Staging them through
+     * the launcher prevents the previously foreground application or stock launcher from being
+     * exposed when the ECARX window closes.</p>
+     */
+    public static boolean launchOverLauncher(@NonNull Context context,
+                                             @NonNull Product product,
+                                             boolean forceFullScreen) {
+        if (forceFullScreen || context instanceof dezz.status.widget.LauncherActivity) {
+            return launch(context, product, forceFullScreen);
+        }
+        Intent stage = new Intent(context, dezz.status.widget.LauncherActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
+                        | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra(EXTRA_STAGED_PRODUCT, product.name())
+                .putExtra(EXTRA_STAGED_FULLSCREEN, false);
+        return start(context, stage);
+    }
 
     public static boolean launch(@NonNull Context context, @NonNull Product product,
                                  boolean forceFullScreen) {

@@ -39,8 +39,30 @@ public final class YandexWindowLauncherContractTest {
         assertTrue(source.contains("YANGO_PACKAGE"));
     }
 
+    @Test
+    public void serviceLaunchStagesOurLauncherUnderTheWindowAndHomeChainIsOptional()
+            throws IOException {
+        String window = source();
+        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        String settings = source("dezz/status/widget/LauncherSettingsActivity.java");
+        String preferences = source("dezz/status/widget/Preferences.java");
+
+        assertTrue(window.contains("launchOverLauncher("));
+        assertTrue(window.contains(
+                "new Intent(context, dezz.status.widget.LauncherActivity.class)"));
+        assertTrue(window.contains("EXTRA_STAGED_PRODUCT"));
+        assertTrue(launcher.contains("handleStagedOrHomeNavigation("));
+        assertTrue(launcher.contains("intent.hasCategory(Intent.CATEGORY_HOME)"));
+        assertTrue(launcher.contains("launcherHomeOpensWindowedNavigator.get()"));
+        assertTrue(settings.contains("HOME → наш лаунчер → оконный Навигатор"));
+        assertTrue(preferences.contains("launcherHomeOpensWindowedNavigator"));
+    }
+
     private static String source() throws IOException {
-        String relative = "dezz/status/widget/launcher/YandexWindowLauncher.java";
+        return source("dezz/status/widget/launcher/YandexWindowLauncher.java");
+    }
+
+    private static String source(String relative) throws IOException {
         Path fromRoot = Paths.get("app", "src", "main", "java").resolve(relative);
         Path fromApp = Paths.get("src", "main", "java").resolve(relative);
         Path file = Files.isRegularFile(fromRoot) ? fromRoot : fromApp;

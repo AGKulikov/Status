@@ -29,9 +29,10 @@ import dezz.status.widget.R;
 /**
  * Canonical application list used by HOME and every runtime "all applications" surface.
  *
- * <p>Only user-installed {@link Intent#CATEGORY_LAUNCHER} activities are included. Settings
- * pickers use {@link InstalledAppCatalog} instead because they intentionally need system,
- * disabled and non-launcher packages as action targets.</p>
+ * <p>Runtime “All applications” surfaces include every enabled
+ * {@link Intent#CATEGORY_LAUNCHER} activity and, for packages without one, a safe exported OEM
+ * screen discovered by {@link InstalledAppCatalog}. This is important on ECARX builds where
+ * stock applications such as Phone have no conventional launcher category.</p>
  */
 public final class LauncherAppCatalog {
     public static final class App {
@@ -52,16 +53,14 @@ public final class LauncherAppCatalog {
     private LauncherAppCatalog() {
     }
 
-    /** User-installed launcher activities shown by runtime "All applications" surfaces. */
+    /** User-installed launcher activities retained for callers that explicitly need that subset. */
     @NonNull
     public static List<App> load(@NonNull Context context) {
         return load(context, false);
     }
 
     /**
-     * Complete launcher-activity catalog used only to resolve explicitly pinned applications.
-     * System applications stay out of every runtime "All applications" list, but a target that
-     * the user deliberately selected in settings must not disappear from HOME or the driver rail.
+     * Complete launcher-activity catalog used by runtime application menus and pinned apps.
      */
     @NonNull
     public static List<App> loadIncludingSystem(@NonNull Context context) {
@@ -88,21 +87,33 @@ public final class LauncherAppCatalog {
             apps.add(new App(String.valueOf(info.loadLabel(manager)),
                     info.activityInfo.packageName, component, systemApp));
         }
+        if (includeSystem) {
+            // ECARX exposes some user-facing system screens without CATEGORY_LAUNCHER.
+            // InstalledAppCatalog accepts only enabled exported activities without a protected
+            // permission, so these screens can be shown without inventing an OEM package name.
+            for (InstalledAppCatalog.App installed : InstalledAppCatalog.load(context)) {
+                if (!installed.launchable() || installed.component == null) continue;
+                if (!components.add(installed.component.flattenToString())) continue;
+                apps.add(new App(installed.label, installed.packageName,
+                        installed.component, installed.system));
+            }
+        }
         apps.sort(Comparator.comparing(value -> value.label.toLowerCase(Locale.ROOT)));
         return apps;
     }
 
     /**
      * Returns the shared user-visible catalog. Filtering is component based so two launcher
-     * activities from one package may be controlled independently.
+     * activities from one package may be controlled independently; system applications are not
+     * silently discarded.
      */
     @NonNull
     public static List<App> loadVisible(@NonNull Context context,
                                         @NonNull Preferences preferences) {
         Set<String> hidden = preferences.launcherAllAppsHiddenComponents.get();
-        if (hidden.isEmpty()) return load(context);
+        if (hidden.isEmpty()) return loadIncludingSystem(context);
         List<App> visible = new ArrayList<>();
-        for (App app : load(context)) {
+        for (App app : loadIncludingSystem(context)) {
             if (!hidden.contains(app.component.flattenToString())) visible.add(app);
         }
         return visible;
