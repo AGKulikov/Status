@@ -11,6 +11,15 @@ on:
       - 'gradle/**'
       - 'gradlew'
       - '.github/workflows/hud-lab.yml'
+  pull_request:
+    paths:
+      - 'hudlab/**'
+      - 'app/libs/geely/ecarx-adaptapi.jar'
+      - 'settings.gradle'
+      - 'build.gradle'
+      - 'gradle/**'
+      - 'gradlew'
+      - '.github/workflows/hud-lab.yml'
 
 permissions:
   contents: read
@@ -53,11 +62,12 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         shell: bash
         run: |
-          test -n "$KEYSTORE_BASE64" || {
-            echo "KEYSTORE_BASE64 is required for the installable HUD Lab artifact" >&2
-            exit 1
-          }
-          echo "$KEYSTORE_BASE64" | base64 -d > keystore.jks
+          if [[ -n "$KEYSTORE_BASE64" ]]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > keystore.jks
+            touch .stable-ha-signing
+          else
+            echo "Stable key is unavailable to this PR; building an unsigned release handoff"
+          fi
 
       - name: Build signed HUD Lab
         env:
@@ -65,12 +75,17 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         shell: bash
         run: |
-          test -n "$KEY_PASSWORD" || {
-            echo "KEY_PASSWORD is required" >&2
-            exit 1
-          }
           chmod +x gradlew
-          ./gradlew --no-daemon :hudlab:clean :hudlab:assembleRelease
+          if [[ -f .stable-ha-signing ]]; then
+            test -n "$KEY_PASSWORD" || {
+              echo "KEY_PASSWORD is required with the stable keystore" >&2
+              exit 1
+            }
+            ./gradlew --no-daemon :hudlab:clean :hudlab:assembleRelease
+          else
+            ALLOW_UNSIGNED_RELEASE=true \
+              ./gradlew --no-daemon :hudlab:clean :hudlab:assembleRelease
+          fi
 
       - name: Verify identity, layout and stable certificate
         shell: bash
@@ -88,17 +103,22 @@ jobs:
             exit 1
           fi
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$APK" >/dev/null
-          CERTS=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" \
-            verify --verbose --print-certs "$APK")
-          echo "$CERTS"
-          echo "$CERTS" | grep -qi \
-            "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
+          if [[ -f .stable-ha-signing ]]; then
+            CERTS=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" \
+              verify --verbose --print-certs "$APK")
+            echo "$CERTS"
+            echo "$CERTS" | grep -qi \
+              "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
+          elif "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$APK"; then
+            echo "PR handoff unexpectedly contains a signature" >&2
+            exit 1
+          fi
           sha256sum "$APK" | tee "$APK.sha256"
 
       - name: Upload signed HUD Lab APK
         uses: actions/upload-artifact@v4
         with:
-          name: hud-lab-0.1-signed
+          name: hud-lab-0.1-release-candidate
           path: |
             hudlab/build/outputs/apk/release/*.apk
             hudlab/build/outputs/apk/release/*.sha256
