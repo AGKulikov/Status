@@ -158,7 +158,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         header.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView title = new TextView(this);
-        title.setText("KX11 ANCS TEST v2");
+        title.setText("KX11 ANCS TEST v3");
         title.setTextColor(Color.WHITE);
         title.setTextSize(20);
         title.setTypeface(Typeface.DEFAULT_BOLD);
@@ -176,7 +176,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         root.addView(header);
 
         selectedView = new TextView(this);
-        selectedView.setText("LightBlue: CONTROL → PAIR, затем SECURE → ANCS");
+        selectedView.setText("PAIR/SECURE = verified; ANCS target = correlation hypothesis");
         selectedView.setTextColor(Color.rgb(207, 216, 220));
         selectedView.setTextSize(13);
         selectedView.setPadding(0, dp(5), 0, dp(4));
@@ -191,7 +191,7 @@ public final class MainActivity extends Activity implements BluetoothDiagnostics
         addButton(buttons, "Стоп scan", view -> diagnostics.stopScan());
         addButton(buttons, "Ждать iPhone", view -> diagnostics.startIncomingConnectionTest());
         addButton(buttons, "Стоп рекламы", view -> diagnostics.stopAdvertising());
-        addButton(buttons, "Подключить verified",
+        addButton(buttons, "Подключить target",
                 view -> diagnostics.connect(selectedCandidate));
         addButton(buttons, "LE bonding verified", view -> diagnostics.requestBond());
         addButton(buttons, "Обновить GATT", view -> diagnostics.refreshAndReconnect());

@@ -34,12 +34,12 @@ jobs:
           ./gradlew -p ancs-test clean testDebugUnitTest assembleDebug --stacktrace
 
       - name: Rename APK
-        run: cp ancs-test/app/build/outputs/apk/debug/app-debug.apk KX11-ANCS-Test-v2.apk
+        run: cp ancs-test/app/build/outputs/apk/debug/app-debug.apk KX11-ANCS-Test-v3.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KX11-ANCS-Test-v2
-          path: KX11-ANCS-Test-v2.apk
+          name: KX11-ANCS-Test-v3
+          path: KX11-ANCS-Test-v3.apk
           if-no-files-found: error
 
       - name: Package iPhone helper source
