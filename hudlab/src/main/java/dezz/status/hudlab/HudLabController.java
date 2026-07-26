@@ -4,9 +4,12 @@
 package dezz.status.hudlab;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
+import android.os.SystemClock;
+import android.util.Base64;
 
 import com.ecarx.xui.adaptapi.ECarXCarProxy;
 import com.ecarx.xui.adaptapi.FunctionStatus;
@@ -23,6 +26,8 @@ import java.util.Locale;
 import ecarx.car.ECarXCar;
 import ecarx.car.hardware.annotation.ApiResult;
 import ecarx.car.hardware.signal.CarSignalManager;
+import ecarx.car.hardware.vehicle.ECarXCarProfileManager;
+import ecarx.car.hardware.vehicle.ECarXCarProfiletransferManager;
 import ecarx.car.hardware.vehicle.ECarXCarSetManager;
 import ecarx.car.hardware.vehicle.ECarXCarVfhudManager;
 import ecarx.car.hardware.vehicle.PATypes;
@@ -48,6 +53,10 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     private static final int ZONE_ALL = Integer.MIN_VALUE;
     private static final long REFRESH_MS = 1_200L;
     private static final int MAX_LOG_LINES = 70;
+    private static final String PREFS = "hud_lab_backups";
+    private static final String BACKUP_PROFILE_TRANSFER_MODE = "profile_transfer_mode";
+    private static final String BACKUP_VEHICLE_MODEL = "vehicle_model";
+    private static final String BACKUP_CLOUD_PROFILE = "cloud_profile";
     private static final HudDisplayFunction DISPLAY_SAFETY =
             new HudDisplayFunction("SAFETY", IHUD.SETTING_FUNC_HUD_DISPLAY_SAFETY);
     private static final HudDisplayFunction DISPLAY_MEDIA =
@@ -68,6 +77,7 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     };
 
     private final Context appContext;
+    private final SharedPreferences backups;
     private final Listener listener;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final HandlerThread thread = new HandlerThread("hud-lab");
@@ -87,6 +97,8 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     private ECarXCarProxy proxy;
     private ECarXCar root;
     private ECarXCarVfhudManager vfHud;
+    private ECarXCarProfileManager profileManager;
+    private ECarXCarProfiletransferManager profileTransfer;
     private CarSignalManager signals;
     private CarFunction carFunction;
     private boolean closed;
@@ -97,6 +109,7 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         Context application = context.getApplicationContext();
         appContext = application == null ? context : application;
         this.listener = listener;
+        backups = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         Arrays.fill(visualFunctions, ON);
         thread.start();
         worker = new Handler(thread.getLooper());
@@ -130,6 +143,8 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             }
             carFunction = null;
             vfHud = null;
+            profileManager = null;
+            profileTransfer = null;
             signals = null;
             root = null;
             ECarXCarProxy current = proxy;
@@ -277,6 +292,183 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         return visualMaskDescription();
     }
 
+    // ---------------------------------------------------------------------
+    // Ten dump-derived experiments which were not present in HUD Lab 0.2.
+    // Every write is initiated by an explicit UI tap. Profile-backed writes
+    // remain transient until the user separately presses the save button.
+    // ---------------------------------------------------------------------
+
+    void setProfileTransferMode(int mode) {
+        runCommand("01 ProfileTransfer HUD mode=" + modeName(mode), () -> {
+            ECarXCarProfiletransferManager manager = requireProfileTransfer();
+            rememberIntOnce(BACKUP_PROFILE_TRANSFER_MODE, readProfileTransferMode());
+            return "CB33278=" + result(manager.CB_HudDispModSetgReq(mode))
+                    + ", feedback=" + readProfileTransferMode();
+        });
+    }
+
+    void restoreProfileTransferMode() {
+        runCommand("01 ProfileTransfer mode: откат", () -> {
+            int original = backups.getInt(BACKUP_PROFILE_TRANSFER_MODE,
+                    readProfileTransferMode());
+            return "value=" + original + ", result="
+                    + result(requireProfileTransfer().CB_HudDispModSetgReq(original));
+        });
+    }
+
+    void setActiveProfileDimMode(int mode) {
+        runCommand("02 CEM HUD mode=" + modeName(mode) + " для активного PEN", () -> {
+            int pen = activePen();
+            VendorVehicleHalPAProto.ProtoHudDispModSetgReq request =
+                    new VendorVehicleHalPAProto.ProtoHudDispModSetgReq();
+            request.hudDispModSetgReqHudDispModSetgReq = mode;
+            request.hudDispModSetgReqIdPen = pen;
+            requireSignals().setHudDispModSetgReq(request);
+            return "signal30814 sent, PEN=" + pen;
+        });
+    }
+
+    void setActiveProfileVisualMask(boolean hidden) {
+        runCommand("03 active-PEN visual mask=" + (hidden ? "HIDE" : "SHOW"), () -> {
+            visualPen = activePen();
+            Arrays.fill(visualFunctions, hidden ? OFF : ON);
+            sendVisualMask();
+            return "signal30816, " + visualMaskDescription();
+        });
+    }
+
+    void setDriverHmiBackground(int value) {
+        runCommand("04 Driver HMI background=" + value, () -> {
+            int pen = activePen();
+            VendorVehicleHalPAProto.ProtoDrvrHmiBackGndInfoSetg request =
+                    new VendorVehicleHalPAProto.ProtoDrvrHmiBackGndInfoSetg();
+            request.drvrHmiBackGndInfoSetgPen = pen;
+            request.drvrHmiBackGndInfoSetgSetg = value;
+            requireSignals().setDrvrHmiBackGndInfoSetg(request);
+            return "signal30805 sent, PEN=" + pen + ", value=" + value;
+        });
+    }
+
+    void setDriverHmiInterface(int value) {
+        runCommand("05 Driver HMI UI=" + value, () -> {
+            int pen = activePen();
+            VendorVehicleHalPAProto.ProtoDrvrHmiUsrIfSetg request =
+                    new VendorVehicleHalPAProto.ProtoDrvrHmiUsrIfSetg();
+            request.drvrHmiUsrIfSetgPen = pen;
+            request.drvrHmiUsrIfSetgSetg = value;
+            requireSignals().setDrvrHmiUsrIfSetg(request);
+            return "signal30807 sent, PEN=" + pen + ", value=" + value;
+        });
+    }
+
+    void setMultimediaInformationMode(int value) {
+        runCommand("06 DIM information mode=" + value, () ->
+                "signal30792=" + result(requireSignals().setMmedHmiModStd(value)));
+    }
+
+    void setIndividualTheme(boolean enabled) {
+        runCommand("07 Individual DIM theme=" + value(enabled), () ->
+                "signal30785=" + result(requireSignals().setDrvrIndThemeSetg(
+                        enabled ? ON : OFF)));
+    }
+
+    void setHmiThemeMode(int value) {
+        runCommand("08 HMI theme mode=" + value, () ->
+                "signal30787=" + result(requireSignals().setHmiThemeModReq(value)));
+    }
+
+    void setDriverDisplayTheme(int value) {
+        runCommand("09 Driver display theme=" + value, () -> {
+            int pen = activePen();
+            VendorVehicleHalPAProto.ProtoDrvrDispSetg request =
+                    new VendorVehicleHalPAProto.ProtoDrvrDispSetg();
+            request.drvrDispSetgPen = pen;
+            request.drvrDispSetgSts = value;
+            requireSignals().setDrvrDispSetg(request);
+            return "signal30803 sent, PEN=" + pen
+                    + ", feedback30873=" + readDriverDisplayTheme();
+        });
+    }
+
+    void setVehicleModelClear(boolean enabled) {
+        runCommand("10 Vehicle model clear=" + value(enabled), () -> {
+            ECarXCarProfiletransferManager manager = requireProfileTransfer();
+            rememberIntOnce(BACKUP_VEHICLE_MODEL, readVehicleModelClear());
+            return "CB33284=" + result(manager.CB_VehMdlClrReq(enabled ? ON : OFF))
+                    + ", feedback33943=" + readVehicleModelClear();
+        });
+    }
+
+    void restoreVehicleModelClear() {
+        runCommand("10 Vehicle model clear: откат", () -> {
+            int original = backups.getInt(BACKUP_VEHICLE_MODEL, OFF);
+            return "value=" + original + ", result="
+                    + result(requireProfileTransfer().CB_VehMdlClrReq(original));
+        });
+    }
+
+    void reloadActiveProfile() {
+        runCommand("Перезагрузить активный профиль (откат transient-настроек)", () -> {
+            int profile = activeProfile();
+            int pen = activePen();
+            ApiResult profileResult = requireProfileManager()
+                    .CB_PSET_RequestActiveProfile(profile);
+            ApiResult penResult = requireSignals().setProfChg(pen);
+            return "profile=" + profile + " → " + result(profileResult)
+                    + ", PEN=" + pen + " → " + result(penResult);
+        });
+    }
+
+    void persistCurrentProfileSettings() {
+        runCommand("Сохранить текущие профильные настройки", () -> {
+            ApiResult low = requireSignals().setSaveSetgToMemPrmnt(OFF);
+            SystemClock.sleep(80L);
+            ApiResult edge = requireSignals().setSaveSetgToMemPrmnt(ON);
+            return "signal29892 0→1: " + result(low) + " / " + result(edge);
+        });
+    }
+
+    void pulseProfileTransferApply() {
+        runCommand("Применить ProfileTransfer", () -> {
+            ECarXCarProfiletransferManager manager = requireProfileTransfer();
+            ApiResult high = manager.CB_Profile_Transfer_Reboot(ON);
+            SystemClock.sleep(80L);
+            ApiResult low = manager.CB_Profile_Transfer_Reboot(OFF);
+            return "CB33274 1→0: " + result(high) + " / " + result(low);
+        });
+    }
+
+    void setCloudProfileHudCandidate() {
+        runCommand("Доп. путь: cloud-profile HUD candidate", () -> {
+            ECarXCarProfileManager manager = requireProfileManager();
+            byte[] current = manager.getByteCBValueForUt(
+                    ECarXCarProfileManager.ManagerId_papsetprofileclouddata);
+            if (current == null || current.length == 0) {
+                throw new IllegalStateException("PA33873 вернул пустой blob");
+            }
+            rememberBytesOnce(BACKUP_CLOUD_PROFILE, current);
+            VendorVehicleHalPAProto.Profileclouddata profile =
+                    VendorVehicleHalPAProto.Profileclouddata.parseFrom(current);
+            profile.vfhudbyte0 = OFF;
+            profile.profiletransferbyte3 = 3;
+            profile.profiletransferbyte9 = ON;
+            manager.CB_PSET_ProfileCloudData(profile);
+            return "RMW PA33873→CB33264: vfhud[0]=0, transfer[3]=3, transfer[9]=1"
+                    + ", bytes=" + current.length;
+        });
+    }
+
+    void restoreCloudProfile() {
+        runCommand("Доп. путь: cloud-profile точный откат", () -> {
+            String encoded = backups.getString(BACKUP_CLOUD_PROFILE, null);
+            if (encoded == null) throw new IllegalStateException("резервная копия ещё не создана");
+            byte[] original = Base64.decode(encoded, Base64.DEFAULT);
+            requireProfileManager().setbytesPropertyForUt(
+                    ECarXCarProfileManager.ManagerId_cbpsetprofileclouddata, original);
+            return "restored raw exact blob, bytes=" + original.length;
+        });
+    }
+
     private void setDisplayFunction(HudDisplayFunction function, boolean enabled) {
         setDisplayFunctions(function.label, enabled, function);
     }
@@ -312,6 +504,8 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             }
             root = null;
             vfHud = null;
+            profileManager = null;
+            profileTransfer = null;
             signals = null;
             carFunction = null;
             appendLog("ecarxcar_service отключён; ждём переподключения");
@@ -329,14 +523,19 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             }
             root = connectedRoot;
             signals = connectedSignals;
-            vfHud = ((ECarXCarSetManager) publicAttributes).getECarXCarVfhudManager();
+            ECarXCarSetManager setManager = (ECarXCarSetManager) publicAttributes;
+            vfHud = setManager.getECarXCarVfhudManager();
+            profileManager = setManager.getECarXCarProfileManager();
+            profileTransfer = setManager.getECarXCarProfiletransferManager();
             CarFunction functions = new CarFunction(appContext);
             functions.initCarSignalManager(connectedRoot, connectedSignals);
             carFunction = functions;
-            appendLog("Подключено: VFHUD + CarFunction + прямые DIM-сигналы");
+            appendLog("Подключено: VFHUD + ProfileTransfer + Profile + CEM/DIM");
         } catch (Throwable failure) {
             root = null;
             vfHud = null;
+            profileManager = null;
+            profileTransfer = null;
             signals = null;
             carFunction = null;
             appendLog("Ошибка инициализации SDK: " + shortFailure(failure));
@@ -384,10 +583,21 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
 
     private void publishSnapshot() {
         if (closed) return;
-        boolean connected = root != null && vfHud != null && signals != null;
+        boolean connected = root != null && vfHud != null && signals != null
+                && profileManager != null && profileTransfer != null;
         StringBuilder out = new StringBuilder(1_200);
         out.append("СОЕДИНЕНИЕ: ").append(connected ? "ГОТОВО" : "ОЖИДАНИЕ").append('\n');
         out.append("Последняя команда: ").append(lastCommand).append("\n\n");
+
+        out.append("Dump-derived profile/DIM state\n");
+        out.append("  Active profile / PEN: ").append(readActiveProfile())
+                .append(" / ").append(readActivePen()).append('\n');
+        out.append("  ProfileTransfer HUD mode CB33278/PA33937: ")
+                .append(readProfileTransferMode()).append('\n');
+        out.append("  Vehicle model clear CB33284/PA33943: ")
+                .append(readVehicleModelClear()).append('\n');
+        out.append("  Driver display feedback 30873: ")
+                .append(readDriverDisplayTheme()).append("\n\n");
 
         out.append("AdaptAPI Settings\n");
         out.append("  HUD_ACTIVE 0x").append(Integer.toHexString(IHUD.SETTING_FUNC_HUD_ACTIVE))
@@ -497,6 +707,77 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         }
     }
 
+    private int activePen() throws Exception {
+        int pen = requireSignals().getProfPenSts1();
+        if (pen < 1 || pen > 13) {
+            throw new IllegalStateException("PEN=" + pen
+                    + " не является активным профилем (ожидалось 1…13)");
+        }
+        return pen;
+    }
+
+    private int activeProfile() throws Exception {
+        PATypes.PA_PSET_ActiveProfile value =
+                requireProfileManager().getPA_PSET_ActiveProfile();
+        if (value == null) throw new IllegalStateException("PA33845=null");
+        return value.getData();
+    }
+
+    private String readActivePen() {
+        try {
+            return Integer.toString(activePen());
+        } catch (Throwable failure) {
+            return "ERROR " + shortFailure(failure);
+        }
+    }
+
+    private String readActiveProfile() {
+        try {
+            return Integer.toString(activeProfile());
+        } catch (Throwable failure) {
+            return "ERROR " + shortFailure(failure);
+        }
+    }
+
+    private int readProfileTransferMode() {
+        try {
+            PATypes.PA_HudDispModSetgReq value =
+                    requireProfileTransfer().getPA_HudDispModSetgReq();
+            return value == null ? -1 : value.getData();
+        } catch (Throwable ignored) {
+            return -1;
+        }
+    }
+
+    private int readVehicleModelClear() {
+        try {
+            PATypes.PA_VehMdlClrReq value =
+                    requireProfileTransfer().getPA_VehMdlClrReq();
+            return value == null ? -1 : value.getData();
+        } catch (Throwable ignored) {
+            return -1;
+        }
+    }
+
+    private String readDriverDisplayTheme() {
+        try {
+            return Integer.toString(requireSignals().getDrvrDispSetgStsSyncn());
+        } catch (Throwable failure) {
+            return "ERROR " + shortFailure(failure);
+        }
+    }
+
+    private void rememberIntOnce(String key, int value) {
+        if (value < 0 || backups.contains(key)) return;
+        backups.edit().putInt(key, value).apply();
+    }
+
+    private void rememberBytesOnce(String key, byte[] value) {
+        if (value == null || value.length == 0 || backups.contains(key)) return;
+        backups.edit().putString(key,
+                Base64.encodeToString(value, Base64.NO_WRAP)).apply();
+    }
+
     private enum SignalRead {
         HUD_REQUEST,
         HUD_ACTIVE_STATUS,
@@ -538,6 +819,20 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     private ECarXCarVfhudManager requireVfHud() {
         if (vfHud == null) throw new IllegalStateException("VFHUD ещё не подключён");
         return vfHud;
+    }
+
+    private ECarXCarProfileManager requireProfileManager() {
+        if (profileManager == null) {
+            throw new IllegalStateException("ProfileManager ещё не подключён");
+        }
+        return profileManager;
+    }
+
+    private ECarXCarProfiletransferManager requireProfileTransfer() {
+        if (profileTransfer == null) {
+            throw new IllegalStateException("ProfileTransfer ещё не подключён");
+        }
+        return profileTransfer;
     }
 
     private CarSignalManager requireSignals() {
