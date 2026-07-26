@@ -53,6 +53,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
     private TextView logView;
     private TextView visualIndexView;
     private TextView exportStatusView;
+    private TextView coverStatusView;
     private Button exportButton;
     private int visualIndex;
     private String fullStatus = "";
@@ -150,7 +151,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         close.setOnClickListener(view -> finish());
         header.addView(close, fixedButton(dp(130)));
 
-        TextView title = text("HUD Lab 0.3", 23, TEXT, true);
+        TextView title = text("HUD Lab 0.4", 23, TEXT, true);
         title.setPadding(dp(16), 0, dp(18), 0);
         header.addView(title);
 
@@ -212,6 +213,25 @@ public final class HudLabActivity extends Activity implements HudLabController.L
 
     private View buildSystemDumpTab() {
         LinearLayout body = columnBody();
+        body.addView(sectionTitle("Замещение штатного Activity на физическом HUD"));
+        body.addView(note(
+                "Из системного APK установлено: штатный com.ecarx.hud запускает HomeActivity "
+                        + "на Display ID 2, windowing mode 5, split position 1. "
+                        + "Эта проверка запускает на том же дисплее полностью чёрный Activity — "
+                        + "не Presentation — и не меняет питание HUD или настройки автомобиля."));
+
+        body.addView(commandPair("ЗАПУСТИТЬ ЧЁРНЫЙ HUD-ACTIVITY", RED,
+                this::startHudCover,
+                "УБРАТЬ ЧЁРНЫЙ HUD-ACTIVITY", GREEN,
+                this::stopHudCover));
+
+        coverStatusView = text(
+                "Замещение выключено. Эта функция не связана с публикацией панели Status Widget.",
+                14, TEXT, false);
+        coverStatusView.setTextIsSelectable(true);
+        coverStatusView.setPadding(0, dp(10), 0, dp(18));
+        body.addView(coverStatusView);
+
         body.addView(sectionTitle("Экспорт фактической реализации HUD этой прошивки"));
         body.addView(note(
                 "HUD Lab 0.2 подтвердил: DISPLAY_DRIVE_ENVIRONMENT и DISPLAY_SAFETY "
@@ -245,6 +265,20 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                 "Экспорт можно выполнить без подключения ноутбука и без root. "
                         + "На Android 9 при первом запуске потребуется разрешить доступ к файлам."));
         return scroll(body);
+    }
+
+    private void startHudCover() {
+        HudDisplayCover.Result result = HudDisplayCover.start(this);
+        coverStatusView.setText(result.message);
+        Toast.makeText(this, result.success ? "HUD-Activity запущен" : "Ошибка запуска",
+                Toast.LENGTH_LONG).show();
+    }
+
+    private void stopHudCover() {
+        HudDisplayCover.stop(this);
+        coverStatusView.setText(
+                "Команда закрытия отправлена. Штатный HUD должен снова стать видимым.");
+        Toast.makeText(this, "HUD-Activity закрывается", Toast.LENGTH_SHORT).show();
     }
 
     private void requestSystemDump() {
