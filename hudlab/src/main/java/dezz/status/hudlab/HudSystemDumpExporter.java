@@ -72,6 +72,25 @@ final class HudSystemDumpExporter {
             "xsf", "openapi", "someip", "car"
     };
 
+    private static final File[] VENDOR_NATIVE_ROOTS = {
+            new File("/vendor/bin"),
+            new File("/vendor/bin/hw"),
+            new File("/vendor/lib"),
+            new File("/vendor/lib/hw"),
+            new File("/vendor/lib64"),
+            new File("/vendor/lib64/hw"),
+            new File("/vendor/etc"),
+            new File("/vendor/firmware"),
+            new File("/odm/firmware"),
+            new File("/mnt/vendor/persist")
+    };
+
+    private static final String[] VENDOR_NATIVE_HINTS = {
+            "dimprotocol", "vfhud", "hud", "kx11", "xma", "cluster", "headup"
+    };
+
+    private static final long MAX_VENDOR_FILE_BYTES = 64L * 1024L * 1024L;
+
     private HudSystemDumpExporter() {
     }
 
@@ -110,6 +129,9 @@ final class HudSystemDumpExporter {
             FrameworkExport framework = exportFrameworkCandidates(zip, entries, report);
             fileCount += framework.files;
             byteCount += framework.bytes;
+            FrameworkExport vendor = exportVendorNativeCandidates(zip, entries, report);
+            fileCount += vendor.files;
+            byteCount += vendor.bytes;
             addText(zip, entries, "report.txt", report.toString());
         } catch (Throwable failure) {
             // A partial archive is deliberately not presented as a valid diagnostic dump.
@@ -230,6 +252,102 @@ final class HudSystemDumpExporter {
             }
         }
         return new FrameworkExport(count, bytes);
+    }
+
+    private static FrameworkExport exportVendorNativeCandidates(ZipOutputStream zip,
+                                                                 Set<String> entries,
+                                                                 StringBuilder report) {
+        report.append("\n============================================================\n")
+                .append("VENDOR DIM/HUD NATIVE CANDIDATES\n")
+                .append("Targets include vendor.ecarx.xma.dimprotocol service, ")
+                .append("libkx11_lib and HUD/DIM firmware resources.\n");
+        int count = 0;
+        long bytes = 0L;
+        Set<String> visited = new HashSet<>();
+        for (File root : VENDOR_NATIVE_ROOTS) {
+            FrameworkExport result = exportVendorTree(
+                    root, root, 0, zip, entries, visited, report);
+            count += result.files;
+            bytes += result.bytes;
+        }
+        return new FrameworkExport(count, bytes);
+    }
+
+    private static FrameworkExport exportVendorTree(File root, File current, int depth,
+                                                     ZipOutputStream zip, Set<String> entries,
+                                                     Set<String> visited,
+                                                     StringBuilder report) {
+        if (depth > 3) return new FrameworkExport(0, 0L);
+        String path = current.getAbsolutePath();
+        if (!visited.add(path)) return new FrameworkExport(0, 0L);
+        if (!current.exists()) {
+            if (depth == 0) report.append(path).append(" MISSING\n");
+            return new FrameworkExport(0, 0L);
+        }
+        if (current.isFile()) {
+            String lower = current.getName().toLowerCase(Locale.ROOT);
+            if (!containsHint(lower, VENDOR_NATIVE_HINTS)) {
+                return new FrameworkExport(0, 0L);
+            }
+            long length = current.length();
+            if (length <= 0L || length > MAX_VENDOR_FILE_BYTES) {
+                report.append(path).append(" SKIPPED_SIZE=").append(length).append('\n');
+                return new FrameworkExport(0, 0L);
+            }
+            String relative = path.substring(Math.min(root.getAbsolutePath().length(),
+                    path.length()));
+            String entry = "vendor-native/" + safeName(root.getAbsolutePath())
+                    + '/' + safePath(relative);
+            long copied = addFile(zip, entries, entry, current, report);
+            return copied < 0L
+                    ? new FrameworkExport(0, 0L)
+                    : new FrameworkExport(1, copied);
+        }
+
+        File[] children;
+        try {
+            children = current.listFiles();
+        } catch (Throwable failure) {
+            report.append(path).append(" LIST_ERROR=")
+                    .append(shortFailure(failure)).append('\n');
+            return new FrameworkExport(0, 0L);
+        }
+        if (children == null) {
+            report.append(path).append(" NOT_READABLE\n");
+            return new FrameworkExport(0, 0L);
+        }
+        Arrays.sort(children, (left, right) ->
+                left.getName().compareToIgnoreCase(right.getName()));
+        int count = 0;
+        long bytes = 0L;
+        for (File child : children) {
+            if (child.isDirectory() || containsHint(
+                    child.getName().toLowerCase(Locale.ROOT), VENDOR_NATIVE_HINTS)) {
+                FrameworkExport result = exportVendorTree(
+                        root, child, depth + 1, zip, entries, visited, report);
+                count += result.files;
+                bytes += result.bytes;
+            }
+        }
+        return new FrameworkExport(count, bytes);
+    }
+
+    private static boolean containsHint(String value, String[] hints) {
+        for (String hint : hints) {
+            if (value.contains(hint)) return true;
+        }
+        return false;
+    }
+
+    private static String safePath(String path) {
+        String[] parts = path.replace('\\', '/').split("/");
+        StringBuilder out = new StringBuilder();
+        for (String part : parts) {
+            if (part.isEmpty()) continue;
+            if (out.length() > 0) out.append('/');
+            out.append(safeName(part));
+        }
+        return out.length() == 0 ? "root" : out.toString();
     }
 
     private static boolean isFrameworkCandidate(File file) {
