@@ -51,7 +51,7 @@ final class HudSystemSurfaceWindow {
     private static final int FRAME_OK = 1;
     private static final int STOP = -1;
     private static final long FRAME_INTERVAL_MS = 250L;
-    private static final int CONNECT_ATTEMPTS = 50;
+    private static final int CONNECT_ATTEMPTS = 250;
     private static final int CONNECT_TIMEOUT_MS = 120;
     private static final int SOCKET_TIMEOUT_MS = 5_000;
 
@@ -165,13 +165,24 @@ final class HudSystemSurfaceWindow {
 
     private void startBridge() {
         String command = bridgeCommand();
-        PrivilegedShell.get(appContext).runCommand(command, (ignoredOutput, error) -> {
-            if (dismissed) return;
-            if (error != null) {
-                fail("нет системного shell-доступа: " + error);
-                return;
+        PrivilegedShell.get(appContext).runLongRunningCommand(
+                command, new PrivilegedShell.LongRunningCommandCallback() {
+            @Override
+            public void onStarted() {
+                if (!dismissed) io.execute(HudSystemSurfaceWindow.this::connectToBridge);
             }
-            io.execute(this::connectToBridge);
+
+            @Override
+            public void onFinished(String commandOutput, String error) {
+                if (dismissed) return;
+                String detail = commandCompletionDetail(commandOutput, error);
+                if (connected || ready) {
+                    closeSocket();
+                    fail("системный HUD bridge неожиданно завершился" + detail);
+                } else {
+                    fail("bridge завершился до открытия порта" + detail);
+                }
+            }
         });
     }
 
@@ -300,7 +311,8 @@ final class HudSystemSurfaceWindow {
         // input is interpolated into this command.
         return "APK=`pm path " + packageName
                 + " | sed -n '1s/^package://p'`; "
-                + "(export CLASSPATH=\"$APK\"; "
+                + "if [ -z \"$APK\" ]; then echo 'base APK path not found'; exit 70; fi; "
+                + "export CLASSPATH=\"$APK\"; "
                 + "app_process /system/bin " + HudSurfaceBridgeMain.class.getName()
                 + " " + nonce
                 + " " + port
@@ -310,7 +322,7 @@ final class HudSystemSurfaceWindow {
                 + " " + HudViewportPolicy.SAFE_WIDTH
                 + " " + HudViewportPolicy.SAFE_HEIGHT
                 + " status_widget_hud_d" + displayId
-                + " </dev/null >/dev/null 2>&1 &)";
+                + " </dev/null 2>&1";
     }
 
     private void closeSocket() {
@@ -364,6 +376,15 @@ final class HudSystemSurfaceWindow {
         String message = failure.getMessage();
         return message == null || message.isEmpty()
                 ? failure.getClass().getSimpleName() : message;
+    }
+
+    @NonNull
+    private static String commandCompletionDetail(String output, String error) {
+        String value = error != null && !error.trim().isEmpty() ? error : output;
+        if (value == null || value.trim().isEmpty()) return " (без диагностического вывода)";
+        value = value.trim().replace('\n', ' ').replace('\r', ' ');
+        if (value.length() > 260) value = value.substring(0, 260);
+        return ": " + value;
     }
 
     private static void closeQuietly(Object value) {
