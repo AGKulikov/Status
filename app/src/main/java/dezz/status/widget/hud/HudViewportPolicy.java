@@ -15,6 +15,15 @@ import androidx.annotation.NonNull;
  */
 public final class HudViewportPolicy {
     public static final int VERIFIED_DISPLAY_ID = 2;
+    /**
+     * SurfaceFlinger stack owned by {@link #VERIFIED_DISPLAY_ID} on the supplied ECARX unit.
+     *
+     * <p>Both {@code dumpsys display} and {@code dumpsys window displays} report
+     * {@code local:2 -> layerStack 2}. Hidden-API access to
+     * {@code Display#getLayerStack()} is blocked on this Android 9 build, so the bridge needs
+     * this dump-verified fallback.</p>
+     */
+    public static final int VERIFIED_LAYER_STACK = 2;
     public static final int VERIFIED_DISPLAY_WIDTH = 1920;
     public static final int VERIFIED_DISPLAY_HEIGHT = 1080;
     public static final int REFERENCE_EDITOR_WIDTH = 1760;
