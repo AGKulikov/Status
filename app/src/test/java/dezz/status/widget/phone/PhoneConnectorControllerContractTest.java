@@ -40,82 +40,146 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("if (mapConnected) endMapSession(\"disconnected\")"));
     }
 
-    @Test public void sessionBarrierAndSerializedGattPreventStaleOverwrite() throws IOException {
+    @Test public void transportSessionBarrierPreventsStaleCallbacksAndDuplicateClients()
+            throws IOException {
         String source = controller();
+        String ensureGatt = between(source, "private void ensureGatt",
+                "private void ensureLegacyBatteryGatt");
+
         assertTrue(source.contains("runIfCurrent(token, action)"));
         assertTrue(source.contains("generation == token"));
-        assertTrue(source.contains("currentGattOperation != null"));
-        assertTrue(source.contains("gattOperations.poll()"));
-        assertTrue(source.contains("ANCS_DATA"));
-        assertTrue(source.contains("ANCS_NOTIFICATION"));
-        assertTrue(source.contains("ATTRIBUTE_TIMEOUT_MS"));
-        assertTrue(source.contains("activeAncsRequestSequence"));
-        assertTrue(source.contains("operation.requestSequence"));
-        assertTrue(source.contains("MAX_NOTIFICATIONS = 50"));
-        assertTrue(source.contains("clearAncsRuntime()"));
-        assertTrue(count(source, "callbackGatt == gatt") >= 3);
-        assertTrue(source.contains("operation.descriptor != callbackDescriptor"));
-        assertTrue(source.contains("operation.characteristic != callbackCharacteristic"));
-        assertTrue(source.contains("GATT operation timed out:"));
+        assertTrue(source.contains("activeAncsTransportSession"));
+        assertTrue(source.contains("transportSession != activeAncsTransportSession"));
+        assertTrue(source.contains("ancsTransportStartPending"));
+        assertTrue(source.contains("ancsTransport == null"));
+        assertTrue(source.contains("activeAncsTransportSession = ++nextAncsTransportSession"));
+        assertTrue(source.contains("new AncsTransportListener(token, transportSession)"));
+        assertTrue(source.contains("dispatchAncsTransport(token, transportSession"));
+        assertTrue(source.contains("closeAncsTransportOnMain(previous)"));
+        assertTrue(ensureGatt.contains("ancsTransport != null"));
+        assertTrue(ensureGatt.contains("ancsTransportStartPending"));
+        assertFalse(ensureGatt.contains("selectedDevice.connectGatt("));
+        assertFalse(ensureGatt.contains("scheduleConnectWatchdog("));
     }
 
-    @Test public void ancsHandshakeHandlesImmediateEventsAndChangingGattServices()
+    @Test public void batteryFallbackIsPreservedInBothAncsAndBatteryOnlyModes()
             throws IOException {
         String source = controller();
-        String eventHandler = between(source, "private void handleAncsEvent",
-                "private void handleServiceChanged");
-        assertTrue(source.contains("requestMtu(DESIRED_GATT_MTU)"));
-        assertTrue(source.contains("callbackGatt != gatt || !mtuPending"));
-        assertTrue(source.contains("if (!serviceDiscoveryStarted) return;"));
-        assertTrue(source.contains("DESIRED_GATT_MTU = 512"));
-        assertTrue(source.contains("GENERIC_ATTRIBUTE_SERVICE"));
-        assertTrue(source.contains("SERVICE_CHANGED"));
-        assertTrue(source.contains("ENABLE_INDICATION_VALUE"));
-        assertTrue(source.contains("ancsNotificationListening = true"));
-        assertTrue(eventHandler.contains("!ancsNotificationListening"));
-        assertFalse(eventHandler.contains("!ancsReady"));
-        assertTrue(source.contains("boolean autoConnect = ancsAuthorizedThisRun"));
-        assertTrue(source.contains("forceDirectGatt = true"));
-        assertTrue(source.contains("deviceRescanTask != null"));
-        assertTrue(source.contains("gattReconnectTask != null"));
-        assertTrue(source.contains("serviceChangedSubscribed ? \"ready\" : \"ready_degraded\""));
+        String transport = transport();
+        String batteryOnly = between(source, "private void ensureLegacyBatteryGatt",
+                "private void startAncsTransportOnMain");
+        String transportListener = between(source, "private final class AncsTransportListener",
+                "private void dispatchAncsTransport");
+        String services = between(transport, "private void handleServices",
+                "private void subscribeServiceChangedIfAvailable");
+        String changed = between(transport, "private void handleCharacteristicChanged",
+                "private static boolean descriptorMatchesStage");
+
+        assertTrue(transport.contains(
+                "UUID.fromString(\"0000180f-0000-1000-8000-00805f9b34fb\")"));
+        assertTrue(transport.contains(
+                "UUID.fromString(\"00002a19-0000-1000-8000-00805f9b34fb\")"));
+        assertTrue(transport.contains(
+                "UUID.fromString(\"00002a1a-0000-1000-8000-00805f9b34fb\")"));
+        assertTrue(transport.contains("startOptionalBatteryRead("));
+        assertTrue(transport.contains("startOptionalBatterySubscription("));
+        assertTrue(transport.contains("batteryReadPendingUuid != null"));
+        assertTrue(transport.contains("isBatteryDescriptorStage(descriptorStage)"));
+        assertTrue(transport.contains("advanceBatteryBootstrapIfIdle()"));
+        assertTrue(services.indexOf("prepareBatteryBootstrap(callbackGatt)")
+                < services.indexOf("callbackGatt.getService(AncsProtocol.SERVICE)"));
+        assertTrue(transport.contains(
+                "subscribeServiceChangedIfAvailable(callbackGatt);\n"
+                        + "        sendNextRequest();"));
+        assertTrue(changed.contains("if (gattClientConnected && value != null)"));
+        assertTrue(transport.contains(
+                "listener.onBatteryCharacteristic(uuid, copy)"));
+        assertTrue(transport.contains(
+                "listener.onBatteryCharacteristic(uuid, value.clone())"));
+        assertTrue(transport.contains("state(\"BAS OPERATION TIMEOUT"));
+        assertTrue(source.contains("state.contains(\"BAS OPERATION TIMEOUT\")"));
+        assertTrue(transportListener.contains("applyBatteryCharacteristic("));
+
+        assertTrue(source.contains("ensureLegacyBatteryGatt(token)"));
+        assertTrue(batteryOnly.contains("selectedDevice.connectGatt(context, autoConnect"));
+        assertTrue(batteryOnly.contains("new SessionGattCallback(token)"));
+        assertTrue(batteryOnly.contains("config == null || config.ancsNeeded()"));
+        assertTrue(source.contains(
+                "state.contains(\"AUTO · ЖДУ SAVED PEER\")"));
+        assertTrue(source.contains(
+                "gattConnected = false;\n"
+                        + "            clearBasData();\n"
+                        + "            resetAncsSession(token, \"waiting_for_phone\")"));
     }
 
-    @Test public void protectedAncsSubscriptionsPrecedeOptionalServiceChangedAndWaitForUser()
+    @Test public void savedPeerTransportOwnsTheLongLivedAncsGattClient()
             throws IOException {
         String source = controller();
-        String setup = between(source, "ancsControlPoint = service.getCharacteristic",
-                "ancsStatus = \"subscribing\"");
-        int data = setup.indexOf("GattTag.ANCS_DATA");
-        int notification = setup.indexOf("GattTag.ANCS_NOTIFICATION");
-        int serviceChanged = setup.indexOf("configureServiceChanged(callbackGatt)");
-        assertTrue(data >= 0);
-        assertTrue(notification > data);
-        assertTrue(serviceChanged > notification);
-        assertTrue(source.contains(
-                "ANCS_AUTHORIZATION_OPERATION_TIMEOUT_MS = 90_000L"));
-        assertTrue(source.contains(
-                "ANCS_SERVICE_PUBLICATION_RETRY_MS = 95_000L"));
-        assertTrue(source.contains("gattOperationTimeoutMillis(operation)"));
-        assertTrue(source.contains("ancsStatus = \"service_not_published\""));
-        assertTrue(source.contains("ancsPublicationRetryCount >= 1"));
-        assertTrue(source.contains("ancsStatus = \"stock_pairing_required\""));
-        assertTrue(source.contains("refreshGattCache(expected)"));
-        assertTrue(source.contains("refreshGattCache(gatt)"));
-        assertTrue(source.contains(
-                "if (operation.tag == GattTag.SERVICE_CHANGED)"));
-        assertTrue(source.contains(
-                "finishGattOperation(token, operation.kind, operation.descriptor,"));
+        String transport = transport();
+        String savedPeer = between(transport, "public boolean connectSavedIphone",
+                "public void stopScan");
+        String clientConnect = between(transport, "private void connectIphonePeripheral",
+                "public void connect(Candidate candidate)");
+        String disconnect = between(transport,
+                "private void handleIphonePeripheralConnectionState",
+                "private final BluetoothGattCallback gattCallback");
+        String connectionCallback = between(transport,
+                "private final BluetoothGattCallback gattCallback",
+                "@Override\n        public void onServicesDiscovered");
 
-        String serviceChangedResult = between(source,
-                "} else if (operation.tag == GattTag.SERVICE_CHANGED)",
-                "} else if (operation.tag == GattTag.CONTROL)");
-        assertFalse(serviceChangedResult.contains("scheduleGattReconnect("));
+        assertTrue(source.contains("created.connectSavedIphone(address)"));
+        assertTrue(source.contains("final String address = selectedAddress"));
+        assertTrue(source.contains("mainHandler.post(() -> startAncsTransportOnMain("));
+        assertTrue(savedPeer.contains("adapter.getRemoteDevice(address.trim())"));
+        assertTrue(savedPeer.contains("connectIphonePeripheral(device, true,"));
+        assertTrue(clientConnect.contains(
+                "device.connectGatt(context, autoConnect, gattCallback,"));
+        assertTrue(clientConnect.contains("BluetoothDevice.TRANSPORT_LE"));
+        assertTrue(clientConnect.contains("if (autoConnect) {"));
+        assertTrue(clientConnect.contains("connectTimeout = null"));
+        assertTrue(clientConnect.contains("return;"));
+        assertTrue(disconnect.contains("if (activeClientAutoConnect)"));
+        assertTrue(disconnect.contains("state(\"AUTO · ЖДУ SAVED PEER\")"));
+        assertTrue(disconnect.contains(
+                "BluetoothGatt оставлен зарегистрированным для фонового reconnect"));
+        assertTrue(source.contains("state.contains(\"AUTO · ЖДУ SAVED PEER\")"));
+        assertTrue(source.contains("state.contains(\"AUTO · SERVICE CHANGED · RECONNECT\")"));
+        assertTrue(connectionCallback.contains("main.post(() ->"));
+        assertFalse(connectionCallback.contains("postAtFrontOfQueue"));
+    }
 
-        String bondRestart = between(source, "private void restartAncsAfterBond",
-                "private void pumpAttributeRequests");
-        assertTrue(bondRestart.contains("scheduleGattReconnect("));
-        assertFalse(bondRestart.contains("startServiceDiscovery("));
+    @Test public void protectedAncsSubscriptionsAreSerializedInsideTheTransport()
+            throws IOException {
+        String transport = transport();
+        String services = between(transport, "private void handleServices",
+                "private void subscribeServiceChangedIfAvailable");
+        String descriptor = between(transport, "private void handleDescriptorWrite",
+                "private void handleCharacteristicChanged");
+
+        assertTrue(services.contains("AncsProtocol.DATA_SOURCE"));
+        assertTrue(services.contains("AncsProtocol.NOTIFICATION_SOURCE"));
+        assertTrue(services.contains("AncsProtocol.CONTROL_POINT"));
+        assertTrue(services.contains("descriptorStage = DescriptorStage.DATA_SOURCE"));
+        assertTrue(descriptor.contains("descriptorStage = DescriptorStage.NOTIFICATION_SOURCE"));
+        assertTrue(descriptor.contains("gattReady = true"));
+        assertTrue(descriptor.contains("state(\"ANCS READY · ОТПРАВЬТЕ УВЕДОМЛЕНИЕ\")"));
+        assertTrue(transport.contains("isAuthorizationError(status)"));
+        assertTrue(transport.contains("requestBond(callbackGatt.getDevice())"));
+        assertTrue(transport.contains("scheduleAncsRetryAfterBond("));
+        assertTrue(transport.contains(
+                "resetBatteryBootstrap();\n"
+                        + "            log(\"Повторяю discovery/ANCS-подписку после bond"));
+        assertTrue(transport.contains("Service Changed indication включена"));
+        assertTrue(transport.contains("DESCRIPTOR_WRITE_TIMEOUT_MS = 15_000L"));
+        assertTrue(transport.contains("BOND_TIMEOUT_MS = 90_000L"));
+        assertTrue(transport.contains("scheduleDescriptorWriteTimeout(callbackGatt"));
+        assertTrue(transport.contains("cancelDescriptorWriteTimeout()"));
+        assertTrue(transport.contains("scheduleBondTimeout(device)"));
+        assertTrue(transport.contains("cancelBondTimeout()"));
+        assertTrue(transport.contains("state(\"CCCD_WRITE_TIMEOUT · \" + expectedStage)"));
+        assertTrue(transport.contains("state(\"LE BOND TIMEOUT\")"));
+        assertTrue(controller().contains("state.contains(\"CCCD_WRITE_TIMEOUT\")"));
+        assertTrue(controller().contains("state.contains(\"LE BOND TIMEOUT\")"));
     }
 
     @Test public void stockEcarxConnectionIsBestEffortAndNeverUnpairs() throws IOException {
@@ -179,26 +243,123 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(controller.contains("oemGattRefreshTask"));
     }
 
-    @Test public void privacyModeAndAppPresentationRemainSourceOnly() throws IOException {
+    @Test public void presentationKeepsDisplayNameTitleAndMessageStrictlySeparated()
+            throws IOException {
         String source = controller();
-        assertTrue(source.contains("notificationAttributeRequest(uid, includeText)"));
-        assertTrue(source.contains("fullTextAttributeUids.contains(uid)"));
-        assertTrue(source.contains("needsMessageTextFollowUp"));
+        String transport = transport();
+        String incoming = between(source, "private void handleAncsTransportNotification",
+                "private void handleAncsTransportAppName");
+        String mirror = between(source, "private void mirrorAncsNotification",
+                "private void mirrorSmsNotification");
+
         assertTrue(source.contains("current.notificationsEnabled\n"
                 + "                || current.messagesEnabled && appleMessage"));
-        assertTrue(source.contains("queueAppDisplayName(notification.appIdentifier)"));
-        assertTrue(source.contains("new AncsProtocol.AppAttributeAccumulator(appIdentifier)"));
+        assertTrue(incoming.contains("bounded(item.title, 4096)"));
+        assertTrue(incoming.contains("bounded(item.message, 4096)"));
+        assertTrue(incoming.contains("boolean hasDisplayName"));
+        assertTrue(incoming.contains("new NotificationRecord(\n"
+                + "                notification, item.categoryId, System.currentTimeMillis(), false,\n"
+                + "                observedAtElapsedMs)"));
+        assertTrue(incoming.contains(
+                "if (hasDisplayName) {\n"
+                        + "            presentAncsNotification(token, record, true)"));
+        assertTrue(incoming.contains("scheduleUnresolvedNotificationExpiry(token, record)"));
+        assertTrue(source.contains("cacheAppDisplayName(appIdentifier, displayName)"));
+        assertTrue(source.contains("if (!record.presented)"));
+        assertTrue(source.contains("presentAncsNotification(token, record, false)"));
+        assertTrue(source.contains("APP_DISPLAY_NAME_WAIT_TIMEOUT_MS = 15_000L"));
+        assertTrue(source.contains("item.observedAtElapsedMs"));
+        assertTrue(source.contains("isUnresolvedNotificationExpired(record)"));
+        assertTrue(source.contains("APP_DISPLAY_NAME_WAIT_TIMEOUT_MS - age"));
+        assertTrue(source.contains("NotificationRecord current = notificationCache.get(uid)"));
+        assertTrue(source.contains("if (current != expected || current.presented) return"));
+        assertTrue(source.contains("notificationCache.remove(uid)"));
+        assertTrue(mirror.contains(".setSubText(appName)"));
+        assertTrue(mirror.contains(".setContentTitle(record.notification.title)"));
+        assertTrue(mirror.contains(".setContentText(record.notification.message)"));
+        assertTrue(mirror.contains(".bigText(record.notification.message)"));
+        assertFalse(mirror.contains("firstNonEmpty("));
+        assertTrue(transport.contains("appDisplayNameRequest(activeRequest.appIdentifier)"));
+        assertTrue(transport.contains("listener.onAppName(activeRequest.appIdentifier, displayName)"));
         assertTrue(source.contains("PhoneAppCatalog.iconResource("));
         assertTrue(source.contains("PhoneAppCatalog.iconKey("));
         assertTrue(source.contains("value.put(\"app_id\""));
         assertTrue(source.contains("value.put(\"app_name\""));
+        assertTrue(source.contains("value.put(\"application\", application)"));
+        assertTrue(source.contains("value.put(\"topic\", item.notification.title)"));
+        assertTrue(source.contains("value.put(\"text\", item.notification.message)"));
         assertTrue(source.contains("value.put(\"received_at\""));
         assertTrue(source.contains("\"diagnostics.last_app\""));
-        assertTrue(source.contains("ANCS_INVALID_PARAMETER = 0xA2"));
         assertTrue(source.contains("basBatteryUpdatedAt >= hfpBatteryUpdatedAt"));
         assertTrue(source.contains("genericBatteryUpdatedAt"));
         assertTrue(source.contains("SystemClock.elapsedRealtime()"));
         assertTrue(source.contains("clearGenericBatteryData()"));
+    }
+
+    @Test public void transportDropsPreExistingReplayBeforeAnyAttributeRequest()
+            throws IOException {
+        String transport = transport();
+        String protocol = transportProtocol();
+        String notificationSource = between(transport,
+                "private void handleNotificationSource", "private void cancelQueuedNotificationRequests");
+        String dataSource = between(transport,
+                "private void handleDataSource", "private void finishRequest");
+
+        assertTrue(protocol.contains("EVENT_FLAG_PRE_EXISTING = 0x04"));
+        assertTrue(transport.contains("AncsProtocol.isPreExisting(event)"));
+        assertTrue(notificationSource.contains("!realtimeAdmission.shouldRequest(event)"));
+        assertTrue(notificationSource.contains("preExistingDropped++"));
+        assertTrue(notificationSource.contains("realtimeAdmission.consumeRemoval(event.uid)"));
+        assertTrue(dataSource.contains("listener.onNotification(new NotificationItem("));
+        assertTrue(dataSource.contains("realtimeAdmission.markDelivered(result.uid)"));
+        assertTrue(dataSource.indexOf("listener.onNotification(new NotificationItem(")
+                < dataSource.indexOf("realtimeAdmission.markDelivered(result.uid)"));
+    }
+
+    @Test public void realtimeTransportExpiresQueuedItemsAndRefreshesDirtyInflightUids()
+            throws IOException {
+        String transport = transport();
+        String notificationSource = between(transport,
+                "private void handleNotificationSource", "private void updateQueuedNotificationAge");
+        String send = between(transport,
+                "private void sendNextRequest", "private void handleDataSource");
+        String data = between(transport,
+                "private void handleDataSource", "private void finishRequest");
+
+        assertTrue(transport.contains("LIVE_NOTIFICATION_MAX_AGE_MS = 15_000L"));
+        assertTrue(transport.contains("SystemClock.elapsedRealtime()"));
+        assertTrue(transport.contains("eventObservedAtElapsedMs"));
+        assertTrue(transport.contains("dirtyNotificationUids"));
+        assertTrue(notificationSource.contains("dirtyNotificationUids.add(event.uid)"));
+        assertTrue(notificationSource.contains(
+                "eventObservedAtElapsedMs.put(event.uid, observedAtElapsedMs)"));
+        assertTrue(send.contains("isExpiredNotification(candidate.observedAtElapsedMs)"));
+        assertTrue(data.contains("dirtyNotificationUids.remove(result.uid)"));
+        assertTrue(data.contains(
+                "enqueuePriorityRequest(Request.notification(latestEvent, latestObservedAt))"));
+        assertTrue(data.contains("finishRequest(\"refresh_queued\")"));
+        assertTrue(data.contains("isExpiredNotification(observedAtElapsedMs)"));
+        assertTrue(data.contains("observedAtElapsedMs));"));
+    }
+
+    @Test public void malformedOrTimedOutDataSourceForcesSessionResynchronization()
+            throws IOException {
+        String source = controller();
+        String transport = transport();
+        String send = between(transport,
+                "private void sendNextRequest", "private void handleDataSource");
+        String data = between(transport,
+                "private void handleDataSource", "private void finishRequest");
+        String abort = between(transport,
+                "private void abortAncsRequestStream", "private void requestBond");
+
+        assertTrue(send.contains("abortAncsRequestStream(\"timeout\")"));
+        assertTrue(data.contains("abortAncsRequestStream(\"notification_malformed\")"));
+        assertTrue(data.contains("abortAncsRequestStream(\"app_malformed\")"));
+        assertTrue(abort.contains("clearAncsRuntime()"));
+        assertTrue(abort.contains("state(\"ANCS DATA DESYNC · RECONNECT · \" + reason)"));
+        assertFalse(abort.contains("sendNextRequest"));
+        assertTrue(source.contains("state.contains(\"ANCS DATA DESYNC\")"));
     }
 
     @Test public void batteryNetworkSmsAndNotificationFallbacksFailClosed() throws IOException {
@@ -247,7 +408,9 @@ public final class PhoneConnectorControllerContractTest {
         String source = controller();
         assertTrue(source.contains("boolean ancsNeeded()"));
         assertTrue(source.contains("return notificationsEnabled || messagesEnabled"));
-        assertTrue(source.contains("if (current.ancsNeeded()) ancsStatus = \"connecting\""));
+        assertTrue(source.contains("if (!current.ancsNeeded())"));
+        assertTrue(source.contains("ancsStatus = \"connecting\""));
+        assertTrue(source.contains("created.connectSavedIphone(address)"));
         assertTrue(source.contains("if (config == null || !config.ancsNeeded())"));
         assertTrue(source.contains("isAppleMessagesApp(record.notification.appIdentifier)"));
         assertTrue(source.contains("current.notificationsEnabled\n"
@@ -284,6 +447,23 @@ public final class PhoneConnectorControllerContractTest {
 
     private static String controller() throws IOException {
         return javaSource("PhoneConnectorController.java");
+    }
+
+    private static String transport() throws IOException {
+        return transportSource("IphoneAncsTransport.java");
+    }
+
+    private static String transportProtocol() throws IOException {
+        return transportSource("AncsProtocol.java");
+    }
+
+    private static String transportSource(String name) throws IOException {
+        Path fromRoot = Paths.get("app", "src", "main", "java", "dezz", "status",
+                "widget", "phone", "transport", name);
+        Path fromApp = Paths.get("src", "main", "java", "dezz", "status",
+                "widget", "phone", "transport", name);
+        Path file = Files.isRegularFile(fromRoot) ? fromRoot : fromApp;
+        return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
     }
 
     private static String javaSource(String name) throws IOException {

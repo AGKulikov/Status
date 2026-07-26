@@ -190,11 +190,13 @@ public final class DriverPanelHa1085ContractTest {
         String intentRules = read(widget.resolve("IntentScenarioSettingsActivity.java"));
         String editor = read(widget.resolve("ScenarioSettingsActivity.java"));
 
-        assertTrue(bootstrap.contains("preferences.widgetEnabled.get()")
-                && bootstrap.contains("preferences.driverPanelEnabled.get()"));
-        assertTrue(starter.contains("!preferences.driverPanelEnabled.get()"));
-        assertTrue(service.contains(
-                "else if (prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get())"));
+        assertTrue(bootstrap.contains(
+                "WidgetServiceStarter.requiresIntegrationHost(preferences)"));
+        assertTrue(bootstrap.contains(
+                "WidgetServiceStarter.requiresHeadlessHost(preferences)"));
+        assertTrue(starter.contains("preferences.driverPanelEnabled.get()"));
+        assertTrue(starter.contains("preferences.phoneConnectorEnabled.get()"));
+        assertTrue(service.contains("else if (headlessHostRequired)"));
         assertTrue(service.contains("runInitialIntegrationStartup()"));
         assertTrue(service.contains("detachStatusSurfaceRuntime(\"status row disabled\")"));
         assertTrue(service.contains("stopLocationTracking()"));
@@ -205,12 +207,12 @@ public final class DriverPanelHa1085ContractTest {
                 + " || !prefs.widgetEnabled.get()"));
         assertTrue(service.contains("void ensureEnabledRuntime()"));
         assertTrue(service.contains(
-                "(prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get())\n"
+                "WidgetServiceStarter.requiresHeadlessHost(prefs)\n"
                         + "                && !integrationsStarted"));
         assertTrue(service.contains("overlayAttachAttempts = 0;"));
         assertTrue(service.contains(
-                "if (prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get()) {\n"
-                + "                ensureEnabledRuntime();"));
+                "if (WidgetServiceStarter.requiresHeadlessHost(prefs)) {\n"
+                        + "                ensureEnabledRuntime();"));
         assertTrue(service.contains("|| !Permissions.allPermissionsGranted(this)) return;"));
         assertTrue(service.contains("if (integrationsStarted)"));
         assertTrue(service.contains("applyPopupPreferencesSafely()"));

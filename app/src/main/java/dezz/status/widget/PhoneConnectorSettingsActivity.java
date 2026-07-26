@@ -842,7 +842,13 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         preferences.phoneSprutPresencePath.set(selectedSprutPath);
 
         WidgetService service = WidgetService.getInstance();
-        if (service != null) service.applyPreferences();
+        if (service != null) {
+            service.applyPreferences();
+        } else {
+            // Enabling the phone connector must also work when every visual surface is disabled.
+            // The shared foreground host is idempotent and safely no-ops when no consumer remains.
+            WidgetServiceStarter.startIfNeeded(this);
+        }
 
         if (showConfirmation) {
             Toast.makeText(this, R.string.phone_saved, Toast.LENGTH_LONG).show();

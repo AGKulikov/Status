@@ -71,15 +71,30 @@ public final class PhoneSelectedIphoneIsolationContractTest {
         }
     }
 
-    @Test public void gattAndInitialProfilesAreOpenedForTheSelectedDeviceOnly()
+    @Test public void ancsTransportAndInitialProfilesUseTheSelectedAddressOnly()
             throws IOException {
         String source = controller();
+        String transport = transport();
+        String ensureGatt = method(source, "private void ensureGatt",
+                "private void ensureLegacyBatteryGatt");
+        String batteryOnly = method(source, "private void ensureLegacyBatteryGatt",
+                "private void startAncsTransportOnMain");
+        String savedPeer = method(transport, "public boolean connectSavedIphone",
+                "public void stopScan");
 
-        assertTrue(source.contains("selectedDevice.connectGatt("));
-        assertFalse(source.contains("adapter.getRemoteDevice("));
+        assertTrue(source.contains("final String address = selectedAddress"));
+        assertTrue(source.contains("created.connectSavedIphone(address)"));
+        assertTrue(source.contains("new AncsTransportListener(token, transportSession)"));
+        assertTrue(savedPeer.contains("adapter.getRemoteDevice(address.trim())"));
+        assertTrue(savedPeer.contains("connectIphonePeripheral(device, true,"));
+        assertFalse(ensureGatt.contains("selectedDevice.connectGatt("));
+        assertFalse(ensureGatt.contains("scheduleConnectWatchdog("));
+        assertTrue(batteryOnly.contains("selectedDevice.connectGatt(context, autoConnect"));
+        assertTrue(batteryOnly.contains("config == null || config.ancsNeeded()"));
         assertTrue(source.contains("proxy.getConnectedDevices()"));
         assertTrue(source.contains("if (isSelected(device))"));
-        assertTrue(source.contains("if (callbackGatt != gatt)"));
+        assertTrue(source.contains("transportSession != activeAncsTransportSession"));
+        assertTrue(transport.contains("if (callbackGatt != gatt) return;"));
         assertTrue(source.contains("generation == token"));
     }
 
@@ -121,10 +136,22 @@ public final class PhoneSelectedIphoneIsolationContractTest {
     }
 
     private static String controller() throws IOException {
+        return source("PhoneConnectorController.java");
+    }
+
+    private static String transport() throws IOException {
+        return source("transport", "IphoneAncsTransport.java");
+    }
+
+    private static String source(String... relative) throws IOException {
         Path fromRoot = Paths.get("app", "src", "main", "java", "dezz", "status",
-                "widget", "phone", "PhoneConnectorController.java");
+                "widget", "phone");
         Path fromApp = Paths.get("src", "main", "java", "dezz", "status",
-                "widget", "phone", "PhoneConnectorController.java");
+                "widget", "phone");
+        for (String part : relative) {
+            fromRoot = fromRoot.resolve(part);
+            fromApp = fromApp.resolve(part);
+        }
         Path file = Files.isRegularFile(fromRoot) ? fromRoot : fromApp;
         return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
     }

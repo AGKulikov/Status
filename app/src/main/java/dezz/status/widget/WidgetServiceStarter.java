@@ -22,10 +22,9 @@ public final class WidgetServiceStarter {
     private WidgetServiceStarter() {}
 
     /**
-     * Starts the shared integration host when either the status overlay or driver panel needs it.
-     * With only the driver panel enabled the service stays headless and supplies live connector
-     * values/scenarios. A temporarily unavailable locked-boot AppOp is deliberately not persisted
-     * as an opt-out: USER_UNLOCKED or the next HOME start will retry safely.
+     * Starts the shared integration host when a surface or a headless connector needs it.
+     * A temporarily unavailable locked-boot AppOp is deliberately not persisted as an opt-out:
+     * USER_UNLOCKED or the next HOME start will retry safely.
      */
     public static boolean startIfNeeded(@NonNull Context context) {
         return attemptStart(applicationContext(context), -1);
@@ -59,13 +58,12 @@ public final class WidgetServiceStarter {
                 return true;
             }
             Preferences preferences = new Preferences(app);
-            if (!preferences.widgetEnabled.get()
-                    && !preferences.driverPanelEnabled.get()
-                    && !preferences.hudPanelEnabled.get()) {
+            if (!requiresIntegrationHost(preferences)) {
                 cancelPendingRetry(app);
                 return false;
             }
-            if (!Permissions.allPermissionsGranted(app)) {
+            if (!Permissions.allPermissionsGranted(app)
+                    && !requiresHeadlessHost(preferences)) {
                 Log.w(TAG, "Status overlay remains enabled; waiting for permissions/unlock");
                 cancelPendingRetry(app);
                 return false;
@@ -80,6 +78,35 @@ public final class WidgetServiceStarter {
             scheduleRetry(app, retryAttempt);
             return false;
         }
+    }
+
+    static boolean requiresIntegrationHost(@NonNull Preferences preferences) {
+        return requiresIntegrationHost(
+                preferences.widgetEnabled.get(),
+                preferences.driverPanelEnabled.get(),
+                preferences.hudPanelEnabled.get(),
+                preferences.phoneConnectorEnabled.get());
+    }
+
+    static boolean requiresHeadlessHost(@NonNull Preferences preferences) {
+        return requiresHeadlessHost(
+                preferences.driverPanelEnabled.get(),
+                preferences.hudPanelEnabled.get(),
+                preferences.phoneConnectorEnabled.get());
+    }
+
+    static boolean requiresIntegrationHost(boolean widgetEnabled,
+                                           boolean driverPanelEnabled,
+                                           boolean hudPanelEnabled,
+                                           boolean phoneConnectorEnabled) {
+        return widgetEnabled || requiresHeadlessHost(
+                driverPanelEnabled, hudPanelEnabled, phoneConnectorEnabled);
+    }
+
+    static boolean requiresHeadlessHost(boolean driverPanelEnabled,
+                                        boolean hudPanelEnabled,
+                                        boolean phoneConnectorEnabled) {
+        return driverPanelEnabled || hudPanelEnabled || phoneConnectorEnabled;
     }
 
     private static void scheduleRetry(@NonNull Context app, int retryAttempt) {

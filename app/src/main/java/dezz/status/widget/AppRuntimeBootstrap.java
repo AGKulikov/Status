@@ -65,16 +65,18 @@ public final class AppRuntimeBootstrap {
     static void reconcileServices(@NonNull Context context,
                                   @NonNull Preferences preferences) {
         Context appContext = context.getApplicationContext();
-        boolean integrationHostRequired = preferences.widgetEnabled.get()
-                || preferences.driverPanelEnabled.get()
-                || preferences.hudPanelEnabled.get();
+        boolean integrationHostRequired =
+                WidgetServiceStarter.requiresIntegrationHost(preferences);
+        boolean headlessHostRequired =
+                WidgetServiceStarter.requiresHeadlessHost(preferences);
         WidgetService runningHost = WidgetService.getInstance();
         if (integrationHostRequired) {
             if (runningHost != null) {
                 // In particular, wake live smart-home/scenario state when the driver rail is
                 // enabled while the status surface is already waiting in WindowManager backoff.
                 runningHost.ensureEnabledRuntime();
-            } else if (Permissions.allPermissionsGranted(appContext)) {
+            } else if (headlessHostRequired
+                    || Permissions.allPermissionsGranted(appContext)) {
                 try {
                     ContextCompat.startForegroundService(appContext,
                             new Intent(appContext, WidgetService.class));

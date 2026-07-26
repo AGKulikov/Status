@@ -325,9 +325,9 @@ public class WidgetService extends Service {
         if (destroyed || binding != null || !prefs.widgetEnabled.get()) return;
         if (!Permissions.allPermissionsGranted(this)) {
             // Location AppOps are shared with the status row but are not required by the
-            // independently attached driver rail or its HA/MQTT/Sprut live-state host. Keep that
-            // host alive while the status surface waits for permissions to be restored.
-            if (prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get()) {
+            // independently attached driver/HUD surfaces and the phone connector. Keep that host
+            // alive while the status surface waits for permissions to be restored.
+            if (WidgetServiceStarter.requiresHeadlessHost(prefs)) {
                 ensureEnabledRuntime();
             } else {
                 stopSelf();
@@ -784,7 +784,9 @@ public class WidgetService extends Service {
         intentScenarioController = new IntentScenarioController(this, prefs, actionDispatcher);
         ensurePopupOverlayManager();
 
-        if (!Permissions.allPermissionsGranted(this)) {
+        boolean headlessHostRequired = WidgetServiceStarter.requiresHeadlessHost(prefs);
+        boolean overlayRuntimeAvailable = Permissions.allPermissionsGranted(this);
+        if (!overlayRuntimeAvailable && !headlessHostRequired) {
             // Locked boot and a few OEM AppOps implementations can report a temporary denial.
             // Never turn that transient state into a permanent user preference and never pull
             // the settings activity over HOME without an explicit user action.
@@ -810,11 +812,12 @@ public class WidgetService extends Service {
             if (binding != null) applyPreferences(false);
         });
 
-        if (prefs.widgetEnabled.get()) {
+        if (prefs.widgetEnabled.get() && overlayRuntimeAvailable) {
             createOverlayView();
-        } else if (prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get()) {
-            // Driver and HUD surfaces are independent. Keep HA/MQTT/Sprut and scenarios alive
-            // without attaching the status-row window when only either one is enabled.
+        } else if (headlessHostRequired) {
+            // Driver/HUD surfaces and the phone connector are independent. Keep integrations
+            // alive without attaching the status-row window when only a headless consumer needs
+            // this foreground service.
             runInitialIntegrationStartup();
         } else {
             stopSelf();
@@ -1097,7 +1100,7 @@ public class WidgetService extends Service {
             }
             // A transient status-row rejection must not freeze live smart-home state on the
             // independently attached driver rail while we wait for WindowManager's retry.
-            if ((prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get())
+            if (WidgetServiceStarter.requiresHeadlessHost(prefs)
                     && !integrationsStarted) {
                 runInitialIntegrationStartup();
             }
@@ -1293,7 +1296,7 @@ public class WidgetService extends Service {
      */
     void ensureEnabledRuntime() {
         if (destroyed || prefs == null) return;
-        if ((prefs.driverPanelEnabled.get() || prefs.hudPanelEnabled.get())
+        if (WidgetServiceStarter.requiresHeadlessHost(prefs)
                 && !integrationsStarted) {
             runInitialIntegrationStartup();
         }
@@ -1317,8 +1320,7 @@ public class WidgetService extends Service {
         if (!statusSurfaceEnabled) {
             detachStatusSurfaceRuntime("status row disabled");
         }
-        if (!statusSurfaceEnabled && !prefs.driverPanelEnabled.get()
-                && !prefs.hudPanelEnabled.get()) {
+        if (!WidgetServiceStarter.requiresIntegrationHost(prefs)) {
             stopSelf();
             return;
         }
