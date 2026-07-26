@@ -25,6 +25,7 @@ import androidx.core.content.ContextCompat;
 import dezz.status.widget.HudPanelSettingsActivity;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.R;
+import dezz.status.widget.shell.PrivilegedShell;
 
 /** Foreground owner of the stable-id external HUD presentation. */
 public final class HudPresentationService extends Service
@@ -240,11 +241,7 @@ public final class HudPresentationService extends Service
                             // presents correctly, but prevents the custom panel from disappearing
                             // if an OEM compositor accepts a buffer on the wrong physical output.
                             // The direct opaque frame still masks the stock HUD.
-                            runtimeDetail = "HUD: ID " + display.getDisplayId()
-                                    + " · системный слой " + readyWindow.layerStack()
-                                    + " · кадр принят SurfaceFlinger"
-                                    + " · окно 728×190 @ (0,720)";
-                            updateNotification(runtimeDetail);
+                            verifySystemLayers(readyWindow, display);
                         }
 
                         @Override
@@ -296,6 +293,34 @@ public final class HudPresentationService extends Service
         presentation = fallback;
     }
 
+    private void verifySystemLayers(@NonNull HudSystemSurfaceWindow window,
+                                    @NonNull Display display) {
+        runtimeDetail = directRuntimeDetail(display, window,
+                "кадр принят · проверка живых слоёв…");
+        updateNotification(runtimeDetail);
+        PrivilegedShell.get(this).runCommand(
+                "dumpsys SurfaceFlinger --list",
+                (output, error) -> {
+                    if (systemSurfaceWindow != window || shownUniqueId == null) return;
+                    HudSurfaceLayerDiagnostics.Result result =
+                            HudSurfaceLayerDiagnostics.inspect(
+                                    output, error, window.surfaceName(), window.maskEnabled());
+                    runtimeDetail = directRuntimeDetail(display, window, result.detail());
+                    updateNotification(runtimeDetail);
+                });
+    }
+
+    @NonNull
+    private static String directRuntimeDetail(@NonNull Display display,
+                                              @NonNull HudSystemSurfaceWindow window,
+                                              @NonNull String suffix) {
+        return "HUD: ID " + display.getDisplayId()
+                + " · SurfaceFlinger stack " + window.layerStack()
+                + " · " + suffix
+                + " · виджеты 728×190 @ (0,720)"
+                + " · маска 808×266 @ (0,720)";
+    }
+
     @NonNull
     private HudPresentation createPresentation(@NonNull Display display) {
         HudPresentation next = new HudPresentation(
@@ -332,7 +357,9 @@ public final class HudPresentationService extends Service
         String mode;
         if (systemSurfaceWindow != null) {
             mode = systemSurfaceWindow.isReady()
-                    ? "системный SurfaceFlinger-слой " + systemSurfaceWindow.layerStack()
+                    ? "SurfaceFlinger stack " + systemSurfaceWindow.layerStack()
+                            + " · маска "
+                            + (systemSurfaceWindow.maskEnabled() ? "ВКЛ" : "ВЫКЛ")
                     : "системная маска запускается";
         } else if (overlayWindow != null) {
             mode = "overlay";
@@ -341,7 +368,7 @@ public final class HudPresentationService extends Service
         }
         return "HUD: " + candidate.name + " · ID " + candidate.id
                 + " · поверхность " + candidate.width + "×" + candidate.height
-                + " · окно 728×190 @ (0,720) · " + mode;
+                + " · виджеты 728×190 · маска 808×266 @ (0,720) · " + mode;
     }
 
     private void createNotificationChannel() {
