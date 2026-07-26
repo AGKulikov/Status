@@ -11,7 +11,7 @@
         android:theme="@style/Theme.HudLab">
 
         <activity
-            android:name=".HudLabActivity"
+            android:name="dezz.status.hudlab.HudLabActivity"
             android:configChanges="keyboardHidden|orientation|screenSize"
             android:exported="true"
             android:launchMode="singleTask"
@@ -23,14 +23,14 @@
         </activity>
 
         <activity
-            android:name=".HudCoverActivity"
+            android:name="dezz.status.hudlab.HudCoverActivity"
             android:configChanges="keyboardHidden|orientation|screenSize"
             android:excludeFromRecents="true"
             android:exported="false"
             android:launchMode="singleTask"
             android:noHistory="false"
             android:screenOrientation="landscape"
-            android:taskAffinity="dezz.status.hudlab.cover"
+            android:taskAffinity="dezz.status.hudlab10.cover"
             android:theme="@style/Theme.HudLab" />
     </application>
 
