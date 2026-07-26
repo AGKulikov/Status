@@ -52,6 +52,7 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     private static final int ON = 1;
     private static final int ZONE_ALL = Integer.MIN_VALUE;
     private static final long REFRESH_MS = 1_200L;
+    private static final long PROFILE_VISUAL_SCAN_STEP_MS = 3_600L;
     private static final int MAX_LOG_LINES = 70;
     private static final String PREFS = "hud_lab_backups";
     private static final String BACKUP_PROFILE_TRANSFER_MODE = "profile_transfer_mode";
@@ -85,6 +86,45 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     private final ArrayDeque<String> logLines = new ArrayDeque<>();
     private final SimpleDateFormat clock = new SimpleDateFormat("HH:mm:ss", Locale.ROOT);
     private final int[] visualFunctions = new int[20];
+    private final Runnable profileVisualScanStep = new Runnable() {
+        @Override
+        public void run() {
+            if (closed || !profileVisualScanRunning) return;
+            if (profileVisualScanIndex >= visualFunctions.length) {
+                profileVisualScanRunning = false;
+                profileVisualScanAppliedIndex = -1;
+                String finished = "01+MASK: перебор завершён; скорость не исчезла";
+                lastCommand = finished;
+                appendLog(finished);
+                publishSnapshot();
+                return;
+            }
+
+            try {
+                visualPen = profileVisualScanPen;
+                Arrays.fill(visualFunctions, profileVisualScanOneOff ? ON : OFF);
+                visualFunctions[profileVisualScanIndex] =
+                        profileVisualScanOneOff ? OFF : ON;
+                sendVisualMask();
+                profileVisualScanAppliedIndex = profileVisualScanIndex;
+                String step = "01+MASK mode=" + modeName(profileVisualScanMode)
+                        + ", PEN=" + profileVisualScanPen
+                        + ", " + scanPatternName(profileVisualScanOneOff)
+                        + ", сейчас F" + twoDigits(profileVisualScanAppliedIndex);
+                lastCommand = step;
+                appendLog(step);
+                profileVisualScanIndex++;
+                publishSnapshot();
+                worker.postDelayed(this, PROFILE_VISUAL_SCAN_STEP_MS);
+            } catch (Throwable failure) {
+                profileVisualScanRunning = false;
+                String failed = "01+MASK: ERROR " + shortFailure(failure);
+                lastCommand = failed;
+                appendLog(failed);
+                publishSnapshot();
+            }
+        }
+    };
     private final Runnable periodicRefresh = new Runnable() {
         @Override
         public void run() {
@@ -103,6 +143,12 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     private CarFunction carFunction;
     private boolean closed;
     private int visualPen = 1;
+    private boolean profileVisualScanRunning;
+    private boolean profileVisualScanOneOff;
+    private int profileVisualScanMode = -1;
+    private int profileVisualScanPen = -1;
+    private int profileVisualScanIndex;
+    private int profileVisualScanAppliedIndex = -1;
     private String lastCommand = "Команды ещё не отправлялись";
 
     HudLabController(Context context, Listener listener) {
@@ -302,18 +348,125 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         runCommand("01 ProfileTransfer HUD mode=" + modeName(mode), () -> {
             ECarXCarProfiletransferManager manager = requireProfileTransfer();
             rememberIntOnce(BACKUP_PROFILE_TRANSFER_MODE, readProfileTransferMode());
-            return "CB33278=" + result(manager.CB_HudDispModSetgReq(mode))
-                    + ", feedback=" + readProfileTransferMode();
+            ApiResult write = manager.CB_HudDispModSetgReq(mode);
+            SystemClock.sleep(220L);
+            return "CB33278=" + result(write)
+                    + ", PA33937=" + readProfileTransferModeStatus();
         });
     }
 
     void restoreProfileTransferMode() {
         runCommand("01 ProfileTransfer mode: откат", () -> {
+            stopProfileVisualScanInternal();
             int original = backups.getInt(BACKUP_PROFILE_TRANSFER_MODE,
                     readProfileTransferMode());
-            return "value=" + original + ", result="
-                    + result(requireProfileTransfer().CB_HudDispModSetgReq(original));
+            ApiResult write = requireProfileTransfer().CB_HudDispModSetgReq(original);
+            SystemClock.sleep(220L);
+            return "value=" + original + ", result=" + result(write)
+                    + ", PA33937=" + readProfileTransferModeStatus();
         });
+    }
+
+    /**
+     * Combines the confirmed ProfileTransfer mode with the lower DIM visual-function mask.
+     *
+     * <p>The scan deliberately changes one flag at a time and waits long enough for the
+     * physical HUD to redraw. Pressing "found" leaves the exact currently displayed mask in
+     * place so it can be verified a second time.</p>
+     */
+    void startProfileVisualScan(int mode, boolean oneOff, boolean allProfiles) {
+        worker.post(() -> {
+            if (closed) return;
+            stopProfileVisualScanInternal();
+            try {
+                ECarXCarProfiletransferManager manager = requireProfileTransfer();
+                rememberIntOnce(BACKUP_PROFILE_TRANSFER_MODE, readProfileTransferMode());
+                ApiResult modeWrite = manager.CB_HudDispModSetgReq(mode);
+                SystemClock.sleep(240L);
+
+                profileVisualScanMode = mode;
+                profileVisualScanOneOff = oneOff;
+                profileVisualScanPen = allProfiles ? 15 : activePen();
+                profileVisualScanIndex = 0;
+                profileVisualScanAppliedIndex = -1;
+                profileVisualScanRunning = true;
+
+                String started = "01+MASK старт: mode=" + modeName(mode)
+                        + ", PEN=" + profileVisualScanPen
+                        + ", " + scanPatternName(oneOff)
+                        + ", CB33278=" + result(modeWrite)
+                        + ", PA33937=" + readProfileTransferModeStatus();
+                lastCommand = started;
+                appendLog(started);
+                publishSnapshot();
+                profileVisualScanStep.run();
+            } catch (Throwable failure) {
+                profileVisualScanRunning = false;
+                String failed = "01+MASK старт: ERROR " + shortFailure(failure);
+                lastCommand = failed;
+                appendLog(failed);
+                publishSnapshot();
+            }
+        });
+    }
+
+    void markProfileVisualScanFound() {
+        worker.post(() -> {
+            if (closed) return;
+            worker.removeCallbacks(profileVisualScanStep);
+            boolean wasRunning = profileVisualScanRunning;
+            profileVisualScanRunning = false;
+            String found = profileVisualScanAppliedIndex < 0
+                    ? "01+MASK: активной комбинации пока нет"
+                    : "01+MASK ЗАФИКСИРОВАНО: mode=" + modeName(profileVisualScanMode)
+                    + ", PEN=" + profileVisualScanPen
+                    + ", " + scanPatternName(profileVisualScanOneOff)
+                    + ", F" + twoDigits(profileVisualScanAppliedIndex)
+                    + "=" + (profileVisualScanOneOff ? OFF : ON)
+                    + (wasRunning ? " (перебор остановлен)" : "");
+            lastCommand = found;
+            appendLog(found);
+            publishSnapshot();
+        });
+    }
+
+    void restoreProfileVisualSearch() {
+        worker.post(() -> {
+            if (closed) return;
+            stopProfileVisualScanInternal();
+            try {
+                int active = activePen();
+                Arrays.fill(visualFunctions, ON);
+                visualPen = active;
+                sendVisualMask();
+                visualPen = 15;
+                sendVisualMask();
+                visualPen = active;
+
+                int original = backups.getInt(BACKUP_PROFILE_TRANSFER_MODE,
+                        readProfileTransferMode());
+                ApiResult modeWrite =
+                        requireProfileTransfer().CB_HudDispModSetgReq(original);
+                SystemClock.sleep(220L);
+                profileVisualScanMode = -1;
+                profileVisualScanPen = -1;
+                profileVisualScanAppliedIndex = -1;
+                String restored = "01+MASK восстановление: active PEN и ProfAll → все F=1"
+                        + ", mode=" + original + " → " + result(modeWrite)
+                        + ", PA33937=" + readProfileTransferModeStatus();
+                lastCommand = restored;
+                appendLog(restored);
+            } catch (Throwable failure) {
+                lastCommand = "01+MASK восстановление: ERROR " + shortFailure(failure);
+                appendLog(lastCommand);
+            }
+            publishSnapshot();
+        });
+    }
+
+    private void stopProfileVisualScanInternal() {
+        worker.removeCallbacks(profileVisualScanStep);
+        profileVisualScanRunning = false;
     }
 
     void setActiveProfileDimMode(int mode) {
@@ -593,11 +746,13 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         out.append("  Active profile / PEN: ").append(readActiveProfile())
                 .append(" / ").append(readActivePen()).append('\n');
         out.append("  ProfileTransfer HUD mode CB33278/PA33937: ")
-                .append(readProfileTransferMode()).append('\n');
+                .append(readProfileTransferModeStatus()).append('\n');
         out.append("  Vehicle model clear CB33284/PA33943: ")
                 .append(readVehicleModelClear()).append('\n');
         out.append("  Driver display feedback 30873: ")
                 .append(readDriverDisplayTheme()).append("\n\n");
+
+        out.append("Поиск 01: ").append(profileVisualScanDescription()).append("\n\n");
 
         out.append("AdaptAPI Settings\n");
         out.append("  HUD_ACTIVE 0x").append(Integer.toHexString(IHUD.SETTING_FUNC_HUD_ACTIVE))
@@ -625,6 +780,11 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         out.append("  DIM priority/resource: ")
                 .append(readSignal(SignalRead.DIM_PRIORITY)).append(" / ")
                 .append(readSignal(SignalRead.DIM_RESOURCE)).append("\n\n");
+        out.append("Сырые данные скорости (только чтение)\n");
+        out.append("  extended / unit / value: ")
+                .append(readSignal(SignalRead.SPEED_EXTENDED)).append(" / ")
+                .append(readSignal(SignalRead.SPEED_UNIT)).append(" / ")
+                .append(readSignal(SignalRead.SPEED_VALUE)).append("\n\n");
         out.append("Локальная visual mask: ").append(visualMaskDescription()).append('\n');
 
         String snapshot = out.toString();
@@ -749,6 +909,16 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         }
     }
 
+    private String readProfileTransferModeStatus() {
+        try {
+            PATypes.PA_HudDispModSetgReq value =
+                    requireProfileTransfer().getPA_HudDispModSetgReq();
+            return value == null ? "null" : value.toString();
+        } catch (Throwable failure) {
+            return "ERROR " + shortFailure(failure);
+        }
+    }
+
     private int readVehicleModelClear() {
         try {
             PATypes.PA_VehMdlClrReq value =
@@ -783,7 +953,10 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         HUD_ACTIVE_STATUS,
         HUD_STATUS,
         DIM_PRIORITY,
-        DIM_RESOURCE
+        DIM_RESOURCE,
+        SPEED_EXTENDED,
+        SPEED_UNIT,
+        SPEED_VALUE
     }
 
     private String readSignal(SignalRead what) {
@@ -806,6 +979,15 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
                     break;
                 case DIM_RESOURCE:
                     value = manager.getNetDIMActvtResourceGroup();
+                    break;
+                case SPEED_EXTENDED:
+                    value = manager.getVehSpdExtdIndcnForUseInt();
+                    break;
+                case SPEED_UNIT:
+                    value = manager.getVehSpdIndcdVeSpdIndcdUnit();
+                    break;
+                case SPEED_VALUE:
+                    value = manager.getVehSpdIndcdVehSpdIndcd();
                     break;
                 default:
                     return "?";
@@ -859,6 +1041,35 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             out.append(String.format(Locale.ROOT, "%02d:%d", index, visualFunctions[index]));
         }
         return out.append(']').toString();
+    }
+
+    private String profileVisualScanDescription() {
+        if (profileVisualScanMode < 0) {
+            return "не запущен";
+        }
+        StringBuilder out = new StringBuilder();
+        out.append(profileVisualScanRunning ? "ИДЁТ" : "ПАУЗА")
+                .append(" · mode=").append(modeName(profileVisualScanMode))
+                .append(" · PEN=").append(profileVisualScanPen)
+                .append(" · ").append(scanPatternName(profileVisualScanOneOff));
+        if (profileVisualScanAppliedIndex >= 0) {
+            out.append(" · на HUD сейчас F")
+                    .append(twoDigits(profileVisualScanAppliedIndex))
+                    .append('=').append(profileVisualScanOneOff ? OFF : ON);
+        }
+        if (profileVisualScanRunning) {
+            out.append(" · следующий через ")
+                    .append(PROFILE_VISUAL_SCAN_STEP_MS / 1_000L).append(",6 с");
+        }
+        return out.toString();
+    }
+
+    private static String scanPatternName(boolean oneOff) {
+        return oneOff ? "все 1, по одному OFF" : "все 0, по одному ON";
+    }
+
+    private static String twoDigits(int value) {
+        return String.format(Locale.ROOT, "%02d", value);
     }
 
     private static String modeName(int mode) {
