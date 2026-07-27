@@ -97,11 +97,29 @@ jobs:
           BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
           echo "$BADGING"
           echo "$BADGING" | grep -F \
-            "package: name='dezz.status.hudlab10' versionCode='18' versionName='0.18'"
+            "package: name='dezz.status.hudlab10' versionCode='21' versionName='0.21'"
           echo "$BADGING" | grep -F "sdkVersion:'28'"
           echo "$BADGING" | grep -F "targetSdkVersion:'28'"
           if echo "$BADGING" | grep -Fq "application-debuggable"; then
             echo "HUD Lab release must not be debuggable" >&2
+            exit 1
+          fi
+          MANIFEST=$("$ANDROID_HOME/build-tools/36.0.0/aapt" \
+            dump xmltree "$APK" AndroidManifest.xml)
+          test "$(printf '%s\n' "$MANIFEST" | grep -c 'E: activity ')" -eq 2
+          if printf '%s\n' "$MANIFEST" | grep -Eq 'E: (service|receiver) '; then
+            echo "HUD Lab release must not contain a service or receiver" >&2
+            exit 1
+          fi
+          DEX_STRINGS=$(mktemp)
+          while IFS= read -r DEX; do
+            unzip -p "$APK" "$DEX" | strings >> "$DEX_STRINGS"
+          done < <(unzip -Z1 "$APK" | grep -E '^classes.*\.dex$')
+          grep -Fq 'HudDisplayStackBridgeMain' "$DEX_STRINGS"
+          grep -Fq 'HudPrivilegedCommandRunner' "$DEX_STRINGS"
+          if grep -Eq 'HudModeFallback(Service|BootReceiver)|HudModeEnforcementPolicy' \
+            "$DEX_STRINGS"; then
+            echo "Removed auto-repeat code leaked into release DEX" >&2
             exit 1
           fi
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$APK" >/dev/null
@@ -120,7 +138,7 @@ jobs:
       - name: Upload signed HUD Lab APK
         uses: actions/upload-artifact@v4
         with:
-          name: hud-lab-0.18-release-candidate
+          name: hud-lab-0.21-release-candidate
           path: |
             hudlab/build/outputs/apk/release/*.apk
             hudlab/build/outputs/apk/release/*.sha256

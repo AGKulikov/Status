@@ -13,10 +13,7 @@ import android.util.Base64;
 
 import com.ecarx.xui.adaptapi.ECarXCarProxy;
 import com.ecarx.xui.adaptapi.FunctionStatus;
-import com.ecarx.xui.adaptapi.car.Car;
-import com.ecarx.xui.adaptapi.car.ICar;
 import com.ecarx.xui.adaptapi.car.base.CarFunction;
-import com.ecarx.xui.adaptapi.car.userprofile.IUserProfile;
 import com.ecarx.xui.adaptapi.car.vehicle.IHUD;
 import com.google.protobuf.nano.MessageNano;
 
@@ -44,9 +41,9 @@ import vendor.ecarx.xma.pa.nano.VendorVehicleHalPAProto;
 /**
  * Isolated controller for controlled HUD experiments on the target ECARX head unit.
  *
- * <p>Diagnostic writes are issued only after an explicit button tap. The separate opt-in,
- * default-OFF {@link HudModeFallbackService} may conservatively repeat the confirmed method 01
- * value. Neither path reboots the HUD or disables a system package.</p>
+ * <p>Diagnostic writes are issued only after an explicit button tap. There is no boot receiver,
+ * foreground service or background mode enforcement. No path reboots the HUD or disables a
+ * system package.</p>
  */
 final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     interface Listener {
@@ -67,7 +64,10 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     private static final String BACKUP_PROFILE_TRANSFER_MODE = "profile_transfer_mode";
     private static final String BACKUP_VEHICLE_MODEL = "vehicle_model";
     private static final String BACKUP_USER_PROFILE_RAW_PREFIX = "user_profile_raw_before_hud_ar_";
+    private static final String BACKUP_USER_PROFILE_HUD_MODE_PREFIX =
+            "user_profile_hud_mode_before_";
     private static final String HUD_AR_PROFILE_KEY = "654443008";
+    private static final String HUD_MODE_PROFILE_KEY = "251660288";
     private static final int PA_PROFILE_CLOUD_DATA =
             ECarXCarProfileManager.ManagerId_papsetprofileclouddata;
     private static final int CB_PROFILE_CLOUD_DATA =
@@ -166,7 +166,6 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     private ECarXCarProfiletransferManager profileTransfer;
     private CarSignalManager signals;
     private CarFunction carFunction;
-    private IUserProfile userProfiles;
     private boolean closed;
     private int visualPen = 1;
     private boolean profileVisualScanRunning;
@@ -175,6 +174,10 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     private int profileVisualScanIndex;
     private int profileVisualScanAppliedIndex = -1;
     private String lastCommand = "Команды ещё не отправлялись";
+    private String userProfileHudArStatus =
+            "не читался; нажмите «ПРОЧИТАТЬ AR» во вкладке DISPLAY_*";
+    private String userProfileHudModeStatus =
+            "не читался; кнопки FIELD124 читают значение перед записью";
 
     HudLabController(Context context, Listener listener) {
         Context application = context.getApplicationContext();
@@ -215,7 +218,6 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
                 }
             }
             carFunction = null;
-            userProfiles = null;
             vfHud = null;
             profileManager = null;
             profileTransfer = null;
@@ -366,7 +368,6 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
 
     void setProfileTransferMode(int mode, Runnable onSuccess) {
         runCommand("01 ProfileTransfer HUD mode=" + modeName(mode), () -> {
-            requireModeFallbackOff();
             int validatedMode = HudProfileTransferMode.requireSdkMode(mode);
             rememberProfileTransferModeOnce(readProfileTransferMode());
             ApiResult write = writeProfileTransferSdkMode(validatedMode);
@@ -374,6 +375,48 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             return "CB33278=" + result(write)
                     + ", PA33937=" + readProfileTransferModeStatus();
         }, onSuccess);
+    }
+
+    /**
+     * Applies the selected profile HUD mode once through both confirmed vendor routes and commits
+     * the current profile settings once. This method never schedules another write.
+     */
+    void applyPersistentHudMode(int mode, String label) {
+        runCommand(label, () -> {
+            int validatedMode = HudProfileTransferMode.requireSdkMode(mode);
+            int pen = activePen();
+            int before = readProfileTransferMode();
+            rememberProfileTransferModeOnce(before);
+
+            ApiResult profileWrite = writeProfileTransferSdkMode(validatedMode);
+            SystemClock.sleep(180L);
+
+            VendorVehicleHalPAProto.ProtoHudDispModSetgReq request =
+                    new VendorVehicleHalPAProto.ProtoHudDispModSetgReq();
+            request.hudDispModSetgReqHudDispModSetgReq = validatedMode;
+            request.hudDispModSetgReqIdPen = pen;
+            requireSignals().setHudDispModSetgReq(request);
+            SystemClock.sleep(220L);
+
+            ApiResult saveLow = requireSignals().setSaveSetgToMemPrmnt(OFF);
+            requireSuccessfulWrite("signal29892 OFF", saveLow);
+            SystemClock.sleep(80L);
+            ApiResult saveEdge = requireSignals().setSaveSetgToMemPrmnt(ON);
+            requireSuccessfulWrite("signal29892 ON", saveEdge);
+            SystemClock.sleep(300L);
+
+            int confirmedMode = readProfileTransferMode();
+            if (confirmedMode != validatedMode) {
+                throw new IllegalStateException("PA33937 не подтвердил mode="
+                        + validatedMode + " (получено " + confirmedMode + ")");
+            }
+            return "OK · один проход · PEN=" + pen
+                    + " · CB33278=" + result(profileWrite)
+                    + " · DIM30814=[" + validatedMode + "," + pen + "]"
+                    + " · SAVE29892=" + result(saveLow) + "→" + result(saveEdge)
+                    + " · PA33937=" + confirmedMode
+                    + " · PA33906=" + readPaMode();
+        });
     }
 
     /**
@@ -386,7 +429,6 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
      */
     void setRawProfileTransferMinusOne() {
         runCommand("01 RAW ProfileTransfer HUD mode=-1", () -> {
-            requireModeFallbackOff();
             int current = readProfileTransferMode();
             rememberProfileTransferModeOnce(current);
             int rollback = savedProfileTransferMode();
@@ -402,29 +444,12 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
 
     void restoreProfileTransferMode() {
         runCommand("01 ProfileTransfer mode: откат", () -> {
-            requireModeFallbackOff();
             stopProfileVisualScanInternal();
             int original = savedProfileTransferMode();
             ApiResult write = writeProfileTransferSdkMode(original);
             SystemClock.sleep(220L);
             return "value=" + original + ", result=" + result(write)
                     + ", PA33937=" + readProfileTransferModeStatus();
-        });
-    }
-
-    void enableModeFallback(int target) {
-        runCommand("01 резервный автоповтор "
-                + HudModeFallbackStore.modeLabel(target), () -> {
-            if (HudModeFallbackStore.read(appContext).enabled) {
-                throw new IllegalStateException("резервный автоповтор уже включён");
-            }
-            if (!HudModeFallbackStore.isTargetMode(target)) {
-                throw new IllegalArgumentException("target должен быть режимом 0…3");
-            }
-            int rollback = savedProfileTransferMode();
-            HudModeFallbackService.enable(appContext, target, rollback);
-            return "ВКЛ; target=" + target + ", rollback=" + rollback
-                    + ". Это резерв, основной mask-поиск не изменён";
         });
     }
 
@@ -450,7 +475,6 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             }
             profileVisualScanPen = -1;
             try {
-                requireModeFallbackOff();
                 int validatedMode = HudProfileTransferMode.requireSdkMode(mode);
                 int pen = activePen();
                 rememberProfileTransferModeOnce(readProfileTransferMode());
@@ -496,7 +520,6 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
                 appendLog("01+MASK РУЧНОЙ: очистка предыдущих проб: " + priorRestore);
             }
             try {
-                requireModeFallbackOff();
                 int validatedMode = HudProfileTransferMode.requireSdkMode(mode);
                 int pen = activePen();
                 rememberProfileTransferModeOnce(readProfileTransferMode());
@@ -543,7 +566,6 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
                 appendLog("01+MASK BASELINE: очистка предыдущих проб: " + priorRestore);
             }
             try {
-                requireModeFallbackOff();
                 int validatedMode = HudProfileTransferMode.requireSdkMode(mode);
                 int pen = activePen();
                 rememberProfileTransferModeOnce(readProfileTransferMode());
@@ -599,7 +621,6 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             if (closed) return;
             stopProfileVisualScanInternal();
             try {
-                requireModeFallbackOff();
                 String restoredPens = restoreAllDirtyVisualMasksBestEffort();
                 int active = activePen();
                 Arrays.fill(visualFunctions, ON);
@@ -671,7 +692,12 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             request.hudDispModSetgReqHudDispModSetgReq = validatedMode;
             request.hudDispModSetgReqIdPen = pen;
             requireSignals().setHudDispModSetgReq(request);
-            return "signal30814 sent, PEN=" + pen;
+            byte[] protobuf = MessageNano.toByteArray(request);
+            appendLog("TX signal30814 / VHAL 0x2170785E · mode="
+                    + validatedMode + ", PEN=" + pen + " · protobuf=" + hex(protobuf));
+            SystemClock.sleep(250L);
+            return "signal30814 sent once, PEN=" + pen
+                    + ", PA33906=" + readPaMode();
         });
     }
 
@@ -795,24 +821,33 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
      */
     void setUserProfileHudAr(boolean enabled) {
         runCommand("UserProfile HUD AR=" + value(enabled), () -> {
-            IUserProfile profiles = requireUserProfiles();
-            int profileId = requireCurrentUserProfileId(profiles);
-            byte[] completeProfile = requireRawProfileCloudDataForProfile(
-                    profiles, profileId);
+            int profileId = requireActiveProfileId();
+            byte[] completeProfile = requireRawProfileCloudDataForProfile(profileId);
             int before = HudProfileWirePatcher.readHudAr(completeProfile);
             rememberUserProfileRawOnce(profileId, completeProfile);
             String readback = writeAndConfirmRawHudAr(
-                    profiles, profileId, completeProfile, enabled);
+                    profileId, completeProfile, enabled);
+            userProfileHudArStatus = "profile=" + profileId + ", value="
+                    + (enabled ? 1 : 0) + ", " + readback;
             return "profile=" + profileId + ", key " + HUD_AR_PROFILE_KEY
                     + ": " + before + "→" + (enabled ? 1 : 0)
                     + ", readback=" + readback;
         });
     }
 
+    void refreshUserProfileHudAr() {
+        runCommand("UserProfile HUD AR: чтение", () -> {
+            int profileId = requireActiveProfileId();
+            byte[] raw = requireRawProfileCloudDataForProfile(profileId);
+            userProfileHudArStatus = "profile=" + profileId + ", value="
+                    + HudProfileWirePatcher.readHudAr(raw) + ", rawBytes=" + raw.length;
+            return userProfileHudArStatus;
+        });
+    }
+
     void restoreUserProfileHudAr() {
         runCommand("UserProfile HUD AR: точный откат", () -> {
-            IUserProfile profiles = requireUserProfiles();
-            int profileId = requireCurrentUserProfileId(profiles);
+            int profileId = requireActiveProfileId();
             String originalBase64 = backups.getString(userProfileBackupKey(profileId), null);
             if (originalBase64 == null) {
                 throw new IllegalStateException(
@@ -823,12 +858,71 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             // Overlay only the original AR bit on a newly read raw profile so unrelated settings
             // changed after the backup are retained.
             String readback = writeAndConfirmRawHudAr(
-                    profiles, profileId,
-                    requireRawProfileCloudDataForProfile(profiles, profileId),
+                    profileId,
+                    requireRawProfileCloudDataForProfile(profileId),
                     originalValue == ON);
             backups.edit().remove(userProfileBackupKey(profileId)).apply();
+            userProfileHudArStatus = "profile=" + profileId + ", value="
+                    + originalValue + ", " + readback;
             return "profile=" + profileId + ", восстановлен исходный AR="
                     + originalValue + " поверх свежего raw-профиля, readback=" + readback;
+        });
+    }
+
+    /**
+     * Writes the ECARX user-profile HUD mode without rebuilding the profile protobuf.
+     *
+     * <p>UserProfile maps custom id 251660288 (CAR_FUNC_HUD_MODE) to
+     * Profileclouddata.profiletransferbyte3, protobuf field 124. Only that field's varint is
+     * replaced; all other bytes are retained exactly and PA33873 must confirm the new value.</p>
+     */
+    void setUserProfileHudMode(int mode) {
+        runCommand("UserProfile FIELD124 HUD mode=" + modeName(mode), () -> {
+            int validatedMode = HudProfileTransferMode.requireSdkMode(mode);
+            int profileId = requireActiveProfileId();
+            byte[] completeProfile = requireRawProfileCloudDataForProfile(profileId);
+            int before = HudProfileWirePatcher.readHudMode(completeProfile);
+            rememberUserProfileHudModeOnce(profileId, before);
+            String readback = writeAndConfirmRawHudMode(
+                    profileId, completeProfile, validatedMode);
+            userProfileHudModeStatus = "profile=" + profileId + ", field124="
+                    + validatedMode + ", " + readback;
+            return "profile=" + profileId + ", customId " + HUD_MODE_PROFILE_KEY
+                    + ", field124: " + before + "→" + validatedMode
+                    + ", readback=" + readback;
+        });
+    }
+
+    void refreshUserProfileHudMode() {
+        runCommand("UserProfile FIELD124 HUD mode: чтение", () -> {
+            int profileId = requireActiveProfileId();
+            byte[] raw = requireRawProfileCloudDataForProfile(profileId);
+            userProfileHudModeStatus = "profile=" + profileId + ", field124="
+                    + HudProfileWirePatcher.readHudMode(raw) + ", rawBytes=" + raw.length;
+            return userProfileHudModeStatus;
+        });
+    }
+
+    void restoreUserProfileHudMode() {
+        runCommand("UserProfile FIELD124 HUD mode: точный откат", () -> {
+            int profileId = requireActiveProfileId();
+            String key = userProfileHudModeBackupKey(profileId);
+            if (!backups.contains(key)) {
+                throw new IllegalStateException(
+                        "для активного профиля " + profileId
+                                + " исходное поле 124 ещё не сохранено");
+            }
+            int originalValue = backups.getInt(key, -1);
+            int validatedMode = HudProfileTransferMode.requireSdkMode(originalValue);
+            String readback = writeAndConfirmRawHudMode(
+                    profileId,
+                    requireRawProfileCloudDataForProfile(profileId),
+                    validatedMode);
+            backups.edit().remove(key).apply();
+            userProfileHudModeStatus = "profile=" + profileId + ", field124="
+                    + validatedMode + ", " + readback;
+            return "profile=" + profileId + ", восстановлен исходный field124="
+                    + validatedMode + " поверх свежего raw-профиля, readback=" + readback;
         });
     }
 
@@ -873,7 +967,6 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             profileTransfer = null;
             signals = null;
             carFunction = null;
-            userProfiles = null;
             appendLog("ecarxcar_service отключён; ждём переподключения"
                     + (interruptedScan
                     ? "; SAFE-цикл остановлен, all=1 будет восстановлен после подключения"
@@ -912,7 +1005,6 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             profileTransfer = null;
             signals = null;
             carFunction = null;
-            userProfiles = null;
             appendLog("Ошибка инициализации SDK: " + shortFailure(failure));
         }
         publishSnapshot();
@@ -997,10 +1089,11 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
                 .append(" / ").append(readActivePen()).append('\n');
         out.append("  ProfileTransfer HUD mode CB33278/PA33937: ")
                 .append(readProfileTransferModeStatus()).append('\n');
-        out.append("  Резервный автоповтор 01: ")
-                .append(HudModeFallbackStore.describe(appContext)).append('\n');
+        out.append("  Фоновый автоповтор: УДАЛЁН в 0.21\n");
         out.append("  UserProfile HUD AR key ").append(HUD_AR_PROFILE_KEY).append(": ")
-                .append(readUserProfileHudAr()).append('\n');
+                .append(userProfileHudArStatus).append('\n');
+        out.append("  UserProfile HUD mode key ").append(HUD_MODE_PROFILE_KEY)
+                .append(" / field124: ").append(userProfileHudModeStatus).append('\n');
         out.append("  Vehicle model clear CB33284/PA33943: ")
                 .append(readVehicleModelClear()).append('\n');
         out.append("  Driver display feedback 30873: ")
@@ -1275,14 +1368,6 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         return value;
     }
 
-    private void requireModeFallbackOff() {
-        if (HudModeFallbackStore.read(appContext).enabled) {
-            throw new IllegalStateException(
-                    "сначала выключите резервный автоповтор; ручные CB33278 заблокированы");
-        }
-    }
-
-
     private int readVehicleModelClear() {
         try {
             PATypes.PA_VehMdlClrReq value =
@@ -1306,24 +1391,12 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         backups.edit().putInt(key, value).apply();
     }
 
-    private IUserProfile requireUserProfiles() {
-        if (userProfiles != null) return userProfiles;
-        ICar car = Car.create(appContext);
-        if (car == null) {
-            throw new IllegalStateException("AdaptAPI Car.create вернул null");
-        }
-        IUserProfile profiles = car.getUserProfileManager();
-        if (profiles == null) {
-            throw new IllegalStateException("IUserProfile ещё не подключён");
-        }
-        userProfiles = profiles;
-        return profiles;
-    }
-
-    private static int requireCurrentUserProfileId(IUserProfile profiles) {
-        int profileId = profiles.getCurrentId();
-        if (profileId < 0) {
-            throw new IllegalStateException("активный IUserProfile ещё не загружен");
+    private int requireActiveProfileId() throws Exception {
+        int profileId = activeProfile();
+        if (!isProfilePen(profileId)) {
+            throw new IllegalStateException(
+                    "PA33845 вернул невалидный активный профиль " + profileId
+                            + " (ожидалось 0…13)");
         }
         return profileId;
     }
@@ -1339,41 +1412,41 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         return raw.clone();
     }
 
-    private byte[] requireRawProfileCloudDataForProfile(IUserProfile profiles,
-                                                        int expectedProfileId) {
-        requireExpectedUserProfileId(profiles, expectedProfileId);
+    private byte[] requireRawProfileCloudDataForProfile(int expectedProfileId)
+            throws Exception {
+        requireExpectedActiveProfileId(expectedProfileId);
         byte[] raw = requireRawProfileCloudData();
-        requireExpectedUserProfileId(profiles, expectedProfileId);
+        requireExpectedActiveProfileId(expectedProfileId);
         return raw;
     }
 
-    private static void requireExpectedUserProfileId(IUserProfile profiles,
-                                                     int expectedProfileId) {
-        int actualProfileId = requireCurrentUserProfileId(profiles);
+    private void requireExpectedActiveProfileId(int expectedProfileId) throws Exception {
+        int actualProfileId = requireActiveProfileId();
         if (actualProfileId != expectedProfileId) {
             throw new IllegalStateException(
-                    "активный IUserProfile изменился: ожидался " + expectedProfileId
+                    "активный профиль PA33845 изменился: ожидался " + expectedProfileId
                             + ", получен " + actualProfileId + "; запись отменена");
         }
     }
 
-    private String writeAndConfirmRawHudAr(IUserProfile profiles, int expectedProfileId,
-                                            byte[] completeProfile, boolean enabled) {
+    private String writeAndConfirmRawHudAr(int expectedProfileId,
+                                           byte[] completeProfile, boolean enabled)
+            throws Exception {
         byte[] patched = HudProfileWirePatcher.patchHudAr(completeProfile, enabled);
         if (!HudProfileWirePatcher.isExactPatch(completeProfile, patched, enabled)) {
             throw new IllegalStateException(
                     "проверка точечного изменения поля vfhudbyte0 не пройдена");
         }
-        requireExpectedUserProfileId(profiles, expectedProfileId);
+        requireExpectedActiveProfileId(expectedProfileId);
         requireProfileManager().setbytesPropertyForUt(CB_PROFILE_CLOUD_DATA, patched);
         int expected = enabled ? ON : OFF;
         String last = "нет данных";
         for (int attempt = 0; attempt < PROFILE_READBACK_ATTEMPTS; attempt++) {
             SystemClock.sleep(PROFILE_READBACK_DELAY_MS);
-            requireExpectedUserProfileId(profiles, expectedProfileId);
+            requireExpectedActiveProfileId(expectedProfileId);
             try {
                 byte[] readback = requireRawProfileCloudData();
-                requireExpectedUserProfileId(profiles, expectedProfileId);
+                requireExpectedActiveProfileId(expectedProfileId);
                 int actual = HudProfileWirePatcher.readHudAr(readback);
                 last = "value=" + actual + ", bytes=" + readback.length;
                 if (actual == expected) return last;
@@ -1383,6 +1456,36 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         }
         throw new IllegalStateException(
                 "CB33264 отправлен, но PA33873 не подтвердил " + expected + ": " + last);
+    }
+
+    private String writeAndConfirmRawHudMode(int expectedProfileId,
+                                             byte[] completeProfile, int mode)
+            throws Exception {
+        int expected = HudProfileTransferMode.requireSdkMode(mode);
+        byte[] patched = HudProfileWirePatcher.patchHudMode(completeProfile, expected);
+        if (!HudProfileWirePatcher.isExactHudModePatch(completeProfile, patched, expected)) {
+            throw new IllegalStateException(
+                    "проверка точечного изменения profiletransferbyte3/field124 не пройдена");
+        }
+        requireExpectedActiveProfileId(expectedProfileId);
+        requireProfileManager().setbytesPropertyForUt(CB_PROFILE_CLOUD_DATA, patched);
+        String last = "нет данных";
+        for (int attempt = 0; attempt < PROFILE_READBACK_ATTEMPTS; attempt++) {
+            SystemClock.sleep(PROFILE_READBACK_DELAY_MS);
+            requireExpectedActiveProfileId(expectedProfileId);
+            try {
+                byte[] readback = requireRawProfileCloudData();
+                requireExpectedActiveProfileId(expectedProfileId);
+                int actual = HudProfileWirePatcher.readHudMode(readback);
+                last = "field124=" + actual + ", bytes=" + readback.length;
+                if (actual == expected) return last;
+            } catch (Throwable failure) {
+                last = shortFailure(failure);
+            }
+        }
+        throw new IllegalStateException(
+                "CB33264 отправлен, но PA33873 не подтвердил field124="
+                        + expected + ": " + last);
     }
 
     private void rememberUserProfileRawOnce(int profileId, byte[] raw) {
@@ -1399,16 +1502,18 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         return BACKUP_USER_PROFILE_RAW_PREFIX + profileId;
     }
 
-    private String readUserProfileHudAr() {
-        try {
-            IUserProfile profiles = requireUserProfiles();
-            int profileId = requireCurrentUserProfileId(profiles);
-            byte[] raw = requireRawProfileCloudData();
-            return "profile=" + profileId + ", value="
-                    + HudProfileWirePatcher.readHudAr(raw) + ", rawBytes=" + raw.length;
-        } catch (Throwable failure) {
-            return "ERROR " + shortFailure(failure);
+    private void rememberUserProfileHudModeOnce(int profileId, int mode) {
+        int validatedMode = HudProfileTransferMode.requireSdkMode(mode);
+        String key = userProfileHudModeBackupKey(profileId);
+        if (backups.contains(key)) return;
+        if (!backups.edit().putInt(key, validatedMode).commit()) {
+            throw new IllegalStateException(
+                    "не удалось сохранить исходный field124; запись HUD mode заблокирована");
         }
+    }
+
+    private static String userProfileHudModeBackupKey(int profileId) {
+        return BACKUP_USER_PROFILE_HUD_MODE_PREFIX + profileId;
     }
 
     private enum SignalRead {

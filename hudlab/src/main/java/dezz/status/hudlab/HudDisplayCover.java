@@ -12,7 +12,7 @@ import java.lang.reflect.Method;
 
 /** Launches the cover with the exact display/window hints used by the stock ECARX HUD. */
 final class HudDisplayCover {
-    private static final int HUD_DISPLAY_ID = 2;
+    static final int HUD_DISPLAY_ID = 2;
     private static final int STOCK_WINDOWING_MODE = 5;
     private static final int STOCK_SPLIT_POSITION = 1;
 
@@ -29,7 +29,15 @@ final class HudDisplayCover {
     private HudDisplayCover() {
     }
 
-    static Result start(Context context) {
+    static Result startBlack(Context context) {
+        return start(context, false);
+    }
+
+    static Result startMarker(Context context) {
+        return start(context, true);
+    }
+
+    private static Result start(Context context, boolean marker) {
         try {
             ActivityOptions options = ActivityOptions.makeBasic();
             options.setLaunchDisplayId(HUD_DISPLAY_ID);
@@ -49,13 +57,15 @@ final class HudDisplayCover {
             }
 
             Intent intent = new Intent(context, HudCoverActivity.class);
+            intent.putExtra(HudCoverActivity.EXTRA_MARKER, marker);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                     | Intent.FLAG_ACTIVITY_CLEAR_TOP
                     | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             Bundle bundle = options.toBundle();
             context.startActivity(intent, bundle);
             return new Result(true,
-                    "Чёрный HUD-Activity запущен: " + details
+                    (marker ? "Контрольная метка" : "Непрозрачный чёрный HUD-Activity")
+                            + " запущен: " + details
                             + ". Проверьте физический HUD, а не превью на основном экране.");
         } catch (Throwable failure) {
             String message = failure.getMessage();

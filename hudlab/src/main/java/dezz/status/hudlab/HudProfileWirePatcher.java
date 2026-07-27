@@ -3,24 +3,51 @@ package dezz.status.hudlab;
 
 import java.util.Arrays;
 
-/** Byte-preserving protobuf patch for Profileclouddata.vfhudbyte0 (field 111). */
+/**
+ * Byte-preserving protobuf patches for the two HUD fields in Profileclouddata.
+ *
+ * <p>ECARX maps vfhudbyte0 (field 111) to HUD_AR_ENGINE and profiletransferbyte3
+ * (field 124) to Profile.CAR_FUNC_HUD_MODE. The complete 150-field stream is
+ * validated before either value is changed.</p>
+ */
 final class HudProfileWirePatcher {
     private static final int HUD_AR_FIELD = 111;
+    private static final int HUD_MODE_FIELD = 124;
     static final int LAST_KNOWN_FIELD = 150;
 
     private HudProfileWirePatcher() {
     }
 
     static int readHudAr(byte[] bytes) {
-        Scan scan = scan(bytes);
+        Scan scan = scan(bytes, HUD_AR_FIELD);
         requireComplete(scan);
+        if (scan.value != 0 && scan.value != 1) {
+            throw new IllegalArgumentException("Invalid HUD AR value");
+        }
         return scan.value;
     }
 
     static byte[] patchHudAr(byte[] bytes, boolean enabled) {
-        Scan scan = scan(bytes);
+        return patchField(bytes, HUD_AR_FIELD, enabled ? 1 : 0);
+    }
+
+    static int readHudMode(byte[] bytes) {
+        Scan scan = scan(bytes, HUD_MODE_FIELD);
         requireComplete(scan);
-        byte[] replacement = encode(enabled ? 1 : 0);
+        return scan.value;
+    }
+
+    static byte[] patchHudMode(byte[] bytes, int mode) {
+        if (mode < 0 || mode > 3) {
+            throw new IllegalArgumentException("HUD mode must be 0…3");
+        }
+        return patchField(bytes, HUD_MODE_FIELD, mode);
+    }
+
+    private static byte[] patchField(byte[] bytes, int field, int value) {
+        Scan scan = scan(bytes, field);
+        requireComplete(scan);
+        byte[] replacement = encode(value);
         byte[] result = new byte[
                 bytes.length - (scan.valueEnd - scan.valueStart) + replacement.length];
         System.arraycopy(bytes, 0, result, 0, scan.valueStart);
@@ -39,7 +66,17 @@ final class HudProfileWirePatcher {
         }
     }
 
-    private static Scan scan(byte[] bytes) {
+    static boolean isExactHudModePatch(byte[] before, byte[] after, int mode) {
+        try {
+            return Arrays.equals(after, patchHudMode(before, mode))
+                    && readHudMode(after) == mode;
+        } catch (RuntimeException invalid) {
+            return false;
+        }
+    }
+
+    private static Scan scan(byte[] bytes, int targetField) {
+        if (bytes == null) throw new IllegalArgumentException("ProfileCloudData is null");
         Scan scan = new Scan();
         boolean[] seen = new boolean[LAST_KNOWN_FIELD + 1];
         int offset = 0;
@@ -64,10 +101,7 @@ final class HudProfileWirePatcher {
                 seen[field] = true;
                 scan.knownFields++;
                 Varint value = varint(bytes, offset);
-                if (field == HUD_AR_FIELD) {
-                    if (value.value != 0 && value.value != 1) {
-                        throw new IllegalArgumentException("Invalid HUD AR value");
-                    }
+                if (field == targetField) {
                     scan.count++;
                     scan.value = (int) value.value;
                     scan.valueStart = offset;
@@ -90,7 +124,7 @@ final class HudProfileWirePatcher {
                             + "/" + LAST_KNOWN_FIELD + " known fields");
         }
         if (scan.count != 1) {
-            throw new IllegalArgumentException("Expected exactly one vfhudbyte0 field");
+            throw new IllegalArgumentException("Expected exactly one target HUD field");
         }
         if (!scan.hasNonZeroOutsideHud) {
             throw new IllegalArgumentException("All-zero ProfileCloudData placeholder");

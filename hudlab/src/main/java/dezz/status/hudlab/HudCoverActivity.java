@@ -14,6 +14,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.TextView;
 
 /**
  * Opaque replacement surface for the physical HUD display.
@@ -23,6 +24,9 @@ import android.widget.FrameLayout;
  */
 public final class HudCoverActivity extends Activity {
     static final String ACTION_STOP = "dezz.status.hudlab.action.STOP_HUD_COVER";
+    static final String EXTRA_MARKER = "marker";
+
+    private FrameLayout root;
 
     private final BroadcastReceiver stopReceiver = new BroadcastReceiver() {
         @Override
@@ -49,10 +53,34 @@ public final class HudCoverActivity extends Activity {
                         | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                         | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
 
-        FrameLayout black = new FrameLayout(this);
-        black.setBackgroundColor(Color.BLACK);
-        setContentView(black);
+        root = new FrameLayout(this);
+        root.setBackgroundColor(Color.BLACK);
+        setContentView(root);
+        render(getIntent());
         registerReceiver(stopReceiver, new IntentFilter(ACTION_STOP));
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        render(intent);
+    }
+
+    private void render(Intent intent) {
+        if (root == null) return;
+        root.removeAllViews();
+        if (intent == null || !intent.getBooleanExtra(EXTRA_MARKER, false)) return;
+        TextView marker = new TextView(this);
+        marker.setText("HUD LAB · DISPLAY ID 2");
+        marker.setTextColor(Color.rgb(80, 255, 145));
+        marker.setTextSize(46);
+        marker.setGravity(android.view.Gravity.CENTER);
+        marker.setBackgroundColor(Color.rgb(0, 80, 30));
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(728, 190);
+        params.leftMargin = 0;
+        params.topMargin = 720;
+        root.addView(marker, params);
     }
 
     @Override

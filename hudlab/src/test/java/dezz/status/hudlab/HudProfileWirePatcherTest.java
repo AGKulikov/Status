@@ -11,10 +11,20 @@ import java.io.ByteArrayOutputStream;
 
 public final class HudProfileWirePatcherTest {
     @Test public void changesOnlyField111() {
-        byte[] before = completeProfile(0);
+        byte[] before = completeProfile(0, 1);
         byte[] after = HudProfileWirePatcher.patchHudAr(before, true);
-        assertArrayEquals(completeProfile(1), after);
+        assertArrayEquals(completeProfile(1, 1), after);
         assertTrue(HudProfileWirePatcher.isExactPatch(before, after, true));
+        assertEquals(1, HudProfileWirePatcher.readHudAr(after));
+        assertEquals(1, HudProfileWirePatcher.readHudMode(after));
+    }
+
+    @Test public void changesOnlyField124() {
+        byte[] before = completeProfile(1, 1);
+        byte[] after = HudProfileWirePatcher.patchHudMode(before, 2);
+        assertArrayEquals(completeProfile(1, 2), after);
+        assertTrue(HudProfileWirePatcher.isExactHudModePatch(before, after, 2));
+        assertEquals(2, HudProfileWirePatcher.readHudMode(after));
         assertEquals(1, HudProfileWirePatcher.readHudAr(after));
     }
 
@@ -25,7 +35,8 @@ public final class HudProfileWirePatcherTest {
 
     @Test(expected = IllegalArgumentException.class)
     public void rejectsAllZeroPlaceholder() {
-        HudProfileWirePatcher.patchHudAr(completeProfileWithFirstValue(0, 0), true);
+        HudProfileWirePatcher.patchHudAr(
+                completeProfileWithFirstValue(0, 0, 0), true);
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -33,16 +44,27 @@ public final class HudProfileWirePatcherTest {
         HudProfileWirePatcher.patchHudAr(completeProfileWithOversizedHudValue(), true);
     }
 
-    private static byte[] completeProfile(int hudValue) {
-        return completeProfileWithFirstValue(42, hudValue);
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsInvalidHudMode() {
+        HudProfileWirePatcher.patchHudMode(completeProfile(0, 1), 4);
+    }
+
+    private static byte[] completeProfile(int hudArValue, int hudModeValue) {
+        return completeProfileWithFirstValue(42, hudArValue, hudModeValue);
     }
 
     private static byte[] completeProfileWithFirstValue(int firstValue, int hudValue) {
+        return completeProfileWithFirstValue(firstValue, hudValue, 1);
+    }
+
+    private static byte[] completeProfileWithFirstValue(
+            int firstValue, int hudArValue, int hudModeValue) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         for (int field = 1; field <= HudProfileWirePatcher.LAST_KNOWN_FIELD; field++) {
             byte[] tag = varint(((long) field) << 3);
             byte[] value = varint(field == 1 ? firstValue
-                    : field == 111 ? hudValue : 0);
+                    : field == 111 ? hudArValue
+                    : field == 124 ? hudModeValue : 0);
             out.write(tag, 0, tag.length);
             out.write(value, 0, value.length);
         }
