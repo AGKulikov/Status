@@ -20,9 +20,12 @@ import com.google.protobuf.nano.MessageNano;
 import java.lang.reflect.Field;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Set;
+import java.util.TreeSet;
 
 import ecarx.car.ECarXCar;
 import ecarx.car.hardware.annotation.ApiResult;
@@ -85,41 +88,48 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     private final HandlerThread thread = new HandlerThread("hud-lab");
     private final Handler worker;
     private final ArrayDeque<String> logLines = new ArrayDeque<>();
+    /** Profiles whose last successfully transmitted mask is not the safe all-one baseline. */
+    private final Set<Integer> dirtyVisualMaskPens = new TreeSet<>();
     private final SimpleDateFormat clock = new SimpleDateFormat("HH:mm:ss", Locale.ROOT);
-    private final int[] visualFunctions = new int[20];
+    private final int[] visualFunctions = new int[HudVisualProbePlan.FUNCTION_COUNT];
     private final Runnable profileVisualScanStep = new Runnable() {
         @Override
         public void run() {
             if (closed || !profileVisualScanRunning) return;
-            if (profileVisualScanIndex >= visualFunctions.length) {
-                profileVisualScanRunning = false;
-                profileVisualScanAppliedIndex = -1;
-                String finished = "01+MASK: перебор завершён; скорость не исчезла";
-                lastCommand = finished;
-                appendLog(finished);
-                publishSnapshot();
-                return;
-            }
 
             try {
+                HudVisualProbePlan.Step probe =
+                        HudVisualProbePlan.step(profileVisualScanIndex);
                 visualPen = profileVisualScanPen;
-                Arrays.fill(visualFunctions, profileVisualScanOneOff ? ON : OFF);
-                visualFunctions[profileVisualScanIndex] =
-                        profileVisualScanOneOff ? OFF : ON;
+                int[] values = probe.values();
+                System.arraycopy(values, 0, visualFunctions, 0, visualFunctions.length);
                 sendVisualMask();
-                profileVisualScanAppliedIndex = profileVisualScanIndex;
-                String step = "01+MASK mode=" + modeName(profileVisualScanMode)
+                profileVisualScanAppliedIndex = probe.functionIndex;
+                String step = "01+MASK SAFE mode=" + modeName(profileVisualScanMode)
                         + ", PEN=" + profileVisualScanPen
-                        + ", " + scanPatternName(profileVisualScanOneOff)
-                        + ", сейчас F" + twoDigits(profileVisualScanAppliedIndex);
+                        + ", шаг " + (profileVisualScanIndex + 1)
+                        + "/" + HudVisualProbePlan.stepCount()
+                        + ": " + probe.label;
                 lastCommand = step;
                 appendLog(step);
                 profileVisualScanIndex++;
+                if (probe.finalRestore) {
+                    profileVisualScanRunning = false;
+                    profileVisualScanAppliedIndex = -1;
+                    String finished = "01+MASK SAFE завершён: PEN="
+                            + profileVisualScanPen + ", все F=1 восстановлены";
+                    lastCommand = finished;
+                    appendLog(finished);
+                    publishSnapshot();
+                    return;
+                }
                 publishSnapshot();
                 worker.postDelayed(this, PROFILE_VISUAL_SCAN_STEP_MS);
             } catch (Throwable failure) {
                 profileVisualScanRunning = false;
-                String failed = "01+MASK: ERROR " + shortFailure(failure);
+                String restore = restoreVisualMaskBestEffort(profileVisualScanPen);
+                String failed = "01+MASK SAFE: ERROR " + shortFailure(failure)
+                        + "; " + restore;
                 lastCommand = failed;
                 appendLog(failed);
                 publishSnapshot();
@@ -145,7 +155,6 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     private boolean closed;
     private int visualPen = 1;
     private boolean profileVisualScanRunning;
-    private boolean profileVisualScanOneOff;
     private int profileVisualScanMode = -1;
     private int profileVisualScanPen = -1;
     private int profileVisualScanIndex;
@@ -179,6 +188,8 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     void close() {
         worker.post(() -> {
             if (closed) return;
+            worker.removeCallbacks(profileVisualScanStep);
+            restoreAllDirtyVisualMasksBestEffort();
             closed = true;
             worker.removeCallbacksAndMessages(null);
             if (carFunction != null) {
@@ -299,18 +310,8 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     void setAllVisualFunctions(int value) {
         int normalized = value == 0 ? OFF : ON;
         runCommand("HUD visual mask: PEN=" + visualPen + ", все=" + normalized, () -> {
+            requireNoSafeVisualScan();
             Arrays.fill(visualFunctions, normalized);
-            sendVisualMask();
-            return visualMaskDescription();
-        });
-    }
-
-    void setAllVisualFunctionsForPen(int pen, int value) {
-        int normalizedPen = Math.max(0, Math.min(15, pen));
-        int normalizedValue = value == 0 ? OFF : ON;
-        runCommand("HUD visual mask: PEN=" + normalizedPen + ", все=" + normalizedValue, () -> {
-            visualPen = normalizedPen;
-            Arrays.fill(visualFunctions, normalizedValue);
             sendVisualMask();
             return visualMaskDescription();
         });
@@ -320,6 +321,7 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         if (index < 0 || index >= visualFunctions.length) return;
         int normalized = value == 0 ? OFF : ON;
         runCommand(String.format(Locale.ROOT, "HUD visual F%02d=%d", index, normalized), () -> {
+            requireNoSafeVisualScan();
             visualFunctions[index] = normalized;
             sendVisualMask();
             return visualMaskDescription();
@@ -327,8 +329,9 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     }
 
     void setVisualPen(int pen) {
-        int normalized = Math.max(0, Math.min(15, pen));
+        int normalized = HudVisualProbePlan.requireProfilePen(pen);
         runCommand("HUD visual PEN=" + normalized, () -> {
+            requireNoSafeVisualScan();
             visualPen = normalized;
             sendVisualMask();
             return visualMaskDescription();
@@ -372,29 +375,39 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
      * Combines the confirmed ProfileTransfer mode with the lower DIM visual-function mask.
      *
      * <p>The scan deliberately changes one flag at a time and waits long enough for the
-     * physical HUD to redraw. Pressing "found" leaves the exact currently displayed mask in
-     * place so it can be verified a second time.</p>
+     * physical HUD to redraw. Every exit path attempts to restore the complete all-one mask.</p>
      */
-    void startProfileVisualScan(int mode, boolean oneOff, boolean allProfiles) {
+    void startSafeProfileVisualScan(int mode) {
         worker.post(() -> {
             if (closed) return;
+            int interruptedPen = profileVisualScanPen;
+            boolean interrupted = profileVisualScanRunning;
             stopProfileVisualScanInternal();
+            if (interrupted) {
+                appendLog("01+MASK SAFE: предыдущий цикл прерван; "
+                        + restoreVisualMaskBestEffort(interruptedPen));
+            }
+            String priorRestore = restoreAllDirtyVisualMasksBestEffort();
+            if (!priorRestore.isEmpty()) {
+                appendLog("01+MASK SAFE: очистка предыдущих проб: " + priorRestore);
+            }
+            profileVisualScanPen = -1;
             try {
                 ECarXCarProfiletransferManager manager = requireProfileTransfer();
+                int pen = activePen();
                 rememberIntOnce(BACKUP_PROFILE_TRANSFER_MODE, readProfileTransferMode());
                 ApiResult modeWrite = manager.CB_HudDispModSetgReq(mode);
                 SystemClock.sleep(240L);
 
                 profileVisualScanMode = mode;
-                profileVisualScanOneOff = oneOff;
-                profileVisualScanPen = allProfiles ? 15 : activePen();
+                profileVisualScanPen = pen;
                 profileVisualScanIndex = 0;
                 profileVisualScanAppliedIndex = -1;
                 profileVisualScanRunning = true;
 
-                String started = "01+MASK старт: mode=" + modeName(mode)
+                String started = "01+MASK SAFE старт: mode=" + modeName(mode)
                         + ", PEN=" + profileVisualScanPen
-                        + ", " + scanPatternName(oneOff)
+                        + ", all=0 → all=1 → F00…F19 по одному OFF → all=1"
                         + ", CB33278=" + result(modeWrite)
                         + ", PA33937=" + readProfileTransferModeStatus();
                 lastCommand = started;
@@ -403,7 +416,8 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
                 profileVisualScanStep.run();
             } catch (Throwable failure) {
                 profileVisualScanRunning = false;
-                String failed = "01+MASK старт: ERROR " + shortFailure(failure);
+                String failed = "01+MASK SAFE старт: ERROR " + shortFailure(failure)
+                        + "; " + restoreVisualMaskBestEffort(profileVisualScanPen);
                 lastCommand = failed;
                 appendLog(failed);
                 publishSnapshot();
@@ -413,24 +427,25 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
 
     /**
      * Applies one complete F00-F19 probe and leaves it active until another explicit command.
-     *
-     * <p>The all-profiles PEN is never added implicitly; it is used only when the caller
-     * explicitly selected the ProfAll action in the UI.</p>
      */
-    void applyHeldVisualProbe(int mode, int index, boolean oneOff, boolean allProfiles) {
+    void applyHeldVisualProbe(int mode, int index) {
         if (index < 0 || index >= visualFunctions.length) return;
         worker.post(() -> {
             if (closed) return;
             stopProfileVisualScanInternal();
+            String priorRestore = restoreAllDirtyVisualMasksBestEffort();
+            if (!priorRestore.isEmpty()) {
+                appendLog("01+MASK РУЧНОЙ: очистка предыдущих проб: " + priorRestore);
+            }
             try {
                 ECarXCarProfiletransferManager manager = requireProfileTransfer();
+                int pen = activePen();
                 rememberIntOnce(BACKUP_PROFILE_TRANSFER_MODE, readProfileTransferMode());
                 ApiResult modeWrite = manager.CB_HudDispModSetgReq(mode);
                 SystemClock.sleep(220L);
 
                 profileVisualScanMode = mode;
-                profileVisualScanOneOff = oneOff;
-                profileVisualScanPen = allProfiles ? 15 : activePen();
+                profileVisualScanPen = pen;
                 profileVisualScanAppliedIndex = index;
                 visualPen = profileVisualScanPen;
 
@@ -438,40 +453,45 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
                 Arrays.fill(visualFunctions, ON);
                 sendVisualMask();
                 SystemClock.sleep(100L);
-                Arrays.fill(visualFunctions, oneOff ? ON : OFF);
-                visualFunctions[index] = oneOff ? OFF : ON;
+                Arrays.fill(visualFunctions, ON);
+                visualFunctions[index] = OFF;
                 sendVisualMask();
 
                 String held = "01+MASK РУЧНОЙ: mode=" + modeName(mode)
                         + ", PEN=" + profileVisualScanPen
-                        + ", " + scanPatternName(oneOff)
                         + ", держим F" + twoDigits(index)
-                        + "=" + (oneOff ? OFF : ON)
+                        + "=0, остальные=1"
                         + ", CB33278=" + result(modeWrite);
                 lastCommand = held;
                 appendLog(held);
             } catch (Throwable failure) {
-                lastCommand = "01+MASK РУЧНОЙ: ERROR " + shortFailure(failure);
+                lastCommand = "01+MASK РУЧНОЙ: ERROR " + shortFailure(failure)
+                        + "; " + restoreVisualMaskBestEffort(profileVisualScanPen);
                 appendLog(lastCommand);
             }
             publishSnapshot();
         });
     }
 
-    /** Applies and holds a complete all-zero or all-one baseline for one explicit PEN scope. */
-    void applyHeldVisualBaseline(int mode, int value, boolean allProfiles) {
+    /** Applies and holds a complete all-zero or all-one baseline for the active profile. */
+    void applyHeldVisualBaseline(int mode, int value) {
         int normalized = value == 0 ? OFF : ON;
         worker.post(() -> {
             if (closed) return;
             stopProfileVisualScanInternal();
+            String priorRestore = restoreAllDirtyVisualMasksBestEffort();
+            if (!priorRestore.isEmpty()) {
+                appendLog("01+MASK BASELINE: очистка предыдущих проб: " + priorRestore);
+            }
             try {
                 ECarXCarProfiletransferManager manager = requireProfileTransfer();
+                int pen = activePen();
                 rememberIntOnce(BACKUP_PROFILE_TRANSFER_MODE, readProfileTransferMode());
                 ApiResult modeWrite = manager.CB_HudDispModSetgReq(mode);
                 SystemClock.sleep(220L);
 
                 profileVisualScanMode = mode;
-                profileVisualScanPen = allProfiles ? 15 : activePen();
+                profileVisualScanPen = pen;
                 profileVisualScanAppliedIndex = -1;
                 visualPen = profileVisualScanPen;
                 Arrays.fill(visualFunctions, normalized);
@@ -484,7 +504,8 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
                 lastCommand = held;
                 appendLog(held);
             } catch (Throwable failure) {
-                lastCommand = "01+MASK BASELINE: ERROR " + shortFailure(failure);
+                lastCommand = "01+MASK BASELINE: ERROR " + shortFailure(failure)
+                        + "; " + restoreVisualMaskBestEffort(profileVisualScanPen);
                 appendLog(lastCommand);
             }
             publishSnapshot();
@@ -497,14 +518,16 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             worker.removeCallbacks(profileVisualScanStep);
             boolean wasRunning = profileVisualScanRunning;
             profileVisualScanRunning = false;
-            String found = profileVisualScanAppliedIndex < 0
+            int foundIndex = profileVisualScanAppliedIndex;
+            String restore = restoreVisualMaskBestEffort(profileVisualScanPen);
+            profileVisualScanAppliedIndex = -1;
+            String found = foundIndex < 0
                     ? "01+MASK: активной комбинации пока нет"
                     : "01+MASK ЗАФИКСИРОВАНО: mode=" + modeName(profileVisualScanMode)
                     + ", PEN=" + profileVisualScanPen
-                    + ", " + scanPatternName(profileVisualScanOneOff)
-                    + ", F" + twoDigits(profileVisualScanAppliedIndex)
-                    + "=" + (profileVisualScanOneOff ? OFF : ON)
-                    + (wasRunning ? " (перебор остановлен)" : "");
+                    + ", F" + twoDigits(foundIndex) + "=0"
+                    + (wasRunning ? " (перебор остановлен)" : "")
+                    + "; " + restore;
             lastCommand = found;
             appendLog(found);
             publishSnapshot();
@@ -516,13 +539,11 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             if (closed) return;
             stopProfileVisualScanInternal();
             try {
+                String restoredPens = restoreAllDirtyVisualMasksBestEffort();
                 int active = activePen();
                 Arrays.fill(visualFunctions, ON);
                 visualPen = active;
                 sendVisualMask();
-                visualPen = 15;
-                sendVisualMask();
-                visualPen = active;
 
                 int original = backups.getInt(BACKUP_PROFILE_TRANSFER_MODE,
                         readProfileTransferMode());
@@ -532,9 +553,10 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
                 profileVisualScanMode = -1;
                 profileVisualScanPen = -1;
                 profileVisualScanAppliedIndex = -1;
-                String restored = "01+MASK восстановление: active PEN и ProfAll → все F=1"
+                String restored = "01+MASK восстановление: active PEN → все F=1"
                         + ", mode=" + original + " → " + result(modeWrite)
-                        + ", PA33937=" + readProfileTransferModeStatus();
+                        + ", PA33937=" + readProfileTransferModeStatus()
+                        + (restoredPens.isEmpty() ? "" : "; ранее: " + restoredPens);
                 lastCommand = restored;
                 appendLog(restored);
             } catch (Throwable failure) {
@@ -548,6 +570,37 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     private void stopProfileVisualScanInternal() {
         worker.removeCallbacks(profileVisualScanStep);
         profileVisualScanRunning = false;
+    }
+
+    private String restoreVisualMaskBestEffort(int pen) {
+        if (!isProfilePen(pen)) {
+            return "all=1 не отправлен: активный PEN ещё не был определён";
+        }
+        try {
+            visualPen = pen;
+            Arrays.fill(visualFunctions, ON);
+            sendVisualMask();
+            return "PEN=" + pen + " восстановлен all=1";
+        } catch (Throwable restoreFailure) {
+            return "ОШИБКА восстановления all=1: " + shortFailure(restoreFailure);
+        }
+    }
+
+    private String restoreAllDirtyVisualMasksBestEffort() {
+        if (dirtyVisualMaskPens.isEmpty()) return "";
+        StringBuilder result = new StringBuilder();
+        for (int pen : new ArrayList<>(dirtyVisualMaskPens)) {
+            if (result.length() > 0) result.append("; ");
+            result.append(restoreVisualMaskBestEffort(pen));
+        }
+        return result.toString();
+    }
+
+    private void requireNoSafeVisualScan() {
+        if (profileVisualScanRunning) {
+            throw new IllegalStateException(
+                    "сначала остановите 01+MASK SAFE; параллельная MASK-команда запрещена");
+        }
     }
 
     void setActiveProfileDimMode(int mode) {
@@ -564,6 +617,7 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
 
     void setActiveProfileVisualMask(boolean hidden) {
         runCommand("03 active-PEN visual mask=" + (hidden ? "HIDE" : "SHOW"), () -> {
+            requireNoSafeVisualScan();
             visualPen = activePen();
             Arrays.fill(visualFunctions, hidden ? OFF : ON);
             sendVisualMask();
@@ -729,6 +783,8 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     @Override
     public void onECarXCarServiceDeath() {
         worker.post(() -> {
+            boolean interruptedScan = profileVisualScanRunning;
+            stopProfileVisualScanInternal();
             if (carFunction != null) {
                 try {
                     carFunction.onECarXCarServiceDeath();
@@ -742,7 +798,10 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             profileTransfer = null;
             signals = null;
             carFunction = null;
-            appendLog("ecarxcar_service отключён; ждём переподключения");
+            appendLog("ecarxcar_service отключён; ждём переподключения"
+                    + (interruptedScan
+                    ? "; SAFE-цикл остановлен, all=1 будет восстановлен после подключения"
+                    : ""));
             publishSnapshot();
         });
     }
@@ -765,6 +824,11 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             functions.initCarSignalManager(connectedRoot, connectedSignals);
             carFunction = functions;
             appendLog("Подключено: VFHUD + ProfileTransfer + Profile + CEM/DIM");
+            String recoveredMasks = restoreAllDirtyVisualMasksBestEffort();
+            if (!recoveredMasks.isEmpty()) {
+                appendLog("Аварийное восстановление после переподключения: "
+                        + recoveredMasks);
+            }
         } catch (Throwable failure) {
             root = null;
             vfHud = null;
@@ -782,6 +846,9 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             if (closed) return;
             String outcome;
             try {
+                // A visual probe is meaningful only if no other HUD write can change the
+                // active mode, profile, activation channel, theme or mask between its steps.
+                requireNoSafeVisualScan();
                 outcome = command.run();
             } catch (Throwable failure) {
                 outcome = "ERROR " + shortFailure(failure);
@@ -804,6 +871,7 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     }
 
     private void sendVisualMask() throws Exception {
+        HudVisualProbePlan.requireProfilePen(visualPen);
         VendorVehicleHalPAProto.ProtoHudVisFctSetgReq request =
                 new VendorVehicleHalPAProto.ProtoHudVisFctSetgReq();
         for (int index = 0; index < visualFunctions.length; index++) {
@@ -814,8 +882,20 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         request.hudVisFctSetgReqPen = visualPen;
         byte[] protobuf = MessageNano.toByteArray(request);
         requireSignals().setHudVisFctSetgReq(request);
+        if (isAllOneVisualMask()) {
+            dirtyVisualMaskPens.remove(visualPen);
+        } else {
+            dirtyVisualMaskPens.add(visualPen);
+        }
         appendLog("TX signal30816 / VHAL 0x21707860 · "
                 + visualMaskDescription() + " · protobuf=" + hex(protobuf));
+    }
+
+    private boolean isAllOneVisualMask() {
+        for (int value : visualFunctions) {
+            if (value != ON) return false;
+        }
+        return true;
     }
 
     private void publishSnapshot() {
@@ -979,11 +1059,12 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
                 : shortFailure(signalFailure);
         throw new IllegalStateException("активный PEN недоступен: ProfPenSts1="
                 + signalDetail + ", PA33845=" + profilePen
-                + " (ожидалось 1…13)");
+                + " (ожидалось 0…13)");
     }
 
     private static boolean isProfilePen(int value) {
-        return value >= 1 && value <= 13;
+        return value >= HudVisualProbePlan.MIN_PROFILE_PEN
+                && value <= HudVisualProbePlan.MAX_PROFILE_PEN;
     }
 
     private int activeProfile() throws Exception {
@@ -1174,22 +1255,20 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         StringBuilder out = new StringBuilder();
         out.append(profileVisualScanRunning ? "ИДЁТ" : "ПАУЗА")
                 .append(" · mode=").append(modeName(profileVisualScanMode))
-                .append(" · PEN=").append(profileVisualScanPen)
-                .append(" · ").append(scanPatternName(profileVisualScanOneOff));
+                .append(" · PEN=").append(profileVisualScanPen);
         if (profileVisualScanAppliedIndex >= 0) {
             out.append(" · на HUD сейчас F")
                     .append(twoDigits(profileVisualScanAppliedIndex))
-                    .append('=').append(profileVisualScanOneOff ? OFF : ON);
+                    .append("=0, остальные=1");
+        } else if (profileVisualScanRunning && profileVisualScanIndex > 0) {
+            out.append(" · baseline/restore");
         }
         if (profileVisualScanRunning) {
-            out.append(" · следующий через ")
-                    .append(PROFILE_VISUAL_SCAN_STEP_MS / 1_000L).append(",6 с");
+            out.append(" · шаг ").append(profileVisualScanIndex)
+                    .append('/').append(HudVisualProbePlan.stepCount())
+                    .append(" · следующий через 3,6 с");
         }
         return out.toString();
-    }
-
-    private static String scanPatternName(boolean oneOff) {
-        return oneOff ? "все 1, по одному OFF" : "все 0, по одному ON";
     }
 
     private static String twoDigits(int value) {

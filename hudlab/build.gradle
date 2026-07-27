@@ -15,8 +15,8 @@ android {
         minSdk 28
         //noinspection ExpiredTargetSdkVersion
         targetSdkVersion 28
-        versionCode 14
-        versionName "0.14"
+        versionCode 15
+        versionName "0.15"
         setProperty("archivesBaseName", "hud-lab-${versionName}")
     }
 
@@ -59,4 +59,5 @@ android {
 dependencies {
     // The same vendor SDK used by Status Widget HA. HUD Lab has a separate package and process.
     implementation files('../app/libs/geely/ecarx-adaptapi.jar')
+    testImplementation 'junit:junit:4.13.2'
 }

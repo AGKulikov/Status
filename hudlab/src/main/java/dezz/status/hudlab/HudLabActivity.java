@@ -162,7 +162,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         close.setOnClickListener(view -> finish());
         header.addView(close, fixedButton(dp(130)));
 
-        TextView title = text("HUD Lab 0.14", 23, TEXT, true);
+        TextView title = text("HUD Lab 0.15", 23, TEXT, true);
         title.setPadding(dp(16), 0, dp(18), 0);
         header.addView(title);
 
@@ -359,44 +359,26 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         body.addView(heldSelector);
         body.addView(commandPair("ВСЕ 1 → ВЫБРАННАЯ OFF", AMBER,
                 () -> controller.applyHeldVisualProbe(
-                        profileSearchMode, heldProbeIndex, true, false),
-                "ВСЕ 0 → ВЫБРАННАЯ ON", AMBER,
-                () -> controller.applyHeldVisualProbe(
-                        profileSearchMode, heldProbeIndex, false, false)));
-        body.addView(commandPair("ACTIVE PEN: ВСЕ 1", GREEN,
-                () -> controller.applyHeldVisualBaseline(profileSearchMode, 1, false),
-                "ACTIVE PEN: ВСЕ 0", RED,
-                () -> controller.applyHeldVisualBaseline(profileSearchMode, 0, false)));
+                        profileSearchMode, heldProbeIndex),
+                "ВОССТАНОВИТЬ ВСЕ 1", GREEN,
+                () -> controller.applyHeldVisualBaseline(profileSearchMode, 1)));
         body.addView(note(
-                "Каждое нажатие сначала отправляет полный baseline, затем полный 20-полевой "
-                        + "вектор выбранной пробы. Результат остаётся до следующего нажатия. "
+                "Ручная проба сначала отправляет полный baseline all=1, затем полный 20-полевой "
+                        + "вектор с одним Fxx=0. Результат остаётся до восстановления. "
                         + "В журнал пишется точный protobuf, а не условное «SUCCESS». "
-                        + "Если ProfPenSts1 недоступен, версия 0.14 безопасно использует "
+                        + "Если ProfPenSts1 недоступен, версия 0.15 безопасно использует "
                         + "активный профиль PA33845 как PEN (в вашем дампе это профиль 13)."));
 
-        body.addView(label("ProfAll (PEN=15) · только явный запасной вариант"));
-        body.addView(commandPair("PROFALL: ВЫБРАННАЯ OFF", RED,
-                () -> controller.applyHeldVisualProbe(
-                        profileSearchMode, heldProbeIndex, true, true),
-                "PROFALL: ВСЕ 1", GREEN,
-                () -> controller.applyHeldVisualBaseline(profileSearchMode, 1, true)));
+        body.addView(label("Безопасный автоматический проход · активный PEN"));
+        body.addView(singleCommand("ЗАПУСТИТЬ ПОЛНЫЙ ЦИКЛ", AMBER,
+                () -> controller.startSafeProfileVisualScan(profileSearchMode)));
         body.addView(note(
-                "ProfAll затрагивает все профили и не включается автоматически. Используйте "
-                        + "его только если тот же Fxx на активном PEN не дал эффекта."));
+                "Строгая последовательность: all=0 держится 3,6 с и автоматически снимается; "
+                        + "затем all=1; затем F00…F19 по одному становятся 0 при остальных=1. "
+                        + "Последний обязательный шаг снова отправляет all=1. При ошибке или "
+                        + "закрытии стенд также пытается немедленно восстановить all=1."));
 
-        body.addView(label("Быстрый автоматический проход · по 3,6 секунды"));
-        body.addView(commandPair("СКАН: ВСЕ 1, ПО ОДНОМУ OFF", AMBER,
-                () -> controller.startProfileVisualScan(profileSearchMode, true, false),
-                "СКАН: ВСЕ 0, ПО ОДНОМУ ON", AMBER,
-                () -> controller.startProfileVisualScan(profileSearchMode, false, false)));
-
-        body.addView(label("Автопроход ProfAll · только после активного PEN"));
-        body.addView(commandPair("PROFALL: ПО ОДНОМУ OFF", RED,
-                () -> controller.startProfileVisualScan(profileSearchMode, true, true),
-                "PROFALL: ПО ОДНОМУ ON", RED,
-                () -> controller.startProfileVisualScan(profileSearchMode, false, true)));
-
-        body.addView(commandPair("СТОП — СКОРОСТЬ ИСЧЕЗЛА", GREEN,
+        body.addView(commandPair("ЗАПИСАТЬ Fxx И ВОССТАНОВИТЬ", GREEN,
                 () -> controller.markProfileVisualScanFound(),
                 "ОСТАНОВИТЬ И ВОССТАНОВИТЬ", BLUE,
                 () -> controller.restoreProfileVisualSearch()));
@@ -407,9 +389,9 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         body.addView(profileSearchStatusView);
         body.addView(note(
                 "Как только скорость полностью исчезнет, сразу нажмите зелёную кнопку. "
-                        + "Текущая комбинация останется на HUD, а её mode, PEN и Fxx будут "
-                        + "зафиксированы в журнале. Если первый перебор закончился без эффекта, "
-                        + "запустите инверсный, затем ProfAll."));
+                        + "Её mode, активный PEN и Fxx будут зафиксированы в журнале, после чего "
+                        + "маска автоматически вернётся в all=1. Стенд работает только с "
+                        + "подтверждённым vendor framework диапазоном профилей 0…13."));
 
         body.addView(sectionTitle("Точные дополнительные состояния из системного ECARX Navi API"));
         body.addView(note(
@@ -704,11 +686,11 @@ public final class HudLabActivity extends Activity implements HudLabController.L
 
     private View buildMaskTab() {
         LinearLayout body = columnBody();
-        body.addView(sectionTitle("Низкоуровневая visual mask · профили PEN 0–15"));
+        body.addView(sectionTitle("Низкоуровневая visual mask · профили PEN 0–13"));
         body.addView(note(
-                "PEN в ECARX — идентификатор профиля, а не Android-дисплей. Ранее стенд "
-                        + "ошибочно сводил PEN только к 0/1. PEN=15 означает ProfAll и позволяет "
-                        + "проверить маску сразу для всех профилей."));
+                "PEN в ECARX — идентификатор профиля, а не Android-дисплей. Дамп подтверждает "
+                        + "профили 0…11, CarSharing 12 и Default 13. Значения 14 и 15 стенд "
+                        + "не отправляет: их смысл в протоколе не доказан."));
 
         body.addView(label("HUD VisFctSetgReq: 20 функций"));
         body.addView(commandPair("Все 0", RED, () -> controller.setAllVisualFunctions(0),
@@ -745,14 +727,10 @@ public final class HudLabActivity extends Activity implements HudLabController.L
 
         body.addView(singleCommand("Применить выбранный PEN", BLUE,
                 () -> controller.setVisualPen(visualPen)));
-        body.addView(commandPair("ProfAll (15): ВСЕ 0", RED,
-                () -> setProfAllMask(0),
-                "ProfAll (15): ВСЕ 1", GREEN,
-                () -> setProfAllMask(1)));
         body.addView(note(
-                "Сначала нажмите «ProfAll: ВСЕ 0» и проверьте HUD. Для возврата сразу нажмите "
-                        + "«ProfAll: ВСЕ 1». SDK не даёт getter маски, поэтому ВСЕ 1 — "
-                        + "предполагаемое восстановление, а не считанная заводская конфигурация."));
+                "SDK не даёт getter маски signal 30816: каждая отправка полностью записывается "
+                        + "в журнал как вектор F00…F19 + PEN и сериализованный protobuf. «Все 1» — "
+                        + "контролируемое восстановление, а не считанная заводская конфигурация."));
 
         return scroll(body);
     }
@@ -861,24 +839,19 @@ public final class HudLabActivity extends Activity implements HudLabController.L
     }
 
     private void previousVisualPen() {
-        visualPen = (visualPen + 15) % 16;
+        visualPen = visualPen <= HudVisualProbePlan.MIN_PROFILE_PEN
+                ? HudVisualProbePlan.MAX_PROFILE_PEN : visualPen - 1;
         updateVisualPen();
     }
 
     private void nextVisualPen() {
-        visualPen = (visualPen + 1) % 16;
+        visualPen = visualPen >= HudVisualProbePlan.MAX_PROFILE_PEN
+                ? HudVisualProbePlan.MIN_PROFILE_PEN : visualPen + 1;
         updateVisualPen();
     }
 
     private void updateVisualPen() {
-        visualPenView.setText(visualPen == 15 ? "PEN 15 · ProfAll"
-                : String.format(Locale.ROOT, "PEN %d", visualPen));
-    }
-
-    private void setProfAllMask(int value) {
-        visualPen = 15;
-        updateVisualPen();
-        controller.setAllVisualFunctionsForPen(15, value);
+        visualPenView.setText(String.format(Locale.ROOT, "PEN %d", visualPen));
     }
 
     private void setCommandsEnabled(boolean enabled) {
