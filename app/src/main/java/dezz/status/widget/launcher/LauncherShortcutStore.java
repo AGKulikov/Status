@@ -90,16 +90,16 @@ public final class LauncherShortcutStore {
         /** 0=start/top, 1=center, 2=end/bottom. */
         public int informationHorizontalAlignment = 0;
         public int informationVerticalAlignment = 1;
-        public int informationPaddingLeftPx = 10;
-        public int informationPaddingTopPx = 7;
-        public int informationPaddingRightPx = 10;
-        public int informationPaddingBottomPx = 7;
+        public int informationPaddingLeftPx = 0;
+        public int informationPaddingTopPx = 0;
+        public int informationPaddingRightPx = 0;
+        public int informationPaddingBottomPx = 0;
         /** INFO only: empty means a standalone row; equal arbitrary names share one row. */
         @NonNull public String informationGroup = "";
         /** INFO only: 0 = above driver controls, 1 = below driver controls. */
         public int informationPlacement = 0;
         /** Named information-row settings; duplicated on members for backward-compatible JSON. */
-        public int informationGroupGapPx = 4;
+        public int informationGroupGapPx = 0;
         public int informationGroupMarginLeftPx = 0;
         public int informationGroupMarginTopPx = 0;
         public int informationGroupMarginRightPx = 0;
@@ -631,6 +631,7 @@ public final class LauncherShortcutStore {
                 .put("gapAfterPx", value.gapAfterPx)
                 .put("columnSpan", value.columnSpan)
                 .put("rowSpan", value.rowSpan).put("showTitle", value.showTitle)
+                .put("edgeToEdgeContent", true)
                 .put("informationLabelTextSizeSp", value.informationLabelTextSizeSp)
                 .put("informationValueTextSizeSp", value.informationValueTextSizeSp)
                 .put("informationFontFamily", value.informationFontFamily)
@@ -754,17 +755,33 @@ public final class LauncherShortcutStore {
             value.informationVerticalAlignment =
                     json.optInt("informationVerticalAlignment", 1);
             value.informationPaddingLeftPx =
-                    json.optInt("informationPaddingLeftPx", 10);
+                    json.optInt("informationPaddingLeftPx", 0);
             value.informationPaddingTopPx =
-                    json.optInt("informationPaddingTopPx", 7);
+                    json.optInt("informationPaddingTopPx", 0);
             value.informationPaddingRightPx =
-                    json.optInt("informationPaddingRightPx", 10);
+                    json.optInt("informationPaddingRightPx", 0);
             value.informationPaddingBottomPx =
-                    json.optInt("informationPaddingBottomPx", 7);
+                    json.optInt("informationPaddingBottomPx", 0);
             value.informationGroup = json.optString("informationGroup", "");
             value.informationPlacement = json.optInt("informationPlacement", 0);
             value.informationGroupGapPx =
-                    json.optInt("informationGroupGapPx", 4);
+                    json.optInt("informationGroupGapPx", 0);
+            if (!json.optBoolean("edgeToEdgeContent", false)) {
+                // HA1130 serialized implicit 10/7 content insets and a 4 px group gap into every
+                // item. Remove exactly those legacy defaults once; explicit newer values remain.
+                if (value.informationPaddingLeftPx == 10
+                        && value.informationPaddingTopPx == 7
+                        && value.informationPaddingRightPx == 10
+                        && value.informationPaddingBottomPx == 7) {
+                    value.informationPaddingLeftPx = 0;
+                    value.informationPaddingTopPx = 0;
+                    value.informationPaddingRightPx = 0;
+                    value.informationPaddingBottomPx = 0;
+                }
+                if (value.informationGroupGapPx == 4) {
+                    value.informationGroupGapPx = 0;
+                }
+            }
             value.informationGroupMarginLeftPx =
                     json.optInt("informationGroupMarginLeftPx", 0);
             value.informationGroupMarginTopPx =

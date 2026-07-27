@@ -83,7 +83,6 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     private MaterialSwitch notificationsEnabled;
     private MaterialSwitch messagesEnabled;
     private MaterialSwitch includeNotificationText;
-    private MaterialSwitch statusBarNotificationsEnabled;
     private MaterialSwitch lowBatteryAlertEnabled;
     private MaterialSwitch sprutPresenceEnabled;
     private TextView selectedDeviceValue;
@@ -1378,23 +1377,6 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     private boolean persistSettings(boolean showConfirmation) {
         if (lowBatteryAlertEnabled.isChecked()) {
             connectorEnabled.setChecked(true);
-        }
-        if (statusBarNotificationsEnabled.isChecked()) {
-            connectorEnabled.setChecked(true);
-            notificationsEnabled.setChecked(true);
-            if (selectedNotificationFields.isEmpty()) {
-                Toast.makeText(this,
-                        R.string.phone_status_notification_fields_required,
-                        Toast.LENGTH_LONG).show();
-                return false;
-            }
-            if (selectedNotificationFields.contains(PhoneStatusBarPolicy.FIELD_TOPIC)
-                    || selectedNotificationFields.contains(
-                    PhoneStatusBarPolicy.FIELD_TEXT)) {
-                // Selecting sensitive fields is an explicit opt-in to the existing connector
-                // privacy switch. App-only ticker mode remains privacy-safe.
-                includeNotificationText.setChecked(true);
-            }
         }
         if ((notificationsEnabled.isChecked() || messagesEnabled.isChecked())
                 && selectedNotificationCategories.isEmpty()) {

@@ -270,9 +270,14 @@ public final class DriverClimateShortcutView extends View {
         float rowCenterY = height * (expanded ? .45f : .73f)
                 - effectiveGap * .50f;
         if (automatic) {
-            // AUTO is a mode, not another fan level. Keep the compact tile unambiguous: one
-            // plain label and no fan/airflow pictograms or decorative badge.
-            drawAutoText(canvas, width / 2f, rowCenterY, unit, color);
+            // AUTO remains a plain word, but the live five-step automatic fan scale must stay
+            // visible. Only decorative fan/airflow pictograms are omitted from the AUTO row.
+            float automaticScaleY = height * (expanded ? .40f : .60f)
+                    - effectiveGap * .40f;
+            drawBars(canvas, width * .12f, automaticScaleY, width * .76f, unit,
+                    indicator.activeSegments, ClimateFanIndicatorPolicy.AUTO_SEGMENTS, color);
+            drawAutoText(canvas, width / 2f,
+                    height * (expanded ? .58f : .82f), unit, color);
             return;
         }
         int totalBars = ClimateFanIndicatorPolicy.MANUAL_SEGMENTS;

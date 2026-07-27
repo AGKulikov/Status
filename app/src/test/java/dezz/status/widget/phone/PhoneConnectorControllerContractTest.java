@@ -110,7 +110,7 @@ public final class PhoneConnectorControllerContractTest {
         assertFalse(source.contains("state.contains(\"AUTO · ЖДУ SAVED PEER\")"));
     }
 
-    @Test public void savedPeerTransportUsesOneBoundedGpsStyleDirectGatt()
+    @Test public void savedPeerTransportScansExactAddressBeforeOneBoundedDirectGatt()
             throws IOException {
         String source = controller();
         String transport = transport();
@@ -129,10 +129,15 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("final String address = selectedAddress"));
         assertTrue(source.contains("mainHandler.post(() -> startAncsTransportOnMain("));
         assertTrue(savedPeer.contains("adapter.getRemoteDevice(address.trim())"));
-        assertTrue(savedPeer.contains(
-                "connectIphonePeripheral(device, CONNECT_TIMEOUT_MS,"));
+        assertTrue(savedPeer.contains("return startSavedPeerScan(device)"));
         assertTrue(savedPeer.contains("stopScan();"));
         assertTrue(savedPeer.contains("stopAdvertising();"));
+        assertTrue(transport.contains(".setDeviceAddress(address)"));
+        assertTrue(transport.contains("ScanSettings.CALLBACK_TYPE_FIRST_MATCH"));
+        assertTrue(transport.contains("connectToSavedAdvertisingIphone("));
+        assertTrue(transport.contains(
+                "connectIphonePeripheral(device, CONNECT_TIMEOUT_MS,"));
+        assertTrue(transport.contains("CONNECT_TIMEOUT_MS = 35_000L"));
         assertTrue(clientConnect.contains(
                 "device.connectGatt(context, false, gattCallback,"));
         assertTrue(clientConnect.contains("BluetoothDevice.TRANSPORT_LE"));

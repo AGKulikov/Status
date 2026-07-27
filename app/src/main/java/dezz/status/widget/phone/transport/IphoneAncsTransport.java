@@ -37,6 +37,7 @@ import android.os.ParcelUuid;
 import android.os.SystemClock;
 import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.nio.charset.StandardCharsets;
@@ -94,9 +95,12 @@ public final class IphoneAncsTransport {
     /** Android/AOSP GATT_AUTH_FAIL (0x89): SMP/encryption could not be completed. */
     private static final int STATUS_GATT_AUTH_FAIL = 0x89;
     private static final long REQUEST_TIMEOUT_MS = 10_000L;
-    private static final long CONNECT_TIMEOUT_MS = 5_000L;
+    /** HWGPS keeps one direct GATT attempt alive for 35 seconds after a scan match. */
+    private static final long CONNECT_TIMEOUT_MS = 35_000L;
     private static final long GPS_CONNECT_TIMEOUT_MS = 15_000L;
     private static final long GPS_SCAN_TIMEOUT_MS = 30_000L;
+    private static final long SAVED_PEER_SCAN_RESTART_MS = 180_000L;
+    private static final long SAVED_PEER_SCAN_RESTART_DELAY_MS = 1_000L;
     private static final long AUTO_ANCS_WAIT_TIMEOUT_MS = 60_000L;
     private static final long GPS_POST_SECURE_DISCOVERY_DELAY_MS = 800L;
     private static final long DISCOVERY_TIMEOUT_MS = 15_000L;
@@ -318,6 +322,7 @@ public final class IphoneAncsTransport {
     private BluetoothGattServer gattServer;
     private BluetoothGatt gatt;
     private BluetoothDevice activeClientTarget;
+    private BluetoothDevice savedPeerScanTarget;
     private final Object verifiedPeerLock = new Object();
     private BluetoothDevice verifiedPeer;
     private final LinkedHashMap<String, GattServerPeer> gattServerPeers =
@@ -513,12 +518,13 @@ public final class IphoneAncsTransport {
     }
 
     /**
-     * Daily path after a successful bootstrap. It addresses the peer saved after ANCS READY and
-     * opens one bounded direct GATT connection without scanning for the Helper service.
+     * Daily path after a successful bootstrap. It scans only for the saved identity and starts
+     * the bounded direct GATT connection from the first real advertisement.
      *
-     * <p>This deliberately mirrors the stable HWGPS/GPSTether lifecycle: never leave an
-     * autoConnect registration behind after a clean disconnect. The owning controller closes
-     * this transport and creates the next single GATT instance through its bounded backoff.</p>
+     * <p>This deliberately mirrors the stable HWGPS/GPSTether lifecycle: scan by the exact saved
+     * address, stop scanning on the first match, then call {@code connectGatt(false,
+     * TRANSPORT_LE)}. Connecting blindly to the cached address is what repeatedly produces
+     * Android status 133 on the KX11 controller.</p>
      */
     public boolean connectSavedIphone(String address) {
         closing = false;
@@ -532,13 +538,18 @@ public final class IphoneAncsTransport {
             log("Saved peer address invalid: `" + address + "`");
             return false;
         }
-        if (iphonePeripheralMode && !helperBootstrapMode && gatt != null
+        boolean matchingGatt = gatt != null
                 && activeClientTarget != null && sameDevice(activeClientTarget, device)
-                && (clientConnectInFlight || gattClientConnected)) {
+                && (clientConnectInFlight || gattClientConnected);
+        boolean matchingScan = scanning && savedPeerScanTarget != null
+                && sameDevice(savedPeerScanTarget, device);
+        if (iphonePeripheralMode && !helperBootstrapMode
+                && (matchingGatt || matchingScan)) {
             log("Saved-peer GATT уже активен для "
                     + safeAddress(device) + "; дубликат connectGatt не создаю"
                     + " connected=" + gattClientConnected
-                    + " inFlight=" + clientConnectInFlight);
+                    + " inFlight=" + clientConnectInFlight
+                    + " scanning=" + matchingScan);
             state(gattReady
                     ? "ANCS READY · ОТПРАВЬТЕ УВЕДОМЛЕНИЕ"
                     : "АВТО · SAVED PEER УЖЕ ЗАРЕГИСТРИРОВАН");
@@ -551,28 +562,85 @@ public final class IphoneAncsTransport {
         resetVerifiedPeerSession();
         iphonePeripheralMode = true;
         helperBootstrapMode = false;
-        iphoneConnectStarted = true;
+        iphoneConnectStarted = false;
         if (!claimVerifiedPeer(device)) {
             iphonePeripheralMode = false;
             state("AUTO · SAVED PEER CONFLICT");
             return false;
         }
-        connectIphonePeripheral(device, CONNECT_TIMEOUT_MS,
-                "GPS-STYLE · SAVED PEER CONNECTING",
-                "saved verified peer; direct connect без scan и Helper service");
-        return gatt != null;
+        return startSavedPeerScan(device);
+    }
+
+    private boolean startSavedPeerScan(@NonNull BluetoothDevice device) {
+        if (closing || !iphonePeripheralMode || helperBootstrapMode) return false;
+        scanner = adapter == null ? null : adapter.getBluetoothLeScanner();
+        if (scanner == null) {
+            savedPeerScanTarget = null;
+            state("AUTO · SAVED PEER SCAN UNAVAILABLE");
+            log("BluetoothLeScanner недоступен для saved-peer reconnect");
+            return false;
+        }
+        String address = safeAddress(device);
+        if (address.isEmpty()) {
+            savedPeerScanTarget = null;
+            state("AUTO · SAVED PEER SCAN FAILED · EMPTY ADDRESS");
+            return false;
+        }
+        ScanFilter filter = new ScanFilter.Builder()
+                .setDeviceAddress(address)
+                .build();
+        ScanSettings settings = new ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
+                .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH)
+                .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
+                .setNumOfMatches(ScanSettings.MATCH_NUM_ONE_ADVERTISEMENT)
+                .setReportDelay(0L)
+                .build();
+        savedPeerScanTarget = device;
+        try {
+            scanner.startScan(Collections.singletonList(filter), settings, scanCallback);
+            scanning = true;
+            state("AUTO · ЖДУ РЕКЛАМУ SAVED PEER");
+            log("HWGPS-style autoscan: exact address=" + address
+                    + ", LOW_POWER/FIRST_MATCH; connectGatt начнётся только после рекламы");
+            BluetoothDevice expected = device;
+            scanTimeout = () -> {
+                if (closing || helperBootstrapMode || iphoneConnectStarted
+                        || !scanning || savedPeerScanTarget == null
+                        || !sameDevice(savedPeerScanTarget, expected)) return;
+                log("Saved-peer autoscan работает " + SAVED_PEER_SCAN_RESTART_MS
+                        + " ms без match; перерегистрирую scan как HWGPS");
+                stopScan();
+                main.postDelayed(() -> {
+                    if (!closing && iphonePeripheralMode && !helperBootstrapMode
+                            && !iphoneConnectStarted) {
+                        startSavedPeerScan(expected);
+                    }
+                }, SAVED_PEER_SCAN_RESTART_DELAY_MS);
+            };
+            main.postDelayed(scanTimeout, SAVED_PEER_SCAN_RESTART_MS);
+            return true;
+        } catch (RuntimeException failure) {
+            scanning = false;
+            savedPeerScanTarget = null;
+            state("AUTO · SAVED PEER SCAN FAILED");
+            log("saved-peer startScan exception: " + failure);
+            return false;
+        }
     }
 
     public void stopScan() {
         if (scanTimeout != null) main.removeCallbacks(scanTimeout);
         scanTimeout = null;
-        if (!scanning || scanner == null) return;
+        boolean wasScanning = scanning;
+        scanning = false;
+        savedPeerScanTarget = null;
+        if (!wasScanning || scanner == null) return;
         try {
             scanner.stopScan(scanCallback);
         } catch (RuntimeException failure) {
             log("stopScan exception: " + failure);
         }
-        scanning = false;
         state("СКАНИРОВАНИЕ ОСТАНОВЛЕНО");
     }
 
@@ -645,6 +713,22 @@ public final class IphoneAncsTransport {
         connectIphonePeripheral(device, GPS_CONNECT_TIMEOUT_MS,
                 "ПОДКЛЮЧАЮ IPHONE · HELPER FALLBACK",
                 "Helper-filtered scan; Android создаёт bootstrap BLE link первым");
+    }
+
+    private void connectToSavedAdvertisingIphone(@NonNull BluetoothDevice device) {
+        BluetoothDevice expected = savedPeerScanTarget;
+        if (!iphonePeripheralMode || helperBootstrapMode || iphoneConnectStarted
+                || expected == null || !sameDevice(expected, device)) return;
+        iphoneConnectStarted = true;
+        stopScan();
+        if (!claimVerifiedPeer(device)) {
+            iphonePeripheralMode = false;
+            state("AUTO · SAVED PEER CONFLICT");
+            return;
+        }
+        connectIphonePeripheral(device, CONNECT_TIMEOUT_MS,
+                "GPS-STYLE · SAVED PEER CONNECTING",
+                "HWGPS-style exact-address scan match; direct GATT after advertisement");
     }
 
     private void connectIphonePeripheral(BluetoothDevice device, long timeoutMs,
@@ -2370,6 +2454,8 @@ public final class IphoneAncsTransport {
         return value.contains("CONNECT RETURNED NULL")
                 || value.contains("CONNECT TIMEOUT")
                 || value.contains("CONNECT EXCEPTION")
+                || value.contains("SAVED PEER SCAN UNAVAILABLE")
+                || value.contains("SAVED PEER SCAN FAILED")
                 || value.contains("SAVED PEER CONFLICT")
                 || value.contains("PEER CONFLICT")
                 || value.contains("CONNECTION FAILED")
@@ -2493,6 +2579,15 @@ public final class IphoneAncsTransport {
                 boolean solicitsAncs = parsed.solicits(AncsProtocol.SERVICE);
                 updateCandidate(result.getDevice(), result.getRssi(), solicitsAncs,
                         parsed.hex, solicitsAncs ? "ANCS solicitation" : "scan");
+                BluetoothDevice savedTarget = savedPeerScanTarget;
+                if (iphonePeripheralMode && !helperBootstrapMode
+                        && savedTarget != null && !iphoneConnectStarted
+                        && sameDevice(savedTarget, result.getDevice())) {
+                    log("HWGPS-style saved-peer match: RSSI=" + result.getRssi()
+                            + " address=" + safeAddress(result.getDevice()));
+                    connectToSavedAdvertisingIphone(result.getDevice());
+                    return;
+                }
                 if (iphonePeripheralMode
                         && advertisesService(record, DIAGNOSTIC_SERVICE)
                         && !iphoneConnectStarted) {
@@ -2516,8 +2611,15 @@ public final class IphoneAncsTransport {
         @Override
         public void onScanFailed(int errorCode) {
             main.post(() -> {
+                if (scanTimeout != null) main.removeCallbacks(scanTimeout);
+                scanTimeout = null;
+                boolean savedPeerScan = savedPeerScanTarget != null
+                        && iphonePeripheralMode && !helperBootstrapMode;
                 scanning = false;
-                state("SCAN_FAILED_" + errorCode);
+                savedPeerScanTarget = null;
+                state(savedPeerScan
+                        ? "AUTO · SAVED PEER SCAN FAILED_" + errorCode
+                        : "SCAN_FAILED_" + errorCode);
                 log("onScanFailed " + errorCode + ": " + scanError(errorCode));
             });
         }
@@ -2792,7 +2894,7 @@ public final class IphoneAncsTransport {
         @Override
         public void onConnectionStateChange(BluetoothGatt callbackGatt,
                                             int status, int newState) {
-            // A busy diagnostic UI must not let the 5 s timeout overtake a connection callback
+            // A busy diagnostic UI must not let the bounded timeout overtake a callback
             // that the Bluetooth stack has already delivered.
             main.post(() -> {
                 if (callbackGatt != gatt) return;

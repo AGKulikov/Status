@@ -112,6 +112,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private final Map<String, View> favoritePanelAnchors = new HashMap<>();
     private final Map<String, FavoritePanelWindow> favoriteWindows = new LinkedHashMap<>();
     private final Set<String> manuallyOpenFavorites = new LinkedHashSet<>();
+    private final Set<String> manuallyClosedFavorites = new LinkedHashSet<>();
     private final Map<String, ConnectorValue> smartHomeValues = new HashMap<>();
     private Map<String, IntentActionRule> smartHomeRules = Collections.emptyMap();
     @Nullable private WidgetService smartHomeValueService;
@@ -148,10 +149,22 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     @Nullable private TextView drawerDone;
     private boolean drawerEditMode;
     private boolean drawerPackageReceiverRegistered;
+    private boolean drawerUninstallReceiverRegistered;
     private int drawerAppsGridScalePercent = 100;
     private final BroadcastReceiver drawerPackageReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
-            if (drawerWindow != null) reloadAllAppsDrawer();
+            if (drawerWindow != null) {
+                drawerWindow.setTouchable(true);
+                reloadAllAppsDrawer();
+            }
+        }
+    };
+    private final BroadcastReceiver drawerUninstallReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (drawerWindow != null) {
+                drawerWindow.setTouchable(true);
+                reloadAllAppsDrawer();
+            }
         }
     };
     private final AppsAdapter.Listener drawerAppsListener = new AppsAdapter.Listener() {
@@ -174,9 +187,11 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                                         @NonNull LauncherAppCatalog.App app) {
             if (!AppDrawerUninstallPolicy.canUninstall(
                     context, app.packageName, app.systemApp)) return;
-            // The full-screen system overlay must not sit above Package Installer.
-            dismissAllApps();
-            AppUninstallLauncher.request(context, app);
+            AttachedWindow current = drawerWindow;
+            if (current != null) current.setTouchable(false);
+            if (!AppUninstallLauncher.request(context, app) && current != null) {
+                current.setTouchable(true);
+            }
         }
     };
     private int attachedType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
@@ -395,7 +410,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         drawerEditMode = false;
         FrameLayout root = new FrameLayout(context);
         root.setClickable(true);
-        root.setBackgroundColor(Color.argb(70, 0, 0, 0));
+        root.setBackgroundColor(Color.rgb(0, 0, 0));
         root.setOnClickListener(view -> {
             if (drawerEditMode) setDrawerEditMode(false);
             else dismissAllApps();
@@ -405,7 +420,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         drawer.setClickable(true);
         // Consume taps inside the drawer; only the uncovered driver-rail side dismisses it.
         drawer.setOnClickListener(view -> { });
-        drawer.setBackgroundColor(Color.argb(247, 10, 13, 18));
+        drawer.setBackgroundColor(Color.rgb(10, 13, 18));
         int contentPadding = dp(context, 24);
         drawer.setPadding(contentPadding, contentPadding, contentPadding, contentPadding);
 
@@ -478,6 +493,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             drawerTitle = title;
             drawerDone = done;
             registerDrawerPackageReceiver();
+            registerDrawerUninstallReceiver();
         } catch (RuntimeException error) {
             Log.w(TAG, "Could not show all-apps drawer", error);
             Toast.makeText(appContext, "Не удалось открыть список приложений",
@@ -508,10 +524,12 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         }
         if (favoriteWindows.containsKey(panelId)) {
             manuallyOpenFavorites.remove(panelId);
+            manuallyClosedFavorites.add(panelId);
             dismissFavoritePanel(panelId);
             return;
         }
         dismissAllApps();
+        manuallyClosedFavorites.remove(panelId);
         manuallyOpenFavorites.add(panelId);
         showFavoritePanel(panelId, anchor);
     }
@@ -535,6 +553,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         root.setOnTouchListener((view, event) -> {
             if (event.getActionMasked() != MotionEvent.ACTION_OUTSIDE) return false;
             manuallyOpenFavorites.remove(panelId);
+            manuallyClosedFavorites.add(panelId);
             dismissFavoritePanel(panelId);
             return true;
         });
@@ -668,6 +687,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         drawerDone = null;
         drawerEditMode = false;
         unregisterDrawerPackageReceiver();
+        unregisterDrawerUninstallReceiver();
         if (drawer != null) drawer.remove();
     }
 
@@ -721,6 +741,27 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         }
     }
 
+    private void registerDrawerUninstallReceiver() {
+        if (drawerUninstallReceiverRegistered) return;
+        try {
+            ContextCompat.registerReceiver(appContext, drawerUninstallReceiver,
+                    new IntentFilter(AppUninstallLauncher.ACTION_FINISHED),
+                    ContextCompat.RECEIVER_NOT_EXPORTED);
+            drawerUninstallReceiverRegistered = true;
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Could not register app-drawer uninstall receiver", error);
+        }
+    }
+
+    private void unregisterDrawerUninstallReceiver() {
+        if (!drawerUninstallReceiverRegistered) return;
+        drawerUninstallReceiverRegistered = false;
+        try {
+            appContext.unregisterReceiver(drawerUninstallReceiver);
+        } catch (RuntimeException ignored) {
+        }
+    }
+
     private void dismissFavoritePanel(@NonNull String panelId) {
         FavoritePanelWindow value = favoriteWindows.remove(panelId);
         if (value == null) return;
@@ -732,6 +773,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         List<String> ids = new ArrayList<>(favoriteWindows.keySet());
         for (String id : ids) dismissFavoritePanel(id);
         manuallyOpenFavorites.clear();
+        manuallyClosedFavorites.clear();
         drawerSmartHomeBindings.clear();
     }
 
@@ -750,9 +792,12 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 new DriverFavoritesPanelStore(preferences).load()) {
             Boolean visible = service.driverFavoritePanelVisibility(panel.id);
             if (Boolean.TRUE.equals(visible)) {
-                showFavoritePanel(panel.id, favoritePanelAnchors.get(panel.id));
+                if (!manuallyClosedFavorites.contains(panel.id)) {
+                    showFavoritePanel(panel.id, favoritePanelAnchors.get(panel.id));
+                }
             } else if (Boolean.FALSE.equals(visible)) {
                 manuallyOpenFavorites.remove(panel.id);
+                manuallyClosedFavorites.remove(panel.id);
                 dismissFavoritePanel(panel.id);
             }
         }
@@ -894,7 +939,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         scroll.setFillViewport(false);
         scroll.setVerticalScrollBarEnabled(rows.size() > 3);
         scroll.setClipToPadding(false);
-        scroll.setPadding(0, 0, 0, dp(context, 12));
+        scroll.setPadding(0, 0, 0, 0);
         LinearLayout host = new LinearLayout(context);
         host.setOrientation(LinearLayout.VERTICAL);
         int contentHeight = 0;
@@ -918,13 +963,16 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             row.setBackground(groupBackground);
             int tileHeight = 0;
             int rowGap = 0;
+            boolean namedGroup = !rowStyle.informationGroup.trim().isEmpty();
             int internalGap = dp(context, rowStyle.informationGroupGapPx);
             for (int itemIndex = 0; itemIndex < rowItems.size(); itemIndex++) {
                 LauncherShortcutStore.Shortcut shortcut = rowItems.get(itemIndex);
                 View tile = shortcutButton(context, shortcut, false);
                 tileHeight = Math.max(tileHeight, informationTileHeight(context, shortcut));
-                rowGap = Math.max(rowGap, Math.max(0,
-                        shortcut.gapAfterPx < 0 ? panelGap : shortcut.gapAfterPx));
+                if (!namedGroup) {
+                    rowGap = Math.max(rowGap, Math.max(0,
+                            shortcut.gapAfterPx < 0 ? panelGap : shortcut.gapAfterPx));
+                }
                 LinearLayout.LayoutParams tileParams =
                         rowStyle.informationGroupDistribution == 1
                                 ? new LinearLayout.LayoutParams(
@@ -982,17 +1030,17 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             @NonNull Context context,
             @NonNull LauncherShortcutStore.Shortcut shortcut) {
         float scaledDensity = context.getResources().getDisplayMetrics().scaledDensity;
-        // Values are allowed to wrap in InformationPanelView. Reserve several real text lines so
-        // device modes/availability details are not measured as one line and then clipped.
+        // Device states may contain mode, value, availability and an error/explanation. Reserve
+        // five value lines and real font leading; the surrounding ScrollView handles any total
+        // height beyond the rail budget instead of clipping the status inside its own tile.
         int text = Math.round((shortcut.informationValueTextSizeSp
-                * (shortcut.informationShowValue ? 3 : 0)
+                * (shortcut.informationShowValue ? 5 : 0)
                 + (shortcut.showTitle ? shortcut.informationLabelTextSizeSp : 0))
-                * scaledDensity);
+                * scaledDensity * 1.18f);
         int padding = dp(context, shortcut.informationPaddingTopPx
                 + shortcut.informationPaddingBottomPx);
         int icon = shortcut.informationIconSizePx + padding;
-        return Math.max(dp(context, 40),
-                Math.max(icon, text + padding + dp(context, 8)));
+        return Math.max(1, Math.max(icon, text + padding));
     }
 
     private static final class InformationSection {
@@ -1254,7 +1302,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 Math.max(1, screenWidth), Math.max(1, screenHeight), type, flags,
-                PixelFormat.TRANSLUCENT);
+                PixelFormat.OPAQUE);
         params.gravity = Gravity.TOP | Gravity.LEFT;
         params.x = DriverPanelLayoutPolicy.panelWindowX(
                 screenWidth, screenWidth, false);
@@ -1444,6 +1492,18 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         void remove() {
             try {
                 manager.removeViewImmediate(view);
+            } catch (RuntimeException ignored) {
+            }
+        }
+
+        void setTouchable(boolean touchable) {
+            if (touchable) {
+                params.flags &= ~WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+            } else {
+                params.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
+            }
+            try {
+                manager.updateViewLayout(view, params);
             } catch (RuntimeException ignored) {
             }
         }

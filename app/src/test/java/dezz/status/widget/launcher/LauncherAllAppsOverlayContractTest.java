@@ -36,9 +36,13 @@ public final class LauncherAllAppsOverlayContractTest {
         int dismiss = method.indexOf("dismissAllAppsDialog();", uninstall);
         int request = method.indexOf("AppUninstallLauncher.request(", uninstall);
         assertTrue(uninstall >= 0);
-        assertTrue(dismiss >= 0);
+        assertTrue(dismiss < 0);
         assertTrue(request >= 0);
-        assertTrue(dismiss < request);
+        assertTrue(method.contains("setAllAppsConfirmationActive(true)"));
+        assertTrue(method.contains("FLAG_NOT_TOUCHABLE"));
+        assertTrue(method.contains("Color.rgb(10, 13, 18)"));
+        assertTrue(launcher.contains("allAppsUninstallReceiver"));
+        assertTrue(launcher.contains("finishAllAppsUninstallFlow()"));
         assertTrue(!method.contains("appCatalog.toggleFavorite(entry.packageName)"));
     }
 
