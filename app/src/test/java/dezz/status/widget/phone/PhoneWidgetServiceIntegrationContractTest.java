@@ -184,6 +184,29 @@ public class PhoneWidgetServiceIntegrationContractTest {
                 "binding.mediaTitleText.setMarqueeEnabled(prefs.media.marqueeEnabled.get())"));
     }
 
+    @Test
+    public void lowBatteryWarningUsesPersistentOneShotLatchAndIndependentColor()
+            throws Exception {
+        String source = readService();
+        String evaluate = between(source, "private void handlePhoneLowBatteryAlert(",
+                "private void showPhoneStatusNotification(");
+        String disconnect = between(source, "private void postPhoneValuesChanged(",
+                "private void rememberPhoneNotificationItems(");
+        String render = between(source, "private void renderPhoneStatusNotification()",
+                "private void updateMediaInfo()");
+
+        assertTrue(source.contains(
+                "prefs.phoneLowBatteryAlertLatched.get()"));
+        assertTrue(evaluate.contains("PhoneLowBatteryAlertPolicy.evaluate("));
+        assertTrue(evaluate.contains("prefs.phoneLowBatteryAlertLatched.set(result.latched)"));
+        assertTrue(evaluate.contains("if (result.trigger) showPhoneLowBatteryAlert(level)"));
+        assertFalse(disconnect.contains("phoneLowBatteryAlertLatched = false"));
+        assertTrue(source.contains("activePhoneBatteryAlertText"));
+        assertTrue(render.contains("prefs.phoneLowBatteryAlertColor.get()"));
+        assertTrue(render.contains("prefs.phoneStatusBarNotificationColor.get()"));
+        assertTrue(render.contains("AutomationState.parseColor(configuredColor, defaultColor)"));
+    }
+
     private static String readService() throws Exception {
         return readWidgetSource("WidgetService.java");
     }

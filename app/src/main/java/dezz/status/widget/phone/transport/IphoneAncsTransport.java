@@ -81,6 +81,8 @@ public final class IphoneAncsTransport {
             UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb");
     private static final UUID BATTERY_POWER_STATE =
             UUID.fromString("00002a1a-0000-1000-8000-00805f9b34fb");
+    private static final UUID BATTERY_LEVEL_STATUS =
+            UUID.fromString("00002bed-0000-1000-8000-00805f9b34fb");
     private static final String LOG_TAG = "KX11ANCS";
     private static final int GATT_SUCCESS = BluetoothGatt.GATT_SUCCESS;
     private static final int STATUS_INSUFFICIENT_AUTHENTICATION = 5;
@@ -196,7 +198,8 @@ public final class IphoneAncsTransport {
         DATA_SOURCE,
         NOTIFICATION_SOURCE,
         BATTERY_LEVEL,
-        BATTERY_POWER
+        BATTERY_POWER,
+        BATTERY_LEVEL_STATUS
     }
 
     private enum BatteryStage {
@@ -205,6 +208,8 @@ public final class IphoneAncsTransport {
         SUBSCRIBE_LEVEL,
         READ_POWER,
         SUBSCRIBE_POWER,
+        READ_LEVEL_STATUS,
+        SUBSCRIBE_LEVEL_STATUS,
         COMPLETE
     }
 
@@ -351,6 +356,7 @@ public final class IphoneAncsTransport {
     private BluetoothGattCharacteristic serviceChanged;
     private BluetoothGattCharacteristic batteryLevel;
     private BluetoothGattCharacteristic batteryPower;
+    private BluetoothGattCharacteristic batteryLevelStatus;
     private BluetoothGattCharacteristic iphoneSecureCharacteristic;
     private Request activeRequest;
     private AncsProtocol.NotificationAccumulator notificationAccumulator;
@@ -1580,7 +1586,8 @@ public final class IphoneAncsTransport {
         UUID uuid = characteristic.getUuid();
         log("onCharacteristicChanged " + shortUuid(uuid)
                 + " bytes=" + AdvertisementParser.hex(value, 80));
-        if (BATTERY_LEVEL.equals(uuid) || BATTERY_POWER_STATE.equals(uuid)) {
+        if (BATTERY_LEVEL.equals(uuid) || BATTERY_POWER_STATE.equals(uuid)
+                || BATTERY_LEVEL_STATUS.equals(uuid)) {
             if (gattClientConnected && value != null) {
                 listener.onBatteryCharacteristic(uuid, value.clone());
             }
@@ -1626,6 +1633,8 @@ public final class IphoneAncsTransport {
                 return BATTERY_LEVEL.equals(uuid);
             case BATTERY_POWER:
                 return BATTERY_POWER_STATE.equals(uuid);
+            case BATTERY_LEVEL_STATUS:
+                return BATTERY_LEVEL_STATUS.equals(uuid);
             case NONE:
             default:
                 return false;
@@ -1634,7 +1643,8 @@ public final class IphoneAncsTransport {
 
     private static boolean isBatteryDescriptorStage(DescriptorStage stage) {
         return stage == DescriptorStage.BATTERY_LEVEL
-                || stage == DescriptorStage.BATTERY_POWER;
+                || stage == DescriptorStage.BATTERY_POWER
+                || stage == DescriptorStage.BATTERY_LEVEL_STATUS;
     }
 
     private void prepareBatteryBootstrap(BluetoothGatt callbackGatt) {
@@ -1642,20 +1652,24 @@ public final class IphoneAncsTransport {
         BluetoothGattService service = callbackGatt.getService(BATTERY_SERVICE);
         batteryLevel = service == null ? null : service.getCharacteristic(BATTERY_LEVEL);
         batteryPower = service == null ? null : service.getCharacteristic(BATTERY_POWER_STATE);
-        if (batteryLevel == null && batteryPower == null) {
+        batteryLevelStatus =
+                service == null ? null : service.getCharacteristic(BATTERY_LEVEL_STATUS);
+        if (batteryLevel == null && batteryPower == null && batteryLevelStatus == null) {
             batteryStage = BatteryStage.COMPLETE;
             log("BAS 0x180F отсутствует; остаются HFP/OEM/broadcast источники заряда");
             return;
         }
         batteryStage = BatteryStage.READ_LEVEL;
         log("BAS fallback найден: level=" + (batteryLevel != null)
-                + " power=" + (batteryPower != null));
+                + " power=" + (batteryPower != null)
+                + " levelStatus=" + (batteryLevelStatus != null));
     }
 
     private void resetBatteryBootstrap() {
         cancelBatteryReadTimeout();
         batteryLevel = null;
         batteryPower = null;
+        batteryLevelStatus = null;
         batteryReadPendingUuid = null;
         batteryStage = BatteryStage.NOT_STARTED;
     }
@@ -1687,9 +1701,18 @@ public final class IphoneAncsTransport {
                     if (startOptionalBatteryRead(callbackGatt, batteryPower)) return;
                     break;
                 case SUBSCRIBE_POWER:
-                    batteryStage = BatteryStage.COMPLETE;
+                    batteryStage = BatteryStage.READ_LEVEL_STATUS;
                     if (startOptionalBatterySubscription(callbackGatt, batteryPower,
                             DescriptorStage.BATTERY_POWER)) return;
+                    break;
+                case READ_LEVEL_STATUS:
+                    batteryStage = BatteryStage.SUBSCRIBE_LEVEL_STATUS;
+                    if (startOptionalBatteryRead(callbackGatt, batteryLevelStatus)) return;
+                    break;
+                case SUBSCRIBE_LEVEL_STATUS:
+                    batteryStage = BatteryStage.COMPLETE;
+                    if (startOptionalBatterySubscription(callbackGatt, batteryLevelStatus,
+                            DescriptorStage.BATTERY_LEVEL_STATUS)) return;
                     break;
                 case NOT_STARTED:
                 case COMPLETE:
@@ -2834,7 +2857,8 @@ public final class IphoneAncsTransport {
             main.post(() -> {
                 if (callbackGatt != gatt) return;
                 UUID uuid = characteristic.getUuid();
-                if ((BATTERY_LEVEL.equals(uuid) || BATTERY_POWER_STATE.equals(uuid))
+                if ((BATTERY_LEVEL.equals(uuid) || BATTERY_POWER_STATE.equals(uuid)
+                        || BATTERY_LEVEL_STATUS.equals(uuid))
                         && uuid.equals(batteryReadPendingUuid)) {
                     cancelBatteryReadTimeout();
                     batteryReadPendingUuid = null;

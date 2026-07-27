@@ -122,6 +122,7 @@ import dezz.status.widget.ha.api.HaEntityCatalog;
 import dezz.status.widget.ha.api.HaWebSocketConnector;
 import dezz.status.widget.mqtt.MqttController;
 import dezz.status.widget.phone.PhoneConnectorController;
+import dezz.status.widget.phone.PhoneLowBatteryAlertPolicy;
 import dezz.status.widget.phone.PhoneStatusBarPolicy;
 import dezz.status.widget.phone.PhoneSprutPresenceExporter;
 import dezz.status.widget.popup.PopupOverlayController;
@@ -307,6 +308,9 @@ public class WidgetService extends Service {
     private final Map<String, ConnectorValue> phoneStatusValues = new LinkedHashMap<>();
     @Nullable
     private PhoneStatusBarPolicy.NotificationPresentation activePhoneNotification;
+    @Nullable
+    private String activePhoneBatteryAlertText;
+    private boolean phoneLowBatteryAlertLatched;
     private final Set<String> observedPhoneNotificationKeys = new LinkedHashSet<>();
     private long activePhoneNotificationExpiresAt;
     private int mediaDurationVisibilityBeforePhoneNotification = View.GONE;
@@ -315,7 +319,7 @@ public class WidgetService extends Service {
             changedValues -> postPhoneValuesChanged(new ArrayList<>(changedValues));
     private final Runnable phoneNotificationExpiry = new Runnable() {
         @Override public void run() {
-            if (destroyed || activePhoneNotification == null) return;
+            if (destroyed || !hasActivePhoneStatusAlert()) return;
             long remaining = activePhoneNotificationExpiresAt
                     - android.os.SystemClock.elapsedRealtime();
             if (remaining > 0L) {
@@ -1398,11 +1402,19 @@ public class WidgetService extends Service {
         }
         if (binding == null) return;
 
-        if (!prefs.phoneStatusBarNotificationsEnabled.get()
-                && activePhoneNotification != null) {
+        phoneLowBatteryAlertLatched = prefs.phoneLowBatteryAlertEnabled.get()
+                && prefs.phoneLowBatteryAlertLatched.get();
+        if (!prefs.phoneLowBatteryAlertEnabled.get()
+                && prefs.phoneLowBatteryAlertLatched.get()) {
+            prefs.phoneLowBatteryAlertLatched.set(false);
+        }
+        boolean activePhoneAlertDisabled = activePhoneBatteryAlertText != null
+                ? !prefs.phoneLowBatteryAlertEnabled.get()
+                : activePhoneNotification != null
+                && !prefs.phoneStatusBarNotificationsEnabled.get();
+        if (activePhoneAlertDisabled) {
             clearPhoneStatusNotification(true);
         }
-
         // Configuration changes are comparatively rare. Cache the parsed document here so
         // frequent connector packets only update existing views and in-memory states.
         if (haConfigs != null) configuredMainBricks = haConfigs.loadMain();
@@ -1410,6 +1422,10 @@ public class WidgetService extends Service {
         rebuildEffectiveHideLists();
         updateForegroundAppTracking();
         updateThemedContext();
+        ConnectorValue currentPhoneBattery = phoneStatusValues.get("battery.level");
+        if (currentPhoneBattery != null) {
+            handlePhoneLowBatteryAlert(currentPhoneBattery);
+        }
 
         updateBackground();
         updateDateTime();
@@ -2035,6 +2051,7 @@ public class WidgetService extends Service {
         if (destroyed || prefs == null) return;
         ConnectorValue latestNotification = null;
         ConnectorValue notificationItems = null;
+        ConnectorValue batteryLevel = null;
         boolean phoneValueChanged = false;
         boolean sessionEnded = false;
         for (ConnectorValue value : changedValues) {
@@ -2049,10 +2066,17 @@ public class WidgetService extends Service {
                 latestNotification = value;
             } else if ("notifications.items".equals(value.resourceId)) {
                 notificationItems = value;
+            } else if ("battery.level".equals(value.resourceId)) {
+                batteryLevel = value;
             }
         }
         if (!phoneValueChanged) return;
-        if (sessionEnded) observedPhoneNotificationKeys.clear();
+        if (sessionEnded) {
+            observedPhoneNotificationKeys.clear();
+            if (activePhoneBatteryAlertText != null) {
+                clearPhoneStatusNotification(true);
+            }
+        }
 
         if (latestNotification != null) {
             // Observe the delivery even while status-row notifications are disabled. Enabling
@@ -2073,6 +2097,9 @@ public class WidgetService extends Service {
                     if (presentation != null) showPhoneStatusNotification(presentation);
                 }
             }
+        }
+        if (!sessionEnded && batteryLevel != null) {
+            handlePhoneLowBatteryAlert(batteryLevel);
         }
 
         if (binding != null) {
@@ -3065,9 +3092,28 @@ public class WidgetService extends Service {
         updateMediaInfo();
     }
 
+    private void handlePhoneLowBatteryAlert(@NonNull ConnectorValue value) {
+        if (prefs == null || !value.fresh || !value.available || !value.readable
+                || !(value.rawValue instanceof Number)) return;
+        int level = ((Number) value.rawValue).intValue();
+        if (level < 0 || level > 100) return;
+        PhoneLowBatteryAlertPolicy.Result result = PhoneLowBatteryAlertPolicy.evaluate(
+                prefs.phoneLowBatteryAlertEnabled.get(),
+                prefs.phoneLowBatteryAlertThreshold.get(),
+                phoneLowBatteryAlertLatched, level);
+        if (phoneLowBatteryAlertLatched != result.latched) {
+            prefs.phoneLowBatteryAlertLatched.set(result.latched);
+        }
+        phoneLowBatteryAlertLatched = result.latched;
+        if (result.trigger) showPhoneLowBatteryAlert(level);
+    }
+
     private void showPhoneStatusNotification(
             @NonNull PhoneStatusBarPolicy.NotificationPresentation presentation) {
-        boolean replacingPresentation = activePhoneNotification != null;
+        // A low-battery warning is rarer and safety-relevant; keep it visible for its full
+        // configured interval instead of letting a routine ANCS event replace it.
+        if (activePhoneBatteryAlertText != null && isPhoneNotificationActive()) return;
+        boolean replacingPresentation = hasActivePhoneStatusAlert();
         if (!replacingPresentation && binding != null) {
             mediaDurationVisibilityBeforePhoneNotification =
                     binding.mediaDurationText.getVisibility();
@@ -3080,6 +3126,26 @@ public class WidgetService extends Service {
             binding.mediaTitleText.setMarqueeText("");
         }
         activePhoneNotification = presentation;
+        activePhoneBatteryAlertText = null;
+        schedulePhoneStatusAlert();
+    }
+
+    private void showPhoneLowBatteryAlert(int level) {
+        boolean replacingPresentation = hasActivePhoneStatusAlert();
+        if (!replacingPresentation && binding != null) {
+            mediaDurationVisibilityBeforePhoneNotification =
+                    binding.mediaDurationText.getVisibility();
+            mediaProgressVisibilityBeforePhoneNotification =
+                    binding.mediaProgressBar.getVisibility();
+        }
+        if (binding != null) binding.mediaTitleText.setMarqueeText("");
+        activePhoneNotification = null;
+        activePhoneBatteryAlertText =
+                getString(R.string.phone_low_battery_alert_text, level);
+        schedulePhoneStatusAlert();
+    }
+
+    private void schedulePhoneStatusAlert() {
         int seconds = Math.max(1, Math.min(120,
                 prefs.phoneStatusBarNotificationSeconds.get()));
         activePhoneNotificationExpiresAt = android.os.SystemClock.elapsedRealtime()
@@ -3089,9 +3155,17 @@ public class WidgetService extends Service {
         if (binding != null) renderPhoneStatusNotification();
     }
 
+    private boolean hasActivePhoneStatusAlert() {
+        return activePhoneNotification != null
+                || !TextUtils.isEmpty(activePhoneBatteryAlertText);
+    }
+
     private boolean isPhoneNotificationActive() {
-        return activePhoneNotification != null && prefs != null
-                && prefs.phoneStatusBarNotificationsEnabled.get()
+        if (!hasActivePhoneStatusAlert() || prefs == null) return false;
+        boolean enabled = activePhoneBatteryAlertText != null
+                ? prefs.phoneLowBatteryAlertEnabled.get()
+                : prefs.phoneStatusBarNotificationsEnabled.get();
+        return enabled
                 && android.os.SystemClock.elapsedRealtime()
                 < activePhoneNotificationExpiresAt;
     }
@@ -3099,6 +3173,7 @@ public class WidgetService extends Service {
     private void clearPhoneStatusNotification(boolean restoreMediaVisibility) {
         mainHandler.removeCallbacks(phoneNotificationExpiry);
         activePhoneNotification = null;
+        activePhoneBatteryAlertText = null;
         activePhoneNotificationExpiresAt = 0L;
         if (binding != null) {
             // Clearing the alert must also stop the custom marquee when MEDIA is disabled or
@@ -3106,6 +3181,9 @@ public class WidgetService extends Service {
             binding.mediaAppText.setMarqueeText("");
             binding.mediaTitleText.setMarqueeText("");
             binding.mediaTitleText.setMarqueeEnabled(prefs.media.marqueeEnabled.get());
+            binding.mediaTitleText.setTextColor(
+                    ContextCompat.getColor(themedContext == null ? this : themedContext,
+                            R.color.text_primary));
         }
         if (restoreMediaVisibility && binding != null) {
             binding.mediaDurationText.setVisibility(
@@ -3117,6 +3195,9 @@ public class WidgetService extends Service {
 
     @NonNull
     private String activePhoneNotificationText() {
+        if (!TextUtils.isEmpty(activePhoneBatteryAlertText)) {
+            return activePhoneBatteryAlertText;
+        }
         PhoneStatusBarPolicy.NotificationPresentation presentation =
                 activePhoneNotification;
         if (presentation == null) return "";
@@ -3135,9 +3216,6 @@ public class WidgetService extends Service {
      */
     private void renderPhoneStatusNotification() {
         if (binding == null || !isPhoneNotificationActive()) return;
-        PhoneStatusBarPolicy.NotificationPresentation presentation =
-                activePhoneNotification;
-        if (presentation == null) return;
 
         stopMediaProgressTicker();
         binding.mediaStateIcon.setVisibility(View.GONE);
@@ -3148,6 +3226,13 @@ public class WidgetService extends Service {
         binding.mediaTitleRow.setVisibility(View.VISIBLE);
         binding.mediaAppText.setMarqueeText("");
         binding.mediaTitleText.setMarqueeEnabled(true);
+        int defaultColor = ContextCompat.getColor(
+                themedContext == null ? this : themedContext, R.color.text_primary);
+        String configuredColor = activePhoneBatteryAlertText != null
+                ? prefs.phoneLowBatteryAlertColor.get()
+                : prefs.phoneStatusBarNotificationColor.get();
+        binding.mediaTitleText.setTextColor(
+                AutomationState.parseColor(configuredColor, defaultColor));
         binding.mediaTitleText.setMarqueeText(activePhoneNotificationText());
 
         LinearLayout.LayoutParams titleLayout =
@@ -4190,6 +4275,8 @@ public class WidgetService extends Service {
         phoneStatusValues.clear();
         observedPhoneNotificationKeys.clear();
         activePhoneNotification = null;
+        activePhoneBatteryAlertText = null;
+        phoneLowBatteryAlertLatched = false;
         activePhoneNotificationExpiresAt = 0L;
         crossSourceRuleRefreshScheduled.set(false);
         synchronized (automationUiLock) {

@@ -34,6 +34,14 @@ public final class PhoneInformationSourcePolicyTest {
 
         assertTrue(sources.size() >= 26);
         assertSource(sources, "connected", "", "iPhone подключён", "boolean", "");
+        assertSource(sources, "battery.charging_source", "",
+                "Источник статуса зарядки", "string", "");
+        assertSource(sources, "battery.external_power", "",
+                "Внешнее питание iPhone", "boolean", "");
+        assertSource(sources, "call.state", "",
+                "Состояние звонка iPhone", "string", "");
+        assertSource(sources, "voice_assistant.active", "",
+                "Голосовой ассистент iPhone активен", "boolean", "");
         assertSource(sources, "notifications.latest", "@value.app_name",
                 "Последнее уведомление", "string", "");
         assertSource(sources, "messages.latest", "@value.display",
@@ -133,6 +141,28 @@ public final class PhoneInformationSourcePolicyTest {
                 "object", "", Collections.emptyMap());
 
         assertEquals("Сообщения", PhoneInformationSourcePolicy.displayValue(value));
+    }
+
+    @Test public void technicalPhoneCodesAreLocalizedForInformationTiles() {
+        ConnectorValue chargingSource = ConnectorValue.current(
+                ConnectorType.PHONE, "default", "battery.charging_source",
+                "ecarx_trend", true, true, false,
+                "string", "", Collections.emptyMap());
+        ConnectorValue call = ConnectorValue.current(
+                ConnectorType.PHONE, "default", "call.state",
+                "incoming", true, true, false,
+                "string", "", Collections.emptyMap());
+        ConnectorValue metadata = ConnectorValue.current(
+                ConnectorType.PHONE, "default", "battery.charging_source",
+                "android_metadata", true, true, false,
+                "string", "", Collections.emptyMap());
+
+        assertEquals("Оценка по ECARX",
+                PhoneInformationSourcePolicy.displayValue(chargingSource, ""));
+        assertEquals("Входящий",
+                PhoneInformationSourcePolicy.displayValue(call, ""));
+        assertEquals("Метаданные Android",
+                PhoneInformationSourcePolicy.displayValue(metadata, ""));
     }
 
     private static SourceBinding phone(String resourceId, String valuePath) {

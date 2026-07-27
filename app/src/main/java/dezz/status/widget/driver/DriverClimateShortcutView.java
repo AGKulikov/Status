@@ -6,9 +6,14 @@
 package dezz.status.widget.driver;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
@@ -33,9 +38,8 @@ import dezz.status.widget.launcher.climate.ClimatePowerStatePolicy;
  * Resolution-independent live climate status for the compact driver rail.
  *
  * <p>Temperature and the fan-level scale form the compact presentation. AUTO and the current
- * airflow pictogram belong to optional extended information. The pictogram uses the production
- * Android Automotive vector set, so increasing the per-button icon size never magnifies a
- * bitmap.</p>
+ * airflow pictogram belong to optional extended information. Fan/airflow artwork comes from the
+ * user-supplied MonjaroPanel 2.0.5 package; geometry and state remain driven by live ECARX data.</p>
  */
 public final class DriverClimateShortcutView extends View {
     /** Keep boot/reconnect behavior identical to the main climate panel. */
@@ -47,17 +51,30 @@ public final class DriverClimateShortcutView extends View {
     private static final String AIRFLOW = "climate.airflow";
     private static final Set<String> CONTROL_IDS = new LinkedHashSet<>(
             Arrays.asList(POWER, TEMP_DRIVER, FAN, AUTO, AIRFLOW));
+    /** Exact opaque components inside MonjaroPanel's ic_temperature.png. */
+    private static final Rect FAN_ARTWORK_SOURCE = new Rect(0, 142, 53, 196);
+    private static final Rect FAN_SEGMENT_SOURCE = new Rect(66, 146, 102, 194);
 
     private final CarIntegration integration;
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG
             | Paint.SUBPIXEL_TEXT_FLAG);
     private final Paint shapePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint artworkPaint = new Paint(Paint.ANTI_ALIAS_FLAG
+            | Paint.FILTER_BITMAP_FLAG);
     private final RectF shape = new RectF();
     @Nullable private final Drawable airflowFace;
-    @Nullable private final Drawable airflowFeet;
+    @Nullable private final Drawable airflowLegs;
+    @Nullable private final Drawable airflowFaceLegs;
     @Nullable private final Drawable airflowWindshield;
+    @Nullable private final Drawable airflowFaceWindshield;
+    @Nullable private final Drawable airflowLegsWindshield;
+    @Nullable private final Drawable airflowAll;
+    @Nullable private final Drawable airflowAuto;
+    @Nullable private final Drawable airflowAutoBadge;
+    @Nullable private final Bitmap fanScaleArtwork;
     private final int foregroundColor;
     private final boolean detailed;
+    private final int detailsGapPx;
     private final CarIntegration.ControlStateListener listener = this::onControlState;
     private final Runnable expiry = this::expireStaleState;
 
@@ -84,21 +101,46 @@ public final class DriverClimateShortcutView extends View {
     public DriverClimateShortcutView(@NonNull Context context,
                                      @NonNull CarIntegration integration,
                                      @Nullable String color) {
-        this(context, integration, color, false);
+        this(context, integration, color, false, 0);
     }
 
     public DriverClimateShortcutView(@NonNull Context context,
                                      @NonNull CarIntegration integration,
                                      @Nullable String color,
                                      boolean detailed) {
+        this(context, integration, color, detailed, 0);
+    }
+
+    public DriverClimateShortcutView(@NonNull Context context,
+                                     @NonNull CarIntegration integration,
+                                     @Nullable String color,
+                                     boolean detailed,
+                                     int detailsGapPx) {
         super(context);
         this.integration = integration;
         foregroundColor = parseColor(color, Color.WHITE);
         this.detailed = detailed;
-        airflowFace = loadAirflowDrawable(context, R.drawable.ic_driver_airflow_face);
-        airflowFeet = loadAirflowDrawable(context, R.drawable.ic_driver_airflow_feet);
+        this.detailsGapPx = Math.max(0, Math.min(96, detailsGapPx));
+        airflowFace = loadAirflowDrawable(
+                context, R.drawable.ic_driver_monjaro_blow_face);
+        airflowLegs = loadAirflowDrawable(
+                context, R.drawable.ic_driver_monjaro_blow_leg);
+        airflowFaceLegs = loadAirflowDrawable(
+                context, R.drawable.ic_driver_monjaro_blow_face_leg);
         airflowWindshield = loadAirflowDrawable(
-                context, R.drawable.ic_driver_airflow_windshield);
+                context, R.drawable.ic_driver_monjaro_blow_window);
+        airflowFaceWindshield = loadAirflowDrawable(
+                context, R.drawable.ic_driver_monjaro_blow_face_window);
+        airflowLegsWindshield = loadAirflowDrawable(
+                context, R.drawable.ic_driver_monjaro_blow_leg_window);
+        airflowAll = loadAirflowDrawable(
+                context, R.drawable.ic_driver_monjaro_blow_all);
+        airflowAuto = loadAirflowDrawable(
+                context, R.drawable.ic_driver_monjaro_blow_auto);
+        airflowAutoBadge = loadAirflowDrawable(
+                context, R.drawable.ic_driver_monjaro_blow_auto_badge);
+        fanScaleArtwork = loadFanScaleArtwork(
+                context, R.drawable.ic_driver_monjaro_temperature_source);
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
     }
 
@@ -220,7 +262,10 @@ public final class DriverClimateShortcutView extends View {
 
         String temperatureText = DriverClimatePresentation.temperature(
                 temperature, temperatureKnown);
-        float temperatureCenterY = height * (expanded ? .18f : showFan ? .32f : .50f);
+        float effectiveGap = expanded
+                ? Math.min(detailsGapPx, height * .14f) : 0f;
+        float temperatureCenterY = height * (expanded ? .18f : showFan ? .32f : .50f)
+                - effectiveGap * .20f;
         drawTemperature(canvas, temperatureText, width / 2f,
                 temperatureCenterY, unit, expanded, color);
         if (!showFan) return;
@@ -237,17 +282,21 @@ public final class DriverClimateShortcutView extends View {
                 : Math.max(1, Math.min(totalBars, fanLevel + 1)))
                 : (indicator.automatic ? Math.max(0, Math.min(totalBars, fanLevel))
                 : indicator.activeSegments);
-        float rowCenterY = height * (expanded ? .45f : .73f);
+        float rowCenterY = height * (expanded ? .45f : .73f)
+                - effectiveGap * .50f;
         drawBars(canvas, width * .12f, rowCenterY, width * .76f, unit,
                 bars, totalBars, color);
         if (!expanded) return;
 
         if (airflowKnown || automatic) {
-            drawAirflow(canvas, width / 2f, height * .77f, unit,
-                    DriverClimatePresentation.airflowTargets(airflowLabel), color);
+            drawAirflow(canvas, width / 2f,
+                    height * .77f + effectiveGap * .50f, unit,
+                    DriverClimatePresentation.airflowTargets(airflowLabel),
+                    automatic, color);
         }
         if (automatic) {
-            drawAutoBadge(canvas, width * .76f, height * .61f, unit, color);
+            drawAutoBadge(canvas, width * .76f,
+                    height * .61f + effectiveGap * .50f, unit, color);
         }
     }
 
@@ -287,10 +336,14 @@ public final class DriverClimateShortcutView extends View {
 
     private void drawBars(Canvas canvas, float startX, float centerY, float availableWidth,
                           float unit, int activeBars, int total, int color) {
-        // Both modes occupy the same immutable envelope. Five AUTO divisions become wider while
-        // retaining this compact gap, instead of being spread through every other manual slot.
         int logicalTotal = Math.max(1,
                 Math.min(ClimateFanScaleGeometry.PHYSICAL_SLOTS, total));
+        if (fanScaleArtwork != null && !fanScaleArtwork.isRecycled()) {
+            drawMonjaroFanScale(canvas, startX, centerY, availableWidth, unit,
+                    activeBars, logicalTotal, color);
+            return;
+        }
+        // Defensive fallback for a resource-decoding failure.
         float gap = Math.max(.7f, unit * .009f);
         float barWidth = ClimateFanScaleGeometry.segmentWidth(
                 availableWidth, gap, logicalTotal);
@@ -310,25 +363,67 @@ public final class DriverClimateShortcutView extends View {
         }
     }
 
-    /** Official AOSP Automotive HVAC vectors, layered to preserve all seven ECARX combinations. */
+    private void drawMonjaroFanScale(@NonNull Canvas canvas, float startX, float centerY,
+                                     float availableWidth, float unit, int activeBars,
+                                     int logicalTotal, int color) {
+        float fanSize = Math.max(5f, unit * .135f);
+        float fanGap = Math.max(1f, unit * .022f);
+        float segmentAreaX = startX + fanSize + fanGap;
+        float segmentAreaWidth = Math.max(1f, availableWidth - fanSize - fanGap);
+        float segmentGap = Math.max(.7f, unit * .009f);
+        float segmentWidth = ClimateFanScaleGeometry.segmentWidth(
+                segmentAreaWidth, segmentGap, logicalTotal);
+        float segmentHeight = Math.max(5f, unit * .135f);
+
+        artworkPaint.setColorFilter(new PorterDuffColorFilter(
+                opaqueRgb(color), PorterDuff.Mode.SRC_IN));
+        artworkPaint.setAlpha(Color.alpha(color));
+        shape.set(startX, centerY - fanSize / 2f,
+                startX + fanSize, centerY + fanSize / 2f);
+        canvas.drawBitmap(fanScaleArtwork, FAN_ARTWORK_SOURCE, shape, artworkPaint);
+
+        for (int index = 0; index < logicalTotal; index++) {
+            int alpha = index < activeBars ? Color.alpha(color)
+                    : Math.max(34, Math.round(Color.alpha(color) * .23f));
+            artworkPaint.setAlpha(alpha);
+            int physicalSlot = ClimateFanScaleGeometry.physicalSlot(index, logicalTotal);
+            float left = segmentAreaX
+                    + physicalSlot * (segmentWidth + segmentGap);
+            shape.set(left, centerY - segmentHeight / 2f,
+                    left + segmentWidth, centerY + segmentHeight / 2f);
+            canvas.drawBitmap(fanScaleArtwork, FAN_SEGMENT_SOURCE, shape, artworkPaint);
+        }
+        artworkPaint.setColorFilter(null);
+        artworkPaint.setAlpha(255);
+    }
+
+    /** Exact MonjaroPanel pictograms preserve all seven ECARX direction combinations. */
     private void drawAirflow(Canvas canvas, float centerX, float centerY, float unit,
-                             int targets, int color) {
-        if (targets == 0) return;
-        float iconWidth = unit * .90f;
-        float iconHeight = iconWidth * 49f / 96f;
-        int left = Math.round(centerX - iconWidth / 2f);
-        int top = Math.round(centerY - iconHeight / 2f);
-        int right = Math.round(centerX + iconWidth / 2f);
-        int bottom = Math.round(centerY + iconHeight / 2f);
-        if ((targets & DriverClimatePresentation.AIRFLOW_WINDSHIELD) != 0) {
-            drawAirflowLayer(canvas, airflowWindshield, left, top, right, bottom, color);
-        }
-        if ((targets & DriverClimatePresentation.AIRFLOW_FACE) != 0) {
-            drawAirflowLayer(canvas, airflowFace, left, top, right, bottom, color);
-        }
-        if ((targets & DriverClimatePresentation.AIRFLOW_LEGS) != 0) {
-            drawAirflowLayer(canvas, airflowFeet, left, top, right, bottom, color);
-        }
+                             int targets, boolean automatic, int color) {
+        Drawable drawable = airflowDrawable(targets);
+        if (drawable == null && automatic) drawable = airflowAuto;
+        if (drawable == null) return;
+        float iconSize = unit * .40f;
+        int left = Math.round(centerX - iconSize / 2f);
+        int top = Math.round(centerY - iconSize / 2f);
+        int right = Math.round(centerX + iconSize / 2f);
+        int bottom = Math.round(centerY + iconSize / 2f);
+        drawAirflowLayer(canvas, drawable, left, top, right, bottom, color);
+    }
+
+    @Nullable
+    private Drawable airflowDrawable(int targets) {
+        int face = DriverClimatePresentation.AIRFLOW_FACE;
+        int legs = DriverClimatePresentation.AIRFLOW_LEGS;
+        int windshield = DriverClimatePresentation.AIRFLOW_WINDSHIELD;
+        if (targets == face) return airflowFace;
+        if (targets == legs) return airflowLegs;
+        if (targets == (face | legs)) return airflowFaceLegs;
+        if (targets == windshield) return airflowWindshield;
+        if (targets == (face | windshield)) return airflowFaceWindshield;
+        if (targets == (legs | windshield)) return airflowLegsWindshield;
+        if (targets == (face | legs | windshield)) return airflowAll;
+        return null;
     }
 
     private static void drawAirflowLayer(@NonNull Canvas canvas,
@@ -347,8 +442,24 @@ public final class DriverClimateShortcutView extends View {
         return drawable == null ? null : drawable.mutate();
     }
 
+    @Nullable
+    private static Bitmap loadFanScaleArtwork(@NonNull Context context, int resourceId) {
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inScaled = false;
+        options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+        return BitmapFactory.decodeResource(context.getResources(), resourceId, options);
+    }
+
     private void drawAutoBadge(@NonNull Canvas canvas, float centerX, float centerY,
                                float unit, int color) {
+        if (airflowAutoBadge != null) {
+            float size = Math.max(8f, unit * .22f);
+            int left = Math.round(centerX - size / 2f);
+            int top = Math.round(centerY - size / 2f);
+            drawAirflowLayer(canvas, airflowAutoBadge, left, top,
+                    Math.round(left + size), Math.round(top + size), color);
+            return;
+        }
         textPaint.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
         textPaint.setTextAlign(Paint.Align.CENTER);
         textPaint.setTextSize(Math.max(7f, unit * .095f));
@@ -372,6 +483,10 @@ public final class DriverClimateShortcutView extends View {
         canvas.drawText("AUTO", centerX,
                 centerY - (metrics.ascent + metrics.descent) / 2f, textPaint);
         shapePaint.setStyle(Paint.Style.FILL);
+    }
+
+    private static int opaqueRgb(int color) {
+        return color | 0xFF000000;
     }
 
     private static int parseColor(@Nullable String raw, int fallback) {

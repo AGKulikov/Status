@@ -44,10 +44,37 @@ public final class PhoneInformationSourcePolicy {
     private static final List<Source> CATALOG = Collections.unmodifiableList(Arrays.asList(
             source("connected", "", "iPhone подключён", "boolean", "",
                     "подключение presence connection"),
+            source("device.name", "", "Имя iPhone", "string", "",
+                    "имя телефон device name"),
+            source("profiles.hfp", "", "Телефонный профиль HFP", "boolean", "",
+                    "профиль звонки handsfree hfp"),
+            source("profiles.map", "", "Профиль сообщений MAP", "boolean", "",
+                    "профиль сообщения sms map"),
+            source("profiles.ble", "", "Соединение BLE с iPhone", "boolean", "",
+                    "профиль ble gatt"),
+            source("profiles.ancs", "", "Apple ANCS готов", "boolean", "",
+                    "профиль уведомления ancs ready"),
             source("battery.level", "", "Заряд iPhone", "number", "%",
                     "батарея battery level"),
+            source("battery.level_source", "", "Источник уровня заряда", "string", "",
+                    "батарея источник battery source"),
             source("battery.charging", "", "Зарядка iPhone", "boolean", "",
                     "заряжается charging power"),
+            source("battery.charging_estimated", "",
+                    "Статус зарядки рассчитан", "boolean", "",
+                    "зарядка точность estimated charging"),
+            source("battery.charging_source", "",
+                    "Источник статуса зарядки", "string", "",
+                    "зарядка источник charging source"),
+            source("battery.external_power", "",
+                    "Внешнее питание iPhone", "boolean", "",
+                    "зарядка кабель беспроводная external power"),
+            source("battery.charge_state", "",
+                    "Состояние батареи iPhone", "string", "",
+                    "зарядка разрядка charging discharging idle"),
+            source("battery.charge_level", "",
+                    "Оценка уровня батареи iPhone", "string", "",
+                    "батарея normal low critical"),
             source("network.available", "", "Сеть iPhone", "boolean", "",
                     "мобильная сеть network available"),
             source("network.operator", "", "Оператор iPhone", "string", "",
@@ -58,6 +85,26 @@ public final class PhoneInformationSourcePolicy {
                     "уровень сигнала cellular signal"),
             source("network.roaming", "", "Роуминг iPhone", "boolean", "",
                     "роуминг roaming"),
+            source("call.active", "", "Активный звонок iPhone", "boolean", "",
+                    "звонок вызов call active"),
+            source("call.state", "", "Состояние звонка iPhone", "string", "",
+                    "звонок входящий исходящий held call state"),
+            source("call.direction", "", "Направление звонка iPhone", "string", "",
+                    "звонок входящий исходящий call direction"),
+            source("call.multiparty", "", "Конференц-связь iPhone", "boolean", "",
+                    "звонок конференция multiparty call"),
+            source("call.audio", "", "Аудио звонка подключено", "boolean", "",
+                    "звонок аудио hfp audio"),
+            source("call.audio_state", "", "Состояние аудио звонка", "string", "",
+                    "звонок аудио подключение hfp audio state"),
+            source("call.audio_wideband", "", "HD-аудио звонка", "boolean", "",
+                    "звонок wideband wbs hd audio"),
+            source("voice_assistant.active", "",
+                    "Голосовой ассистент iPhone активен", "boolean", "",
+                    "siri голосовой ассистент voice recognition"),
+            source("ringtone.in_band", "",
+                    "Рингтон передаётся с iPhone", "boolean", "",
+                    "звонок рингтон in band ring"),
             source("notifications.count", "", "Количество уведомлений", "number", "",
                     "уведомления notifications count"),
 
@@ -161,14 +208,50 @@ public final class PhoneInformationSourcePolicy {
     @Nullable
     public static Object displayValue(@NonNull ConnectorValue value) {
         String path = valuePath(value.resourceId);
-        return value.resolveValue(path);
+        return displayValue(value, path);
     }
 
     /** Resolves the exact scalar selected from a structured PHONE resource. */
     @Nullable
     public static Object displayValue(@NonNull ConnectorValue value,
                                       @NonNull String valuePath) {
-        return value.resolveValue(valuePath);
+        Object raw = value.resolveValue(valuePath);
+        if (!valuePath.isEmpty() || !(raw instanceof CharSequence)) return raw;
+        String code = raw.toString();
+        switch (value.resourceId + ":" + code) {
+            case "battery.level_source:ble_bas":
+            case "battery.charging_source:ble_bas":
+                return "BLE BAS";
+            case "battery.level_source:hfp_ecarx": return "HFP/ECARX";
+            case "battery.level_source:android_broadcast": return "Android Bluetooth";
+            case "battery.charging_source:hfp_vendor": return "HFP/OEM";
+            case "battery.charging_source:android_metadata": return "Метаданные Android";
+            case "battery.charging_source:bas_trend": return "Оценка по BLE BAS";
+            case "battery.charging_source:hfp_trend": return "Оценка по HFP";
+            case "battery.charging_source:ecarx_trend": return "Оценка по ECARX";
+            case "battery.charging_source:system_trend": return "Оценка Android";
+            case "battery.charge_state:charging": return "Заряжается";
+            case "battery.charge_state:discharging": return "Разряжается";
+            case "battery.charge_state:idle": return "Зарядка не активна";
+            case "battery.charge_state:not_charging": return "Не заряжается";
+            case "battery.charge_level:good": return "Нормальный";
+            case "battery.charge_level:low": return "Низкий";
+            case "battery.charge_level:critical": return "Критический";
+            case "call.state:idle": return "Нет вызова";
+            case "call.state:active": return "Активен";
+            case "call.state:held":
+            case "call.state:held_by_response": return "Удержание";
+            case "call.state:dialing": return "Набор номера";
+            case "call.state:alerting": return "Идут гудки";
+            case "call.state:incoming": return "Входящий";
+            case "call.state:waiting": return "Ожидающий";
+            case "call.direction:incoming": return "Входящий";
+            case "call.direction:outgoing": return "Исходящий";
+            case "call.audio_state:connected": return "Подключено";
+            case "call.audio_state:connecting": return "Подключается";
+            case "call.audio_state:disconnected": return "Отключено";
+            default: return raw;
+        }
     }
 
     @NonNull

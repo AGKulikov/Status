@@ -43,6 +43,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -51,8 +52,13 @@ import java.util.Set;
 
 import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.ConnectorValue;
+import dezz.status.widget.phone.PhoneAppCatalog;
+import dezz.status.widget.phone.PhoneLowBatteryAlertPolicy;
+import dezz.status.widget.phone.PhoneNotificationFilter;
 import dezz.status.widget.phone.PhoneStatusBarPolicy;
+import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
+import dezz.status.widget.settings.SettingsColorValue;
 import dezz.status.widget.sprut.SprutActionValue;
 import dezz.status.widget.sprut.SprutCatalog;
 import dezz.status.widget.sprut.SprutHubCatalogStore;
@@ -78,11 +84,18 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     private MaterialSwitch messagesEnabled;
     private MaterialSwitch includeNotificationText;
     private MaterialSwitch statusBarNotificationsEnabled;
+    private MaterialSwitch lowBatteryAlertEnabled;
     private MaterialSwitch sprutPresenceEnabled;
     private TextView selectedDeviceValue;
+    private TextView selectedNotificationCategoriesValue;
+    private TextView notificationAppFilterModeValue;
+    private TextView selectedNotificationAppsValue;
     private TextView selectedStatusItemsValue;
     private TextView selectedNotificationFieldsValue;
     private TextView notificationDurationValue;
+    private TextView lowBatteryThresholdValue;
+    private MaterialButton notificationColorButton;
+    private MaterialButton lowBatteryColorButton;
     private TextView selectedSprutPathValue;
     private TextView diagnostics;
     private final Handler diagnosticsHandler = new Handler(Looper.getMainLooper());
@@ -98,7 +111,13 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     @NonNull private String selectedSprutPath = "";
     @NonNull private final Set<String> selectedStatusItems = new LinkedHashSet<>();
     @NonNull private final Set<String> selectedNotificationFields = new LinkedHashSet<>();
+    @NonNull private final Set<Integer> selectedNotificationCategories = new LinkedHashSet<>();
+    @NonNull private final Set<String> selectedNotificationApps = new LinkedHashSet<>();
+    private int notificationAppFilterMode = PhoneNotificationFilter.MODE_ALL;
     private int notificationDurationSeconds = 10;
+    private int lowBatteryThreshold = 20;
+    @NonNull private String notificationTickerColor = "#FFFFFFFF";
+    @NonNull private String lowBatteryAlertColor = "#FFFF453A";
     @NonNull private SprutCatalog sprutCatalog = SprutCatalog.empty();
 
     @Override
@@ -113,8 +132,20 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         selectedNotificationFields.addAll(PhoneStatusBarPolicy.parseIds(
                 preferences.phoneStatusBarNotificationFields.get(),
                 PhoneStatusBarPolicy.notificationFieldIds()));
+        selectedNotificationCategories.addAll(PhoneNotificationFilter.parseCategoryIds(
+                preferences.phoneNotificationCategoryIds.get()));
+        selectedNotificationApps.addAll(PhoneNotificationFilter.parseAppKeys(
+                preferences.phoneNotificationAppFilterKeys.get()));
+        notificationAppFilterMode = PhoneNotificationFilter.normalizeMode(
+                preferences.phoneNotificationAppFilterMode.get());
         notificationDurationSeconds = boundedNotificationDuration(
                 preferences.phoneStatusBarNotificationSeconds.get());
+        lowBatteryThreshold = PhoneLowBatteryAlertPolicy.boundedThreshold(
+                preferences.phoneLowBatteryAlertThreshold.get());
+        notificationTickerColor = validColorOr(
+                preferences.phoneStatusBarNotificationColor.get(), "#FFFFFFFF");
+        lowBatteryAlertColor = validColorOr(
+                preferences.phoneLowBatteryAlertColor.get(), "#FFFF453A");
         View screen = buildScreen();
         setContentView(screen);
         SettingsBackNavigation.install(this, screen);
@@ -203,7 +234,18 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 preferences.phoneIncludeNotificationText.get());
         addSwitchRow(dataRows, includeNotificationText,
                 R.string.phone_text_title, R.string.phone_text_subtitle, true);
+
+        selectedNotificationCategoriesValue = addDisclosureRow(dataRows,
+                R.string.phone_filter_categories_title, this::chooseNotificationCategories,
+                true);
+        notificationAppFilterModeValue = addDisclosureRow(dataRows,
+                R.string.phone_filter_app_mode_title, this::chooseNotificationAppFilterMode,
+                true);
+        selectedNotificationAppsValue = addDisclosureRow(dataRows,
+                R.string.phone_filter_apps_title, this::chooseNotificationApps,
+                true);
         page.addView(card(dataRows), topMargin(7));
+        refreshFilterSummaries();
 
         messagesEnabled.setOnCheckedChangeListener((button, checked) ->
                 refreshDiagnostics());
@@ -276,7 +318,38 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 secondary(getString(R.string.phone_status_items_hint), 13);
         statusItemsHint.setPadding(dp(8), 0, dp(8), 0);
         page.addView(statusItemsHint, topMargin(8));
+
+        notificationColorButton = actionButton("", this::chooseNotificationTickerColor);
+        AppleColorPickerDialog.decorateButton(notificationColorButton,
+                getString(R.string.phone_status_notification_color_title),
+                notificationTickerColor);
+        page.addView(notificationColorButton, topMargin(10));
         refreshStatusBarSummaries();
+
+        page.addView(sectionTitle(getString(R.string.phone_section_alerts)), topMargin(24));
+        LinearLayout alertRows = column();
+        lowBatteryAlertEnabled = new MaterialSwitch(this);
+        lowBatteryAlertEnabled.setChecked(preferences.phoneLowBatteryAlertEnabled.get());
+        addSwitchRow(alertRows, lowBatteryAlertEnabled,
+                R.string.phone_low_battery_enable_title,
+                R.string.phone_low_battery_enable_subtitle, false);
+        lowBatteryAlertEnabled.setOnCheckedChangeListener((button, checked) -> {
+            if (checked) connectorEnabled.setChecked(true);
+        });
+        lowBatteryThresholdValue = addDisclosureRow(alertRows,
+                R.string.phone_low_battery_threshold_title,
+                this::chooseLowBatteryThreshold, true);
+        page.addView(card(alertRows), topMargin(7));
+
+        lowBatteryColorButton = actionButton("", this::chooseLowBatteryColor);
+        AppleColorPickerDialog.decorateButton(lowBatteryColorButton,
+                getString(R.string.phone_low_battery_color_title), lowBatteryAlertColor);
+        page.addView(lowBatteryColorButton, topMargin(10));
+        TextView lowBatteryHint =
+                secondary(getString(R.string.phone_low_battery_hint), 13);
+        lowBatteryHint.setPadding(dp(8), 0, dp(8), 0);
+        page.addView(lowBatteryHint, topMargin(8));
+        refreshAlertSummaries();
 
         page.addView(sectionTitle(getString(R.string.phone_section_sprut)), topMargin(24));
         LinearLayout sprutRows = column();
@@ -346,6 +419,23 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         parent.addView(row, matchWrap());
     }
 
+    @NonNull
+    private TextView addDisclosureRow(@NonNull LinearLayout parent, int titleRes,
+                                      @NonNull Runnable action, boolean separated) {
+        if (separated) parent.addView(separator(), separatorParams());
+        LinearLayout disclosureRow = clickableRow(action);
+        LinearLayout labels = column();
+        labels.addView(text(getString(titleRes), 17, Typeface.NORMAL), matchWrap());
+        TextView value = secondary("", 14);
+        labels.addView(value, topMargin(3));
+        disclosureRow.addView(labels, weighted());
+        TextView disclosure = text("›", 30, Typeface.NORMAL);
+        disclosure.setTextColor(color(R.color.settings_tertiary_text));
+        disclosureRow.addView(disclosure, wrapWrap());
+        parent.addView(disclosureRow, matchWrap());
+        return value;
+    }
+
     private void chooseStatusItems() {
         List<PhoneStatusBarPolicy.StatusItem> items =
                 PhoneStatusBarPolicy.statusItems();
@@ -413,6 +503,171 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 .show();
     }
 
+    private void chooseNotificationCategories() {
+        List<PhoneNotificationFilter.Category> categories =
+                PhoneNotificationFilter.categories();
+        String[] labels = new String[categories.size()];
+        boolean[] checked = new boolean[categories.size()];
+        Set<Integer> working = new LinkedHashSet<>(selectedNotificationCategories);
+        for (int index = 0; index < categories.size(); index++) {
+            PhoneNotificationFilter.Category category = categories.get(index);
+            labels[index] = category.label;
+            checked[index] = working.contains(category.id);
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.phone_filter_categories_choose)
+                .setMultiChoiceItems(labels, checked, (dialog, which, selected) -> {
+                    int id = categories.get(which).id;
+                    if (selected) {
+                        working.add(id);
+                    } else {
+                        working.remove(id);
+                    }
+                })
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    selectedNotificationCategories.clear();
+                    selectedNotificationCategories.addAll(
+                            PhoneNotificationFilter.parseCategoryIds(
+                                    PhoneNotificationFilter.serializeCategoryIds(working)));
+                    refreshFilterSummaries();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void chooseNotificationAppFilterMode() {
+        String[] labels = {
+                getString(R.string.phone_filter_app_mode_all),
+                getString(R.string.phone_filter_app_mode_only),
+                getString(R.string.phone_filter_app_mode_except)
+        };
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.phone_filter_app_mode_choose)
+                .setSingleChoiceItems(labels,
+                        PhoneNotificationFilter.normalizeMode(notificationAppFilterMode), null)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getListView().setOnItemClickListener(
+                (parent, view, position, id) -> {
+                    notificationAppFilterMode =
+                            PhoneNotificationFilter.normalizeMode(position);
+                    dialog.dismiss();
+                    refreshFilterSummaries();
+                }));
+        dialog.show();
+    }
+
+    private void chooseNotificationApps() {
+        List<AppFilterChoice> apps = availableAppFilters();
+        String[] labels = new String[apps.size()];
+        boolean[] checked = new boolean[apps.size()];
+        Set<String> working = new LinkedHashSet<>(selectedNotificationApps);
+        for (int index = 0; index < apps.size(); index++) {
+            AppFilterChoice app = apps.get(index);
+            labels[index] = app.label;
+            checked[index] = working.contains(app.key);
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.phone_filter_apps_choose)
+                .setMultiChoiceItems(labels, checked, (dialog, which, selected) -> {
+                    String key = apps.get(which).key;
+                    if (selected) {
+                        working.add(key);
+                    } else {
+                        working.remove(key);
+                    }
+                })
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    selectedNotificationApps.clear();
+                    selectedNotificationApps.addAll(PhoneNotificationFilter.parseAppKeys(
+                            PhoneNotificationFilter.serializeAppKeys(working)));
+                    refreshFilterSummaries();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    @NonNull
+    private List<AppFilterChoice> availableAppFilters() {
+        LinkedHashMap<String, AppFilterChoice> result = new LinkedHashMap<>();
+        for (PhoneAppCatalog.FilterApp app : PhoneAppCatalog.filterApps()) {
+            result.put(app.key, new AppFilterChoice(app.key, app.label));
+        }
+        WidgetService service = WidgetService.getInstance();
+        if (service != null) {
+            for (ConnectorValue value : service.connectorValueSnapshot()) {
+                if (value.connectorType != ConnectorType.PHONE) continue;
+                if ("notifications.items".equals(value.resourceId)
+                        && value.rawValue instanceof List<?>) {
+                    for (Object item : (List<?>) value.rawValue) {
+                        if (item instanceof Map<?, ?>) {
+                            addObservedAppFilter(result, (Map<?, ?>) item);
+                        }
+                    }
+                } else if ("diagnostics.last_app".equals(value.resourceId)
+                        && value.rawValue instanceof Map<?, ?>) {
+                    addObservedAppFilter(result, (Map<?, ?>) value.rawValue);
+                }
+            }
+        }
+        for (String key : selectedNotificationApps) {
+            if (!result.containsKey(key)) {
+                result.put(key, new AppFilterChoice(key,
+                        PhoneAppCatalog.displayNameFallback(key) + " · " + key));
+            }
+        }
+        List<AppFilterChoice> sorted = new ArrayList<>(result.values());
+        sorted.sort(Comparator.comparing(value -> value.label, String.CASE_INSENSITIVE_ORDER));
+        return sorted;
+    }
+
+    private static void addObservedAppFilter(
+            @NonNull Map<String, AppFilterChoice> destination,
+            @NonNull Map<?, ?> raw) {
+        Object identifierValue = firstObject(raw.get("app_id"), raw.get("app"), raw.get("id"));
+        String identifier = identifierValue == null ? "" : clean(String.valueOf(identifierValue));
+        String key = PhoneAppCatalog.filterKey(identifier);
+        if (key.isEmpty()) return;
+        Object nameValue = firstObject(raw.get("application"),
+                raw.get("app_name"), raw.get("name"));
+        String name = nameValue == null ? "" : clean(String.valueOf(nameValue));
+        if (name.isEmpty()) {
+            name = PhoneAppCatalog.displayNameFallback(identifier);
+        }
+        destination.put(key, new AppFilterChoice(key,
+                name + (key.equals(PhoneNotificationFilter.normalizeAppKey(identifier))
+                        ? " · " + identifier : "")));
+    }
+
+    @Nullable
+    private static Object firstObject(@Nullable Object... values) {
+        for (Object value : values) {
+            if (value != null && !String.valueOf(value).trim().isEmpty()) return value;
+        }
+        return null;
+    }
+
+    private void refreshFilterSummaries() {
+        if (selectedNotificationCategoriesValue != null) {
+            selectedNotificationCategoriesValue.setText(getString(
+                    R.string.phone_filter_categories_summary,
+                    selectedNotificationCategories.size()));
+        }
+        if (notificationAppFilterModeValue != null) {
+            int label = notificationAppFilterMode == PhoneNotificationFilter.MODE_ONLY_SELECTED
+                    ? R.string.phone_filter_app_mode_only
+                    : notificationAppFilterMode
+                    == PhoneNotificationFilter.MODE_EXCEPT_SELECTED
+                    ? R.string.phone_filter_app_mode_except
+                    : R.string.phone_filter_app_mode_all;
+            notificationAppFilterModeValue.setText(label);
+        }
+        if (selectedNotificationAppsValue != null) {
+            selectedNotificationAppsValue.setText(getString(
+                    R.string.phone_filter_apps_summary, selectedNotificationApps.size()));
+        }
+    }
+
     private void chooseNotificationDuration() {
         EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_NUMBER);
@@ -448,6 +703,87 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
             dialog.dismiss();
         }));
         dialog.show();
+    }
+
+    private void chooseNotificationTickerColor() {
+        chooseColor(getString(R.string.phone_status_notification_color_title),
+                notificationTickerColor, selected -> {
+                    notificationTickerColor = validColorOr(selected, "#FFFFFFFF");
+                    AppleColorPickerDialog.decorateButton(notificationColorButton,
+                            getString(R.string.phone_status_notification_color_title),
+                            notificationTickerColor);
+                });
+    }
+
+    private void chooseLowBatteryColor() {
+        chooseColor(getString(R.string.phone_low_battery_color_title),
+                lowBatteryAlertColor, selected -> {
+                    lowBatteryAlertColor = validColorOr(selected, "#FFFF453A");
+                    AppleColorPickerDialog.decorateButton(lowBatteryColorButton,
+                            getString(R.string.phone_low_battery_color_title),
+                            lowBatteryAlertColor);
+                });
+    }
+
+    private void chooseColor(@NonNull String title, @NonNull String current,
+                             @NonNull ColorSelection listener) {
+        AppleColorPickerDialog.show(this, title, current,
+                AppleColorPickerDialog.Options.opaque(),
+                new AppleColorPickerDialog.Listener() {
+                    @Override public void onPreview(@Nullable String selected) {
+                        listener.onSelected(selected == null ? current : selected);
+                    }
+
+                    @Override public void onSelected(@Nullable String selected) {
+                        listener.onSelected(selected == null ? current : selected);
+                    }
+
+                    @Override public void onCancelled(@Nullable String originalValue) {
+                        listener.onSelected(current);
+                    }
+                });
+    }
+
+    private void chooseLowBatteryThreshold() {
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setSingleLine(true);
+        input.setText(String.valueOf(lowBatteryThreshold));
+        input.setSelectAllOnFocus(true);
+        input.setHint(R.string.phone_low_battery_threshold_prompt);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.phone_low_battery_threshold_title)
+                .setMessage(R.string.phone_low_battery_threshold_prompt)
+                .setView(input)
+                .setPositiveButton(android.R.string.ok, null)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(
+                android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener(view -> {
+            int requested;
+            try {
+                requested = Integer.parseInt(clean(input.getText().toString()));
+            } catch (NumberFormatException invalid) {
+                input.setError(getString(R.string.phone_low_battery_threshold_invalid));
+                return;
+            }
+            if (requested < 1 || requested > 100) {
+                input.setError(getString(R.string.phone_low_battery_threshold_invalid));
+                return;
+            }
+            lowBatteryThreshold = requested;
+            refreshAlertSummaries();
+            dialog.dismiss();
+        }));
+        dialog.show();
+    }
+
+    private void refreshAlertSummaries() {
+        if (lowBatteryThresholdValue != null) {
+            lowBatteryThresholdValue.setText(getString(
+                    R.string.phone_low_battery_threshold_value, lowBatteryThreshold));
+        }
     }
 
     private void refreshStatusBarSummaries() {
@@ -571,6 +907,12 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         String lastError = "";
         String lastAppName = "";
         long lastAppAt = 0L;
+        Integer batteryLevel = null;
+        Boolean batteryCharging = null;
+        Boolean batteryChargingEstimated = null;
+        String batteryLevelSource = "";
+        String batteryChargingSource = "";
+        String callState = "";
         WidgetService service = WidgetService.getInstance();
         if (service != null) {
             for (ConnectorValue value : service.connectorValueSnapshot()) {
@@ -580,6 +922,26 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 if (value.available && value.readable) available++;
                 if ("connected".equals(value.resourceId)) {
                     phoneConnected = Boolean.TRUE.equals(value.rawValue);
+                } else if ("battery.level".equals(value.resourceId)
+                        && value.available && value.rawValue instanceof Number) {
+                    batteryLevel = ((Number) value.rawValue).intValue();
+                } else if ("battery.level_source".equals(value.resourceId)
+                        && value.available && value.rawValue != null) {
+                    batteryLevelSource = clean(String.valueOf(value.rawValue));
+                } else if ("battery.charging".equals(value.resourceId)
+                        && value.available && value.rawValue instanceof Boolean) {
+                    batteryCharging = (Boolean) value.rawValue;
+                } else if ("battery.charging_estimated".equals(value.resourceId)
+                        && value.available && value.rawValue instanceof Boolean) {
+                    batteryChargingEstimated = (Boolean) value.rawValue;
+                } else if ("battery.charging_source".equals(value.resourceId)
+                        && value.available && value.rawValue != null) {
+                    batteryChargingSource = clean(String.valueOf(value.rawValue));
+                } else if ("call.state".equals(value.resourceId)
+                        && value.available && value.rawValue != null) {
+                    callState = clean(String.valueOf(
+                            dezz.status.widget.launcher.information.PhoneInformationSourcePolicy
+                                    .displayValue(value, "")));
                 } else if ("diagnostics.ancs".equals(value.resourceId)) {
                     ancsStatus = clean(value.rawValue == null
                             ? "" : String.valueOf(value.rawValue));
@@ -633,6 +995,26 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 phoneConnected
                         ? getString(R.string.phone_diag_connected_selected)
                         : getString(R.string.phone_diag_disconnected_selected)));
+        String levelSource = localizedBatterySource(batteryLevelSource);
+        String chargingSource = localizedBatterySource(batteryChargingSource);
+        String chargingText = batteryCharging == null
+                ? getString(R.string.phone_diag_charging_unknown)
+                : getString(Boolean.TRUE.equals(batteryCharging)
+                        ? R.string.phone_diag_charging_yes
+                        : R.string.phone_diag_charging_no)
+                + (Boolean.TRUE.equals(batteryChargingEstimated)
+                ? getString(R.string.phone_diag_charging_estimated) : "")
+                + (chargingSource.isEmpty() ? "" : " · " + chargingSource);
+        result.append('\n').append(line(batteryLevel != null,
+                getString(R.string.phone_diag_battery),
+                batteryLevel == null
+                        ? getString(R.string.phone_diag_battery_waiting)
+                        : getString(R.string.phone_diag_battery_format,
+                                batteryLevel, levelSource, chargingText)));
+        result.append('\n').append(line(!callState.isEmpty(),
+                getString(R.string.phone_diag_call),
+                callState.isEmpty()
+                        ? getString(R.string.phone_diag_call_waiting) : callState));
         result.append('\n').append(line("accepted".equals(stockConnectionStatus)
                         || ancsReceiving,
                 getString(R.string.phone_diag_stock_connection),
@@ -682,6 +1064,23 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                     getString(R.string.phone_diag_last_error), lastError));
         }
         diagnostics.setText(result);
+    }
+
+    @NonNull
+    private String localizedBatterySource(@NonNull String source) {
+        switch (source) {
+            case "ble_bas": return "BLE BAS";
+            case "hfp_ecarx": return "HFP/ECARX";
+            case "android_broadcast": return "Android Bluetooth";
+            case "hfp_vendor": return "HFP/OEM";
+            case "android_metadata":
+                return getString(R.string.phone_diag_source_android_metadata);
+            case "bas_trend": return getString(R.string.phone_diag_source_bas_trend);
+            case "hfp_trend": return getString(R.string.phone_diag_source_hfp_trend);
+            case "ecarx_trend": return getString(R.string.phone_diag_source_ecarx_trend);
+            case "system_trend": return getString(R.string.phone_diag_source_android_trend);
+            default: return source;
+        }
     }
 
     @NonNull
@@ -1027,6 +1426,9 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     }
 
     private boolean persistSettings(boolean showConfirmation) {
+        if (lowBatteryAlertEnabled.isChecked()) {
+            connectorEnabled.setChecked(true);
+        }
         if (statusBarNotificationsEnabled.isChecked()) {
             connectorEnabled.setChecked(true);
             notificationsEnabled.setChecked(true);
@@ -1043,6 +1445,20 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 // privacy switch. App-only ticker mode remains privacy-safe.
                 includeNotificationText.setChecked(true);
             }
+        }
+        if ((notificationsEnabled.isChecked() || messagesEnabled.isChecked())
+                && selectedNotificationCategories.isEmpty()) {
+            Toast.makeText(this, R.string.phone_filter_categories_required,
+                    Toast.LENGTH_LONG).show();
+            return false;
+        }
+        if ((notificationsEnabled.isChecked() || messagesEnabled.isChecked())
+                && notificationAppFilterMode
+                == PhoneNotificationFilter.MODE_ONLY_SELECTED
+                && selectedNotificationApps.isEmpty()) {
+            Toast.makeText(this, R.string.phone_filter_apps_required,
+                    Toast.LENGTH_LONG).show();
+            return false;
         }
         if (connectorEnabled.isChecked() && selectedDeviceAddress.isEmpty()) {
             Toast.makeText(this, R.string.phone_choose_required,
@@ -1064,6 +1480,14 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
             }
         }
 
+        int savedLowBatteryThreshold =
+                PhoneLowBatteryAlertPolicy.boundedThreshold(lowBatteryThreshold);
+        boolean resetLowBatteryLatch =
+                preferences.phoneLowBatteryAlertEnabled.get()
+                        != lowBatteryAlertEnabled.isChecked()
+                || preferences.phoneLowBatteryAlertThreshold.get()
+                        != savedLowBatteryThreshold;
+
         preferences.phoneConnectorEnabled.set(connectorEnabled.isChecked());
         preferences.phoneDeviceAddress.set(selectedDeviceAddress);
         preferences.phoneNotificationsEnabled.set(notificationsEnabled.isChecked());
@@ -1078,7 +1502,20 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                         PhoneStatusBarPolicy.notificationFieldIds()));
         preferences.phoneStatusBarNotificationSeconds.set(
                 boundedNotificationDuration(notificationDurationSeconds));
-        if (statusBarNotificationsEnabled.isChecked()) {
+        preferences.phoneNotificationCategoryIds.set(
+                PhoneNotificationFilter.serializeCategoryIds(
+                        selectedNotificationCategories));
+        preferences.phoneNotificationAppFilterMode.set(
+                PhoneNotificationFilter.normalizeMode(notificationAppFilterMode));
+        preferences.phoneNotificationAppFilterKeys.set(
+                PhoneNotificationFilter.serializeAppKeys(selectedNotificationApps));
+        preferences.phoneStatusBarNotificationColor.set(notificationTickerColor);
+        preferences.phoneLowBatteryAlertEnabled.set(lowBatteryAlertEnabled.isChecked());
+        preferences.phoneLowBatteryAlertThreshold.set(savedLowBatteryThreshold);
+        preferences.phoneLowBatteryAlertColor.set(lowBatteryAlertColor);
+        if (resetLowBatteryLatch) preferences.phoneLowBatteryAlertLatched.set(false);
+        if (statusBarNotificationsEnabled.isChecked()
+                || lowBatteryAlertEnabled.isChecked()) {
             List<BrickType> order = BrickType.parseOrder(preferences.brickOrder.get());
             if (!order.contains(BrickType.MEDIA)) {
                 order.add(BrickType.MEDIA);
@@ -1335,6 +1772,28 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         if (normalized.isEmpty()) return "—";
         int suffixStart = Math.max(0, normalized.length() - 5);
         return "••••" + normalized.substring(suffixStart);
+    }
+
+    @NonNull
+    private static String validColorOr(@Nullable String raw, @NonNull String fallback) {
+        SettingsColorValue parsed = SettingsColorValue.tryParse(raw);
+        if (parsed == null || parsed.kind() != SettingsColorValue.Kind.COLOR) return fallback;
+        String serialized = parsed.serialize();
+        return serialized == null ? fallback : serialized;
+    }
+
+    private interface ColorSelection {
+        void onSelected(@Nullable String selected);
+    }
+
+    private static final class AppFilterChoice {
+        @NonNull final String key;
+        @NonNull final String label;
+
+        AppFilterChoice(@NonNull String key, @NonNull String label) {
+            this.key = key;
+            this.label = label;
+        }
     }
 
     private static final class BondedPhone {

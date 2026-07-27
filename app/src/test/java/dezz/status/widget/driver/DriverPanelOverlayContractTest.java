@@ -76,10 +76,11 @@ public class DriverPanelOverlayContractTest {
         assertFalse(climateSource.contains("drawFanGlyph"));
         assertTrue(climateSource.contains("drawText(\"AUTO\""));
         assertTrue(climateSource.contains("drawBars(canvas, width * .12f"));
-        assertTrue(climateSource.contains("Official AOSP Automotive HVAC vectors"));
-        assertTrue(climateSource.contains("R.drawable.ic_driver_airflow_face"));
-        assertTrue(climateSource.contains("R.drawable.ic_driver_airflow_feet"));
-        assertTrue(climateSource.contains("R.drawable.ic_driver_airflow_windshield"));
+        assertTrue(climateSource.contains("Exact MonjaroPanel pictograms"));
+        assertTrue(climateSource.contains("R.drawable.ic_driver_monjaro_blow_face"));
+        assertTrue(climateSource.contains("R.drawable.ic_driver_monjaro_blow_leg"));
+        assertTrue(climateSource.contains("R.drawable.ic_driver_monjaro_blow_window"));
+        assertTrue(climateSource.contains("R.drawable.ic_driver_monjaro_temperature_source"));
         assertFalse(climateSource.contains("drawDirectionArrow"));
         assertTrue(climateSource.contains("AIRFLOW = \"climate.airflow\""));
         assertTrue(climateSource.contains("boolean expanded = detailed;"));
@@ -91,6 +92,10 @@ public class DriverPanelOverlayContractTest {
         assertTrue(source.contains("// HA1085 keeps the detailed climate tile"));
         assertTrue(source.contains("DriverPanelLayoutPolicy.shortcutWeight(expandedClimate)"));
         assertTrue(source.contains("DriverPanelLayoutPolicy.shortcutIconHeight("));
+        assertTrue(source.contains("boolean liveClimate = isLiveClimate(shortcut)"));
+        assertTrue(source.contains("boolean stockClimateAction = isStockClimateAction(shortcut)"));
+        assertTrue(source.contains("shortcut.liveClimateIcon"));
+        assertTrue(source.contains("shortcut.climateDetailsGapPx"));
         assertTrue(source.contains("button.setSoundEffectsEnabled(false)"));
     }
 

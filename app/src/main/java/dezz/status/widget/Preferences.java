@@ -668,6 +668,28 @@ public class Preferences {
     /** Ordered notification fields used by the temporary status-row presentation. */
     public final Str phoneStatusBarNotificationFields = new Str(this,
             "phoneNotificationTickerFields", "application,topic,text");
+    /** ANCS categories allowed to enter the live notification cache and presentation surfaces. */
+    public final Str phoneNotificationCategoryIds = new Str(this,
+            "phoneNotificationCategoryIds", "0,1,2,3,4,5,6,7,8,9,10,11");
+    /** 0 = all apps, 1 = only selected apps, 2 = every app except selected apps. */
+    public final Int phoneNotificationAppFilterMode = new Int(this,
+            "phoneNotificationAppFilterMode", 0);
+    /** Canonical iOS application keys used by the selected app-filter mode. */
+    public final Str phoneNotificationAppFilterKeys = new Str(this,
+            "phoneNotificationAppFilterKeys", "");
+    /** Independent text color for live ANCS notifications temporarily replacing Now Playing. */
+    public final Str phoneStatusBarNotificationColor = new Str(this,
+            "phoneNotificationTickerColor", "#FFFFFFFF");
+    /** One-shot status-row warning when a fresh selected-iPhone battery level is below threshold. */
+    public final Bool phoneLowBatteryAlertEnabled = new Bool(this,
+            "phoneLowBatteryAlertEnabled", false);
+    public final Int phoneLowBatteryAlertThreshold = new Int(this,
+            "phoneLowBatteryAlertThreshold", 20);
+    public final Str phoneLowBatteryAlertColor = new Str(this,
+            "phoneLowBatteryAlertColor", "#FFFF453A");
+    /** Internal latch: survives Bluetooth/service restarts and resets only after recovery. */
+    public final Bool phoneLowBatteryAlertLatched = new Bool(this,
+            "phoneLowBatteryAlertLatched", false);
     /** Optional writable Sprut.hub boolean characteristic reflecting phone presence. */
     public final Bool phoneSprutPresenceEnabled = new Bool(this,
             "phoneSprutPresenceEnabled", false);

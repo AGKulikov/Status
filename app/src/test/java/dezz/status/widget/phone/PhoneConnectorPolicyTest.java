@@ -29,6 +29,59 @@ public final class PhoneConnectorPolicyTest {
         assertNull(PhoneConnectorPolicy.decodeBatteryPowerState(1 << 4));
     }
 
+    @Test public void decodesBas11BatteryLevelStatusAndOptionalLevel() {
+        // Flags: battery level present. Power: present, wired source, charging, good.
+        int power = 1 | 1 << 1 | 1 << 5 | 1 << 7;
+        PhoneConnectorPolicy.BatteryLevelStatus charging =
+                PhoneConnectorPolicy.decodeBatteryLevelStatus(new byte[] {
+                        0x02, (byte) power, (byte) (power >>> 8), 73
+                });
+        assertEquals(Integer.valueOf(73), charging.level);
+        assertEquals(Boolean.TRUE, charging.charging);
+        assertEquals(Boolean.TRUE, charging.externalPower);
+        assertEquals("charging", charging.chargeState);
+        assertEquals("good", charging.chargeLevel);
+
+        // Active discharge and no external source.
+        power = 1 | 2 << 5 | 2 << 7;
+        PhoneConnectorPolicy.BatteryLevelStatus discharging =
+                PhoneConnectorPolicy.decodeBatteryLevelStatus(new byte[] {
+                        0x00, (byte) power, (byte) (power >>> 8)
+                });
+        assertNull(discharging.level);
+        assertEquals(Boolean.FALSE, discharging.charging);
+        assertEquals(Boolean.FALSE, discharging.externalPower);
+        assertEquals("discharging", discharging.chargeState);
+        assertEquals("low", discharging.chargeLevel);
+
+        assertNull(PhoneConnectorPolicy.decodeBatteryLevelStatus(new byte[] {0x02, 0, 0}));
+        assertNull(PhoneConnectorPolicy.decodeBatteryLevelStatus(new byte[] {0x01, 0, 0, 0}));
+    }
+
+    @Test public void batteryTrendOnlyInfersDirectionFromTwoValidDifferentSamples() {
+        assertEquals(Boolean.TRUE,
+                PhoneConnectorPolicy.inferChargingFromLevelTrend(41, 42));
+        assertEquals(Boolean.FALSE,
+                PhoneConnectorPolicy.inferChargingFromLevelTrend(42, 41));
+        assertNull(PhoneConnectorPolicy.inferChargingFromLevelTrend(42, 42));
+        assertNull(PhoneConnectorPolicy.inferChargingFromLevelTrend(null, 42));
+        assertNull(PhoneConnectorPolicy.inferChargingFromLevelTrend(42, 101));
+    }
+
+    @Test public void decodesOnlyExplicitAndroidBluetoothChargingMetadata() {
+        assertEquals(Boolean.TRUE, PhoneConnectorPolicy.decodeBluetoothChargingMetadata(
+                "true".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        assertEquals(Boolean.TRUE, PhoneConnectorPolicy.decodeBluetoothChargingMetadata(
+                "charging".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        assertEquals(Boolean.FALSE, PhoneConnectorPolicy.decodeBluetoothChargingMetadata(
+                "0".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        assertEquals(Boolean.FALSE, PhoneConnectorPolicy.decodeBluetoothChargingMetadata(
+                "not charging".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        assertNull(PhoneConnectorPolicy.decodeBluetoothChargingMetadata(
+                "unknown".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        assertNull(PhoneConnectorPolicy.decodeBluetoothChargingMetadata(null));
+    }
+
     @Test public void reconnectBackoffIsBoundedButNeverStops() {
         assertEquals(2_000L, PhoneConnectorPolicy.reconnectDelayMillis(0));
         assertEquals(5_000L, PhoneConnectorPolicy.reconnectDelayMillis(1));

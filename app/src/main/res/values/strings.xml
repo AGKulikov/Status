@@ -290,6 +290,19 @@
     <string name="phone_messages_subtitle">Receive Apple Messages notifications through ANCS and device-qualified Bluetooth MAP events, when available</string>
     <string name="phone_text_title">Include notification and message text</string>
     <string name="phone_text_subtitle">Show titles and message text; turn off for private summaries only</string>
+    <string name="phone_filter_categories_title">Notification types</string>
+    <string name="phone_filter_categories_summary">%1$d of 12 types selected</string>
+    <string name="phone_filter_categories_choose">Choose ANCS notification types</string>
+    <string name="phone_filter_categories_required">Select at least one notification type.</string>
+    <string name="phone_filter_app_mode_title">Application filter</string>
+    <string name="phone_filter_app_mode_choose">Choose application filter</string>
+    <string name="phone_filter_app_mode_all">All applications</string>
+    <string name="phone_filter_app_mode_only">Only selected applications</string>
+    <string name="phone_filter_app_mode_except">All except selected applications</string>
+    <string name="phone_filter_apps_title">Applications</string>
+    <string name="phone_filter_apps_summary">%1$d applications selected</string>
+    <string name="phone_filter_apps_choose">Choose iPhone applications</string>
+    <string name="phone_filter_apps_required">Choose at least one application for “Only selected applications”.</string>
 
     <string name="phone_section_status_bar">Status row</string>
     <string name="phone_status_items_title">Persistent iPhone status blocks</string>
@@ -307,6 +320,18 @@
     <string name="phone_status_notification_duration_value">%1$d seconds</string>
     <string name="phone_status_notification_duration_prompt">Seconds from 1 to 120</string>
     <string name="phone_status_notification_duration_invalid">Enter a value from 1 to 120 seconds.</string>
+    <string name="phone_status_notification_color_title">iPhone notification color</string>
+
+    <string name="phone_section_alerts">iPhone alerts</string>
+    <string name="phone_low_battery_enable_title">Low iPhone battery alert</string>
+    <string name="phone_low_battery_enable_subtitle">Temporarily replace Now Playing once when the selected iPhone drops below the threshold</string>
+    <string name="phone_low_battery_threshold_title">Battery threshold</string>
+    <string name="phone_low_battery_threshold_value">Alert below %1$d%%</string>
+    <string name="phone_low_battery_threshold_prompt">Percentage from 1 to 100</string>
+    <string name="phone_low_battery_threshold_invalid">Enter a value from 1 to 100.</string>
+    <string name="phone_low_battery_color_title">Low-battery alert color</string>
+    <string name="phone_low_battery_hint">The warning fires once when the fresh battery value enters the configured range. It is rearmed after the charge recovers above the threshold.</string>
+    <string name="phone_low_battery_alert_text">Low iPhone battery · %1$d%%</string>
 
     <string name="phone_section_sprut">Sprut.hub presence</string>
     <string name="phone_sprut_enable_title">Export iPhone presence</string>
@@ -337,6 +362,20 @@
     <string name="phone_diag_connection">Selected iPhone connection</string>
     <string name="phone_diag_connected_selected">connected</string>
     <string name="phone_diag_disconnected_selected">not connected</string>
+    <string name="phone_diag_battery">iPhone battery</string>
+    <string name="phone_diag_battery_waiting">waiting for battery level</string>
+    <string name="phone_diag_battery_format">%1$d%% · %2$s · %3$s</string>
+    <string name="phone_diag_charging_unknown">charging state has not been published yet; it will appear after an explicit BAS/HFP flag or a percentage change</string>
+    <string name="phone_diag_charging_yes">charging</string>
+    <string name="phone_diag_charging_no">not charging</string>
+    <string name="phone_diag_charging_estimated"> (estimated)</string>
+    <string name="phone_diag_source_bas_trend">estimated from BLE BAS</string>
+    <string name="phone_diag_source_hfp_trend">estimated from HFP</string>
+    <string name="phone_diag_source_ecarx_trend">estimated from ECARX</string>
+    <string name="phone_diag_source_android_trend">estimated from Android Bluetooth</string>
+    <string name="phone_diag_source_android_metadata">Android Bluetooth metadata</string>
+    <string name="phone_diag_call">Call state</string>
+    <string name="phone_diag_call_waiting">HFP has not published call state yet</string>
     <string name="phone_diag_stock_connection">Stock ECARX Bluetooth</string>
     <string name="phone_diag_stock_accepted">connect request for the already paired phone was accepted (this is not new pairing)</string>
     <string name="phone_diag_stock_not_registered">Android has a bond, but the stock ECARX service does not know this iPhone; pair it again in stock settings</string>

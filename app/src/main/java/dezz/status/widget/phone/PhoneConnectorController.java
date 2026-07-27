@@ -21,6 +21,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -81,6 +82,7 @@ public final class PhoneConnectorController {
     private static final long DEVICE_RESCAN_MS = 15_000L;
     private static final long ANCS_STABLE_READY_RESET_MS = 50_000L;
     private static final long APP_DISPLAY_NAME_WAIT_TIMEOUT_MS = 15_000L;
+    private static final long BATTERY_TREND_MAX_AGE_MS = 20L * 60L * 1_000L;
     private static final int DESIRED_GATT_MTU = 512;
     private static final int GATT_INSUFFICIENT_AUTHENTICATION = 5;
     private static final int GATT_INSUFFICIENT_AUTHORIZATION = 8;
@@ -92,6 +94,10 @@ public final class PhoneConnectorController {
             "android.bluetooth.headsetclient.profile.action.CONNECTION_STATE_CHANGED";
     private static final String ACTION_HFP_AG_EVENT =
             "android.bluetooth.headsetclient.profile.action.AG_EVENT";
+    private static final String ACTION_HFP_AUDIO_STATE =
+            "android.bluetooth.headsetclient.profile.action.AUDIO_STATE_CHANGED";
+    private static final String ACTION_HFP_CALL_CHANGED =
+            "android.bluetooth.headsetclient.profile.action.AG_CALL_CHANGED";
     private static final String ACTION_MAP_CONNECTION =
             "android.bluetooth.mapmce.profile.action.CONNECTION_STATE_CHANGED";
     private static final String ACTION_MAP_MESSAGE_RECEIVED =
@@ -132,6 +138,20 @@ public final class PhoneConnectorController {
             "android.bluetooth.headsetclient.extra.NETWORK_SIGNAL_STRENGTH";
     private static final String EXTRA_HFP_NETWORK_ROAMING =
             "android.bluetooth.headsetclient.extra.NETWORK_ROAMING";
+    private static final String EXTRA_HFP_VOICE_RECOGNITION =
+            "android.bluetooth.headsetclient.extra.VOICE_RECOGNITION";
+    private static final String EXTRA_HFP_IN_BAND_RING =
+            "android.bluetooth.headsetclient.extra.IN_BAND_RING";
+    private static final String EXTRA_HFP_AUDIO_WBS =
+            "android.bluetooth.headsetclient.extra.AUDIO_WBS";
+    private static final String EXTRA_HFP_CALL =
+            "android.bluetooth.headsetclient.extra.CALL";
+    private static final int HFP_AUDIO_DISCONNECTED = 0;
+    private static final int HFP_AUDIO_CONNECTING = 1;
+    private static final int HFP_AUDIO_CONNECTED = 2;
+    // Android system Bluetooth metadata keys. Read reflectively because the methods remain
+    // @SystemApi while this head-unit build intentionally targets the Android 9 permission model.
+    private static final int METADATA_MAIN_CHARGING = 19;
 
     private static final UUID BATTERY_SERVICE =
             UUID.fromString("0000180f-0000-1000-8000-00805f9b34fb");
@@ -139,6 +159,8 @@ public final class PhoneConnectorController {
             UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb");
     private static final UUID BATTERY_POWER_STATE =
             UUID.fromString("00002a1a-0000-1000-8000-00805f9b34fb");
+    private static final UUID BATTERY_LEVEL_STATUS =
+            UUID.fromString("00002bed-0000-1000-8000-00805f9b34fb");
     private static final UUID GENERIC_ATTRIBUTE_SERVICE =
             UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
     private static final UUID SERVICE_CHANGED =
@@ -203,23 +225,48 @@ public final class PhoneConnectorController {
     private boolean basBatteryKnown;
     private boolean basChargingKnown;
     private boolean genericBatteryKnown;
+    private final Map<String, Integer> batteryTrendLevels = new LinkedHashMap<>();
     @Nullable private Integer hfpBatteryLevel;
     @Nullable private Integer basBatteryLevel;
     @Nullable private Integer genericBatteryLevel;
     @Nullable private Boolean hfpBatteryCharging;
     @Nullable private Boolean basBatteryCharging;
+    @Nullable private Boolean metadataBatteryCharging;
+    @Nullable private Boolean basExternalPower;
+    private String basChargeState = "";
+    private String basChargeLevel = "";
     private long hfpBatteryUpdatedAt;
     private long basBatteryUpdatedAt;
     private long genericBatteryUpdatedAt;
     private long hfpChargingUpdatedAt;
     private long basChargingUpdatedAt;
+    private long metadataChargingUpdatedAt;
+    private long batteryTrendUpdatedAt;
     @Nullable private Integer batteryLevel;
     @Nullable private Boolean batteryCharging;
+    @Nullable private Boolean batteryTrendCharging;
+    private String batteryTrendSource = "";
+    @Nullable private Boolean batteryChargingEstimated;
+    @Nullable private Boolean batteryExternalPower;
+    private String batteryLevelSource = "";
+    private String batteryChargingSource = "";
+    private String batteryChargeState = "";
+    private String batteryChargeLevel = "";
     @Nullable private Boolean networkAvailable;
     @Nullable private Integer networkSignal;
     @Nullable private Boolean networkRoaming;
     private String networkOperator = "";
     private String networkType = "";
+    @Nullable private Boolean voiceRecognitionActive;
+    @Nullable private Boolean inBandRingSupported;
+    @Nullable private Boolean callActive;
+    @Nullable private Boolean callAudioConnected;
+    @Nullable private Boolean callAudioWideband;
+    private String callState = "";
+    private String callAudioState = "";
+    private String callDirection = "";
+    @Nullable private Boolean callMultiparty;
+    private final Map<String, CallRecord> calls = new LinkedHashMap<>();
 
     @Nullable private BluetoothGattCharacteristic ancsControlPoint;
     @Nullable private BluetoothGattCharacteristic ancsDataSource;
@@ -458,18 +505,43 @@ public final class PhoneConnectorController {
         genericBatteryLevel = null;
         hfpBatteryCharging = null;
         basBatteryCharging = null;
+        metadataBatteryCharging = null;
+        basExternalPower = null;
+        basChargeState = "";
+        basChargeLevel = "";
         hfpBatteryUpdatedAt = 0L;
         basBatteryUpdatedAt = 0L;
         genericBatteryUpdatedAt = 0L;
         hfpChargingUpdatedAt = 0L;
         basChargingUpdatedAt = 0L;
+        metadataChargingUpdatedAt = 0L;
+        batteryTrendLevels.clear();
+        batteryTrendCharging = null;
+        batteryTrendSource = "";
+        batteryTrendUpdatedAt = 0L;
         batteryLevel = null;
         batteryCharging = null;
+        batteryChargingEstimated = null;
+        batteryExternalPower = null;
+        batteryLevelSource = "";
+        batteryChargingSource = "";
+        batteryChargeState = "";
+        batteryChargeLevel = "";
         networkAvailable = null;
         networkSignal = null;
         networkRoaming = null;
         networkOperator = "";
         networkType = "";
+        voiceRecognitionActive = null;
+        inBandRingSupported = null;
+        callActive = null;
+        callAudioConnected = null;
+        callAudioWideband = null;
+        callState = "";
+        callAudioState = "";
+        callDirection = "";
+        callMultiparty = null;
+        calls.clear();
         ancsAuthorizedThisRun = false;
         forceDirectGatt = false;
         serviceDiscoveryStarted = false;
@@ -501,6 +573,8 @@ public final class PhoneConnectorController {
         filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
         filter.addAction(ACTION_HFP_CONNECTION);
         filter.addAction(ACTION_HFP_AG_EVENT);
+        filter.addAction(ACTION_HFP_AUDIO_STATE);
+        filter.addAction(ACTION_HFP_CALL_CHANGED);
         filter.addAction(ACTION_MAP_CONNECTION);
         filter.addAction(ACTION_MAP_MESSAGE_RECEIVED);
         filter.addAction(ACTION_MAP_MESSAGE_READ_CHANGED);
@@ -596,12 +670,24 @@ public final class PhoneConnectorController {
             hfpConnected = true;
             applyHfpEvent(token, intent);
             updateConnected(token);
+        } else if (ACTION_HFP_AUDIO_STATE.equals(action)) {
+            hfpConnected = true;
+            applyHfpAudioState(token, intent.getIntExtra(
+                    BluetoothProfile.EXTRA_STATE, HFP_AUDIO_DISCONNECTED),
+                    booleanExtra(intent, EXTRA_HFP_AUDIO_WBS));
+            updateConnected(token);
+        } else if (ACTION_HFP_CALL_CHANGED.equals(action)) {
+            hfpConnected = true;
+            applyHfpCall(token, rawExtra(intent, EXTRA_HFP_CALL));
+            updateConnected(token);
         } else if (ACTION_DEVICE_BATTERY_LEVEL_CHANGED.equals(action)) {
             Integer raw = intExtra(intent, EXTRA_DEVICE_BATTERY_LEVEL, "battery_level");
             if (raw != null && raw >= 0 && raw <= 100) {
                 genericBatteryKnown = true;
                 genericBatteryLevel = raw;
                 genericBatteryUpdatedAt = SystemClock.elapsedRealtime();
+                observeBatteryTrend("system", raw);
+                readCachedBluetoothCharging(device);
                 refreshBatteryValues();
                 publishSnapshot(token);
             }
@@ -717,6 +803,8 @@ public final class PhoneConnectorController {
         hfpBatteryKnown = true;
         hfpBatteryLevel = normalized;
         hfpBatteryUpdatedAt = SystemClock.elapsedRealtime();
+        observeBatteryTrend("ecarx", normalized);
+        readCachedBluetoothCharging(selectedDevice);
         refreshBatteryValues();
         publishSnapshot(token);
     }
@@ -868,8 +956,11 @@ public final class PhoneConnectorController {
                             }
                         } else if (exactDevice != null
                                 && profileId == PROFILE_HEADSET_CLIENT) {
+                            HfpInitialState initial =
+                                    readInitialHfpState(proxy, exactDevice);
                             runIfCurrent(token, () -> {
                                 hfpConnected = true;
+                                applyInitialHfpState(token, initial);
                                 updateConnected(token);
                             });
                         } else if (exactDevice != null
@@ -896,6 +987,52 @@ public final class PhoneConnectorController {
             adapter.getProfileProxy(context, listener, profileId);
         } catch (Throwable ignored) {
             // Unsupported profile id / permission denial is an explicit fail-closed result.
+        }
+    }
+
+    @NonNull
+    private static HfpInitialState readInitialHfpState(
+            @NonNull BluetoothProfile proxy, @NonNull BluetoothDevice device) {
+        Bundle agEvents = null;
+        List<?> currentCalls = null;
+        Integer audioState = null;
+        try {
+            Method method = proxy.getClass().getMethod(
+                    "getCurrentAgEvents", BluetoothDevice.class);
+            method.setAccessible(true);
+            Object raw = method.invoke(proxy, device);
+            if (raw instanceof Bundle) agEvents = new Bundle((Bundle) raw);
+        } catch (Throwable ignored) {}
+        try {
+            Method method = proxy.getClass().getMethod(
+                    "getCurrentCalls", BluetoothDevice.class);
+            method.setAccessible(true);
+            Object raw = method.invoke(proxy, device);
+            if (raw instanceof List<?>) currentCalls = new ArrayList<>((List<?>) raw);
+        } catch (Throwable ignored) {}
+        try {
+            Method method = proxy.getClass().getMethod(
+                    "getAudioState", BluetoothDevice.class);
+            method.setAccessible(true);
+            Object raw = method.invoke(proxy, device);
+            if (raw instanceof Number) audioState = ((Number) raw).intValue();
+        } catch (Throwable ignored) {}
+        return new HfpInitialState(agEvents, currentCalls, audioState);
+    }
+
+    private void applyInitialHfpState(long token, @NonNull HfpInitialState initial) {
+        if (initial.agEvents != null) {
+            Intent event = new Intent(ACTION_HFP_AG_EVENT);
+            event.putExtras(initial.agEvents);
+            applyHfpEvent(token, event);
+        }
+        if (initial.currentCalls != null) {
+            calls.clear();
+            for (Object call : initial.currentCalls) updateHfpCall(call);
+            rebuildHfpCallSummary();
+        }
+        if (initial.audioState != null) {
+            applyHfpAudioState(token, initial.audioState, null);
         }
     }
 
@@ -1203,7 +1340,8 @@ public final class PhoneConnectorController {
         boolean appleMessage = isAppleMessagesApp(item.appIdentifier);
         boolean allowed = config.notificationsEnabled
                 || config.messagesEnabled && appleMessage;
-        if (!allowed) return;
+        if (!allowed || !config.allowsNotification(
+                item.appIdentifier, item.categoryId)) return;
         long observedAtElapsedMs = item.observedAtElapsedMs > 0L
                 ? item.observedAtElapsedMs : SystemClock.elapsedRealtime();
         if (SystemClock.elapsedRealtime() - observedAtElapsedMs
@@ -1548,6 +1686,12 @@ public final class PhoneConnectorController {
             queueOptionalNotificationSubscription(callbackGatt, power,
                     GattTag.BATTERY_POWER_SUBSCRIPTION);
         }
+        BluetoothGattCharacteristic status = battery.getCharacteristic(BATTERY_LEVEL_STATUS);
+        if (status != null) {
+            queueCharacteristicRead(status, GattTag.BATTERY_LEVEL_STATUS_READ);
+            queueOptionalNotificationSubscription(callbackGatt, status,
+                    GattTag.BATTERY_LEVEL_STATUS_SUBSCRIPTION);
+        }
     }
 
     private boolean configureServiceChanged(@NonNull BluetoothGatt callbackGatt) {
@@ -1788,7 +1932,8 @@ public final class PhoneConnectorController {
             handleAncsData(token, payload);
         } else if (SERVICE_CHANGED.equals(uuid)) {
             handleServiceChanged(token);
-        } else if (BATTERY_LEVEL.equals(uuid) || BATTERY_POWER_STATE.equals(uuid)) {
+        } else if (BATTERY_LEVEL.equals(uuid) || BATTERY_POWER_STATE.equals(uuid)
+                || BATTERY_LEVEL_STATUS.equals(uuid)) {
             applyBatteryCharacteristic(token, uuid, payload);
         }
     }
@@ -1801,6 +1946,7 @@ public final class PhoneConnectorController {
             removeAncsNotification(token, event.uid);
             return;
         }
+        if (!current.allowsCategory(event.categoryId)) return;
         removedAttributeUids.remove(event.uid);
         pendingAncsEvents.remove(event.uid);
         pendingAncsEvents.put(event.uid, event);
@@ -1934,9 +2080,13 @@ public final class PhoneConnectorController {
         AncsProtocol.Notification notification = accumulator.complete();
         if (notification == null) return;
         Config current = config;
+        AncsProtocol.Event pendingEvent = pendingAncsEvents.get(uid);
+        int categoryId = pendingEvent == null ? 0 : pendingEvent.categoryId;
         boolean appleMessage = isAppleMessagesApp(notification.appIdentifier);
         boolean allowed = current != null && (current.notificationsEnabled
-                || current.messagesEnabled && appleMessage);
+                || current.messagesEnabled && appleMessage)
+                && current.allowsNotification(
+                notification.appIdentifier, categoryId);
         boolean needsMessageTextFollowUp = allowed && !responseIncludedText
                 && current != null && !current.notificationsEnabled
                 && current.messagesEnabled && current.includeNotificationText
@@ -1952,8 +2102,7 @@ public final class PhoneConnectorController {
             dirtyAttributeUids.remove(uid);
             fullTextAttributeUids.remove(uid);
         } else if (!removedAttributeUids.contains(uid)) {
-            AncsProtocol.Event event = pendingAncsEvents.remove(uid);
-            int categoryId = event == null ? 0 : event.categoryId;
+            pendingAncsEvents.remove(uid);
             NotificationRecord record = new NotificationRecord(
                     notification, categoryId, System.currentTimeMillis());
             notificationCache.remove(uid);
@@ -2123,13 +2272,34 @@ public final class PhoneConnectorController {
             basBatteryKnown = true;
             basBatteryLevel = raw;
             basBatteryUpdatedAt = SystemClock.elapsedRealtime();
+            observeBatteryTrend("bas", raw);
         } else if (BATTERY_POWER_STATE.equals(uuid)) {
             Boolean decoded = PhoneConnectorPolicy.decodeBatteryPowerState(raw);
             if (decoded != null) {
                 basChargingKnown = true;
                 basBatteryCharging = decoded;
                 basChargingUpdatedAt = SystemClock.elapsedRealtime();
+                basChargeState = decoded ? "charging" : "not_charging";
             }
+        } else if (BATTERY_LEVEL_STATUS.equals(uuid)) {
+            PhoneConnectorPolicy.BatteryLevelStatus decoded =
+                    PhoneConnectorPolicy.decodeBatteryLevelStatus(payload);
+            if (decoded == null) return;
+            long now = SystemClock.elapsedRealtime();
+            if (decoded.level != null) {
+                basBatteryKnown = true;
+                basBatteryLevel = decoded.level;
+                basBatteryUpdatedAt = now;
+                observeBatteryTrend("bas", decoded.level);
+            }
+            if (decoded.charging != null) {
+                basChargingKnown = true;
+                basBatteryCharging = decoded.charging;
+                basChargingUpdatedAt = now;
+            }
+            basExternalPower = decoded.externalPower;
+            basChargeState = decoded.chargeState;
+            basChargeLevel = decoded.chargeLevel;
         }
         refreshBatteryValues();
         publishSnapshot(token);
@@ -2144,6 +2314,7 @@ public final class PhoneConnectorController {
                 hfpBatteryKnown = true;
                 hfpBatteryLevel = normalized;
                 hfpBatteryUpdatedAt = SystemClock.elapsedRealtime();
+                observeBatteryTrend("hfp", normalized);
             }
         }
         Integer rawSignal = intExtra(intent, EXTRA_HFP_NETWORK_SIGNAL,
@@ -2185,21 +2356,193 @@ public final class PhoneConnectorController {
             hfpBatteryCharging = charging;
             hfpChargingUpdatedAt = SystemClock.elapsedRealtime();
         }
+        Boolean voiceRecognition = booleanExtra(intent, EXTRA_HFP_VOICE_RECOGNITION,
+                "voice_recognition", "voiceRecognition");
+        if (voiceRecognition != null) voiceRecognitionActive = voiceRecognition;
+        Boolean inBandRing = booleanExtra(intent, EXTRA_HFP_IN_BAND_RING,
+                "in_band_ring", "inBandRing");
+        if (inBandRing != null) inBandRingSupported = inBandRing;
         refreshBatteryValues();
         publishSnapshot(token);
+    }
+
+    private void applyHfpAudioState(long token, int state, @Nullable Boolean wideband) {
+        if (state == HFP_AUDIO_CONNECTED) {
+            callAudioConnected = true;
+            callAudioState = "connected";
+            callAudioWideband = wideband;
+        } else if (state == HFP_AUDIO_CONNECTING) {
+            callAudioConnected = false;
+            callAudioState = "connecting";
+            callAudioWideband = null;
+        } else {
+            callAudioConnected = false;
+            callAudioState = "disconnected";
+            callAudioWideband = null;
+        }
+        publishSnapshot(token);
+    }
+
+    private void applyHfpCall(long token, @Nullable Object rawCall) {
+        if (updateHfpCall(rawCall)) {
+            rebuildHfpCallSummary();
+            publishSnapshot(token);
+        }
+    }
+
+    private boolean updateHfpCall(@Nullable Object rawCall) {
+        if (rawCall == null) return false;
+        Integer state = reflectedInt(rawCall, "getState");
+        if (state == null || state < 0 || state > 7) return false;
+        Object uuid = reflected(rawCall, "getUUID");
+        Integer id = reflectedInt(rawCall, "getId");
+        String key = uuid == null ? id == null ? "" : "id:" + id : "uuid:" + uuid;
+        if (key.isEmpty()) return false;
+        if (state == 7) {
+            calls.remove(key);
+            return true;
+        }
+        Boolean outgoing = reflectedBoolean(rawCall, "isOutgoing");
+        Boolean multiparty = reflectedBoolean(rawCall, "isMultiParty");
+        calls.put(key, new CallRecord(state,
+                Boolean.TRUE.equals(outgoing) ? "outgoing" : "incoming",
+                Boolean.TRUE.equals(multiparty)));
+        return true;
+    }
+
+    private void rebuildHfpCallSummary() {
+        if (calls.isEmpty()) {
+            callActive = false;
+            callState = "idle";
+            callDirection = "";
+            callMultiparty = false;
+            return;
+        }
+        CallRecord selected = null;
+        for (CallRecord candidate : calls.values()) {
+            if (selected == null
+                    || callStatePriority(candidate.state) < callStatePriority(selected.state)) {
+                selected = candidate;
+            }
+        }
+        callActive = true;
+        callState = selected == null ? "" : callStateCode(selected.state);
+        callDirection = selected == null ? "" : selected.direction;
+        boolean multiparty = false;
+        for (CallRecord item : calls.values()) multiparty |= item.multiparty;
+        callMultiparty = multiparty;
+    }
+
+    private void clearHfpCallData() {
+        calls.clear();
+        callActive = null;
+        callState = "";
+        callDirection = "";
+        callMultiparty = null;
+        callAudioConnected = null;
+        callAudioState = "";
+        callAudioWideband = null;
+    }
+
+    @NonNull
+    private static String callStateCode(int state) {
+        switch (state) {
+            case 0: return "active";
+            case 1: return "held";
+            case 2: return "dialing";
+            case 3: return "alerting";
+            case 4: return "incoming";
+            case 5: return "waiting";
+            case 6: return "held_by_response";
+            default: return "";
+        }
+    }
+
+    private static int callStatePriority(int state) {
+        switch (state) {
+            case 4: return 0;
+            case 5: return 1;
+            case 2: return 2;
+            case 3: return 3;
+            case 0: return 4;
+            case 1:
+            case 6: return 5;
+            default: return 6;
+        }
     }
 
     private void refreshBatteryValues() {
         if (basBatteryKnown && basBatteryUpdatedAt >= hfpBatteryUpdatedAt
                 && basBatteryUpdatedAt >= genericBatteryUpdatedAt) {
             batteryLevel = basBatteryLevel;
+            batteryLevelSource = "ble_bas";
         } else if (hfpBatteryKnown && hfpBatteryUpdatedAt >= genericBatteryUpdatedAt) {
             batteryLevel = hfpBatteryLevel;
+            batteryLevelSource = "hfp_ecarx";
         } else {
             batteryLevel = genericBatteryKnown ? genericBatteryLevel : null;
+            batteryLevelSource = genericBatteryKnown ? "android_broadcast" : "";
         }
-        batteryCharging = basChargingKnown && basChargingUpdatedAt >= hfpChargingUpdatedAt
-                ? basBatteryCharging : hfpChargingKnown ? hfpBatteryCharging : null;
+        if (basChargingKnown && basChargingUpdatedAt >= hfpChargingUpdatedAt
+                && basChargingUpdatedAt >= metadataChargingUpdatedAt) {
+            batteryCharging = basBatteryCharging;
+            batteryChargingEstimated = false;
+            batteryChargingSource = "ble_bas";
+            batteryExternalPower = basExternalPower;
+            batteryChargeState = basChargeState;
+            batteryChargeLevel = basChargeLevel;
+        } else if (metadataBatteryCharging != null
+                && metadataChargingUpdatedAt >= hfpChargingUpdatedAt) {
+            batteryCharging = metadataBatteryCharging;
+            batteryChargingEstimated = false;
+            batteryChargingSource = "android_metadata";
+            batteryExternalPower = null;
+            batteryChargeLevel = "";
+            batteryChargeState = Boolean.TRUE.equals(metadataBatteryCharging)
+                    ? "charging" : "not_charging";
+        } else if (hfpChargingKnown) {
+            batteryCharging = hfpBatteryCharging;
+            batteryChargingEstimated = false;
+            batteryChargingSource = "hfp_vendor";
+            batteryExternalPower = null;
+            batteryChargeLevel = "";
+            batteryChargeState = Boolean.TRUE.equals(hfpBatteryCharging)
+                    ? "charging" : "not_charging";
+        } else if (batteryTrendCharging != null
+                && SystemClock.elapsedRealtime() - batteryTrendUpdatedAt
+                <= BATTERY_TREND_MAX_AGE_MS) {
+            batteryCharging = batteryTrendCharging;
+            batteryChargingEstimated = true;
+            batteryChargingSource = batteryTrendSource + "_trend";
+            batteryExternalPower = null;
+            batteryChargeLevel = "";
+            batteryChargeState = Boolean.TRUE.equals(batteryTrendCharging)
+                    ? "charging" : "discharging";
+        } else {
+            batteryCharging = null;
+            batteryChargingEstimated = null;
+            batteryChargingSource = "";
+            batteryExternalPower = basExternalPower;
+            batteryChargeState = basChargeState;
+            batteryChargeLevel = basChargeLevel;
+        }
+    }
+
+    private void observeBatteryTrend(@NonNull String source, int level) {
+        Integer previous = batteryTrendLevels.put(source, level);
+        Boolean inferred = PhoneConnectorPolicy.inferChargingFromLevelTrend(previous, level);
+        if (inferred == null) return;
+        batteryTrendCharging = inferred;
+        batteryTrendSource = source;
+        batteryTrendUpdatedAt = SystemClock.elapsedRealtime();
+    }
+
+    private void clearBatteryTrendSource(@NonNull String source) {
+        batteryTrendLevels.remove(source);
+        if (!source.equals(batteryTrendSource)) return;
+        batteryTrendCharging = null;
+        batteryTrendSource = "";
+        batteryTrendUpdatedAt = 0L;
     }
 
     private void clearBasData() {
@@ -2207,8 +2550,12 @@ public final class PhoneConnectorController {
         basChargingKnown = false;
         basBatteryLevel = null;
         basBatteryCharging = null;
+        basExternalPower = null;
+        basChargeState = "";
+        basChargeLevel = "";
         basBatteryUpdatedAt = 0L;
         basChargingUpdatedAt = 0L;
+        clearBatteryTrendSource("bas");
         refreshBatteryValues();
     }
 
@@ -2219,11 +2566,16 @@ public final class PhoneConnectorController {
         hfpBatteryCharging = null;
         hfpBatteryUpdatedAt = 0L;
         hfpChargingUpdatedAt = 0L;
+        clearBatteryTrendSource("hfp");
+        clearBatteryTrendSource("ecarx");
         networkAvailable = null;
         networkSignal = null;
         networkRoaming = null;
         networkOperator = "";
         networkType = "";
+        voiceRecognitionActive = null;
+        inBandRingSupported = null;
+        clearHfpCallData();
         refreshBatteryValues();
     }
 
@@ -2231,7 +2583,27 @@ public final class PhoneConnectorController {
         genericBatteryKnown = false;
         genericBatteryLevel = null;
         genericBatteryUpdatedAt = 0L;
+        metadataBatteryCharging = null;
+        metadataChargingUpdatedAt = 0L;
+        clearBatteryTrendSource("system");
         refreshBatteryValues();
+    }
+
+    /**
+     * Reads the framework's already-cached charging bit without opening another radio link.
+     * This is a best-effort complement to BAS/HFP: the SystemApi can be absent or permission
+     * gated on a particular Geely firmware, in which case explicit protocol sources and the
+     * clearly-labelled percentage trend continue to work.
+     */
+    private void readCachedBluetoothCharging(@Nullable BluetoothDevice device) {
+        if (device == null || !isSelected(device)
+                || basChargingKnown || hfpChargingKnown) return;
+        byte[] payload = reflectedBluetoothMetadata(device, METADATA_MAIN_CHARGING);
+        Boolean charging =
+                PhoneConnectorPolicy.decodeBluetoothChargingMetadata(payload);
+        if (charging == null) return;
+        metadataBatteryCharging = charging;
+        metadataChargingUpdatedAt = SystemClock.elapsedRealtime();
     }
 
     private void beginMapSession() {
@@ -2256,6 +2628,9 @@ public final class PhoneConnectorController {
     private void handleMapMessage(long token, @NonNull Intent intent) {
         Config current = config;
         if (!mapConnected || current == null || !current.messagesEnabled) return;
+        // MAP is the selected iPhone's Messages fallback. Apply the same app/category policy as
+        // ANCS so an excluded Messages app cannot reappear through the second transport.
+        if (!current.allowsNotification("com.apple.MobileSMS", 4)) return;
         String handle = bounded(intent.getStringExtra(EXTRA_MAP_MESSAGE_HANDLE), 256);
         String text = bounded(intent.getStringExtra(Intent.EXTRA_TEXT), 4_096);
         if (handle.isEmpty() || current.includeNotificationText && text.isEmpty()) {
@@ -2405,6 +2780,10 @@ public final class PhoneConnectorController {
 
     private void updateConnected(long token) {
         boolean next = aclConnected || hfpConnected || mapConnected || gattConnected;
+        if (next) {
+            readCachedBluetoothCharging(selectedDevice);
+            refreshBatteryValues();
+        }
         if (connected == next) {
             publishSnapshot(token);
             return;
@@ -2870,13 +3249,37 @@ public final class PhoneConnectorController {
         List<ConnectorValue> snapshot = new ArrayList<>();
         long now = System.currentTimeMillis();
         snapshot.add(value("connected", false, true, "boolean", "", now));
+        snapshot.add(value("device.name", null, false, "string", "", now));
+        snapshot.add(value("profiles.hfp", null, false, "boolean", "", now));
+        snapshot.add(value("profiles.map", null, false, "boolean", "", now));
+        snapshot.add(value("profiles.ble", null, false, "boolean", "", now));
+        snapshot.add(value("profiles.ancs", null, false, "boolean", "", now));
         snapshot.add(value("battery.level", null, false, "number", "%", now));
+        snapshot.add(value("battery.level_source", null, false, "string", "", now));
         snapshot.add(value("battery.charging", null, false, "boolean", "", now));
+        snapshot.add(value("battery.charging_estimated", null, false,
+                "boolean", "", now));
+        snapshot.add(value("battery.charging_source", null, false,
+                "string", "", now));
+        snapshot.add(value("battery.external_power", null, false,
+                "boolean", "", now));
+        snapshot.add(value("battery.charge_state", null, false, "string", "", now));
+        snapshot.add(value("battery.charge_level", null, false, "string", "", now));
         snapshot.add(value("network.available", null, false, "boolean", "", now));
         snapshot.add(value("network.operator", null, false, "string", "", now));
         snapshot.add(value("network.type", null, false, "string", "", now));
         snapshot.add(value("network.signal", null, false, "number", "%", now));
         snapshot.add(value("network.roaming", null, false, "boolean", "", now));
+        snapshot.add(value("call.active", null, false, "boolean", "", now));
+        snapshot.add(value("call.state", null, false, "string", "", now));
+        snapshot.add(value("call.direction", null, false, "string", "", now));
+        snapshot.add(value("call.multiparty", null, false, "boolean", "", now));
+        snapshot.add(value("call.audio", null, false, "boolean", "", now));
+        snapshot.add(value("call.audio_state", null, false, "string", "", now));
+        snapshot.add(value("call.audio_wideband", null, false, "boolean", "", now));
+        snapshot.add(value("voice_assistant.active", null, false,
+                "boolean", "", now));
+        snapshot.add(value("ringtone.in_band", null, false, "boolean", "", now));
         snapshot.add(value("notifications.count", 0, false, "number", "", now));
         snapshot.add(value("notifications.latest", null, false, "object", "", now));
         snapshot.add(value("notifications.items", Collections.emptyList(), false,
@@ -2898,10 +3301,32 @@ public final class PhoneConnectorController {
         long now = System.currentTimeMillis();
         List<ConnectorValue> snapshot = new ArrayList<>();
         snapshot.add(value("connected", connected, active, "boolean", "", now));
+        snapshot.add(value("device.name", selectedName.isEmpty() ? null : selectedName,
+                !selectedName.isEmpty(), "string", "", now));
+        snapshot.add(value("profiles.hfp", hfpConnected, active, "boolean", "", now));
+        snapshot.add(value("profiles.map", mapConnected, active, "boolean", "", now));
+        snapshot.add(value("profiles.ble", gattConnected, active, "boolean", "", now));
+        snapshot.add(value("profiles.ancs", ancsReady, active, "boolean", "", now));
         snapshot.add(value("battery.level", batteryLevel,
                 connected && batteryLevel != null, "number", "%", now));
+        snapshot.add(value("battery.level_source",
+                batteryLevelSource.isEmpty() ? null : batteryLevelSource,
+                connected && !batteryLevelSource.isEmpty(), "string", "", now));
         snapshot.add(value("battery.charging", batteryCharging,
                 connected && batteryCharging != null, "boolean", "", now));
+        snapshot.add(value("battery.charging_estimated", batteryChargingEstimated,
+                connected && batteryChargingEstimated != null, "boolean", "", now));
+        snapshot.add(value("battery.charging_source",
+                batteryChargingSource.isEmpty() ? null : batteryChargingSource,
+                connected && !batteryChargingSource.isEmpty(), "string", "", now));
+        snapshot.add(value("battery.external_power", batteryExternalPower,
+                connected && batteryExternalPower != null, "boolean", "", now));
+        snapshot.add(value("battery.charge_state",
+                batteryChargeState.isEmpty() ? null : batteryChargeState,
+                connected && !batteryChargeState.isEmpty(), "string", "", now));
+        snapshot.add(value("battery.charge_level",
+                batteryChargeLevel.isEmpty() ? null : batteryChargeLevel,
+                connected && !batteryChargeLevel.isEmpty(), "string", "", now));
         snapshot.add(value("network.available", networkAvailable,
                 connected && networkAvailable != null, "boolean", "", now));
         snapshot.add(value("network.operator",
@@ -2913,6 +3338,28 @@ public final class PhoneConnectorController {
                 connected && networkSignal != null, "number", "%", now));
         snapshot.add(value("network.roaming", networkRoaming,
                 connected && networkRoaming != null, "boolean", "", now));
+        snapshot.add(value("call.active", callActive,
+                hfpConnected && callActive != null, "boolean", "", now));
+        snapshot.add(value("call.state", callState.isEmpty() ? null : callState,
+                hfpConnected && !callState.isEmpty(), "string", "", now));
+        snapshot.add(value("call.direction",
+                callDirection.isEmpty() ? null : callDirection,
+                hfpConnected && !callDirection.isEmpty(), "string", "", now));
+        snapshot.add(value("call.multiparty", callMultiparty,
+                hfpConnected && callMultiparty != null, "boolean", "", now));
+        snapshot.add(value("call.audio", callAudioConnected,
+                hfpConnected && callAudioConnected != null, "boolean", "", now));
+        snapshot.add(value("call.audio_state",
+                callAudioState.isEmpty() ? null : callAudioState,
+                hfpConnected && !callAudioState.isEmpty(), "string", "", now));
+        snapshot.add(value("call.audio_wideband", callAudioWideband,
+                hfpConnected && callAudioWideband != null, "boolean", "", now));
+        snapshot.add(value("voice_assistant.active", voiceRecognitionActive,
+                hfpConnected && voiceRecognitionActive != null,
+                "boolean", "", now));
+        snapshot.add(value("ringtone.in_band", inBandRingSupported,
+                hfpConnected && inBandRingSupported != null,
+                "boolean", "", now));
 
         boolean notificationsAvailable = connected && ancsReady
                 && config != null && config.notificationsEnabled;
@@ -3143,6 +3590,53 @@ public final class PhoneConnectorController {
         return null;
     }
 
+    @Nullable
+    private static Object rawExtra(@NonNull Intent intent, @NonNull String key) {
+        try {
+            Bundle extras = intent.getExtras();
+            return extras == null ? null : extras.get(key);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private static Object reflected(@NonNull Object target, @NonNull String methodName) {
+        try {
+            Method method = target.getClass().getMethod(methodName);
+            method.setAccessible(true);
+            return method.invoke(target);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private static Integer reflectedInt(@NonNull Object target, @NonNull String methodName) {
+        Object raw = reflected(target, methodName);
+        return raw instanceof Number ? ((Number) raw).intValue() : null;
+    }
+
+    @Nullable
+    private static Boolean reflectedBoolean(@NonNull Object target,
+                                               @NonNull String methodName) {
+        Object raw = reflected(target, methodName);
+        return raw instanceof Boolean ? (Boolean) raw : null;
+    }
+
+    @Nullable
+    private static byte[] reflectedBluetoothMetadata(
+            @NonNull BluetoothDevice device, int key) {
+        try {
+            Method method = device.getClass().getMethod("getMetadata", int.class);
+            method.setAccessible(true);
+            Object raw = method.invoke(device, key);
+            return raw instanceof byte[] ? ((byte[]) raw).clone() : null;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     private static int ancsNotificationId(long uid) {
         return 0x51000000 ^ (int) (uid ^ uid >>> 32);
     }
@@ -3269,8 +3763,10 @@ public final class PhoneConnectorController {
         ANCS_NOTIFICATION,
         BATTERY_LEVEL_READ,
         BATTERY_POWER_READ,
+        BATTERY_LEVEL_STATUS_READ,
         BATTERY_LEVEL_SUBSCRIPTION,
         BATTERY_POWER_SUBSCRIPTION,
+        BATTERY_LEVEL_STATUS_SUBSCRIPTION,
         CONTROL
     }
 
@@ -3364,20 +3860,55 @@ public final class PhoneConnectorController {
         }
     }
 
+    private static final class CallRecord {
+        final int state;
+        @NonNull final String direction;
+        final boolean multiparty;
+
+        CallRecord(int state, @NonNull String direction, boolean multiparty) {
+            this.state = state;
+            this.direction = direction;
+            this.multiparty = multiparty;
+        }
+    }
+
+    private static final class HfpInitialState {
+        @Nullable final Bundle agEvents;
+        @Nullable final List<?> currentCalls;
+        @Nullable final Integer audioState;
+
+        HfpInitialState(@Nullable Bundle agEvents, @Nullable List<?> currentCalls,
+                        @Nullable Integer audioState) {
+            this.agEvents = agEvents;
+            this.currentCalls = currentCalls;
+            this.audioState = audioState;
+        }
+    }
+
     private static final class Config {
         final boolean enabled;
         @NonNull final String deviceAddress;
         final boolean notificationsEnabled;
         final boolean messagesEnabled;
         final boolean includeNotificationText;
+        @NonNull final Set<Integer> notificationCategoryIds;
+        final int notificationAppFilterMode;
+        @NonNull final Set<String> notificationAppFilterKeys;
 
         Config(boolean enabled, @NonNull String deviceAddress, boolean notificationsEnabled,
-               boolean messagesEnabled, boolean includeNotificationText) {
+               boolean messagesEnabled, boolean includeNotificationText,
+               @NonNull Set<Integer> notificationCategoryIds,
+               int notificationAppFilterMode,
+               @NonNull Set<String> notificationAppFilterKeys) {
             this.enabled = enabled;
             this.deviceAddress = deviceAddress;
             this.notificationsEnabled = notificationsEnabled;
             this.messagesEnabled = messagesEnabled;
             this.includeNotificationText = includeNotificationText;
+            this.notificationCategoryIds = notificationCategoryIds;
+            this.notificationAppFilterMode =
+                    PhoneNotificationFilter.normalizeMode(notificationAppFilterMode);
+            this.notificationAppFilterKeys = notificationAppFilterKeys;
         }
 
         @NonNull
@@ -3386,17 +3917,36 @@ public final class PhoneConnectorController {
                     bounded(prefs.phoneDeviceAddress.get(), 64),
                     prefs.phoneNotificationsEnabled.get(),
                     prefs.phoneMessagesEnabled.get(),
-                    prefs.phoneIncludeNotificationText.get());
+                    prefs.phoneIncludeNotificationText.get(),
+                    PhoneNotificationFilter.parseCategoryIds(
+                            prefs.phoneNotificationCategoryIds.get()),
+                    prefs.phoneNotificationAppFilterMode.get(),
+                    PhoneNotificationFilter.parseAppKeys(
+                            prefs.phoneNotificationAppFilterKeys.get()));
         }
 
         @NonNull
         String signature() {
             return enabled + "|" + deviceAddress + "|" + notificationsEnabled + "|"
-                    + messagesEnabled + "|" + includeNotificationText;
+                    + messagesEnabled + "|" + includeNotificationText + "|"
+                    + PhoneNotificationFilter.serializeCategoryIds(
+                    notificationCategoryIds) + "|" + notificationAppFilterMode + "|"
+                    + PhoneNotificationFilter.serializeAppKeys(notificationAppFilterKeys);
         }
 
         boolean ancsNeeded() {
             return notificationsEnabled || messagesEnabled;
+        }
+
+        boolean allowsCategory(int categoryId) {
+            return PhoneNotificationFilter.allowsCategory(
+                    notificationCategoryIds, categoryId);
+        }
+
+        boolean allowsNotification(@Nullable String appIdentifier, int categoryId) {
+            return PhoneNotificationFilter.allows(notificationAppFilterMode,
+                    notificationAppFilterKeys, notificationCategoryIds,
+                    PhoneAppCatalog.filterKey(appIdentifier), categoryId);
         }
     }
 }
