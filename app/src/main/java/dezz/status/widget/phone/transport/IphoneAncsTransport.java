@@ -502,7 +502,11 @@ public final class IphoneAncsTransport {
 
     /**
      * Daily path after a successful bootstrap. It addresses the peer saved after ANCS READY and
-     * starts Android's public background GATT connection without scanning for the Helper service.
+     * opens one bounded direct GATT connection without scanning for the Helper service.
+     *
+     * <p>This deliberately mirrors the stable HWGPS/GPSTether lifecycle: never leave an
+     * autoConnect registration behind after a clean disconnect. The owning controller closes
+     * this transport and creates the next single GATT instance through its bounded backoff.</p>
      */
     public boolean connectSavedIphone(String address) {
         if (!ensureAdapter()) return false;
@@ -517,7 +521,7 @@ public final class IphoneAncsTransport {
         if (iphonePeripheralMode && !helperBootstrapMode && gatt != null
                 && activeClientTarget != null && sameDevice(activeClientTarget, device)
                 && (clientConnectInFlight || gattClientConnected)) {
-            log("Saved-peer autoConnect уже зарегистрирован для "
+            log("Saved-peer GATT уже активен для "
                     + safeAddress(device) + "; дубликат connectGatt не создаю"
                     + " connected=" + gattClientConnected
                     + " inFlight=" + clientConnectInFlight);
@@ -539,8 +543,9 @@ public final class IphoneAncsTransport {
             state("AUTO · SAVED PEER CONFLICT");
             return false;
         }
-        connectIphonePeripheral(device, true,
-                "saved verified peer; без scan и без Helper service");
+        connectIphonePeripheral(device, CONNECT_TIMEOUT_MS,
+                "GPS-STYLE · SAVED PEER CONNECTING",
+                "saved verified peer; direct connect без scan и Helper service");
         return gatt != null;
     }
 
@@ -623,57 +628,51 @@ public final class IphoneAncsTransport {
             log("Найденный iPhone не совпал с peer текущей test-session");
             return;
         }
-        connectIphonePeripheral(device, false,
+        connectIphonePeripheral(device, GPS_CONNECT_TIMEOUT_MS,
+                "ПОДКЛЮЧАЮ IPHONE · HELPER FALLBACK",
                 "Helper-filtered scan; Android создаёт bootstrap BLE link первым");
     }
 
-    private void connectIphonePeripheral(BluetoothDevice device, boolean autoConnect,
-                                         String reason) {
+    private void connectIphonePeripheral(BluetoothDevice device, long timeoutMs,
+                                         String connectingState, String reason) {
         clearAncsRuntime();
         clearIphonePeripheralRuntime(false);
         iphonePeripheralMode = true;
         iphoneConnectStarted = true;
         activeClientTarget = device;
-        activeClientAutoConnect = autoConnect;
+        activeClientAutoConnect = false;
         clientConnectInFlight = true;
-        state(autoConnect
-                ? "АВТО · SAVED PEER CONNECTING"
-                : "ПОДКЛЮЧАЮ IPHONE · HELPER FALLBACK");
+        state(connectingState);
         log("iPhone target: " + safeName(device) + " " + safeAddress(device)
                 + " type=" + typeLabel(safeType(device))
                 + " bond=" + bondLabel(safeBondState(device)));
-        log("connectGatt(autoConnect=" + autoConnect + ", TRANSPORT_LE) · " + reason);
+        log("connectGatt(autoConnect=false, TRANSPORT_LE) · " + reason);
 
         try {
-            gatt = device.connectGatt(context, autoConnect, gattCallback,
+            gatt = device.connectGatt(context, false, gattCallback,
                     BluetoothDevice.TRANSPORT_LE);
             if (gatt == null) {
                 clientConnectInFlight = false;
+                activeClientTarget = null;
                 state("GPS-STYLE · CONNECT RETURNED NULL");
                 log("connectGatt вернул null");
                 return;
             }
-            if (autoConnect) {
-                connectTimeout = null;
-                log("autoConnect=true зарегистрирован как долгоживущий background GATT; "
-                        + "локальный timeout не закрывает его, повторный вызов блокируется");
-                return;
-            }
             BluetoothGatt expected = gatt;
-            long timeoutMs = GPS_CONNECT_TIMEOUT_MS;
             connectTimeout = () -> {
                 if (gatt != expected || !clientConnectInFlight) return;
                 clientConnectInFlight = false;
                 state("GPS-STYLE · CONNECT TIMEOUT");
                 log("Нет callback подключения за " + timeoutMs
                         + " ms · target=" + safeAddress(expected.getDevice())
-                        + " autoConnect=" + autoConnect);
+                        + " autoConnect=false");
                 closeClientGatt(expected);
                 clearAncsRuntime();
             };
             main.postDelayed(connectTimeout, timeoutMs);
         } catch (RuntimeException failure) {
             clientConnectInFlight = false;
+            activeClientTarget = null;
             state("GPS-STYLE · CONNECT EXCEPTION");
             log("connectGatt exception: " + failure);
         }
@@ -2252,6 +2251,7 @@ public final class IphoneAncsTransport {
             gattClientConnected = false;
             clientConnectInFlight = false;
             activeClientTarget = null;
+            activeClientAutoConnect = false;
         }
         try {
             callbackGatt.close();
@@ -2706,19 +2706,13 @@ public final class IphoneAncsTransport {
             discoverServices(callbackGatt);
         } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
             cancelConnectTimeout();
-            gattClientConnected = false;
-            if (activeClientAutoConnect) {
-                clientConnectInFlight = true;
-                clearAncsRuntime();
-                state("AUTO · ЖДУ SAVED PEER");
-                log("STATE_DISCONNECTED status=0 на long-lived autoConnect; "
-                        + "BluetoothGatt оставлен зарегистрированным для фонового reconnect");
-                return;
-            }
             clientConnectInFlight = false;
-            state("GPS-STYLE · IPHONE DISCONNECTED");
+            gattClientConnected = false;
             closeClientGatt(callbackGatt);
             clearAncsRuntime();
+            state("GPS-STYLE · IPHONE DISCONNECTED");
+            log("STATE_DISCONNECTED: старый BluetoothGatt закрыт; "
+                    + "следующую единственную direct-попытку создаст controller backoff");
         }
     }
 

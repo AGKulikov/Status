@@ -104,15 +104,11 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(batteryOnly.contains("selectedDevice.connectGatt(context, autoConnect"));
         assertTrue(batteryOnly.contains("new SessionGattCallback(token)"));
         assertTrue(batteryOnly.contains("config == null || config.ancsNeeded()"));
-        assertTrue(source.contains(
-                "state.contains(\"AUTO · ЖДУ SAVED PEER\")"));
-        assertTrue(source.contains(
-                "gattConnected = false;\n"
-                        + "            clearBasData();\n"
-                        + "            resetAncsSession(token, \"waiting_for_phone\")"));
+        assertTrue(source.contains("state.contains(\"IPHONE DISCONNECTED\")"));
+        assertFalse(source.contains("state.contains(\"AUTO · ЖДУ SAVED PEER\")"));
     }
 
-    @Test public void savedPeerTransportOwnsTheLongLivedAncsGattClient()
+    @Test public void savedPeerTransportUsesOneBoundedGpsStyleDirectGatt()
             throws IOException {
         String source = controller();
         String transport = transport();
@@ -131,18 +127,22 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("final String address = selectedAddress"));
         assertTrue(source.contains("mainHandler.post(() -> startAncsTransportOnMain("));
         assertTrue(savedPeer.contains("adapter.getRemoteDevice(address.trim())"));
-        assertTrue(savedPeer.contains("connectIphonePeripheral(device, true,"));
+        assertTrue(savedPeer.contains(
+                "connectIphonePeripheral(device, CONNECT_TIMEOUT_MS,"));
+        assertTrue(savedPeer.contains("stopScan();"));
+        assertTrue(savedPeer.contains("stopAdvertising();"));
         assertTrue(clientConnect.contains(
-                "device.connectGatt(context, autoConnect, gattCallback,"));
+                "device.connectGatt(context, false, gattCallback,"));
         assertTrue(clientConnect.contains("BluetoothDevice.TRANSPORT_LE"));
-        assertTrue(clientConnect.contains("if (autoConnect) {"));
-        assertTrue(clientConnect.contains("connectTimeout = null"));
-        assertTrue(clientConnect.contains("return;"));
-        assertTrue(disconnect.contains("if (activeClientAutoConnect)"));
-        assertTrue(disconnect.contains("state(\"AUTO · ЖДУ SAVED PEER\")"));
-        assertTrue(disconnect.contains(
-                "BluetoothGatt оставлен зарегистрированным для фонового reconnect"));
-        assertTrue(source.contains("state.contains(\"AUTO · ЖДУ SAVED PEER\")"));
+        assertTrue(clientConnect.contains("activeClientAutoConnect = false"));
+        assertTrue(clientConnect.contains("main.postDelayed(connectTimeout, timeoutMs)"));
+        assertFalse(clientConnect.contains("autoConnect=true"));
+        assertTrue(disconnect.contains("closeClientGatt(callbackGatt)"));
+        assertTrue(disconnect.contains("state(\"GPS-STYLE · IPHONE DISCONNECTED\")"));
+        assertFalse(disconnect.contains("if (activeClientAutoConnect)"));
+        assertFalse(source.contains("state.contains(\"AUTO · ЖДУ SAVED PEER\")"));
+        assertTrue(source.contains("state.contains(\"IPHONE DISCONNECTED\")"));
+        assertTrue(source.contains("scheduleGattReconnect(token,"));
         assertTrue(source.contains("state.contains(\"AUTO · SERVICE CHANGED · RECONNECT\")"));
         assertTrue(connectionCallback.contains("main.post(() ->"));
         assertFalse(connectionCallback.contains("postAtFrontOfQueue"));

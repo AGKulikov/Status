@@ -1129,14 +1129,6 @@ public final class PhoneConnectorController {
             updateConnected(token);
             return;
         }
-        if (state.contains("AUTO · ЖДУ SAVED PEER")) {
-            cancelStableAncsReadyReset();
-            gattConnected = false;
-            clearBasData();
-            resetAncsSession(token, "waiting_for_phone");
-            updateConnected(token);
-            return;
-        }
         if (state.contains("AUTO · SERVICE CHANGED · RECONNECT")) {
             scheduleGattReconnect(token, "ANCS Service Changed", "services_changed");
             return;
