@@ -107,6 +107,15 @@ public interface CarIntegration {
         void onResult(boolean success, @Nullable String message);
     }
 
+    /** Independently switchable OEM HUD content groups exposed by the ECARX Settings API. */
+    enum StockHudDisplayCategory {
+        DRIVE_ENVIRONMENT,
+        SAFETY,
+        MEDIA,
+        NAVIGATION,
+        PHONE
+    }
+
     /** Whether this vehicle can feed the given brick right now. */
     boolean isBrickSupported(@NonNull BrickType type);
 
@@ -185,6 +194,31 @@ public interface CarIntegration {
     default void setStockHudCarHidden(boolean hidden,
                                       @NonNull ControlCommandListener listener) {
         listener.onResult(false, "Управление штатной графикой HUD недоступно в этой сборке");
+    }
+
+    /**
+     * Select the OEM ProfileTransfer HUD layout (0 Guide, 1 Drive, 2 AR, 3 Simple).
+     *
+     * <p>When {@code autoRepeat} is enabled, implementations may conservatively reapply only this
+     * selected CB33278 value after boot, profile/HUD transitions and the observed 20 km/h reset.
+     * This contract never authorises a visual mask, a save pulse, or any undocumented value.</p>
+     */
+    default void setStockHudProfileMode(int mode, boolean autoRepeat,
+                                        @NonNull ControlCommandListener listener) {
+        listener.onResult(false, "Режимы штатного HUD недоступны в этой сборке");
+    }
+
+    /** Stop the optional CB33278 fallback immediately without changing the currently shown mode. */
+    default void stopStockHudProfileModeAutoRepeat(
+            @NonNull ControlCommandListener listener) {
+        listener.onResult(false, "Автоповтор штатного HUD недоступен в этой сборке");
+    }
+
+    /** Toggle one OEM HUD content group through generic {@code ICarFunction.setFunctionValue}. */
+    default void setStockHudDisplayCategory(
+            @NonNull StockHudDisplayCategory category, boolean enabled,
+            @NonNull ControlCommandListener listener) {
+        listener.onResult(false, "Категории штатного HUD недоступны в этой сборке");
     }
 
     /** Release all subscriptions and vendor resources. The instance is not reusable afterwards. */

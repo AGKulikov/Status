@@ -628,6 +628,21 @@ public class Preferences {
     /** Restore the HUD presentation after boot/package replacement while the master switch is on. */
     public final Bool hudPanelAutostart = new Bool(this, "hudPanelAutostart", true);
     public final Str hudPanelConfigJson = new Str(this, "hudPanelConfigJson", "");
+    /** Last explicitly selected OEM ProfileTransfer mode; -1 means do not change it. */
+    public final Int hudStockProfileMode = new Int(this, "hudStockProfileMode", -1);
+    /**
+     * Opt-in conservative fallback. It repeats only the selected mode 0..3 through CB33278 and
+     * never sends a visual mask or the generic profile-save signal.
+     */
+    public final Bool hudStockProfileModeAutoRepeat =
+            new Bool(this, "hudStockProfileModeAutoRepeat", false);
+    /** Desired values for the five independent ECARX Settings HUD content categories. */
+    public final Bool hudStockDriveEnvironment =
+            new Bool(this, "hudStockDriveEnvironment", true);
+    public final Bool hudStockSafety = new Bool(this, "hudStockSafety", true);
+    public final Bool hudStockMedia = new Bool(this, "hudStockMedia", true);
+    public final Bool hudStockNavigation = new Bool(this, "hudStockNavigation", true);
+    public final Bool hudStockPhone = new Bool(this, "hudStockPhone", true);
     /** Additive cell positions for action/smart-home icons; shortcut actions stay untouched. */
     public final Str launcherActionsGridJson = new Str(this, "launcherActionsGridJson", "");
     public final Int launcherAppsColumns = new Int(this, "launcherAppsColumns", 3);

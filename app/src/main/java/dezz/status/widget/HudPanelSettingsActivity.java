@@ -43,6 +43,7 @@ import dezz.status.widget.hud.HudPanelStore;
 import dezz.status.widget.hud.HudPresentationService;
 import dezz.status.widget.hud.HudRuntimeData;
 import dezz.status.widget.hud.HudViewportPolicy;
+import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.SourceBinding;
@@ -532,6 +533,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         form.addView(free);
         form.addView(maskStockHud);
         form.addView(maskHint);
+        Button stockHud = button("Штатные режимы и разделы HUD");
+        stockHud.setOnClickListener(view -> editStockHudControls());
+        form.addView(stockHud, marginTop(10));
         form.addView(snow);
         form.addView(sync);
         form.addView(autostart);
@@ -582,6 +586,143 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                     dialog.dismiss();
                 }));
         dialog.show();
+    }
+
+    private void editStockHudControls() {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout form = column();
+        form.setPadding(dp(18), dp(8), dp(18), dp(22));
+        scroll.addView(form);
+
+        form.addView(section("ProfileTransfer · CB33278"));
+        form.addView(text(
+                "Четыре штатных режима, найденные в ECARX: 0 Guide, 1 Drive, 2 AR, "
+                        + "3 Simple. Команда меняет только выбранный режим и не передаёт "
+                        + "нулевую HUD-маску.",
+                12, 0xFFB8C0CC), marginTop(5));
+        String[] modeChoices = {
+                "Не менять",
+                "0 · Guide",
+                "1 · Drive",
+                "2 · AR",
+                "3 · Simple"
+        };
+        Spinner mode = spinner(modeChoices, "Не менять");
+        int savedMode = preferences.hudStockProfileMode.get();
+        mode.setSelection(savedMode >= 0 && savedMode <= 3 ? savedMode + 1 : 0);
+        form.addView(mode, marginTop(7));
+        Switch autoRepeat = switchView(
+                "Резервный автоповтор выбранного режима",
+                preferences.hudStockProfileModeAutoRepeat.get());
+        form.addView(autoRepeat, marginTop(6));
+        form.addView(text(
+                "Автоповтор срабатывает после загрузки, смены профиля, переходов HUD/ADAS "
+                        + "и пересечения 20 км/ч. Не чаще 5 записей в минуту, с circuit breaker. "
+                        + "Передаётся только CB33278 со значением 0…3.",
+                12, 0xFFFFCC66), marginTop(4));
+
+        form.addView(section("Разделы штатного HUD"), marginTop(14));
+        form.addView(text(
+                "Отдельный штатный путь ICarFunction.setFunctionValue. На прошивках, где "
+                        + "раздел недоступен, приложение покажет фактический отказ ECARX.",
+                12, 0xFFB8C0CC), marginTop(4));
+        boolean originalDrive = preferences.hudStockDriveEnvironment.get();
+        boolean originalSafety = preferences.hudStockSafety.get();
+        boolean originalMedia = preferences.hudStockMedia.get();
+        boolean originalNavigation = preferences.hudStockNavigation.get();
+        boolean originalPhone = preferences.hudStockPhone.get();
+        Switch drive = switchView("Drive Environment · машинка и окружение", originalDrive);
+        Switch safety = switchView("Safety · скорость и безопасность", originalSafety);
+        Switch media = switchView("Media · музыка", originalMedia);
+        Switch navigation = switchView("Navigation · навигация", originalNavigation);
+        Switch phone = switchView("Phone · телефон", originalPhone);
+        final boolean[] forceAllCategories = {false};
+        form.addView(drive, marginTop(5));
+        form.addView(safety);
+        form.addView(media);
+        form.addView(navigation);
+        form.addView(phone);
+        Button restore = button("Включить все пять разделов");
+        restore.setOnClickListener(view -> {
+            forceAllCategories[0] = true;
+            drive.setChecked(true);
+            safety.setChecked(true);
+            media.setChecked(true);
+            navigation.setChecked(true);
+            phone.setChecked(true);
+        });
+        form.addView(restore, marginTop(8));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Штатный HUD ECARX")
+                .setView(scroll)
+                .setPositiveButton("Применить", null)
+                .setNegativeButton("Отмена", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    int selectedMode = mode.getSelectedItemPosition() - 1;
+                    boolean repeat = selectedMode >= 0 && autoRepeat.isChecked();
+                    preferences.hudStockProfileMode.set(selectedMode);
+                    preferences.hudStockProfileModeAutoRepeat.set(repeat);
+                    CarIntegration integration = CarIntegrations.get(this);
+                    if (selectedMode >= 0) {
+                        integration.setStockHudProfileMode(selectedMode, repeat,
+                                (success, message) -> showStockHudResult(
+                                        "Режим " + selectedMode, success, message));
+                    } else {
+                        integration.stopStockHudProfileModeAutoRepeat(
+                                (success, message) -> {
+                                    if (!success) showStockHudResult(
+                                            "Автоповтор", false, message);
+                                });
+                    }
+
+                    applyStockHudCategoryIfChanged(integration,
+                            CarIntegration.StockHudDisplayCategory.DRIVE_ENVIRONMENT,
+                            originalDrive, drive.isChecked(), forceAllCategories[0],
+                            preferences.hudStockDriveEnvironment);
+                    applyStockHudCategoryIfChanged(integration,
+                            CarIntegration.StockHudDisplayCategory.SAFETY,
+                            originalSafety, safety.isChecked(), forceAllCategories[0],
+                            preferences.hudStockSafety);
+                    applyStockHudCategoryIfChanged(integration,
+                            CarIntegration.StockHudDisplayCategory.MEDIA,
+                            originalMedia, media.isChecked(), forceAllCategories[0],
+                            preferences.hudStockMedia);
+                    applyStockHudCategoryIfChanged(integration,
+                            CarIntegration.StockHudDisplayCategory.NAVIGATION,
+                            originalNavigation, navigation.isChecked(), forceAllCategories[0],
+                            preferences.hudStockNavigation);
+                    applyStockHudCategoryIfChanged(integration,
+                            CarIntegration.StockHudDisplayCategory.PHONE,
+                            originalPhone, phone.isChecked(), forceAllCategories[0],
+                            preferences.hudStockPhone);
+                    dialog.dismiss();
+                }));
+        dialog.show();
+    }
+
+    private void applyStockHudCategoryIfChanged(
+            @NonNull CarIntegration integration,
+            @NonNull CarIntegration.StockHudDisplayCategory category,
+            boolean original, boolean desired, boolean force,
+            @NonNull Preferences.Bool preference) {
+        preference.set(desired);
+        if (!force && original == desired) return;
+        integration.setStockHudDisplayCategory(category, desired, (success, message) -> {
+            if (!success) showStockHudResult(category.name(), false, message);
+        });
+    }
+
+    private void showStockHudResult(String operation, boolean success,
+                                    @Nullable String message) {
+        String detail = message == null || message.trim().isEmpty()
+                ? (success ? "команда принята" : "ECARX не подтвердил команду")
+                : message.trim();
+        Toast.makeText(getApplicationContext(),
+                operation + ": " + detail, success ? Toast.LENGTH_SHORT : Toast.LENGTH_LONG)
+                .show();
     }
 
     private void applyStockHudPreference(boolean hidden) {

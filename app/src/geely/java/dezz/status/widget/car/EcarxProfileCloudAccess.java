@@ -10,9 +10,12 @@ import androidx.annotation.Nullable;
 import com.ecarx.xui.adaptapi.ECarXCarProxy;
 
 import ecarx.car.ECarXCar;
+import ecarx.car.hardware.annotation.ApiResult;
 import ecarx.car.hardware.signal.CarSignalManager;
 import ecarx.car.hardware.vehicle.ECarXCarProfileManager;
+import ecarx.car.hardware.vehicle.ECarXCarProfiletransferManager;
 import ecarx.car.hardware.vehicle.ECarXCarSetManager;
+import ecarx.car.hardware.vehicle.PATypes;
 
 /**
  * Minimal raw access to the complete ECARX ProfileCloudData protobuf.
@@ -30,6 +33,7 @@ final class EcarxProfileCloudAccess implements ECarXCarProxy.ECarXCarProxyMethod
 
     @Nullable private ECarXCarProxy proxy;
     @Nullable private volatile ECarXCarProfileManager profileManager;
+    @Nullable private volatile ECarXCarProfiletransferManager profileTransferManager;
     private volatile boolean closed;
 
     EcarxProfileCloudAccess(@NonNull Context context) {
@@ -69,17 +73,64 @@ final class EcarxProfileCloudAccess implements ECarXCarProxy.ECarXCarProxyMethod
         }
     }
 
+    /**
+     * Send one documented ProfileTransfer HUD mode. No visual mask or save command is coupled to
+     * this call. Values outside the vendor SDK's explicit 0..3 range are rejected locally.
+     */
+    @NonNull
+    HudModeResult writeHudMode(int mode) {
+        if (mode < 0 || mode > 3) {
+            return new HudModeResult(false, null, "режим должен быть 0…3");
+        }
+        ECarXCarProfiletransferManager manager = profileTransferManager;
+        if (closed || manager == null) {
+            return new HudModeResult(false, null,
+                    "ProfileTransfer ещё не подключён к ecarxcar_service");
+        }
+        try {
+            ApiResult result = manager.CB_HudDispModSetgReq(mode);
+            Integer readback = readHudMode(manager);
+            boolean accepted = result == ApiResult.SUCCEED;
+            return new HudModeResult(accepted, readback,
+                    "CB33278=" + result + ", PA33937="
+                            + (readback == null ? "недоступно" : readback));
+        } catch (Throwable failure) {
+            Log.w(TAG, "Could not write HUD ProfileTransfer mode", failure);
+            return new HudModeResult(false, null,
+                    failure.getClass().getSimpleName()
+                            + (failure.getMessage() == null
+                            ? "" : ": " + failure.getMessage()));
+        }
+    }
+
+    @Nullable
+    private static Integer readHudMode(@NonNull ECarXCarProfiletransferManager manager) {
+        try {
+            PATypes.PA_HudDispModSetgReq value = manager.getPA_HudDispModSetgReq();
+            if (value == null || value.getData() < 0) return null;
+            return value.getData();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     @Override
     public void onECarXCarServiceConnected(ECarXCar root,
                                             CarSignalManager ignoredSignals) {
         if (closed || root == null) return;
         try {
             Object manager = root.getCarManager(ECarXCar.PA_SERVICE);
-            profileManager = manager instanceof ECarXCarSetManager
-                    ? ((ECarXCarSetManager) manager).getECarXCarProfileManager()
-                    : null;
+            if (manager instanceof ECarXCarSetManager) {
+                ECarXCarSetManager setManager = (ECarXCarSetManager) manager;
+                profileManager = setManager.getECarXCarProfileManager();
+                profileTransferManager = setManager.getECarXCarProfiletransferManager();
+            } else {
+                profileManager = null;
+                profileTransferManager = null;
+            }
         } catch (Throwable failure) {
             profileManager = null;
+            profileTransferManager = null;
             Log.w(TAG, "PA profile manager is unavailable", failure);
         }
     }
@@ -87,11 +138,13 @@ final class EcarxProfileCloudAccess implements ECarXCarProxy.ECarXCarProxyMethod
     @Override
     public void onECarXCarServiceDeath() {
         profileManager = null;
+        profileTransferManager = null;
     }
 
     void close() {
         closed = true;
         profileManager = null;
+        profileTransferManager = null;
         ECarXCarProxy current = proxy;
         proxy = null;
         if (current != null) {
@@ -100,6 +153,19 @@ final class EcarxProfileCloudAccess implements ECarXCarProxy.ECarXCarProxyMethod
             } catch (Throwable failure) {
                 Log.d(TAG, "Raw profile proxy cleanup failed", failure);
             }
+        }
+    }
+
+    static final class HudModeResult {
+        final boolean accepted;
+        @Nullable final Integer readback;
+        @NonNull final String detail;
+
+        HudModeResult(boolean accepted, @Nullable Integer readback,
+                      @NonNull String detail) {
+            this.accepted = accepted;
+            this.readback = readback;
+            this.detail = detail;
         }
     }
 }

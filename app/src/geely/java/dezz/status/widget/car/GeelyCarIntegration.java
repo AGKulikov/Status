@@ -210,6 +210,8 @@ final class GeelyCarIntegration implements CarIntegration {
     private long nextControlCommandGeneration;
     /** Cancels delayed profile/fallback work when a newer HUD AR preference replaces it. */
     private final AtomicLong hudArRequestGeneration = new AtomicLong();
+    /** Cancels readiness retries when another OEM ProfileTransfer mode is selected. */
+    private final AtomicLong hudModeRequestGeneration = new AtomicLong();
     private volatile boolean controlsShuttingDown;
     /** Confirmed routing facts are published across the catalog and control workers. */
     @Nullable private volatile ConfirmedFanMode lastConfirmedClimateAutoMode;
@@ -2992,6 +2994,159 @@ final class GeelyCarIntegration implements CarIntegration {
         }
     }
 
+    @Override
+    public void setStockHudProfileMode(int mode, boolean autoRepeat,
+                                       @NonNull ControlCommandListener listener) {
+        if (mode < 0 || mode > 3) {
+            postCommandResult(listener, false, "Режим штатного HUD должен быть 0…3");
+            return;
+        }
+        if (controlsShuttingDown) {
+            postCommandResult(listener, false, "ECARX уже остановлен");
+            return;
+        }
+        long generation = hudModeRequestGeneration.incrementAndGet();
+        try {
+            if (autoRepeat) {
+                HudModeFallbackService.enable(appContext, mode, "settings-mode-" + mode);
+            } else {
+                // Selecting a one-shot mode with the switch OFF must also stop an older fallback.
+                HudModeFallbackService.disable(appContext);
+            }
+        } catch (RuntimeException failure) {
+            postCommandResult(listener, false,
+                    "Не удалось изменить автоповтор: " + failure.getMessage());
+            return;
+        }
+        if (!executeControlTask(() -> attemptStockHudProfileMode(
+                mode, autoRepeat, generation, 0, listener))) {
+            postCommandResult(listener, false, "ECARX уже остановлен");
+        }
+    }
+
+    private void attemptStockHudProfileMode(int mode, boolean autoRepeat, long generation,
+                                            int attempt,
+                                            @NonNull ControlCommandListener listener) {
+        if (controlsShuttingDown || generation != hudModeRequestGeneration.get()) {
+            postCommandResult(listener, false, "Режим HUD заменён более новым");
+            return;
+        }
+        EcarxProfileCloudAccess.HudModeResult result = profileCloudAccess.writeHudMode(mode);
+        if (result.accepted) {
+            String repeat = autoRepeat
+                    ? "; резервный автоповтор включён"
+                    : "; автоповтор выключен";
+            postCommandResult(listener, true, result.detail + repeat);
+            return;
+        }
+        if (attempt + 1 < HUD_AR_PROFILE_READY_ATTEMPTS) {
+            mainHandler.postDelayed(() -> {
+                if (controlsShuttingDown || generation != hudModeRequestGeneration.get()) {
+                    postCommandResult(listener, false, "Режим HUD заменён более новым");
+                } else if (!executeControlTask(() -> attemptStockHudProfileMode(
+                        mode, autoRepeat, generation, attempt + 1, listener))) {
+                    postCommandResult(listener, false, "ECARX уже остановлен");
+                }
+            }, HUD_AR_PROFILE_READY_RETRY_MS);
+            return;
+        }
+        if (autoRepeat) {
+            // The independent service owns its own ECARX proxy and will keep waiting safely.
+            postCommandResult(listener, true,
+                    "Автоповтор режима " + mode
+                            + " включён; основной ECARX-канал ещё не готов");
+        } else {
+            postCommandResult(listener, false, result.detail);
+        }
+    }
+
+    @Override
+    public void stopStockHudProfileModeAutoRepeat(
+            @NonNull ControlCommandListener listener) {
+        hudModeRequestGeneration.incrementAndGet();
+        try {
+            HudModeFallbackService.disable(appContext);
+            postCommandResult(listener, true,
+                    "Автоповтор выключен; текущий режим HUD не изменён");
+        } catch (RuntimeException failure) {
+            postCommandResult(listener, false,
+                    "Не удалось выключить автоповтор: " + failure.getMessage());
+        }
+    }
+
+    @Override
+    public void setStockHudDisplayCategory(
+            @NonNull StockHudDisplayCategory category, boolean enabled,
+            @NonNull ControlCommandListener listener) {
+        if (controlsShuttingDown) {
+            postCommandResult(listener, false, "ECARX уже остановлен");
+            return;
+        }
+        if (!executeControlTask(() -> {
+            ICarFunction source = ensureCarFunctions();
+            if (source == null) {
+                postCommandResult(listener, false,
+                        "ICarFunction ещё не подключён к ecarxcar_service");
+                return;
+            }
+            int functionId = stockHudDisplayFunctionId(category);
+            int desired = enabled ? ICarFunction.COMMON_VALUE_ON
+                    : ICarFunction.COMMON_VALUE_OFF;
+            boolean accepted;
+            boolean zoned = true;
+            try {
+                accepted = source.setFunctionValue(functionId, NO_ZONE, desired);
+            } catch (Throwable zonedFailure) {
+                zoned = false;
+                try {
+                    accepted = source.setFunctionValue(functionId, desired);
+                } catch (Throwable unzonedFailure) {
+                    invalidateFunctionProxy(source);
+                    postCommandResult(listener, false,
+                            category + ": " + unzonedFailure.getClass().getSimpleName());
+                    return;
+                }
+            }
+            Integer confirmed = null;
+            try {
+                int value = zoned
+                        ? source.getFunctionValue(functionId, NO_ZONE)
+                        : source.getFunctionValue(functionId);
+                if (value == ICarFunction.COMMON_VALUE_ON
+                        || value == ICarFunction.COMMON_VALUE_OFF) {
+                    confirmed = value;
+                }
+            } catch (Throwable ignored) {
+                // Some firmware accepts the write but exposes no readable value for this group.
+            }
+            boolean success = confirmed == null ? accepted : confirmed == desired;
+            String detail = category + "=" + desired + ": accepted=" + accepted
+                    + ", readback=" + (confirmed == null ? "недоступно" : confirmed);
+            postCommandResult(listener, success, detail);
+        })) {
+            postCommandResult(listener, false, "ECARX уже остановлен");
+        }
+    }
+
+    private static int stockHudDisplayFunctionId(
+            @NonNull StockHudDisplayCategory category) {
+        switch (category) {
+            case DRIVE_ENVIRONMENT:
+                return IHUD.SETTING_FUNC_HUD_DISPLAY_DRIVE_ENVIRONMENT;
+            case SAFETY:
+                return IHUD.SETTING_FUNC_HUD_DISPLAY_SAFETY;
+            case MEDIA:
+                // The spelling MEIDA is part of the vendor SDK ABI.
+                return IHUD.SETTING_FUNC_HUD_DISPLAY_MEIDA;
+            case NAVIGATION:
+                return IHUD.SETTING_FUNC_HUD_DISPLAY_NAVI;
+            case PHONE:
+                return IHUD.SETTING_FUNC_HUD_DISPLAY_BTPHONE;
+            default:
+                throw new IllegalArgumentException("Неизвестная категория HUD " + category);
+        }
+    }
+
     private void attemptHudArProfile(@NonNull HudArRequest request, int readinessAttempt) {
         if (!isCurrentHudArRequest(request)) {
             completeHudArRequest(request, false, "Настройка HUD заменена более новой");
@@ -3698,6 +3853,7 @@ final class GeelyCarIntegration implements CarIntegration {
     public void shutdown() {
         controlsShuttingDown = true;
         hudArRequestGeneration.incrementAndGet();
+        hudModeRequestGeneration.incrementAndGet();
         synchronized (controlCommandSubmissionLock) {
             latestControlCommandSubmissions.clear();
         }
