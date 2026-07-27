@@ -19,6 +19,7 @@ import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 
 import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
@@ -41,6 +42,7 @@ public final class HudCanvasView extends View {
     public interface EditorListener {
         void onSelectionChanged(@Nullable HudElementConfig selected);
         void onGeometryChanged(@NonNull HudElementConfig item, boolean committed);
+        void onConfigure(@NonNull HudElementConfig item);
     }
 
     private static final float HANDLE_SIZE = 34f;
@@ -64,6 +66,8 @@ public final class HudCanvasView extends View {
     private int startHeight;
     private float startFineX;
     private float startFineY;
+    private final int touchSlop;
+    private boolean movedSinceDown;
     @Nullable private String loadedFontUri;
     @Nullable private Typeface loadedFont;
 
@@ -83,6 +87,7 @@ public final class HudCanvasView extends View {
         this.editor = editor;
         this.localHudViewport = localHudViewport;
         this.editorListener = editorListener;
+        touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
         // A black full-screen View would overwrite neighbouring planes of the composite display.
         setBackgroundColor(editor ? Color.BLACK : Color.TRANSPARENT);
         setFocusable(editor);
@@ -210,6 +215,10 @@ public final class HudCanvasView extends View {
     }
 
     private void drawElement(Canvas canvas, HudElementConfig item, RectF bounds, float scale) {
+        if (item.type == HudElementType.BACKDROP) {
+            drawBackdrop(canvas, item, bounds);
+            return;
+        }
         AutomationState automation = data.automation(item);
         int textColor = parseColor(automation.color,
                 config.syncElementColors ? config.globalTextColor : item.textColor,
@@ -218,16 +227,7 @@ public final class HudCanvasView extends View {
         int unitColor = parseColor(null,
                 config.syncElementColors ? config.globalUnitColor : item.unitColor,
                 0xCCFFFFFF);
-        int background = parseColor(automation.backgroundColor, item.backgroundColor,
-                Color.TRANSPARENT);
         int alpha = Math.round(255f * item.brightness / 100f);
-        if (background != Color.TRANSPARENT) {
-            paint.setStyle(Paint.Style.FILL);
-            paint.setColor(withAlpha(background,
-                    Math.round(Color.alpha(background) * alpha / 255f)));
-            float radius = Math.min(bounds.width(), bounds.height()) * .12f;
-            canvas.drawRoundRect(bounds, radius, radius, paint);
-        }
         textColor = withAlpha(textColor, Math.round(Color.alpha(textColor) * alpha / 255f));
         unitColor = withAlpha(unitColor, Math.round(Color.alpha(unitColor) * alpha / 255f));
 
@@ -272,6 +272,31 @@ public final class HudCanvasView extends View {
             default:
                 drawText(canvas, item, data.textFor(item), bounds, textColor, scale);
         }
+    }
+
+    private void drawBackdrop(Canvas canvas, HudElementConfig item, RectF bounds) {
+        float radius = Math.max(0f, Math.min(item.cornerRadiusPx,
+                Math.min(bounds.width(), bounds.height()) / 2f));
+        int fill = parseColor(null, item.backgroundColor, 0xFF121923);
+        int fillAlpha = Math.round(Color.alpha(fill)
+                * item.backgroundOpacityPercent / 100f);
+        paint.clearShadowLayer();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(withAlpha(fill, fillAlpha));
+        canvas.drawRoundRect(bounds, radius, radius, paint);
+
+        if (item.borderWidthPx <= 0 || item.borderOpacityPercent <= 0) return;
+        int border = parseColor(null, item.borderColor, Color.WHITE);
+        int borderAlpha = Math.round(Color.alpha(border)
+                * item.borderOpacityPercent / 100f);
+        float half = item.borderWidthPx / 2f;
+        RectF borderBounds = new RectF(bounds);
+        borderBounds.inset(half, half);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(item.borderWidthPx);
+        paint.setColor(withAlpha(border, borderAlpha));
+        canvas.drawRoundRect(borderBounds, Math.max(0f, radius - half),
+                Math.max(0f, radius - half), paint);
     }
 
     private void drawManeuver(Canvas canvas, HudElementConfig item, RectF bounds, int color) {
@@ -344,7 +369,7 @@ public final class HudCanvasView extends View {
             }
         }
         drawManeuver(canvas, item, inset(arrow, scale * 4f), color);
-        drawText(canvas, item, data.textFor(item), inset(text, scale * 5f), unitColor, scale);
+        drawText(canvas, item, data.textFor(item), text, unitColor, scale);
     }
 
     private void drawLanes(Canvas canvas, HudElementConfig item, RectF bounds, int color) {
@@ -568,7 +593,7 @@ public final class HudCanvasView extends View {
         Layout.Alignment alignment = "LEFT".equals(item.alignment)
                 ? Layout.Alignment.ALIGN_NORMAL : "RIGHT".equals(item.alignment)
                 ? Layout.Alignment.ALIGN_OPPOSITE : Layout.Alignment.ALIGN_CENTER;
-        drawStyledText(canvas, value, inset(bounds, 4f * scale), color, size,
+        drawStyledText(canvas, value, bounds, color, size,
                 alignment, item.wrapText, item.fontWeight);
     }
 
@@ -673,12 +698,16 @@ public final class HudCanvasView extends View {
                 startHeight = dragging.height;
                 startFineX = (float) dragging.options.optDouble("fineX", 0d);
                 startFineY = (float) dragging.options.optDouble("fineY", 0d);
+                movedSinceDown = false;
                 getParent().requestDisallowInterceptTouchEvent(true);
                 return true;
             case MotionEvent.ACTION_MOVE:
                 if (dragging == null) return true;
                 float dx = event.getX() - downX;
                 float dy = event.getY() - downY;
+                if (Math.abs(dx) > touchSlop || Math.abs(dy) > touchSlop) {
+                    movedSinceDown = true;
+                }
                 if (resizing) {
                     dragging.width = clamp(startWidth + Math.round(dx / geometry.cellWidth),
                             1, config.gridColumns - dragging.x);
@@ -698,6 +727,9 @@ public final class HudCanvasView extends View {
                 return true;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
+                HudElementConfig completed = dragging;
+                boolean configure = event.getActionMasked() == MotionEvent.ACTION_UP
+                        && completed != null && !movedSinceDown && !resizing;
                 if (dragging != null && editorListener != null) {
                     editorListener.onGeometryChanged(dragging, true);
                 }
@@ -705,6 +737,9 @@ public final class HudCanvasView extends View {
                 resizing = false;
                 getParent().requestDisallowInterceptTouchEvent(false);
                 performClick();
+                if (configure && editorListener != null) {
+                    editorListener.onConfigure(completed);
+                }
                 return true;
             default:
                 return true;

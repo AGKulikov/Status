@@ -41,6 +41,7 @@ public final class LauncherElementFrame extends MaterialCardView {
     private boolean editMode;
     private boolean contentTouchBlocked;
     private boolean preserveAspectRatio;
+    private boolean stayBehindSiblings;
     private int snapPx = 20;
     private int minimumWidthPx;
     private int minimumHeightPx;
@@ -137,6 +138,11 @@ public final class LauncherElementFrame extends MaterialCardView {
         preserveAspectRatio = preserve;
     }
 
+    /** Decorative layers must remain below all live widgets even while they are edited. */
+    public void setStayBehindSiblings(boolean stayBehind) {
+        stayBehindSiblings = stayBehind;
+    }
+
     @Override
     public boolean onInterceptTouchEvent(MotionEvent event) {
         if (contentTouchBlocked) return true;
@@ -151,7 +157,7 @@ public final class LauncherElementFrame extends MaterialCardView {
         if (lp == null) return false;
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                bringToFront();
+                if (!stayBehindSiblings) bringToFront();
                 downRawX = event.getRawX();
                 downRawY = event.getRawY();
                 downX = lp.leftMargin;

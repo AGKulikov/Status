@@ -8,13 +8,14 @@ package dezz.status.widget.launcher;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.Drawable;
 import android.util.TypedValue;
 import android.view.GestureDetector;
 import android.view.Gravity;
@@ -28,6 +29,8 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import com.google.android.material.card.MaterialCardView;
 
 import java.util.IdentityHashMap;
 import java.util.Map;
@@ -57,6 +60,7 @@ public final class LauncherGlobalElementProxyView extends View {
     @Nullable private View styledSource;
     private final Map<TextView, TextSnapshot> originalTexts = new IdentityHashMap<>();
     private final Map<ImageView, ColorFilter> originalImageFilters = new IdentityHashMap<>();
+    private float appliedTextScale = Float.NaN;
     private boolean longPressTriggered;
     private boolean sourceCancelled;
 
@@ -116,6 +120,7 @@ public final class LauncherGlobalElementProxyView extends View {
         ensureSourceAppearance(value);
         DrawTransform transform = transform(value);
         if (!transform.drawable()) return;
+        compensateTextScale(transform.scaleY);
         int checkpoint = canvas.save();
         if (appearance.cornerRadiusPx > 0) {
             Path clip = new Path();
@@ -126,7 +131,8 @@ public final class LauncherGlobalElementProxyView extends View {
         }
         canvas.translate(transform.offsetX, transform.offsetY);
         canvas.scale(transform.scaleX, transform.scaleY);
-        value.draw(canvas);
+        canvas.translate(-transform.sourceLeft, -transform.sourceTop);
+        drawWithoutAutomaticSurface(value, canvas);
         canvas.restoreToCount(checkpoint);
     }
 
@@ -153,11 +159,15 @@ public final class LauncherGlobalElementProxyView extends View {
                 || getWidth() <= 0 || getHeight() <= 0) return false;
         DrawTransform transform = transform(value);
         if (!transform.drawable()) return false;
-        float mappedX = (event.getX() - transform.offsetX) / transform.scaleX;
-        float mappedY = (event.getY() - transform.offsetY) / transform.scaleY;
+        float mappedX = transform.sourceLeft
+                + (event.getX() - transform.offsetX) / transform.scaleX;
+        float mappedY = transform.sourceTop
+                + (event.getY() - transform.offsetY) / transform.scaleY;
         if (appearance.scaleMode == LauncherGlobalElementLayoutStore.ScaleMode.FIT
-                && (mappedX < 0f || mappedX > value.getWidth()
-                || mappedY < 0f || mappedY > value.getHeight())) {
+                && (mappedX < transform.sourceLeft
+                || mappedX > transform.sourceRight
+                || mappedY < transform.sourceTop
+                || mappedY > transform.sourceBottom)) {
             return true;
         }
         MotionEvent forwarded = MotionEvent.obtain(event);
@@ -227,11 +237,18 @@ public final class LauncherGlobalElementProxyView extends View {
         float viewportHeight = Math.max(0f, bottom - top);
         if (viewportWidth <= 0f || viewportHeight <= 0f) return DrawTransform.EMPTY;
 
-        float sourceWidth = Math.max(1, source.getWidth());
-        float sourceHeight = Math.max(1, source.getHeight());
+        float sourceLeft = Math.min(source.getWidth(), source.getPaddingLeft());
+        float sourceTop = Math.min(source.getHeight(), source.getPaddingTop());
+        float sourceRight = Math.max(sourceLeft,
+                source.getWidth() - source.getPaddingRight());
+        float sourceBottom = Math.max(sourceTop,
+                source.getHeight() - source.getPaddingBottom());
+        float sourceWidth = Math.max(1f, sourceRight - sourceLeft);
+        float sourceHeight = Math.max(1f, sourceBottom - sourceTop);
         if (appearance.scaleMode == LauncherGlobalElementLayoutStore.ScaleMode.STRETCH) {
             return new DrawTransform(left, top,
-                    viewportWidth / sourceWidth, viewportHeight / sourceHeight);
+                    viewportWidth / sourceWidth, viewportHeight / sourceHeight,
+                    sourceLeft, sourceTop, sourceRight, sourceBottom);
         }
         float widthScale = viewportWidth / sourceWidth;
         float heightScale = viewportHeight / sourceHeight;
@@ -243,7 +260,8 @@ public final class LauncherGlobalElementProxyView extends View {
                 appearance.horizontalAlignment);
         float y = alignedOffset(top, viewportHeight, drawnHeight,
                 appearance.verticalAlignment);
-        return new DrawTransform(x, y, scale, scale);
+        return new DrawTransform(x, y, scale, scale,
+                sourceLeft, sourceTop, sourceRight, sourceBottom);
     }
 
     private static float alignedOffset(float start, float available, float used, int alignment) {
@@ -287,6 +305,7 @@ public final class LauncherGlobalElementProxyView extends View {
         originalTexts.clear();
         originalImageFilters.clear();
         styledSource = null;
+        appliedTextScale = Float.NaN;
     }
 
     private void applyCustomStyles(@NonNull View value) {
@@ -330,6 +349,9 @@ public final class LauncherGlobalElementProxyView extends View {
             } else if (original != null) {
                 text.setGravity(original.gravity);
             }
+            // Atomic HOME widgets start flush with their frame. Optional outer padding remains an
+            // explicit per-widget setting in Appearance instead of a hidden source-view inset.
+            text.setPadding(0, 0, 0, 0);
         }
         if (value instanceof ImageView) {
             ImageView image = (ImageView) value;
@@ -347,11 +369,44 @@ public final class LauncherGlobalElementProxyView extends View {
     }
 
     private void applySurface() {
-        GradientDrawable background = new GradientDrawable();
-        Integer color = parseOptionalColor(appearance.backgroundColor);
-        background.setColor(color == null ? Color.TRANSPARENT : color);
-        background.setCornerRadius(Math.max(0, appearance.cornerRadiusPx));
-        setBackground(background);
+        setBackgroundColor(Color.TRANSPARENT);
+    }
+
+    private void compensateTextScale(float scaleY) {
+        float scale = Math.max(.01f, Math.abs(scaleY));
+        if (Math.abs(appliedTextScale - scale) < .002f) return;
+        appliedTextScale = scale;
+        float configuredPx = appearance.textSizeSp > 0
+                ? TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP,
+                appearance.textSizeSp, getResources().getDisplayMetrics()) : 0f;
+        for (Map.Entry<TextView, TextSnapshot> entry : originalTexts.entrySet()) {
+            float desiredScreenPx = configuredPx > 0f
+                    ? configuredPx : entry.getValue().textSizePx;
+            entry.getKey().setTextSize(TypedValue.COMPLEX_UNIT_PX,
+                    desiredScreenPx / scale);
+        }
+    }
+
+    private static void drawWithoutAutomaticSurface(
+            @NonNull View source, @NonNull Canvas canvas) {
+        if (source instanceof MaterialCardView) {
+            MaterialCardView card = (MaterialCardView) source;
+            ColorStateList original = card.getCardBackgroundColor();
+            card.setCardBackgroundColor(Color.TRANSPARENT);
+            try {
+                card.draw(canvas);
+            } finally {
+                card.setCardBackgroundColor(original);
+            }
+            return;
+        }
+        Drawable original = source.getBackground();
+        source.setBackground(null);
+        try {
+            source.draw(canvas);
+        } finally {
+            source.setBackground(original);
+        }
     }
 
     @Nullable
@@ -382,17 +437,28 @@ public final class LauncherGlobalElementProxyView extends View {
     }
 
     private static final class DrawTransform {
-        static final DrawTransform EMPTY = new DrawTransform(0f, 0f, 0f, 0f);
+        static final DrawTransform EMPTY =
+                new DrawTransform(0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f);
         final float offsetX;
         final float offsetY;
         final float scaleX;
         final float scaleY;
+        final float sourceLeft;
+        final float sourceTop;
+        final float sourceRight;
+        final float sourceBottom;
 
-        DrawTransform(float offsetX, float offsetY, float scaleX, float scaleY) {
+        DrawTransform(float offsetX, float offsetY, float scaleX, float scaleY,
+                      float sourceLeft, float sourceTop,
+                      float sourceRight, float sourceBottom) {
             this.offsetX = offsetX;
             this.offsetY = offsetY;
             this.scaleX = scaleX;
             this.scaleY = scaleY;
+            this.sourceLeft = sourceLeft;
+            this.sourceTop = sourceTop;
+            this.sourceRight = sourceRight;
+            this.sourceBottom = sourceBottom;
         }
 
         boolean drawable() {
@@ -405,12 +471,20 @@ public final class LauncherGlobalElementProxyView extends View {
         final int textColor;
         @Nullable final Typeface typeface;
         final int gravity;
+        final int paddingLeft;
+        final int paddingTop;
+        final int paddingRight;
+        final int paddingBottom;
 
         TextSnapshot(@NonNull TextView source) {
             textSizePx = source.getTextSize();
             textColor = source.getCurrentTextColor();
             typeface = source.getTypeface();
             gravity = source.getGravity();
+            paddingLeft = source.getPaddingLeft();
+            paddingTop = source.getPaddingTop();
+            paddingRight = source.getPaddingRight();
+            paddingBottom = source.getPaddingBottom();
         }
 
         void restore(@NonNull TextView target) {
@@ -418,6 +492,7 @@ public final class LauncherGlobalElementProxyView extends View {
             target.setTextColor(textColor);
             target.setTypeface(typeface);
             target.setGravity(gravity);
+            target.setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom);
         }
     }
 }

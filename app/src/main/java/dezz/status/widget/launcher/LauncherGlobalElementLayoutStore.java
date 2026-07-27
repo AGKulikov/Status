@@ -121,8 +121,10 @@ public final class LauncherGlobalElementLayoutStore {
             fontFamily = clean(fontFamily);
             horizontalAlignment = clampStyle(horizontalAlignment, -1, 2);
             verticalAlignment = clampStyle(verticalAlignment, -1, 2);
-            backgroundColor = colorOrTransparent(backgroundColor);
-            cornerRadiusPx = clampStyle(cornerRadiusPx, 0, 240);
+            // Widget surfaces are intentionally transparent. Decorative colour, frame and radius
+            // belong to independent backdrop layers which always remain behind live widgets.
+            backgroundColor = "#00000000";
+            cornerRadiusPx = 0;
             if (tapAction == null) tapAction = TapAction.INHERIT;
             appComponent = clean(appComponent);
             if (tapAction == TapAction.APP && appComponent.isEmpty()) {

@@ -159,7 +159,10 @@ public final class MediaPanelConfig {
         return Collections.unmodifiableList(result);
     }
 
-    /** Returns the effective state; enabling can be rejected when the grid has no free slot. */
+    /**
+     * Returns the effective state. A newly enabled element may overlap at its saved/default
+     * position when the grid is full; the free-form HOME editor lets the user separate it later.
+     */
     public boolean setEnabled(@NonNull String id, boolean enabled) {
         Element value = elements.get(id);
         if (value == null) return false;
@@ -171,7 +174,10 @@ public final class MediaPanelConfig {
         value.enabled = true;
         if (!displaceCollisions(value, value.column, value.row)) {
             restoreElements(snapshot);
-            return false;
+            value = elements.get(id);
+            if (value == null) return false;
+            value.enabled = true;
+            normalizePlacement(value);
         }
         return true;
     }

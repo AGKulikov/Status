@@ -34,7 +34,8 @@ public class DriverPanelOverlayContractTest {
         assertTrue(source.contains("int drawerLeft = profile.side.get() == 0 ? physicalWidth : 0"));
         assertTrue(source.contains("compactDrawerParams("));
         assertTrue(source.contains("allAppsOverlayParams("));
-        assertTrue(source.contains("root.setOnClickListener(view -> dismissAllApps())"));
+        assertTrue(source.contains("if (drawerEditMode) setDrawerEditMode(false)"));
+        assertTrue(source.contains("else dismissAllApps()"));
         assertTrue(source.contains("root.setPadding(0, geometry.contentTop, 0,"));
         assertTrue(source.contains("screenHeight - geometry.contentBottom"));
         assertTrue(source.contains("width, Math.max(1, screenHeight), type"));
@@ -212,8 +213,19 @@ public class DriverPanelOverlayContractTest {
         assertTrue(controller.contains("grid.setPadding(dp(context, 16), dp(context, 16),"));
         assertTrue(controller.contains("title.setText(\"Все приложения\")"));
         assertTrue(controller.contains("FavoriteAppsConfigStore"));
-        assertTrue(controller.contains("tile.setOnLongClickListener(view ->"));
+        assertTrue(controller.contains("AppDrawerTileView"));
+        assertTrue(controller.contains("setDrawerEditMode(true)"));
+        assertTrue(controller.contains("AppDrawerUninstallPolicy.canUninstall("));
         assertTrue(controller.contains("AppUninstallLauncher.request(context, app)"));
+        int uninstall = controller.indexOf(
+                "@Override public void uninstall(@NonNull Context context,");
+        int dismiss = controller.indexOf("dismissAllApps();", uninstall);
+        int request = controller.indexOf(
+                "AppUninstallLauncher.request(context, app)", uninstall);
+        assertTrue(uninstall >= 0);
+        assertTrue(dismiss >= 0);
+        assertTrue(request >= 0);
+        assertTrue(dismiss < request);
 
         assertTrue(launcher.contains("LauncherAppCatalog.loadIncludingSystem(context)"));
         assertTrue(launcher.contains("appCatalog.allVisible()"));

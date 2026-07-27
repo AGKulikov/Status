@@ -25,6 +25,8 @@ import androidx.core.content.ContextCompat;
 import dezz.status.widget.HudPanelSettingsActivity;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.R;
+import dezz.status.widget.car.CarIntegration;
+import dezz.status.widget.car.CarIntegrations;
 
 /** Foreground owner of the stable-id external HUD presentation. */
 public final class HudPresentationService extends Service
@@ -54,6 +56,7 @@ public final class HudPresentationService extends Service
     private HudSystemSurfaceWindow systemSurfaceWindow;
     private long systemSurfaceRetryAfter;
     @Nullable private String shownUniqueId;
+    @Nullable private Boolean requestedStockHudCarHidden;
 
     public static void apply(@NonNull Context context) {
         Context app = applicationContext(context);
@@ -125,6 +128,7 @@ public final class HudPresentationService extends Service
             if (current != null) current.invalidateHud();
         });
         data.start();
+        reconcileStockHudCarPreference();
         reconcilePresentation();
     }
 
@@ -167,7 +171,36 @@ public final class HudPresentationService extends Service
         }
         config = store.load();
         if (data != null) data.updateConfig(config);
+        reconcileStockHudCarPreference();
         reconcilePresentation();
+    }
+
+    /**
+     * Pair the visual mask option with the removed stock Settings AR preference.
+     *
+     * <p>The ECARX implementation preserves the complete active profile and changes only its
+     * legacy AR key. We intentionally do not restore it merely because this service is destroyed:
+     * Android may recreate the foreground service during boot/display churn. An explicit switch
+     * from mask on to mask off sends the restoring value.</p>
+     */
+    private void reconcileStockHudCarPreference() {
+        if (config == null) return;
+        boolean hidden = config.maskStockHud;
+        if (requestedStockHudCarHidden != null
+                && requestedStockHudCarHidden.booleanValue() == hidden) {
+            return;
+        }
+        requestedStockHudCarHidden = hidden;
+        CarIntegration integration = CarIntegrations.get(this);
+        integration.setStockHudCarHidden(hidden, (success, message) -> {
+            Log.i(TAG, "Stock HUD ego-car preference hidden=" + hidden
+                    + ", success=" + success + ", detail=" + message);
+            if (!success && requestedStockHudCarHidden != null
+                    && requestedStockHudCarHidden.booleanValue() == hidden) {
+                // Let the next explicit apply/display reconnect retry after a cold Binder start.
+                requestedStockHudCarHidden = null;
+            }
+        });
     }
 
     private void reconcilePresentation() {

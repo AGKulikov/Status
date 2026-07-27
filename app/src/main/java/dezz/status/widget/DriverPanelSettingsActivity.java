@@ -33,7 +33,9 @@ import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -53,6 +55,9 @@ import dezz.status.widget.settings.SettingsBackNavigation;
 /** Visual editor for the unified current-generation Monjaro driver panel. */
 public final class DriverPanelSettingsActivity extends AppCompatActivity {
     private interface IntSetter { void set(int value); }
+    private interface ShortcutSetter {
+        void set(@NonNull LauncherShortcutStore.Shortcut shortcut);
+    }
 
     private Preferences preferences;
     private Preferences.DriverPanelProfile profile;
@@ -130,9 +135,11 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
+        scroll.setClipToPadding(false);
+        scroll.setVerticalScrollBarEnabled(true);
         LinearLayout settings = new LinearLayout(this);
         settings.setOrientation(LinearLayout.VERTICAL);
-        settings.setPadding(dp(10), 0, dp(22), dp(28));
+        settings.setPadding(dp(10), 0, dp(22), dp(96));
         scroll.addView(settings, new ScrollView.LayoutParams(match(), wrap()));
 
         title(settings, "Панель водителя");
@@ -331,7 +338,12 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         MaterialButton up = compactButton("↑");
         up.setEnabled(index > 0);
         up.setOnClickListener(view -> {
-            store.move(shortcut.id, -1);
+            if (shortcut.kind == LauncherShortcutStore.Kind.INFO
+                    && !shortcut.informationGroup.trim().isEmpty()) {
+                store.moveInformationGroupItem(shortcut.id, -1);
+            } else {
+                store.move(shortcut.id, -1);
+            }
             refreshButtons();
             applyPanel();
         });
@@ -339,7 +351,12 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         MaterialButton down = compactButton("↓");
         down.setEnabled(index < total - 1);
         down.setOnClickListener(view -> {
-            store.move(shortcut.id, 1);
+            if (shortcut.kind == LauncherShortcutStore.Kind.INFO
+                    && !shortcut.informationGroup.trim().isEmpty()) {
+                store.moveInformationGroupItem(shortcut.id, 1);
+            } else {
+                store.move(shortcut.id, 1);
+            }
             refreshButtons();
             applyPanel();
         });
@@ -433,6 +450,15 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         body.addView(controls, topMargin(dp(8)));
 
         if (shortcut.kind == LauncherShortcutStore.Kind.INFO) {
+            MaterialButton informationGroup = compactButton(
+                    shortcut.informationGroup.trim().isEmpty()
+                            ? "＋ Объединить в горизонтальный ряд"
+                            : "Горизонтальный ряд: "
+                            + shortcut.informationGroup.trim());
+            informationGroup.setOnClickListener(
+                    view -> editInformationGroup(shortcut));
+            body.addView(informationGroup, topMargin(dp(8)));
+
             MaterialSwitch showIcon = new MaterialSwitch(this);
             showIcon.setText("Показывать значок слева");
             showIcon.setTextColor(Color.WHITE);
@@ -447,7 +473,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             body.addView(showIcon, topMargin(dp(8)));
 
             MaterialButton informationAppearance =
-                    compactButton("Текст, шрифт, выравнивание и отступы");
+                    compactButton("Оформление содержимого");
             informationAppearance.setOnClickListener(
                     view -> editInformationAppearance(shortcut));
             body.addView(informationAppearance, topMargin(dp(8)));
@@ -637,6 +663,326 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 .show();
     }
 
+    private void editInformationGroup(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        if (shortcut.informationGroup.trim().isEmpty()) {
+            chooseInformationGroup(shortcut);
+            return;
+        }
+        showInformationGroupSettings(shortcut);
+    }
+
+    private void chooseInformationGroup(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        List<String> groups = new ArrayList<>();
+        for (LauncherShortcutStore.Shortcut value : store.all()) {
+            String group = value.informationGroup.trim();
+            if (value.kind == LauncherShortcutStore.Kind.INFO
+                    && !group.isEmpty() && !groups.contains(group)) {
+                groups.add(group);
+            }
+        }
+        List<String> choices = new ArrayList<>();
+        choices.add("Без группы · отдельная строка");
+        for (String group : groups) choices.add("Добавить в «" + group + "»");
+        choices.add("＋ Создать новый горизонтальный ряд");
+        new AlertDialog.Builder(this)
+                .setTitle("Горизонтальный ряд")
+                .setMessage("Элементы одного ряда располагаются слева направо. "
+                        + "У ряда свои положение, интервалы, отступы, фон и выравнивание.")
+                .setItems(choices.toArray(new String[0]), (dialog, which) -> {
+                    if (which == 0) {
+                        shortcut.informationGroup = "";
+                        persistInformationAppearance(shortcut);
+                        refreshButtons();
+                        return;
+                    }
+                    if (which <= groups.size()) {
+                        assignInformationGroup(shortcut, groups.get(which - 1));
+                        showInformationGroupSettings(shortcut);
+                        return;
+                    }
+                    createInformationGroup(shortcut);
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void createInformationGroup(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("Например: Связь или Статусы");
+        new AlertDialog.Builder(this)
+                .setTitle("Название горизонтального ряда")
+                .setView(input)
+                .setPositiveButton("Создать", (dialog, which) -> {
+                    String group = input.getText().toString().trim();
+                    if (group.isEmpty()) {
+                        Toast.makeText(this, "Введите название ряда",
+                                Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    assignInformationGroup(shortcut, group);
+                    showInformationGroupSettings(shortcut);
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void assignInformationGroup(
+            @NonNull LauncherShortcutStore.Shortcut shortcut,
+            @NonNull String rawGroup) {
+        String group = rawGroup.trim();
+        LauncherShortcutStore.Shortcut representative = null;
+        for (LauncherShortcutStore.Shortcut value : store.all()) {
+            if (value.kind == LauncherShortcutStore.Kind.INFO
+                    && group.equals(value.informationGroup.trim())) {
+                representative = value;
+                break;
+            }
+        }
+        if (representative != null) copyInformationGroupSettings(
+                representative, shortcut);
+        shortcut.informationGroup = group;
+        store.upsert(shortcut);
+        refreshButtons();
+        applyPanel();
+    }
+
+    private void showInformationGroupSettings(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        ScrollView scroll = new ScrollView(this);
+        scroll.setClipToPadding(false);
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(20), dp(10), dp(20), dp(72));
+        scroll.addView(form, new ScrollView.LayoutParams(match(), wrap()));
+
+        String groupName = shortcut.informationGroup.trim();
+        int memberCount = informationGroupMembers(groupName).size();
+        hint(form, "Ряд «" + groupName + "» · " + memberCount
+                + " элементов. Стрелки карточки меняют порядок слева направо.");
+
+        MaterialButton membership = compactButton("Состав ряда / сменить группу");
+        membership.setOnClickListener(view -> chooseInformationGroup(shortcut));
+        form.addView(membership, rowParams());
+
+        LinearLayout order = new LinearLayout(this);
+        order.setOrientation(LinearLayout.HORIZONTAL);
+        MaterialButton rowUp = compactButton("↑ Ряд выше");
+        rowUp.setOnClickListener(view -> {
+            store.moveInformationGroup(groupName,
+                    shortcut.informationPlacement, -1);
+            refreshButtons();
+            applyPanel();
+        });
+        MaterialButton rowDown = compactButton("↓ Ряд ниже");
+        rowDown.setOnClickListener(view -> {
+            store.moveInformationGroup(groupName,
+                    shortcut.informationPlacement, 1);
+            refreshButtons();
+            applyPanel();
+        });
+        order.addView(rowUp, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        LinearLayout.LayoutParams downParams =
+                new LinearLayout.LayoutParams(0, dp(48), 1f);
+        downParams.leftMargin = dp(8);
+        order.addView(rowDown, downParams);
+        form.addView(order, rowParams());
+
+        MaterialButton placement = compactButton("Положение ряда: "
+                + (shortcut.informationPlacement == 1
+                ? "снизу панели" : "сверху панели"));
+        placement.setOnClickListener(view -> new AlertDialog.Builder(this)
+                .setTitle("Положение горизонтального ряда")
+                .setItems(new String[]{"Сверху панели", "Снизу панели"},
+                        (dialog, which) -> {
+                            applyInformationGroupSetting(shortcut,
+                                    value -> value.informationPlacement = which);
+                            placement.setText("Положение ряда: "
+                                    + (which == 1 ? "снизу панели" : "сверху панели"));
+                        })
+                .show());
+        form.addView(placement, rowParams());
+
+        MaterialButton distribution = compactButton("Ширина элементов: "
+                + (shortcut.informationGroupDistribution == 1
+                ? "по содержимому" : "одинаковая"));
+        distribution.setOnClickListener(view -> new AlertDialog.Builder(this)
+                .setTitle("Распределение в ряду")
+                .setItems(new String[]{"Одинаковая ширина", "По содержимому"},
+                        (dialog, which) -> {
+                            applyInformationGroupSetting(shortcut,
+                                    value -> value.informationGroupDistribution = which);
+                            distribution.setText("Ширина элементов: "
+                                    + (which == 1 ? "по содержимому" : "одинаковая"));
+                        })
+                .show());
+        form.addView(distribution, rowParams());
+
+        MaterialButton horizontal = compactButton("Положение содержимого: "
+                + horizontalAlignmentLabel(
+                shortcut.informationGroupHorizontalAlignment));
+        horizontal.setOnClickListener(view -> new AlertDialog.Builder(this)
+                .setTitle("Положение ряда по горизонтали")
+                .setItems(new String[]{"Слева", "По центру", "Справа"},
+                        (dialog, which) -> {
+                            applyInformationGroupSetting(shortcut, value ->
+                                    value.informationGroupHorizontalAlignment = which);
+                            horizontal.setText("Положение содержимого: "
+                                    + horizontalAlignmentLabel(which));
+                        })
+                .show());
+        form.addView(horizontal, rowParams());
+
+        MaterialButton vertical = compactButton("Выравнивание элементов: "
+                + verticalAlignmentLabel(shortcut.informationGroupVerticalAlignment));
+        vertical.setOnClickListener(view -> new AlertDialog.Builder(this)
+                .setTitle("Выравнивание элементов ряда")
+                .setItems(new String[]{"Сверху", "По центру", "Снизу"},
+                        (dialog, which) -> {
+                            applyInformationGroupSetting(shortcut, value ->
+                                    value.informationGroupVerticalAlignment = which);
+                            vertical.setText("Выравнивание элементов: "
+                                    + verticalAlignmentLabel(which));
+                        })
+                .show());
+        form.addView(vertical, rowParams());
+
+        slider(form, "Расстояние между элементами", 0, 120,
+                shortcut.informationGroupGapPx, " px", selected ->
+                        applyInformationGroupSetting(shortcut,
+                                value -> value.informationGroupGapPx = selected));
+
+        title(form, "Внешние отступы ряда");
+        groupSlider(form, shortcut, "Слева",
+                shortcut.informationGroupMarginLeftPx,
+                (value, selected) -> value.informationGroupMarginLeftPx = selected);
+        groupSlider(form, shortcut, "Сверху",
+                shortcut.informationGroupMarginTopPx,
+                (value, selected) -> value.informationGroupMarginTopPx = selected);
+        groupSlider(form, shortcut, "Справа",
+                shortcut.informationGroupMarginRightPx,
+                (value, selected) -> value.informationGroupMarginRightPx = selected);
+        groupSlider(form, shortcut, "Снизу",
+                shortcut.informationGroupMarginBottomPx,
+                (value, selected) -> value.informationGroupMarginBottomPx = selected);
+
+        title(form, "Внутренние отступы ряда");
+        groupSlider(form, shortcut, "Слева",
+                shortcut.informationGroupPaddingLeftPx,
+                (value, selected) -> value.informationGroupPaddingLeftPx = selected);
+        groupSlider(form, shortcut, "Сверху",
+                shortcut.informationGroupPaddingTopPx,
+                (value, selected) -> value.informationGroupPaddingTopPx = selected);
+        groupSlider(form, shortcut, "Справа",
+                shortcut.informationGroupPaddingRightPx,
+                (value, selected) -> value.informationGroupPaddingRightPx = selected);
+        groupSlider(form, shortcut, "Снизу",
+                shortcut.informationGroupPaddingBottomPx,
+                (value, selected) -> value.informationGroupPaddingBottomPx = selected);
+
+        MaterialButton background = compactButton("Цвет фона ряда");
+        AppleColorPickerDialog.decorateButton(background, "Цвет фона ряда",
+                shortcut.informationGroupBackgroundColor);
+        background.setOnClickListener(view -> AppleColorPickerDialog.show(this,
+                "Фон горизонтального ряда",
+                shortcut.informationGroupBackgroundColor,
+                AppleColorPickerDialog.Options.standard(),
+                new AppleColorPickerDialog.Listener() {
+                    @Override public void onPreview(@Nullable String value) {
+                        if (value == null) return;
+                        applyInformationGroupSetting(shortcut, member ->
+                                member.informationGroupBackgroundColor = value);
+                        AppleColorPickerDialog.decorateButton(background,
+                                "Цвет фона ряда", value);
+                    }
+
+                    @Override public void onSelected(@Nullable String value) {
+                        if (value == null) return;
+                        applyInformationGroupSetting(shortcut, member ->
+                                member.informationGroupBackgroundColor = value);
+                    }
+                }));
+        form.addView(background, rowParams());
+        slider(form, "Скругление фона ряда", 0, 120,
+                shortcut.informationGroupCornerRadiusPx, " px", selected ->
+                        applyInformationGroupSetting(shortcut, value ->
+                                value.informationGroupCornerRadiusPx = selected));
+
+        new AlertDialog.Builder(this)
+                .setTitle("Горизонтальный ряд · " + groupName)
+                .setView(scroll)
+                .setPositiveButton("Готово", null)
+                .show();
+    }
+
+    private interface GroupIntSetter {
+        void set(@NonNull LauncherShortcutStore.Shortcut shortcut, int value);
+    }
+
+    private void groupSlider(@NonNull LinearLayout form,
+                             @NonNull LauncherShortcutStore.Shortcut shortcut,
+                             @NonNull String label, int current,
+                             @NonNull GroupIntSetter setter) {
+        slider(form, label, 0, 120, current, " px", selected ->
+                applyInformationGroupSetting(shortcut,
+                        value -> setter.set(value, selected)));
+    }
+
+    private void applyInformationGroupSetting(
+            @NonNull LauncherShortcutStore.Shortcut source,
+            @NonNull ShortcutSetter setter) {
+        setter.set(source);
+        String group = source.informationGroup.trim();
+        for (LauncherShortcutStore.Shortcut value : store.all()) {
+            if (value.kind == LauncherShortcutStore.Kind.INFO
+                    && group.equals(value.informationGroup.trim())) {
+                setter.set(value);
+                store.upsert(value);
+            }
+        }
+        refreshPreview();
+        applyPanel();
+    }
+
+    @NonNull
+    private List<LauncherShortcutStore.Shortcut> informationGroupMembers(
+            @NonNull String rawGroup) {
+        String group = rawGroup.trim();
+        List<LauncherShortcutStore.Shortcut> result = new ArrayList<>();
+        for (LauncherShortcutStore.Shortcut value : store.all()) {
+            if (value.kind == LauncherShortcutStore.Kind.INFO
+                    && group.equals(value.informationGroup.trim())) result.add(value);
+        }
+        return result;
+    }
+
+    private static void copyInformationGroupSettings(
+            @NonNull LauncherShortcutStore.Shortcut source,
+            @NonNull LauncherShortcutStore.Shortcut target) {
+        target.informationPlacement = source.informationPlacement;
+        target.informationGroupGapPx = source.informationGroupGapPx;
+        target.informationGroupMarginLeftPx = source.informationGroupMarginLeftPx;
+        target.informationGroupMarginTopPx = source.informationGroupMarginTopPx;
+        target.informationGroupMarginRightPx = source.informationGroupMarginRightPx;
+        target.informationGroupMarginBottomPx = source.informationGroupMarginBottomPx;
+        target.informationGroupPaddingLeftPx = source.informationGroupPaddingLeftPx;
+        target.informationGroupPaddingTopPx = source.informationGroupPaddingTopPx;
+        target.informationGroupPaddingRightPx = source.informationGroupPaddingRightPx;
+        target.informationGroupPaddingBottomPx = source.informationGroupPaddingBottomPx;
+        target.informationGroupHorizontalAlignment =
+                source.informationGroupHorizontalAlignment;
+        target.informationGroupVerticalAlignment =
+                source.informationGroupVerticalAlignment;
+        target.informationGroupDistribution = source.informationGroupDistribution;
+        target.informationGroupBackgroundColor =
+                source.informationGroupBackgroundColor;
+        target.informationGroupCornerRadiusPx =
+                source.informationGroupCornerRadiusPx;
+    }
+
     private void editInformationAppearance(
             @NonNull LauncherShortcutStore.Shortcut shortcut) {
         ScrollView scroll = new ScrollView(this);
@@ -679,34 +1025,6 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                         })
                 .show());
         form.addView(placement, rowParams());
-
-        MaterialButton group = compactButton(informationGroupLabel(shortcut));
-        group.setOnClickListener(view -> {
-            EditText input = new EditText(this);
-            input.setSingleLine(true);
-            input.setHint("Например: Связь или Верхний ряд");
-            input.setText(shortcut.informationGroup);
-            input.setSelection(input.length());
-            new AlertDialog.Builder(this)
-                    .setTitle("Горизонтальная группа")
-                    .setMessage("Одинаковое произвольное имя объединяет любые "
-                            + "информационные элементы в один ряд. Пустое имя — отдельная строка.")
-                    .setView(input)
-                    .setPositiveButton("Применить", (dialog, which) -> {
-                        shortcut.informationGroup =
-                                input.getText().toString().trim();
-                        group.setText(informationGroupLabel(shortcut));
-                        persistInformationAppearance(shortcut);
-                    })
-                    .setNeutralButton("Без группы", (dialog, which) -> {
-                        shortcut.informationGroup = "";
-                        group.setText(informationGroupLabel(shortcut));
-                        persistInformationAppearance(shortcut);
-                    })
-                    .setNegativeButton("Отмена", null)
-                    .show();
-        });
-        form.addView(group, rowParams());
 
         addSwitch(form, "Показывать значение",
                 shortcut.informationShowValue, checked -> {
@@ -907,10 +1225,14 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         }
         preview.removeAllViews();
         List<LauncherShortcutStore.Shortcut> enabled = new ArrayList<>();
+        int interactiveCount = 0;
         for (LauncherShortcutStore.Shortcut value : store.all()) {
-            if (value.enabled && enabled.size() < DriverPanelLayoutPolicy.MAX_BUTTONS) {
-                enabled.add(value);
+            if (!value.enabled) continue;
+            if (LauncherShortcutStore.isInteractive(value)) {
+                if (interactiveCount >= DriverPanelLayoutPolicy.MAX_BUTTONS) continue;
+                interactiveCount++;
             }
+            enabled.add(value);
         }
         int minimumPanelWidth = DriverPanelLayoutPolicy.referencePanelWidth(
                 profile.style == Preferences.DriverPanelStyle.NEW);
@@ -922,7 +1244,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         int scaledBottom = Math.round(profile.bottomPaddingPx.get()
                 * height / 1080f);
         DriverPanelLayoutPolicy.Layout layout = DriverPanelLayoutPolicy.calculate(
-                height, scaledTop, scaledBottom, enabled.size(),
+                height, scaledTop, scaledBottom, interactiveCount,
                 false);
         addPreviewSegment(enabled, railWidth, height, layout, side);
     }
@@ -943,34 +1265,115 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         float radius = Math.max(dp(20), profile.cornerRadiusPx.get()) * .62f;
         background.setCornerRadii(panelCornerRadii(radius, side == 1));
         rail.setBackground(background);
+        List<LauncherShortcutStore.Shortcut> topInformation = new ArrayList<>();
+        List<LauncherShortcutStore.Shortcut> controls = new ArrayList<>();
+        List<LauncherShortcutStore.Shortcut> bottomInformation = new ArrayList<>();
         for (LauncherShortcutStore.Shortcut value : values) {
-            View icon;
-            if (isLiveClimate(value)) {
-                DriverClimateShortcutView climate = new DriverClimateShortcutView(
-                        this, CarIntegrations.get(this), value.iconColor,
-                        value.extendedClimateInfo,
-                        Math.round(value.climateDetailsGapPx * .62f));
-                climate.showPreviewSample();
-                icon = climate;
+            if (value.kind == LauncherShortcutStore.Kind.INFO) {
+                (value.informationPlacement == 1
+                        ? bottomInformation : topInformation).add(value);
             } else {
-                ImageView image = new ImageView(this);
-                Drawable drawable = resolveIcon(value);
-                if (drawable != null) image.setImageDrawable(drawable);
-                icon = image;
+                controls.add(value);
             }
-            int iconSize = Math.max(dp(18), Math.min(width - dp(8),
-                    Math.round(value.iconSizePx * .62f)));
-            FrameLayout cell = new FrameLayout(this);
-            boolean expandedClimate = false;
-            cell.addView(icon, new FrameLayout.LayoutParams(iconSize,
-                    DriverPanelLayoutPolicy.shortcutIconHeight(iconSize, expandedClimate),
-                    Gravity.CENTER));
-            rail.addView(cell, new LinearLayout.LayoutParams(match(), 0,
-                    DriverPanelLayoutPolicy.shortcutWeight(expandedClimate)));
         }
+        addPreviewInformationRows(rail, topInformation, width);
+        for (LauncherShortcutStore.Shortcut value : controls) {
+            FrameLayout cell = previewShortcutCell(value, width);
+            rail.addView(cell, new LinearLayout.LayoutParams(match(), 0,
+                    DriverPanelLayoutPolicy.shortcutWeight(false)));
+        }
+        addPreviewInformationRows(rail, bottomInformation, width);
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, screenHeight,
                 Gravity.TOP | (side == 0 ? Gravity.LEFT : Gravity.RIGHT));
         preview.addView(rail, params);
+    }
+
+    private void addPreviewInformationRows(
+            @NonNull LinearLayout rail,
+            @NonNull List<LauncherShortcutStore.Shortcut> information,
+            int railWidth) {
+        LinkedHashMap<String, List<LauncherShortcutStore.Shortcut>> rows =
+                new LinkedHashMap<>();
+        for (LauncherShortcutStore.Shortcut value : information) {
+            String group = value.informationGroup.trim();
+            String key = group.isEmpty() ? "\u0000" + value.id : group;
+            rows.computeIfAbsent(key, ignored -> new ArrayList<>()).add(value);
+        }
+        for (Map.Entry<String, List<LauncherShortcutStore.Shortcut>> entry : rows.entrySet()) {
+            List<LauncherShortcutStore.Shortcut> items = entry.getValue();
+            LauncherShortcutStore.Shortcut style = items.get(0);
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(previewGroupGravity(style));
+            row.setPadding(Math.round(style.informationGroupPaddingLeftPx * .62f),
+                    Math.round(style.informationGroupPaddingTopPx * .62f),
+                    Math.round(style.informationGroupPaddingRightPx * .62f),
+                    Math.round(style.informationGroupPaddingBottomPx * .62f));
+            GradientDrawable surface = new GradientDrawable();
+            surface.setColor(parseColor(style.informationGroupBackgroundColor,
+                    Color.TRANSPARENT));
+            surface.setCornerRadius(Math.round(
+                    style.informationGroupCornerRadiusPx * .62f));
+            row.setBackground(surface);
+            int gap = Math.round(style.informationGroupGapPx * .62f);
+            int rowHeight = dp(42)
+                    + Math.round((style.informationGroupPaddingTopPx
+                    + style.informationGroupPaddingBottomPx) * .62f);
+            for (int index = 0; index < items.size(); index++) {
+                FrameLayout cell = previewShortcutCell(items.get(index), railWidth);
+                LinearLayout.LayoutParams cellParams =
+                        style.informationGroupDistribution == 1
+                                ? new LinearLayout.LayoutParams(dp(42), match())
+                                : new LinearLayout.LayoutParams(0, match(), 1f);
+                cellParams.rightMargin = index + 1 < items.size() ? gap : 0;
+                row.addView(cell, cellParams);
+            }
+            LinearLayout.LayoutParams rowParams =
+                    new LinearLayout.LayoutParams(match(), rowHeight);
+            rowParams.leftMargin = Math.round(style.informationGroupMarginLeftPx * .62f);
+            rowParams.topMargin = Math.round(style.informationGroupMarginTopPx * .62f);
+            rowParams.rightMargin = Math.round(style.informationGroupMarginRightPx * .62f);
+            rowParams.bottomMargin =
+                    Math.round(style.informationGroupMarginBottomPx * .62f);
+            rail.addView(row, rowParams);
+        }
+    }
+
+    @NonNull
+    private FrameLayout previewShortcutCell(
+            @NonNull LauncherShortcutStore.Shortcut value, int railWidth) {
+        View icon;
+        if (isLiveClimate(value)) {
+            DriverClimateShortcutView climate = new DriverClimateShortcutView(
+                    this, CarIntegrations.get(this), value.iconColor,
+                    value.extendedClimateInfo,
+                    Math.round(value.climateDetailsGapPx * .62f));
+            climate.showPreviewSample();
+            icon = climate;
+        } else {
+            ImageView image = new ImageView(this);
+            Drawable drawable = resolveIcon(value);
+            if (drawable != null) image.setImageDrawable(drawable);
+            icon = image;
+        }
+        int iconSize = Math.max(dp(18), Math.min(railWidth - dp(8),
+                Math.round(value.iconSizePx * .62f)));
+        FrameLayout cell = new FrameLayout(this);
+        cell.addView(icon, new FrameLayout.LayoutParams(iconSize,
+                DriverPanelLayoutPolicy.shortcutIconHeight(iconSize, false),
+                Gravity.CENTER));
+        return cell;
+    }
+
+    private static int previewGroupGravity(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        int horizontal = shortcut.informationGroupHorizontalAlignment <= 0
+                ? Gravity.START : shortcut.informationGroupHorizontalAlignment == 1
+                ? Gravity.CENTER_HORIZONTAL : Gravity.END;
+        int vertical = shortcut.informationGroupVerticalAlignment <= 0
+                ? Gravity.TOP : shortcut.informationGroupVerticalAlignment == 1
+                ? Gravity.CENTER_VERTICAL : Gravity.BOTTOM;
+        return horizontal | vertical;
     }
 
     @Nullable

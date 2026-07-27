@@ -16,7 +16,8 @@ import java.util.Set;
 /** Versioned, exportable HUD layout and presentation settings. */
 public final class HudPanelConfig {
     public static final int SCHEMA_VERSION = 3;
-    public static final int MAX_ELEMENTS = 512;
+    /** Safety-only document limit; the editor imposes no practical backdrop count limit. */
+    public static final int MAX_ELEMENTS = 4_096;
     public static final int MAX_JSON_CHARS = 1_048_576;
 
     @NonNull public String displayUniqueId = "";
@@ -151,7 +152,10 @@ public final class HudPanelConfig {
     @NonNull
     public List<HudElementConfig> drawingOrder() {
         ArrayList<HudElementConfig> result = new ArrayList<>(elements);
-        result.sort(Comparator.comparingInt(item -> item.zIndex));
+        result.sort(Comparator
+                .comparingInt((HudElementConfig item) ->
+                        item.type == HudElementType.BACKDROP ? 0 : 1)
+                .thenComparingInt(item -> item.zIndex));
         return result;
     }
 

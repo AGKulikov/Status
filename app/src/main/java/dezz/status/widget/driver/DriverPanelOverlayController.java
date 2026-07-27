@@ -5,7 +5,10 @@
 
 package dezz.status.widget.driver;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
@@ -37,6 +40,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -56,6 +60,8 @@ import dezz.status.widget.WidgetAccessibilityService;
 import dezz.status.widget.WidgetService;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.launcher.HighResolutionAppIconLoader;
+import dezz.status.widget.launcher.AppDrawerTileView;
+import dezz.status.widget.launcher.AppDrawerUninstallPolicy;
 import dezz.status.widget.launcher.AppUninstallLauncher;
 import dezz.status.widget.launcher.InformationShortcutView;
 import dezz.status.widget.launcher.LauncherAppCatalog;
@@ -138,6 +144,41 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private final List<AttachedWindow> panelWindows = new ArrayList<>();
     @Nullable private AttachedWindow drawerWindow;
     @Nullable private GridView drawerGrid;
+    @Nullable private TextView drawerTitle;
+    @Nullable private TextView drawerDone;
+    private boolean drawerEditMode;
+    private boolean drawerPackageReceiverRegistered;
+    private int drawerAppsGridScalePercent = 100;
+    private final BroadcastReceiver drawerPackageReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (drawerWindow != null) reloadAllAppsDrawer();
+        }
+    };
+    private final AppsAdapter.Listener drawerAppsListener = new AppsAdapter.Listener() {
+        @Override public void launch(@NonNull Context context,
+                                     @NonNull LauncherAppCatalog.App app) {
+            try {
+                dismissAllApps();
+                context.startActivity(LauncherAppCatalog.launchIntent(app));
+            } catch (RuntimeException error) {
+                Toast.makeText(context, "Не удалось открыть " + app.label,
+                        Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        @Override public void enterEditMode() {
+            setDrawerEditMode(true);
+        }
+
+        @Override public void uninstall(@NonNull Context context,
+                                        @NonNull LauncherAppCatalog.App app) {
+            if (!AppDrawerUninstallPolicy.canUninstall(
+                    context, app.packageName, app.systemApp)) return;
+            // The full-screen system overlay must not sit above Package Installer.
+            dismissAllApps();
+            AppUninstallLauncher.request(context, app);
+        }
+    };
     private int attachedType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
     private int applyGeneration;
     private int drawerGeneration;
@@ -350,10 +391,15 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 metrics.widthPixels, referenceWidth);
         int appsGridScalePercent = Math.max(60, Math.min(180,
                 preferences.launcherAllAppsIconScalePercent.get()));
+        drawerAppsGridScalePercent = appsGridScalePercent;
+        drawerEditMode = false;
         FrameLayout root = new FrameLayout(context);
         root.setClickable(true);
         root.setBackgroundColor(Color.argb(70, 0, 0, 0));
-        root.setOnClickListener(view -> dismissAllApps());
+        root.setOnClickListener(view -> {
+            if (drawerEditMode) setDrawerEditMode(false);
+            else dismissAllApps();
+        });
 
         FrameLayout drawer = new FrameLayout(context);
         drawer.setClickable(true);
@@ -382,6 +428,20 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 Gravity.TOP | Gravity.END);
         drawer.addView(close, closeParams);
 
+        TextView done = new TextView(context);
+        done.setText("Готово");
+        done.setTextColor(Color.WHITE);
+        done.setTextSize(17);
+        done.setGravity(Gravity.CENTER);
+        done.setPadding(dp(context, 18), 0, dp(context, 18), 0);
+        done.setBackground(rippleBackground(Color.argb(45, 255, 255, 255), 18));
+        done.setContentDescription("Завершить удаление приложений");
+        done.setVisibility(View.GONE);
+        done.setOnClickListener(view -> setDrawerEditMode(false));
+        FrameLayout.LayoutParams doneParams = new FrameLayout.LayoutParams(
+                dp(context, 132), 72, Gravity.TOP | Gravity.END);
+        drawer.addView(done, doneParams);
+
         GridView grid = new GridView(context);
         grid.setNumColumns(Math.max(3,
                 Math.min(8, preferences.launcherAllAppsColumns.get())));
@@ -392,7 +452,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         grid.setPadding(dp(context, 16), dp(context, 16),
                 dp(context, 16), dp(context, 16));
         grid.setAdapter(new AppsAdapter(context, Collections.emptyList(),
-                preferences, appsGridScalePercent, this::dismissAllApps));
+                preferences, appsGridScalePercent, drawerAppsListener));
         FrameLayout.LayoutParams gridParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         gridParams.topMargin = 84;
@@ -415,6 +475,9 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             manager.addView(root, params);
             drawerWindow = new AttachedWindow(root, params, manager);
             drawerGrid = grid;
+            drawerTitle = title;
+            drawerDone = done;
+            registerDrawerPackageReceiver();
         } catch (RuntimeException error) {
             Log.w(TAG, "Could not show all-apps drawer", error);
             Toast.makeText(appContext, "Не удалось открыть список приложений",
@@ -429,8 +492,10 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             mainHandler.post(() -> {
                 if (drawerGrid == null || drawerWindow == null
                         || generation != drawerGeneration) return;
-                drawerGrid.setAdapter(new AppsAdapter(drawerGrid.getContext(), apps,
-                        preferences, appsGridScalePercent, this::dismissAllApps));
+                AppsAdapter adapter = new AppsAdapter(drawerGrid.getContext(), apps,
+                        preferences, appsGridScalePercent, drawerAppsListener);
+                adapter.setEditMode(drawerEditMode);
+                drawerGrid.setAdapter(adapter);
             });
         });
     }
@@ -599,7 +664,61 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         AttachedWindow drawer = drawerWindow;
         drawerWindow = null;
         drawerGrid = null;
+        drawerTitle = null;
+        drawerDone = null;
+        drawerEditMode = false;
+        unregisterDrawerPackageReceiver();
         if (drawer != null) drawer.remove();
+    }
+
+    private void setDrawerEditMode(boolean enabled) {
+        drawerEditMode = enabled;
+        if (drawerTitle != null) {
+            drawerTitle.setText(enabled ? "Удаление приложений" : "Все приложения");
+        }
+        if (drawerDone != null) drawerDone.setVisibility(enabled ? View.VISIBLE : View.GONE);
+        if (drawerGrid != null && drawerGrid.getAdapter() instanceof AppsAdapter) {
+            ((AppsAdapter) drawerGrid.getAdapter()).setEditMode(enabled);
+        }
+    }
+
+    private void reloadAllAppsDrawer() {
+        if (drawerWindow == null || catalogExecutor.isShutdown()) return;
+        final int generation = ++drawerGeneration;
+        catalogExecutor.execute(() -> {
+            List<LauncherAppCatalog.App> apps =
+                    LauncherAppCatalog.loadVisible(appContext, preferences);
+            mainHandler.post(() -> {
+                if (drawerGrid == null || drawerWindow == null
+                        || generation != drawerGeneration) return;
+                AppsAdapter adapter = new AppsAdapter(drawerGrid.getContext(), apps,
+                        preferences, drawerAppsGridScalePercent, drawerAppsListener);
+                adapter.setEditMode(drawerEditMode);
+                drawerGrid.setAdapter(adapter);
+            });
+        });
+    }
+
+    private void registerDrawerPackageReceiver() {
+        if (drawerPackageReceiverRegistered) return;
+        IntentFilter filter = new IntentFilter(Intent.ACTION_PACKAGE_REMOVED);
+        filter.addDataScheme("package");
+        try {
+            ContextCompat.registerReceiver(appContext, drawerPackageReceiver, filter,
+                    ContextCompat.RECEIVER_EXPORTED);
+            drawerPackageReceiverRegistered = true;
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Could not register app-drawer package receiver", error);
+        }
+    }
+
+    private void unregisterDrawerPackageReceiver() {
+        if (!drawerPackageReceiverRegistered) return;
+        drawerPackageReceiverRegistered = false;
+        try {
+            appContext.unregisterReceiver(drawerPackageReceiver);
+        } catch (RuntimeException ignored) {
+        }
     }
 
     private void dismissFavoritePanel(@NonNull String panelId) {
@@ -701,7 +820,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 + bottomSection.desiredHeight;
         int informationBudget = desiredInformationHeight <= 0 ? 0
                 : controls.isEmpty() ? availableHeight
-                : Math.max(dp(context, 64), Math.round(availableHeight * .48f));
+                : Math.max(dp(context, 72), Math.round(availableHeight * .64f));
         int topHeight;
         int bottomHeight;
         if (desiredInformationHeight <= informationBudget) {
@@ -774,34 +893,74 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         ScrollView scroll = new ScrollView(context);
         scroll.setFillViewport(false);
         scroll.setVerticalScrollBarEnabled(rows.size() > 3);
+        scroll.setClipToPadding(false);
+        scroll.setPadding(0, 0, 0, dp(context, 12));
         LinearLayout host = new LinearLayout(context);
         host.setOrientation(LinearLayout.VERTICAL);
         int contentHeight = 0;
         for (List<LauncherShortcutStore.Shortcut> rowItems : rows.values()) {
+            LauncherShortcutStore.Shortcut rowStyle = rowItems.get(0);
             LinearLayout row = new LinearLayout(context);
             row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            int rowHeight = 0;
+            row.setGravity(groupGravity(rowStyle));
+            int groupPaddingLeft = dp(context, rowStyle.informationGroupPaddingLeftPx);
+            int groupPaddingTop = dp(context, rowStyle.informationGroupPaddingTopPx);
+            int groupPaddingRight = dp(context, rowStyle.informationGroupPaddingRightPx);
+            int groupPaddingBottom = dp(context,
+                    rowStyle.informationGroupPaddingBottomPx);
+            row.setPadding(groupPaddingLeft, groupPaddingTop,
+                    groupPaddingRight, groupPaddingBottom);
+            GradientDrawable groupBackground = new GradientDrawable();
+            groupBackground.setColor(safeColor(
+                    rowStyle.informationGroupBackgroundColor, Color.TRANSPARENT));
+            groupBackground.setCornerRadius(dp(context,
+                    rowStyle.informationGroupCornerRadiusPx));
+            row.setBackground(groupBackground);
+            int tileHeight = 0;
             int rowGap = 0;
-            for (LauncherShortcutStore.Shortcut shortcut : rowItems) {
+            int internalGap = dp(context, rowStyle.informationGroupGapPx);
+            for (int itemIndex = 0; itemIndex < rowItems.size(); itemIndex++) {
+                LauncherShortcutStore.Shortcut shortcut = rowItems.get(itemIndex);
                 View tile = shortcutButton(context, shortcut, false);
-                rowHeight = Math.max(rowHeight, informationTileHeight(context, shortcut));
+                tileHeight = Math.max(tileHeight, informationTileHeight(context, shortcut));
                 rowGap = Math.max(rowGap, Math.max(0,
                         shortcut.gapAfterPx < 0 ? panelGap : shortcut.gapAfterPx));
-                LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(
-                        0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
-                tileParams.setMargins(dp(context, 2), 0, dp(context, 2), 0);
+                LinearLayout.LayoutParams tileParams =
+                        rowStyle.informationGroupDistribution == 1
+                                ? new LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT)
+                                : new LinearLayout.LayoutParams(
+                                0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+                tileParams.rightMargin =
+                        itemIndex + 1 < rowItems.size() ? internalGap : 0;
                 row.addView(tile, tileParams);
             }
+            int rowHeight = tileHeight + groupPaddingTop + groupPaddingBottom;
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, rowHeight);
-            rowParams.bottomMargin = rowGap;
+            rowParams.leftMargin = dp(context, rowStyle.informationGroupMarginLeftPx);
+            rowParams.topMargin = dp(context, rowStyle.informationGroupMarginTopPx);
+            rowParams.rightMargin = dp(context, rowStyle.informationGroupMarginRightPx);
+            rowParams.bottomMargin = dp(context,
+                    rowStyle.informationGroupMarginBottomPx) + rowGap;
             host.addView(row, rowParams);
-            contentHeight += rowHeight + rowGap;
+            contentHeight += rowHeight + rowParams.topMargin + rowParams.bottomMargin;
         }
         scroll.addView(host, new ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         return new InformationSection(scroll, contentHeight);
+    }
+
+    private static int groupGravity(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        int horizontal = shortcut.informationGroupHorizontalAlignment <= 0
+                ? Gravity.START : shortcut.informationGroupHorizontalAlignment == 1
+                ? Gravity.CENTER_HORIZONTAL : Gravity.END;
+        int vertical = shortcut.informationGroupVerticalAlignment <= 0
+                ? Gravity.TOP : shortcut.informationGroupVerticalAlignment == 1
+                ? Gravity.CENTER_VERTICAL : Gravity.BOTTOM;
+        return horizontal | vertical;
     }
 
     private void registerFavoriteAnchors(
@@ -823,8 +982,10 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             @NonNull Context context,
             @NonNull LauncherShortcutStore.Shortcut shortcut) {
         float scaledDensity = context.getResources().getDisplayMetrics().scaledDensity;
+        // Values are allowed to wrap in InformationPanelView. Reserve several real text lines so
+        // device modes/availability details are not measured as one line and then clipped.
         int text = Math.round((shortcut.informationValueTextSizeSp
-                * (shortcut.informationShowValue ? 1 : 0)
+                * (shortcut.informationShowValue ? 3 : 0)
                 + (shortcut.showTitle ? shortcut.informationLabelTextSizeSp : 0))
                 * scaledDensity);
         int padding = dp(context, shortcut.informationPaddingTopPx
@@ -1289,19 +1450,32 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     }
 
     private static final class AppsAdapter extends BaseAdapter {
+        interface Listener {
+            void launch(@NonNull Context context, @NonNull LauncherAppCatalog.App app);
+            void enterEditMode();
+            void uninstall(@NonNull Context context, @NonNull LauncherAppCatalog.App app);
+        }
+
         private final Context context;
         private final List<LauncherAppCatalog.App> apps;
         private final Map<String, FavoriteAppConfig> appearances;
         private final int scalePercent;
-        private final Runnable close;
+        private final Listener listener;
+        private boolean editMode;
 
         AppsAdapter(Context context, List<LauncherAppCatalog.App> apps,
-                    Preferences preferences, int scalePercent, Runnable close) {
+                    Preferences preferences, int scalePercent, Listener listener) {
             this.context = context;
             this.apps = apps;
             this.appearances = new FavoriteAppsConfigStore(preferences).appearanceSnapshot();
             this.scalePercent = scalePercent;
-            this.close = close;
+            this.listener = listener;
+        }
+
+        void setEditMode(boolean enabled) {
+            if (editMode == enabled) return;
+            editMode = enabled;
+            notifyDataSetChanged();
         }
 
         @Override public int getCount() { return apps.size(); }
@@ -1313,26 +1487,21 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             LauncherAppCatalog.App app = apps.get(position);
             FavoriteAppConfig appearance = appearances.get(app.packageName);
             if (appearance == null) appearance = new FavoriteAppConfig(app.packageName);
+            AppDrawerTileView cell = convertView instanceof AppDrawerTileView
+                    ? (AppDrawerTileView) convertView : new AppDrawerTileView(context);
             LinearLayout tile = LauncherAppTileRenderer.render(
-                    context, convertView, app.label,
+                    context, cell.reusableContent(), app.label,
                     LauncherAppCatalog.loadIcon(context, app),
                     appearance, scalePercent);
-            tile.setContentDescription(app.label);
-            tile.setOnClickListener(view -> {
-                try {
-                    close.run();
-                    context.startActivity(LauncherAppCatalog.launchIntent(app));
-                } catch (RuntimeException error) {
-                    Toast.makeText(context, "Не удалось открыть " + app.label,
-                            Toast.LENGTH_SHORT).show();
-                }
-            });
-            tile.setOnLongClickListener(view -> {
-                close.run();
-                AppUninstallLauncher.request(context, app);
-                return true;
-            });
-            return tile;
+            boolean uninstallable = AppDrawerUninstallPolicy.canUninstall(
+                    context, app.packageName, app.systemApp);
+            cell.setContentDescription(app.label
+                    + (editMode && uninstallable ? ", можно удалить" : ""));
+            cell.bind(tile, editMode, uninstallable,
+                    () -> listener.launch(context, app),
+                    listener::enterEditMode,
+                    () -> listener.uninstall(context, app));
+            return cell;
         }
     }
 

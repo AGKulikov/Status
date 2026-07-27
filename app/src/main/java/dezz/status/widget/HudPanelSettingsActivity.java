@@ -43,6 +43,7 @@ import dezz.status.widget.hud.HudPanelStore;
 import dezz.status.widget.hud.HudPresentationService;
 import dezz.status.widget.hud.HudRuntimeData;
 import dezz.status.widget.hud.HudViewportPolicy;
+import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.settings.SettingsBackNavigation;
@@ -104,6 +105,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         updateSelection(item);
                         main.removeCallbacks(persistLive);
                         main.postDelayed(persistLive, committed ? 0L : 55L);
+                    }
+
+                    @Override public void onConfigure(@NonNull HudElementConfig item) {
+                        editElement(item);
                     }
                 });
         preview.addView(canvas, new FrameLayout.LayoutParams(
@@ -169,6 +174,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Button add = button("+ Элемент");
         add.setOnClickListener(view -> addElement());
         row.addView(add);
+        Button backdrop = button("+ Подложка");
+        backdrop.setOnClickListener(view -> addBackdrop());
+        row.addView(backdrop);
         Button options = button("Параметры");
         options.setOnClickListener(view -> editGlobalOptions());
         row.addView(options);
@@ -243,14 +251,17 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
     }
 
     private void addElement() {
-        HudElementType[] types = HudElementType.values();
-        String[] labels = new String[types.length];
-        for (int index = 0; index < types.length; index++) {
-            labels[index] = types[index].category + " · " + types[index].label;
+        ArrayList<HudElementType> types = new ArrayList<>();
+        for (HudElementType type : HudElementType.values()) {
+            if (type != HudElementType.BACKDROP) types.add(type);
+        }
+        String[] labels = new String[types.size()];
+        for (int index = 0; index < types.size(); index++) {
+            labels[index] = types.get(index).category + " · " + types.get(index).label;
         }
         new AlertDialog.Builder(this).setTitle("Добавить на HUD")
                 .setItems(labels, (dialog, which) -> {
-                    HudElementType type = types[which];
+                    HudElementType type = types.get(which);
                     int ordinal = 1;
                     HudElementConfig item;
                     do {
@@ -266,7 +277,26 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 }).setNegativeButton("Отмена", null).show();
     }
 
+    private void addBackdrop() {
+        int ordinal = 1;
+        HudElementConfig item;
+        do {
+            item = HudElementConfig.create(HudElementType.BACKDROP, ordinal++,
+                    config.gridColumns, config.gridRows);
+        } while (containsId(item.id));
+        item.zIndex = previousBackdropLayer();
+        config.elements.add(item);
+        canvas.updateConfig(config);
+        canvas.select(item.id);
+        persist(false);
+        editElement(item);
+    }
+
     private void editElement(@NonNull HudElementConfig item) {
+        if (item.type == HudElementType.BACKDROP) {
+            editBackdrop(item);
+            return;
+        }
         ScrollView scroll = new ScrollView(this);
         LinearLayout form = column();
         form.setPadding(dp(18), dp(8), dp(18), dp(18));
@@ -283,7 +313,6 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         EditText unit = field(form, "Единица", item.unit, false);
         EditText textColor = field(form, "Цвет текста", item.textColor, false);
         EditText unitColor = field(form, "Цвет единицы", item.unitColor, false);
-        EditText background = field(form, "Цвет фона", item.backgroundColor, false);
         EditText fontSize = field(form, "Размер текста", Integer.toString(item.fontSizeSp), true);
         EditText fontWeight = field(form, "Насыщенность шрифта 100–900",
                 Integer.toString(item.fontWeight), true);
@@ -307,6 +336,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Switch wrap = switchView("Переносить длинный текст", item.wrapText);
         form.addView(itemEnabled, marginTop(8));
         form.addView(wrap, marginTop(4));
+        form.addView(text("У виджета нет собственной подложки. Размер фрейма меняет место "
+                + "для текста и масштаб графики; размер текста меняется только здесь.",
+                12, 0xFF95A0AF), marginTop(6));
 
         form.addView(section("Умный дом / внешний источник"), marginTop(16));
         String connectorName = item.sourceBinding == null
@@ -346,7 +378,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         item.unit = value(unit);
                         item.textColor = value(textColor);
                         item.unitColor = value(unitColor);
-                        item.backgroundColor = value(background);
+                        item.backgroundColor = "#00000000";
                         item.fontSizeSp = integer(fontSize, item.fontSizeSp);
                         item.fontWeight = integer(fontWeight, item.fontWeight);
                         item.x = integer(x, item.x);
@@ -378,6 +410,72 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                         Toast.makeText(this, "Проверьте параметры: " + error.getMessage(),
                                 Toast.LENGTH_LONG).show();
                     }
+                }));
+        dialog.show();
+    }
+
+    private void editBackdrop(@NonNull HudElementConfig item) {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout form = column();
+        form.setPadding(dp(18), dp(8), dp(18), dp(24));
+        scroll.addView(form);
+
+        EditText title = field(form, "Название", item.title, false);
+        LinearLayout geometry = new LinearLayout(this);
+        EditText x = compactNumber("X", item.x);
+        EditText y = compactNumber("Y", item.y);
+        EditText width = compactNumber("W", item.width);
+        EditText height = compactNumber("H", item.height);
+        geometry.addView(x, weighted());
+        geometry.addView(y, weighted());
+        geometry.addView(width, weighted());
+        geometry.addView(height, weighted());
+        form.addView(label("Положение и размер"), marginTop(10));
+        form.addView(geometry);
+
+        EditText color = field(form, "Цвет подложки", item.backgroundColor, false);
+        EditText opacity = field(form, "Прозрачность заливки 0–100 %",
+                Integer.toString(item.backgroundOpacityPercent), true);
+        EditText corner = field(form, "Скругление, px",
+                Integer.toString(item.cornerRadiusPx), true);
+        EditText borderColor = field(form, "Цвет рамки", item.borderColor, false);
+        EditText borderOpacity = field(form, "Прозрачность рамки 0–100 %",
+                Integer.toString(item.borderOpacityPercent), true);
+        EditText borderWidth = field(form, "Толщина рамки, px",
+                Integer.toString(item.borderWidthPx), true);
+        Switch itemEnabled = switchView("Показывать подложку", item.enabled);
+        form.addView(itemEnabled, marginTop(8));
+        form.addView(text("Подложка всегда рисуется ниже всех HUD-виджетов. "
+                + "Тень на HUD отключена и в настройках отсутствует.",
+                12, 0xFF95A0AF), marginTop(6));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Подложка HUD")
+                .setView(scroll)
+                .setPositiveButton("Применить", null)
+                .setNegativeButton("Отмена", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    item.title = value(title);
+                    item.x = integer(x, item.x);
+                    item.y = integer(y, item.y);
+                    item.width = integer(width, item.width);
+                    item.height = integer(height, item.height);
+                    item.backgroundColor = value(color);
+                    item.backgroundOpacityPercent =
+                            integer(opacity, item.backgroundOpacityPercent);
+                    item.cornerRadiusPx = integer(corner, item.cornerRadiusPx);
+                    item.borderColor = value(borderColor);
+                    item.borderOpacityPercent =
+                            integer(borderOpacity, item.borderOpacityPercent);
+                    item.borderWidthPx = integer(borderWidth, item.borderWidthPx);
+                    item.enabled = itemEnabled.isChecked();
+                    item.normalize(config.gridColumns, config.gridRows);
+                    canvas.updateConfig(config);
+                    updateSelection(item);
+                    persist(false);
+                    dialog.dismiss();
                 }));
         dialog.show();
     }
@@ -416,12 +514,15 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         Switch showGrid = switchView("Показывать сетку в редакторе", config.showGrid);
         Switch free = switchView("Свободное перемещение между линиями", config.freeMovement);
         Switch maskStockHud = switchView(
-                "Скрывать штатные машинку и скорость системной HUD-маской",
+                "Скрывать штатные машинку и скорость (AR + HUD-маска)",
                 config.maskStockHud);
         TextView maskHint = text(
-                "Для элементов ecarx_daemon используется отдельный SurfaceFlinger-слой. "
-                        + "Он запускается через настроенный локальный ADB/Telnet; "
-                        + "при недоступности автоматически остаётся обычный overlay.",
+                "Машинка и дорога отключаются старым штатным AR-флагом через полный активный "
+                        + "профиль автомобиля; цифровая скорость закрывается чёрной маской. "
+                        + "AR-флаг применяется и при выключенной пользовательской HUD-панели. "
+                        + "Для элементов ecarx_daemon дополнительно используется отдельный "
+                        + "SurfaceFlinger-слой через локальный ADB/Telnet; при его недоступности "
+                        + "остаётся обычный overlay.",
                 12, 0xFFB8C0CC);
         Switch snow = switchView("Снежный режим", config.snowMode);
         Switch sync = switchView("Один цвет для всех элементов", config.syncElementColors);
@@ -469,6 +570,9 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                     config.showGrid = showGrid.isChecked();
                     config.freeMovement = free.isChecked();
                     config.maskStockHud = maskStockHud.isChecked();
+                    if (!preferences.hudPanelEnabled.get()) {
+                        applyStockHudPreference(config.maskStockHud);
+                    }
                     config.snowMode = snow.isChecked();
                     config.syncElementColors = sync.isChecked();
                     preferences.hudPanelAutostart.set(autostart.isChecked());
@@ -478,6 +582,17 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                     dialog.dismiss();
                 }));
         dialog.show();
+    }
+
+    private void applyStockHudPreference(boolean hidden) {
+        CarIntegrations.get(this).setStockHudCarHidden(hidden, (success, message) -> {
+            if (success) return;
+            String detail = message == null || message.trim().isEmpty()
+                    ? "ECARX не подтвердил изменение"
+                    : message.trim();
+            Toast.makeText(getApplicationContext(),
+                    "Штатный HUD AR: " + detail, Toast.LENGTH_LONG).show();
+        });
     }
 
     private void confirmReset() {
@@ -588,6 +703,16 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
         int maximum = 0;
         for (HudElementConfig item : config.elements) maximum = Math.max(maximum, item.zIndex);
         return maximum + 1;
+    }
+
+    private int previousBackdropLayer() {
+        int minimum = 0;
+        for (HudElementConfig item : config.elements) {
+            if (item.type == HudElementType.BACKDROP) {
+                minimum = Math.min(minimum, item.zIndex);
+            }
+        }
+        return minimum - 1;
     }
 
     @Override

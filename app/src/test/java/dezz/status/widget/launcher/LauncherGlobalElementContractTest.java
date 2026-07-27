@@ -40,8 +40,27 @@ public final class LauncherGlobalElementContractTest {
         assertTrue(proxy.contains("ScaleMode.STRETCH"));
         assertTrue(proxy.contains("Math.min(widthScale, heightScale)"));
         assertTrue(proxy.contains("configurationListener.onConfigure()"));
+        assertTrue(proxy.contains("compensateTextScale(transform.scaleY)"));
+        assertTrue(proxy.contains("text.setPadding(0, 0, 0, 0)"));
+        assertTrue(proxy.contains("drawWithoutAutomaticSurface"));
         String media = read("launcher/media/MediaPanelView.java");
         assertTrue(media.contains("ImageView.ScaleType.FIT_CENTER"));
+    }
+
+    @Test
+    public void homeBackdropsAreIndependentUnlimitedLayersBelowWidgets() throws Exception {
+        String activity = read("LauncherActivity.java");
+        String store = read("launcher/LauncherBackdropStore.java");
+        String surface = read("launcher/LauncherBackdropView.java");
+
+        assertTrue(activity.contains("entries.add(\"Подложка…\")"));
+        assertTrue(activity.contains("workspace.addView(frame, Math.min(backdropIndex"));
+        assertTrue(activity.contains("frame.setStayBehindSiblings(true)"));
+        assertTrue(activity.contains("Тень · только HOME"));
+        assertTrue(store.contains("launcherBackdropsJson"));
+        assertTrue(store.contains("public Backdrop create()"));
+        assertTrue(!store.contains("MAX_BACKDROPS"));
+        assertTrue(surface.contains("paint.setShadowLayer("));
     }
 
     @Test

@@ -510,6 +510,8 @@ public class Preferences {
     /** Screen-wide geometry of individual HOME elements after migration from panel-local grids. */
     public final Str launcherGlobalElementsJson = new Str(this,
             "launcherGlobalElementsJson", "");
+    /** Independent decorative HOME layers. They are always rendered below live widgets. */
+    public final Str launcherBackdropsJson = new Str(this, "launcherBackdropsJson", "");
     public final Str launcherFavoritePackages = new Str(this, "launcherFavoritePackages", "");
     /** Per-application HOME icon/label sizes; selection and order remain in the legacy list. */
     public final Str launcherFavoriteAppsAppearanceJson = new Str(this,
