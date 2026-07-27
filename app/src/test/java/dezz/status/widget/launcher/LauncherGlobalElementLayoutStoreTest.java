@@ -39,12 +39,12 @@ public final class LauncherGlobalElementLayoutStoreTest {
     }
 
     @Test
-    public void deepAppearanceDefaultsToNonDistortingFitAndLockedRatio() {
+    public void deepAppearanceDefaultsToNonDistortingFitAndFreeFrame() {
         LauncherGlobalElementLayoutStore.Appearance value =
                 new LauncherGlobalElementLayoutStore.Appearance();
 
         assertEquals(LauncherGlobalElementLayoutStore.ScaleMode.FIT, value.scaleMode);
-        org.junit.Assert.assertTrue(value.preserveAspectRatio);
+        org.junit.Assert.assertFalse(value.preserveAspectRatio);
         assertEquals(LauncherGlobalElementLayoutStore.TapAction.INHERIT,
                 value.tapAction);
     }

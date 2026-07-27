@@ -23,7 +23,7 @@ import dezz.status.widget.Preferences;
  * panel layout after Android has measured it, preserving existing user arrangements.</p>
  */
 public final class LauncherGlobalElementLayoutStore {
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 3;
     private static final int MIN_WIDTH = 36;
     private static final int MIN_HEIGHT = 28;
 
@@ -62,7 +62,7 @@ public final class LauncherGlobalElementLayoutStore {
     /** Deep per-widget rendering and interaction settings, independent of its rectangle. */
     public static final class Appearance {
         @NonNull public ScaleMode scaleMode = ScaleMode.FIT;
-        public boolean preserveAspectRatio = true;
+        public boolean preserveAspectRatio = false;
         public int paddingLeftPx;
         public int paddingTopPx;
         public int paddingRightPx;
@@ -153,7 +153,7 @@ public final class LauncherGlobalElementLayoutStore {
         try {
             JSONObject root = new JSONObject(raw);
             int version = root.optInt("version", 0);
-            if (version != 1 && version != SCHEMA_VERSION) return;
+            if (version < 1 || version > SCHEMA_VERSION) return;
             JSONObject elements = root.optJSONObject("elements");
             if (elements == null) return;
             java.util.Iterator<String> keys = elements.keys();
@@ -169,7 +169,7 @@ public final class LauncherGlobalElementLayoutStore {
                 geometry.put(id, clamp(parsed, screenWidth, screenHeight));
                 JSONObject appearance = value.optJSONObject("appearance");
                 if (appearance != null) {
-                    appearances.put(id, decodeAppearance(appearance));
+                    appearances.put(id, decodeAppearance(appearance, version));
                 }
             }
         } catch (JSONException ignored) {
@@ -245,7 +245,7 @@ public final class LauncherGlobalElementLayoutStore {
     }
 
     @NonNull
-    private static Appearance decodeAppearance(@NonNull JSONObject encoded) {
+    private static Appearance decodeAppearance(@NonNull JSONObject encoded, int version) {
         Appearance value = new Appearance();
         try {
             value.scaleMode = ScaleMode.valueOf(
@@ -253,8 +253,10 @@ public final class LauncherGlobalElementLayoutStore {
         } catch (IllegalArgumentException ignored) {
             value.scaleMode = ScaleMode.FIT;
         }
-        value.preserveAspectRatio =
-                encoded.optBoolean("preserveAspectRatio", true);
+        // HA1130 saved every widget with ratio locking enabled by default. Migrate those frames
+        // once so width and height become genuinely independent; users can re-enable the option.
+        value.preserveAspectRatio = version >= 3
+                && encoded.optBoolean("preserveAspectRatio", false);
         value.paddingLeftPx = encoded.optInt("paddingLeftPx", 0);
         value.paddingTopPx = encoded.optInt("paddingTopPx", 0);
         value.paddingRightPx = encoded.optInt("paddingRightPx", 0);

@@ -235,6 +235,12 @@ public final class LauncherActivity extends AppCompatActivity {
     @Nullable private MaterialButton allAppsDone;
     private boolean allAppsEditMode;
     private boolean allAppsUninstallInProgress;
+    private boolean allAppsUninstallReceiverRegistered;
+    private final BroadcastReceiver allAppsUninstallReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            finishAllAppsUninstallFlow();
+        }
+    };
     private TextView navigationArrival;
     private TextView navigationDuration;
     private TextView navigationDistance;
@@ -437,6 +443,7 @@ public final class LauncherActivity extends AppCompatActivity {
             }
         }
         registerNavigationReceiver();
+        registerAllAppsUninstallReceiver();
         WidgetServiceStarter.startIfNeeded(this);
         navigationUiHandler.removeCallbacks(safeAreaRefresh);
         navigationUiHandler.post(safeAreaRefresh);
@@ -485,6 +492,7 @@ public final class LauncherActivity extends AppCompatActivity {
         if (mediaController != null) mediaController.stop();
         releaseNavigationGraphics();
         unregisterNavigationReceiver();
+        unregisterAllAppsUninstallReceiver();
         super.onStop();
     }
 
@@ -524,11 +532,7 @@ public final class LauncherActivity extends AppCompatActivity {
         if (shortcutStore != null) shortcutStore.load();
         applyLauncherPreferences();
         if (appCatalog != null) reloadAppCatalogAsync(false);
-        if (allAppsUninstallInProgress) {
-            allAppsUninstallInProgress = false;
-            lastAppCatalogLoadElapsed = 0L;
-            reloadAppCatalogAsync(true);
-        }
+        if (allAppsUninstallInProgress) finishAllAppsUninstallFlow();
         if (shortcutStore != null) {
             refreshShortcutGrid();
         }
@@ -556,6 +560,38 @@ public final class LauncherActivity extends AppCompatActivity {
         catch (RuntimeException failure) {
             Log.w(TAG, "Navigation receiver was already removed", failure);
         }
+    }
+
+    private void registerAllAppsUninstallReceiver() {
+        if (allAppsUninstallReceiverRegistered) return;
+        try {
+            ContextCompat.registerReceiver(this, allAppsUninstallReceiver,
+                    new IntentFilter(AppUninstallLauncher.ACTION_FINISHED),
+                    ContextCompat.RECEIVER_NOT_EXPORTED);
+            allAppsUninstallReceiverRegistered = true;
+        } catch (RuntimeException failure) {
+            allAppsUninstallReceiverRegistered = false;
+            Log.w(TAG, "Could not register All Apps uninstall receiver", failure);
+        }
+    }
+
+    private void unregisterAllAppsUninstallReceiver() {
+        if (!allAppsUninstallReceiverRegistered) return;
+        allAppsUninstallReceiverRegistered = false;
+        try {
+            unregisterReceiver(allAppsUninstallReceiver);
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "All Apps uninstall receiver was already removed", failure);
+        }
+    }
+
+    private void finishAllAppsUninstallFlow() {
+        if (!allAppsUninstallInProgress) return;
+        allAppsUninstallInProgress = false;
+        setAllAppsConfirmationActive(false);
+        lastAppCatalogLoadElapsed = 0L;
+        if (appCatalog != null) reloadAppCatalogAsync(true);
+        refreshAllAppsDrawerContents();
     }
 
     private void reconcileMediaController() {
@@ -1104,8 +1140,7 @@ public final class LauncherActivity extends AppCompatActivity {
                     && (editMode || proxy != null && proxy.sourceIsShown());
             entry.getValue().setVisibility(visible ? View.VISIBLE : View.GONE);
             entry.getValue().setEditMode(editMode, snap);
-            entry.getValue().setCardElevation(editMode ? dp(10) : 0);
-            if (proxy != null && visible) proxy.invalidate();
+            if (proxy != null && visible) proxy.refreshFromSource();
         }
     }
 
@@ -2768,7 +2803,9 @@ public final class LauncherActivity extends AppCompatActivity {
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setGravity(Gravity.CENTER);
-        content.setPadding(dp(6), dp(6), dp(6), dp(6));
+        // Atomic widgets are edge-to-edge. Any visual breathing room belongs to the explicit
+        // per-widget outer-padding setting, not an invisible inset baked into this source tile.
+        content.setPadding(0, 0, 0, 0);
         ImageView icon = new ImageView(this);
         if (addButton) {
             icon.setImageResource(R.drawable.ic_add);
@@ -2792,7 +2829,7 @@ public final class LauncherActivity extends AppCompatActivity {
             label.setText(addButton ? "+  Добавить" : shortcut.title);
             label.setMaxLines(2);
             LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(matchWidth(), wrapContent());
-            labelLp.topMargin = dp(4);
+            labelLp.topMargin = 0;
             content.addView(label, labelLp);
         }
         TextView stateLabel = null;
@@ -2805,7 +2842,7 @@ public final class LauncherActivity extends AppCompatActivity {
             stateLabel.setSingleLine(false);
             stateLabel.setMaxLines(Integer.MAX_VALUE);
             stateLabel.setEllipsize(null);
-            stateLabel.setPadding(dp(5), 0, dp(5), 0);
+            stateLabel.setPadding(0, 0, 0, 0);
             GradientDrawable badge = new GradientDrawable();
             badge.setColor(Color.argb(150, 0, 0, 0));
             badge.setCornerRadius(dp(9));
@@ -2822,7 +2859,7 @@ public final class LauncherActivity extends AppCompatActivity {
         if (stateLabel != null) {
             FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(
                     matchWidth(), wrapContent(), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-            badgeLp.setMargins(dp(4), dp(4), dp(4), dp(4));
+            badgeLp.setMargins(0, 0, 0, 0);
             card.addView(stateLabel, badgeLp);
         }
         if (addButton) {
@@ -3608,7 +3645,7 @@ public final class LauncherActivity extends AppCompatActivity {
         allAppsUninstallInProgress = false;
         FrameLayout root = new FrameLayout(this);
         root.setPadding(dp(24), dp(18), dp(24), dp(24));
-        root.setBackgroundColor(Color.argb(247, 10, 13, 18));
+        root.setBackgroundColor(Color.rgb(10, 13, 18));
         TextView title = text(24, Color.WHITE, true);
         title.setText("Все приложения");
         title.setGravity(Gravity.CENTER_VERTICAL);
@@ -3685,7 +3722,7 @@ public final class LauncherActivity extends AppCompatActivity {
             dialog.show();
             Window shown = dialog.getWindow();
             if (shown != null) {
-                shown.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                shown.setBackgroundDrawable(new ColorDrawable(Color.rgb(10, 13, 18)));
                 shown.setLayout(WindowManager.LayoutParams.MATCH_PARENT,
                         WindowManager.LayoutParams.MATCH_PARENT);
             }
@@ -3725,6 +3762,17 @@ public final class LauncherActivity extends AppCompatActivity {
         }
     }
 
+    private void setAllAppsConfirmationActive(boolean active) {
+        android.app.AlertDialog dialog = allAppsDialog;
+        Window window = dialog == null ? null : dialog.getWindow();
+        if (window == null) return;
+        if (active) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
+        }
+    }
+
     private void refreshAllAppsDrawerContents() {
         GridView grid = allAppsGrid;
         if (grid == null || appCatalog == null) return;
@@ -3744,12 +3792,15 @@ public final class LauncherActivity extends AppCompatActivity {
                                 LauncherActivity.this, entry.packageName,
                                 entry.systemApp)) return;
                         lastAppCatalogLoadElapsed = 0L;
-                        // A TYPE_APPLICATION_OVERLAY dialog may remain above the system Package
-                        // Installer and intercept its confirmation buttons. Remove our window
-                        // before ACTION_DELETE; onResume refreshes the catalog afterwards.
-                        dismissAllAppsDialog();
+                        // Keep the exact grid/edit session visible behind Package Installer.
+                        // Temporarily make only our window input-transparent so confirmation
+                        // receives every tap; onResume restores interaction in the same overlay.
+                        setAllAppsConfirmationActive(true);
                         allAppsUninstallInProgress = AppUninstallLauncher.request(
                                 LauncherActivity.this, entry.packageName, entry.label);
+                        if (!allAppsUninstallInProgress) {
+                            setAllAppsConfirmationActive(false);
+                        }
                     }
                 });
         adapter.setEditMode(allAppsEditMode);

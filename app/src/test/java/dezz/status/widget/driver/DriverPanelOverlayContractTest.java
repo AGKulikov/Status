@@ -223,9 +223,11 @@ public class DriverPanelOverlayContractTest {
         int request = controller.indexOf(
                 "AppUninstallLauncher.request(context, app)", uninstall);
         assertTrue(uninstall >= 0);
-        assertTrue(dismiss >= 0);
         assertTrue(request >= 0);
-        assertTrue(dismiss < request);
+        assertTrue(dismiss < 0 || dismiss > request);
+        assertTrue(controller.contains("current.setTouchable(false)"));
+        assertTrue(controller.contains("AppUninstallLauncher.ACTION_FINISHED"));
+        assertTrue(controller.contains("PixelFormat.OPAQUE"));
 
         assertTrue(launcher.contains("LauncherAppCatalog.loadIncludingSystem(context)"));
         assertTrue(launcher.contains("appCatalog.allVisible()"));

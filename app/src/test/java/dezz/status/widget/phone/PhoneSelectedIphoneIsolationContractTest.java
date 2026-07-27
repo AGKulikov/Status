@@ -86,8 +86,9 @@ public final class PhoneSelectedIphoneIsolationContractTest {
         assertTrue(source.contains("created.connectSavedIphone(address)"));
         assertTrue(source.contains("new AncsTransportListener(token, transportSession)"));
         assertTrue(savedPeer.contains("adapter.getRemoteDevice(address.trim())"));
-        assertTrue(savedPeer.contains(
-                "connectIphonePeripheral(device, CONNECT_TIMEOUT_MS,"));
+        assertTrue(savedPeer.contains("return startSavedPeerScan(device)"));
+        assertTrue(transport.contains(".setDeviceAddress(address)"));
+        assertTrue(transport.contains("sameDevice(savedTarget, result.getDevice())"));
         assertFalse(ensureGatt.contains("selectedDevice.connectGatt("));
         assertFalse(ensureGatt.contains("scheduleConnectWatchdog("));
         assertTrue(batteryOnly.contains("selectedDevice.connectGatt(context, autoConnect"));

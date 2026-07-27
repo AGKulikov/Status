@@ -112,8 +112,11 @@ public final class LauncherElementFrame extends MaterialCardView {
     }
 
     public void setEditMode(boolean enabled, int snapPx) {
+        int normalizedSnap = Math.max(1, snapPx);
+        boolean modeChanged = editMode != enabled;
         editMode = enabled;
-        this.snapPx = Math.max(1, snapPx);
+        this.snapPx = normalizedSnap;
+        if (!modeChanged) return;
         editBadge.setVisibility(enabled ? VISIBLE : GONE);
         for (ImageView handle : resizeHandles) {
             if (handle != null) handle.setVisibility(enabled ? VISIBLE : GONE);
@@ -177,36 +180,20 @@ public final class LauncherElementFrame extends MaterialCardView {
                 if (Math.abs(dx) > touchSlop || Math.abs(dy) > touchSlop) {
                     movedSinceDown = true;
                 }
-                if (resizeCorner != LauncherPanelResizeMath.Corner.NONE) {
-                    View parent = (View) getParent();
-                    LauncherPanelResizeMath.Rect start =
-                            new LauncherPanelResizeMath.Rect(
-                                    downX, downY, downX + downWidth, downY + downHeight);
-                    LauncherPanelResizeMath.Rect resized = preserveAspectRatio
-                            ? LauncherPanelResizeMath.resizeKeepingAspect(
-                                    resizeCorner, start, dx, dy,
-                                    parent.getWidth(), parent.getHeight(),
-                                    minimumWidthPx, minimumHeightPx, snapPx,
-                                    downWidth / (float) Math.max(1, downHeight))
-                            : LauncherPanelResizeMath.resize(
-                                    resizeCorner, start, dx, dy,
-                                    parent.getWidth(), parent.getHeight(),
-                                    minimumWidthPx, minimumHeightPx, snapPx);
-                    lp.leftMargin = resized.left;
-                    lp.topMargin = resized.top;
-                    lp.width = resized.width();
-                    lp.height = resized.height();
-                } else {
-                    int maxX = Math.max(0, ((View) getParent()).getWidth() - getWidth());
-                    int maxY = Math.max(0, ((View) getParent()).getHeight() - getHeight());
-                    lp.leftMargin = Math.max(0, Math.min(snap(downX + dx), maxX));
-                    lp.topMargin = Math.max(0, Math.min(snap(downY + dy), maxY));
-                }
+                // Follow the finger pixel-for-pixel. Grid snapping during every MOVE was the
+                // source of the visible jumps in the hardware video; snap once on release.
+                applyGeometry(lp, dx, dy, 1);
                 setLayoutParams(lp);
                 return true;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
                 if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(false);
+                if (event.getActionMasked() == MotionEvent.ACTION_UP && movedSinceDown) {
+                    int finalDx = Math.round(event.getRawX() - downRawX);
+                    int finalDy = Math.round(event.getRawY() - downRawY);
+                    applyGeometry(lp, finalDx, finalDy, snapPx);
+                    setLayoutParams(lp);
+                }
                 listener.onGeometryChanged(elementId, lp.leftMargin, lp.topMargin,
                         Math.max(1, lp.width), Math.max(1, lp.height));
                 resizeCorner = LauncherPanelResizeMath.Corner.NONE;
@@ -225,8 +212,40 @@ public final class LauncherElementFrame extends MaterialCardView {
         return true;
     }
 
-    private int snap(int value) {
-        return Math.round(value / (float) snapPx) * snapPx;
+    private void applyGeometry(@NonNull FrameLayout.LayoutParams lp,
+                               int dx, int dy, int gridSnapPx) {
+        View parent = (View) getParent();
+        if (resizeCorner != LauncherPanelResizeMath.Corner.NONE) {
+            LauncherPanelResizeMath.Rect start =
+                    new LauncherPanelResizeMath.Rect(
+                            downX, downY, downX + downWidth, downY + downHeight);
+            LauncherPanelResizeMath.Rect resized = preserveAspectRatio
+                    ? LauncherPanelResizeMath.resizeKeepingAspect(
+                            resizeCorner, start, dx, dy,
+                            parent.getWidth(), parent.getHeight(),
+                            minimumWidthPx, minimumHeightPx, gridSnapPx,
+                            downWidth / (float) Math.max(1, downHeight))
+                    : LauncherPanelResizeMath.resize(
+                            resizeCorner, start, dx, dy,
+                            parent.getWidth(), parent.getHeight(),
+                            minimumWidthPx, minimumHeightPx, gridSnapPx);
+            lp.leftMargin = resized.left;
+            lp.topMargin = resized.top;
+            lp.width = resized.width();
+            lp.height = resized.height();
+            return;
+        }
+        int maxX = Math.max(0, parent.getWidth() - downWidth);
+        int maxY = Math.max(0, parent.getHeight() - downHeight);
+        lp.leftMargin = Math.max(0,
+                Math.min(snap(downX + dx, gridSnapPx), maxX));
+        lp.topMargin = Math.max(0,
+                Math.min(snap(downY + dy, gridSnapPx), maxY));
+    }
+
+    private static int snap(int value, int gridSnapPx) {
+        int safeSnap = Math.max(1, gridSnapPx);
+        return Math.round(value / (float) safeSnap) * safeSnap;
     }
 
     private void addResizeHandle(@NonNull LauncherPanelResizeMath.Corner corner,

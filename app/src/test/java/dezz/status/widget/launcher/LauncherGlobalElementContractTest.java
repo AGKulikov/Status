@@ -6,6 +6,7 @@
 package dezz.status.widget.launcher;
 
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 
 import org.junit.Test;
 
@@ -40,7 +41,8 @@ public final class LauncherGlobalElementContractTest {
         assertTrue(proxy.contains("ScaleMode.STRETCH"));
         assertTrue(proxy.contains("Math.min(widthScale, heightScale)"));
         assertTrue(proxy.contains("configurationListener.onConfigure()"));
-        assertTrue(proxy.contains("compensateTextScale(transform.scaleY)"));
+        assertTrue(proxy.contains("drawNestedText(canvas, (TextView) value"));
+        assertFalse(proxy.contains("compensateTextScale"));
         assertTrue(proxy.contains("text.setPadding(0, 0, 0, 0)"));
         assertTrue(proxy.contains("drawWithoutAutomaticSurface"));
         String media = read("launcher/media/MediaPanelView.java");

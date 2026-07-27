@@ -209,6 +209,12 @@ public class MarqueeOutlineTextView extends OutlineTextView {
         evaluateAndUpdate();
     }
 
+    /** Original user-visible string, without the internal second marquee copy/separator. */
+    @NonNull
+    public CharSequence getMarqueeSourceText() {
+        return sourceText == null ? "" : sourceText;
+    }
+
     /**
      * Enable / disable the marquee scroll behavior. When disabled, overflowing text is rendered
      * statically up to {@link #setMaxWidth(int) maxWidth} and cut off with an end ellipsis;

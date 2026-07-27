@@ -1302,6 +1302,8 @@ public final class PhoneConnectorController {
         return state.contains("CONNECT RETURNED NULL")
                 || state.contains("CONNECT TIMEOUT")
                 || state.contains("CONNECT EXCEPTION")
+                || state.contains("SAVED PEER SCAN UNAVAILABLE")
+                || state.contains("SAVED PEER SCAN FAILED")
                 || state.contains("SAVED PEER CONFLICT")
                 || state.contains("PEER CONFLICT")
                 || state.contains("CONNECTION FAILED")

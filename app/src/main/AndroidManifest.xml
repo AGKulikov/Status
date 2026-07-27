@@ -111,6 +111,13 @@
         </activity>
 
         <activity
+            android:name=".launcher.AppUninstallProxyActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.StatusWidget.TransparentProxy" />
+
+        <activity
             android:name=".LauncherSettingsActivity"
             android:exported="false"
             android:screenOrientation="landscape" />

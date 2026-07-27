@@ -375,7 +375,8 @@ public final class InformationPanelView extends FrameLayout {
         icon.setContentDescription(item.displayLabel());
         int iconSize = scaledDp(item.iconSizePx, item.scalePercent);
         LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(iconSize, iconSize);
-        iconLp.rightMargin = scaledDp(9, item.scalePercent);
+        // No implicit icon/text inset: the owning free frame/group controls every gap.
+        iconLp.rightMargin = 0;
         tile.addView(icon, iconLp);
         icon.setVisibility(item.showIcon ? View.VISIBLE : View.GONE);
 

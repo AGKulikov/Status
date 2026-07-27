@@ -168,6 +168,8 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("preferences.phoneLowBatteryAlertThreshold.set("));
         assertTrue(source.contains("preferences.phoneLowBatteryAlertColor.set("));
         assertTrue(source.contains("preferences.phoneLowBatteryAlertLatched.set(false)"));
+        assertFalse(source.contains("statusBarNotificationsEnabled.isChecked()"));
+        assertFalse(source.contains("private MaterialSwitch statusBarNotificationsEnabled"));
     }
 
     @Test
