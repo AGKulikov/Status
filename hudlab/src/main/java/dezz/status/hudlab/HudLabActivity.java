@@ -56,12 +56,16 @@ public final class HudLabActivity extends Activity implements HudLabController.L
     private TextView heldProbeIndexView;
     private TextView profileSearchModeView;
     private TextView profileSearchStatusView;
+    private TextView fallbackStatusView;
     private TextView exportStatusView;
     private Button exportButton;
+    private Button fallbackEnableButton;
     private int visualIndex;
     private int heldProbeIndex;
     private int visualPen = 1;
     private int profileSearchMode;
+    private int selectedFallbackMode = HudModeFallbackStore.NO_MODE;
+    private boolean commandChannelConnected;
     private String fullStatus = "";
     private String lastDumpPath = "";
 
@@ -77,6 +81,10 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                         | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                         | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
 
+        HudModeFallbackStore.Config fallback = HudModeFallbackStore.read(this);
+        if (fallback.enabled && HudModeFallbackStore.isTargetMode(fallback.target)) {
+            selectedFallbackMode = fallback.target;
+        }
         setContentView(buildUi());
         setCommandsEnabled(false);
         controller = new HudLabController(this, this);
@@ -117,6 +125,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         if (profileSearchStatusView != null) {
             profileSearchStatusView.setText(findStatusLine(snapshot, "Поиск 01:"));
         }
+        updateFallbackStatus();
         setCommandsEnabled(connected);
     }
 
@@ -162,7 +171,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         close.setOnClickListener(view -> finish());
         header.addView(close, fixedButton(dp(130)));
 
-        TextView title = text("HUD Lab 0.15", 23, TEXT, true);
+        TextView title = text("HUD Lab 0.17", 23, TEXT, true);
         title.setPadding(dp(16), 0, dp(18), 0);
         header.addView(title);
 
@@ -366,7 +375,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                 "Ручная проба сначала отправляет полный baseline all=1, затем полный 20-полевой "
                         + "вектор с одним Fxx=0. Результат остаётся до восстановления. "
                         + "В журнал пишется точный protobuf, а не условное «SUCCESS». "
-                        + "Если ProfPenSts1 недоступен, версия 0.15 безопасно использует "
+                        + "Если ProfPenSts1 недоступен, версия 0.17 безопасно использует "
                         + "активный профиль PA33845 как PEN (в вашем дампе это профиль 13)."));
 
         body.addView(label("Безопасный автоматический проход · активный PEN"));
@@ -412,12 +421,65 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         body.addView(commandRow(BLUE,
                 new String[]{"0 GUIDE", "1 DRIVE", "2 AR", "3 SIMPLE", "ОТКАТ"},
                 new Runnable[]{
-                        () -> controller.setProfileTransferMode(0),
-                        () -> controller.setProfileTransferMode(1),
-                        () -> controller.setProfileTransferMode(2),
-                        () -> controller.setProfileTransferMode(3),
+                        () -> applyProfileTransferMode(0),
+                        () -> applyProfileTransferMode(1),
+                        () -> applyProfileTransferMode(2),
+                        () -> applyProfileTransferMode(3),
                         () -> controller.restoreProfileTransferMode()
                 }));
+        body.addView(singleCommand("−1 RAW → CB33278 (В ОБХОД SDK)", RED,
+                this::applyRawProfileTransferMode));
+        body.addView(note(
+                "Обычный ECARX SDK принимает здесь только 0…3 и отбрасывает −1 до отправки. "
+                        + "Эта отдельная кнопка передаёт −1 напрямую в тот же CB33278 через "
+                        + "ECARX property service. Команда разрешается только после сохранения "
+                        + "валидного режима для возврата. Если PA33937 не читается, сначала "
+                        + "нажмите любой рабочий режим 0…3. Для возврата нажмите «ОТКАТ»."));
+
+        body.addView(sectionTitle("Резервный автоповтор · по умолчанию ВЫКЛ"));
+        body.addView(note(
+                "Включайте только после визуального подтверждения выбранного режима 0…3 выше. "
+                        + "Резерв повторяет только CB33278 после загрузки, смены профиля, "
+                        + "переходов HUD/ADAS и пересечения 20 км/ч. Watchdog проверяет состояние "
+                        + "раз в минуту; действует лимит 5 записей/мин и circuit breaker. "
+                        + "RAW −1, mask 30816, save 29892 и ProfileTransfer reboot "
+                        + "не отправляются."));
+        fallbackStatusView = text("", 14, Color.rgb(255, 214, 125), true);
+        fallbackStatusView.setTypeface(Typeface.MONOSPACE);
+        fallbackStatusView.setPadding(dp(8), dp(5), dp(8), dp(8));
+        body.addView(fallbackStatusView);
+        LinearLayout fallbackControls = new LinearLayout(this);
+        fallbackControls.setOrientation(LinearLayout.HORIZONTAL);
+        fallbackControls.setPadding(0, 0, 0, dp(7));
+        fallbackEnableButton = commandButton("ВКЛЮЧИТЬ ВЫБРАННЫЙ TARGET", AMBER,
+                () -> controller.enableModeFallback(selectedFallbackMode));
+        Button disableFallback = button("OFF · НЕМЕДЛЕННО ПРЕКРАТИТЬ", RED, true);
+        disableFallback.setOnClickListener(view -> {
+            try {
+                HudModeFallbackService.disable(this);
+                Toast.makeText(this, "Резервный автоповтор выключен",
+                        Toast.LENGTH_SHORT).show();
+            } catch (Throwable failure) {
+                Toast.makeText(this, "Не удалось выключить: "
+                                + failure.getClass().getSimpleName(),
+                        Toast.LENGTH_LONG).show();
+            }
+            updateFallbackStatus();
+        });
+        LinearLayout.LayoutParams fallbackLeft =
+                new LinearLayout.LayoutParams(0, dp(48), 1f);
+        fallbackLeft.rightMargin = dp(4);
+        LinearLayout.LayoutParams fallbackRight =
+                new LinearLayout.LayoutParams(0, dp(48), 1f);
+        fallbackRight.leftMargin = dp(4);
+        fallbackControls.addView(fallbackEnableButton, fallbackLeft);
+        fallbackControls.addView(disableFallback, fallbackRight);
+        body.addView(fallbackControls);
+        body.addView(note(
+                "OFF сначала синхронно сохраняет запрет, затем снимает callbacks и останавливает "
+                        + "foreground service. Автоматического отката при OFF нет: после остановки "
+                        + "при необходимости нажмите обычный «ОТКАТ»."));
+        updateFallbackStatus();
 
         body.addView(label("02 · CEM HUD mode с реальным активным PEN · signal 30814"));
         body.addView(commandRow(BLUE,
@@ -434,6 +496,11 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                 () -> controller.setActiveProfileVisualMask(true),
                 "ВСЕ F00–F19 = 1", GREEN,
                 () -> controller.setActiveProfileVisualMask(false)));
+        body.addView(note(
+                "Это временная диагностическая маска, а не доказанный постоянный способ. "
+                        + "Словарь F00–F19 в прошивке отсутствует, поэтому all=0 может скрыть "
+                        + "в том числе штатные предупреждения. При закрытии стенда любая "
+                        + "неединичная маска автоматически возвращается в all=1."));
 
         body.addView(label("04 · Driver HMI background · signal 30805 · значения 0…5"));
         body.addView(commandRow(AMBER,
@@ -549,9 +616,52 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                     label = Integer.toString(mode);
                     break;
             }
-            profileSearchModeView.setText("Выбран режим поиска: " + label);
+            profileSearchModeView.setText("Проверяется режим поиска: " + label);
         }
-        if (controller != null) controller.setProfileTransferMode(mode);
+        if (controller != null) {
+            controller.setProfileTransferMode(mode,
+                    () -> confirmFallbackTarget(mode));
+        }
+    }
+
+    private void applyProfileTransferMode(int mode) {
+        if (controller != null) {
+            controller.setProfileTransferMode(mode,
+                    () -> confirmFallbackTarget(mode));
+        }
+    }
+
+    private void confirmFallbackTarget(int mode) {
+        selectedFallbackMode = HudProfileTransferMode.requireSdkMode(mode);
+        if (profileSearchMode == mode && profileSearchModeView != null) {
+            profileSearchModeView.setText("Выбран режим поиска: "
+                    + HudModeFallbackStore.modeLabel(mode));
+        }
+        updateFallbackStatus();
+        Toast.makeText(this,
+                "Режим " + mode + " применён; target готов к ручному включению",
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private void applyRawProfileTransferMode() {
+        if (controller != null) controller.setRawProfileTransferMinusOne();
+        updateFallbackStatus();
+    }
+
+    private void updateFallbackStatus() {
+        if (fallbackStatusView == null) return;
+        fallbackStatusView.setText("Выбран target: "
+                + HudModeFallbackStore.modeLabel(selectedFallbackMode)
+                + "\n" + HudModeFallbackStore.describe(this));
+        updateFallbackEnableButton();
+    }
+
+    private void updateFallbackEnableButton() {
+        if (fallbackEnableButton == null) return;
+        boolean enabled = commandChannelConnected
+                && HudModeFallbackStore.isTargetMode(selectedFallbackMode);
+        fallbackEnableButton.setEnabled(enabled);
+        fallbackEnableButton.setAlpha(enabled ? 1f : 0.42f);
     }
 
     private static String findStatusLine(String status, String prefix) {
@@ -855,10 +965,12 @@ public final class HudLabActivity extends Activity implements HudLabController.L
     }
 
     private void setCommandsEnabled(boolean enabled) {
+        commandChannelConnected = enabled;
         for (Button button : commandButtons) {
             button.setEnabled(enabled);
             button.setAlpha(enabled ? 1f : 0.42f);
         }
+        updateFallbackEnableButton();
     }
 
     private void copyStatus() {

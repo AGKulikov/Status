@@ -29,6 +29,7 @@ import java.util.TreeSet;
 
 import ecarx.car.ECarXCar;
 import ecarx.car.hardware.annotation.ApiResult;
+import ecarx.car.hardware.property.ECarXCarPropertyManagerBase;
 import ecarx.car.hardware.signal.CarSignalManager;
 import ecarx.car.hardware.vehicle.ECarXCarProfileManager;
 import ecarx.car.hardware.vehicle.ECarXCarProfiletransferManager;
@@ -40,8 +41,9 @@ import vendor.ecarx.xma.pa.nano.VendorVehicleHalPAProto;
 /**
  * Isolated controller for controlled HUD experiments on the target ECARX head unit.
  *
- * <p>Nothing is written automatically. A write is issued only after an explicit button tap.
- * This class never reboots the HUD and never disables or stops a system package.</p>
+ * <p>Diagnostic writes are issued only after an explicit button tap. The separate opt-in,
+ * default-OFF {@link HudModeFallbackService} may conservatively repeat the confirmed method 01
+ * value. Neither path reboots the HUD or disables a system package.</p>
  */
 final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     interface Listener {
@@ -62,6 +64,8 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     private static final String BACKUP_PROFILE_TRANSFER_MODE = "profile_transfer_mode";
     private static final String BACKUP_VEHICLE_MODEL = "vehicle_model";
     private static final String BACKUP_CLOUD_PROFILE = "cloud_profile";
+    private static final int PROFILE_TRANSFER_MODE_CB = 33278;
+    private static final int VEHICLE_AREA_GLOBAL = 1;
     private static final HudDisplayFunction DISPLAY_SAFETY =
             new HudDisplayFunction("SAFETY", IHUD.SETTING_FUNC_HUD_DISPLAY_SAFETY);
     private static final HudDisplayFunction DISPLAY_MEDIA =
@@ -348,26 +352,67 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     // remain transient until the user separately presses the save button.
     // ---------------------------------------------------------------------
 
-    void setProfileTransferMode(int mode) {
+    void setProfileTransferMode(int mode, Runnable onSuccess) {
         runCommand("01 ProfileTransfer HUD mode=" + modeName(mode), () -> {
-            ECarXCarProfiletransferManager manager = requireProfileTransfer();
-            rememberIntOnce(BACKUP_PROFILE_TRANSFER_MODE, readProfileTransferMode());
-            ApiResult write = manager.CB_HudDispModSetgReq(mode);
+            requireModeFallbackOff();
+            int validatedMode = HudProfileTransferMode.requireSdkMode(mode);
+            rememberProfileTransferModeOnce(readProfileTransferMode());
+            ApiResult write = writeProfileTransferSdkMode(validatedMode);
             SystemClock.sleep(220L);
             return "CB33278=" + result(write)
+                    + ", PA33937=" + readProfileTransferModeStatus();
+        }, onSuccess);
+    }
+
+    /**
+     * Sends the invalid/sentinel value -1 directly to CB33278.
+     *
+     * <p>{@link ECarXCarProfiletransferManager#CB_HudDispModSetgReq(int)} rejects -1 before
+     * touching the vehicle property. This deliberately separate diagnostic path bypasses only
+     * that Java enum validator; it still uses the same ECARX property service and global area.
+     * A valid mode must be available for rollback before the raw write is allowed.</p>
+     */
+    void setRawProfileTransferMinusOne() {
+        runCommand("01 RAW ProfileTransfer HUD mode=-1", () -> {
+            requireModeFallbackOff();
+            int current = readProfileTransferMode();
+            rememberProfileTransferModeOnce(current);
+            int rollback = savedProfileTransferMode();
+            ApiResult write = writeRawProfileTransferMode(
+                    HudProfileTransferMode.RAW_INVALID_SENTINEL);
+            requireSuccessfulWrite("RAW CB33278", write);
+            SystemClock.sleep(300L);
+            return "raw setIntProperty(33278, GLOBAL, -1)=" + result(write)
+                    + ", rollback=" + rollback
                     + ", PA33937=" + readProfileTransferModeStatus();
         });
     }
 
     void restoreProfileTransferMode() {
         runCommand("01 ProfileTransfer mode: откат", () -> {
+            requireModeFallbackOff();
             stopProfileVisualScanInternal();
-            int original = backups.getInt(BACKUP_PROFILE_TRANSFER_MODE,
-                    readProfileTransferMode());
-            ApiResult write = requireProfileTransfer().CB_HudDispModSetgReq(original);
+            int original = savedProfileTransferMode();
+            ApiResult write = writeProfileTransferSdkMode(original);
             SystemClock.sleep(220L);
             return "value=" + original + ", result=" + result(write)
                     + ", PA33937=" + readProfileTransferModeStatus();
+        });
+    }
+
+    void enableModeFallback(int target) {
+        runCommand("01 резервный автоповтор "
+                + HudModeFallbackStore.modeLabel(target), () -> {
+            if (HudModeFallbackStore.read(appContext).enabled) {
+                throw new IllegalStateException("резервный автоповтор уже включён");
+            }
+            if (!HudModeFallbackStore.isTargetMode(target)) {
+                throw new IllegalArgumentException("target должен быть режимом 0…3");
+            }
+            int rollback = savedProfileTransferMode();
+            HudModeFallbackService.enable(appContext, target, rollback);
+            return "ВКЛ; target=" + target + ", rollback=" + rollback
+                    + ". Это резерв, основной mask-поиск не изменён";
         });
     }
 
@@ -393,13 +438,14 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             }
             profileVisualScanPen = -1;
             try {
-                ECarXCarProfiletransferManager manager = requireProfileTransfer();
+                requireModeFallbackOff();
+                int validatedMode = HudProfileTransferMode.requireSdkMode(mode);
                 int pen = activePen();
-                rememberIntOnce(BACKUP_PROFILE_TRANSFER_MODE, readProfileTransferMode());
-                ApiResult modeWrite = manager.CB_HudDispModSetgReq(mode);
+                rememberProfileTransferModeOnce(readProfileTransferMode());
+                ApiResult modeWrite = writeProfileTransferSdkMode(validatedMode);
                 SystemClock.sleep(240L);
 
-                profileVisualScanMode = mode;
+                profileVisualScanMode = validatedMode;
                 profileVisualScanPen = pen;
                 profileVisualScanIndex = 0;
                 profileVisualScanAppliedIndex = -1;
@@ -438,13 +484,14 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
                 appendLog("01+MASK РУЧНОЙ: очистка предыдущих проб: " + priorRestore);
             }
             try {
-                ECarXCarProfiletransferManager manager = requireProfileTransfer();
+                requireModeFallbackOff();
+                int validatedMode = HudProfileTransferMode.requireSdkMode(mode);
                 int pen = activePen();
-                rememberIntOnce(BACKUP_PROFILE_TRANSFER_MODE, readProfileTransferMode());
-                ApiResult modeWrite = manager.CB_HudDispModSetgReq(mode);
+                rememberProfileTransferModeOnce(readProfileTransferMode());
+                ApiResult modeWrite = writeProfileTransferSdkMode(validatedMode);
                 SystemClock.sleep(220L);
 
-                profileVisualScanMode = mode;
+                profileVisualScanMode = validatedMode;
                 profileVisualScanPen = pen;
                 profileVisualScanAppliedIndex = index;
                 visualPen = profileVisualScanPen;
@@ -484,13 +531,14 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
                 appendLog("01+MASK BASELINE: очистка предыдущих проб: " + priorRestore);
             }
             try {
-                ECarXCarProfiletransferManager manager = requireProfileTransfer();
+                requireModeFallbackOff();
+                int validatedMode = HudProfileTransferMode.requireSdkMode(mode);
                 int pen = activePen();
-                rememberIntOnce(BACKUP_PROFILE_TRANSFER_MODE, readProfileTransferMode());
-                ApiResult modeWrite = manager.CB_HudDispModSetgReq(mode);
+                rememberProfileTransferModeOnce(readProfileTransferMode());
+                ApiResult modeWrite = writeProfileTransferSdkMode(validatedMode);
                 SystemClock.sleep(220L);
 
-                profileVisualScanMode = mode;
+                profileVisualScanMode = validatedMode;
                 profileVisualScanPen = pen;
                 profileVisualScanAppliedIndex = -1;
                 visualPen = profileVisualScanPen;
@@ -539,16 +587,15 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             if (closed) return;
             stopProfileVisualScanInternal();
             try {
+                requireModeFallbackOff();
                 String restoredPens = restoreAllDirtyVisualMasksBestEffort();
                 int active = activePen();
                 Arrays.fill(visualFunctions, ON);
                 visualPen = active;
                 sendVisualMask();
 
-                int original = backups.getInt(BACKUP_PROFILE_TRANSFER_MODE,
-                        readProfileTransferMode());
-                ApiResult modeWrite =
-                        requireProfileTransfer().CB_HudDispModSetgReq(original);
+                int original = savedProfileTransferMode();
+                ApiResult modeWrite = writeProfileTransferSdkMode(original);
                 SystemClock.sleep(220L);
                 profileVisualScanMode = -1;
                 profileVisualScanPen = -1;
@@ -605,10 +652,11 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
 
     void setActiveProfileDimMode(int mode) {
         runCommand("02 CEM HUD mode=" + modeName(mode) + " для активного PEN", () -> {
+            int validatedMode = HudProfileTransferMode.requireSdkMode(mode);
             int pen = activePen();
             VendorVehicleHalPAProto.ProtoHudDispModSetgReq request =
                     new VendorVehicleHalPAProto.ProtoHudDispModSetgReq();
-            request.hudDispModSetgReqHudDispModSetgReq = mode;
+            request.hudDispModSetgReqHudDispModSetgReq = validatedMode;
             request.hudDispModSetgReqIdPen = pen;
             requireSignals().setHudDispModSetgReq(request);
             return "signal30814 sent, PEN=" + pen;
@@ -842,19 +890,28 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     }
 
     private void runCommand(String title, Command command) {
+        runCommand(title, command, null);
+    }
+
+    private void runCommand(String title, Command command, Runnable onSuccess) {
         worker.post(() -> {
             if (closed) return;
             String outcome;
+            boolean succeeded = false;
             try {
                 // A visual probe is meaningful only if no other HUD write can change the
                 // active mode, profile, activation channel, theme or mask between its steps.
                 requireNoSafeVisualScan();
                 outcome = command.run();
+                succeeded = true;
             } catch (Throwable failure) {
                 outcome = "ERROR " + shortFailure(failure);
             }
             lastCommand = title + " → " + outcome;
             appendLog(lastCommand);
+            if (succeeded && onSuccess != null && !closed) {
+                main.post(onSuccess);
+            }
             publishSnapshot();
             worker.postDelayed(this::publishSnapshot, 300L);
         });
@@ -911,6 +968,8 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
                 .append(" / ").append(readActivePen()).append('\n');
         out.append("  ProfileTransfer HUD mode CB33278/PA33937: ")
                 .append(readProfileTransferModeStatus()).append('\n');
+        out.append("  Резервный автоповтор 01: ")
+                .append(HudModeFallbackStore.describe(appContext)).append('\n');
         out.append("  Vehicle model clear CB33284/PA33943: ")
                 .append(readVehicleModelClear()).append('\n');
         out.append("  Driver display feedback 30873: ")
@@ -1123,6 +1182,75 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             return "ERROR " + shortFailure(failure);
         }
     }
+
+    private ApiResult writeProfileTransferSdkMode(int mode) {
+        int validatedMode = HudProfileTransferMode.requireSdkMode(mode);
+        ApiResult write = requireProfileTransfer().CB_HudDispModSetgReq(validatedMode);
+        requireSuccessfulWrite("CB33278", write);
+        // Some cars report PA33937 as unavailable even though the command visibly changes HUD.
+        // In that case this known-good mode is still a safe rollback point for the RAW probe.
+        rememberProfileTransferModeOnce(validatedMode);
+        return write;
+    }
+
+    private ApiResult writeRawProfileTransferMode(int mode) throws Exception {
+        ECarXCarProfiletransferManager manager = requireProfileTransfer();
+        Field managerField = null;
+        Class<?> owner = manager.getClass();
+        while (owner != null && managerField == null) {
+            try {
+                managerField = owner.getDeclaredField("mMgr");
+            } catch (NoSuchFieldException ignored) {
+                owner = owner.getSuperclass();
+            }
+        }
+        if (managerField == null) {
+            throw new IllegalStateException("поле ECARX mMgr не найдено");
+        }
+        managerField.setAccessible(true);
+        Object rawManager = managerField.get(manager);
+        if (!(rawManager instanceof ECarXCarPropertyManagerBase)) {
+            throw new IllegalStateException("ECARX mMgr имеет неожиданный тип "
+                    + (rawManager == null ? "null" : rawManager.getClass().getName()));
+        }
+        return ((ECarXCarPropertyManagerBase) rawManager).setIntProperty(
+                PROFILE_TRANSFER_MODE_CB, VEHICLE_AREA_GLOBAL, mode);
+    }
+
+    private static void requireSuccessfulWrite(String label, ApiResult write) {
+        if (write != ApiResult.SUCCEED) {
+            throw new IllegalStateException(label + " вернул " + result(write));
+        }
+    }
+
+    private void rememberProfileTransferModeOnce(int value) {
+        if (!HudProfileTransferMode.isSdkMode(value)
+                || backups.contains(BACKUP_PROFILE_TRANSFER_MODE)) {
+            return;
+        }
+        backups.edit().putInt(BACKUP_PROFILE_TRANSFER_MODE, value).apply();
+    }
+
+    private int savedProfileTransferMode() {
+        if (!backups.contains(BACKUP_PROFILE_TRANSFER_MODE)) {
+            throw new IllegalStateException(
+                    "нет валидного исходного режима 0…3 — RAW-команда и откат запрещены");
+        }
+        int value = backups.getInt(BACKUP_PROFILE_TRANSFER_MODE, -1);
+        if (!HudProfileTransferMode.isSdkMode(value)) {
+            throw new IllegalStateException(
+                    "резервная копия режима невалидна: " + value);
+        }
+        return value;
+    }
+
+    private void requireModeFallbackOff() {
+        if (HudModeFallbackStore.read(appContext).enabled) {
+            throw new IllegalStateException(
+                    "сначала выключите резервный автоповтор; ручные CB33278 заблокированы");
+        }
+    }
+
 
     private int readVehicleModelClear() {
         try {

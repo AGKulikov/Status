@@ -427,7 +427,7 @@ final class HudSystemDumpExporter {
 
     private static void appendDeviceReport(Context context, StringBuilder out) {
         out.append("HUD LAB SYSTEM EXPORT\n")
-                .append("hudLabVersion=0.15\n")
+                .append("hudLabVersion=0.17\n")
                 .append("created=").append(new Date()).append('\n')
                 .append("manufacturer=").append(Build.MANUFACTURER).append('\n')
                 .append("brand=").append(Build.BRAND).append('\n')
