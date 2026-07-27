@@ -15,9 +15,28 @@ android {
         minSdk 28
         //noinspection ExpiredTargetSdkVersion
         targetSdkVersion 28
-        versionCode 11
-        versionName "0.11"
+        versionCode 21
+        versionName "0.21"
         setProperty("archivesBaseName", "hud-lab-${versionName}")
+    }
+
+    sourceSets {
+        main {
+            // Reuse the already-audited local ADB/Telnet transports from the main application.
+            // HUD Lab supplies its own small coordinator and deliberately excludes the main
+            // application's permission-grant orchestration.
+            java.srcDir '../app/src/main/java/dezz/status/widget/shell'
+            java.exclude '**/PrivilegedShell.java'
+            // The previous experimental auto-repeat implementation must not be packaged.
+            java.exclude '**/HudModeFallbackBootReceiver.java'
+            java.exclude '**/HudModeFallbackService.java'
+            java.exclude '**/HudModeEnforcementPolicy.java'
+            java.exclude '**/HudModeFallbackStore.java'
+        }
+        test {
+            java.exclude '**/HudModeEnforcementPolicyTest.java'
+            java.exclude '**/HudModeFallbackStoreTest.java'
+        }
     }
 
     compileOptions {
@@ -59,4 +78,6 @@ android {
 dependencies {
     // The same vendor SDK used by Status Widget HA. HUD Lab has a separate package and process.
     implementation files('../app/libs/geely/ecarx-adaptapi.jar')
+    implementation libs.adblib
+    testImplementation 'junit:junit:4.13.2'
 }

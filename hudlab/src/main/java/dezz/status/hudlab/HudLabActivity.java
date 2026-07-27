@@ -13,8 +13,12 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.hardware.display.DisplayManager;
+import android.os.Build;
 import android.os.Bundle;
+import android.util.DisplayMetrics;
 import android.view.Gravity;
+import android.view.Display;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
@@ -26,6 +30,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
@@ -49,17 +54,23 @@ public final class HudLabActivity extends Activity implements HudLabController.L
     private final List<View> tabPages = new ArrayList<>();
     private HudLabController controller;
     private TextView connectionBadge;
+    private TextView lastCommandView;
     private TextView snapshotView;
     private TextView logView;
     private TextView visualIndexView;
     private TextView visualPenView;
+    private TextView heldProbeIndexView;
     private TextView profileSearchModeView;
     private TextView profileSearchStatusView;
     private TextView exportStatusView;
+    private TextView displayExperimentStatusView;
     private Button exportButton;
+    private HudPrivilegedCommandRunner privilegedCommands;
     private int visualIndex;
+    private int heldProbeIndex;
     private int visualPen = 1;
     private int profileSearchMode;
+    private boolean displayStackCommandRunning;
     private String fullStatus = "";
     private String lastDumpPath = "";
 
@@ -75,8 +86,16 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                         | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                         | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
 
+        // Migration from 0.18/0.19: synchronously disarm the removed background fallback before
+        // the ECARX command channel is opened. The service and boot receiver no longer exist.
+        try {
+            disableLegacyFallback();
+        } catch (Throwable ignored) {
+            // The service and receiver are absent from 0.21, so a stale preference cannot write.
+        }
         setContentView(buildUi());
         setCommandsEnabled(false);
+        privilegedCommands = new HudPrivilegedCommandRunner(this);
         controller = new HudLabController(this, this);
         controller.start();
     }
@@ -86,6 +105,10 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         HudLabController current = controller;
         controller = null;
         if (current != null) current.close();
+        HudDisplayCover.stop(this);
+        HudPrivilegedCommandRunner commands = privilegedCommands;
+        privilegedCommands = null;
+        if (commands != null) commands.close();
         super.onDestroy();
     }
 
@@ -111,7 +134,13 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         connectionBadge.setText(connected ? "ECARX: ГОТОВО" : "ECARX: ОЖИДАНИЕ");
         connectionBadge.setTextColor(connected ? Color.rgb(102, 231, 156)
                 : Color.rgb(255, 192, 92));
-        fullStatus = snapshot + "\nСОБЫТИЯ\n" + eventLog;
+        fullStatus = snapshot + "\nDISPLAY ID LAB\n"
+                + (displayExperimentStatusView == null
+                ? displayInventory() : displayExperimentStatusView.getText())
+                + "\nСОБЫТИЯ\n" + eventLog;
+        if (lastCommandView != null) {
+            lastCommandView.setText(findStatusLine(snapshot, "Последняя команда:"));
+        }
         if (profileSearchStatusView != null) {
             profileSearchStatusView.setText(findStatusLine(snapshot, "Поиск 01:"));
         }
@@ -129,11 +158,17 @@ public final class HudLabActivity extends Activity implements HudLabController.L
 
         TextView warning = text(
                 "Экспериментальный стенд: используйте только на стоящей машине. "
-                        + "Команды выполняются только по нажатию. Сначала пробуйте transient-варианты; "
-                        + "сохранение профиля и ProfileTransfer apply вынесены в отдельные кнопки.",
+                        + "Команды выполняются только по нажатию. Поиск F00–F19 не сохраняется "
+                        + "автоматически и не перезагружает HUD.",
                 14, Color.rgb(255, 199, 98), false);
         warning.setPadding(dp(10), dp(5), dp(10), dp(8));
         root.addView(warning);
+
+        lastCommandView = text("Последняя команда: команды ещё не отправлялись",
+                14, Color.rgb(255, 214, 125), true);
+        lastCommandView.setTypeface(Typeface.MONOSPACE);
+        lastCommandView.setPadding(dp(10), dp(4), dp(10), dp(8));
+        root.addView(lastCommandView);
 
         root.addView(buildTabBar(), new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
@@ -160,7 +195,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         close.setOnClickListener(view -> finish());
         header.addView(close, fixedButton(dp(130)));
 
-        TextView title = text("HUD Lab 0.11", 23, TEXT, true);
+        TextView title = text("HUD Lab 0.21", 23, TEXT, true);
         title.setPadding(dp(16), 0, dp(18), 0);
         header.addView(title);
 
@@ -186,7 +221,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
         tabs.setPadding(0, 0, 0, dp(5));
-        addTabButton(tabs, "01 + СКОРОСТЬ", 0);
+        addTabButton(tabs, "ONE-SHOT", 0);
         addTabButton(tabs, "СИСТЕМНЫЙ ДАМП", 1);
         addTabButton(tabs, "DISPLAY_*", 2);
         addTabButton(tabs, "MASK", 3);
@@ -230,7 +265,8 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                         + "Повторять эти команды больше не нужно."));
         body.addView(note(
                 "Кнопка ниже соберёт в один ZIP установленные системные APK HUD, DIMProtocol, "
-                        + "PowerSomeIP, AdaptAPI, OpenAPI и читаемые ECARX/Geely framework-JAR. "
+                        + "PowerSomeIP, AdaptAPI, OpenAPI, читаемые ECARX/Geely framework-JAR, "
+                        + "низкоуровневые IPCP/VHAL/UART/LIN/LVDS/MCU-файлы и журнал HUD Lab. "
                         + "Личные данные приложений не читаются, настройки не меняются."));
 
         exportButton = button("СОБРАТЬ ZIP В DOWNLOAD", BLUE, false);
@@ -278,7 +314,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         Thread worker = new Thread(() -> {
             try {
                 HudSystemDumpExporter.Result result =
-                        HudSystemDumpExporter.export(getApplicationContext());
+                        HudSystemDumpExporter.export(getApplicationContext(), fullStatus);
                 runOnUiThread(() -> {
                     lastDumpPath = result.file.getAbsolutePath();
                     exportStatusView.setText(result.summary()
@@ -321,6 +357,99 @@ public final class HudLabActivity extends Activity implements HudLabController.L
 
     private View buildNewPathsTab() {
         LinearLayout body = columnBody();
+        body.addView(sectionTitle("Способ A · ProfileTransfer + DIM + SAVE"));
+        body.addView(note(
+                "Кнопка отправляет каждую штатную команду ровно один раз: режим 2 в профиль "
+                        + "CB33278, затем тот же режим напрямую в DIM через signal30814 с реальным "
+                        + "активным PEN и, последним шагом, сохранение signal29892. Никаких "
+                        + "таймеров, автозапуска, контроля скорости и повторов после закрытия нет."));
+        body.addView(commandPair("УБРАТЬ МАШИНКУ · MODE 2", GREEN,
+                () -> controller.applyPersistentHudMode(
+                        2, "ONE-SHOT убрать машинку · mode=2"),
+                "ВЕРНУТЬ ШТАТНО · MODE 1", BLUE,
+                () -> controller.applyPersistentHudMode(
+                        1, "ONE-SHOT вернуть штатный HUD · mode=1")));
+        body.addView(note(
+                "Используется подтверждённый машиной профиль 13, когда ProfPenSts1 возвращает "
+                        + "служебное −1. Результат всех трёх стадий и прочитанный PA33937 сразу "
+                        + "появятся в жёлтой строке над вкладками."));
+
+        body.addView(sectionTitle("Способ B · UserProfile field 124"));
+        body.addView(note(
+                "Это отдельный постоянный профильный путь CB33264/PA33873. В ECARX "
+                        + "CAR_FUNC_HUD_MODE (251660288) прямо сопоставлен полю "
+                        + "profiletransferbyte3, protobuf tag 124. Стенд заменяет только varint "
+                        + "этого поля в полном raw-профиле, проверяет остальные байты и читает "
+                        + "field124 обратно. Перед первой записью сохраняется исходное значение."));
+        body.addView(commandRow(AMBER,
+                new String[]{"FIELD 0", "FIELD 1", "FIELD 2", "FIELD 3"},
+                new Runnable[]{
+                        () -> controller.setUserProfileHudMode(0),
+                        () -> controller.setUserProfileHudMode(1),
+                        () -> controller.setUserProfileHudMode(2),
+                        () -> controller.setUserProfileHudMode(3)
+                }));
+        body.addView(commandPair("ПРОЧИТАТЬ FIELD 124", BLUE,
+                () -> controller.refreshUserProfileHudMode(),
+                "ТОЧНЫЙ ОТКАТ FIELD 124", GREEN,
+                () -> controller.restoreUserProfileHudMode()));
+
+        body.addView(sectionTitle("Способ C · прямой DIM активного профиля"));
+        body.addView(note(
+                "Одна команда signal30814 / VHAL 0x2170785E с payload [mode, active PEN]. "
+                        + "Здесь нет ProfileTransfer, сохранения 29892 и фонового повторения, "
+                        + "поэтому можно отдельно проверить именно реакцию DIM."));
+        body.addView(commandRow(BLUE,
+                new String[]{"DIM 0", "DIM 1", "DIM 2", "DIM 3"},
+                new Runnable[]{
+                        () -> controller.setActiveProfileDimMode(0),
+                        () -> controller.setActiveProfileDimMode(1),
+                        () -> controller.setActiveProfileDimMode(2),
+                        () -> controller.setActiveProfileDimMode(3)
+                }));
+
+        body.addView(sectionTitle("Способ D · visual mask активного профиля"));
+        body.addView(note(
+                "Нижний ECARX-сигнал 30816 содержит 20 отдельных HUD-флагов. Это пока "
+                        + "исследовательский путь: используйте ручной Fxx-тест ниже, чтобы найти "
+                        + "флаг именно белой машинки, не выключая скорость целиком."));
+
+        body.addView(sectionTitle("Способ E · физический HUD: stack 2 → stack 22"));
+        body.addView(note(
+                "Это точная проверка вашей гипотезы. Штатный com.ecarx.hud продолжает "
+                        + "публиковать окна в Android displayId/layerStack 2, но физический "
+                        + "local:2 на 12 секунд переключается на layerStack 22. На stack 22 "
+                        + "создаётся зелёная метка «HUD LAB · STACK 22». Затем в finally "
+                        + "выполняется один обязательный возврат на stack 2. Таймеров команд, "
+                        + "автоповтора и запуска после перезагрузки нет."));
+        body.addView(singleStandaloneCommand(
+                "ТЕСТ STACK 22 · 12 СЕКУНД", RED, this::runDisplayStack22Test));
+        body.addView(singleStandaloneCommand(
+                "АВАРИЙНО ВЕРНУТЬ STACK 2", GREEN, this::restoreDisplayStack2));
+        body.addView(note(
+                "Тест выполняется под локальным shell-UID через ADB 5555/7777 или Telnet 23, "
+                        + "потому что SurfaceFlinger закономерно запрещает эту операцию обычному "
+                        + "APK. Root не используется. Проводить только на стоящей машине."));
+
+        body.addView(sectionTitle("Способ F · занять штатный Android displayId 2"));
+        body.addView(note(
+                "Штатный BootBroadcastReceiver запускает HomeActivity ровно через "
+                        + "setLaunchDisplayId(2), windowingMode=5, splitPosition=1. Здесь HUD Lab "
+                        + "запускает своё непрозрачное Activity с теми же параметрами. Если белая "
+                        + "машинка является окном com.ecarx.hud, чёрный Activity должен закрыть "
+                        + "её композиционно; если она останется, источник находится ниже Android "
+                        + "окон — в DIM/HWC/отдельном аппаратном слое."));
+        body.addView(commandRowStandalone(BLUE,
+                new String[]{"МЕТКА НА ID 2", "ЧЁРНЫЙ COVER ID 2", "УБРАТЬ COVER"},
+                new Runnable[]{this::startDisplay2Marker, this::startDisplay2Black,
+                        this::stopDisplay2Cover}));
+        displayExperimentStatusView = text(displayInventory(), 13,
+                Color.rgb(255, 214, 125), true);
+        displayExperimentStatusView.setTypeface(Typeface.MONOSPACE);
+        displayExperimentStatusView.setTextIsSelectable(true);
+        displayExperimentStatusView.setPadding(0, dp(6), 0, dp(12));
+        body.addView(displayExperimentStatusView);
+
         body.addView(sectionTitle("Точный поиск внутри подтверждённого способа 01"));
         body.addView(note(
                 "Вы подтвердили, что ProfileTransfer действительно меняет штатный HUD: "
@@ -328,7 +457,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                         + "Выберите ниже режим, в котором машинки уже нет, затем запустите "
                         + "поэлементный перебор. Каждая комбинация держится на HUD 3,6 секунды."));
 
-        body.addView(label("Режим 01, внутри которого искать отдельный слой скорости"));
+        body.addView(label("Режим 01 · нажатие сразу отправляет CB33278"));
         body.addView(commandRow(BLUE,
                 new String[]{"0 GUIDE", "1 DRIVE", "2 AR", "3 SIMPLE"},
                 new Runnable[]{
@@ -341,19 +470,41 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         profileSearchModeView.setPadding(dp(8), dp(5), dp(8), dp(8));
         body.addView(profileSearchModeView);
 
-        body.addView(label("Шаг 1 · активный профиль (PEN)"));
-        body.addView(commandPair("СКАН: ВСЕ 1, ПО ОДНОМУ OFF", AMBER,
-                () -> controller.startProfileVisualScan(profileSearchMode, true, false),
-                "СКАН: ВСЕ 0, ПО ОДНОМУ ON", AMBER,
-                () -> controller.startProfileVisualScan(profileSearchMode, false, false)));
+        body.addView(label("Ручной фиксированный тест · активный профиль"));
+        LinearLayout heldSelector = new LinearLayout(this);
+        heldSelector.setOrientation(LinearLayout.HORIZONTAL);
+        heldSelector.setGravity(Gravity.CENTER_VERTICAL);
+        heldSelector.addView(commandButton("− F", CARD_BORDER, this::previousHeldProbe),
+                new LinearLayout.LayoutParams(0, dp(46), 1f));
+        heldProbeIndexView = text("F00", 18, TEXT, true);
+        heldProbeIndexView.setGravity(Gravity.CENTER);
+        heldSelector.addView(heldProbeIndexView,
+                new LinearLayout.LayoutParams(dp(86), dp(46)));
+        heldSelector.addView(commandButton("+ F", CARD_BORDER, this::nextHeldProbe),
+                new LinearLayout.LayoutParams(0, dp(46), 1f));
+        body.addView(heldSelector);
+        body.addView(commandPair("ВСЕ 1 → ВЫБРАННАЯ OFF", AMBER,
+                () -> controller.applyHeldVisualProbe(
+                        profileSearchMode, heldProbeIndex),
+                "ВОССТАНОВИТЬ ВСЕ 1", GREEN,
+                () -> controller.applyHeldVisualBaseline(profileSearchMode, 1)));
+        body.addView(note(
+                "Ручная проба сначала отправляет полный baseline all=1, затем полный 20-полевой "
+                        + "вектор с одним Fxx=0. Результат остаётся до восстановления. "
+                        + "В журнал пишется точный protobuf, а не условное «SUCCESS». "
+                        + "Если ProfPenSts1 недоступен, версия 0.21 безопасно использует "
+                        + "активный профиль PA33845 как PEN (в вашем дампе это профиль 13)."));
 
-        body.addView(label("Шаг 2 · ProfAll, если активный PEN не дал результата"));
-        body.addView(commandPair("PROFALL: ПО ОДНОМУ OFF", RED,
-                () -> controller.startProfileVisualScan(profileSearchMode, true, true),
-                "PROFALL: ПО ОДНОМУ ON", RED,
-                () -> controller.startProfileVisualScan(profileSearchMode, false, true)));
+        body.addView(label("Безопасный автоматический проход · активный PEN"));
+        body.addView(singleCommand("ЗАПУСТИТЬ ПОЛНЫЙ ЦИКЛ", AMBER,
+                () -> controller.startSafeProfileVisualScan(profileSearchMode)));
+        body.addView(note(
+                "Строгая последовательность: all=0 держится 3,6 с и автоматически снимается; "
+                        + "затем all=1; затем F00…F19 по одному становятся 0 при остальных=1. "
+                        + "Последний обязательный шаг снова отправляет all=1. При ошибке или "
+                        + "закрытии стенд также пытается немедленно восстановить all=1."));
 
-        body.addView(commandPair("СТОП — СКОРОСТЬ ИСЧЕЗЛА", GREEN,
+        body.addView(commandPair("ЗАПИСАТЬ Fxx И ВОССТАНОВИТЬ", GREEN,
                 () -> controller.markProfileVisualScanFound(),
                 "ОСТАНОВИТЬ И ВОССТАНОВИТЬ", BLUE,
                 () -> controller.restoreProfileVisualSearch()));
@@ -364,35 +515,30 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         body.addView(profileSearchStatusView);
         body.addView(note(
                 "Как только скорость полностью исчезнет, сразу нажмите зелёную кнопку. "
-                        + "Текущая комбинация останется на HUD, а её mode, PEN и Fxx будут "
-                        + "зафиксированы в журнале. Если первый перебор закончился без эффекта, "
-                        + "запустите инверсный, затем ProfAll."));
+                        + "Её mode, активный PEN и Fxx будут зафиксированы в журнале, после чего "
+                        + "маска автоматически вернётся в all=1. Стенд работает только с "
+                        + "подтверждённым vendor framework диапазоном профилей 0…13."));
 
-        body.addView(sectionTitle("Точные дополнительные состояния из системного ECARX Navi API"));
+        body.addView(sectionTitle("Состояния Navi 4/5/6 — не дополнительные HUD-режимы"));
         body.addView(note(
-                "Это не случайные значения. Системный NaviInteraction отправляет их в соседний "
-                        + "VFHUD CB33260: 4 — перестроение маршрута, 5 — въезд в тоннель, "
-                        + "6 — выезд из тоннеля. Проверьте HUD после каждого нажатия; обратная "
-                        + "связь отображается как PA33894."));
-        body.addView(commandRow(AMBER,
-                new String[]{"4 REROUTING", "5 TUNNEL ENTER", "6 TUNNEL END"},
-                new Runnable[]{
-                        () -> controller.setVfDisplayMode(4),
-                        () -> controller.setVfDisplayMode(5),
-                        () -> controller.setVfDisplayMode(6)
-                }));
+                "4 REROUTING, 5 TUNNEL ENTER и 6 TUNNEL END действительно найдены в Navi API, "
+                        + "но native-модуль CB33267 проверяет только value==1. Значения 0, 2, 3, "
+                        + "4, 5 и 6 сворачиваются в один false-флаг. Поэтому кнопки 4/5/6 из "
+                        + "0.18 удалены: они создавали видимость новых режимов, но не могли "
+                        + "включить отдельное состояние HUD."));
 
         body.addView(sectionTitle("Ручная проверка и прежние диагностические пути"));
-        body.addView(label("01 · ProfileTransfer HUD mode · CB33278 / PA33937"));
-        body.addView(commandRow(BLUE,
-                new String[]{"0 GUIDE", "1 DRIVE", "2 AR", "3 SIMPLE", "ОТКАТ"},
-                new Runnable[]{
-                        () -> controller.setProfileTransferMode(0),
-                        () -> controller.setProfileTransferMode(1),
-                        () -> controller.setProfileTransferMode(2),
-                        () -> controller.setProfileTransferMode(3),
-                        () -> controller.restoreProfileTransferMode()
-                }));
+        body.addView(label("01 · Откат ProfileTransfer HUD mode · CB33278 / PA33937"));
+        body.addView(singleCommand("ОТКАТИТЬ РЕЖИМ 01", GREEN,
+                () -> controller.restoreProfileTransferMode()));
+        body.addView(singleCommand("−1 RAW → CB33278 (В ОБХОД SDK)", RED,
+                this::applyRawProfileTransferMode));
+        body.addView(note(
+                "Обычный ECARX SDK принимает здесь только 0…3 и отбрасывает −1 до отправки. "
+                        + "Эта отдельная кнопка передаёт −1 напрямую в тот же CB33278 через "
+                        + "ECARX property service. Команда разрешается только после сохранения "
+                        + "валидного режима для возврата. Если PA33937 не читается, сначала "
+                        + "нажмите любой рабочий режим 0…3. Для возврата нажмите «ОТКАТ»."));
 
         body.addView(label("02 · CEM HUD mode с реальным активным PEN · signal 30814"));
         body.addView(commandRow(BLUE,
@@ -409,6 +555,11 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                 () -> controller.setActiveProfileVisualMask(true),
                 "ВСЕ F00–F19 = 1", GREEN,
                 () -> controller.setActiveProfileVisualMask(false)));
+        body.addView(note(
+                "Это временная диагностическая маска, а не доказанный постоянный способ. "
+                        + "Словарь F00–F19 в прошивке отсутствует, поэтому all=0 может скрыть "
+                        + "в том числе штатные предупреждения. При закрытии стенда любая "
+                        + "неединичная маска автоматически возвращается в all=1."));
 
         body.addView(label("04 · Driver HMI background · signal 30805 · значения 0…5"));
         body.addView(commandRow(AMBER,
@@ -486,11 +637,9 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                         () -> controller.restoreVehicleModelClear()
                 }));
 
-        body.addView(sectionTitle("Откат, применение и дополнительный профильный путь"));
-        body.addView(commandPair("ПЕРЕЗАГРУЗИТЬ АКТИВНЫЙ ПРОФИЛЬ", GREEN,
-                () -> controller.reloadActiveProfile(),
-                "ПРИМЕНИТЬ PROFILETRANSFER", AMBER,
-                () -> controller.pulseProfileTransferApply()));
+        body.addView(sectionTitle("Откат и сохранение только подтверждённого результата"));
+        body.addView(singleCommand("ПЕРЕЗАГРУЗИТЬ АКТИВНЫЙ ПРОФИЛЬ", GREEN,
+                () -> controller.reloadActiveProfile()));
         body.addView(note(
                 "04/05/09 отправляются transient и сами в память не записываются. "
                         + "«Перезагрузить активный профиль» возвращает сохранённую штатную "
@@ -498,16 +647,10 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                         + "визуального подтверждения на HUD."));
         body.addView(singleCommand("СОХРАНИТЬ ТЕКУЩИЙ НАЙДЕННЫЙ ВАРИАНТ (29892 0→1)",
                 AMBER, () -> controller.persistCurrentProfileSettings()));
-
-        body.addView(label("Дополнительно · полный cloud-profile RMW с точным backup"));
-        body.addView(commandPair("ПРОБА HUD-БАЙТОВ 0/3/9", RED,
-                () -> controller.setCloudProfileHudCandidate(),
-                "ВОССТАНОВИТЬ ИСХОДНЫЙ BLOB", GREEN,
-                () -> controller.restoreCloudProfile()));
         body.addView(note(
-                "Cloud-profile путь меняет только vfhudbyte0 и profiletransferbyte3/9 "
-                        + "в предварительно считанном полном сообщении. Исходный blob сохраняется "
-                        + "до первой записи и восстанавливается побайтно."));
+                "Сохранение 29892 не используется во время поиска: связь этого общего сигнала "
+                        + "с HUD-mask не доказана. Нажимайте его только после повторного "
+                        + "визуального подтверждения найденного Fxx."));
         return scroll(body);
     }
 
@@ -532,9 +675,17 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                     label = Integer.toString(mode);
                     break;
             }
-            profileSearchModeView.setText("Выбран режим поиска: " + label);
+            profileSearchModeView.setText("Проверяется режим поиска: " + label);
         }
-        if (controller != null) controller.setProfileTransferMode(mode);
+        if (controller != null) {
+            controller.setProfileTransferMode(mode,
+                    () -> Toast.makeText(this, "Режим " + mode + " применён один раз",
+                            Toast.LENGTH_SHORT).show());
+        }
+    }
+
+    private void applyRawProfileTransferMode() {
+        if (controller != null) controller.setRawProfileTransferMinusOne();
     }
 
     private static String findStatusLine(String status, String prefix) {
@@ -549,27 +700,54 @@ public final class HudLabActivity extends Activity implements HudLabController.L
     private View buildElementsTab() {
         LinearLayout body = columnBody();
         body.addView(sectionTitle("Отдельное скрытие штатного содержимого HUD"));
+        body.addView(sectionTitle("Штатный AR-флаг активного профиля · старое меню HUD"));
         body.addView(note(
-                "Это новый путь ECARX Settings API, не использовавшийся в HUD Lab 0.1. "
-                        + "Он не выключает питание HUD и не запускает нашу панель. "
-                        + "После нажатия смотрите результат и значение support/value во вкладке «Статус»."));
+                "В старых ECARX Settings переключатель «AR режим» записывал функцию "
+                        + "654443008 в поле vfhudbyte0 полного профиля автомобиля. "
+                        + "Здесь сохраняются точные raw-байты PA33873, меняется только protobuf-"
+                        + "поле 111 и выполняется подтверждённое чтение обратно. Публичный JSON "
+                        + "не используется: он не содержит 65 скрытых vendor-полей."));
+        body.addView(commandRow(AMBER,
+                new String[]{"ПРОЧИТАТЬ AR", "AR ON · 1", "AR OFF · 0", "ТОЧНЫЙ ОТКАТ"},
+                new Runnable[]{
+                        () -> controller.refreshUserProfileHudAr(),
+                        () -> controller.setUserProfileHudAr(true),
+                        () -> controller.setUserProfileHudAr(false),
+                        () -> controller.restoreUserProfileHudAr()
+                }));
+        body.addView(note(
+                "Сначала проверьте AR ON · 1: именно это значение использовал старый штатный "
+                        + "переключатель. Чтение выполняется только по кнопке и больше не вызывается "
+                        + "в фоновом обновлении статуса. Текущий profile/value виден во вкладке "
+                        + "«Статус». "
+                        + "Откат возвращает исходное значение AR в свежий raw-профиль того же "
+                        + "активного Profile ID, сохраняя последующие изменения других настроек."));
+
+        body.addView(sectionTitle(
+                "Категории Settings API · на этой прошивке NOT AVAILABLE"));
+        body.addView(note(
+                "Константы существуют, но HUD.buildFunctions их не регистрирует. Ваш прошлый "
+                        + "runtime уже вернул support=notavailable, value=255, allowed=null. "
+                        + "Эти кнопки сохранены только как повторяемая диагностика; визуального "
+                        + "эффекта от них на этой прошивке не ожидается. Результат каждой пробы "
+                        + "теперь постоянно виден над вкладками."));
 
         body.addView(label("Машинка и дорожное окружение · DISPLAY_DRIVE_ENVIRONMENT"));
-        body.addView(commandPair("СКРЫТЬ МАШИНКУ", RED,
+        body.addView(commandPair("ПРОБА OFF", RED,
                 () -> controller.setDisplayDriveEnvironment(false),
-                "ПОКАЗАТЬ МАШИНКУ", GREEN,
+                "ПРОБА ON", GREEN,
                 () -> controller.setDisplayDriveEnvironment(true)));
 
         body.addView(label("Скорость и информация безопасности · DISPLAY_SAFETY"));
-        body.addView(commandPair("СКРЫТЬ СКОРОСТЬ", RED,
+        body.addView(commandPair("ПРОБА OFF", RED,
                 () -> controller.setDisplaySafety(false),
-                "ПОКАЗАТЬ СКОРОСТЬ", GREEN,
+                "ПРОБА ON", GREEN,
                 () -> controller.setDisplaySafety(true)));
 
         body.addView(label("Обе искомые категории одной командой"));
-        body.addView(commandPair("СКРЫТЬ ОБЕ", RED,
+        body.addView(commandPair("ПРОБА ОБЕ OFF", RED,
                 () -> controller.setPrimaryDisplayElements(false),
-                "ПОКАЗАТЬ ОБЕ", GREEN,
+                "ПРОБА ОБЕ ON", GREEN,
                 () -> controller.setPrimaryDisplayElements(true)));
 
         body.addView(label("Остальные отдельные категории"));
@@ -656,24 +834,32 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                 "«ВСЁ ON» — быстрый возврат штатных запросов после эксперимента. "
                         + "Публикацию нашей панели этот стенд не запускает."));
 
-        body.addView(label("VFHUD CB_HUD_DispModSet"));
-        body.addView(modeGrid(false));
+        body.addView(label("VFHUD CB33267 · только navigation flag false/true"));
+        body.addView(commandPair("0 · FALSE", AMBER,
+                () -> controller.setVfDisplayMode(0),
+                "1 · TRUE", BLUE,
+                () -> controller.setVfDisplayMode(1)));
+        body.addView(note(
+                "Это не прямой четырёхпозиционный mode setter. Native-модуль отличает только "
+                        + "1 от всех остальных значений и затем сам вычисляет итоговый режим "
+                        + "по состояниям HUD/AR/ADAS."));
 
-        body.addView(label("Прямой DIM HudDispModSetgReq · PEN=1"));
+        body.addView(label("Прямой DIM HudDispModSetgReq · реальный активный PEN"));
         body.addView(modeGrid(true));
         body.addView(note(
                 "Режимы: 0 IntellGuide, 1 IntellDrive, 2 AR, 3 Simple. "
-                        + "Они не являются переключателями машинки или скорости."));
+                        + "В 0.18 здесь ошибочно был жёстко задан PEN=1; теперь используется "
+                        + "ProfPenSts1 с подтверждённым fallback на PA33845."));
         return scroll(body);
     }
 
     private View buildMaskTab() {
         LinearLayout body = columnBody();
-        body.addView(sectionTitle("Низкоуровневая visual mask · профили PEN 0–15"));
+        body.addView(sectionTitle("Низкоуровневая visual mask · профили PEN 0–13"));
         body.addView(note(
-                "PEN в ECARX — идентификатор профиля, а не Android-дисплей. Ранее стенд "
-                        + "ошибочно сводил PEN только к 0/1. PEN=15 означает ProfAll и позволяет "
-                        + "проверить маску сразу для всех профилей."));
+                "PEN в ECARX — идентификатор профиля, а не Android-дисплей. Дамп подтверждает "
+                        + "профили 0…11, CarSharing 12 и Default 13. Значения 14 и 15 стенд "
+                        + "не отправляет: их смысл в протоколе не доказан."));
 
         body.addView(label("HUD VisFctSetgReq: 20 функций"));
         body.addView(commandPair("Все 0", RED, () -> controller.setAllVisualFunctions(0),
@@ -710,14 +896,10 @@ public final class HudLabActivity extends Activity implements HudLabController.L
 
         body.addView(singleCommand("Применить выбранный PEN", BLUE,
                 () -> controller.setVisualPen(visualPen)));
-        body.addView(commandPair("ProfAll (15): ВСЕ 0", RED,
-                () -> setProfAllMask(0),
-                "ProfAll (15): ВСЕ 1", GREEN,
-                () -> setProfAllMask(1)));
         body.addView(note(
-                "Сначала нажмите «ProfAll: ВСЕ 0» и проверьте HUD. Для возврата сразу нажмите "
-                        + "«ProfAll: ВСЕ 1». SDK не даёт getter маски, поэтому ВСЕ 1 — "
-                        + "предполагаемое восстановление, а не считанная заводская конфигурация."));
+                "SDK не даёт getter маски signal 30816: каждая отправка полностью записывается "
+                        + "в журнал как вектор F00…F19 + PEN и сериализованный protobuf. «Все 1» — "
+                        + "контролируемое восстановление, а не считанная заводская конфигурация."));
 
         return scroll(body);
     }
@@ -748,7 +930,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
 
     private void setMode(boolean directDim, int mode) {
         if (directDim) {
-            controller.setDimDisplayMode(mode, 1);
+            controller.setActiveProfileDimMode(mode);
         } else {
             controller.setVfDisplayMode(mode);
         }
@@ -788,10 +970,174 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         return row;
     }
 
+    private View commandRowStandalone(int color, String[] labels, Runnable[] actions) {
+        if (labels.length != actions.length || labels.length == 0) {
+            throw new IllegalArgumentException("labels/actions");
+        }
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, 0, 0, dp(7));
+        for (int index = 0; index < labels.length; index++) {
+            Button button = button(labels[index], color, true);
+            Runnable action = actions[index];
+            button.setOnClickListener(view -> action.run());
+            LinearLayout.LayoutParams params =
+                    new LinearLayout.LayoutParams(0, dp(48), 1f);
+            if (index > 0) params.leftMargin = dp(4);
+            if (index + 1 < labels.length) params.rightMargin = dp(4);
+            row.addView(button, params);
+        }
+        return row;
+    }
+
+    private View singleStandaloneCommand(String label, int color, Runnable action) {
+        Button button = button(label, color, true);
+        button.setOnClickListener(view -> action.run());
+        LinearLayout container = new LinearLayout(this);
+        container.setPadding(0, 0, 0, dp(7));
+        container.addView(button, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
+        return container;
+    }
+
+    private void runDisplayStack22Test() {
+        runDisplayStackCommand("test",
+                "Тест начат: physical local:2 → layerStack 22 на 12 секунд. "
+                        + "Смотрите на реальный HUD; ожидается зелёная метка STACK 22.");
+    }
+
+    private void restoreDisplayStack2() {
+        runDisplayStackCommand("restore",
+                "Отправляется аварийный возврат physical local:2 → layerStack 2…");
+    }
+
+    private void runDisplayStackCommand(String action, String pendingStatus) {
+        boolean testCommand = "test".equals(action);
+        if (testCommand && displayStackCommandRunning) {
+            setDisplayExperimentStatus(
+                    "Предыдущий stack-тест ещё выполняется. Он сам вернёт stack 2 "
+                            + "не позднее чем через 12 секунд.");
+            return;
+        }
+        HudPrivilegedCommandRunner commands = privilegedCommands;
+        if (commands == null) {
+            setDisplayExperimentStatus("Локальный shell-канал ещё не готов.");
+            return;
+        }
+        if (testCommand) displayStackCommandRunning = true;
+        setDisplayExperimentStatus(pendingStatus + "\n\n" + displayInventory());
+        String packageName = getPackageName();
+        String command = "APK=$(pm path " + packageName
+                + " | sed -n '1s/^package://p'); "
+                + "if [ -z \"$APK\" ]; then echo 'ERROR base APK not found'; exit 70; fi; "
+                + "export CLASSPATH=\"$APK\"; "
+                + "app_process /system/bin "
+                + HudDisplayStackBridgeMain.class.getName()
+                + " " + action + " 2>&1";
+        commands.runTrusted(command, (output, error) -> {
+            if (testCommand) displayStackCommandRunning = false;
+            String result;
+            if (error != null && !error.trim().isEmpty()) {
+                result = "STACK " + action + ": ERROR · " + error;
+            } else if (output == null || output.trim().isEmpty()) {
+                result = "STACK " + action + ": команда завершилась без вывода";
+            } else {
+                result = "STACK " + action + ":\n" + output.trim();
+            }
+            setDisplayExperimentStatus(result + "\n\n" + displayInventory());
+        });
+    }
+
+    private void startDisplay2Marker() {
+        HudDisplayCover.Result result = HudDisplayCover.startMarker(this);
+        setDisplayExperimentStatus(result.message + "\n\n" + displayInventory());
+    }
+
+    private void startDisplay2Black() {
+        HudDisplayCover.Result result = HudDisplayCover.startBlack(this);
+        setDisplayExperimentStatus(result.message + "\n\n" + displayInventory());
+    }
+
+    private void stopDisplay2Cover() {
+        HudDisplayCover.stop(this);
+        setDisplayExperimentStatus(
+                "Команда остановки HUD cover отправлена.\n\n" + displayInventory());
+    }
+
+    private void setDisplayExperimentStatus(String value) {
+        if (displayExperimentStatusView != null) {
+            displayExperimentStatusView.setText(value);
+        }
+        if (lastCommandView != null) {
+            String firstLine = value == null ? "" : value.split("\\n", 2)[0];
+            lastCommandView.setText("Последняя команда: " + firstLine);
+        }
+    }
+
+    private String displayInventory() {
+        StringBuilder out = new StringBuilder("Android displays:");
+        try {
+            DisplayManager manager =
+                    (DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
+            Display[] displays = manager == null ? new Display[0] : manager.getDisplays();
+            Arrays.sort(displays, (left, right) ->
+                    Integer.compare(left.getDisplayId(), right.getDisplayId()));
+            boolean id2 = false;
+            boolean id22 = false;
+            for (Display display : displays) {
+                DisplayMetrics metrics = new DisplayMetrics();
+                display.getRealMetrics(metrics);
+                int id = display.getDisplayId();
+                id2 |= id == 2;
+                id22 |= id == 22;
+                out.append("\nID ").append(id)
+                        .append(" · ").append(display.getName())
+                        .append(" · ").append(metrics.widthPixels)
+                        .append('×').append(metrics.heightPixels)
+                        .append(" · flags=0x")
+                        .append(Integer.toHexString(display.getFlags()))
+                        .append("\n  ").append(display);
+            }
+            out.append("\nИтог: displayId 2 ")
+                    .append(id2 ? "найден" : "НЕ НАЙДЕН")
+                    .append("; displayId 22 ")
+                    .append(id22 ? "уже существует" : "не существует");
+        } catch (Throwable failure) {
+            out.append("\nERROR ").append(failure.getClass().getSimpleName())
+                    .append(" · ").append(failure.getMessage());
+        }
+        return out.toString();
+    }
+
+    private void disableLegacyFallback() {
+        Context base = getApplicationContext();
+        if (base == null) base = this;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            Context device = base.createDeviceProtectedStorageContext();
+            if (device != null) base = device;
+        }
+        boolean committed = base.getSharedPreferences(
+                        "hud_mode_fallback_v1", Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean("enabled", false)
+                .putString("status", "Удалено в HUD Lab 0.21")
+                .putLong("status_at", System.currentTimeMillis())
+                .commit();
+        if (!committed) {
+            throw new IllegalStateException("не удалось снять старый fallback-флаг");
+        }
+    }
+
     private Button commandButton(String label, int color, Runnable action) {
         Button button = button(label, color, true);
         button.setOnClickListener(view -> {
-            if (controller != null) action.run();
+            if (controller != null) {
+                if (lastCommandView != null) {
+                    lastCommandView.setText("Последняя команда: нажата «"
+                            + label + "» — отправка…");
+                }
+                action.run();
+            }
         });
         commandButtons.add(button);
         return button;
@@ -807,29 +1153,38 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         updateVisualIndex();
     }
 
+    private void previousHeldProbe() {
+        heldProbeIndex = (heldProbeIndex + 19) % 20;
+        updateHeldProbe();
+    }
+
+    private void nextHeldProbe() {
+        heldProbeIndex = (heldProbeIndex + 1) % 20;
+        updateHeldProbe();
+    }
+
+    private void updateHeldProbe() {
+        heldProbeIndexView.setText(String.format(Locale.ROOT, "F%02d", heldProbeIndex));
+    }
+
     private void updateVisualIndex() {
         visualIndexView.setText(String.format(Locale.ROOT, "F%02d", visualIndex));
     }
 
     private void previousVisualPen() {
-        visualPen = (visualPen + 15) % 16;
+        visualPen = visualPen <= HudVisualProbePlan.MIN_PROFILE_PEN
+                ? HudVisualProbePlan.MAX_PROFILE_PEN : visualPen - 1;
         updateVisualPen();
     }
 
     private void nextVisualPen() {
-        visualPen = (visualPen + 1) % 16;
+        visualPen = visualPen >= HudVisualProbePlan.MAX_PROFILE_PEN
+                ? HudVisualProbePlan.MIN_PROFILE_PEN : visualPen + 1;
         updateVisualPen();
     }
 
     private void updateVisualPen() {
-        visualPenView.setText(visualPen == 15 ? "PEN 15 · ProfAll"
-                : String.format(Locale.ROOT, "PEN %d", visualPen));
-    }
-
-    private void setProfAllMask(int value) {
-        visualPen = 15;
-        updateVisualPen();
-        controller.setAllVisualFunctionsForPen(15, value);
+        visualPenView.setText(String.format(Locale.ROOT, "PEN %d", visualPen));
     }
 
     private void setCommandsEnabled(boolean enabled) {

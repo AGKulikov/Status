@@ -12,9 +12,11 @@ import android.content.pm.PackageManager;
 import android.content.pm.ProviderInfo;
 import android.content.pm.ServiceInfo;
 import android.content.pm.Signature;
+import android.hardware.display.DisplayManager;
 import android.os.Build;
 import android.os.Environment;
 import android.os.StatFs;
+import android.util.DisplayMetrics;
 import android.view.Display;
 import android.view.WindowManager;
 
@@ -73,6 +75,10 @@ final class HudSystemDumpExporter {
     };
 
     private static final File[] VENDOR_NATIVE_ROOTS = {
+            new File("/system/lib"),
+            new File("/system/lib64"),
+            new File("/system/vendor/lib"),
+            new File("/system/vendor/lib64"),
             new File("/vendor/bin"),
             new File("/vendor/bin/hw"),
             new File("/vendor/lib"),
@@ -80,13 +86,16 @@ final class HudSystemDumpExporter {
             new File("/vendor/lib64"),
             new File("/vendor/lib64/hw"),
             new File("/vendor/etc"),
+            new File("/odm/etc"),
             new File("/vendor/firmware"),
             new File("/odm/firmware"),
             new File("/mnt/vendor/persist")
     };
 
     private static final String[] VENDOR_NATIVE_HINTS = {
-            "dimprotocol", "vfhud", "hud", "kx11", "xma", "cluster", "headup"
+            "dimprotocol", "vfhud", "hud", "kx11", "xma", "cluster", "headup",
+            "ipcp", "vhal_v1_0_net", "uart", "lin", "lvds", "someip",
+            "vehicle_1.0", "automotive", "mcu", "signal", "property"
     };
 
     private static final long MAX_VENDOR_FILE_BYTES = 64L * 1024L * 1024L;
@@ -94,7 +103,7 @@ final class HudSystemDumpExporter {
     private HudSystemDumpExporter() {
     }
 
-    static Result export(Context context) throws Exception {
+    static Result export(Context context, String runtimeReport) throws Exception {
         File downloads = Environment.getExternalStoragePublicDirectory(
                 Environment.DIRECTORY_DOWNLOADS);
         File directory = new File(downloads, "HudLabDump");
@@ -132,6 +141,10 @@ final class HudSystemDumpExporter {
             FrameworkExport vendor = exportVendorNativeCandidates(zip, entries, report);
             fileCount += vendor.files;
             byteCount += vendor.bytes;
+            if (runtimeReport == null || runtimeReport.trim().isEmpty()) {
+                runtimeReport = "HUD Lab runtime log is empty.\n";
+            }
+            addText(zip, entries, "hudlab-runtime.txt", runtimeReport);
             addText(zip, entries, "report.txt", report.toString());
         } catch (Throwable failure) {
             // A partial archive is deliberately not presented as a valid diagnostic dump.
@@ -166,8 +179,7 @@ final class HudSystemDumpExporter {
             PackageInfo info = packages.getPackageInfo(packageName, flags);
             ApplicationInfo app = info.applicationInfo;
             report.append("versionName=").append(info.versionName).append('\n')
-                    .append("versionCode=").append(Build.VERSION.SDK_INT >= 28
-                            ? info.getLongVersionCode() : info.versionCode).append('\n')
+                    .append("versionCode=").append(info.getLongVersionCode()).append('\n')
                     .append("uid=").append(app == null ? "?" : app.uid).append('\n')
                     .append("flags=0x").append(app == null ? "?"
                             : Integer.toHexString(app.flags)).append('\n')
@@ -415,6 +427,7 @@ final class HudSystemDumpExporter {
 
     private static void appendDeviceReport(Context context, StringBuilder out) {
         out.append("HUD LAB SYSTEM EXPORT\n")
+                .append("hudLabVersion=0.21\n")
                 .append("created=").append(new Date()).append('\n')
                 .append("manufacturer=").append(Build.MANUFACTURER).append('\n')
                 .append("brand=").append(Build.BRAND).append('\n')
@@ -438,11 +451,58 @@ final class HudSystemDumpExporter {
         } catch (Throwable failure) {
             out.append("displayError=").append(shortFailure(failure)).append('\n');
         }
+        appendAllDisplays(context, out);
         try {
             StatFs stats = new StatFs(Environment.getExternalStorageDirectory().getAbsolutePath());
             out.append("externalFreeBytes=").append(stats.getAvailableBytes()).append('\n');
         } catch (Throwable failure) {
             out.append("storageError=").append(shortFailure(failure)).append('\n');
+        }
+    }
+
+    /**
+     * Captures every display visible through DisplayManager, not only the display hosting HUD Lab.
+     *
+     * <p>This is intentionally based on public APIs so the result remains useful even when the
+     * diagnostic APK is not platform-signed. In particular it records the real logical bounds of
+     * display 2 instead of assuming that a Presentation's requested width is the physical mode.</p>
+     */
+    private static void appendAllDisplays(Context context, StringBuilder out) {
+        out.append("\nALL DISPLAYS\n");
+        try {
+            DisplayManager manager = (DisplayManager) context.getSystemService(
+                    Context.DISPLAY_SERVICE);
+            Display[] displays = manager == null ? new Display[0] : manager.getDisplays();
+            out.append("displayCount=").append(displays.length).append('\n');
+            Arrays.sort(displays, (left, right) ->
+                    Integer.compare(left.getDisplayId(), right.getDisplayId()));
+            for (Display display : displays) {
+                try {
+                    DisplayMetrics real = new DisplayMetrics();
+                    DisplayMetrics app = new DisplayMetrics();
+                    display.getRealMetrics(real);
+                    display.getMetrics(app);
+                    out.append("display[").append(display.getDisplayId()).append("]")
+                            .append(" name=").append(display.getName())
+                            .append(" flags=0x").append(Integer.toHexString(display.getFlags()))
+                            .append(" state=").append(display.getState())
+                            .append(" rotation=").append(display.getRotation())
+                            .append(" mode=").append(display.getMode())
+                            .append(" real=").append(real.widthPixels).append('x')
+                            .append(real.heightPixels).append('@').append(real.densityDpi)
+                            .append(" app=").append(app.widthPixels).append('x')
+                            .append(app.heightPixels).append('@').append(app.densityDpi)
+                            .append(" supportedModes=")
+                            .append(Arrays.toString(display.getSupportedModes()))
+                            .append(" descriptor=").append(display)
+                            .append('\n');
+                } catch (Throwable displayFailure) {
+                    out.append("display[").append(display.getDisplayId())
+                            .append("] ERROR=").append(shortFailure(displayFailure)).append('\n');
+                }
+            }
+        } catch (Throwable failure) {
+            out.append("allDisplaysError=").append(shortFailure(failure)).append('\n');
         }
     }
 
