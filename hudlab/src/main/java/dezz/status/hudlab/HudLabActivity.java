@@ -171,7 +171,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         close.setOnClickListener(view -> finish());
         header.addView(close, fixedButton(dp(130)));
 
-        TextView title = text("HUD Lab 0.17", 23, TEXT, true);
+        TextView title = text("HUD Lab 0.18", 23, TEXT, true);
         title.setPadding(dp(16), 0, dp(18), 0);
         header.addView(title);
 
@@ -375,7 +375,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                 "Ручная проба сначала отправляет полный baseline all=1, затем полный 20-полевой "
                         + "вектор с одним Fxx=0. Результат остаётся до восстановления. "
                         + "В журнал пишется точный protobuf, а не условное «SUCCESS». "
-                        + "Если ProfPenSts1 недоступен, версия 0.17 безопасно использует "
+                        + "Если ProfPenSts1 недоступен, версия 0.18 безопасно использует "
                         + "активный профиль PA33845 как PEN (в вашем дампе это профиль 13)."));
 
         body.addView(label("Безопасный автоматический проход · активный PEN"));
@@ -676,6 +676,27 @@ public final class HudLabActivity extends Activity implements HudLabController.L
     private View buildElementsTab() {
         LinearLayout body = columnBody();
         body.addView(sectionTitle("Отдельное скрытие штатного содержимого HUD"));
+        body.addView(sectionTitle("Штатный AR-флаг активного профиля · старое меню HUD"));
+        body.addView(note(
+                "В старых ECARX Settings переключатель «AR режим» записывал функцию "
+                        + "654443008 в поле vfhudbyte0 полного профиля автомобиля. "
+                        + "Здесь сохраняются точные raw-байты PA33873, меняется только protobuf-"
+                        + "поле 111 и выполняется подтверждённое чтение обратно. Публичный JSON "
+                        + "не используется: он не содержит 65 скрытых vendor-полей."));
+        body.addView(commandRow(AMBER,
+                new String[]{"AR ON · 1", "AR OFF · 0", "ТОЧНЫЙ ОТКАТ"},
+                new Runnable[]{
+                        () -> controller.setUserProfileHudAr(true),
+                        () -> controller.setUserProfileHudAr(false),
+                        () -> controller.restoreUserProfileHudAr()
+                }));
+        body.addView(note(
+                "Сначала проверьте AR ON · 1: именно это значение использовал старый штатный "
+                        + "переключатель. Текущий profile/value виден во вкладке «Статус». "
+                        + "Откат возвращает исходное значение AR в свежий raw-профиль того же "
+                        + "активного Profile ID, сохраняя последующие изменения других настроек."));
+
+        body.addView(sectionTitle("Категории содержимого через текущий Settings API"));
         body.addView(note(
                 "Это новый путь ECARX Settings API, не использовавшийся в HUD Lab 0.1. "
                         + "Он не выключает питание HUD и не запускает нашу панель. "
