@@ -163,7 +163,8 @@ public final class NavigationPanelConfig {
 
     /**
      * Enables an item at its saved/default location, or at the closest free location when that
-     * rectangle is occupied. Existing elements never jump merely because a hidden item was added.
+     * rectangle is occupied. If the grid is full, overlap is allowed so adding from the HOME
+     * catalog can never fail; the free-form editor lets the user move it afterwards.
      */
     public boolean setEnabled(@NonNull String id, boolean enabled) {
         Element value = elements.get(id);
@@ -178,8 +179,7 @@ public final class NavigationPanelConfig {
         if (isFree(value)) return true;
         int[] free = nearestFree(value, value.column, value.row);
         if (free == null) {
-            value.enabled = false;
-            return false;
+            return true;
         }
         value.column = free[0];
         value.row = free[1];

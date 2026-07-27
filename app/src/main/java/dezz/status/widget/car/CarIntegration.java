@@ -174,6 +174,19 @@ public interface CarIntegration {
         listener.onResult(false, "Функции автомобиля недоступны в этой сборке");
     }
 
+    /**
+     * Change the legacy stock-HUD AR preference which controls the central ego-car/road graphic.
+     *
+     * <p>This is deliberately separate from the generic visual controls: ECARX stores the old
+     * setting in the complete active user profile, and an unsafe partial write can reset unrelated
+     * vehicle preferences. Implementations must preserve every other profile field. This flag is
+     * not asserted to control the numeric speed readout.</p>
+     */
+    default void setStockHudCarHidden(boolean hidden,
+                                      @NonNull ControlCommandListener listener) {
+        listener.onResult(false, "Управление штатной графикой HUD недоступно в этой сборке");
+    }
+
     /** Release all subscriptions and vendor resources. The instance is not reusable afterwards. */
     void shutdown();
 }

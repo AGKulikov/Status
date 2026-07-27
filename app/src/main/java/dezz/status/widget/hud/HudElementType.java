@@ -14,6 +14,8 @@ import java.util.Locale;
  * to a panel never changes the external-display lifecycle or the editor grid.</p>
  */
 public enum HudElementType {
+    BACKDROP("Подложка", "Оформление", "", 16, 8),
+
     CLOCK("Часы", "Основное", "", 7, 3),
 
     MEDIA_ARTWORK("Обложка", "Медиа", "", 6, 6),

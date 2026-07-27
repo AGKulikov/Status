@@ -68,9 +68,13 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 import dezz.status.widget.launcher.CombinedNavigationPanelPolicy;
+import dezz.status.widget.launcher.AppDrawerTileView;
+import dezz.status.widget.launcher.AppDrawerUninstallPolicy;
 import dezz.status.widget.launcher.AppUninstallLauncher;
 import dezz.status.widget.launcher.HighResolutionAppIconLoader;
 import dezz.status.widget.launcher.InformationShortcutView;
+import dezz.status.widget.launcher.LauncherBackdropStore;
+import dezz.status.widget.launcher.LauncherBackdropView;
 import dezz.status.widget.launcher.LauncherActionsGridConfig;
 import dezz.status.widget.launcher.LauncherActionsGridConfigStore;
 import dezz.status.widget.launcher.LauncherAppCatalog;
@@ -151,6 +155,8 @@ public final class LauncherActivity extends AppCompatActivity {
     private final Map<String, LauncherGlobalElementProxyView> globalElementProxies =
             new LinkedHashMap<>();
     private final Map<String, View> globalElementSources = new LinkedHashMap<>();
+    private final Map<String, LauncherElementFrame> backdropFrames = new LinkedHashMap<>();
+    private final Map<String, LauncherBackdropView> backdropViews = new LinkedHashMap<>();
     private final Handler navigationUiHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService launcherWorker = Executors.newFixedThreadPool(2, runnable -> {
         Thread thread = new Thread(() -> {
@@ -172,6 +178,7 @@ public final class LauncherActivity extends AppCompatActivity {
         @Override public void run() {
             if (!activityStarted || isFinishing() || isDestroyed()) return;
             syncGlobalElements();
+            syncLauncherBackdrops();
             refreshGlobalElementVisibility();
             navigationUiHandler.postDelayed(this, GLOBAL_ELEMENT_REFRESH_MS);
         }
@@ -186,6 +193,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private Preferences preferences;
     private LauncherLayoutStore layoutStore;
     private LauncherGlobalElementLayoutStore globalElementLayoutStore;
+    private LauncherBackdropStore backdropStore;
     private PanelElementConfigStore panelElementStore;
     private LauncherActionsGridConfigStore actionsGridConfigStore;
     private NavigationPanelConfigStore navigationPanelConfigStore;
@@ -222,6 +230,11 @@ public final class LauncherActivity extends AppCompatActivity {
     private LauncherMediaController mediaController;
     private MediaPanelView mediaPanel;
     @Nullable private android.app.AlertDialog allAppsDialog;
+    @Nullable private GridView allAppsGrid;
+    @Nullable private TextView allAppsTitle;
+    @Nullable private MaterialButton allAppsDone;
+    private boolean allAppsEditMode;
+    private boolean allAppsUninstallInProgress;
     private TextView navigationArrival;
     private TextView navigationDuration;
     private TextView navigationDistance;
@@ -270,6 +283,7 @@ public final class LauncherActivity extends AppCompatActivity {
     @Nullable private String appliedNavigationConfigJson;
     @Nullable private String appliedActionsGridJson;
     @Nullable private String appliedGlobalElementsJson;
+    @Nullable private String appliedLauncherBackdropsJson;
     private int appliedAppsColumns = -1;
     private int appliedActionsColumns = -1;
     private int appsGridScalePercent = 100;
@@ -325,6 +339,7 @@ public final class LauncherActivity extends AppCompatActivity {
         carIntegration = CarIntegrations.get(this);
         layoutStore = new LauncherLayoutStore(preferences);
         globalElementLayoutStore = new LauncherGlobalElementLayoutStore(preferences);
+        backdropStore = new LauncherBackdropStore(preferences);
         panelElementStore = new PanelElementConfigStore(preferences);
         actionsGridConfigStore = new LauncherActionsGridConfigStore(preferences);
         navigationPanelConfigStore = new NavigationPanelConfigStore(preferences);
@@ -457,7 +472,7 @@ public final class LauncherActivity extends AppCompatActivity {
         navigationUiHandler.removeCallbacks(ensureSmartHomeValueSubscription);
         navigationUiHandler.removeCallbacks(safeAreaRefresh);
         navigationUiHandler.removeCallbacks(globalElementRefresh);
-        dismissAllAppsDialog();
+        if (!allAppsUninstallInProgress) dismissAllAppsDialog();
         if (smartHomeValueService != null) {
             smartHomeValueService.removeConnectorValueListener(smartHomeValueListener);
             smartHomeValueService = null;
@@ -475,6 +490,7 @@ public final class LauncherActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        dismissAllAppsDialog();
         navigationUiHandler.removeCallbacksAndMessages(null);
         navigationRefresh.cancel();
         launcherWorker.shutdownNow();
@@ -508,6 +524,11 @@ public final class LauncherActivity extends AppCompatActivity {
         if (shortcutStore != null) shortcutStore.load();
         applyLauncherPreferences();
         if (appCatalog != null) reloadAppCatalogAsync(false);
+        if (allAppsUninstallInProgress) {
+            allAppsUninstallInProgress = false;
+            lastAppCatalogLoadElapsed = 0L;
+            reloadAppCatalogAsync(true);
+        }
         if (shortcutStore != null) {
             refreshShortcutGrid();
         }
@@ -572,6 +593,7 @@ public final class LauncherActivity extends AppCompatActivity {
                     appCatalog = loaded;
                     lastAppCatalogLoadElapsed = SystemClock.elapsedRealtime();
                     refreshFavorites();
+                    refreshAllAppsDrawerContents();
                 });
             });
         } catch (RejectedExecutionException failure) {
@@ -874,6 +896,7 @@ public final class LauncherActivity extends AppCompatActivity {
             globalElementLayoutStore.load(workspace.getWidth(), workspace.getHeight());
             globalElementsActivated = true;
         }
+        syncLauncherBackdrops();
         syncGlobalElements();
         for (Map.Entry<String, LauncherElementFrame> entry : panels.entrySet()) {
             if (!hasGlobalFrameForPanel(entry.getKey())) continue;
@@ -884,6 +907,81 @@ public final class LauncherActivity extends AppCompatActivity {
         }
         refreshGlobalElementVisibility();
         appliedGlobalElementsJson = preferences.launcherGlobalElementsJson.get();
+    }
+
+    /** Keeps every decorative HOME surface below all live widgets and panel sources. */
+    private void syncLauncherBackdrops() {
+        if (workspace == null || backdropStore == null
+                || workspace.getWidth() <= 0 || workspace.getHeight() <= 0) return;
+        String raw = preferences.launcherBackdropsJson.get();
+        boolean reloaded = !Objects.equals(appliedLauncherBackdropsJson, raw);
+        if (reloaded) {
+            backdropStore.load(workspace.getWidth(), workspace.getHeight());
+            appliedLauncherBackdropsJson = raw;
+        }
+
+        List<LauncherBackdropStore.Backdrop> values = backdropStore.all();
+        Set<String> retained = new LinkedHashSet<>();
+        for (LauncherBackdropStore.Backdrop value : values) retained.add(value.id);
+        for (String stale : new ArrayList<>(backdropFrames.keySet())) {
+            if (retained.contains(stale)) continue;
+            LauncherElementFrame frame = backdropFrames.remove(stale);
+            backdropViews.remove(stale);
+            if (frame != null) workspace.removeView(frame);
+        }
+
+        int snap = Math.max(4, preferences.launcherSnapPx.get());
+        int backdropIndex = 0;
+        for (LauncherBackdropStore.Backdrop value : values) {
+            LauncherElementFrame frame = backdropFrames.get(value.id);
+            LauncherBackdropView surface = backdropViews.get(value.id);
+            if (frame == null || surface == null) {
+                String id = value.id;
+                surface = new LauncherBackdropView(this, value);
+                frame = new LauncherElementFrame(this, id, value.name,
+                        (changedId, x, y, width, height) -> {
+                            LauncherBackdropStore.Backdrop changed = backdropStore.get(changedId);
+                            if (changed == null) return;
+                            changed.x = x;
+                            changed.y = y;
+                            changed.width = width;
+                            changed.height = height;
+                            saveLauncherBackdrop(changed);
+                        });
+                frame.setMinimumGeometryPx(dp(36), dp(28));
+                frame.setCardBackgroundColor(Color.TRANSPARENT);
+                frame.setCardElevation(0);
+                frame.setRadius(0);
+                frame.setPreserveAspectRatio(false);
+                frame.setStayBehindSiblings(true);
+                frame.setOnClickListener(view -> {
+                    if (editMode) showLauncherBackdropEditor(id);
+                });
+                frame.setContent(surface);
+                FrameLayout.LayoutParams params =
+                        new FrameLayout.LayoutParams(value.width, value.height);
+                params.leftMargin = value.x;
+                params.topMargin = value.y;
+                workspace.addView(frame, Math.min(backdropIndex, workspace.getChildCount()),
+                        params);
+                backdropFrames.put(id, frame);
+                backdropViews.put(id, surface);
+            } else {
+                surface.setBackdrop(value);
+                if (reloaded) {
+                    FrameLayout.LayoutParams params =
+                            (FrameLayout.LayoutParams) frame.getLayoutParams();
+                    params.width = value.width;
+                    params.height = value.height;
+                    params.leftMargin = value.x;
+                    params.topMargin = value.y;
+                    frame.setLayoutParams(params);
+                }
+            }
+            frame.setEditMode(editMode, snap);
+            frame.setCardElevation(0);
+            backdropIndex++;
+        }
     }
 
     private boolean hasGlobalFrameForPanel(@NonNull String panelId) {
@@ -1206,20 +1304,6 @@ public final class LauncherActivity extends AppCompatActivity {
                     saveLauncherWidgetAppearance(id, appearance);
                 });
 
-        TextView surface = text(17, Color.WHITE, true);
-        surface.setText("Фон виджета");
-        form.addView(surface, widgetEditorSection());
-        addWidgetColorButton(form, "Цвет фона", appearance.backgroundColor,
-                value -> {
-                    appearance.backgroundColor = value;
-                    saveLauncherWidgetAppearance(id, appearance);
-                });
-        addWidgetEditorSlider(form, "Скругление", 0, 160,
-                appearance.cornerRadiusPx, " px", value -> {
-                    appearance.cornerRadiusPx = value;
-                    saveLauncherWidgetAppearance(id, appearance);
-                });
-
         TextView behavior = text(17, Color.WHITE, true);
         behavior.setText("Поведение при нажатии");
         form.addView(behavior, widgetEditorSection());
@@ -1298,9 +1382,138 @@ public final class LauncherActivity extends AppCompatActivity {
         }
     }
 
+    private void createLauncherBackdrop() {
+        if (backdropStore == null || workspace == null) return;
+        syncLauncherBackdrops();
+        LauncherBackdropStore.Backdrop value = backdropStore.create();
+        appliedLauncherBackdropsJson = preferences.launcherBackdropsJson.get();
+        syncLauncherBackdrops();
+        showLauncherBackdropEditor(value.id);
+    }
+
+    private void saveLauncherBackdrop(@NonNull LauncherBackdropStore.Backdrop value) {
+        if (backdropStore == null) return;
+        backdropStore.put(value);
+        appliedLauncherBackdropsJson = preferences.launcherBackdropsJson.get();
+        LauncherBackdropStore.Backdrop normalized = backdropStore.get(value.id);
+        LauncherBackdropView surface = backdropViews.get(value.id);
+        if (normalized != null && surface != null) surface.setBackdrop(normalized);
+    }
+
+    private void showLauncherBackdropEditor(@NonNull String id) {
+        if (backdropStore == null || isFinishing() || isDestroyed()) return;
+        LauncherBackdropStore.Backdrop value = backdropStore.get(id);
+        if (value == null) return;
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(20), dp(10), dp(20), dp(32));
+        scroll.addView(form, new ScrollView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView hint = text(13, Color.LTGRAY, false);
+        hint.setText("Подложка — отдельный свободно масштабируемый слой. "
+                + "Она всегда остаётся ниже всех виджетов.");
+        form.addView(hint);
+
+        TextView fill = text(17, Color.WHITE, true);
+        fill.setText("Заливка");
+        form.addView(fill, widgetEditorSection());
+        addWidgetColorButton(form, "Цвет подложки", value.fillColor, selected -> {
+            value.fillColor = selected;
+            saveLauncherBackdrop(value);
+        });
+        addWidgetEditorSlider(form, "Непрозрачность", 0, 100,
+                value.fillOpacityPercent, " %", selected -> {
+                    value.fillOpacityPercent = selected;
+                    saveLauncherBackdrop(value);
+                });
+        addWidgetEditorSlider(form, "Скругление", 0, 300,
+                value.cornerRadiusPx, " px", selected -> {
+                    value.cornerRadiusPx = selected;
+                    saveLauncherBackdrop(value);
+                });
+
+        TextView border = text(17, Color.WHITE, true);
+        border.setText("Рамка");
+        form.addView(border, widgetEditorSection());
+        addWidgetColorButton(form, "Цвет рамки", value.borderColor, selected -> {
+            value.borderColor = selected;
+            saveLauncherBackdrop(value);
+        });
+        addWidgetEditorSlider(form, "Непрозрачность рамки", 0, 100,
+                value.borderOpacityPercent, " %", selected -> {
+                    value.borderOpacityPercent = selected;
+                    saveLauncherBackdrop(value);
+                });
+        addWidgetEditorSlider(form, "Толщина рамки", 0, 80,
+                value.borderWidthPx, " px", selected -> {
+                    value.borderWidthPx = selected;
+                    saveLauncherBackdrop(value);
+                });
+
+        TextView shadow = text(17, Color.WHITE, true);
+        shadow.setText("Тень · только HOME");
+        form.addView(shadow, widgetEditorSection());
+        addWidgetColorButton(form, "Цвет тени", value.shadowColor, selected -> {
+            value.shadowColor = selected;
+            saveLauncherBackdrop(value);
+        });
+        addWidgetEditorSlider(form, "Непрозрачность тени", 0, 100,
+                value.shadowOpacityPercent, " %", selected -> {
+                    value.shadowOpacityPercent = selected;
+                    saveLauncherBackdrop(value);
+                });
+        addWidgetEditorSlider(form, "Размытие тени", 0, 160,
+                value.shadowRadiusPx, " px", selected -> {
+                    value.shadowRadiusPx = selected;
+                    saveLauncherBackdrop(value);
+                });
+        addWidgetEditorSlider(form, "Смещение тени X", -120, 120,
+                value.shadowOffsetXPx, " px", selected -> {
+                    value.shadowOffsetXPx = selected;
+                    saveLauncherBackdrop(value);
+                });
+        addWidgetEditorSlider(form, "Смещение тени Y", -120, 120,
+                value.shadowOffsetYPx, " px", selected -> {
+                    value.shadowOffsetYPx = selected;
+                    saveLauncherBackdrop(value);
+                });
+
+        androidx.appcompat.app.AlertDialog editor =
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle(value.name)
+                        .setView(scroll)
+                        .setPositiveButton("Готово", null)
+                        .setNegativeButton("Удалить", null)
+                        .create();
+        editor.setOnShowListener(ignored ->
+                editor.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE)
+                        .setOnClickListener(view ->
+                                new androidx.appcompat.app.AlertDialog.Builder(this)
+                                        .setTitle("Удалить подложку?")
+                                        .setMessage("Подложка будет удалена, виджеты не изменятся.")
+                                        .setPositiveButton("Удалить", (dialog, which) -> {
+                                            backdropStore.remove(id);
+                                            appliedLauncherBackdropsJson =
+                                                    preferences.launcherBackdropsJson.get();
+                                            LauncherElementFrame frame =
+                                                    backdropFrames.remove(id);
+                                            backdropViews.remove(id);
+                                            if (frame != null) workspace.removeView(frame);
+                                            editor.dismiss();
+                                        })
+                                        .setNegativeButton("Отмена", null)
+                                        .show()));
+        editor.show();
+    }
+
     private void showLauncherWidgetCatalog() {
         List<String> entries = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
+        entries.add("Подложка…");
+        actions.add(this::createLauncherBackdrop);
         if (hasRemovedLauncherWidgets()) {
             entries.add("Вернуть удалённый виджет…");
             actions.add(this::showRemovedLauncherWidgets);
@@ -3391,6 +3604,8 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private void showAllApps() {
         dismissAllAppsDialog();
+        allAppsEditMode = false;
+        allAppsUninstallInProgress = false;
         FrameLayout root = new FrameLayout(this);
         root.setPadding(dp(24), dp(18), dp(24), dp(24));
         root.setBackgroundColor(Color.argb(247, 10, 13, 18));
@@ -3412,6 +3627,19 @@ public final class LauncherActivity extends AppCompatActivity {
         root.addView(close, new FrameLayout.LayoutParams(
                 dp(72), dp(72), Gravity.TOP | Gravity.END));
 
+        MaterialButton done = new MaterialButton(this);
+        done.setText("Готово");
+        done.setTextSize(16);
+        done.setTextColor(Color.WHITE);
+        done.setAllCaps(false);
+        done.setMinWidth(0);
+        done.setInsetTop(0);
+        done.setInsetBottom(0);
+        done.setVisibility(View.GONE);
+        done.setContentDescription("Завершить удаление приложений");
+        root.addView(done, new FrameLayout.LayoutParams(
+                dp(132), dp(64), Gravity.TOP | Gravity.END));
+
         GridView grid = new GridView(this);
         grid.setNumColumns(Math.max(3,
                 Math.min(8, preferences.launcherAllAppsColumns.get())));
@@ -3419,8 +3647,6 @@ public final class LauncherActivity extends AppCompatActivity {
         int gap = Math.max(0, Math.min(40, preferences.launcherAllAppsGapPx.get()));
         grid.setVerticalSpacing(dp(gap));
         grid.setHorizontalSpacing(dp(gap));
-        AppAdapter adapter = new AppAdapter(appCatalog.allVisible(), false);
-        grid.setAdapter(adapter);
         FrameLayout.LayoutParams gridParams = new FrameLayout.LayoutParams(
                 matchWidth(), matchHeight());
         gridParams.topMargin = dp(84);
@@ -3440,21 +3666,20 @@ public final class LauncherActivity extends AppCompatActivity {
             dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
         }
         allAppsDialog = dialog;
+        allAppsGrid = grid;
+        allAppsTitle = title;
+        allAppsDone = done;
+        refreshAllAppsDrawerContents();
         close.setOnClickListener(view -> dismissAllAppsDialog());
+        done.setOnClickListener(view -> setAllAppsEditMode(false));
         dialog.setOnDismissListener(ignored -> {
-            if (allAppsDialog == dialog) allAppsDialog = null;
-        });
-        grid.setOnItemClickListener((parent, view, position, id) -> {
-            dismissAllAppsDialog();
-            launchApp((AppEntry) parent.getItemAtPosition(position));
-        });
-        grid.setOnItemLongClickListener((parent, view, position, id) -> {
-            AppEntry entry = (AppEntry) parent.getItemAtPosition(position);
-            dismissAllAppsDialog();
-            lastAppCatalogLoadElapsed = 0L;
-            AppUninstallLauncher.request(
-                    this, entry.packageName, entry.label);
-            return true;
+            if (allAppsDialog != dialog) return;
+            allAppsDialog = null;
+            allAppsGrid = null;
+            allAppsTitle = null;
+            allAppsDone = null;
+            allAppsEditMode = false;
+            allAppsUninstallInProgress = false;
         });
         try {
             dialog.show();
@@ -3477,9 +3702,54 @@ public final class LauncherActivity extends AppCompatActivity {
     private void dismissAllAppsDialog() {
         android.app.AlertDialog dialog = allAppsDialog;
         allAppsDialog = null;
+        allAppsGrid = null;
+        allAppsTitle = null;
+        allAppsDone = null;
+        allAppsEditMode = false;
+        allAppsUninstallInProgress = false;
         if (dialog == null) return;
         try { dialog.dismiss(); }
         catch (RuntimeException ignored) {}
+    }
+
+    private void setAllAppsEditMode(boolean enabled) {
+        allAppsEditMode = enabled;
+        TextView title = allAppsTitle;
+        if (title != null) title.setText(enabled
+                ? "Удаление приложений" : "Все приложения");
+        MaterialButton done = allAppsDone;
+        if (done != null) done.setVisibility(enabled ? View.VISIBLE : View.GONE);
+        GridView grid = allAppsGrid;
+        if (grid != null && grid.getAdapter() instanceof AppAdapter) {
+            ((AppAdapter) grid.getAdapter()).setEditMode(enabled);
+        }
+    }
+
+    private void refreshAllAppsDrawerContents() {
+        GridView grid = allAppsGrid;
+        if (grid == null || appCatalog == null) return;
+        AppAdapter adapter = new AppAdapter(appCatalog.allVisible(), false,
+                new AllAppsCallbacks() {
+                    @Override public void launch(@NonNull AppEntry entry) {
+                        dismissAllAppsDialog();
+                        launchApp(entry);
+                    }
+
+                    @Override public void enterEditMode() {
+                        setAllAppsEditMode(true);
+                    }
+
+                    @Override public void uninstall(@NonNull AppEntry entry) {
+                        if (!AppDrawerUninstallPolicy.canUninstall(
+                                LauncherActivity.this, entry.packageName,
+                                entry.systemApp)) return;
+                        lastAppCatalogLoadElapsed = 0L;
+                        allAppsUninstallInProgress = AppUninstallLauncher.request(
+                                LauncherActivity.this, entry.packageName, entry.label);
+                    }
+                });
+        adapter.setEditMode(allAppsEditMode);
+        grid.setAdapter(adapter);
     }
 
     private void refreshFavorites() {
@@ -3582,16 +3852,38 @@ public final class LauncherActivity extends AppCompatActivity {
         }
     }
 
+    private interface AllAppsCallbacks {
+        void launch(@NonNull AppEntry entry);
+        void enterEditMode();
+        void uninstall(@NonNull AppEntry entry);
+    }
+
     private final class AppAdapter extends BaseAdapter {
         private final List<AppEntry> values;
         private final boolean cacheIcons;
         private final Map<String, FavoriteAppConfig> appearances;
+        @Nullable private final AllAppsCallbacks allAppsCallbacks;
+        private boolean drawerEditMode;
+
         AppAdapter(List<AppEntry> values, boolean cacheIcons) {
+            this(values, cacheIcons, null);
+        }
+
+        AppAdapter(List<AppEntry> values, boolean cacheIcons,
+                   @Nullable AllAppsCallbacks callbacks) {
             this.values = values;
             this.cacheIcons = cacheIcons;
+            this.allAppsCallbacks = callbacks;
             // One JSON parse for this adapter instead of one full parse for every recycled cell.
             this.appearances = favoriteAppsConfigStore.appearanceSnapshot();
         }
+
+        void setEditMode(boolean enabled) {
+            if (drawerEditMode == enabled) return;
+            drawerEditMode = enabled;
+            notifyDataSetChanged();
+        }
+
         @Override public int getCount() { return values.size(); }
         @Override public AppEntry getItem(int position) { return values.get(position); }
         @Override public long getItemId(int position) { return position; }
@@ -3601,8 +3893,13 @@ public final class LauncherActivity extends AppCompatActivity {
             AppEntry entry = getItem(position);
             FavoriteAppConfig appearance = appearances.get(entry.packageName);
             if (appearance == null) appearance = new FavoriteAppConfig(entry.packageName);
-            View tile = LauncherAppTileRenderer.render(
-                    LauncherActivity.this, reusable, entry.label,
+            AppDrawerTileView drawerCell = !cacheIcons
+                    ? reusable instanceof AppDrawerTileView
+                    ? (AppDrawerTileView) reusable : new AppDrawerTileView(LauncherActivity.this)
+                    : null;
+            LinearLayout tile = LauncherAppTileRenderer.render(
+                    LauncherActivity.this,
+                    drawerCell == null ? reusable : drawerCell.reusableContent(), entry.label,
                     entry.icon(LauncherActivity.this, cacheIcons),
                     appearance, cacheIcons ? appsGridScalePercent
                             : Math.max(60, Math.min(180,
@@ -3617,8 +3914,19 @@ public final class LauncherActivity extends AppCompatActivity {
                     refreshFavorites();
                     return true;
                 });
+                return tile;
             }
-            return tile;
+            AllAppsCallbacks callbacks = allAppsCallbacks;
+            if (callbacks == null || drawerCell == null) return tile;
+            boolean uninstallable = AppDrawerUninstallPolicy.canUninstall(
+                    LauncherActivity.this, entry.packageName, entry.systemApp);
+            drawerCell.setContentDescription(entry.label
+                    + (drawerEditMode && uninstallable ? ", можно удалить" : ""));
+            drawerCell.bind(tile, drawerEditMode, uninstallable,
+                    () -> callbacks.launch(entry),
+                    callbacks::enterEditMode,
+                    () -> callbacks.uninstall(entry));
+            return drawerCell;
         }
     }
 

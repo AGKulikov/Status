@@ -98,6 +98,23 @@ public final class LauncherShortcutStore {
         @NonNull public String informationGroup = "";
         /** INFO only: 0 = above driver controls, 1 = below driver controls. */
         public int informationPlacement = 0;
+        /** Named information-row settings; duplicated on members for backward-compatible JSON. */
+        public int informationGroupGapPx = 4;
+        public int informationGroupMarginLeftPx = 0;
+        public int informationGroupMarginTopPx = 0;
+        public int informationGroupMarginRightPx = 0;
+        public int informationGroupMarginBottomPx = 0;
+        public int informationGroupPaddingLeftPx = 0;
+        public int informationGroupPaddingTopPx = 0;
+        public int informationGroupPaddingRightPx = 0;
+        public int informationGroupPaddingBottomPx = 0;
+        /** 0=start/top, 1=center, 2=end/bottom. */
+        public int informationGroupHorizontalAlignment = 0;
+        public int informationGroupVerticalAlignment = 1;
+        /** 0=equal-width cells, 1=content-width cells. */
+        public int informationGroupDistribution = 0;
+        @NonNull public String informationGroupBackgroundColor = "#00000000";
+        public int informationGroupCornerRadiusPx = 0;
         public boolean informationShowValue = true;
         public int informationIconSizePx = 32;
         public int informationIconAlpha = 255;
@@ -159,6 +176,20 @@ public final class LauncherShortcutStore {
             value.informationPaddingBottomPx = informationPaddingBottomPx;
             value.informationGroup = informationGroup;
             value.informationPlacement = informationPlacement;
+            value.informationGroupGapPx = informationGroupGapPx;
+            value.informationGroupMarginLeftPx = informationGroupMarginLeftPx;
+            value.informationGroupMarginTopPx = informationGroupMarginTopPx;
+            value.informationGroupMarginRightPx = informationGroupMarginRightPx;
+            value.informationGroupMarginBottomPx = informationGroupMarginBottomPx;
+            value.informationGroupPaddingLeftPx = informationGroupPaddingLeftPx;
+            value.informationGroupPaddingTopPx = informationGroupPaddingTopPx;
+            value.informationGroupPaddingRightPx = informationGroupPaddingRightPx;
+            value.informationGroupPaddingBottomPx = informationGroupPaddingBottomPx;
+            value.informationGroupHorizontalAlignment = informationGroupHorizontalAlignment;
+            value.informationGroupVerticalAlignment = informationGroupVerticalAlignment;
+            value.informationGroupDistribution = informationGroupDistribution;
+            value.informationGroupBackgroundColor = informationGroupBackgroundColor;
+            value.informationGroupCornerRadiusPx = informationGroupCornerRadiusPx;
             value.informationShowValue = informationShowValue;
             value.informationIconSizePx = informationIconSizePx;
             value.informationIconAlpha = informationIconAlpha;
@@ -386,6 +417,79 @@ public final class LauncherShortcutStore {
         save();
     }
 
+    /** Moves one member left/right inside its named horizontal information row. */
+    public void moveInformationGroupItem(@NonNull String id, int delta) {
+        if (delta == 0) return;
+        Shortcut moving = null;
+        for (Shortcut value : shortcuts) {
+            if (value.id.equals(id)) {
+                moving = value;
+                break;
+            }
+        }
+        if (moving == null || moving.kind != Kind.INFO
+                || moving.informationGroup.trim().isEmpty()) return;
+        List<Integer> memberIndices = new ArrayList<>();
+        for (int index = 0; index < shortcuts.size(); index++) {
+            Shortcut candidate = shortcuts.get(index);
+            if (candidate.kind == Kind.INFO
+                    && candidate.informationPlacement == moving.informationPlacement
+                    && moving.informationGroup.equals(candidate.informationGroup)) {
+                memberIndices.add(index);
+            }
+        }
+        int from = -1;
+        for (int index = 0; index < memberIndices.size(); index++) {
+            if (shortcuts.get(memberIndices.get(index)).id.equals(id)) {
+                from = index;
+                break;
+            }
+        }
+        if (from < 0) return;
+        int to = Math.max(0, Math.min(memberIndices.size() - 1, from + delta));
+        if (from == to) return;
+        Collections.swap(shortcuts, memberIndices.get(from), memberIndices.get(to));
+        save();
+    }
+
+    /** Moves a complete named information row before/after the adjacent row at one placement. */
+    public void moveInformationGroup(@NonNull String rawGroup, int placement, int delta) {
+        String group = rawGroup.trim();
+        if (group.isEmpty() || delta == 0) return;
+        List<Integer> slots = new ArrayList<>();
+        List<String> rowKeys = new ArrayList<>();
+        List<List<Shortcut>> rows = new ArrayList<>();
+        for (int index = 0; index < shortcuts.size(); index++) {
+            Shortcut value = shortcuts.get(index);
+            if (value.kind != Kind.INFO
+                    || value.informationPlacement != (placement == 1 ? 1 : 0)) continue;
+            slots.add(index);
+            String key = value.informationGroup.trim().isEmpty()
+                    ? "\u0000" + value.id : value.informationGroup.trim();
+            int rowIndex = rowKeys.indexOf(key);
+            if (rowIndex < 0) {
+                rowKeys.add(key);
+                rows.add(new ArrayList<>());
+                rowIndex = rows.size() - 1;
+            }
+            rows.get(rowIndex).add(value);
+        }
+        int from = rowKeys.indexOf(group);
+        if (from < 0) return;
+        int to = Math.max(0, Math.min(rows.size() - 1, from + delta));
+        if (from == to) return;
+        List<Shortcut> moving = rows.remove(from);
+        String movingKey = rowKeys.remove(from);
+        rows.add(to, moving);
+        rowKeys.add(to, movingKey);
+        List<Shortcut> flattened = new ArrayList<>();
+        for (List<Shortcut> row : rows) flattened.addAll(row);
+        for (int index = 0; index < slots.size(); index++) {
+            shortcuts.set(slots.get(index), flattened.get(index));
+        }
+        save();
+    }
+
     private void save() {
         try {
             JSONObject root = new JSONObject().put("version", SCHEMA_VERSION);
@@ -445,6 +549,33 @@ public final class LauncherShortcutStore {
         value.informationGroup = value.informationGroup == null
                 ? "" : value.informationGroup.trim();
         value.informationPlacement = value.informationPlacement == 1 ? 1 : 0;
+        value.informationGroupGapPx = clampGroupSpacing(value.informationGroupGapPx);
+        value.informationGroupMarginLeftPx =
+                clampGroupSpacing(value.informationGroupMarginLeftPx);
+        value.informationGroupMarginTopPx =
+                clampGroupSpacing(value.informationGroupMarginTopPx);
+        value.informationGroupMarginRightPx =
+                clampGroupSpacing(value.informationGroupMarginRightPx);
+        value.informationGroupMarginBottomPx =
+                clampGroupSpacing(value.informationGroupMarginBottomPx);
+        value.informationGroupPaddingLeftPx =
+                clampGroupSpacing(value.informationGroupPaddingLeftPx);
+        value.informationGroupPaddingTopPx =
+                clampGroupSpacing(value.informationGroupPaddingTopPx);
+        value.informationGroupPaddingRightPx =
+                clampGroupSpacing(value.informationGroupPaddingRightPx);
+        value.informationGroupPaddingBottomPx =
+                clampGroupSpacing(value.informationGroupPaddingBottomPx);
+        value.informationGroupHorizontalAlignment = Math.max(0,
+                Math.min(2, value.informationGroupHorizontalAlignment));
+        value.informationGroupVerticalAlignment = Math.max(0,
+                Math.min(2, value.informationGroupVerticalAlignment));
+        value.informationGroupDistribution =
+                value.informationGroupDistribution == 1 ? 1 : 0;
+        value.informationGroupBackgroundColor =
+                colorOrTransparent(value.informationGroupBackgroundColor);
+        value.informationGroupCornerRadiusPx = Math.max(0,
+                Math.min(120, value.informationGroupCornerRadiusPx));
         value.informationIconSizePx = Math.max(12,
                 Math.min(MAX_ICON_SIZE_PX, value.informationIconSizePx));
         value.informationIconAlpha = clampByte(value.informationIconAlpha);
@@ -461,6 +592,17 @@ public final class LauncherShortcutStore {
 
     private static int clampInformationPadding(int value) {
         return Math.max(0, Math.min(96, value));
+    }
+
+    private static int clampGroupSpacing(int value) {
+        return Math.max(0, Math.min(120, value));
+    }
+
+    @NonNull
+    private static String colorOrTransparent(@Nullable String value) {
+        String clean = value == null ? "" : value.trim();
+        return clean.matches("#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?")
+                ? clean : "#00000000";
     }
 
     private static JSONObject toJson(Shortcut value) throws JSONException {
@@ -504,6 +646,33 @@ public final class LauncherShortcutStore {
                 .put("informationPaddingBottomPx", value.informationPaddingBottomPx)
                 .put("informationGroup", value.informationGroup)
                 .put("informationPlacement", value.informationPlacement)
+                .put("informationGroupGapPx", value.informationGroupGapPx)
+                .put("informationGroupMarginLeftPx",
+                        value.informationGroupMarginLeftPx)
+                .put("informationGroupMarginTopPx",
+                        value.informationGroupMarginTopPx)
+                .put("informationGroupMarginRightPx",
+                        value.informationGroupMarginRightPx)
+                .put("informationGroupMarginBottomPx",
+                        value.informationGroupMarginBottomPx)
+                .put("informationGroupPaddingLeftPx",
+                        value.informationGroupPaddingLeftPx)
+                .put("informationGroupPaddingTopPx",
+                        value.informationGroupPaddingTopPx)
+                .put("informationGroupPaddingRightPx",
+                        value.informationGroupPaddingRightPx)
+                .put("informationGroupPaddingBottomPx",
+                        value.informationGroupPaddingBottomPx)
+                .put("informationGroupHorizontalAlignment",
+                        value.informationGroupHorizontalAlignment)
+                .put("informationGroupVerticalAlignment",
+                        value.informationGroupVerticalAlignment)
+                .put("informationGroupDistribution",
+                        value.informationGroupDistribution)
+                .put("informationGroupBackgroundColor",
+                        value.informationGroupBackgroundColor)
+                .put("informationGroupCornerRadiusPx",
+                        value.informationGroupCornerRadiusPx)
                 .put("informationShowValue", value.informationShowValue)
                 .put("informationIconSizePx", value.informationIconSizePx)
                 .put("informationIconAlpha", value.informationIconAlpha)
@@ -594,6 +763,34 @@ public final class LauncherShortcutStore {
                     json.optInt("informationPaddingBottomPx", 7);
             value.informationGroup = json.optString("informationGroup", "");
             value.informationPlacement = json.optInt("informationPlacement", 0);
+            value.informationGroupGapPx =
+                    json.optInt("informationGroupGapPx", 4);
+            value.informationGroupMarginLeftPx =
+                    json.optInt("informationGroupMarginLeftPx", 0);
+            value.informationGroupMarginTopPx =
+                    json.optInt("informationGroupMarginTopPx", 0);
+            value.informationGroupMarginRightPx =
+                    json.optInt("informationGroupMarginRightPx", 0);
+            value.informationGroupMarginBottomPx =
+                    json.optInt("informationGroupMarginBottomPx", 0);
+            value.informationGroupPaddingLeftPx =
+                    json.optInt("informationGroupPaddingLeftPx", 0);
+            value.informationGroupPaddingTopPx =
+                    json.optInt("informationGroupPaddingTopPx", 0);
+            value.informationGroupPaddingRightPx =
+                    json.optInt("informationGroupPaddingRightPx", 0);
+            value.informationGroupPaddingBottomPx =
+                    json.optInt("informationGroupPaddingBottomPx", 0);
+            value.informationGroupHorizontalAlignment =
+                    json.optInt("informationGroupHorizontalAlignment", 0);
+            value.informationGroupVerticalAlignment =
+                    json.optInt("informationGroupVerticalAlignment", 1);
+            value.informationGroupDistribution =
+                    json.optInt("informationGroupDistribution", 0);
+            value.informationGroupBackgroundColor =
+                    json.optString("informationGroupBackgroundColor", "#00000000");
+            value.informationGroupCornerRadiusPx =
+                    json.optInt("informationGroupCornerRadiusPx", 0);
             value.informationShowValue =
                     json.optBoolean("informationShowValue", true);
             value.informationIconSizePx =

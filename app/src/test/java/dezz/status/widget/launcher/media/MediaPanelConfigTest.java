@@ -114,7 +114,7 @@ public final class MediaPanelConfigTest {
         assertNoEnabledOverlap(config);
     }
 
-    @Test public void enablingElementIsRejectedWhenGridIsCompletelyOccupied() {
+    @Test public void enablingElementMayOverlapWhenGridIsCompletelyOccupied() {
         MediaPanelConfig config = new MediaPanelConfig();
         for (MediaPanelConfig.Spec spec : MediaPanelConfig.SPECS) {
             config.setEnabled(spec.id, false);
@@ -123,9 +123,11 @@ public final class MediaPanelConfigTest {
         assertTrue(config.setSpan(MediaPanelConfig.ARTWORK,
                 MediaPanelConfig.GRID_COLUMNS, MediaPanelConfig.GRID_ROWS));
 
-        assertFalse(config.setEnabled(MediaPanelConfig.TITLE, true));
-        assertFalse(config.element(MediaPanelConfig.TITLE).enabled);
-        assertNoEnabledOverlap(config);
+        assertTrue(config.setEnabled(MediaPanelConfig.TITLE, true));
+        assertTrue(config.element(MediaPanelConfig.TITLE).enabled);
+        assertTrue(MediaPanelConfig.overlaps(
+                config.element(MediaPanelConfig.ARTWORK),
+                config.element(MediaPanelConfig.TITLE)));
     }
 
     @Test public void customGridRepositionsElementsWithoutOverlap() {

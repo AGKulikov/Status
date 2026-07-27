@@ -28,7 +28,9 @@ public final class LauncherAllAppsOverlayContractTest {
         assertTrue(method.indexOf("dialogWindow.setType(") < method.indexOf("dialog.show()"));
         assertTrue(method.contains("dismissAllAppsDialog()"));
         assertTrue(method.contains("AppUninstallLauncher.request("));
-        assertTrue(method.contains("setOnItemLongClickListener"));
+        assertTrue(method.contains("AppDrawerUninstallPolicy.canUninstall("));
+        assertTrue(method.contains("setAllAppsEditMode(true)"));
+        assertTrue(method.contains("allAppsUninstallInProgress"));
         assertTrue(method.contains("lastAppCatalogLoadElapsed = 0L"));
         assertTrue(!method.contains("appCatalog.toggleFavorite(entry.packageName)"));
     }
@@ -37,7 +39,8 @@ public final class LauncherAllAppsOverlayContractTest {
         String launcher = source();
         int start = launcher.indexOf("protected void onStop()");
         int end = launcher.indexOf("protected void onDestroy()", start);
-        assertTrue(launcher.substring(start, end).contains("dismissAllAppsDialog()"));
+        String stop = launcher.substring(start, end);
+        assertTrue(stop.contains("if (!allAppsUninstallInProgress) dismissAllAppsDialog()"));
     }
 
     private static String source() throws IOException {

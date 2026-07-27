@@ -34,7 +34,8 @@ public class DriverPanelOverlayContractTest {
         assertTrue(source.contains("int drawerLeft = profile.side.get() == 0 ? physicalWidth : 0"));
         assertTrue(source.contains("compactDrawerParams("));
         assertTrue(source.contains("allAppsOverlayParams("));
-        assertTrue(source.contains("root.setOnClickListener(view -> dismissAllApps())"));
+        assertTrue(source.contains("if (drawerEditMode) setDrawerEditMode(false)"));
+        assertTrue(source.contains("else dismissAllApps()"));
         assertTrue(source.contains("root.setPadding(0, geometry.contentTop, 0,"));
         assertTrue(source.contains("screenHeight - geometry.contentBottom"));
         assertTrue(source.contains("width, Math.max(1, screenHeight), type"));
@@ -212,7 +213,9 @@ public class DriverPanelOverlayContractTest {
         assertTrue(controller.contains("grid.setPadding(dp(context, 16), dp(context, 16),"));
         assertTrue(controller.contains("title.setText(\"Все приложения\")"));
         assertTrue(controller.contains("FavoriteAppsConfigStore"));
-        assertTrue(controller.contains("tile.setOnLongClickListener(view ->"));
+        assertTrue(controller.contains("AppDrawerTileView"));
+        assertTrue(controller.contains("setDrawerEditMode(true)"));
+        assertTrue(controller.contains("AppDrawerUninstallPolicy.canUninstall("));
         assertTrue(controller.contains("AppUninstallLauncher.request(context, app)"));
 
         assertTrue(launcher.contains("LauncherAppCatalog.loadIncludingSystem(context)"));

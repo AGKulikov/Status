@@ -56,7 +56,8 @@ public final class DriverPanelPost1117ContractTest {
         String launcher = read("LauncherActivity.java");
         String settings = read("AllAppsSettingsActivity.java");
 
-        assertTrue(overlay.contains("root.setOnClickListener(view -> dismissAllApps())"));
+        assertTrue(overlay.contains("if (drawerEditMode) setDrawerEditMode(false)"));
+        assertTrue(overlay.contains("else dismissAllApps()"));
         assertTrue(overlay.contains("allAppsOverlayParams("));
         assertTrue(overlay.contains("drawerParams.leftMargin = drawerLeft"));
         assertTrue(overlay.contains("screenWidth, screenWidth, false"));
@@ -82,8 +83,8 @@ public final class DriverPanelPost1117ContractTest {
                 "setFixedCellBackgroundColor(shortcut.backgroundColor)"));
         assertTrue(informationPanel.contains("fixedCellBackgroundColor"));
         assertTrue(driverSettings.contains("Показывать значок слева"));
-        assertTrue(driverSettings.contains(
-                "Текст, шрифт, выравнивание и отступы"));
+        assertTrue(driverSettings.contains("Оформление содержимого"));
+        assertTrue(driverSettings.contains("Объединить в горизонтальный ряд"));
         assertTrue(shortcuts.contains("informationHorizontalAlignment"));
         assertTrue(shortcuts.contains("informationPaddingLeftPx"));
         assertTrue(information.contains("item.fontFamily"));

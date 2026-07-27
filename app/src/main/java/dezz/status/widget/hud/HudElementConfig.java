@@ -34,6 +34,12 @@ public final class HudElementConfig {
     @NonNull public String textColor = "#FFFFFFFF";
     @NonNull public String unitColor = "#CCFFFFFF";
     @NonNull public String backgroundColor = "#00000000";
+    /** Decorative settings are used only by {@link HudElementType#BACKDROP}. */
+    public int backgroundOpacityPercent = 72;
+    public int cornerRadiusPx = 18;
+    @NonNull public String borderColor = "#FFFFFFFF";
+    public int borderOpacityPercent;
+    public int borderWidthPx;
     public int fontSizeSp = 34;
     public int fontWeight = 600;
     /** LEFT, CENTER or RIGHT. */
@@ -71,6 +77,14 @@ public final class HudElementConfig {
     public void applyTypeDefaults() {
         try {
             switch (type) {
+                case BACKDROP:
+                    backgroundColor = "#FF121923";
+                    backgroundOpacityPercent = 72;
+                    cornerRadiusPx = 18;
+                    borderColor = "#FFFFFFFF";
+                    borderOpacityPercent = 0;
+                    borderWidthPx = 0;
+                    break;
                 case CLOCK:
                     options.put("clockMode", "SYSTEM");
                     break;
@@ -157,7 +171,23 @@ public final class HudElementConfig {
         unit = bounded(unit, 64, "");
         textColor = bounded(textColor, 32, "#FFFFFFFF");
         unitColor = bounded(unitColor, 32, "#CCFFFFFF");
-        backgroundColor = bounded(backgroundColor, 32, "#00000000");
+        if (type == HudElementType.BACKDROP) {
+            backgroundColor = bounded(backgroundColor, 32, "#FF121923");
+            backgroundOpacityPercent = clamp(backgroundOpacityPercent, 0, 100);
+            cornerRadiusPx = clamp(cornerRadiusPx, 0, 500);
+            borderColor = bounded(borderColor, 32, "#FFFFFFFF");
+            borderOpacityPercent = clamp(borderOpacityPercent, 0, 100);
+            borderWidthPx = clamp(borderWidthPx, 0, 100);
+        } else {
+            // A widget frame is only geometry. Decorative surfaces are independent BACKDROP
+            // elements and can never be coupled to the widget's content.
+            backgroundColor = "#00000000";
+            backgroundOpacityPercent = 0;
+            cornerRadiusPx = 0;
+            borderColor = "#00000000";
+            borderOpacityPercent = 0;
+            borderWidthPx = 0;
+        }
         alignment = normalizeAlignment(alignment);
         gridColumns = clamp(gridColumns, 4, 200);
         gridRows = clamp(gridRows, 2, 100);
@@ -191,6 +221,11 @@ public final class HudElementConfig {
         out.put("textFormat", textFormat).put("unit", unit);
         out.put("textColor", textColor).put("unitColor", unitColor);
         out.put("backgroundColor", backgroundColor);
+        out.put("backgroundOpacityPercent", backgroundOpacityPercent);
+        out.put("cornerRadiusPx", cornerRadiusPx);
+        out.put("borderColor", borderColor);
+        out.put("borderOpacityPercent", borderOpacityPercent);
+        out.put("borderWidthPx", borderWidthPx);
         out.put("fontSizeSp", fontSizeSp).put("fontWeight", fontWeight);
         out.put("alignment", alignment).put("wrapText", wrapText);
         out.put("brightness", brightness);
@@ -220,6 +255,11 @@ public final class HudElementConfig {
         out.textColor = source.optString("textColor", "#FFFFFFFF");
         out.unitColor = source.optString("unitColor", "#CCFFFFFF");
         out.backgroundColor = source.optString("backgroundColor", "#00000000");
+        out.backgroundOpacityPercent = source.optInt("backgroundOpacityPercent", 72);
+        out.cornerRadiusPx = source.optInt("cornerRadiusPx", 18);
+        out.borderColor = source.optString("borderColor", "#FFFFFFFF");
+        out.borderOpacityPercent = source.optInt("borderOpacityPercent", 0);
+        out.borderWidthPx = source.optInt("borderWidthPx", 0);
         out.fontSizeSp = source.optInt("fontSizeSp", 34);
         out.fontWeight = source.optInt("fontWeight", 600);
         out.alignment = source.optString("alignment", "CENTER");
