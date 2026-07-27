@@ -150,6 +150,27 @@ public final class PhoneConnectorControllerContractTest {
         assertFalse(connectionCallback.contains("postAtFrontOfQueue"));
     }
 
+    @Test public void terminalGattFailuresAndExactAclLossUseOneTypedRetryPath()
+            throws IOException {
+        String source = controller();
+        String transport = transport();
+        String broadcast = between(source, "private void handleBluetoothBroadcast",
+                "private static BluetoothDevice parcelableDevice");
+
+        assertTrue(transport.contains("default void onRetryRequired(String reason)"));
+        assertTrue(transport.contains("if (!closing && !retrySignalled"));
+        assertTrue(transport.contains("requiresControllerRetry(value)"));
+        assertTrue(transport.contains("listener.onRetryRequired(value)"));
+        assertTrue(transport.contains("closing = true"));
+        assertTrue(transport.contains("retrySignalled = false"));
+        assertTrue(source.contains("@Override public void onRetryRequired(String reason)"));
+        assertTrue(source.contains("handleAncsTransportFailure(token,"));
+        assertTrue(broadcast.contains("if (!isSelected(device)) return;"));
+        assertTrue(broadcast.contains("BluetoothDevice.ACTION_ACL_DISCONNECTED"));
+        assertTrue(broadcast.contains("transport != BluetoothDevice.TRANSPORT_BREDR"));
+        assertTrue(broadcast.contains("scheduleGattReconnect(token,"));
+    }
+
     @Test public void protectedAncsSubscriptionsAreSerializedInsideTheTransport()
             throws IOException {
         String transport = transport();

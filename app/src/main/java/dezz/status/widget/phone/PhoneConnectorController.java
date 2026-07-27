@@ -645,6 +645,15 @@ public final class PhoneConnectorController {
                 if (mapConnected) endMapSession("disconnected");
             }
             updateConnected(token);
+            // Some ECARX Android 9 builds omit the LE transport extra and can also lose the
+            // BluetoothGatt disconnect callback. The exact selected peer's LE/unknown ACL loss
+            // therefore becomes an explicit retry signal. The scheduler is idempotent when the
+            // ordinary GATT callback arrives too.
+            if (config != null && config.ancsNeeded()
+                    && transport != BluetoothDevice.TRANSPORT_BREDR) {
+                scheduleGattReconnect(token,
+                        "Selected iPhone ACL link disconnected", "retrying");
+            }
         } else if (ACTION_HFP_CONNECTION.equals(action)) {
             int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE,
                     BluetoothProfile.STATE_DISCONNECTED);
@@ -1202,6 +1211,13 @@ public final class PhoneConnectorController {
         @Override public void onState(String state) {
             dispatchAncsTransport(token, transportSession,
                     () -> handleAncsTransportState(token, state));
+        }
+
+        @Override public void onRetryRequired(String reason) {
+            dispatchAncsTransport(token, transportSession,
+                    () -> handleAncsTransportFailure(token,
+                            reason == null || reason.trim().isEmpty()
+                                    ? "ANCS transport disconnected" : reason));
         }
 
         @Override public void onLog(String line) {

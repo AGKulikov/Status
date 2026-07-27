@@ -48,6 +48,32 @@ public final class PopupOverlayConfigTest {
     }
 
     @Test
+    public void popupTypographyAndHorizontalCompositionRoundTrip() throws Exception {
+        PopupItemConfig source = PopupItemConfig.create("phone_latest", 0);
+        source.orientation = 1;
+        source.showTitle = false;
+        source.showStatus = true;
+        source.titleFontFamily = "serif";
+        source.titleBold = true;
+        source.titleItalic = true;
+        source.textFontFamily = "monospace";
+        source.textBold = false;
+        source.textItalic = true;
+
+        PopupItemConfig restored = PopupItemConfig.fromJson(source.toJson(), 0);
+
+        assertEquals(1, restored.orientation);
+        assertFalse(restored.showTitle);
+        assertTrue(restored.showStatus);
+        assertEquals("serif", restored.titleFontFamily);
+        assertTrue(restored.titleBold);
+        assertTrue(restored.titleItalic);
+        assertEquals("monospace", restored.textFontFamily);
+        assertFalse(restored.textBold);
+        assertTrue(restored.textItalic);
+    }
+
+    @Test
     public void settingsChangePreservesPositionSavedByDragController() {
         PopupOverlayConfig staleEditor = PopupOverlayConfig.create("gate", "Ворота", 0);
         staleEditor.x = 100;

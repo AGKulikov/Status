@@ -53,7 +53,6 @@ public final class DriverClimateShortcutView extends View {
             Arrays.asList(POWER, TEMP_DRIVER, FAN, AUTO, AIRFLOW));
     /** Exact opaque components inside MonjaroPanel's ic_temperature.png. */
     private static final Rect FAN_ARTWORK_SOURCE = new Rect(0, 142, 53, 196);
-    private static final Rect FAN_SEGMENT_SOURCE = new Rect(66, 146, 102, 194);
 
     private final CarIntegration integration;
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG
@@ -69,8 +68,6 @@ public final class DriverClimateShortcutView extends View {
     @Nullable private final Drawable airflowFaceWindshield;
     @Nullable private final Drawable airflowLegsWindshield;
     @Nullable private final Drawable airflowAll;
-    @Nullable private final Drawable airflowAuto;
-    @Nullable private final Drawable airflowAutoBadge;
     @Nullable private final Bitmap fanScaleArtwork;
     private final int foregroundColor;
     private final boolean detailed;
@@ -135,10 +132,6 @@ public final class DriverClimateShortcutView extends View {
                 context, R.drawable.ic_driver_monjaro_blow_leg_window);
         airflowAll = loadAirflowDrawable(
                 context, R.drawable.ic_driver_monjaro_blow_all);
-        airflowAuto = loadAirflowDrawable(
-                context, R.drawable.ic_driver_monjaro_blow_auto);
-        airflowAutoBadge = loadAirflowDrawable(
-                context, R.drawable.ic_driver_monjaro_blow_auto_badge);
         fanScaleArtwork = loadFanScaleArtwork(
                 context, R.drawable.ic_driver_monjaro_temperature_source);
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
@@ -274,29 +267,27 @@ public final class DriverClimateShortcutView extends View {
                 ClimateFanIndicatorPolicy.fromConfirmedState(fanLabel, fanLevel);
         boolean automatic = DriverClimatePresentation.automatic(
                 autoKnown, autoActive, fanLabel);
-        int totalBars = automatic
-                ? ClimateFanIndicatorPolicy.AUTO_SEGMENTS
-                : ClimateFanIndicatorPolicy.MANUAL_SEGMENTS;
-        int bars = automatic
-                ? (indicator.automatic ? indicator.activeSegments
-                : Math.max(1, Math.min(totalBars, fanLevel + 1)))
-                : (indicator.automatic ? Math.max(0, Math.min(totalBars, fanLevel))
-                : indicator.activeSegments);
         float rowCenterY = height * (expanded ? .45f : .73f)
                 - effectiveGap * .50f;
+        if (automatic) {
+            // AUTO is a mode, not another fan level. Keep the compact tile unambiguous: one
+            // plain label and no fan/airflow pictograms or decorative badge.
+            drawAutoText(canvas, width / 2f, rowCenterY, unit, color);
+            return;
+        }
+        int totalBars = ClimateFanIndicatorPolicy.MANUAL_SEGMENTS;
+        int bars = indicator.automatic
+                ? Math.max(0, Math.min(totalBars, fanLevel))
+                : indicator.activeSegments;
         drawBars(canvas, width * .12f, rowCenterY, width * .76f, unit,
                 bars, totalBars, color);
         if (!expanded) return;
 
-        if (airflowKnown || automatic) {
+        if (airflowKnown) {
             drawAirflow(canvas, width / 2f,
                     height * .77f + effectiveGap * .50f, unit,
                     DriverClimatePresentation.airflowTargets(airflowLabel),
-                    automatic, color);
-        }
-        if (automatic) {
-            drawAutoBadge(canvas, width * .76f,
-                    height * .61f + effectiveGap * .50f, unit, color);
+                    false, color);
         }
     }
 
@@ -382,16 +373,24 @@ public final class DriverClimateShortcutView extends View {
                 startX + fanSize, centerY + fanSize / 2f);
         canvas.drawBitmap(fanScaleArtwork, FAN_ARTWORK_SOURCE, shape, artworkPaint);
 
+        // The original PNG segment crop overlaps the neighbouring slanted mark by one pixel.
+        // Repeating that crop creates the visible "dots" between scale marks. Preserve the
+        // supplied Monjaro fan glyph, but draw clean antialiased slanted bars from geometry.
+        float cleanHeight = Math.max(4f, segmentHeight * .78f);
         for (int index = 0; index < logicalTotal; index++) {
             int alpha = index < activeBars ? Color.alpha(color)
                     : Math.max(34, Math.round(Color.alpha(color) * .23f));
-            artworkPaint.setAlpha(alpha);
+            shapePaint.setColor((color & 0x00FFFFFF) | (alpha << 24));
             int physicalSlot = ClimateFanScaleGeometry.physicalSlot(index, logicalTotal);
             float left = segmentAreaX
                     + physicalSlot * (segmentWidth + segmentGap);
-            shape.set(left, centerY - segmentHeight / 2f,
-                    left + segmentWidth, centerY + segmentHeight / 2f);
-            canvas.drawBitmap(fanScaleArtwork, FAN_SEGMENT_SOURCE, shape, artworkPaint);
+            canvas.save();
+            canvas.rotate(-14f, left + segmentWidth / 2f, centerY);
+            shape.set(left, centerY - cleanHeight / 2f,
+                    left + segmentWidth, centerY + cleanHeight / 2f);
+            canvas.drawRoundRect(shape, segmentWidth * .32f,
+                    segmentWidth * .32f, shapePaint);
+            canvas.restore();
         }
         artworkPaint.setColorFilter(null);
         artworkPaint.setAlpha(255);
@@ -401,7 +400,6 @@ public final class DriverClimateShortcutView extends View {
     private void drawAirflow(Canvas canvas, float centerX, float centerY, float unit,
                              int targets, boolean automatic, int color) {
         Drawable drawable = airflowDrawable(targets);
-        if (drawable == null && automatic) drawable = airflowAuto;
         if (drawable == null) return;
         float iconSize = unit * .40f;
         int left = Math.round(centerX - iconSize / 2f);
@@ -450,39 +448,15 @@ public final class DriverClimateShortcutView extends View {
         return BitmapFactory.decodeResource(context.getResources(), resourceId, options);
     }
 
-    private void drawAutoBadge(@NonNull Canvas canvas, float centerX, float centerY,
-                               float unit, int color) {
-        if (airflowAutoBadge != null) {
-            float size = Math.max(8f, unit * .22f);
-            int left = Math.round(centerX - size / 2f);
-            int top = Math.round(centerY - size / 2f);
-            drawAirflowLayer(canvas, airflowAutoBadge, left, top,
-                    Math.round(left + size), Math.round(top + size), color);
-            return;
-        }
+    private void drawAutoText(@NonNull Canvas canvas, float centerX, float centerY,
+                              float unit, int color) {
         textPaint.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
         textPaint.setTextAlign(Paint.Align.CENTER);
-        textPaint.setTextSize(Math.max(7f, unit * .095f));
-        float textWidth = textPaint.measureText("AUTO");
+        textPaint.setTextSize(Math.max(9f, unit * .145f));
         Paint.FontMetrics metrics = textPaint.getFontMetrics();
-        float halfHeight = Math.max(unit * .065f,
-                (metrics.descent - metrics.ascent) * .58f);
-        float horizontalPadding = unit * .045f;
-        shape.set(centerX - textWidth / 2f - horizontalPadding,
-                centerY - halfHeight,
-                centerX + textWidth / 2f + horizontalPadding,
-                centerY + halfHeight);
-        shapePaint.setStyle(Paint.Style.FILL);
-        shapePaint.setColor(withAlpha(color, .18f));
-        canvas.drawRoundRect(shape, halfHeight, halfHeight, shapePaint);
-        shapePaint.setStyle(Paint.Style.STROKE);
-        shapePaint.setStrokeWidth(Math.max(1f, unit * .012f));
-        shapePaint.setColor(withAlpha(color, .72f));
-        canvas.drawRoundRect(shape, halfHeight, halfHeight, shapePaint);
         textPaint.setColor(color);
         canvas.drawText("AUTO", centerX,
                 centerY - (metrics.ascent + metrics.descent) / 2f, textPaint);
-        shapePaint.setStyle(Paint.Style.FILL);
     }
 
     private static int opaqueRgb(int color) {

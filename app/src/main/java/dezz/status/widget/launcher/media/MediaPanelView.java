@@ -40,6 +40,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import dezz.status.widget.R;
+import dezz.status.widget.MarqueeOutlineTextView;
 import dezz.status.widget.launcher.LauncherGlobalElementTag;
 import dezz.status.widget.launcher.LauncherLayoutStore;
 import dezz.status.widget.launcher.LauncherMediaController;
@@ -81,9 +82,9 @@ public final class MediaPanelView extends FrameLayout {
     @Nullable private LayoutEditor layoutEditor;
     private boolean globalEditPreview;
     private ImageView artwork;
-    private TextView title;
-    private TextView artist;
-    private TextView album;
+    private MarqueeOutlineTextView title;
+    private MarqueeOutlineTextView artist;
+    private MarqueeOutlineTextView album;
     private TextView application;
     private ProgressBar progress;
     private TextView timeline;
@@ -261,17 +262,17 @@ public final class MediaPanelView extends FrameLayout {
                 }
                 return artwork;
             case MediaPanelConfig.TITLE:
-                title = text(scaleSp(23, element.scalePercent), color(config.titleColor,
+                title = marqueeText(scaleSp(23, element.scalePercent), color(config.titleColor,
                         Color.WHITE), true);
                 title.setContentDescription("Название композиции");
                 return title;
             case MediaPanelConfig.ARTIST:
-                artist = text(scaleSp(18, element.scalePercent), color(config.secondaryColor,
+                artist = marqueeText(scaleSp(18, element.scalePercent), color(config.secondaryColor,
                         Color.LTGRAY), false);
                 artist.setContentDescription("Исполнитель");
                 return artist;
             case MediaPanelConfig.ALBUM:
-                album = text(scaleSp(15, element.scalePercent),
+                album = marqueeText(scaleSp(15, element.scalePercent),
                         withAlpha(color(config.secondaryColor, Color.LTGRAY), 210), false);
                 album.setContentDescription("Альбом");
                 return album;
@@ -446,6 +447,18 @@ public final class MediaPanelView extends FrameLayout {
     }
 
     @NonNull
+    private MarqueeOutlineTextView marqueeText(float sizeSp, int textColor, boolean bold) {
+        MarqueeOutlineTextView value = new MarqueeOutlineTextView(getContext());
+        value.setGravity(Gravity.CENTER_VERTICAL);
+        value.setTextSize(sizeSp);
+        value.setTextColor(textColor);
+        value.setSingleLine(true);
+        value.setPadding(0, 0, 0, 0);
+        if (bold) value.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        return value;
+    }
+
+    @NonNull
     private ImageButton button(int icon, @NonNull String description,
                                @Nullable OnClickListener listener, int scalePercent) {
         ImageButton value = new ImageButton(getContext());
@@ -516,20 +529,11 @@ public final class MediaPanelView extends FrameLayout {
      * restart all long-title animations because Android treats setText/setEllipsize/setSelected as
      * a new marquee even when the resulting visual value is identical.
      */
-    private static void applyMediaText(@NonNull TextView view, @NonNull String value,
+    private static void applyMediaText(@NonNull MarqueeOutlineTextView view,
+                                       @NonNull String value,
                                        boolean marqueeEnabled) {
-        boolean textChanged = !TextUtils.equals(view.getText(), value);
-        TextUtils.TruncateAt nextEllipsize = marqueeEnabled
-                ? TextUtils.TruncateAt.MARQUEE : TextUtils.TruncateAt.END;
-        boolean modeChanged = view.getEllipsize() != nextEllipsize;
-        if ((textChanged || modeChanged) && view.isSelected()) view.setSelected(false);
-        if (modeChanged) {
-            view.setEllipsize(nextEllipsize);
-            view.setMarqueeRepeatLimit(-1);
-        }
-        if (textChanged) view.setText(value);
-        boolean selected = marqueeEnabled && !value.isEmpty();
-        if (view.isSelected() != selected) view.setSelected(selected);
+        view.setMarqueeEnabled(marqueeEnabled);
+        view.setMarqueeText(value);
     }
 
     /** Applies an expensive bitmap/background change only when the rendered pixels changed. */

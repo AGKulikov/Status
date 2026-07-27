@@ -65,11 +65,13 @@ public final class LauncherElementFrame extends MaterialCardView {
         minimumWidthPx = dp(160);
         minimumHeightPx = dp(96);
 
-        setRadius(dp(24));
-        setCardElevation(dp(5));
-        setCardBackgroundColor(Color.argb(150, 18, 18, 24));
+        // The frame is geometry/editor chrome only. Visual underlays are independent
+        // LauncherBackdropView layers explicitly added by the user.
+        setRadius(0);
+        setCardElevation(0);
+        setCardBackgroundColor(Color.TRANSPARENT);
         setUseCompatPadding(false);
-        setPreventCornerOverlap(true);
+        setPreventCornerOverlap(false);
 
         rootHost = new FrameLayout(context);
         super.addView(rootHost, new LayoutParams(
@@ -118,7 +120,7 @@ public final class LauncherElementFrame extends MaterialCardView {
         }
         setStrokeWidth(enabled ? dp(3) : 0);
         setStrokeColor(Color.rgb(55, 135, 245));
-        setCardElevation(enabled ? dp(10) : dp(5));
+        setCardElevation(0);
         setClickable(enabled);
     }
 

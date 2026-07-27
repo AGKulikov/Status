@@ -266,64 +266,14 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         statusItemsDisclosure.setTextColor(color(R.color.settings_tertiary_text));
         statusItemsRow.addView(statusItemsDisclosure, wrapWrap());
         statusBarRows.addView(statusItemsRow, matchWrap());
-
-        statusBarNotificationsEnabled = new MaterialSwitch(this);
-        statusBarNotificationsEnabled.setChecked(
-                preferences.phoneStatusBarNotificationsEnabled.get());
-        addSwitchRow(statusBarRows, statusBarNotificationsEnabled,
-                R.string.phone_status_notification_title,
-                R.string.phone_status_notification_subtitle, true);
-        statusBarNotificationsEnabled.setOnCheckedChangeListener((button, checked) -> {
-            if (!checked) return;
-            // The ticker is a PHONE/ANCS consumer, so make its two upstream switches explicit
-            // instead of letting the user save a configuration that can never emit a value.
-            connectorEnabled.setChecked(true);
-            notificationsEnabled.setChecked(true);
-        });
-
-        LinearLayout notificationFieldsRow =
-                clickableRow(this::chooseNotificationFields);
-        LinearLayout notificationFieldsLabels = column();
-        notificationFieldsLabels.addView(text(
-                getString(R.string.phone_status_notification_fields_title),
-                17, Typeface.NORMAL), matchWrap());
-        selectedNotificationFieldsValue = secondary("", 14);
-        notificationFieldsLabels.addView(selectedNotificationFieldsValue, topMargin(3));
-        notificationFieldsRow.addView(notificationFieldsLabels, weighted());
-        TextView notificationFieldsDisclosure = text("›", 30, Typeface.NORMAL);
-        notificationFieldsDisclosure.setTextColor(
-                color(R.color.settings_tertiary_text));
-        notificationFieldsRow.addView(notificationFieldsDisclosure, wrapWrap());
-        statusBarRows.addView(separator(), separatorParams());
-        statusBarRows.addView(notificationFieldsRow, matchWrap());
-
-        LinearLayout notificationDurationRow =
-                clickableRow(this::chooseNotificationDuration);
-        LinearLayout notificationDurationLabels = column();
-        notificationDurationLabels.addView(text(
-                getString(R.string.phone_status_notification_duration_title),
-                17, Typeface.NORMAL), matchWrap());
-        notificationDurationValue = secondary("", 14);
-        notificationDurationLabels.addView(notificationDurationValue, topMargin(3));
-        notificationDurationRow.addView(notificationDurationLabels, weighted());
-        TextView notificationDurationDisclosure = text("›", 30, Typeface.NORMAL);
-        notificationDurationDisclosure.setTextColor(
-                color(R.color.settings_tertiary_text));
-        notificationDurationRow.addView(notificationDurationDisclosure, wrapWrap());
-        statusBarRows.addView(separator(), separatorParams());
-        statusBarRows.addView(notificationDurationRow, matchWrap());
-
         page.addView(card(statusBarRows), topMargin(7));
         TextView statusItemsHint =
                 secondary(getString(R.string.phone_status_items_hint), 13);
         statusItemsHint.setPadding(dp(8), 0, dp(8), 0);
         page.addView(statusItemsHint, topMargin(8));
-
-        notificationColorButton = actionButton("", this::chooseNotificationTickerColor);
-        AppleColorPickerDialog.decorateButton(notificationColorButton,
-                getString(R.string.phone_status_notification_color_title),
-                notificationTickerColor);
-        page.addView(notificationColorButton, topMargin(10));
+        page.addView(actionButton("Показ уведомлений — в разделе «Автоматизации»",
+                () -> startActivity(new Intent(this,
+                        PhoneNotificationAutomationSettingsActivity.class))), topMargin(10));
         refreshStatusBarSummaries();
 
         page.addView(sectionTitle(getString(R.string.phone_section_alerts)), topMargin(24));
@@ -1495,13 +1445,6 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         preferences.phoneIncludeNotificationText.set(includeNotificationText.isChecked());
         preferences.phoneStatusBarItems.set(PhoneStatusBarPolicy.serializeIds(
                 selectedStatusItems, PhoneStatusBarPolicy.statusIds()));
-        preferences.phoneStatusBarNotificationsEnabled.set(
-                statusBarNotificationsEnabled.isChecked());
-        preferences.phoneStatusBarNotificationFields.set(
-                PhoneStatusBarPolicy.serializeIds(selectedNotificationFields,
-                        PhoneStatusBarPolicy.notificationFieldIds()));
-        preferences.phoneStatusBarNotificationSeconds.set(
-                boundedNotificationDuration(notificationDurationSeconds));
         preferences.phoneNotificationCategoryIds.set(
                 PhoneNotificationFilter.serializeCategoryIds(
                         selectedNotificationCategories));
@@ -1509,12 +1452,11 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 PhoneNotificationFilter.normalizeMode(notificationAppFilterMode));
         preferences.phoneNotificationAppFilterKeys.set(
                 PhoneNotificationFilter.serializeAppKeys(selectedNotificationApps));
-        preferences.phoneStatusBarNotificationColor.set(notificationTickerColor);
         preferences.phoneLowBatteryAlertEnabled.set(lowBatteryAlertEnabled.isChecked());
         preferences.phoneLowBatteryAlertThreshold.set(savedLowBatteryThreshold);
         preferences.phoneLowBatteryAlertColor.set(lowBatteryAlertColor);
         if (resetLowBatteryLatch) preferences.phoneLowBatteryAlertLatched.set(false);
-        if (statusBarNotificationsEnabled.isChecked()
+        if (preferences.phoneStatusBarNotificationsEnabled.get()
                 || lowBatteryAlertEnabled.isChecked()) {
             List<BrickType> order = BrickType.parseOrder(preferences.brickOrder.get());
             if (!order.contains(BrickType.MEDIA)) {

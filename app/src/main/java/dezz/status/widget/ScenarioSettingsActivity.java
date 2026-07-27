@@ -54,11 +54,13 @@ import dezz.status.widget.ha.api.HaEntity;
 import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.integration.SourceBinding;
+import dezz.status.widget.integration.SystemConditionResolver;
 import dezz.status.widget.popup.PopupItemConfig;
 import dezz.status.widget.popup.PopupItemConfigStore;
 import dezz.status.widget.popup.PopupIconCatalog;
 import dezz.status.widget.popup.PopupOverlayConfig;
 import dezz.status.widget.popup.PopupOverlayConfigStore;
+import dezz.status.widget.phone.PhoneNotificationAutomation;
 import dezz.status.widget.scenario.Condition;
 import dezz.status.widget.scenario.ConditionMode;
 import dezz.status.widget.scenario.Input;
@@ -84,12 +86,15 @@ import dezz.status.widget.sprut.SprutProtocolAdapter;
  * scenario written by another version of the application.</p>
  */
 public final class ScenarioSettingsActivity extends AppCompatActivity {
+    public static final String EXTRA_TARGET_SCOPE = "scenario_target_scope";
+    public static final String EXTRA_TARGET_ID = "scenario_target_id";
     private static final String DEFAULT_CONNECTOR_ID = "default";
     private static final String[] CONNECTORS = {
-            "HOME_ASSISTANT", "MQTT", "SPRUTHUB", "PHONE"
+            "HOME_ASSISTANT", "MQTT", "SPRUTHUB", "PHONE",
+            SystemConditionResolver.CONNECTOR_TYPE
     };
     private static final String[] CONNECTOR_LABELS = {
-            "Home Assistant", "MQTT", "Sprut.hub", "Телефон"
+            "Home Assistant", "MQTT", "Sprut.hub", "Телефон", "Автомобиль и система"
     };
     /** Views remain bounded even when a connector exposes hundreds of devices. */
     private static final int MAX_SOURCE_RESULTS = 100;
@@ -134,13 +139,38 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
     private Button addButton;
     private final List<Entry> entries = new ArrayList<>();
     private String loadError;
+    @Nullable private TargetScope suggestedTargetScope;
+    @Nullable private String suggestedTargetId;
+
+    @NonNull
+    public static Intent intentForTarget(@NonNull android.content.Context context,
+                                         @NonNull TargetScope scope,
+                                         @NonNull String targetId) {
+        return new Intent(context, ScenarioSettingsActivity.class)
+                .putExtra(EXTRA_TARGET_SCOPE, scope.jsonName())
+                .putExtra(EXTRA_TARGET_ID, targetId);
+    }
 
     @Override
     protected void onCreate(@Nullable Bundle state) {
         super.onCreate(state);
         prefs = new Preferences(this);
+        try {
+            String scope = getIntent().getStringExtra(EXTRA_TARGET_SCOPE);
+            String id = getIntent().getStringExtra(EXTRA_TARGET_ID);
+            if (scope != null && id != null && !id.trim().isEmpty()) {
+                suggestedTargetScope = TargetScope.fromJsonName(scope);
+                suggestedTargetId = id.trim();
+            }
+        } catch (RuntimeException ignored) {
+            suggestedTargetScope = null;
+            suggestedTargetId = null;
+        }
         loadEntries();
         showContent();
+        if (state == null && suggestedTargetScope != null && suggestedTargetId != null) {
+            scenarioHost.post(() -> showEditor(-1));
+        }
     }
 
     private void showContent() {
@@ -603,7 +633,7 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                     source == null ? nextScenarioId() : source.id);
             hideControlAndLabel(root, scenarioId);
 
-            root.addView(section("1. Когда изменится устройство"), topMargin(16));
+            root.addView(section("1. Источник условия"), topMargin(16));
             connector = spinner(root, "Коннектор",
                     CONNECTORS, condition == null ? CONNECTORS[0]
                             : condition.reference.connectorType);
@@ -624,7 +654,7 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                     : sourceLabel(condition.reference));
             root.addView(sourceSummary, topMargin(6));
             Button chooseSource = new Button(ScenarioSettingsActivity.this);
-            chooseSource.setText("Выбрать коннектор и устройство");
+            chooseSource.setText("Выбрать источник условия");
             chooseSource.setOnClickListener(view -> showSourcePicker());
             root.addView(chooseSource, topMargin(6));
 
@@ -712,6 +742,21 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             keepDriverActionSupported();
             updateValueControl();
             keepTileVisibilityOutOfPopupScope();
+            if (source == null && suggestedTargetScope != null
+                    && suggestedTargetId != null) {
+                // Populate the child identity first: the popup visibility guard permits only the
+                // three reserved notification fields and needs the exact id while scope changes.
+                targetId.setText(suggestedTargetId);
+                selectSpinnerValue(target, TARGET_VALUES,
+                        suggestedTargetScope.jsonName());
+                targetSummary.setText(targetLabel(
+                        suggestedTargetScope, suggestedTargetId));
+                selectSpinnerValue(localField, FIELD_VALUES,
+                        LocalField.VISIBLE.jsonName());
+                trueBooleanChoice.setSelection(1);
+                falseBooleanChoice.setSelection(2);
+                updateValueControl();
+            }
         }
 
         Scenario read() {
@@ -735,7 +780,8 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             TargetScope targetScope = TargetScope.fromJsonName(mappedValue(target, TARGET_VALUES));
             String selectedTargetId = text(targetId);
             validateTarget(targetScope, selectedTargetId);
-            if (field == LocalField.VISIBLE && targetScope == TargetScope.POPUP) {
+            if (field == LocalField.VISIBLE && targetScope == TargetScope.POPUP
+                    && !PhoneNotificationAutomation.isFieldAutomationId(selectedTargetId)) {
                 throw new IllegalArgumentException("Видимость настраивается для всего "
                         + "плавающего оверлея. Выберите «Весь плавающий оверлей»");
             }
@@ -803,9 +849,11 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                     !bool && !directText ? View.VISIBLE : View.GONE);
         }
 
-        /** Visibility of popup UI belongs to the independent window, not to a child tile.
-         * Legacy POPUP/VISIBLE JSON remains valid in the runtime controller, but the visual
-         * editor always redirects that combination to an OVERLAY target. */
+        /**
+         * Normal popup visibility belongs to its independent window. Phone application/topic/text
+         * are intentional exceptions: they share one window but require independent privacy
+         * conditions in both that window and the status row.
+         */
         private void keepTileVisibilityOutOfPopupScope() {
             LocalField field;
             try {
@@ -815,6 +863,11 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             }
             if (field != LocalField.VISIBLE
                     || !TargetScope.POPUP.jsonName().equals(mappedValue(target, TARGET_VALUES))) {
+                return;
+            }
+            String selectedTargetId = text(targetId);
+            if (selectedTargetId.isEmpty()
+                    || PhoneNotificationAutomation.isFieldAutomationId(selectedTargetId)) {
                 return;
             }
             selectSpinnerValue(target, TARGET_VALUES, TargetScope.OVERLAY.jsonName());
@@ -859,6 +912,9 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                             case "PHONE":
                                 showPhoneSourcePicker();
                                 break;
+                            case SystemConditionResolver.CONNECTOR_TYPE:
+                                showSystemSourcePicker();
+                                break;
                             case "MQTT":
                             default:
                                 showMqttSourcePicker();
@@ -867,6 +923,115 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                     })
                     .setNegativeButton("Отмена", null)
                     .show();
+        }
+
+        private void showSystemSourcePicker() {
+            String[] labels = {
+                    "Диапазон времени",
+                    "Пассажир присутствует",
+                    "Элемент другой автоматизации отображается"
+            };
+            new AlertDialog.Builder(ScenarioSettingsActivity.this)
+                    .setTitle("Автомобиль и система")
+                    .setItems(labels, (dialog, which) -> {
+                        switch (which) {
+                            case 0:
+                                showTimeRangePicker();
+                                break;
+                            case 1:
+                                applySystemSource(SystemConditionResolver.PASSENGER_RESOURCE,
+                                        "Автомобиль · пассажир присутствует");
+                                break;
+                            case 2:
+                                showVisibleAutomationScopePicker();
+                                break;
+                            default:
+                                break;
+                        }
+                    })
+                    .setNegativeButton("Назад", (dialog, which) -> showSourcePicker())
+                    .show();
+        }
+
+        private void showTimeRangePicker() {
+            LinearLayout form = column();
+            form.setPadding(dp(16), dp(4), dp(16), dp(4));
+            EditText start = field(form, "Начало, ЧЧ:ММ", "08:00");
+            EditText end = field(form, "Окончание, ЧЧ:ММ", "20:00");
+            start.setInputType(InputType.TYPE_CLASS_DATETIME
+                    | InputType.TYPE_DATETIME_VARIATION_TIME);
+            end.setInputType(InputType.TYPE_CLASS_DATETIME
+                    | InputType.TYPE_DATETIME_VARIATION_TIME);
+            AlertDialog dialog = new AlertDialog.Builder(ScenarioSettingsActivity.this)
+                    .setTitle("Диапазон времени")
+                    .setMessage("Диапазон может переходить через полночь. "
+                            + "Одинаковое начало и окончание означает весь день.")
+                    .setView(form)
+                    .setNegativeButton("Отмена", null)
+                    .setPositiveButton("Применить", null)
+                    .create();
+            dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                    .setOnClickListener(view -> {
+                        try {
+                            String startValue = text(start);
+                            String endValue = text(end);
+                            applySystemSource(SystemConditionResolver.timeRangeResource(
+                                            startValue, endValue),
+                                    "Время · " + startValue + "–" + endValue);
+                            dialog.dismiss();
+                        } catch (RuntimeException error) {
+                            showValidationError(error);
+                        }
+                    }));
+            dialog.show();
+        }
+
+        private void showVisibleAutomationScopePicker() {
+            new AlertDialog.Builder(ScenarioSettingsActivity.this)
+                    .setTitle("Где находится элемент")
+                    .setItems(TARGET_LABELS, (dialog, which) ->
+                            showVisibleAutomationTargetPicker(
+                                    TargetScope.fromJsonName(TARGET_VALUES[which])))
+                    .setNegativeButton("Назад", (dialog, which) -> showSystemSourcePicker())
+                    .show();
+        }
+
+        private void showVisibleAutomationTargetPicker(TargetScope scope) {
+            List<TargetOption> options = targetOptions(scope);
+            if (options.isEmpty()) {
+                Toast.makeText(ScenarioSettingsActivity.this,
+                        "В выбранной области пока нет элементов", Toast.LENGTH_LONG).show();
+                showVisibleAutomationScopePicker();
+                return;
+            }
+            String[] labels = new String[options.size()];
+            for (int index = 0; index < options.size(); index++) {
+                labels[index] = options.get(index).label;
+            }
+            new AlertDialog.Builder(ScenarioSettingsActivity.this)
+                    .setTitle("Отображаемый элемент")
+                    .setItems(labels, (dialog, which) -> {
+                        TargetOption option = options.get(which);
+                        String resource = SystemConditionResolver.AUTOMATION_VISIBLE_PREFIX
+                                + scope.jsonName() + ":" + option.id;
+                        applySystemSource(resource,
+                                "Автоматизация · отображается\n" + option.label);
+                    })
+                    .setNegativeButton("Назад",
+                            (dialog, which) -> showVisibleAutomationScopePicker())
+                    .show();
+        }
+
+        private void applySystemSource(String resource, String label) {
+            selectSpinnerValue(connector, CONNECTORS,
+                    SystemConditionResolver.CONNECTOR_TYPE);
+            connectorId.setText(SystemConditionResolver.CONNECTOR_ID);
+            resourceId.setText(resource);
+            valuePath.setText("");
+            sourceSummary.setText(label);
+            selectSpinnerValue(operator, OPERATOR_VALUES, Operator.TRUE.jsonName());
+            operand.setText("");
+            secondOperand.setText("");
         }
 
         private void showHomeAssistantSourcePicker() {
@@ -1548,6 +1713,9 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             case "HOME_ASSISTANT": connector = "Home Assistant"; break;
             case "SPRUTHUB": connector = "Sprut.hub"; break;
             case "PHONE": connector = "Телефон"; break;
+            case SystemConditionResolver.CONNECTOR_TYPE:
+                connector = "Автомобиль и система";
+                break;
             case "MQTT": connector = "MQTT"; break;
             default: connector = reference.connectorType; break;
         }

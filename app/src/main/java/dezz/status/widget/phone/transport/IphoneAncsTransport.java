@@ -37,6 +37,8 @@ import android.os.ParcelUuid;
 import android.os.SystemClock;
 import android.util.Log;
 
+import androidx.annotation.Nullable;
+
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
@@ -111,6 +113,8 @@ public final class IphoneAncsTransport {
 
     public interface Listener {
         void onState(String state);
+        /** Reconnect lifecycle is typed and must not depend only on parsing diagnostic text. */
+        default void onRetryRequired(String reason) {}
         void onLog(String line);
         void onCandidates(List<Candidate> candidates);
         void onNotification(NotificationItem item);
@@ -334,6 +338,8 @@ public final class IphoneAncsTransport {
     private boolean iphoneSecureConfirmed;
     private boolean iphonePostSecureDiscoveryScheduled;
     private boolean iphoneAncsSeen;
+    private boolean closing;
+    private boolean retrySignalled;
     private boolean ancsRetryAfterBond;
     private boolean ancsAuthorizationFailureSeen;
     private boolean leBondAttemptObserved;
@@ -515,6 +521,8 @@ public final class IphoneAncsTransport {
      * this transport and creates the next single GATT instance through its bounded backoff.</p>
      */
     public boolean connectSavedIphone(String address) {
+        closing = false;
+        retrySignalled = false;
         if (!ensureAdapter()) return false;
         if (address == null || address.trim().isEmpty()) return false;
         final BluetoothDevice device;
@@ -756,6 +764,7 @@ public final class IphoneAncsTransport {
     }
 
     public void close() {
+        closing = true;
         stopScan();
         stopAdvertising();
         disconnect();
@@ -2345,8 +2354,48 @@ public final class IphoneAncsTransport {
     }
 
     private void state(String value) {
+        if (!closing && !retrySignalled && requiresControllerRetry(value)) {
+            retrySignalled = true;
+            // Deliver the typed lifecycle signal first. The controller closes this transport and
+            // advances its session barrier while processing it, so a later diagnostic-state
+            // callback cannot accidentally become the only owner of reconnection.
+            listener.onRetryRequired(value);
+        }
         listener.onState(value);
         log("STATE: " + value);
+    }
+
+    private static boolean requiresControllerRetry(@Nullable String value) {
+        if (value == null) return false;
+        return value.contains("CONNECT RETURNED NULL")
+                || value.contains("CONNECT TIMEOUT")
+                || value.contains("CONNECT EXCEPTION")
+                || value.contains("SAVED PEER CONFLICT")
+                || value.contains("PEER CONFLICT")
+                || value.contains("CONNECTION FAILED")
+                || value.contains("GPS-STYLE FAILED")
+                || value.contains("IPHONE DISCONNECTED")
+                || value.contains("SERVICE CHANGED · RECONNECT")
+                || value.contains("DISCOVERY_FAILED_")
+                || value.contains("DISCOVERY_START_FAILED")
+                || value.contains("DISCOVERY_TIMEOUT")
+                || value.contains("ANCS_INCOMPLETE")
+                || value.contains("SUBSCRIBE_EXCEPTION")
+                || value.contains("SUBSCRIBE_LOCAL_FAILED")
+                || value.contains("CCCD_START_FAILED")
+                || value.contains("CCCD_WRITE_EXCEPTION")
+                || value.contains("CCCD_WRITE_TIMEOUT")
+                || value.contains("CCCD_FAILED_")
+                || value.contains("BAS OPERATION TIMEOUT")
+                || value.contains("ANCS DATA DESYNC")
+                || value.contains("ANCS WAIT TIMEOUT")
+                || value.contains("SECURE READ FAILED")
+                || value.contains("BOND_START_FAILED")
+                || value.contains("LE BOND TIMEOUT")
+                || value.contains("LE BOND FAILED")
+                || value.contains("ATTEMPTS EXHAUSTED")
+                || value.contains("PAIRING FAILED")
+                || value.contains("AUTH FAILED ПОСЛЕ BOND");
     }
 
     private void log(String message) {

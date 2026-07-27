@@ -79,6 +79,9 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.widget.ImageViewCompat;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
@@ -123,6 +126,7 @@ import dezz.status.widget.ha.api.HaWebSocketConnector;
 import dezz.status.widget.mqtt.MqttController;
 import dezz.status.widget.phone.PhoneConnectorController;
 import dezz.status.widget.phone.PhoneLowBatteryAlertPolicy;
+import dezz.status.widget.phone.PhoneNotificationAutomation;
 import dezz.status.widget.phone.PhoneStatusBarPolicy;
 import dezz.status.widget.phone.PhoneSprutPresenceExporter;
 import dezz.status.widget.popup.PopupOverlayController;
@@ -203,13 +207,6 @@ public class WidgetService extends Service {
      * trick that makes this transition stay inside a stable window rectangle.
      */
     private static final int BRICK_TRANSITION_DURATION_MS = 450;
-    /**
-     * Duration of {@link android.animation.LayoutTransition#CHANGING} animations that fire
-     * when a child changes its own size (clock minute, date, media track, icon swap). Shorter
-     * than visibility flips because the user sees small frequent updates as snappy when
-     * animated under ~300ms; longer feels sluggish for tiny shifts.
-     */
-    private static final int CONTENT_CHANGE_DURATION_MS = 250;
     /** Duration of the alpha animation used when a brick is hidden in keeps-space mode. */
     private static final int BRICK_ALPHA_DURATION_MS = 300;
 
@@ -219,6 +216,7 @@ public class WidgetService extends Service {
     private static final long GNSS_STATUS_CHECK_INTERVAL = 2_000L;
     private static final long GNSS_LOCATION_INTERVAL_MS = 2_000L;
     private static final long DATETIME_UPDATE_INTERVAL_MS = 60_000L;
+    private static final long SYSTEM_CONDITION_REFRESH_INTERVAL_MS = 60_000L;
     /** Cadence for advancing the media progress bar while a track is actively playing. 250ms
      *  is fast enough to look smooth on a thin bar and slow enough to not show up in profilers. */
     // One repaint per second is visually sufficient for a compact status-row progress line and
@@ -278,6 +276,16 @@ public class WidgetService extends Service {
         if (WidgetService.this.destroyed || changed.isEmpty()) return;
         boolean affectsStatusRow = changed.containsKey(AutomationContract.SCOPE_MAIN)
                 || changed.containsKey(AutomationContract.SCOPE_BUILTIN);
+        boolean affectsPhoneNotification = false;
+        Set<String> changedPopupItems = changed.get(AutomationContract.SCOPE_POPUP);
+        if (changedPopupItems != null) {
+            for (String id : changedPopupItems) {
+                if (PhoneNotificationAutomation.isFieldAutomationId(id)) {
+                    affectsPhoneNotification = true;
+                    break;
+                }
+            }
+        }
         if (popupOverlay != null) {
             for (Map.Entry<String, Set<String>> entry : changed.entrySet()) {
                 for (String id : entry.getValue()) {
@@ -296,6 +304,7 @@ public class WidgetService extends Service {
         // attachment must not discard their connector updates.
         if (WidgetService.this.binding == null) return;
         if (changed.containsKey(AutomationContract.SCOPE_MAIN)) renderHomeAssistantBricks();
+        if (affectsPhoneNotification) refreshActivePhoneNotificationForConditions();
         // A popup-only temperature/sensor stream must not remeasure and animate the independent
         // status row. HA1048 did that for every packet even when no status brick had changed.
         if (affectsStatusRow) applyBrickVisibility(currentBrickSet());
@@ -308,11 +317,16 @@ public class WidgetService extends Service {
     private final Map<String, ConnectorValue> phoneStatusValues = new LinkedHashMap<>();
     @Nullable
     private PhoneStatusBarPolicy.NotificationPresentation activePhoneNotification;
+    /** Base field selection captured with the active delivery; local conditions refine it. */
+    @NonNull
+    private Set<String> activePhoneNotificationFields = Collections.emptySet();
     @Nullable
     private String activePhoneBatteryAlertText;
     private boolean phoneLowBatteryAlertLatched;
     private final Set<String> observedPhoneNotificationKeys = new LinkedHashSet<>();
     private long activePhoneNotificationExpiresAt;
+    private long activePhonePopupNotificationExpiresAt;
+    private boolean phoneNotificationPopupConfigured;
     private int mediaDurationVisibilityBeforePhoneNotification = View.GONE;
     private int mediaProgressVisibilityBeforePhoneNotification = View.GONE;
     private final ConnectorValueRegistry.Listener phoneStatusListener =
@@ -334,6 +348,18 @@ public class WidgetService extends Service {
             schedulePopupRefresh();
         }
     };
+    private final Runnable phonePopupNotificationExpiry = new Runnable() {
+        @Override public void run() {
+            if (destroyed || activePhonePopupNotificationExpiresAt <= 0L) return;
+            long remaining = activePhonePopupNotificationExpiresAt
+                    - android.os.SystemClock.elapsedRealtime();
+            if (remaining > 0L) {
+                mainHandler.postDelayed(this, remaining);
+                return;
+            }
+            clearPhonePopupNotification();
+        }
+    };
     private final Runnable crossSourceRuleRefresh = () -> {
         crossSourceRuleRefreshScheduled.set(false);
         if (destroyed) return;
@@ -348,6 +374,10 @@ public class WidgetService extends Service {
     private void scheduleCrossSourceRuleRefresh() {
         if (destroyed || !crossSourceRuleRefreshScheduled.compareAndSet(false, true)) return;
         mainHandler.postDelayed(crossSourceRuleRefresh, 50L);
+    }
+
+    private void refreshActivePhoneNotificationForConditions() {
+        if (binding != null && activePhoneNotification != null) updateMediaInfo();
     }
 
     private void postPhoneValuesChanged(@NonNull List<ConnectorValue> immutableCopy) {
@@ -447,41 +477,24 @@ public class WidgetService extends Service {
 
     /**
      * Number of in-flight transitions that have widened the WindowManager window to the
-     * screen-width "buffer" so animations can play in a stable rectangle. Incremented when
-     * a transition starts the buffer, decremented when it ends; the window is restored to
-     * WRAP_CONTENT only when the counter reaches zero. Shared between:
+     * screen-width "buffer" so explicit visibility animations can play in a stable rectangle.
+     * Incremented when a transition starts the buffer, decremented when it ends; the window is
+     * restored to WRAP_CONTENT only when the counter reaches zero. Shared between:
      * <ul>
      *   <li>{@link #beginVisibilityTransition} (brick show/hide)</li>
-     *   <li>The always-on {@link android.animation.LayoutTransition#CHANGING} on
-     *       overlayContainer (any child changing measured size)</li>
-     *   <li>The eager pre-empt in the {@code onLayoutChange} listener that catches a
-     *       shrink one frame before {@code LayoutTransition.startTransition} would,
-     *       so the window doesn't snap below the children that are still animating
-     *       at their old positions</li>
+     *   <li>The eager pre-empt in the size-change listener that catches a shrink before the
+     *       window manager applies the new wrap-content bounds.</li>
      * </ul>
      */
     private int pendingBufferedTransitions = 0;
 
     /**
      * Closes the buffer opened eagerly by {@code onLayoutChange} when the content shrinks.
-     * Posted with a delay slightly longer than {@link #BRICK_TRANSITION_DURATION_MS}; the
-     * happy-path {@code LayoutTransition.endTransition} usually fires first and the
-     * counter goes to zero on its own — this is the safety net for the case where no
-     * {@code LayoutTransition} actually runs (e.g. a same-size measure that still
-     * propagated through), so the window doesn't stay screen-wide forever.
+     * Posted with a delay slightly longer than {@link #BRICK_TRANSITION_DURATION_MS}, so the
+     * window cannot remain screen-wide when a size hint is not followed by a visibility
+     * transition.
      */
     private final Runnable shrinkBufferSafetyClose = this::endBufferedTransition;
-
-    /**
-     * Always-on {@link android.animation.LayoutTransition#CHANGING} animation installed on the
-     * overlay container. Held as a field so {@link #beginVisibilityTransition} can disable
-     * CHANGING for the duration of a visibility flip — otherwise the explicit ChangeBounds
-     * inside the visibility {@link android.transition.TransitionSet} and the implicit CHANGING
-     * triggered by sibling bricks shifting both play at once, producing the visible "double
-     * animation". Re-enabled when the visibility transition's close runnable fires.
-     */
-    @Nullable
-    private android.animation.LayoutTransition contentLayoutTransition;
 
     private Context themedContext;
     private int appliedThemePref = -1;
@@ -572,6 +585,17 @@ public class WidgetService extends Service {
             updateDateTime();
             long now = System.currentTimeMillis();
             long delay = DATETIME_UPDATE_INTERVAL_MS - (now % DATETIME_UPDATE_INTERVAL_MS);
+            mainHandler.postDelayed(this, delay);
+        }
+    };
+    /** Time-range conditions remain live even when the status row has no clock or is disabled. */
+    private final Runnable systemConditionRefresh = new Runnable() {
+        @Override public void run() {
+            if (destroyed || !integrationsStarted) return;
+            if (scenarioController != null) scenarioController.refreshSystemConditions();
+            long now = System.currentTimeMillis();
+            long delay = SYSTEM_CONDITION_REFRESH_INTERVAL_MS
+                    - (now % SYSTEM_CONDITION_REFRESH_INTERVAL_MS);
             mainHandler.postDelayed(this, delay);
         }
     };
@@ -721,6 +745,9 @@ public class WidgetService extends Service {
         // after a new process starts. Each connector promotes only values returned by its fresh
         // startup snapshot/retained replay, preventing a missed offline change from looking live.
         automationStates.markAllStale();
+        // A popup notification is intentionally ephemeral. Never resurrect its retained visible
+        // state after ignition-off or process death.
+        clearPhonePopupNotification();
         haConfigs = new HaBrickConfigStore(prefs);
         configuredMainBricks = haConfigs.loadMain();
         mqttController = new MqttController(this, prefs, automationStates, connectorValues,
@@ -803,6 +830,7 @@ public class WidgetService extends Service {
         actionDispatcher = new ConnectorActionDispatcher(
                 mqttController, sprutController, haApiController);
         scenarioController = new LocalScenarioController(prefs, automationStates, connectorValues,
+                CarIntegrations.get(this),
                 targets -> {
                     // Initial startup performs one consolidated render after all providers and
                     // scenarios are configured. Do not enqueue a second popup/layout pass.
@@ -811,14 +839,25 @@ public class WidgetService extends Service {
                         if (destroyed) return;
                         if (binding != null) renderHomeAssistantBricks();
                         applyPopupPreferencesSafely();
-                        if (binding != null) applyBrickVisibility(currentBrickSet());
+                        boolean phoneFieldsChanged = false;
                         for (String target : targets) {
+                            if (target.startsWith(AutomationContract.SCOPE_POPUP + "|")
+                                    && PhoneNotificationAutomation.isFieldAutomationId(
+                                    target.substring(target.indexOf('|') + 1))) {
+                                phoneFieldsChanged = true;
+                            }
                             if (target.startsWith(AutomationContract.SCOPE_DRIVER + "|")) {
                                 DriverPanelService.apply(this);
                             }
                             if (target.startsWith(AutomationContract.SCOPE_HUD + "|")) {
                                 HudPresentationService.notifyAutomationChanged(this);
                             }
+                        }
+                        if (binding != null) {
+                            if (phoneFieldsChanged && activePhoneNotification != null) {
+                                updateMediaInfo();
+                            }
+                            applyBrickVisibility(currentBrickSet());
                         }
                     });
                 });
@@ -890,6 +929,11 @@ public class WidgetService extends Service {
         if (prefs.hudPanelEnabled.get()) HudPresentationService.notifyAutomationChanged(this);
         mainHandler.removeCallbacks(automationFreshnessTick);
         mainHandler.postDelayed(automationFreshnessTick, 30_000L);
+        mainHandler.removeCallbacks(systemConditionRefresh);
+        long now = System.currentTimeMillis();
+        mainHandler.postDelayed(systemConditionRefresh,
+                SYSTEM_CONDITION_REFRESH_INTERVAL_MS
+                        - (now % SYSTEM_CONDITION_REFRESH_INTERVAL_MS));
     }
 
     private void scheduleInitialIntegrationStartupAfterFrame() {
@@ -952,7 +996,7 @@ public class WidgetService extends Service {
     }
 
     private void applyPopupPreferencesSafely() {
-        if (prefs == null || !prefs.widgetEnabled.get()) return;
+        if (prefs == null || !Settings.canDrawOverlays(this)) return;
         ensurePopupOverlayManager();
         if (popupOverlay == null) return;
         try {
@@ -963,11 +1007,21 @@ public class WidgetService extends Service {
     }
 
     private void ensurePopupOverlayManager() {
-        if (popupOverlay != null || prefs == null || !prefs.widgetEnabled.get()
+        if (popupOverlay != null || prefs == null || !Settings.canDrawOverlays(this)
                 || automationStates == null
                 || actionDispatcher == null) return;
         popupOverlay = new PopupOverlayManager(this, prefs, automationStates,
                 actionDispatcher, this::popupBuiltinValue);
+    }
+
+    private void ensurePhoneNotificationPopupConfigured() {
+        if (phoneNotificationPopupConfigured || prefs == null) return;
+        try {
+            PhoneNotificationAutomation.ensureConfigured(prefs);
+            phoneNotificationPopupConfigured = true;
+        } catch (JSONException | RuntimeException failure) {
+            Log.e(TAG, "Could not configure phone notification popup", failure);
+        }
     }
 
     @Override
@@ -1035,13 +1089,10 @@ public class WidgetService extends Service {
             notifyOverlayState();
         });
 
-        // Synchronous "size about to change" hook. Fires from {@code onMeasure} of the
-        // BufferingLinearLayout — earlier than OnLayoutChangeListener and earlier than
-        // LayoutTransition.startTransition, both of which run after ViewRootImpl has
-        // already pushed the new wrap_content dimensions to WindowManager. Catching it
-        // mid-measure lets our updateViewLayout(screenWidth) win the race so the window
-        // never snaps below the children that are about to animate. The safety runnable
-        // is a fallback in case no LayoutTransition actually plays.
+        // Synchronous "size about to change" hook. It fires from onMeasure before ViewRootImpl
+        // pushes new wrap-content dimensions to WindowManager. Catching it mid-measure lets our
+        // updateViewLayout(screenWidth) win the race, so an explicit visibility transition never
+        // snaps below the children that are about to animate.
         binding.overlayContainer.setSizeChangeHint((oldW, newW, oldH, newH) -> {
             if (params == null) return;
             if (prefs.widgetMode.get() == WIDGET_MODE_STATUS_BAR) return;
@@ -1053,42 +1104,11 @@ public class WidgetService extends Service {
                     BRICK_TRANSITION_DURATION_MS + 200);
         });
 
-        // Universal "content size changed" animation: install a LayoutTransition with only the
-        // CHANGING type enabled on the overlay container. Any child that changes its measured
-        // size (clock minute rolls over, date string flips at midnight, media title scrolls to
-        // a new track, status icon swaps drawable) will produce a smooth ChangeBounds-style
-        // animation for itself and any siblings it pushes around. CHANGE_APPEARING / APPEARING
-        // / DISAPPEARING are left disabled — those cases are handled by our explicit
-        // {@link #beginVisibilityTransition} that knows about the window-buffer trick.
-        // We hook startTransition / endTransition into the same buffered-transition counter so
-        // the window doesn't snap mid-animation when CHANGING runs solo, and so concurrent
-        // CHANGING + visibility transitions coexist correctly.
-        contentLayoutTransition = new android.animation.LayoutTransition();
-        android.animation.LayoutTransition lt = contentLayoutTransition;
-        lt.disableTransitionType(android.animation.LayoutTransition.APPEARING);
-        lt.disableTransitionType(android.animation.LayoutTransition.DISAPPEARING);
-        lt.disableTransitionType(android.animation.LayoutTransition.CHANGE_APPEARING);
-        lt.disableTransitionType(android.animation.LayoutTransition.CHANGE_DISAPPEARING);
-        lt.enableTransitionType(android.animation.LayoutTransition.CHANGING);
-        lt.setDuration(android.animation.LayoutTransition.CHANGING, CONTENT_CHANGE_DURATION_MS);
-        lt.setInterpolator(android.animation.LayoutTransition.CHANGING,
-                new android.view.animation.AccelerateDecelerateInterpolator());
-        lt.addTransitionListener(new android.animation.LayoutTransition.TransitionListener() {
-            @Override
-            public void startTransition(android.animation.LayoutTransition transition,
-                                        android.view.ViewGroup container, View view, int type) {
-                if (type != android.animation.LayoutTransition.CHANGING) return;
-                beginBufferedTransition(true);
-            }
-
-            @Override
-            public void endTransition(android.animation.LayoutTransition transition,
-                                      android.view.ViewGroup container, View view, int type) {
-                if (type != android.animation.LayoutTransition.CHANGING) return;
-                endBufferedTransition();
-            }
-        });
-        binding.overlayContainer.setLayoutTransition(lt);
+        // Never install an always-on LayoutTransition. A marquee invalidates once per display
+        // frame and several Android 9 ECARX builds misclassify that invalidation as a bounds
+        // change, making every sibling Settings/app icon visibly twitch. Show/hide remains
+        // handled by the explicit buffered transition below.
+        binding.overlayContainer.setLayoutTransition(null);
 
         // Set up drag listener (just registers a touch listener on the root view — safe to do
         // before addView since the listener captures touches once attached).
@@ -1287,7 +1307,6 @@ public class WidgetService extends Service {
             binding.getRoot().animate().cancel();
             binding.overlayContainer.setLayoutTransition(null);
         }
-        contentLayoutTransition = null;
         pendingBufferedTransitions = 0;
         usageStatsManager = null;
         lastForegroundPackage = null;
@@ -1357,6 +1376,9 @@ public class WidgetService extends Service {
     @SuppressLint("MissingPermission")
     private void applyPreferences(boolean reconfigureIntegrations) {
         if (destroyed || prefs == null) return;
+        if (prefs.phonePopupNotificationsEnabled.get()) {
+            ensurePhoneNotificationPopupConfigured();
+        }
 
         boolean statusSurfaceEnabled = prefs.widgetEnabled.get();
         if (!statusSurfaceEnabled) {
@@ -1400,6 +1422,13 @@ public class WidgetService extends Service {
         if (reconfigureIntegrations && !popupAppliedByStartup && integrationsStarted) {
             applyPopupPreferencesSafely();
         }
+        if (!prefs.phonePopupNotificationsEnabled.get()) {
+            clearPhonePopupNotification();
+        } else if (integrationsStarted) {
+            // The reserved overlay can be created by this preference pass after the manager's
+            // previous catalog snapshot. Reconcile its state owner before an event arrives.
+            applyPopupPreferencesSafely();
+        }
         if (binding == null) return;
 
         phoneLowBatteryAlertLatched = prefs.phoneLowBatteryAlertEnabled.get()
@@ -1438,14 +1467,9 @@ public class WidgetService extends Service {
         trackingSet.addAll(popupBuiltinTypes());
         trackingSet.addAll(driverInformationBrickTypes());
 
-        // The content-change LayoutTransition only makes sense in floating mode, where the
-        // widget's own width animates as brick content grows/shrinks. In status-bar mode the
-        // row is full-width with fixed groups — there is nothing to animate, but the CHANGING
-        // tracker still arms itself on every layout pass of the container and on OEM head
-        // units it visibly "regroups" the media row once a second (triggered by the periodic
-        // GNSS/status redraws) while the marquee scrolls. Disable it entirely there.
-        binding.overlayContainer.setLayoutTransition(
-                prefs.widgetMode.get() == WIDGET_MODE_STATUS_BAR ? null : contentLayoutTransition);
+        // Keep implicit child transitions disabled in every mode. Only explicit visibility
+        // changes are animated; ordinary text and icon frames must never move their siblings.
+        binding.overlayContainer.setLayoutTransition(null);
 
         // Reorder children of the root LinearLayout to match brickOrder. Hidden bricks are
         // appended at the end with View.GONE — kept attached so we don't need to re-bind state.
@@ -2073,6 +2097,7 @@ public class WidgetService extends Service {
         if (!phoneValueChanged) return;
         if (sessionEnded) {
             observedPhoneNotificationKeys.clear();
+            clearPhonePopupNotification();
             if (activePhoneBatteryAlertText != null) {
                 clearPhoneStatusNotification(true);
             }
@@ -2088,13 +2113,28 @@ public class WidgetService extends Service {
             rememberPhoneNotificationItems(notificationItems);
             rememberPhoneNotificationKey(latestKey);
             if (latestIsNew) {
-                if (prefs.phoneStatusBarNotificationsEnabled.get()) {
+                if (prefs.phoneStatusBarNotificationsEnabled.get()
+                        || prefs.phonePopupNotificationsEnabled.get()) {
                     Set<String> selected = PhoneStatusBarPolicy.parseIds(
                             prefs.phoneStatusBarNotificationFields.get(),
                             PhoneStatusBarPolicy.notificationFieldIds());
                     PhoneStatusBarPolicy.NotificationPresentation presentation =
                             PhoneStatusBarPolicy.notification(latestNotification, selected);
-                    if (presentation != null) showPhoneStatusNotification(presentation);
+                    if (presentation != null) {
+                        updatePhoneNotificationFieldStates(presentation, selected);
+                        boolean presentedInStatusRow = false;
+                        boolean presentedInPopup = false;
+                        if (prefs.phoneStatusBarNotificationsEnabled.get()) {
+                            presentedInStatusRow =
+                                    showPhoneStatusNotification(presentation, selected);
+                        }
+                        if (prefs.phonePopupNotificationsEnabled.get()) {
+                            presentedInPopup = showPhonePopupNotification(presentation);
+                        }
+                        if (!presentedInStatusRow && !presentedInPopup) {
+                            clearPhoneNotificationFieldsIfInactive();
+                        }
+                    }
                 }
             }
         }
@@ -2677,6 +2717,9 @@ public class WidgetService extends Service {
     /** Called after either an exported Broadcast or MQTT packet has been persisted. */
     public void onAutomationStateChanged(String scope, String id) {
         if (destroyed) return;
+        if (scenarioController != null) {
+            scenarioController.refreshSystemConditions();
+        }
         synchronized (automationUiLock) {
             pendingAutomationUi.computeIfAbsent(scope, ignored -> new HashSet<>()).add(id);
             if (automationUiRefreshScheduled) return;
@@ -2791,15 +2834,6 @@ public class WidgetService extends Service {
         if (binding == null) return;
         beginBufferedTransition(expanding);
 
-        // Suppress the always-on CHANGING animation for the duration of this visibility flip.
-        // Sibling bricks shift positions when a brick appears/disappears, which LayoutTransition
-        // would otherwise interpret as a content change and animate in parallel with our own
-        // explicit ChangeBounds inside the TransitionSet — visible as a doubled motion.
-        if (contentLayoutTransition != null) {
-            contentLayoutTransition.disableTransitionType(
-                    android.animation.LayoutTransition.CHANGING);
-        }
-
         android.transition.TransitionSet tx = new android.transition.TransitionSet();
         tx.addTransition(new android.transition.ChangeBounds());
         tx.addTransition(new android.transition.Fade());
@@ -2815,10 +2849,6 @@ public class WidgetService extends Service {
         Runnable closeOnce = () -> {
             if (closed[0]) return;
             closed[0] = true;
-            if (contentLayoutTransition != null) {
-                contentLayoutTransition.enableTransitionType(
-                        android.animation.LayoutTransition.CHANGING);
-            }
             endBufferedTransition();
         };
         tx.addListener(new android.transition.Transition.TransitionListener() {
@@ -3108,11 +3138,46 @@ public class WidgetService extends Service {
         if (result.trigger) showPhoneLowBatteryAlert(level);
     }
 
-    private void showPhoneStatusNotification(
-            @NonNull PhoneStatusBarPolicy.NotificationPresentation presentation) {
+    /**
+     * Publishes the three fields before either destination renders. Local scenarios therefore
+     * resolve the exact same application/topic/text visibility for the status row and popup.
+     */
+    private void updatePhoneNotificationFieldStates(
+            @NonNull PhoneStatusBarPolicy.NotificationPresentation presentation,
+            @NonNull Set<String> selectedFields) {
+        if (automationStates == null || prefs == null) return;
+        int seconds = Math.max(1, Math.min(120,
+                prefs.phoneStatusBarNotificationSeconds.get()));
+        long now = System.currentTimeMillis();
+        long expiresAt = now + seconds * 1_000L;
+        try {
+            for (String fieldId : PhoneStatusBarPolicy.notificationFieldIds()) {
+                String automationId =
+                        PhoneNotificationAutomation.automationIdForField(fieldId);
+                String text = PhoneStatusBarPolicy.notificationFieldText(
+                        presentation, fieldId);
+                boolean visible = selectedFields.contains(fieldId) && !text.isEmpty();
+                automationStates.apply(AutomationContract.SCOPE_POPUP, automationId,
+                        new JSONObject()
+                                .put("text", text)
+                                .put("visible", visible)
+                                .put("fresh", true)
+                                .put("source", "phone")
+                                .put("updated_at", now)
+                                .put("expires_at", expiresAt));
+                onAutomationStateChanged(AutomationContract.SCOPE_POPUP, automationId);
+            }
+        } catch (JSONException | RuntimeException failure) {
+            Log.e(TAG, "Could not publish phone notification fields", failure);
+        }
+    }
+
+    private boolean showPhoneStatusNotification(
+            @NonNull PhoneStatusBarPolicy.NotificationPresentation presentation,
+            @NonNull Set<String> selectedFields) {
         // A low-battery warning is rarer and safety-relevant; keep it visible for its full
         // configured interval instead of letting a routine ANCS event replace it.
-        if (activePhoneBatteryAlertText != null && isPhoneNotificationActive()) return;
+        if (activePhoneBatteryAlertText != null && isPhoneNotificationActive()) return false;
         boolean replacingPresentation = hasActivePhoneStatusAlert();
         if (!replacingPresentation && binding != null) {
             mediaDurationVisibilityBeforePhoneNotification =
@@ -3126,8 +3191,90 @@ public class WidgetService extends Service {
             binding.mediaTitleText.setMarqueeText("");
         }
         activePhoneNotification = presentation;
+        activePhoneNotificationFields = Collections.unmodifiableSet(
+                new LinkedHashSet<>(selectedFields));
         activePhoneBatteryAlertText = null;
         schedulePhoneStatusAlert();
+        return true;
+    }
+
+    /** Opens the reserved window in place; its three field states were already replaced above. */
+    private boolean showPhonePopupNotification(
+            @NonNull PhoneStatusBarPolicy.NotificationPresentation presentation) {
+        if (automationStates == null || prefs == null) return false;
+        try {
+            ensurePhoneNotificationPopupConfigured();
+            if (!phoneNotificationPopupConfigured) return false;
+            applyPopupPreferencesSafely();
+            int seconds = Math.max(1, Math.min(120,
+                    prefs.phoneStatusBarNotificationSeconds.get()));
+            long now = System.currentTimeMillis();
+            long expiresAt = now + seconds * 1_000L;
+            JSONObject overlay = new JSONObject()
+                    .put("visible", true)
+                    .put("fresh", true)
+                    .put("source", "phone")
+                    .put("updated_at", now)
+                    .put("expires_at", expiresAt);
+            automationStates.apply(AutomationContract.SCOPE_OVERLAY,
+                    PhoneNotificationAutomation.OVERLAY_ID, overlay);
+            onAutomationStateChanged(AutomationContract.SCOPE_OVERLAY,
+                    PhoneNotificationAutomation.OVERLAY_ID);
+            activePhonePopupNotificationExpiresAt =
+                    android.os.SystemClock.elapsedRealtime() + seconds * 1_000L;
+            mainHandler.removeCallbacks(phonePopupNotificationExpiry);
+            mainHandler.postDelayed(phonePopupNotificationExpiry, seconds * 1_000L);
+            return true;
+        } catch (JSONException | RuntimeException failure) {
+            Log.e(TAG, "Could not present phone notification popup", failure);
+            return false;
+        }
+    }
+
+    private void clearPhonePopupNotification() {
+        mainHandler.removeCallbacks(phonePopupNotificationExpiry);
+        activePhonePopupNotificationExpiresAt = 0L;
+        if (automationStates == null) return;
+        try {
+            long now = System.currentTimeMillis();
+            automationStates.apply(AutomationContract.SCOPE_OVERLAY,
+                    PhoneNotificationAutomation.OVERLAY_ID,
+                    new JSONObject().put("visible", false).put("fresh", false)
+                            .put("updated_at", now));
+            onAutomationStateChanged(AutomationContract.SCOPE_OVERLAY,
+                    PhoneNotificationAutomation.OVERLAY_ID);
+            clearPhoneNotificationFieldsIfInactive();
+        } catch (JSONException | RuntimeException failure) {
+            Log.w(TAG, "Could not clear phone notification popup", failure);
+        }
+    }
+
+    /**
+     * Clears shared field state only after both destinations have finished. This keeps status-row
+     * conditions working when the popup is disabled, and popup conditions working when the main
+     * status surface is disabled.
+     */
+    private void clearPhoneNotificationFieldsIfInactive() {
+        if (automationStates == null) return;
+        long elapsed = android.os.SystemClock.elapsedRealtime();
+        boolean statusStillUsesFields = activePhoneNotification != null
+                && prefs != null
+                && prefs.phoneStatusBarNotificationsEnabled.get()
+                && elapsed < activePhoneNotificationExpiresAt;
+        boolean popupStillUsesFields = activePhonePopupNotificationExpiresAt > 0L
+                && elapsed < activePhonePopupNotificationExpiresAt;
+        if (statusStillUsesFields || popupStillUsesFields) return;
+        try {
+            long now = System.currentTimeMillis();
+            for (String automationId : PhoneNotificationAutomation.fieldAutomationIds()) {
+                automationStates.apply(AutomationContract.SCOPE_POPUP, automationId,
+                        new JSONObject().put("text", "").put("visible", false)
+                                .put("fresh", false).put("updated_at", now));
+                onAutomationStateChanged(AutomationContract.SCOPE_POPUP, automationId);
+            }
+        } catch (JSONException | RuntimeException failure) {
+            Log.w(TAG, "Could not clear phone notification fields", failure);
+        }
     }
 
     private void showPhoneLowBatteryAlert(int level) {
@@ -3140,8 +3287,10 @@ public class WidgetService extends Service {
         }
         if (binding != null) binding.mediaTitleText.setMarqueeText("");
         activePhoneNotification = null;
+        activePhoneNotificationFields = Collections.emptySet();
         activePhoneBatteryAlertText =
                 getString(R.string.phone_low_battery_alert_text, level);
+        clearPhoneNotificationFieldsIfInactive();
         schedulePhoneStatusAlert();
     }
 
@@ -3152,7 +3301,7 @@ public class WidgetService extends Service {
                 + seconds * 1_000L;
         mainHandler.removeCallbacks(phoneNotificationExpiry);
         mainHandler.postDelayed(phoneNotificationExpiry, seconds * 1_000L);
-        if (binding != null) renderPhoneStatusNotification();
+        if (binding != null) updateMediaInfo();
     }
 
     private boolean hasActivePhoneStatusAlert() {
@@ -3162,17 +3311,19 @@ public class WidgetService extends Service {
 
     private boolean isPhoneNotificationActive() {
         if (!hasActivePhoneStatusAlert() || prefs == null) return false;
-        boolean enabled = activePhoneBatteryAlertText != null
-                ? prefs.phoneLowBatteryAlertEnabled.get()
-                : prefs.phoneStatusBarNotificationsEnabled.get();
-        return enabled
-                && android.os.SystemClock.elapsedRealtime()
-                < activePhoneNotificationExpiresAt;
+        if (android.os.SystemClock.elapsedRealtime()
+                >= activePhoneNotificationExpiresAt) return false;
+        if (activePhoneBatteryAlertText != null) {
+            return prefs.phoneLowBatteryAlertEnabled.get();
+        }
+        return prefs.phoneStatusBarNotificationsEnabled.get()
+                && !activePhoneNotificationText().isEmpty();
     }
 
     private void clearPhoneStatusNotification(boolean restoreMediaVisibility) {
         mainHandler.removeCallbacks(phoneNotificationExpiry);
         activePhoneNotification = null;
+        activePhoneNotificationFields = Collections.emptySet();
         activePhoneBatteryAlertText = null;
         activePhoneNotificationExpiresAt = 0L;
         if (binding != null) {
@@ -3191,6 +3342,7 @@ public class WidgetService extends Service {
             binding.mediaProgressBar.setVisibility(
                     mediaProgressVisibilityBeforePhoneNotification);
         }
+        clearPhoneNotificationFieldsIfInactive();
     }
 
     @NonNull
@@ -3201,13 +3353,19 @@ public class WidgetService extends Service {
         PhoneStatusBarPolicy.NotificationPresentation presentation =
                 activePhoneNotification;
         if (presentation == null) return "";
-        if (presentation.application.isEmpty()) return presentation.text;
-        String details = presentation.text;
-        if (presentation.application.equals(presentation.topic)) {
-            details = presentation.body;
+        Set<String> visibleFields = new LinkedHashSet<>();
+        for (String fieldId : activePhoneNotificationFields) {
+            String value = PhoneStatusBarPolicy.notificationFieldText(
+                    presentation, fieldId);
+            if (value.isEmpty()) continue;
+            String automationId =
+                    PhoneNotificationAutomation.automationIdForField(fieldId);
+            boolean visible = automationStates == null
+                    || automationStates.effectiveVisibility(
+                    AutomationContract.SCOPE_POPUP, automationId, true);
+            if (visible) visibleFields.add(fieldId);
         }
-        if (details.isEmpty()) return presentation.application;
-        return presentation.application + " · " + details;
+        return PhoneStatusBarPolicy.notificationText(presentation, visibleFields);
     }
 
     /**
@@ -4275,9 +4433,12 @@ public class WidgetService extends Service {
         phoneStatusValues.clear();
         observedPhoneNotificationKeys.clear();
         activePhoneNotification = null;
+        activePhoneNotificationFields = Collections.emptySet();
         activePhoneBatteryAlertText = null;
         phoneLowBatteryAlertLatched = false;
         activePhoneNotificationExpiresAt = 0L;
+        activePhonePopupNotificationExpiresAt = 0L;
+        phoneNotificationPopupConfigured = false;
         crossSourceRuleRefreshScheduled.set(false);
         synchronized (automationUiLock) {
             pendingAutomationUi.clear();

@@ -283,6 +283,46 @@ public final class PhoneStatusBarPolicy {
         return uid == null || receivedAt == null ? null : uid + "+" + receivedAt;
     }
 
+    /** Sanitized value of one independently conditionable notification field. */
+    public static String notificationFieldText(NotificationPresentation presentation,
+                                               String fieldId) {
+        if (presentation == null) return "";
+        switch (cleanId(fieldId)) {
+            case FIELD_APPLICATION:
+                return presentation.application;
+            case FIELD_TOPIC:
+                return presentation.topic;
+            case FIELD_TEXT:
+                return presentation.body;
+            default:
+                return "";
+        }
+    }
+
+    /**
+     * Composes only fields whose independent visibility condition currently allows them.
+     *
+     * <p>Equal adjacent fields are emitted once. This is common for ANCS payloads where the
+     * application name and topic are identical, and avoids revealing or reserving space for a
+     * field that its own condition hid.</p>
+     */
+    public static String notificationText(NotificationPresentation presentation,
+                                          Collection<String> visibleFieldIds) {
+        if (presentation == null) return "";
+        Set<String> visible = canonicalSelection(visibleFieldIds, NOTIFICATION_FIELD_IDS);
+        StringBuilder result = new StringBuilder();
+        String previous = "";
+        for (String fieldId : NOTIFICATION_FIELD_IDS) {
+            if (!visible.contains(fieldId)) continue;
+            String value = notificationFieldText(presentation, fieldId);
+            if (value.isEmpty() || value.equals(previous)) continue;
+            if (result.length() > 0) result.append(" · ");
+            result.append(value);
+            previous = value;
+        }
+        return result.toString();
+    }
+
     /** One selectable scalar PHONE value. */
     public static final class StatusItem {
         public final String id;

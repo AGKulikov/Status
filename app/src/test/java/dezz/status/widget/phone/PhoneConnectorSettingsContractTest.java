@@ -124,6 +124,8 @@ public final class PhoneConnectorSettingsContractTest {
     public void applyReconfiguresRuntimeAndSprutPickerMatchesExporterRule()
             throws IOException {
         String source = javaSource("PhoneConnectorSettingsActivity.java");
+        String presentation = javaSource(
+                "PhoneNotificationAutomationSettingsActivity.java");
 
         assertTrue(source.contains("SettingsBackNavigation.install(this, screen)"));
         assertTrue(source.contains("if (service != null) {"));
@@ -138,26 +140,30 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("selectedSprutPath = \"\""));
         assertFalse(source.contains("PhoneConnectorController"));
         assertTrue(source.contains("chooseStatusItems()"));
-        assertTrue(source.contains("chooseNotificationFields()"));
-        assertTrue(source.contains("chooseNotificationDuration()"));
-        assertTrue(source.contains("requested < 1 || requested > 120"));
-        assertTrue(source.contains("selectedNotificationFields.isEmpty()"));
-        assertTrue(source.contains(
-                "selectedNotificationFields.contains(PhoneStatusBarPolicy.FIELD_TOPIC)"));
-        assertTrue(source.contains("includeNotificationText.setChecked(true)"));
-        assertTrue(source.contains("order.add(BrickType.MEDIA)"));
-        assertTrue(source.contains(
-                "preferences.phoneStatusBarNotificationsEnabled.set("));
+        assertTrue(presentation.contains("chooseFields()"));
+        assertTrue(presentation.contains("chooseDuration()"));
+        assertTrue(presentation.contains("value < 1 || value > 120"));
+        assertTrue(presentation.contains("working.isEmpty()"));
+        assertTrue(presentation.contains(
+                "selectedFields.contains(PhoneStatusBarPolicy.FIELD_TOPIC)"));
+        assertTrue(presentation.contains("prefs.phoneIncludeNotificationText.set(true)"));
+        assertTrue(presentation.contains("order.add(BrickType.MEDIA)"));
+        assertTrue(presentation.contains(
+                "prefs.phoneStatusBarNotificationsEnabled.set(statusEnabled)"));
+        assertTrue(presentation.contains(
+                "prefs.phonePopupNotificationsEnabled.set(popupEnabled)"));
+        assertTrue(presentation.contains("PhoneNotificationAutomation.ensureConfigured(prefs)"));
+        assertTrue(presentation.contains("ScenarioSettingsActivity.intentForTarget(this,"));
+        assertTrue(presentation.contains("TargetScope.OVERLAY"));
         assertTrue(source.contains("chooseNotificationCategories()"));
         assertTrue(source.contains("chooseNotificationAppFilterMode()"));
         assertTrue(source.contains("chooseNotificationApps()"));
-        assertTrue(source.contains("chooseNotificationTickerColor()"));
         assertTrue(source.contains("chooseLowBatteryThreshold"));
         assertTrue(source.contains("chooseLowBatteryColor"));
         assertTrue(source.contains("preferences.phoneNotificationCategoryIds.set("));
         assertTrue(source.contains("preferences.phoneNotificationAppFilterMode.set("));
         assertTrue(source.contains("preferences.phoneNotificationAppFilterKeys.set("));
-        assertTrue(source.contains("preferences.phoneStatusBarNotificationColor.set("));
+        assertTrue(presentation.contains("prefs.phoneStatusBarNotificationColor.set("));
         assertTrue(source.contains("preferences.phoneLowBatteryAlertEnabled.set("));
         assertTrue(source.contains("preferences.phoneLowBatteryAlertThreshold.set("));
         assertTrue(source.contains("preferences.phoneLowBatteryAlertColor.set("));

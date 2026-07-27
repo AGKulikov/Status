@@ -37,6 +37,7 @@ import com.ecarx.xui.adaptapi.car.base.ICarFunction;
 import com.ecarx.xui.adaptapi.car.base.ICarInfo;
 import com.ecarx.xui.adaptapi.car.hvac.IHvac;
 import com.ecarx.xui.adaptapi.car.sensor.ISensor;
+import com.ecarx.xui.adaptapi.car.sensor.ISensorEvent;
 import com.ecarx.xui.adaptapi.car.vehicle.IBcm;
 import com.ecarx.xui.adaptapi.car.vehicle.IDriveMode;
 import com.ecarx.xui.adaptapi.car.vehicle.IHUD;
@@ -158,6 +159,8 @@ final class GeelyCarIntegration implements CarIntegration {
     private static final String LOW_LEVEL_GEAR_ACTUAL_ID = "ECarx.gear_actual";
     private static final String LOW_LEVEL_GEAR_MANUAL_ID = "ECarx.gear_manual_mode";
     private static final String HIGH_BEAM_ID = "IBcm.high_beam";
+    private static final String PASSENGER_OCCUPATION_ID =
+            "ISensor.seat_occupation_status_passenger";
 
     private final Context appContext;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -454,6 +457,13 @@ final class GeelyCarIntegration implements CarIntegration {
             new TelemetrySignal("ignition_state", "Состояние зажигания",
                     ISensor.SENSOR_TYPE_IGNITION_STATE,
                     "Код ISensorEvent.IGNITION_STATE_*", "",
+                    false, true, false, 0L),
+            // mConfig reads the dedicated front-passenger occupation event, not the seat-belt
+            // warning (a passenger may be present before fastening the belt).
+            new TelemetrySignal("seat_occupation_status_passenger",
+                    "Пассажир на переднем сиденье",
+                    ISensor.SENSOR_TYPE_SEAT_OCCUPATION_STATUS_PASSENGER,
+                    "0 = нет, 1 = присутствует", "",
                     false, true, false, 0L)
     };
 
@@ -2042,10 +2052,12 @@ final class GeelyCarIntegration implements CarIntegration {
                         || !isValidTelemetryEventValue(value, signal.boundedTemperature)
                         || isLowLevelGearPreferred(signal)) return;
                 supported.set(true);
+                int delivered = normalizedEventValue(signal, value);
+                if (delivered == Integer.MIN_VALUE) return;
                 // Several nominally numeric AdaptAPI signals (notably fluid/oil levels) are
                 // exposed through the integer event callback on some firmware revisions.
                 deliverTelemetry(subscription, signal.id, signal.label,
-                        signal.telemetryUnit, value);
+                        signal.telemetryUnit, delivered);
             }
 
             @Override public void onSensorSupportChanged(int changedType, FunctionStatus status) {
@@ -2107,9 +2119,11 @@ final class GeelyCarIntegration implements CarIntegration {
             if (signal.eventOnly) {
                 int latest = source.getSensorEvent(signal.sensorType);
                 if (isValidTelemetryEventValue(latest, signal.boundedTemperature)) {
+                    int delivered = normalizedEventValue(signal, latest);
+                    if (delivered == Integer.MIN_VALUE) return;
                     supported.set(true);
                     deliverTelemetry(subscription, signal.id, signal.label,
-                            signal.telemetryUnit, latest);
+                            signal.telemetryUnit, delivered);
                 } else if (!signal.probeWithoutSupport) {
                     requestSensorRecovery(signal.sensorType);
                 }
@@ -2132,6 +2146,13 @@ final class GeelyCarIntegration implements CarIntegration {
 
     private boolean isLowLevelGearPreferred(TelemetrySignal signal) {
         return signal.id.equals(GEAR_ID) && isLowLevelGearFresh();
+    }
+
+    private static int normalizedEventValue(@NonNull TelemetrySignal signal, int raw) {
+        if (!PASSENGER_OCCUPATION_ID.equals(signal.id)) return raw;
+        if (raw == ISensorEvent.SEAT_OCCUPATION_STATUS_OCCUPIED) return 1;
+        if (raw == ISensorEvent.SEAT_OCCUPATION_STATUS_NONE) return 0;
+        return Integer.MIN_VALUE;
     }
 
     private boolean isLowLevelGearFresh() {

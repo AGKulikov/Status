@@ -4,6 +4,7 @@ package dezz.status.widget.integration;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -23,6 +24,7 @@ import java.util.Set;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.automation.AutomationContract;
 import dezz.status.widget.automation.AutomationStateStore;
+import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.scenario.LocalAction;
 import dezz.status.widget.scenario.LocalField;
 import dezz.status.widget.scenario.Scenario;
@@ -49,6 +51,7 @@ public final class LocalScenarioController implements ConnectorValueRegistry.Lis
     private final Preferences prefs;
     private final AutomationStateStore stateStore;
     private final ConnectorValueRegistry valueRegistry;
+    private final SystemConditionResolver systemConditions;
     private final Listener listener;
     private List<Scenario> scenarios = Collections.emptyList();
     private Map<String, JSONObject> previousOverrides = Collections.emptyMap();
@@ -58,10 +61,20 @@ public final class LocalScenarioController implements ConnectorValueRegistry.Lis
                                    @NonNull AutomationStateStore stateStore,
                                    @NonNull ConnectorValueRegistry valueRegistry,
                                    @NonNull Listener listener) {
+        this(prefs, stateStore, valueRegistry, null, listener);
+    }
+
+    public LocalScenarioController(@NonNull Preferences prefs,
+                                   @NonNull AutomationStateStore stateStore,
+                                   @NonNull ConnectorValueRegistry valueRegistry,
+                                   @Nullable CarIntegration carIntegration,
+                                   @NonNull Listener listener) {
         this.prefs = prefs;
         this.stateStore = stateStore;
         this.valueRegistry = valueRegistry;
         this.listener = listener;
+        this.systemConditions = new SystemConditionResolver(prefs, stateStore,
+                carIntegration, this::refreshSystemConditions);
         valueRegistry.addListener(this);
     }
 
@@ -71,7 +84,13 @@ public final class LocalScenarioController implements ConnectorValueRegistry.Lis
         if (!json.equals(loadedJson)) {
             scenarios = parse(json);
             loadedJson = json;
+            systemConditions.configure(scenarios);
         }
+        evaluateLocked();
+    }
+
+    /** Re-evaluates time/vehicle/visibility sources without pretending a cloud value changed. */
+    public synchronized void refreshSystemConditions() {
         evaluateLocked();
     }
 
@@ -88,6 +107,7 @@ public final class LocalScenarioController implements ConnectorValueRegistry.Lis
 
     public synchronized void destroy() {
         valueRegistry.removeListener(this);
+        systemConditions.destroy();
         stateStore.clearScenarioOverrides();
         Set<String> changed = Collections.unmodifiableSet(
                 new LinkedHashSet<>(previousOverrides.keySet()));
@@ -96,7 +116,9 @@ public final class LocalScenarioController implements ConnectorValueRegistry.Lis
     }
 
     private void evaluateLocked() {
-        LinkedHashMap<String, JSONObject> overrides = buildOverrides(scenarios, valueRegistry);
+        ValueResolver composite = reference -> SystemConditionResolver.isSystem(reference)
+                ? systemConditions.resolve(reference) : valueRegistry.resolve(reference);
+        LinkedHashMap<String, JSONObject> overrides = buildOverrides(scenarios, composite);
 
         LinkedHashSet<String> changedTargets = changedTargets(previousOverrides, overrides);
         if (changedTargets.isEmpty()) return;

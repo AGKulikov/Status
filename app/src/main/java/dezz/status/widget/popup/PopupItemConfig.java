@@ -6,6 +6,7 @@ import androidx.annotation.NonNull;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import dezz.status.widget.Fonts;
 import dezz.status.widget.automation.AutomationContract;
 import dezz.status.widget.integration.ActionBinding;
 import dezz.status.widget.integration.SourceBinding;
@@ -14,7 +15,7 @@ import dezz.status.widget.scenario.ScenarioPresets;
 
 /** Independent configuration of one text/tile cell in the second floating overlay. */
 public final class PopupItemConfig {
-    public static final int SCHEMA_VERSION = 5;
+    public static final int SCHEMA_VERSION = 6;
     /** Legacy single-overlay id. Existing configurations migrate here automatically. */
     public static final String DEFAULT_OVERLAY_ID = "popup";
     public static final String TYPE_HA_DEVICE = "HA_DEVICE";
@@ -66,14 +67,18 @@ public final class PopupItemConfig {
     public boolean showStatus;
     public String title;
     public int titleSize;
+    public String titleFontFamily;
     public String titleColor;
     public int titleAlpha;
     public boolean titleBold;
+    public boolean titleItalic;
     public String defaultText;
     public int textSize;
+    public String textFontFamily;
     public String defaultTextColor;
     public int textAlpha;
     public boolean textBold;
+    public boolean textItalic;
     public String pendingText;
     public String pendingColor;
     public String staleText;
@@ -129,14 +134,18 @@ public final class PopupItemConfig {
         c.showStatus = true;
         c.title = id;
         c.titleSize = 18;
+        c.titleFontFamily = Fonts.DEFAULT_KEY;
         c.titleColor = "#CCFFFFFF";
         c.titleAlpha = 255;
         c.titleBold = false;
+        c.titleItalic = false;
         c.defaultText = "";
         c.textSize = 24;
+        c.textFontFamily = Fonts.DEFAULT_KEY;
         c.defaultTextColor = "#FFFFFFFF";
         c.textAlpha = 255;
         c.textBold = true;
+        c.textItalic = false;
         c.pendingText = "…";
         c.pendingColor = "#80FFFFFF";
         c.staleText = "…";
@@ -193,14 +202,20 @@ public final class PopupItemConfig {
         c.showStatus = o.optBoolean("showStatus", c.showStatus);
         c.title = o.optString("title", c.title);
         c.titleSize = clamp(o.optInt("titleSize", c.titleSize), 8, 200);
+        c.titleFontFamily = Fonts.findByKey(
+                o.optString("titleFontFamily", c.titleFontFamily)).key;
         c.titleColor = o.optString("titleColor", c.titleColor);
         c.titleAlpha = clamp(o.optInt("titleAlpha", c.titleAlpha), 0, 255);
         c.titleBold = o.optBoolean("titleBold", c.titleBold);
+        c.titleItalic = o.optBoolean("titleItalic", c.titleItalic);
         c.defaultText = o.optString("defaultText", c.defaultText);
         c.textSize = clamp(o.optInt("textSize", c.textSize), 8, 300);
+        c.textFontFamily = Fonts.findByKey(
+                o.optString("textFontFamily", c.textFontFamily)).key;
         c.defaultTextColor = o.optString("defaultTextColor", c.defaultTextColor);
         c.textAlpha = clamp(o.optInt("textAlpha", c.textAlpha), 0, 255);
         c.textBold = o.optBoolean("textBold", c.textBold);
+        c.textItalic = o.optBoolean("textItalic", c.textItalic);
         // Schema-1 used one unavailable value for both startup and stale states.
         String oldUnavailableText = o.optString("unavailableText", c.pendingText);
         String oldUnavailableColor = o.optString("unavailableColor", c.pendingColor);
@@ -262,11 +277,14 @@ public final class PopupItemConfig {
                 .put("iconAdjustX", iconAdjustX).put("iconAdjustY", iconAdjustY)
                 .put("iconRotation", iconRotation).put("orientation", orientation)
                 .put("showTitle", showTitle).put("showStatus", showStatus);
-        o.put("title", title).put("titleSize", titleSize).put("titleColor", titleColor)
-                .put("titleAlpha", titleAlpha).put("titleBold", titleBold);
+        o.put("title", title).put("titleSize", titleSize)
+                .put("titleFontFamily", titleFontFamily).put("titleColor", titleColor)
+                .put("titleAlpha", titleAlpha).put("titleBold", titleBold)
+                .put("titleItalic", titleItalic);
         o.put("defaultText", defaultText).put("textSize", textSize)
+                .put("textFontFamily", textFontFamily)
                 .put("defaultTextColor", defaultTextColor).put("textAlpha", textAlpha)
-                .put("textBold", textBold);
+                .put("textBold", textBold).put("textItalic", textItalic);
         o.put("pendingText", pendingText).put("pendingColor", pendingColor)
                 .put("staleText", staleText).put("staleColor", staleColor)
                 .put("staleAfterSeconds", staleAfterSeconds);

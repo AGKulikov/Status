@@ -29,8 +29,8 @@ public final class DriverClimateIconContractTest {
         assertTrue(view.contains("drawBars("));
         assertTrue(view.contains("drawMonjaroFanScale("));
         assertTrue(view.contains("FAN_ARTWORK_SOURCE"));
-        assertTrue(view.contains("FAN_SEGMENT_SOURCE"));
         assertTrue(view.contains("ClimateFanScaleGeometry.physicalSlot("));
+        assertTrue(view.contains("drawRoundRect(shape"));
         assertFalse(view.contains("R.drawable.ic_fan"));
     }
 
@@ -50,15 +50,15 @@ public final class DriverClimateIconContractTest {
     }
 
     @Test
-    public void autoAirflowAndConfigurableGapRemainExtendedOnly() throws IOException {
+    public void autoIsPlainTextAndConfigurableGapRemainsExtendedOnly() throws IOException {
         String view = source();
 
         assertTrue(view.contains("boolean expanded = detailed"));
-        assertTrue(view.contains("drawAutoBadge("));
+        assertTrue(view.contains("drawAutoText("));
         assertTrue(view.contains("drawAirflow("));
         assertTrue(view.contains("detailsGapPx"));
         assertTrue(view.contains("height * .14f"));
-        assertTrue(view.contains("R.drawable.ic_driver_monjaro_blow_auto_badge"));
+        assertFalse(view.contains("R.drawable.ic_driver_monjaro_blow_auto_badge"));
         assertTrue(view.contains("if (!expanded) return;"));
     }
 

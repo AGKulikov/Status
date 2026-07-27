@@ -213,6 +213,12 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         CheckBox italic = check("Курсив", c.italic);
         italic.setOnCheckedChangeListener((v, value) -> { c.italic = value; onConfigChanged(); });
         page.addView(italic);
+        Button font = button("Шрифт: " + fontLabel(c.fontFamily));
+        font.setOnClickListener(v -> chooseFont(font, c.fontFamily, value -> {
+            c.fontFamily = value;
+            onConfigChanged();
+        }));
+        page.addView(font, topMargin(6));
         addSlider(page, "Размер шрифта", 10, 160, c.fontSize, value -> { c.fontSize = value; onConfigChanged(); }, " px");
         addSlider(page, "Прозрачность текста", 0, 255, c.contentAlpha, value -> { c.contentAlpha = value; onConfigChanged(); }, " / 255");
         addColor(page, "Обычный цвет", c.defaultColor, value -> { c.defaultColor = value; onConfigChanged(); });
@@ -277,6 +283,13 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
                 value -> { c.columnSpan = value; cellInfo.setText(cellInfo()); onConfigChanged(); }, " яч.");
         addSlider(page, "Высота плитки", 1, Math.max(1, overlay.rows), c.rowSpan,
                 value -> { c.rowSpan = value; cellInfo.setText(cellInfo()); onConfigChanged(); }, " яч.");
+        CheckBox horizontal = check("Иконка и текст в один горизонтальный ряд",
+                c.orientation == 1);
+        horizontal.setOnCheckedChangeListener((v, value) -> {
+            c.orientation = value ? 1 : 0;
+            onConfigChanged();
+        });
+        page.addView(horizontal);
 
         page.addView(section("Иконка"), topMargin(20));
         Button icon = button("Выбрать иконку: " + c.icon);
@@ -304,6 +317,24 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         page.addView(showTitle);
         EditText title = field(page, "Название на плитке", c.title);
         watch(title, value -> { c.title = value; c.name = value; onConfigChanged(); });
+        Button titleFont = button("Шрифт названия: " + fontLabel(c.titleFontFamily));
+        titleFont.setOnClickListener(v -> chooseFont(titleFont, c.titleFontFamily, value -> {
+            c.titleFontFamily = value;
+            onConfigChanged();
+        }));
+        page.addView(titleFont, topMargin(6));
+        CheckBox titleBold = check("Жирное название", c.titleBold);
+        titleBold.setOnCheckedChangeListener((v, value) -> {
+            c.titleBold = value;
+            onConfigChanged();
+        });
+        page.addView(titleBold);
+        CheckBox titleItalic = check("Курсивное название", c.titleItalic);
+        titleItalic.setOnCheckedChangeListener((v, value) -> {
+            c.titleItalic = value;
+            onConfigChanged();
+        });
+        page.addView(titleItalic);
         addSlider(page, "Размер названия", 8, 100, c.titleSize,
                 value -> { c.titleSize = value; onConfigChanged(); }, " px");
         addColor(page, "Цвет названия", c.titleColor,
@@ -313,6 +344,24 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         page.addView(showStatus);
         EditText defaultText = field(page, "Текст без полученного статуса", c.defaultText);
         watch(defaultText, value -> { c.defaultText = value; onConfigChanged(); });
+        Button textFont = button("Шрифт статуса: " + fontLabel(c.textFontFamily));
+        textFont.setOnClickListener(v -> chooseFont(textFont, c.textFontFamily, value -> {
+            c.textFontFamily = value;
+            onConfigChanged();
+        }));
+        page.addView(textFont, topMargin(6));
+        CheckBox textBold = check("Жирный статус", c.textBold);
+        textBold.setOnCheckedChangeListener((v, value) -> {
+            c.textBold = value;
+            onConfigChanged();
+        });
+        page.addView(textBold);
+        CheckBox textItalic = check("Курсивный статус", c.textItalic);
+        textItalic.setOnCheckedChangeListener((v, value) -> {
+            c.textItalic = value;
+            onConfigChanged();
+        });
+        page.addView(textItalic);
         addSlider(page, "Размер статуса", 8, 140, c.textSize,
                 value -> { c.textSize = value; onConfigChanged(); }, " px");
         addColor(page, "Обычный цвет статуса", c.defaultTextColor,
@@ -1020,6 +1069,8 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         previewTitle.setTextColor(parseColor(popup.titleColor));
         previewTitle.setAlpha(popup.titleAlpha / 255f);
         previewTitle.setGravity(Gravity.CENTER);
+        previewTitle.setTypeface(Fonts.resolve(this, popup.titleFontFamily,
+                popup.titleBold, popup.titleItalic));
         String normalText = popup.defaultText.isEmpty() ? "Актуальный статус" : popup.defaultText;
         previewValue.setText(tested == null ? normalText : tested.text);
         previewValue.setTextSize(Math.min(72, popup.textSize));
@@ -1027,6 +1078,8 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
                 ? popup.defaultTextColor : tested.color));
         previewValue.setAlpha(popup.textAlpha / 255f);
         previewValue.setGravity(Gravity.CENTER);
+        previewValue.setTypeface(Fonts.resolve(this, popup.textFontFamily,
+                popup.textBold, popup.textItalic));
         GradientDrawable bg = new GradientDrawable();
         int fill = withAlpha(parseColor(popup.backgroundColor), popup.backgroundAlpha);
         bg.setColor(fill);
@@ -1060,6 +1113,30 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         if (liveApplyScheduled) return;
         liveApplyScheduled = true;
         liveHandler.postDelayed(this::persistLive, LIVE_APPLY_INTERVAL_MS);
+    }
+
+    private void chooseFont(Button button, String current, StringConsumer consumer) {
+        String[] labels = new String[Fonts.ALL.size()];
+        int selected = 0;
+        for (int index = 0; index < Fonts.ALL.size(); index++) {
+            Fonts.Family family = Fonts.ALL.get(index);
+            labels[index] = getString(family.labelRes);
+            if (family.key.equals(current)) selected = index;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Шрифт")
+                .setSingleChoiceItems(labels, selected, (dialog, which) -> {
+                    String key = Fonts.ALL.get(which).key;
+                    consumer.accept(key);
+                    button.setText("Шрифт: " + fontLabel(key));
+                    dialog.dismiss();
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private String fontLabel(String family) {
+        return getString(Fonts.findByKey(family).labelRes);
     }
 
     private void flushLiveApply() {

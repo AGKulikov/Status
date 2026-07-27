@@ -110,17 +110,24 @@ public final class MediaPanelInteractionContractTest {
                 "MediaStateFreshness.changedAt(artworkChanged, receivedElapsed"));
     }
 
-    @Test public void marqueeIsOverflowOnlyAndResetsWhenTextChanges() throws IOException {
+    @Test public void marqueeMovesOnlyItsCanvasAndNeverRelayoutsSiblingIcons()
+            throws IOException {
         String source = source("dezz/status/widget/launcher/media/MediaPanelView.java");
-        assertTrue(source.contains("TextUtils.TruncateAt.MARQUEE"));
-        assertTrue(source.contains("view.setMarqueeRepeatLimit(-1)"));
-        assertTrue(source.contains(
-                "if ((textChanged || modeChanged) && view.isSelected()) view.setSelected(false)"));
-        assertTrue(source.contains("if (textChanged) view.setText(value)"));
-        assertTrue(source.contains(
-                "if (view.isSelected() != selected) view.setSelected(selected)"));
-        assertFalse(source.contains("restartTextMarquee"));
-        assertFalse(source.contains("forceRestart"));
+        String marquee = source("dezz/status/widget/MarqueeOutlineTextView.java");
+        assertTrue(source.contains("MarqueeOutlineTextView"));
+        assertTrue(source.contains("view.setMarqueeEnabled(marqueeEnabled)"));
+        assertTrue(source.contains("view.setMarqueeText(value)"));
+        assertFalse(source.contains("TextUtils.TruncateAt.MARQUEE"));
+        assertFalse(source.contains("setMarqueeRepeatLimit"));
+        assertFalse(source.contains("view.setSelected("));
+        assertTrue(marquee.contains("Choreographer.FrameCallback"));
+        assertTrue(marquee.contains("canvas.translate(contentLeft - scrollPx, layoutTop)"));
+        assertTrue(marquee.contains("Layout layout = getLayout()"));
+        assertTrue(marquee.contains("layout.draw(canvas)"));
+        assertTrue(marquee.contains("postInvalidateOnAnimation()"));
+        assertTrue(marquee.contains("MeasureSpec.EXACTLY"));
+        assertTrue(marquee.contains("if (scrolling) return;"));
+        assertFalse(marquee.contains("setScrollX(Math.round(scrollPx))"));
         String settings = source("dezz/status/widget/MediaPanelSettingsActivity.java");
         assertTrue(settings.contains("Прокручивать длинный текст"));
         assertTrue(settings.contains("config.setMarqueeEnabled(element.id, checked)"));

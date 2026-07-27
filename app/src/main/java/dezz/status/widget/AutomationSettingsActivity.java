@@ -140,6 +140,11 @@ public final class AutomationSettingsActivity extends AppCompatActivity {
         delete.setOnClickListener(v -> confirmDelete(item));
         actions.addView(delete, weighted());
         card.addView(actions, topMargin(7));
+        Button conditions = button("Условия автоматизации");
+        conditions.setOnClickListener(v -> startActivity(
+                ScenarioSettingsActivity.intentForTarget(this,
+                        dezz.status.widget.scenario.TargetScope.MAIN, item.id)));
+        card.addView(conditions, topMargin(6));
         return card;
     }
 

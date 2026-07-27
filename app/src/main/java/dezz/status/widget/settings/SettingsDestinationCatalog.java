@@ -227,6 +227,12 @@ public final class SettingsDestinationCatalog {
                 "Триггеры, условия и действия между всеми коннекторами",
                 "scenario", "dezz.status.widget.ScenarioSettingsActivity",
                 "правила", "триггер", "условие", "действие"));
+        values.add(activity("automation_phone_notifications", Group.AUTOMATION,
+                "Уведомления телефона",
+                "Строка состояния, настраиваемый оверлей, длительность и условия показа",
+                "phone", "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
+                "iphone", "ancs", "уведомления", "оверлей", "всплывающие",
+                "шрифт", "время", "пассажир"));
         values.add(activity("automation_intent", Group.AUTOMATION,
                 "Внешние кнопки и Intent",
                 "Команды с кнопок руля и других Android-событий",

@@ -184,6 +184,34 @@ public final class PhoneStatusBarPolicyTest {
         assertEquals("", appOnly.text);
     }
 
+    @Test public void notificationFieldsComposeIndependentlyWithoutDuplicateAncsTopic() {
+        PhoneStatusBarPolicy.NotificationPresentation presentation =
+                PhoneStatusBarPolicy.notification(latest(notificationMap(
+                                17L, 101L, "Дом", "Дом", "Калитка открыта")),
+                        new LinkedHashSet<>(PhoneStatusBarPolicy.notificationFieldIds()));
+        assertNotNull(presentation);
+
+        assertEquals("Дом", PhoneStatusBarPolicy.notificationFieldText(
+                presentation, PhoneStatusBarPolicy.FIELD_APPLICATION));
+        assertEquals("Дом", PhoneStatusBarPolicy.notificationFieldText(
+                presentation, PhoneStatusBarPolicy.FIELD_TOPIC));
+        assertEquals("Калитка открыта", PhoneStatusBarPolicy.notificationFieldText(
+                presentation, PhoneStatusBarPolicy.FIELD_TEXT));
+        assertEquals("", PhoneStatusBarPolicy.notificationFieldText(
+                presentation, "unknown"));
+
+        assertEquals("Дом · Калитка открыта", PhoneStatusBarPolicy.notificationText(
+                presentation, PhoneStatusBarPolicy.notificationFieldIds()));
+        assertEquals("Дом", PhoneStatusBarPolicy.notificationText(presentation,
+                Collections.singleton(PhoneStatusBarPolicy.FIELD_APPLICATION)));
+        assertEquals("Калитка открыта", PhoneStatusBarPolicy.notificationText(presentation,
+                Collections.singleton(PhoneStatusBarPolicy.FIELD_TEXT)));
+        assertEquals("Дом · Калитка открыта", PhoneStatusBarPolicy.notificationText(
+                presentation, Arrays.asList(
+                        PhoneStatusBarPolicy.FIELD_TOPIC,
+                        PhoneStatusBarPolicy.FIELD_TEXT)));
+    }
+
     @Test public void notificationRejectsStaleUnavailableWrongAndIncompleteValues() {
         Map<String, Object> complete = notificationMap(
                 7L, 100L, "Дом", "Дом", "Закрыто");

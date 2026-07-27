@@ -118,6 +118,9 @@ public final class LauncherPanelResizeMathTest {
         assertTrue(source.contains(
                 "handle.setVisibility(enabled ? VISIBLE : GONE)"));
         assertTrue(source.contains("listener.onGeometryChanged(elementId, lp.leftMargin"));
+        assertTrue(source.contains("setCardBackgroundColor(Color.TRANSPARENT)"));
+        assertTrue(source.contains("setUseCompatPadding(false)"));
+        assertTrue(source.contains("setPreventCornerOverlap(false)"));
     }
 
     private static LauncherPanelResizeMath.Rect resize(

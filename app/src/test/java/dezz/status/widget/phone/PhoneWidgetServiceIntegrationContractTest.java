@@ -189,7 +189,7 @@ public class PhoneWidgetServiceIntegrationContractTest {
             throws Exception {
         String source = readService();
         String evaluate = between(source, "private void handlePhoneLowBatteryAlert(",
-                "private void showPhoneStatusNotification(");
+                "private void updatePhoneNotificationFieldStates(");
         String disconnect = between(source, "private void postPhoneValuesChanged(",
                 "private void rememberPhoneNotificationItems(");
         String render = between(source, "private void renderPhoneStatusNotification()",

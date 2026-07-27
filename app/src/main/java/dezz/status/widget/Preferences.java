@@ -679,6 +679,9 @@ public class Preferences {
     /** Whether a newly received real-time ANCS event temporarily replaces Now Playing. */
     public final Bool phoneStatusBarNotificationsEnabled = new Bool(this,
             "phoneNotificationTickerEnabled", false);
+    /** Whether the newest ANCS event is also rendered by its dedicated automation overlay. */
+    public final Bool phonePopupNotificationsEnabled = new Bool(this,
+            "phoneNotificationPopupEnabled", false);
     /** How long the temporary notification presentation remains visible. */
     public final Int phoneStatusBarNotificationSeconds = new Int(this,
             "phoneNotificationTickerSeconds", 10);

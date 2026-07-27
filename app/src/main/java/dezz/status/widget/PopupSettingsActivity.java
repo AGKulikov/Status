@@ -149,6 +149,11 @@ public final class PopupSettingsActivity extends AppCompatActivity {
         });
         toggles.addView(defaultVisible, weighted());
         page.addView(toggles, topMargin(8));
+        Button conditions = button("Условия показа этого оверлея");
+        conditions.setOnClickListener(v -> startActivity(
+                ScenarioSettingsActivity.intentForTarget(this,
+                        dezz.status.widget.scenario.TargetScope.OVERLAY, overlay.id)));
+        page.addView(conditions, topMargin(8));
         CheckBox positionLocked = check(
                 "Заблокировать перемещение оверлея", overlay.positionLocked);
         positionLocked.setOnCheckedChangeListener((v, value) -> {

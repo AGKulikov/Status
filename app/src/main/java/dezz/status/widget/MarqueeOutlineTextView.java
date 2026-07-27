@@ -18,9 +18,14 @@
 package dezz.status.widget;
 
 import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.Typeface;
+import android.text.Layout;
 import android.text.TextUtils;
 import android.util.AttributeSet;
+import android.view.Choreographer;
+import android.view.Gravity;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -48,11 +53,10 @@ public class MarqueeOutlineTextView extends OutlineTextView {
      *  enough to read as a pause, and the dot gives an explicit "end of one cycle" marker. */
     private static final String SEPARATOR = "   •   ";
 
-    /** Frame period in milliseconds. 16 ≈ 60 fps. */
-    private static final long FRAME_PERIOD_MS = 16L;
-
-    /** Pixels of horizontal motion per frame. Calibrated for ~75 px/s at 60 fps. */
-    private static final float DEFAULT_SPEED_PX_PER_FRAME = 1.25f;
+    /** Time-based speed keeps motion identical on 30/60/90 Hz displays. */
+    private static final float DEFAULT_SPEED_PX_PER_SECOND = 75f;
+    /** Do not jump after the UI thread was briefly blocked. */
+    private static final long MAX_FRAME_DELTA_NANOS = 50_000_000L;
 
     @Nullable
     private CharSequence sourceText;
@@ -61,29 +65,47 @@ public class MarqueeOutlineTextView extends OutlineTextView {
     private boolean scrolling = false;
     private boolean attached = false;
     private boolean marqueeEnabled = true;
-    private float speedPxPerFrame = DEFAULT_SPEED_PX_PER_FRAME;
+    private float speedPxPerSecond = DEFAULT_SPEED_PX_PER_SECOND;
+    private boolean frameScheduled;
+    private long lastFrameTimeNanos;
 
-    private boolean insideTick = false;
-
-    private final Runnable tick = new Runnable() {
+    private final Choreographer.FrameCallback frameCallback = new Choreographer.FrameCallback() {
         @Override
-        public void run() {
+        public void doFrame(long frameTimeNanos) {
+            frameScheduled = false;
             if (!scrolling || !attached) return;
-            scrollPx += speedPxPerFrame;
+            if (lastFrameTimeNanos != 0L) {
+                long elapsed = Math.max(0L, Math.min(MAX_FRAME_DELTA_NANOS,
+                        frameTimeNanos - lastFrameTimeNanos));
+                scrollPx += speedPxPerSecond * elapsed / 1_000_000_000f;
+            }
+            lastFrameTimeNanos = frameTimeNanos;
             if (loopWidthPx > 0f && scrollPx >= loopWidthPx) {
                 // Wrap: the second copy of the text is now at the position the first occupied,
                 // so resetting scrollX is visually invisible.
-                scrollPx -= loopWidthPx;
+                scrollPx %= loopWidthPx;
             }
-            insideTick = true;
-            try {
-                setScrollX(Math.round(scrollPx));
-            } finally {
-                insideTick = false;
-            }
-            postOnAnimationDelayed(this, FRAME_PERIOD_MS);
+            // Draw with a floating-point canvas translation. setScrollX(int) quantizes motion
+            // into alternating 2/3 px steps on 30 Hz head units and also trips OEM parent-layout
+            // animation hooks, which made neighbouring Settings/app icons twitch.
+            postInvalidateOnAnimation();
+            scheduleFrame();
         }
     };
+
+    private void scheduleFrame() {
+        if (frameScheduled || !scrolling || !attached) return;
+        frameScheduled = true;
+        Choreographer.getInstance().postFrameCallback(frameCallback);
+    }
+
+    private void cancelFrame() {
+        if (frameScheduled) {
+            Choreographer.getInstance().removeFrameCallback(frameCallback);
+        }
+        frameScheduled = false;
+        lastFrameTimeNanos = 0L;
+    }
 
     @Override
     public void scrollTo(int x, int y) {
@@ -91,9 +113,62 @@ public class MarqueeOutlineTextView extends OutlineTextView {
         // on every frame for non-editable text views. With LEFT/START gravity (our default)
         // that routine resets {@code scrollX} to 0 — fighting our marquee tick and producing
         // periodic visual jumps back to the start of the text. While the marquee is actively
-        // scrolling, only our own tick gets to write to scrollX; any other caller is ignored.
-        if (scrolling && !insideTick) return;
+        // scrolling, keep the View's integer scroll at zero. onDraw applies our sub-pixel offset.
+        if (scrolling) return;
         super.scrollTo(x, y);
+    }
+
+    @Override
+    public void onDraw(@NonNull Canvas canvas) {
+        if (!scrolling) {
+            super.onDraw(canvas);
+            return;
+        }
+        Layout layout = getLayout();
+        if (layout == null) return;
+
+        // Do not call TextView.onDraw while moving. It couples clipping to the View's integer
+        // scrollX and some Android 9 vendor implementations consequently invalidate/relayout the
+        // parent. Draw the already-shaped TextView Layout directly inside one fixed viewport.
+        // Only this canvas receives a floating-point translation; sibling views and their
+        // geometry stay completely untouched.
+        float contentLeft = getCompoundPaddingLeft();
+        float contentTop = getCompoundPaddingTop();
+        float contentRight = getWidth() - getCompoundPaddingRight();
+        float contentBottom = getHeight() - getCompoundPaddingBottom();
+        if (contentRight <= contentLeft || contentBottom <= contentTop) return;
+        float layoutTop = contentTop;
+        int verticalGravity = getGravity() & Gravity.VERTICAL_GRAVITY_MASK;
+        float remaining = Math.max(0f, contentBottom - contentTop - layout.getHeight());
+        if (verticalGravity == Gravity.BOTTOM) {
+            layoutTop += remaining;
+        } else if (verticalGravity == Gravity.CENTER_VERTICAL) {
+            layoutTop += remaining / 2f;
+        }
+
+        int restore = canvas.save();
+        canvas.clipRect(contentLeft, contentTop, contentRight, contentBottom);
+        canvas.translate(contentLeft - scrollPx, layoutTop);
+        android.text.TextPaint paint = getPaint();
+        Paint.Style originalStyle = paint.getStyle();
+        float originalStrokeWidth = paint.getStrokeWidth();
+        int originalColor = paint.getColor();
+        try {
+            if (getOutlineWidth() > 0f) {
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(getOutlineWidth());
+                paint.setColor(getOutlineColor());
+                layout.draw(canvas);
+            }
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(getCurrentTextColor());
+            layout.draw(canvas);
+        } finally {
+            paint.setStyle(originalStyle);
+            paint.setStrokeWidth(originalStrokeWidth);
+            paint.setColor(originalColor);
+            canvas.restoreToCount(restore);
+        }
     }
 
     public MarqueeOutlineTextView(@NonNull Context context) {
@@ -175,16 +250,13 @@ public class MarqueeOutlineTextView extends OutlineTextView {
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         attached = true;
-        if (scrolling) {
-            removeCallbacks(tick);
-            postOnAnimation(tick);
-        }
+        scheduleFrame();
     }
 
     @Override
     protected void onDetachedFromWindow() {
         attached = false;
-        removeCallbacks(tick);
+        cancelFrame();
         super.onDetachedFromWindow();
     }
 
@@ -193,10 +265,15 @@ public class MarqueeOutlineTextView extends OutlineTextView {
 
         int maxWidthPx = getMaxWidth();
         boolean hasMaxWidth = maxWidthPx > 0 && maxWidthPx < Integer.MAX_VALUE;
+        int laidOutWidth = getWidth();
+        int viewportWidth = laidOutWidth > 0
+                ? (hasMaxWidth ? Math.min(laidOutWidth, maxWidthPx) : laidOutWidth)
+                : maxWidthPx;
+        boolean hasViewport = viewportWidth > 0 && viewportWidth < Integer.MAX_VALUE;
         float contentWidth = getPaint().measureText(text, 0, text.length());
         int paddings = getPaddingLeft() + getPaddingRight();
         float naturalTotalWidth = contentWidth + paddings;
-        boolean overflowing = hasMaxWidth && naturalTotalWidth > maxWidthPx + 0.5f;
+        boolean overflowing = hasViewport && naturalTotalWidth > viewportWidth + 0.5f;
 
         Mode desiredMode = overflowing
                 ? (marqueeEnabled ? Mode.MARQUEE : Mode.ELLIPSIZE)
@@ -212,15 +289,12 @@ public class MarqueeOutlineTextView extends OutlineTextView {
         if (desiredMode == currentMode && TextUtils.equals(getText(), desiredRenderedText)) {
             // Already in the right state. If we're supposed to be scrolling and the tick
             // happened to be removed (e.g. by setMarqueeEnabled re-entrancy), re-arm it.
-            if (scrolling && attached) {
-                removeCallbacks(tick);
-                postOnAnimation(tick);
-            }
+            scheduleFrame();
             return;
         }
 
         // Real transition — only here do we reset scroll state.
-        removeCallbacks(tick);
+        cancelFrame();
         scrolling = false;
         scrollPx = 0f;
         setScrollX(0);
@@ -251,9 +325,7 @@ public class MarqueeOutlineTextView extends OutlineTextView {
             super.setText(desiredRenderedText);
             scrolling = true;
             requestLayout();
-            if (attached) {
-                postOnAnimation(tick);
-            }
+            scheduleFrame();
         } else if (desiredMode == Mode.ELLIPSIZE) {
             // Overflow + marquee disabled: static render, cap at maxWidth with end ellipsis.
             // setHorizontallyScrolling(false) plus ellipsize=END lets the TextView handle the
@@ -278,6 +350,13 @@ public class MarqueeOutlineTextView extends OutlineTextView {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        // HOME media cells pass an exact grid-cell width. Respect it so a moving glyph never
+        // changes the geometry of neighbouring Settings/app icons.
+        if (android.view.View.MeasureSpec.getMode(widthMeasureSpec)
+                == android.view.View.MeasureSpec.EXACTLY) {
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+            return;
+        }
         // Re-measure under UNSPECIFIED so {@code setHorizontallyScrolling(true)} reports the
         // full natural text width without being squeezed by a competing-sibling AT_MOST cap
         // (overlay's LinearLayout horizontal with multiple bricks gives each child the

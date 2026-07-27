@@ -686,10 +686,21 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         choices.add("Без группы · отдельная строка");
         for (String group : groups) choices.add("Добавить в «" + group + "»");
         choices.add("＋ Создать новый горизонтальный ряд");
+        LinearLayout explanation = new LinearLayout(this);
+        explanation.setOrientation(LinearLayout.VERTICAL);
+        explanation.setPadding(dp(24), dp(4), dp(24), dp(8));
+        TextView hint = new TextView(this);
+        hint.setText("Элементы одного ряда располагаются слева направо. "
+                + "У ряда свои положение, интервалы, отступы, фон и выравнивание.");
+        hint.setTextSize(14);
+        explanation.addView(hint, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         new AlertDialog.Builder(this)
                 .setTitle("Горизонтальный ряд")
-                .setMessage("Элементы одного ряда располагаются слева направо. "
-                        + "У ряда свои положение, интервалы, отступы, фон и выравнивание.")
+                // AlertDialog cannot render message + list together reliably on the Geely
+                // Android 9 theme: setMessage replaces the list entirely. A custom header keeps
+                // the explanation and the actionable choices visible at the same time.
+                .setView(explanation)
                 .setItems(choices.toArray(new String[0]), (dialog, which) -> {
                     if (which == 0) {
                         shortcut.informationGroup = "";

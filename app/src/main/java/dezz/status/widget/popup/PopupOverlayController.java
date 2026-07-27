@@ -37,12 +37,14 @@ import java.util.Set;
 import java.util.UUID;
 
 import dezz.status.widget.OutlineTextView;
+import dezz.status.widget.Fonts;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.automation.AutomationContract;
 import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.automation.AutomationStateStore;
 import dezz.status.widget.integration.ActionBinding;
 import dezz.status.widget.integration.ActionDispatcher;
+import dezz.status.widget.phone.PhoneNotificationAutomation;
 
 /** Independent fixed-pixel, draggable, touchable popup grid controlled by retained HA state. */
 public final class PopupOverlayController {
@@ -296,6 +298,14 @@ public final class PopupOverlayController {
                     && !item.builtinId.isEmpty() ? item.builtinId : item.automationId;
             AutomationState state = states.get(stateScope, stateId);
             if (!state.visible) continue;
+            if (PhoneNotificationAutomation.isFieldAutomationId(stateId)
+                    && (!state.fresh || state.text == null || state.text.isEmpty()
+                    || (state.expiresAt > 0L && now >= state.expiresAt))) {
+                // A local condition may override visibility but never the lifetime/content of a
+                // phone delivery. Otherwise a false-branch "show" rule would resurrect an old or
+                // empty notification after its timer expired.
+                continue;
+            }
             BuiltinValue builtin = PopupItemConfig.TYPE_BUILTIN.equals(item.type)
                     ? builtinProvider.getBuiltinValue(item.builtinId) : null;
             if (PopupItemConfig.TYPE_BUILTIN.equals(item.type) && builtin == null) continue;
@@ -407,7 +417,8 @@ public final class PopupOverlayController {
         title.setTextSize(TypedValue.COMPLEX_UNIT_PX, item.titleSize);
         title.setTextColor(withAlpha(AutomationState.parseColor(item.titleColor, 0xCCFFFFFF),
                 item.titleAlpha));
-        title.setTypeface(title.getTypeface(), item.titleBold ? Typeface.BOLD : Typeface.NORMAL);
+        title.setTypeface(Fonts.resolve(context, item.titleFontFamily,
+                item.titleBold, item.titleItalic));
         title.setVisibility(item.showTitle ? View.VISIBLE : View.GONE);
         textGroup.addView(title, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -419,7 +430,8 @@ public final class PopupOverlayController {
         value.setTextSize(TypedValue.COMPLEX_UNIT_PX, item.textSize);
         value.setTextColor(withAlpha(AutomationState.parseColor(presentation.color, 0xFFFFFFFF),
                 item.textAlpha));
-        value.setTypeface(value.getTypeface(), item.textBold ? Typeface.BOLD : Typeface.NORMAL);
+        value.setTypeface(Fonts.resolve(context, item.textFontFamily,
+                item.textBold, item.textItalic));
         value.setVisibility(item.showStatus ? View.VISIBLE : View.GONE);
         textGroup.addView(value, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
