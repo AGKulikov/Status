@@ -31,6 +31,14 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("\"phoneNotificationTickerEnabled\", false"));
         assertTrue(source.contains("\"phoneNotificationTickerSeconds\", 10"));
         assertTrue(source.contains("\"phoneNotificationTickerFields\""));
+        assertTrue(source.contains("\"phoneNotificationCategoryIds\""));
+        assertTrue(source.contains("\"phoneNotificationAppFilterMode\""));
+        assertTrue(source.contains("\"phoneNotificationAppFilterKeys\""));
+        assertTrue(source.contains("\"phoneNotificationTickerColor\""));
+        assertTrue(source.contains("\"phoneLowBatteryAlertEnabled\""));
+        assertTrue(source.contains("\"phoneLowBatteryAlertThreshold\""));
+        assertTrue(source.contains("\"phoneLowBatteryAlertColor\""));
+        assertTrue(source.contains("\"phoneLowBatteryAlertLatched\""));
         assertTrue(source.contains("\"phoneSprutPresenceEnabled\", false"));
         assertTrue(source.contains("\"phoneSprutPresencePath\", \"\""));
         assertTrue(source.substring(source.indexOf("SECRET_PREFERENCE_KEYS"),
@@ -103,6 +111,13 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("line(!ancsRequested || notificationDelivery"));
         assertTrue(source.contains("localizedStockConnectionStatus(stockConnectionStatus)"));
         assertTrue(source.contains("localizedAncsSetup(ancsSetup)"));
+        assertTrue(source.contains("\"battery.level_source\".equals(value.resourceId)"));
+        assertTrue(source.contains("\"battery.charging\".equals(value.resourceId)"));
+        assertTrue(source.contains("\"battery.charging_estimated\".equals(value.resourceId)"));
+        assertTrue(source.contains("\"battery.charging_source\".equals(value.resourceId)"));
+        assertTrue(source.contains("\"call.state\".equals(value.resourceId)"));
+        assertTrue(source.contains("phone_diag_charging_unknown"));
+        assertTrue(source.contains("phone_diag_source_android_metadata"));
     }
 
     @Test
@@ -133,6 +148,20 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("order.add(BrickType.MEDIA)"));
         assertTrue(source.contains(
                 "preferences.phoneStatusBarNotificationsEnabled.set("));
+        assertTrue(source.contains("chooseNotificationCategories()"));
+        assertTrue(source.contains("chooseNotificationAppFilterMode()"));
+        assertTrue(source.contains("chooseNotificationApps()"));
+        assertTrue(source.contains("chooseNotificationTickerColor()"));
+        assertTrue(source.contains("chooseLowBatteryThreshold"));
+        assertTrue(source.contains("chooseLowBatteryColor"));
+        assertTrue(source.contains("preferences.phoneNotificationCategoryIds.set("));
+        assertTrue(source.contains("preferences.phoneNotificationAppFilterMode.set("));
+        assertTrue(source.contains("preferences.phoneNotificationAppFilterKeys.set("));
+        assertTrue(source.contains("preferences.phoneStatusBarNotificationColor.set("));
+        assertTrue(source.contains("preferences.phoneLowBatteryAlertEnabled.set("));
+        assertTrue(source.contains("preferences.phoneLowBatteryAlertThreshold.set("));
+        assertTrue(source.contains("preferences.phoneLowBatteryAlertColor.set("));
+        assertTrue(source.contains("preferences.phoneLowBatteryAlertLatched.set(false)"));
     }
 
     @Test
@@ -188,6 +217,16 @@ public final class PhoneConnectorSettingsContractTest {
                     "name=\"phone_status_notification_duration_title\""));
             assertTrue(source.contains(
                     "name=\"phone_status_notification_fields_required\""));
+            assertTrue(source.contains("name=\"phone_filter_categories_title\""));
+            assertTrue(source.contains("name=\"phone_filter_app_mode_title\""));
+            assertTrue(source.contains("name=\"phone_filter_apps_title\""));
+            assertTrue(source.contains("name=\"phone_status_notification_color_title\""));
+            assertTrue(source.contains("name=\"phone_low_battery_enable_title\""));
+            assertTrue(source.contains("name=\"phone_low_battery_threshold_title\""));
+            assertTrue(source.contains("name=\"phone_low_battery_color_title\""));
+            assertTrue(source.contains("name=\"phone_diag_battery\""));
+            assertTrue(source.contains("name=\"phone_diag_charging_unknown\""));
+            assertTrue(source.contains("name=\"phone_diag_source_android_metadata\""));
             assertFalse(source.contains("name=\"phone_allow_sms\""));
             assertFalse(source.contains("name=\"phone_sms_permission_granted\""));
         }

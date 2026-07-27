@@ -412,10 +412,9 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 0, dp(46), 1f);
         appearanceParams.leftMargin = dp(8);
         controls.addView(appearance, appearanceParams);
-        boolean liveClimate = isStockClimate(shortcut);
+        boolean liveClimate = isLiveClimate(shortcut);
         MaterialButton chooseIcon = compactButton(liveClimate ? "Живая" : "Иконка");
-        chooseIcon.setEnabled(!liveClimate);
-        if (!liveClimate) chooseIcon.setOnClickListener(view -> chooseIcon(shortcut));
+        chooseIcon.setOnClickListener(view -> chooseIcon(shortcut));
         LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(
                 0, dp(46), 1f);
         iconParams.leftMargin = dp(8);
@@ -467,6 +466,13 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 applyPanel();
             });
             body.addView(extendedClimate, topMargin(dp(8)));
+            slider(body, "Отступ между основной и расширенной информацией",
+                    0, 96, shortcut.climateDetailsGapPx, " px", value -> {
+                        shortcut.climateDetailsGapPx = value;
+                        store.upsert(shortcut);
+                        refreshPreview();
+                        applyPanel();
+                    });
         }
 
         MaterialButton longAction = compactButton(shortcut.hasLongAction
@@ -549,6 +555,9 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                     if (existing == null
                             && action == LauncherShortcutStore.Builtin.STOCK_CLIMATE) {
                         shortcut.iconSizePx = 76;
+                    }
+                    if (action == LauncherShortcutStore.Builtin.STOCK_CLIMATE) {
+                        shortcut.liveClimateIcon = true;
                     }
                     store.upsert(shortcut);
                     refreshButtons();
@@ -857,14 +866,21 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
 
     private void chooseIcon(@NonNull LauncherShortcutStore.Shortcut shortcut) {
         List<LauncherIconResolver.Preset> presets = LauncherIconResolver.presets();
-        String[] labels = new String[presets.size()];
-        for (int i = 0; i < presets.size(); i++) labels[i] = presets.get(i).label;
+        String[] labels = new String[presets.size() + 1];
+        labels[0] = "Живая иконка климата";
+        for (int i = 0; i < presets.size(); i++) labels[i + 1] = presets.get(i).label;
         new AlertDialog.Builder(this)
                 .setTitle("Иконка · " + shortcut.title)
                 .setItems(labels, (dialog, which) -> {
-                    LauncherIconResolver.Preset preset = presets.get(which);
-                    shortcut.icon = preset.key;
-                    shortcut.iconCustomized = true;
+                    if (which == 0) {
+                        shortcut.liveClimateIcon = true;
+                        shortcut.iconSizePx = Math.max(shortcut.iconSizePx, 76);
+                    } else {
+                        LauncherIconResolver.Preset preset = presets.get(which - 1);
+                        shortcut.liveClimateIcon = false;
+                        shortcut.icon = preset.key;
+                        shortcut.iconCustomized = true;
+                    }
                     store.upsert(shortcut);
                     refreshButtons();
                     applyPanel();
@@ -929,11 +945,11 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         rail.setBackground(background);
         for (LauncherShortcutStore.Shortcut value : values) {
             View icon;
-            if (value.kind == LauncherShortcutStore.Kind.BUILTIN
-                    && LauncherShortcutStore.Builtin.STOCK_CLIMATE.key.equals(value.target)) {
+            if (isLiveClimate(value)) {
                 DriverClimateShortcutView climate = new DriverClimateShortcutView(
                         this, CarIntegrations.get(this), value.iconColor,
-                        value.extendedClimateInfo);
+                        value.extendedClimateInfo,
+                        Math.round(value.climateDetailsGapPx * .62f));
                 climate.showPreviewSample();
                 icon = climate;
             } else {
@@ -990,10 +1006,10 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         }
     }
 
-    private static boolean isStockClimate(
+    private static boolean isLiveClimate(
             @NonNull LauncherShortcutStore.Shortcut shortcut) {
-        return shortcut.kind == LauncherShortcutStore.Kind.BUILTIN
-                && LauncherShortcutStore.Builtin.STOCK_CLIMATE.key.equals(shortcut.target);
+        return shortcut.liveClimateIcon
+                && LauncherShortcutStore.isInteractive(shortcut);
     }
 
     @NonNull

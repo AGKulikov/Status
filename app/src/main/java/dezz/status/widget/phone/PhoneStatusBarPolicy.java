@@ -36,13 +36,44 @@ public final class PhoneStatusBarPolicy {
     private static final List<StatusItem> STATUS_ITEMS = Collections.unmodifiableList(
             Arrays.asList(
                     status("connected", "iPhone подключён", "", Kind.CONNECTION),
+                    status("device.name", "Имя iPhone", "iPhone", Kind.TEXT),
+                    status("profiles.hfp", "Телефонный профиль HFP", "HFP", Kind.PROFILE),
+                    status("profiles.map", "Сообщения MAP", "MAP", Kind.PROFILE),
+                    status("profiles.ble", "Соединение BLE", "BLE", Kind.PROFILE),
+                    status("profiles.ancs", "Apple ANCS готов", "ANCS", Kind.PROFILE),
                     status("battery.level", "Заряд iPhone", "АКБ", Kind.PERCENT),
+                    status("battery.level_source", "Источник уровня заряда",
+                            "Источник АКБ", Kind.CODE),
                     status("battery.charging", "Зарядка iPhone", "", Kind.CHARGING),
+                    status("battery.charging_estimated", "Точность статуса зарядки",
+                            "Статус зарядки", Kind.ESTIMATED),
+                    status("battery.charging_source", "Источник статуса зарядки",
+                            "Источник зарядки", Kind.CODE),
+                    status("battery.external_power", "Внешнее питание iPhone",
+                            "", Kind.POWER),
+                    status("battery.charge_state", "Состояние батареи iPhone",
+                            "АКБ", Kind.CODE),
+                    status("battery.charge_level", "Оценка заряда iPhone",
+                            "АКБ", Kind.CODE),
                     status("network.available", "Сеть iPhone", "", Kind.NETWORK),
                     status("network.operator", "Оператор iPhone", "Оператор", Kind.TEXT),
                     status("network.type", "Тип сети iPhone", "Сеть", Kind.TEXT),
                     status("network.signal", "Сигнал сети iPhone", "Сигнал", Kind.PERCENT),
                     status("network.roaming", "Роуминг iPhone", "", Kind.ROAMING),
+                    status("call.active", "Активный звонок", "", Kind.CALL),
+                    status("call.state", "Состояние звонка", "Звонок", Kind.CODE),
+                    status("call.direction", "Направление звонка", "Звонок", Kind.CODE),
+                    status("call.multiparty", "Конференц-связь",
+                            "Конференция", Kind.BOOLEAN),
+                    status("call.audio", "Аудио звонка", "", Kind.CALL_AUDIO),
+                    status("call.audio_state", "Состояние аудио звонка",
+                            "Аудио", Kind.CODE),
+                    status("call.audio_wideband", "Широкополосное аудио звонка",
+                            "HD-аудио", Kind.BOOLEAN),
+                    status("voice_assistant.active", "Голосовой ассистент iPhone",
+                            "", Kind.VOICE),
+                    status("ringtone.in_band", "Рингтон передаётся с iPhone",
+                            "Рингтон с iPhone", Kind.BOOLEAN),
                     status("notifications.count", "Количество уведомлений", "Увед.", Kind.COUNT),
                     status("messages.unread", "Непрочитанные сообщения", "SMS", Kind.COUNT),
                     status("diagnostics.ancs", "Состояние Apple ANCS", "ANCS", Kind.TEXT),
@@ -139,6 +170,29 @@ public final class PhoneStatusBarPolicy {
                 return booleanText(raw, "Сеть iPhone доступна", "Сеть iPhone недоступна");
             case ROAMING:
                 return booleanText(raw, "Роуминг", "Без роуминга");
+            case PROFILE:
+                return booleanText(raw, item.displayPrefix + " подключён",
+                        item.displayPrefix + " отключён");
+            case POWER:
+                return booleanText(raw, "Питание iPhone подключено",
+                        "Питание iPhone не подключено");
+            case ESTIMATED:
+                return booleanText(raw, "Статус зарядки рассчитан",
+                        "Статус зарядки получен от телефона");
+            case CALL:
+                return booleanText(raw, "Есть активный звонок", "Нет активного звонка");
+            case CALL_AUDIO:
+                return booleanText(raw, "Аудио звонка подключено",
+                        "Аудио звонка отключено");
+            case VOICE:
+                return booleanText(raw, "Голосовой ассистент активен",
+                        "Голосовой ассистент не активен");
+            case BOOLEAN:
+                return prefixed(item.displayPrefix,
+                        booleanText(raw, "да", "нет"));
+            case CODE:
+                return prefixed(item.displayPrefix,
+                        codeText(item.resourceId, raw));
             case PERCENT:
                 return prefixed(item.displayPrefix, formatPercent(raw));
             case COUNT:
@@ -291,6 +345,14 @@ public final class PhoneStatusBarPolicy {
         CHARGING,
         NETWORK,
         ROAMING,
+        PROFILE,
+        POWER,
+        ESTIMATED,
+        CALL,
+        CALL_AUDIO,
+        VOICE,
+        BOOLEAN,
+        CODE,
         PERCENT,
         COUNT,
         TEXT
@@ -312,6 +374,44 @@ public final class PhoneStatusBarPolicy {
 
     private static String booleanText(Object raw, String whenTrue, String whenFalse) {
         return raw instanceof Boolean ? ((Boolean) raw ? whenTrue : whenFalse) : null;
+    }
+
+    private static String codeText(String resourceId, Object raw) {
+        String value = singleLine(raw, MAX_STATUS_TEXT_CODE_POINTS);
+        if (value == null) return null;
+        switch (resourceId + ":" + value) {
+            case "battery.level_source:ble_bas": return "BLE BAS";
+            case "battery.level_source:hfp_ecarx": return "HFP/ECARX";
+            case "battery.level_source:android_broadcast": return "Android Bluetooth";
+            case "battery.charging_source:ble_bas": return "BLE BAS";
+            case "battery.charging_source:hfp_vendor": return "HFP/OEM";
+            case "battery.charging_source:android_metadata": return "Android metadata";
+            case "battery.charging_source:bas_trend": return "изменение BLE BAS";
+            case "battery.charging_source:hfp_trend": return "изменение HFP";
+            case "battery.charging_source:ecarx_trend": return "изменение ECARX";
+            case "battery.charging_source:system_trend": return "изменение Android";
+            case "battery.charge_state:charging": return "заряжается";
+            case "battery.charge_state:discharging": return "разряжается";
+            case "battery.charge_state:idle": return "зарядка не активна";
+            case "battery.charge_state:not_charging": return "не заряжается";
+            case "battery.charge_level:good": return "нормальный";
+            case "battery.charge_level:low": return "низкий";
+            case "battery.charge_level:critical": return "критический";
+            case "call.state:idle": return "нет вызова";
+            case "call.state:active": return "активен";
+            case "call.state:held": return "удержание";
+            case "call.state:dialing": return "набор номера";
+            case "call.state:alerting": return "идут гудки";
+            case "call.state:incoming": return "входящий";
+            case "call.state:waiting": return "ожидающий";
+            case "call.state:held_by_response": return "удержание";
+            case "call.direction:incoming": return "входящий";
+            case "call.direction:outgoing": return "исходящий";
+            case "call.audio_state:connected": return "подключено";
+            case "call.audio_state:connecting": return "подключается";
+            case "call.audio_state:disconnected": return "отключено";
+            default: return value;
+        }
     }
 
     private static String formatPercent(Object raw) {

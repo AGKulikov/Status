@@ -133,6 +133,7 @@ public final class ShortcutActionPicker {
             value.showState = true;
             value.showTitle = true;
             value.hasLongAction = false;
+            value.liveClimateIcon = false;
             InformationShortcutDefaults.apply(preferences, item, value);
             save(value);
         }).show();
@@ -152,6 +153,7 @@ public final class ShortcutActionPicker {
         value.showTitle = false;
         value.showState = false;
         value.hasLongAction = false;
+        value.liveClimateIcon = false;
         value.stateBinding = null;
         value.rowSpan = 1;
         save(value);
@@ -241,6 +243,10 @@ public final class ShortcutActionPicker {
                         value.iconCustomized = false;
                         value.iconColor = "#FFE0E5F3";
                         value.stateBinding = null;
+                        if (action == LauncherShortcutStore.Builtin.STOCK_CLIMATE) {
+                            value.liveClimateIcon = true;
+                            value.iconSizePx = Math.max(value.iconSizePx, 76);
+                        }
                         save(value);
                     }
                 }).setNegativeButton("Отмена", null).show();

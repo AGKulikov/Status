@@ -89,6 +89,18 @@ public class PhoneAppCatalogTest {
                 PhoneAppCatalog.iconResource("unknown.mail.client", 6));
     }
 
+    @Test public void filterKeysUnifyKnownAliasesAndPreserveUnknownBundleIds() {
+        assertEquals("com.apple.mobilesms",
+                PhoneAppCatalog.filterKey("com.apple.Messages"));
+        assertEquals("ph.telegra.telegraph",
+                PhoneAppCatalog.filterKey("org.telegram.Telegram"));
+        assertEquals("com.example.client",
+                PhoneAppCatalog.filterKey(" COM.EXAMPLE.CLIENT "));
+        assertTrue(PhoneAppCatalog.filterApps().stream()
+                .anyMatch(app -> "WhatsApp".equals(app.label)
+                        && "net.whatsapp.whatsapp".equals(app.key)));
+    }
+
     @Test public void everyPhoneIconIsARepositoryVector() throws Exception {
         for (String key : new String[] {
                 "calendar", "chat", "finance", "health", "mail", "maps", "messages",

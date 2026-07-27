@@ -65,8 +65,15 @@ public final class LauncherShortcutStore {
         @NonNull public String activeIconColor = "#FFFFB300";
         public boolean useVehicleStateColor = true;
         public boolean showState = true;
+        /**
+         * Driver rail only: renders the live climate presentation independently from the
+         * shortcut's primary action. This lets the same live tile launch any supported action.
+         */
+        public boolean liveClimateIcon = false;
         /** Driver climate tile adds AUTO/airflow when enabled; temperature and scale stay basic. */
         public boolean extendedClimateInfo = false;
+        /** Extra vertical space between temperature/fan and AUTO/airflow, in source pixels. */
+        public int climateDetailsGapPx = 0;
         public int iconSizePx = 54;
         public int dividerThicknessPx = 2;
         /** -1 inherits the panel-wide value; otherwise this button owns its following gap. */
@@ -130,7 +137,9 @@ public final class LauncherShortcutStore {
             value.activeIconColor = activeIconColor;
             value.useVehicleStateColor = useVehicleStateColor;
             value.showState = showState;
+            value.liveClimateIcon = liveClimateIcon;
             value.extendedClimateInfo = extendedClimateInfo;
+            value.climateDetailsGapPx = climateDetailsGapPx;
             value.iconSizePx = iconSizePx;
             value.dividerThicknessPx = dividerThicknessPx;
             value.gapAfterPx = gapAfterPx;
@@ -407,6 +416,8 @@ public final class LauncherShortcutStore {
         value.longCommandCycleValues = sanitizeCycleValues(value.longCommandCycleValues);
         value.iconSizePx = Math.max(MIN_ICON_SIZE_PX,
                 Math.min(MAX_ICON_SIZE_PX, value.iconSizePx));
+        value.climateDetailsGapPx = Math.max(0,
+                Math.min(96, value.climateDetailsGapPx));
         value.dividerThicknessPx = Math.max(1, Math.min(20, value.dividerThicknessPx));
         value.gapAfterPx = Math.max(-1, Math.min(80, value.gapAfterPx));
         value.columnSpan = Math.max(1,
@@ -470,7 +481,9 @@ public final class LauncherShortcutStore {
                 .put("activeIconColor", value.activeIconColor)
                 .put("useVehicleStateColor", value.useVehicleStateColor)
                 .put("showState", value.showState)
+                .put("liveClimateIcon", value.liveClimateIcon)
                 .put("extendedClimateInfo", value.extendedClimateInfo)
+                .put("climateDetailsGapPx", value.climateDetailsGapPx)
                 .put("iconSizePx", value.iconSizePx)
                 .put("dividerThicknessPx", value.dividerThicknessPx)
                 .put("gapAfterPx", value.gapAfterPx)
@@ -545,7 +558,12 @@ public final class LauncherShortcutStore {
             value.activeIconColor = json.optString("activeIconColor", "#FFFFB300");
             value.useVehicleStateColor = json.optBoolean("useVehicleStateColor", true);
             value.showState = json.optBoolean("showState", true);
+            value.liveClimateIcon = json.has("liveClimateIcon")
+                    ? json.optBoolean("liveClimateIcon", false)
+                    : value.kind == Kind.BUILTIN
+                    && Builtin.STOCK_CLIMATE.key.equals(value.target);
             value.extendedClimateInfo = json.optBoolean("extendedClimateInfo", false);
+            value.climateDetailsGapPx = json.optInt("climateDetailsGapPx", 0);
             value.iconSizePx = json.optInt("iconSizePx", 54);
             value.dividerThicknessPx = json.optInt("dividerThicknessPx", 2);
             value.gapAfterPx = json.optInt("gapAfterPx", -1);
@@ -635,6 +653,7 @@ public final class LauncherShortcutStore {
             values.add(driverBuiltin(Builtin.BACK, "Назад"));
             Shortcut climate = driverBuiltin(Builtin.STOCK_CLIMATE, "Климат");
             climate.iconSizePx = 76;
+            climate.liveClimateIcon = true;
             climate.extendedClimateInfo = false;
             values.add(climate);
             values.add(driverBuiltin(Builtin.ALL_APPS, "Приложения"));

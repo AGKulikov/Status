@@ -407,13 +407,33 @@ public final class InformationSourcePicker {
     private static String phoneLabel(@NonNull String resourceId) {
         switch (resourceId) {
             case "connected": return "iPhone подключён";
+            case "device.name": return "Имя iPhone";
+            case "profiles.hfp": return "Телефонный профиль HFP";
+            case "profiles.map": return "Профиль сообщений MAP";
+            case "profiles.ble": return "Соединение BLE с iPhone";
+            case "profiles.ancs": return "Apple ANCS готов";
             case "battery.level": return "Заряд iPhone";
+            case "battery.level_source": return "Источник уровня заряда";
             case "battery.charging": return "Зарядка iPhone";
+            case "battery.charging_estimated": return "Статус зарядки рассчитан";
+            case "battery.charging_source": return "Источник статуса зарядки";
+            case "battery.external_power": return "Внешнее питание iPhone";
+            case "battery.charge_state": return "Состояние батареи iPhone";
+            case "battery.charge_level": return "Оценка уровня батареи iPhone";
             case "network.available": return "Сеть iPhone";
             case "network.operator": return "Оператор iPhone";
             case "network.type": return "Тип сети iPhone";
             case "network.signal": return "Сигнал сети iPhone";
             case "network.roaming": return "Роуминг iPhone";
+            case "call.active": return "Активный звонок iPhone";
+            case "call.state": return "Состояние звонка iPhone";
+            case "call.direction": return "Направление звонка iPhone";
+            case "call.multiparty": return "Конференц-связь iPhone";
+            case "call.audio": return "Аудио звонка подключено";
+            case "call.audio_state": return "Состояние аудио звонка";
+            case "call.audio_wideband": return "HD-аудио звонка";
+            case "voice_assistant.active": return "Голосовой ассистент iPhone";
+            case "ringtone.in_band": return "Рингтон передаётся с iPhone";
             case "notifications.count": return "Количество уведомлений";
             case "notifications.latest": return "Последнее уведомление";
             case "notifications.items": return "Уведомления iPhone";

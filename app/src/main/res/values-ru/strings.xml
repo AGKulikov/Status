@@ -285,6 +285,19 @@
     <string name="phone_messages_subtitle">Получать сообщения Apple через ANCS и события Bluetooth MAP с подтверждённым устройством, если они доступны</string>
     <string name="phone_text_title">Показывать текст уведомлений и сообщений</string>
     <string name="phone_text_subtitle">Отображать заголовки и текст; выключите, чтобы оставить только приватные сводки</string>
+    <string name="phone_filter_categories_title">Типы уведомлений</string>
+    <string name="phone_filter_categories_summary">Выбрано типов: %1$d из 12</string>
+    <string name="phone_filter_categories_choose">Выбрать типы уведомлений ANCS</string>
+    <string name="phone_filter_categories_required">Выберите хотя бы один тип уведомлений.</string>
+    <string name="phone_filter_app_mode_title">Фильтр приложений</string>
+    <string name="phone_filter_app_mode_choose">Выбрать режим фильтра приложений</string>
+    <string name="phone_filter_app_mode_all">Все приложения</string>
+    <string name="phone_filter_app_mode_only">Только выбранные приложения</string>
+    <string name="phone_filter_app_mode_except">Все, кроме выбранных приложений</string>
+    <string name="phone_filter_apps_title">Приложения</string>
+    <string name="phone_filter_apps_summary">Выбрано приложений: %1$d</string>
+    <string name="phone_filter_apps_choose">Выбрать приложения iPhone</string>
+    <string name="phone_filter_apps_required">Выберите хотя бы одно приложение для режима «Только выбранные».</string>
 
     <string name="phone_section_status_bar">Статусная строка</string>
     <string name="phone_status_items_title">Постоянные блоки статусов iPhone</string>
@@ -302,6 +315,18 @@
     <string name="phone_status_notification_duration_value">%1$d сек.</string>
     <string name="phone_status_notification_duration_prompt">Введите от 1 до 120 секунд</string>
     <string name="phone_status_notification_duration_invalid">Введите значение от 1 до 120 секунд.</string>
+    <string name="phone_status_notification_color_title">Цвет уведомлений iPhone</string>
+
+    <string name="phone_section_alerts">Предупреждения iPhone</string>
+    <string name="phone_low_battery_enable_title">Предупреждать о низком заряде</string>
+    <string name="phone_low_battery_enable_subtitle">Один раз временно заменять Now Playing, когда заряд выбранного iPhone опустится ниже порога</string>
+    <string name="phone_low_battery_threshold_title">Порог заряда</string>
+    <string name="phone_low_battery_threshold_value">Предупреждать ниже %1$d%%</string>
+    <string name="phone_low_battery_threshold_prompt">Введите процент от 1 до 100</string>
+    <string name="phone_low_battery_threshold_invalid">Введите значение от 1 до 100.</string>
+    <string name="phone_low_battery_color_title">Цвет предупреждения о заряде</string>
+    <string name="phone_low_battery_hint">Предупреждение срабатывает один раз при входе свежего значения заряда ниже заданного порога. Повторное срабатывание разрешается после восстановления заряда выше порога.</string>
+    <string name="phone_low_battery_alert_text">Низкий заряд iPhone · %1$d%%</string>
 
     <string name="phone_section_sprut">Присутствие в Sprut.hub</string>
     <string name="phone_sprut_enable_title">Передавать присутствие iPhone</string>
@@ -332,6 +357,20 @@
     <string name="phone_diag_connection">Подключение выбранного iPhone</string>
     <string name="phone_diag_connected_selected">подключён</string>
     <string name="phone_diag_disconnected_selected">не подключён</string>
+    <string name="phone_diag_battery">Батарея iPhone</string>
+    <string name="phone_diag_battery_waiting">ожидание уровня заряда</string>
+    <string name="phone_diag_battery_format">%1$d%% · %2$s · %3$s</string>
+    <string name="phone_diag_charging_unknown">статус зарядки пока не передан; появится после явного BAS/HFP-флага или изменения процента</string>
+    <string name="phone_diag_charging_yes">заряжается</string>
+    <string name="phone_diag_charging_no">не заряжается</string>
+    <string name="phone_diag_charging_estimated"> (оценка)</string>
+    <string name="phone_diag_source_bas_trend">оценка по BLE BAS</string>
+    <string name="phone_diag_source_hfp_trend">оценка по HFP</string>
+    <string name="phone_diag_source_ecarx_trend">оценка по ECARX</string>
+    <string name="phone_diag_source_android_trend">оценка Android Bluetooth</string>
+    <string name="phone_diag_source_android_metadata">метаданные Android Bluetooth</string>
+    <string name="phone_diag_call">Состояние звонка</string>
+    <string name="phone_diag_call_waiting">HFP ещё не передал состояние звонков</string>
     <string name="phone_diag_stock_connection">Штатный Bluetooth ECARX</string>
     <string name="phone_diag_stock_accepted">запрос подключения уже сопряжённого телефона принят (это не новое сопряжение)</string>
     <string name="phone_diag_stock_not_registered">Android видит сопряжение, но штатная служба ECARX не знает этот iPhone; пересопрягите его в штатных настройках</string>

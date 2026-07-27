@@ -81,6 +81,8 @@ public final class PhoneConnectorControllerContractTest {
                 "UUID.fromString(\"00002a19-0000-1000-8000-00805f9b34fb\")"));
         assertTrue(transport.contains(
                 "UUID.fromString(\"00002a1a-0000-1000-8000-00805f9b34fb\")"));
+        assertTrue(transport.contains(
+                "UUID.fromString(\"00002bed-0000-1000-8000-00805f9b34fb\")"));
         assertTrue(transport.contains("startOptionalBatteryRead("));
         assertTrue(transport.contains("startOptionalBatterySubscription("));
         assertTrue(transport.contains("batteryReadPendingUuid != null"));
@@ -104,15 +106,11 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(batteryOnly.contains("selectedDevice.connectGatt(context, autoConnect"));
         assertTrue(batteryOnly.contains("new SessionGattCallback(token)"));
         assertTrue(batteryOnly.contains("config == null || config.ancsNeeded()"));
-        assertTrue(source.contains(
-                "state.contains(\"AUTO · ЖДУ SAVED PEER\")"));
-        assertTrue(source.contains(
-                "gattConnected = false;\n"
-                        + "            clearBasData();\n"
-                        + "            resetAncsSession(token, \"waiting_for_phone\")"));
+        assertTrue(source.contains("state.contains(\"IPHONE DISCONNECTED\")"));
+        assertFalse(source.contains("state.contains(\"AUTO · ЖДУ SAVED PEER\")"));
     }
 
-    @Test public void savedPeerTransportOwnsTheLongLivedAncsGattClient()
+    @Test public void savedPeerTransportUsesOneBoundedGpsStyleDirectGatt()
             throws IOException {
         String source = controller();
         String transport = transport();
@@ -131,18 +129,22 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("final String address = selectedAddress"));
         assertTrue(source.contains("mainHandler.post(() -> startAncsTransportOnMain("));
         assertTrue(savedPeer.contains("adapter.getRemoteDevice(address.trim())"));
-        assertTrue(savedPeer.contains("connectIphonePeripheral(device, true,"));
+        assertTrue(savedPeer.contains(
+                "connectIphonePeripheral(device, CONNECT_TIMEOUT_MS,"));
+        assertTrue(savedPeer.contains("stopScan();"));
+        assertTrue(savedPeer.contains("stopAdvertising();"));
         assertTrue(clientConnect.contains(
-                "device.connectGatt(context, autoConnect, gattCallback,"));
+                "device.connectGatt(context, false, gattCallback,"));
         assertTrue(clientConnect.contains("BluetoothDevice.TRANSPORT_LE"));
-        assertTrue(clientConnect.contains("if (autoConnect) {"));
-        assertTrue(clientConnect.contains("connectTimeout = null"));
-        assertTrue(clientConnect.contains("return;"));
-        assertTrue(disconnect.contains("if (activeClientAutoConnect)"));
-        assertTrue(disconnect.contains("state(\"AUTO · ЖДУ SAVED PEER\")"));
-        assertTrue(disconnect.contains(
-                "BluetoothGatt оставлен зарегистрированным для фонового reconnect"));
-        assertTrue(source.contains("state.contains(\"AUTO · ЖДУ SAVED PEER\")"));
+        assertTrue(clientConnect.contains("activeClientAutoConnect = false"));
+        assertTrue(clientConnect.contains("main.postDelayed(connectTimeout, timeoutMs)"));
+        assertFalse(clientConnect.contains("autoConnect=true"));
+        assertTrue(disconnect.contains("closeClientGatt(callbackGatt)"));
+        assertTrue(disconnect.contains("state(\"GPS-STYLE · IPHONE DISCONNECTED\")"));
+        assertFalse(disconnect.contains("if (activeClientAutoConnect)"));
+        assertFalse(source.contains("state.contains(\"AUTO · ЖДУ SAVED PEER\")"));
+        assertTrue(source.contains("state.contains(\"IPHONE DISCONNECTED\")"));
+        assertTrue(source.contains("scheduleGattReconnect(token,"));
         assertTrue(source.contains("state.contains(\"AUTO · SERVICE CHANGED · RECONNECT\")"));
         assertTrue(connectionCallback.contains("main.post(() ->"));
         assertFalse(connectionCallback.contains("postAtFrontOfQueue"));
@@ -366,6 +368,14 @@ public final class PhoneConnectorControllerContractTest {
         String source = controller();
         assertTrue(source.contains("ACTION_DEVICE_BATTERY_LEVEL_CHANGED"));
         assertTrue(source.contains("PhoneConnectorPolicy.normalizeHfpBattery"));
+        assertTrue(source.contains("BATTERY_LEVEL_STATUS"));
+        assertTrue(source.contains("decodeBatteryLevelStatus"));
+        assertTrue(source.contains("inferChargingFromLevelTrend"));
+        assertTrue(source.contains("BATTERY_TREND_MAX_AGE_MS"));
+        assertTrue(source.contains("METADATA_MAIN_CHARGING = 19"));
+        assertTrue(source.contains("reflectedBluetoothMetadata("));
+        assertTrue(source.contains("decodeBluetoothChargingMetadata"));
+        assertTrue(source.contains("batteryChargingSource = \"android_metadata\""));
         assertTrue(source.contains("NETWORK_SIGNAL_STRENGTH"));
         assertTrue(source.contains("networkOperator = \"\""));
         assertTrue(source.contains("ACTION_MAP_MESSAGE_RECEIVED"));
@@ -387,6 +397,14 @@ public final class PhoneConnectorControllerContractTest {
         String source = controller();
         for (String resource : new String[] {
                 "connected", "battery.level", "battery.charging",
+                "device.name", "profiles.hfp", "profiles.map", "profiles.ble",
+                "profiles.ancs", "battery.level_source",
+                "battery.charging_estimated", "battery.charging_source",
+                "battery.external_power", "battery.charge_state",
+                "battery.charge_level", "call.active", "call.state",
+                "call.direction", "call.multiparty", "call.audio",
+                "call.audio_state", "call.audio_wideband",
+                "voice_assistant.active", "ringtone.in_band",
                 "network.available", "network.operator", "network.type",
                 "network.signal", "network.roaming", "notifications.count",
                 "notifications.latest", "notifications.items", "messages.unread",
@@ -402,6 +420,22 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("device.put(\"stock_connection\""));
         assertTrue(source.contains("device.put(\"ancs_setup\""));
         assertFalse(source.contains("device.put(\"address\", selectedAddress)"));
+    }
+
+    @Test public void hfpInitialSnapshotAndLiveEventsExposePrivacySafeCallState()
+            throws IOException {
+        String source = controller();
+
+        assertTrue(source.contains("ACTION_HFP_AUDIO_STATE"));
+        assertTrue(source.contains("ACTION_HFP_CALL_CHANGED"));
+        assertTrue(source.contains("\"getCurrentAgEvents\""));
+        assertTrue(source.contains("\"getCurrentCalls\""));
+        assertTrue(source.contains("\"getAudioState\""));
+        assertTrue(source.contains("applyInitialHfpState("));
+        assertTrue(source.contains("reflectedInt(rawCall, \"getState\")"));
+        assertTrue(source.contains("reflectedBoolean(rawCall, \"isOutgoing\")"));
+        assertTrue(source.contains("reflectedBoolean(rawCall, \"isMultiParty\")"));
+        assertFalse(source.contains("reflected(rawCall, \"getNumber\")"));
     }
 
     @Test public void smsOnlyModeStillStartsExactDeviceAncs() throws IOException {

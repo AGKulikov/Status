@@ -77,9 +77,9 @@ import dezz.status.widget.sprut.SprutHubController;
 /**
  * Owns the selected Monjaro driver rail and the overlay all-apps drawer.
  *
- * <p>The rail is always one continuous window. Its movable climate shortcut uses the already
- * normalized live climate state and temporarily removes the whole rail from input hit-testing
- * while an accessibility gesture taps the covered OEM climate coordinate.</p>
+ * <p>The rail is always one continuous window. A live climate presentation is independent from
+ * its assigned primary/long action. Only the stock-climate action temporarily removes the whole
+ * rail from input hit-testing while an accessibility gesture taps the covered OEM coordinate.</p>
  */
 final class DriverPanelOverlayController implements DriverPanelActionExecutor.Host {
     interface StatusListener {
@@ -875,13 +875,15 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         content.setGravity(Gravity.CENTER);
         int requested = Math.max(LauncherShortcutStore.MIN_ICON_SIZE_PX,
                 Math.min(LauncherShortcutStore.MAX_ICON_SIZE_PX, shortcut.iconSizePx));
-        boolean stockClimate = isStockClimate(shortcut);
+        boolean liveClimate = isLiveClimate(shortcut);
+        boolean stockClimateAction = isStockClimateAction(shortcut);
         boolean expandedClimate = isExpandedClimate(shortcut);
         View icon;
         @Nullable ImageView stateIcon = null;
-        if (stockClimate) {
+        if (liveClimate) {
             icon = new DriverClimateShortcutView(context, CarIntegrations.get(appContext),
-                    shortcut.iconColor, shortcut.extendedClimateInfo);
+                    shortcut.iconColor, shortcut.extendedClimateInfo,
+                    shortcut.climateDetailsGapPx);
         } else {
             ImageView image = new ImageView(context);
             image.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -899,7 +901,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             icon = image;
             stateIcon = image;
         }
-        if (stockClimate || opensWindowedYandex(shortcut)) {
+        if (stockClimateAction || opensWindowedYandex(shortcut)) {
             // The destination surface already produces its own audible acknowledgement. Keeping
             // the proxy button silent prevents the intermittent double click heard when ECARX
             // creates a Yandex floating window (and does the same for the stock-climate proxy).
@@ -963,7 +965,13 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         return button;
     }
 
-    private static boolean isStockClimate(
+    private static boolean isLiveClimate(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        return shortcut.liveClimateIcon
+                && LauncherShortcutStore.isInteractive(shortcut);
+    }
+
+    private static boolean isStockClimateAction(
             @NonNull LauncherShortcutStore.Shortcut shortcut) {
         return shortcut.kind == LauncherShortcutStore.Kind.BUILTIN
                 && LauncherShortcutStore.Builtin.STOCK_CLIMATE.key.equals(shortcut.target);

@@ -29,17 +29,24 @@ public final class DriverPanelPost1117ContractTest {
         assertTrue(climate.contains("AIRFLOW_WINDSHIELD"));
         assertTrue(climate.contains("AIRFLOW_FACE"));
         assertTrue(climate.contains("AIRFLOW_LEGS"));
-        assertTrue(climate.contains("R.drawable.ic_driver_airflow_face"));
-        assertTrue(climate.contains("R.drawable.ic_driver_airflow_feet"));
-        assertTrue(climate.contains("R.drawable.ic_driver_airflow_windshield"));
+        assertTrue(climate.contains("R.drawable.ic_driver_monjaro_blow_face"));
+        assertTrue(climate.contains("R.drawable.ic_driver_monjaro_blow_leg"));
+        assertTrue(climate.contains("R.drawable.ic_driver_monjaro_blow_window"));
+        assertTrue(climate.contains("R.drawable.ic_driver_monjaro_temperature_source"));
         assertFalse(climate.contains("drawDirectionArrow"));
         String settings = read("DriverPanelSettingsActivity.java");
         String overlay = read("driver/DriverPanelOverlayController.java");
+        String shortcuts = read("launcher/LauncherShortcutStore.java");
         assertTrue(settings.contains(
                 "Расширенная информация: AUTO и пиктограмма обдува"));
+        assertTrue(settings.contains(
+                "Отступ между основной и расширенной информацией"));
         assertTrue(settings.contains("extendedClimate.setChecked(shortcut.extendedClimateInfo)"));
-        assertTrue(overlay.contains(
-                "shortcut.iconColor, shortcut.extendedClimateInfo"));
+        assertTrue(settings.contains("Живая иконка климата"));
+        assertTrue(shortcuts.contains("public boolean liveClimateIcon = false"));
+        assertTrue(shortcuts.contains("public int climateDetailsGapPx = 0"));
+        assertTrue(overlay.contains("shortcut.climateDetailsGapPx"));
+        assertTrue(overlay.contains("boolean stockClimateAction = isStockClimateAction"));
     }
 
     @Test
@@ -104,7 +111,8 @@ public final class DriverPanelPost1117ContractTest {
         String overlay = read("driver/DriverPanelOverlayController.java");
         String launcher = read("LauncherActivity.java");
 
-        assertTrue(overlay.contains("stockClimate || opensWindowedYandex(shortcut)"));
+        assertTrue(overlay.contains(
+                "stockClimateAction || opensWindowedYandex(shortcut)"));
         assertTrue(overlay.contains("button.setSoundEffectsEnabled(false)"));
         assertTrue(launcher.contains("if (!addButton && opensWindowedYandex(shortcut))"));
         assertTrue(launcher.contains("card.setSoundEffectsEnabled(false)"));

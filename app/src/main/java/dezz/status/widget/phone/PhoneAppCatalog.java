@@ -9,8 +9,10 @@ import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -56,6 +58,7 @@ public final class PhoneAppCatalog {
     private static final int CATEGORY_ENTERTAINMENT = 11;
 
     private static final Map<String, Entry> ENTRIES = createEntries();
+    private static final List<FilterApp> FILTER_APPS = createFilterApps();
 
     private PhoneAppCatalog() {
     }
@@ -126,6 +129,24 @@ public final class PhoneAppCatalog {
         return entry == null ? categoryIconKey(categoryId) : entry.iconKey;
     }
 
+    /**
+     * Stable application key used by notification allow/deny settings. Every known alias of the
+     * same iOS application resolves to one key; an unknown app keeps its exact normalized bundle
+     * identifier so it can still be selected after being observed.
+     */
+    @NonNull
+    public static String filterKey(@Nullable String appIdentifier) {
+        String normalized = normalize(appIdentifier);
+        Entry entry = ENTRIES.get(normalized);
+        return entry == null ? normalized : entry.filterKey;
+    }
+
+    /** Known applications shown before dynamically observed bundle identifiers in settings. */
+    @NonNull
+    public static List<FilterApp> filterApps() {
+        return FILTER_APPS;
+    }
+
     @NonNull
     private static String categoryIconKey(int categoryId) {
         switch (categoryId) {
@@ -158,7 +179,7 @@ public final class PhoneAppCatalog {
 
     @NonNull
     private static Map<String, Entry> createEntries() {
-        Map<String, Entry> entries = new HashMap<>();
+        Map<String, Entry> entries = new LinkedHashMap<>();
 
         register(entries, "Сообщения", KEY_MESSAGES,
                 "com.apple.mobilesms",
@@ -224,11 +245,21 @@ public final class PhoneAppCatalog {
         return Collections.unmodifiableMap(entries);
     }
 
+    @NonNull
+    private static List<FilterApp> createFilterApps() {
+        LinkedHashMap<String, FilterApp> result = new LinkedHashMap<>();
+        for (Entry entry : ENTRIES.values()) {
+            result.put(entry.filterKey, new FilterApp(entry.filterKey, entry.displayName));
+        }
+        return Collections.unmodifiableList(new ArrayList<>(result.values()));
+    }
+
     private static void register(@NonNull Map<String, Entry> entries,
                                  @NonNull String displayName,
                                  @NonNull String iconKey,
                                  @NonNull String... identifiers) {
-        Entry entry = new Entry(displayName, iconKey);
+        if (identifiers.length == 0) return;
+        Entry entry = new Entry(displayName, iconKey, normalize(identifiers[0]));
         for (String identifier : identifiers) entries.put(normalize(identifier), entry);
     }
 
@@ -240,10 +271,23 @@ public final class PhoneAppCatalog {
     private static final class Entry {
         @NonNull final String displayName;
         @NonNull final String iconKey;
+        @NonNull final String filterKey;
 
-        Entry(@NonNull String displayName, @NonNull String iconKey) {
+        Entry(@NonNull String displayName, @NonNull String iconKey,
+              @NonNull String filterKey) {
             this.displayName = displayName;
             this.iconKey = iconKey;
+            this.filterKey = filterKey;
+        }
+    }
+
+    public static final class FilterApp {
+        @NonNull public final String key;
+        @NonNull public final String label;
+
+        private FilterApp(@NonNull String key, @NonNull String label) {
+            this.key = key;
+            this.label = label;
         }
     }
 }

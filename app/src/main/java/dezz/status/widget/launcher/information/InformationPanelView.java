@@ -527,7 +527,9 @@ public final class InformationPanelView extends FrameLayout {
         if (binding == null || !binding.isBound()) return Value.unknown();
         ConnectorValue source = connectorValues.get(connectorKey(binding));
         if (source == null) return Value.unknown();
-        Object raw = source.resolveValue(binding.valuePath);
+        Object raw = binding.connectorType == ConnectorType.PHONE
+                ? PhoneInformationSourcePolicy.displayValue(source, binding.valuePath)
+                : source.resolveValue(binding.valuePath);
         if (!InformationValuePolicy.isConnectorKnown(source.fresh, source.available,
                 source.readable, raw)) return Value.unknown();
         String suffix = unit(item, binding.unitSuffix.isEmpty() ? source.unit

@@ -26,13 +26,33 @@ public final class PhoneStatusBarPolicyTest {
                 PhoneStatusBarPolicy.statusItems();
         assertEquals(Arrays.asList(
                         "connected",
+                        "device.name",
+                        "profiles.hfp",
+                        "profiles.map",
+                        "profiles.ble",
+                        "profiles.ancs",
                         "battery.level",
+                        "battery.level_source",
                         "battery.charging",
+                        "battery.charging_estimated",
+                        "battery.charging_source",
+                        "battery.external_power",
+                        "battery.charge_state",
+                        "battery.charge_level",
                         "network.available",
                         "network.operator",
                         "network.type",
                         "network.signal",
                         "network.roaming",
+                        "call.active",
+                        "call.state",
+                        "call.direction",
+                        "call.multiparty",
+                        "call.audio",
+                        "call.audio_state",
+                        "call.audio_wideband",
+                        "voice_assistant.active",
+                        "ringtone.in_band",
                         "notifications.count",
                         "messages.unread",
                         "diagnostics.ancs",
@@ -80,6 +100,15 @@ public final class PhoneStatusBarPolicyTest {
         assertEquals("АКБ 74%", display("battery.level", 74));
         assertEquals("Сигнал 12.5%", display("network.signal", 12.5d));
         assertEquals("iPhone заряжается", display("battery.charging", true));
+        assertEquals("Питание iPhone подключено",
+                display("battery.external_power", true));
+        assertEquals("АКБ разряжается",
+                display("battery.charge_state", "discharging"));
+        assertEquals("Источник зарядки Android metadata",
+                display("battery.charging_source", "android_metadata"));
+        assertEquals("Звонок входящий", display("call.state", "incoming"));
+        assertEquals("Есть активный звонок", display("call.active", true));
+        assertEquals("BLE подключён", display("profiles.ble", true));
         assertEquals("Без роуминга", display("network.roaming", false));
         assertEquals("Увед. 3", display("notifications.count", 3L));
         assertEquals("Оператор Orange RO 5G",
