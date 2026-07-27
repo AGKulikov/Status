@@ -174,6 +174,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                                         @NonNull LauncherAppCatalog.App app) {
             if (!AppDrawerUninstallPolicy.canUninstall(
                     context, app.packageName, app.systemApp)) return;
+            // The full-screen system overlay must not sit above Package Installer.
+            dismissAllApps();
             AppUninstallLauncher.request(context, app);
         }
     };

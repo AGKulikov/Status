@@ -37,8 +37,6 @@ import com.ecarx.xui.adaptapi.car.base.ICarFunction;
 import com.ecarx.xui.adaptapi.car.base.ICarInfo;
 import com.ecarx.xui.adaptapi.car.hvac.IHvac;
 import com.ecarx.xui.adaptapi.car.sensor.ISensor;
-import com.ecarx.xui.adaptapi.car.userprofile.IProfile;
-import com.ecarx.xui.adaptapi.car.userprofile.IUserProfile;
 import com.ecarx.xui.adaptapi.car.vehicle.IBcm;
 import com.ecarx.xui.adaptapi.car.vehicle.IDriveMode;
 import com.ecarx.xui.adaptapi.car.vehicle.IHUD;
@@ -47,8 +45,6 @@ import com.ecarx.xui.adaptapi.tpms.ITireState;
 import com.ecarx.xui.adaptapi.tpms.TPMS;
 import com.ecarx.xui.adaptapi.vehicle.VehicleSeat;
 import com.ecarx.xui.adaptapi.vehicle.VehicleZone;
-
-import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -68,7 +64,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import dezz.status.widget.BrickType;
-import dezz.status.widget.hud.HudProfileSnapshotPatcher;
+import dezz.status.widget.hud.HudProfileWirePatcher;
 import dezz.status.widget.launcher.vehicle.VehicleDerivedMetrics;
 
 /**
@@ -244,6 +240,7 @@ final class GeelyCarIntegration implements CarIntegration {
     @Nullable
     private volatile ICarFunction carFunctions;
     private final EcarxSignalFallback signalFallback;
+    private final EcarxProfileCloudAccess profileCloudAccess;
     /** Prefer the richer callback once it has produced a value; AdaptAPI remains the cold fallback. */
     private volatile boolean lowLevelGearKnown;
     private volatile boolean lowLevelHighBeamKnown;
@@ -838,6 +835,7 @@ final class GeelyCarIntegration implements CarIntegration {
 
     GeelyCarIntegration(@NonNull Context appContext) {
         this.appContext = appContext;
+        profileCloudAccess = new EcarxProfileCloudAccess(appContext);
         signalFallback = new EcarxSignalFallback(appContext,
                 new EcarxSignalFallback.Listener() {
                     @Override public void onGear(int adaptGear, int actualGear,
@@ -2972,13 +2970,13 @@ final class GeelyCarIntegration implements CarIntegration {
     }
 
     /**
-     * Replays the removed stock Settings "AR mode" through the active profile first.
+     * Replays the removed stock Settings "AR mode" through the raw active profile first.
      *
-     * <p>In this ECARX SDK function {@code 654443008} is annotated as
-     * {@code PA_PSET_ProfileCloudData.vfhudbyte0}. The vendor apply call constructs a fresh
-     * protobuf, so every write below starts from a newly read complete profile and changes only
-     * that key. A generic {@link ICarFunction} write is repeated only a few times as an
-     * unconfirmed compatibility fallback.</p>
+     * <p>The public {@code IUserProfile} adapter rebuilds a 150-field vendor protobuf from only
+     * 85 exposed fields and can therefore clear hidden vehicle settings. Every write below reads
+     * the complete PA33873 wire message, changes only {@code vfhudbyte0} (field 111), and sends
+     * those exact bytes through CB33264. A generic {@link ICarFunction} write is repeated only a
+     * few times as an unconfirmed compatibility fallback.</p>
      */
     @Override
     public void setStockHudCarHidden(boolean hidden,
@@ -3000,42 +2998,37 @@ final class GeelyCarIntegration implements CarIntegration {
             return;
         }
         try {
-            ICar car = ensureCarApi();
-            IUserProfile profiles = car == null ? null : car.getUserProfileManager();
-            int profileId = profiles == null ? -1 : profiles.getCurrentId();
-            IProfile current = profileId < 0 || profiles == null
-                    ? null : profiles.getUserProfileData(profileId);
-            if (current == null) {
+            byte[] completeProfile = profileCloudAccess.readCompleteProfile();
+            if (completeProfile == null || completeProfile.length == 0) {
                 retryHudArProfileReadiness(request, readinessAttempt,
-                        "активный профиль ещё не загружен");
+                        "PA33873 ProfileCloudData ещё не загружен");
                 return;
             }
 
-            String completeJson = current.toJOSNString();
-            int[] containedFunctions = current.getContainsProfileFuncIds();
-            int expectedFunctions = containedFunctions == null ? 0 : containedFunctions.length;
-            String patchedJson;
+            byte[] patchedProfile;
             try {
-                patchedJson = HudProfileSnapshotPatcher.patchHudAr(
-                        completeJson, request.hidden, expectedFunctions);
+                patchedProfile = HudProfileWirePatcher.patchHudAr(
+                        completeProfile, request.hidden);
             } catch (IllegalArgumentException invalidSnapshot) {
                 retryHudArProfileReadiness(request, readinessAttempt,
                         invalidSnapshot.getMessage());
                 return;
             }
-
-            JSONObject original = new JSONObject(completeJson);
-            String previous = original.optString(
-                    HudProfileSnapshotPatcher.HUD_AR_PROFILE_KEY, "");
-            if (String.valueOf(request.desiredValue).equals(previous)) {
+            int previous = HudProfileWirePatcher.readHudAr(completeProfile);
+            if (previous == request.desiredValue) {
                 completeHudArRequest(request, true,
                         "Штатный AR-профиль уже установлен: " + previous);
                 return;
             }
+            if (!HudProfileWirePatcher.isExactPatch(
+                    completeProfile, patchedProfile, request.hidden)) {
+                startHudArFunctionFallback(request,
+                        "проверка точечного изменения ProfileCloudData не пройдена");
+                return;
+            }
 
             request.profileApplyAttempts++;
-            boolean accepted = profiles.applyUserProfileData(
-                    profileId, profileWithJson(current, patchedJson));
+            boolean accepted = profileCloudAccess.writeCompleteProfile(patchedProfile);
             if (!accepted) {
                 if (request.profileApplyAttempts < HUD_AR_PROFILE_APPLY_ATTEMPTS) {
                     scheduleHudArTask(request,
@@ -3043,12 +3036,12 @@ final class GeelyCarIntegration implements CarIntegration {
                             HUD_AR_PROFILE_READBACK_MS);
                 } else {
                     startHudArFunctionFallback(request,
-                            "IUserProfile отклонил полный профиль");
+                            "низкоуровневая запись полного профиля отклонена");
                 }
                 return;
             }
             scheduleHudArTask(request,
-                    () -> verifyHudArProfile(request, profileId),
+                    () -> verifyHudArProfile(request),
                     HUD_AR_PROFILE_READBACK_MS);
         } catch (Throwable error) {
             Log.w(TAG, "legacy HUD AR profile write failed", error);
@@ -3085,30 +3078,18 @@ final class GeelyCarIntegration implements CarIntegration {
                 HUD_AR_PROFILE_READY_RETRY_MS);
     }
 
-    private void verifyHudArProfile(@NonNull HudArRequest request, int appliedProfileId) {
+    private void verifyHudArProfile(@NonNull HudArRequest request) {
         if (!isCurrentHudArRequest(request)) {
             completeHudArRequest(request, false, "Настройка HUD заменена более новой");
             return;
         }
         try {
-            ICar car = ensureCarApi();
-            IUserProfile profiles = car == null ? null : car.getUserProfileManager();
-            int currentId = profiles == null ? -1 : profiles.getCurrentId();
-            IProfile current = profiles == null || currentId != appliedProfileId
-                    ? null : profiles.getUserProfileData(currentId);
-            if (current != null) {
-                int[] containedFunctions = current.getContainsProfileFuncIds();
-                int expectedFunctions =
-                        containedFunctions == null ? 0 : containedFunctions.length;
-                String completeJson = current.toJOSNString();
-                // Validation also rejects the SDK's all-zero not-yet-loaded placeholder.
-                HudProfileSnapshotPatcher.patchHudAr(
-                        completeJson, request.hidden, expectedFunctions);
-                int confirmed = new JSONObject(completeJson).getInt(
-                        HudProfileSnapshotPatcher.HUD_AR_PROFILE_KEY);
+            byte[] completeProfile = profileCloudAccess.readCompleteProfile();
+            if (completeProfile != null && completeProfile.length > 0) {
+                int confirmed = HudProfileWirePatcher.readHudAr(completeProfile);
                 if (confirmed == request.desiredValue) {
                     completeHudArRequest(request, true,
-                            "Штатный AR-профиль подтверждён: " + confirmed);
+                            "Полный PA-профиль HUD AR подтверждён: " + confirmed);
                     return;
                 }
             }
@@ -3195,42 +3176,6 @@ final class GeelyCarIntegration implements CarIntegration {
         if (request.finished.compareAndSet(false, true)) {
             postCommandResult(request.listener, success, message);
         }
-    }
-
-    @NonNull
-    private static IProfile profileWithJson(@NonNull IProfile delegate,
-                                            @NonNull String completeJson) {
-        return new IProfile() {
-            @Override
-            public boolean containsProfileFuncId(int functionId, int zone) {
-                return delegate.containsProfileFuncId(functionId, zone);
-            }
-
-            @Override
-            public int[] getContainsProfileFuncIds() {
-                return delegate.getContainsProfileFuncIds();
-            }
-
-            @Override
-            public int getProfileFuncValue(int functionId, int zone) {
-                return delegate.getProfileFuncValue(functionId, zone);
-            }
-
-            @Override
-            public float getProfileFuncValueFloat(int functionId, int zone) {
-                return delegate.getProfileFuncValueFloat(functionId, zone);
-            }
-
-            @Override
-            public int[] getProfileSupportedZones(int functionId) {
-                return delegate.getProfileSupportedZones(functionId);
-            }
-
-            @Override
-            public String toJOSNString() {
-                return completeJson;
-            }
-        };
     }
 
     @NonNull
@@ -3791,6 +3736,7 @@ final class GeelyCarIntegration implements CarIntegration {
             detachControlWatcher();
             cancelActiveControlCommandsOnWorker("ECARX остановлен");
         });
+        profileCloudAccess.close();
         signalFallback.shutdown();
         telemetryWorker.shutdown();
         controlWorker.shutdown();

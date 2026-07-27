@@ -3744,6 +3744,10 @@ public final class LauncherActivity extends AppCompatActivity {
                                 LauncherActivity.this, entry.packageName,
                                 entry.systemApp)) return;
                         lastAppCatalogLoadElapsed = 0L;
+                        // A TYPE_APPLICATION_OVERLAY dialog may remain above the system Package
+                        // Installer and intercept its confirmation buttons. Remove our window
+                        // before ACTION_DELETE; onResume refreshes the catalog afterwards.
+                        dismissAllAppsDialog();
                         allAppsUninstallInProgress = AppUninstallLauncher.request(
                                 LauncherActivity.this, entry.packageName, entry.label);
                     }
