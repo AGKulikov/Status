@@ -35,10 +35,10 @@ public final class SettingsDestinationCatalog {
     public enum Group {
         STATUS("status", "Строка состояния",
                 "Положение, состав и оформление верхней строки", "status"),
-        HOME("home", "Домашний экран",
-                "HOME, компоновка и содержимое блоков", "home"),
+        HOME("home", "Лаунчер",
+                "Все кнопки, виджеты, информация и компоновка в одном разделе", "home"),
         PANELS("panels", "Панели",
-                "Медиа, навигация, климат, датчики и быстрые действия", "panels"),
+                "Панель водителя, HUD и независимые плавающие панели", "panels"),
         SMART_HOME("smart_home", "Умный дом",
                 "Подключения Home Assistant, Sprut.hub, MQTT и iPhone", "smart_home"),
         AUTOMATION("automation", "Автоматизация",
@@ -129,45 +129,40 @@ public final class SettingsDestinationCatalog {
                 "preset", "dezz.status.widget.PresetsActivity",
                 "пресеты", "профили", "шаблоны", "оформление"));
 
-        values.add(activity("home_behavior", Group.HOME, "Поведение HOME",
-                "Полноэкранный режим, фон, сетка и шаг привязки",
+        values.add(activity("home_behavior", Group.HOME, "Лаунчер",
+                "Поведение, общий пул элементов, фон, сетка и шаг привязки",
                 "home", "dezz.status.widget.LauncherSettingsActivity",
                 "лаунчер", "домашний экран", "фон", "сетка", "полноэкранный"));
         values.add(action("home_layout", Group.HOME, "Компоновка на реальном HOME",
                 "Перетаскивание и изменение размера блоков за любой угол",
                 "layout", ACTION_EDIT_HOME_LAYOUT,
                 "редактор", "размер", "позиция", "блок", "панель", "сетка"));
-        values.add(activity("home_panel_content", Group.HOME, "Состав блоков",
-                "Порядок, видимость и масштаб элементов внутри блоков",
-                "panels", "dezz.status.widget.PanelElementSettingsActivity",
-                "содержимое", "элементы", "порядок", "масштаб", "блоки"));
-
-        values.add(activity("panel_apps", Group.PANELS, "Избранные приложения",
+        values.add(activity("panel_apps", Group.HOME, "Избранные приложения",
                 "Список, порядок, подписи и размеры иконок приложений",
                 "apps", "dezz.status.widget.FavoriteAppsSettingsActivity",
                 "приложения", "иконки", "избранное"));
-        values.add(activity("all_apps", Group.PANELS, "Меню «Все приложения»",
+        values.add(activity("all_apps", Group.HOME, "Меню «Все приложения»",
                 "Общий вид для HOME и панели водителя: масштаб, столбцы, интервалы и скрытие",
                 "apps", "dezz.status.widget.AllAppsSettingsActivity",
                 "все приложения", "лаунчер", "панель водителя", "иконки",
                 "масштаб", "расстояние", "столбцы", "скрыть", "показать"));
-        values.add(activity("panel_media", Group.PANELS, "Медиаблок",
+        values.add(activity("panel_media", Group.HOME, "Медиавиджеты",
                 "Сетка, элементы, бегущие строки, обложка, громкость и цвета",
                 "media", "dezz.status.widget.MediaPanelSettingsActivity",
                 "музыка", "трек", "альбом", "артист", "обложка", "громкость", "яндекс"));
-        values.add(activity("panel_navigation", Group.PANELS, "Навигация",
+        values.add(activity("panel_navigation", Group.HOME, "Навигационные виджеты",
                 "Сетка маршрута, манёвры, полосы, ETA и редактор на HOME",
                 "navigation", "dezz.status.widget.NavigationPanelSettingsActivity",
                 "маршрут", "маневр", "полосы", "eta", "яндекс навигатор"));
-        values.add(activity("panel_routes", Group.PANELS, "Избранные места",
+        values.add(activity("panel_routes", Group.HOME, "Избранные места",
                 "Домой, работа и другие кнопки маршрутов, иконки и оформление",
                 "routes", "dezz.status.widget.FavoriteRoutesSettingsActivity",
                 "места", "домой", "работа", "координаты", "маршруты"));
-        values.add(activity("panel_climate", Group.PANELS, "Климат",
-                "Элементы, сетка, уровни, резервирование экрана и внешний оверлей",
+        values.add(activity("panel_climate", Group.HOME, "Климатические виджеты",
+                "Элементы климата, размеры, уровни и внешний вид на лаунчере",
                 "climate", "dezz.status.widget.ClimatePanelSettingsActivity",
                 "кондиционер", "вентилятор", "авто", "сиденья", "руль", "резервирование"));
-        values.add(activity("panel_vehicle", Group.PANELS, "Информация об автомобиле",
+        values.add(activity("panel_vehicle", Group.HOME, "Информация об автомобиле",
                 "Внутренние датчики, вычисляемые показатели, подписи и цвета",
                 "vehicle", "dezz.status.widget.VehicleInfoPanelSettingsActivity",
                 "hud", "телеметрия", "топливо", "температура", "датчики"));
@@ -176,12 +171,12 @@ public final class SettingsDestinationCatalog {
                 "hud", "dezz.status.widget.HudPanelSettingsActivity",
                 "hud", "проекция", "внешний дисплей", "стрелки", "светофоры",
                 "полосы", "телеметрия", "умный дом", "сценарии", "сетка"));
-        values.add(activity("panel_information", Group.PANELS, "Блок «Информация»",
+        values.add(activity("panel_information", Group.HOME, "Информационные виджеты",
                 "Своя сетка статусов автомобиля, магнитолы и устройств умного дома",
                 "information", "dezz.status.widget.InformationPanelSettingsActivity",
                 "датчики", "статусы", "сетка", "home assistant", "sprut", "mqtt",
                 "информация"));
-        values.add(activity("panel_actions", Group.PANELS, "Кнопки и умный дом",
+        values.add(activity("panel_actions", Group.HOME, "Кнопки и умный дом",
                 "Индивидуальная сетка, размеры и позиции кнопок — редактирование на HOME и в настройках",
                 "actions", "dezz.status.widget.LauncherShortcutSettingsActivity",
                 "быстрые действия", "ворота", "свет", "функции", "иконки",

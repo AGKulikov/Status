@@ -83,11 +83,9 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
                 preferences.launcherBackgroundColor.get());
 
         addTitle("Компоновка");
-        addHint("Каждый элемент перемещается и масштабируется по всему HOME независимо от "
-                + "исходного блока. Видимость и содержимое задаются в едином разделе.");
-        addButton("Открыть единый раздел блоков…", v ->
-                startActivity(SettingsHubActivity.intent(this,
-                        dezz.status.widget.settings.SettingsDestinationCatalog.Group.PANELS)));
+        addHint("Каждый элемент перемещается и масштабируется по всему HOME независимо. "
+                + "Редактор открывается только этой кнопкой или отдельной добавленной кнопкой "
+                + "«Редактировать лаунчер» — длинный тап на HOME его не включает.");
         addButton("Сбросить расположение элементов", v -> new AlertDialog.Builder(this)
                 .setTitle("Сбросить компоновку?")
                 .setMessage("Элементы вернутся к расположению, рассчитанному из текущих блоков. "
@@ -127,15 +125,15 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         TextView label = new TextView(this);
         label.setTextSize(17);
         SeekBar seek = new SeekBar(this);
-        seek.setMax(96);
-        seek.setProgress(Math.max(0, preferences.launcherSnapPx.get() - 4));
+        seek.setMax(99);
+        seek.setProgress(Math.max(0, preferences.launcherSnapPx.get() - 1));
         TextView value = new TextView(this);
         value.setMinWidth(dp(80));
         value.setGravity(Gravity.END);
-        value.setText((seek.getProgress() + 4) + " px");
+        value.setText((seek.getProgress() + 1) + " px");
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar bar, int progress, boolean user) {
-                int pixels = progress + 4;
+                int pixels = progress + 1;
                 value.setText(pixels + " px");
                 if (user) preferences.launcherSnapPx.set(pixels);
             }

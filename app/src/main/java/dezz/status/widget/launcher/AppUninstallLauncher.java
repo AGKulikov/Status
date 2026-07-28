@@ -43,12 +43,28 @@ public final class AppUninstallLauncher {
 
     public static boolean request(@NonNull Context context,
                                   @NonNull LauncherAppCatalog.App app) {
-        return request(context, app.packageName, app.label);
+        return request(context, app.packageName, app.label,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
+    }
+
+    /** Uses the owning drawer's accepted ECARX layer so confirmation cannot appear behind it. */
+    public static boolean request(@NonNull Context context,
+                                  @NonNull LauncherAppCatalog.App app,
+                                  int windowType) {
+        return request(context, app.packageName, app.label, windowType);
     }
 
     public static boolean request(@NonNull Context context,
                                   @NonNull String packageName,
                                   @NonNull String label) {
+        return request(context, packageName, label,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
+    }
+
+    private static boolean request(@NonNull Context context,
+                                   @NonNull String packageName,
+                                   @NonNull String label,
+                                   int windowType) {
         String target = packageName.trim();
         if (target.isEmpty()) return false;
         if (!safePackageName(target)) {
@@ -68,9 +84,10 @@ public final class AppUninstallLauncher {
             boolean canOverlay = Build.VERSION.SDK_INT < Build.VERSION_CODES.M
                     || Settings.canDrawOverlays(context);
             if (window != null && canOverlay) {
-                // All Apps is already an application overlay. Put confirmation in the same layer,
-                // but add it later so it remains visibly above the unchanged grid.
-                window.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
+                // Put confirmation in the same accepted layer as its owning drawer. On ECARX the
+                // driver drawer may be above TYPE_APPLICATION_OVERLAY, so forcing the public type
+                // would hide this dialog behind the still-visible app grid.
+                window.setType(windowType);
                 window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
             } else if (!(context instanceof Activity)) {
                 return launchSystemConfirmation(context, target, label);

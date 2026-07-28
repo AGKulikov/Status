@@ -512,6 +512,9 @@ public class Preferences {
             "launcherGlobalElementsJson", "");
     /** Independent decorative HOME layers. They are always rendered below live widgets. */
     public final Str launcherBackdropsJson = new Str(this, "launcherBackdropsJson", "");
+    /** Horizontal free-frame groups. Members keep their own style/action and text size. */
+    public final Str launcherHorizontalGroupsJson = new Str(
+            this, "launcherHorizontalGroupsJson", "");
     public final Str launcherFavoritePackages = new Str(this, "launcherFavoritePackages", "");
     /** Per-application HOME icon/label sizes; selection and order remain in the legacy list. */
     public final Str launcherFavoriteAppsAppearanceJson = new Str(this,
@@ -526,6 +529,9 @@ public class Preferences {
     /** Flattened launcher components hidden from both HOME and driver-panel catalogs. */
     public final StringSet launcherAllAppsHiddenComponents = new StringSet(
             this, "launcherAllAppsHiddenComponents");
+    /** One-time HA1132 default: system apps are hidden except the user-facing Phone app. */
+    public final Bool launcherSystemAppsDefaultApplied = new Bool(
+            this, "launcherSystemAppsDefaultApplied", false);
     public final Str launcherBackgroundColor = new Str(this, "launcherBackgroundColor", "#101827");
     public final Bool launcherShowGrid = new Bool(this, "launcherShowGrid", true);
     public final Int launcherSnapPx = new Int(this, "launcherSnapPx", 20);

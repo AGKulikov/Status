@@ -216,12 +216,13 @@ public class DriverPanelOverlayContractTest {
         assertTrue(controller.contains("AppDrawerTileView"));
         assertTrue(controller.contains("setDrawerEditMode(true)"));
         assertTrue(controller.contains("AppDrawerUninstallPolicy.canUninstall("));
-        assertTrue(controller.contains("AppUninstallLauncher.request(context, app)"));
+        assertTrue(controller.contains(
+                "AppUninstallLauncher.request(context, app, attachedType)"));
         int uninstall = controller.indexOf(
                 "@Override public void uninstall(@NonNull Context context,");
         int dismiss = controller.indexOf("dismissAllApps();", uninstall);
         int request = controller.indexOf(
-                "AppUninstallLauncher.request(context, app)", uninstall);
+                "AppUninstallLauncher.request(context, app, attachedType)", uninstall);
         assertTrue(uninstall >= 0);
         assertTrue(request >= 0);
         assertTrue(dismiss < 0 || dismiss > request);

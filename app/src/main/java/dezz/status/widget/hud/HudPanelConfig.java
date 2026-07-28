@@ -147,6 +147,34 @@ public final class HudPanelConfig {
         if (elements.size() > MAX_ELEMENTS) {
             elements.subList(MAX_ELEMENTS, elements.size()).clear();
         }
+        normalizeHorizontalGroups(ids);
+    }
+
+    /** Keeps group membership deterministic and prevents nested or duplicate ownership. */
+    private void normalizeHorizontalGroups(@NonNull Set<String> ids) {
+        Set<String> claimed = new HashSet<>();
+        for (HudElementConfig group : elements) {
+            if (group.type != HudElementType.HORIZONTAL_GROUP) continue;
+            List<String> valid = new ArrayList<>();
+            for (String id : HudHorizontalGroup.memberIds(group)) {
+                HudElementConfig member = find(id);
+                if (!ids.contains(id) || member == null
+                        || member.type == HudElementType.HORIZONTAL_GROUP
+                        || member.type == HudElementType.BACKDROP
+                        || !claimed.add(id)) {
+                    continue;
+                }
+                valid.add(id);
+            }
+            HudHorizontalGroup.setMemberIds(group, valid);
+        }
+    }
+
+    private HudElementConfig find(@NonNull String id) {
+        for (HudElementConfig item : elements) {
+            if (id.equals(item.id)) return item;
+        }
+        return null;
     }
 
     @NonNull

@@ -62,8 +62,10 @@ public final class LauncherElementFrame extends MaterialCardView {
         this.elementId = elementId;
         this.listener = listener;
         touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
-        minimumWidthPx = dp(160);
-        minimumHeightPx = dp(96);
+        // Atomic widgets are free rectangles. The editor handles may visually overlap on a very
+        // small item, but they must never impose an invisible 160x96 minimum on saved geometry.
+        minimumWidthPx = 1;
+        minimumHeightPx = 1;
 
         // The frame is geometry/editor chrome only. Visual underlays are independent
         // LauncherBackdropView layers explicitly added by the user.
@@ -121,8 +123,9 @@ public final class LauncherElementFrame extends MaterialCardView {
         for (ImageView handle : resizeHandles) {
             if (handle != null) handle.setVisibility(enabled ? VISIBLE : GONE);
         }
-        setStrokeWidth(enabled ? dp(3) : 0);
-        setStrokeColor(Color.rgb(55, 135, 245));
+        // The four handles and the badge are sufficient editor chrome. Drawing a rectangle around
+        // every item made those technical contours look like real launcher underlays.
+        setStrokeWidth(0);
         setCardElevation(0);
         setClickable(enabled);
     }

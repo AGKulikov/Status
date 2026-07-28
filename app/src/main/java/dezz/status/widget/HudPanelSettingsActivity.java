@@ -31,13 +31,17 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import dezz.status.widget.hud.HudCanvasView;
 import dezz.status.widget.hud.HudDisplaySelector;
 import dezz.status.widget.hud.HudElementConfig;
 import dezz.status.widget.hud.HudElementType;
+import dezz.status.widget.hud.HudHorizontalGroup;
 import dezz.status.widget.hud.HudPanelConfig;
 import dezz.status.widget.hud.HudPanelStore;
 import dezz.status.widget.hud.HudPresentationService;
@@ -298,6 +302,10 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
             editBackdrop(item);
             return;
         }
+        if (item.type == HudElementType.HORIZONTAL_GROUP) {
+            editHorizontalGroup(item);
+            return;
+        }
         ScrollView scroll = new ScrollView(this);
         LinearLayout form = column();
         form.setPadding(dp(18), dp(8), dp(18), dp(18));
@@ -413,6 +421,235 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                     }
                 }));
         dialog.show();
+    }
+
+    /** Configures a real geometry container; it never paints its own surface or shadow. */
+    private void editHorizontalGroup(@NonNull HudElementConfig group) {
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout form = column();
+        form.setPadding(dp(18), dp(8), dp(18), dp(24));
+        scroll.addView(form);
+
+        EditText title = field(form, "Название", group.title, false);
+        LinearLayout geometry = new LinearLayout(this);
+        EditText x = compactNumber("X", group.x);
+        EditText y = compactNumber("Y", group.y);
+        EditText width = compactNumber("W", group.width);
+        EditText height = compactNumber("H", group.height);
+        geometry.addView(x, weighted());
+        geometry.addView(y, weighted());
+        geometry.addView(width, weighted());
+        geometry.addView(height, weighted());
+        form.addView(label("Положение и размер фрейма"), marginTop(10));
+        form.addView(geometry);
+
+        EditText gap = field(form, "Расстояние между элементами, px",
+                Integer.toString(HudHorizontalGroup.gapPx(group)), true);
+        EditText paddingLeft = field(form, "Внутренний отступ слева, px",
+                Integer.toString(HudHorizontalGroup.paddingLeftPx(group)), true);
+        EditText paddingTop = field(form, "Внутренний отступ сверху, px",
+                Integer.toString(HudHorizontalGroup.paddingTopPx(group)), true);
+        EditText paddingRight = field(form, "Внутренний отступ справа, px",
+                Integer.toString(HudHorizontalGroup.paddingRightPx(group)), true);
+        EditText paddingBottom = field(form, "Внутренний отступ снизу, px",
+                Integer.toString(HudHorizontalGroup.paddingBottomPx(group)), true);
+        EditText marginLeft = field(form, "Внешний отступ слева, px",
+                Integer.toString(HudHorizontalGroup.marginLeftPx(group)), true);
+        EditText marginTop = field(form, "Внешний отступ сверху, px",
+                Integer.toString(HudHorizontalGroup.marginTopPx(group)), true);
+        EditText marginRight = field(form, "Внешний отступ справа, px",
+                Integer.toString(HudHorizontalGroup.marginRightPx(group)), true);
+        EditText marginBottom = field(form, "Внешний отступ снизу, px",
+                Integer.toString(HudHorizontalGroup.marginBottomPx(group)), true);
+
+        Spinner distribution = spinner(new String[]{"Компактно", "Равные ячейки"},
+                HudHorizontalGroup.distribution(group) == 1
+                        ? "Равные ячейки" : "Компактно");
+        form.addView(label("Распределение"), marginTop(10));
+        form.addView(distribution);
+        Spinner horizontal = spinner(new String[]{"Слева", "По центру", "Справа"},
+                horizontalGroupAlignmentLabel(
+                        HudHorizontalGroup.horizontalAlignment(group)));
+        form.addView(label("Положение содержимого по горизонтали"), marginTop(10));
+        form.addView(horizontal);
+        Spinner vertical = spinner(new String[]{"Сверху", "По центру", "Снизу"},
+                verticalGroupAlignmentLabel(HudHorizontalGroup.verticalAlignment(group)));
+        form.addView(label("Выравнивание элементов по вертикали"), marginTop(10));
+        form.addView(vertical);
+        Switch itemEnabled = switchView("Показывать группу", group.enabled);
+        form.addView(itemEnabled, marginTop(8));
+
+        form.addView(section("Элементы слева направо"), marginTop(16));
+        form.addView(text("Отметьте элементы. Стрелками меняется порядок; кнопка ⚙ открывает "
+                + "индивидуальные настройки. Размеры текста при растяжении ряда не меняются.",
+                12, 0xFF95A0AF), marginTop(4));
+        List<HudElementConfig> candidates = hudHorizontalGroupCandidates(group);
+        Map<String, Boolean> selected = new LinkedHashMap<>();
+        List<String> existing = HudHorizontalGroup.memberIds(group);
+        for (HudElementConfig candidate : candidates) {
+            selected.put(candidate.id, existing.contains(candidate.id));
+        }
+        LinearLayout memberRows = column();
+        form.addView(memberRows, marginTop(6));
+        rebuildHudHorizontalGroupMembers(memberRows, candidates, selected);
+        form.addView(text("Группа прозрачна. Для цвета, рамки и скругления добавьте отдельную "
+                + "подложку HUD. Тень на HUD не используется.",
+                12, 0xFF95A0AF), marginTop(10));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Горизонтальный ряд HUD")
+                .setView(scroll)
+                .setPositiveButton("Применить", null)
+                .setNegativeButton("Отмена", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    try {
+                        ArrayList<String> memberIds = new ArrayList<>();
+                        for (HudElementConfig candidate : candidates) {
+                            if (Boolean.TRUE.equals(selected.get(candidate.id))) {
+                                memberIds.add(candidate.id);
+                            }
+                        }
+                        if (memberIds.size() < 2) {
+                            Toast.makeText(this, "Выберите минимум два элемента",
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        group.title = value(title);
+                        group.x = integer(x, group.x);
+                        group.y = integer(y, group.y);
+                        group.width = integer(width, group.width);
+                        group.height = integer(height, group.height);
+                        group.enabled = itemEnabled.isChecked();
+                        HudHorizontalGroup.setMemberIds(group, memberIds);
+                        putHudGroupOption(group, "gapPx", integer(gap, 0));
+                        putHudGroupOption(group, "paddingLeftPx", integer(paddingLeft, 0));
+                        putHudGroupOption(group, "paddingTopPx", integer(paddingTop, 0));
+                        putHudGroupOption(group, "paddingRightPx", integer(paddingRight, 0));
+                        putHudGroupOption(group, "paddingBottomPx", integer(paddingBottom, 0));
+                        putHudGroupOption(group, "marginLeftPx", integer(marginLeft, 0));
+                        putHudGroupOption(group, "marginTopPx", integer(marginTop, 0));
+                        putHudGroupOption(group, "marginRightPx", integer(marginRight, 0));
+                        putHudGroupOption(group, "marginBottomPx", integer(marginBottom, 0));
+                        putHudGroupOption(group, "distribution",
+                                distribution.getSelectedItemPosition());
+                        putHudGroupOption(group, "horizontalAlignment",
+                                horizontal.getSelectedItemPosition());
+                        putHudGroupOption(group, "verticalAlignment",
+                                vertical.getSelectedItemPosition());
+                        group.normalize(config.gridColumns, config.gridRows);
+                        config.normalize();
+                        canvas.updateConfig(config);
+                        updateSelection(group);
+                        persist(false);
+                        dialog.dismiss();
+                    } catch (RuntimeException error) {
+                        Toast.makeText(this, "Проверьте параметры: " + error.getMessage(),
+                                Toast.LENGTH_LONG).show();
+                    }
+                }));
+        dialog.show();
+    }
+
+    @NonNull
+    private List<HudElementConfig> hudHorizontalGroupCandidates(
+            @NonNull HudElementConfig editedGroup) {
+        ArrayList<HudElementConfig> result = new ArrayList<>();
+        List<String> current = HudHorizontalGroup.memberIds(editedGroup);
+        for (String id : current) {
+            HudElementConfig value = findElement(id);
+            if (value != null && value.type != HudElementType.BACKDROP
+                    && value.type != HudElementType.HORIZONTAL_GROUP) {
+                result.add(value);
+            }
+        }
+        for (HudElementConfig value : config.elements) {
+            if (value.id.equals(editedGroup.id) || result.contains(value)
+                    || value.type == HudElementType.BACKDROP
+                    || value.type == HudElementType.HORIZONTAL_GROUP
+                    || belongsToOtherHudHorizontalGroup(value.id, editedGroup.id)) {
+                continue;
+            }
+            result.add(value);
+        }
+        return result;
+    }
+
+    private boolean belongsToOtherHudHorizontalGroup(@NonNull String memberId,
+                                                     @NonNull String editedGroupId) {
+        for (HudElementConfig value : config.elements) {
+            if (value.type == HudElementType.HORIZONTAL_GROUP
+                    && !value.id.equals(editedGroupId)
+                    && HudHorizontalGroup.memberIds(value).contains(memberId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void rebuildHudHorizontalGroupMembers(
+            @NonNull LinearLayout container,
+            @NonNull List<HudElementConfig> candidates,
+            @NonNull Map<String, Boolean> selected) {
+        container.removeAllViews();
+        for (int index = 0; index < candidates.size(); index++) {
+            HudElementConfig candidate = candidates.get(index);
+            LinearLayout row = new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            Switch included = switchView(candidate.title,
+                    Boolean.TRUE.equals(selected.get(candidate.id)));
+            included.setOnCheckedChangeListener((button, checked) ->
+                    selected.put(candidate.id, checked));
+            row.addView(included, new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            Button up = button("↑");
+            up.setEnabled(index > 0);
+            int from = index;
+            up.setOnClickListener(view -> {
+                Collections.swap(candidates, from, from - 1);
+                rebuildHudHorizontalGroupMembers(container, candidates, selected);
+            });
+            row.addView(up, fixed(48));
+            Button down = button("↓");
+            down.setEnabled(index + 1 < candidates.size());
+            down.setOnClickListener(view -> {
+                Collections.swap(candidates, from, from + 1);
+                rebuildHudHorizontalGroupMembers(container, candidates, selected);
+            });
+            row.addView(down, fixed(48));
+            Button configure = button("⚙");
+            configure.setOnClickListener(view -> editElement(candidate));
+            row.addView(configure, fixed(54));
+            container.addView(row);
+        }
+    }
+
+    @Nullable
+    private HudElementConfig findElement(@NonNull String id) {
+        for (HudElementConfig value : config.elements) {
+            if (id.equals(value.id)) return value;
+        }
+        return null;
+    }
+
+    private static void putHudGroupOption(@NonNull HudElementConfig group,
+                                          @NonNull String key, int value) {
+        try {
+            group.options.put(key, value);
+        } catch (JSONException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    @NonNull
+    private static String horizontalGroupAlignmentLabel(int value) {
+        return value == 1 ? "По центру" : value == 2 ? "Справа" : "Слева";
+    }
+
+    @NonNull
+    private static String verticalGroupAlignmentLabel(int value) {
+        return value == 1 ? "По центру" : value == 2 ? "Снизу" : "Сверху";
     }
 
     private void editBackdrop(@NonNull HudElementConfig item) {
