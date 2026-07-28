@@ -328,10 +328,7 @@ public class WidgetAccessibilityService extends AccessibilityService {
     @Override
     protected boolean onKeyEvent(KeyEvent event) {
         if (event == null) return false;
-        int displayId = -1;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            displayId = event.getDisplayId();
-        }
+        int displayId = keyDisplayId(event);
         ActionRecorder.record(ActionRecorder.SOURCE_STEERING_KEY, "KEY_EVENT",
                 ActionRecorder.object(
                         "key_code", event.getKeyCode(),
@@ -349,6 +346,20 @@ public class WidgetAccessibilityService extends AccessibilityService {
                         + " repeat=" + event.getRepeatCount() + " display=" + displayId);
         // Observing must never consume a steering-wheel or hardware key.
         return false;
+    }
+
+    /**
+     * ECARX exposes an InputEvent display id on some builds, but it is hidden from the public
+     * Android SDK used to compile the APK. Reflection keeps the extra diagnostic when available
+     * without making steering-key capture depend on that OEM extension.
+     */
+    private static int keyDisplayId(@NonNull KeyEvent event) {
+        try {
+            Object value = event.getClass().getMethod("getDisplayId").invoke(event);
+            return value instanceof Number ? ((Number) value).intValue() : -1;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return -1;
+        }
     }
 
     /**
