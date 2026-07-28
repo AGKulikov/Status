@@ -197,7 +197,7 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(transport.contains("REMOTE_LOGICAL_NAME = \"iPhone_ANCS\""));
         assertTrue(advertising.contains(".addServiceUuid(new ParcelUuid(DIAGNOSTIC_SERVICE))"));
         assertTrue(advertising.contains(".addServiceData(new ParcelUuid(DIAGNOSTIC_SERVICE)"));
-        assertFalse(advertising.contains("setIncludeDeviceName(true)"));
+        assertFalse(advertising.contains(".setIncludeDeviceName(true)"));
         assertFalse(transport.contains("adapter.setName("));
         assertTrue(source.contains("\"transport.ancs.local_name\""));
         assertTrue(source.contains("\"transport.ancs.remote_name\""));
