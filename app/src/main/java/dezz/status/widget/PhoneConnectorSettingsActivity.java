@@ -283,7 +283,7 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 R.string.phone_low_battery_enable_title,
                 R.string.phone_low_battery_enable_subtitle, false);
         lowBatteryAlertEnabled.setOnCheckedChangeListener((button, checked) -> {
-            if (checked) connectorEnabled.setChecked(true);
+            if (checked && connectorEnabled != null) connectorEnabled.setChecked(true);
         });
         lowBatteryThresholdValue = addDisclosureRow(alertRows,
                 R.string.phone_low_battery_threshold_title,
@@ -923,7 +923,11 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
 
         boolean ancsReceiving = "ready".equals(ancsStatus)
                 || "ready_degraded".equals(ancsStatus);
-        boolean ancsRequested = notificationsEnabled.isChecked() || messagesEnabled.isChecked();
+        boolean notificationsRequested = checked(notificationsEnabled,
+                preferences.phoneNotificationsEnabled.get());
+        boolean messagesRequested = checked(messagesEnabled,
+                preferences.phoneMessagesEnabled.get());
+        boolean ancsRequested = notificationsRequested || messagesRequested;
         boolean notificationDelivery = notificationDeliveryEnabled();
         StringBuilder result = new StringBuilder();
         result.append(line(bluetooth.supported, getString(R.string.phone_diag_adapter),
@@ -973,10 +977,10 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                         || ancsReceiving,
                 getString(R.string.phone_diag_stock_connection),
                 localizedStockConnectionStatus(stockConnectionStatus)));
-        result.append('\n').append(line(!messagesEnabled.isChecked()
+        result.append('\n').append(line(!messagesRequested
                         || "ready".equals(mapStatus),
                 getString(R.string.phone_diag_sms),
-                !messagesEnabled.isChecked()
+                !messagesRequested
                         ? getString(R.string.phone_diag_not_required)
                         : "ready".equals(mapStatus)
                         ? getString(R.string.phone_diag_map_ready)
@@ -1321,13 +1325,20 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         persistSettings(true);
     }
 
+    private static boolean checked(
+            @Nullable MaterialSwitch value,
+            boolean savedFallback) {
+        return value == null ? savedFallback : value.isChecked();
+    }
+
     private void testAncsConnection() {
         if (!persistSettings(false)) return;
-        if (!connectorEnabled.isChecked()) {
+        if (!preferences.phoneConnectorEnabled.get()) {
             Toast.makeText(this, R.string.phone_test_enable_first, Toast.LENGTH_LONG).show();
             return;
         }
-        if (!notificationsEnabled.isChecked() && !messagesEnabled.isChecked()) {
+        if (!preferences.phoneNotificationsEnabled.get()
+                && !preferences.phoneMessagesEnabled.get()) {
             Toast.makeText(this, R.string.phone_test_choose_source, Toast.LENGTH_LONG).show();
             return;
         }
@@ -1383,16 +1394,29 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     }
 
     private boolean persistSettings(boolean showConfirmation) {
-        if (lowBatteryAlertEnabled.isChecked()) {
-            connectorEnabled.setChecked(true);
+        boolean connectorRequested = checked(connectorEnabled,
+                preferences.phoneConnectorEnabled.get());
+        boolean notificationsRequested = checked(notificationsEnabled,
+                preferences.phoneNotificationsEnabled.get());
+        boolean messagesRequested = checked(messagesEnabled,
+                preferences.phoneMessagesEnabled.get());
+        boolean includeTextRequested = checked(includeNotificationText,
+                preferences.phoneIncludeNotificationText.get());
+        boolean lowBatteryAlertRequested = checked(lowBatteryAlertEnabled,
+                preferences.phoneLowBatteryAlertEnabled.get());
+        boolean sprutPresenceRequested = checked(sprutPresenceEnabled,
+                preferences.phoneSprutPresenceEnabled.get());
+        if (lowBatteryAlertRequested) {
+            connectorRequested = true;
+            if (connectorEnabled != null) connectorEnabled.setChecked(true);
         }
-        if ((notificationsEnabled.isChecked() || messagesEnabled.isChecked())
+        if ((notificationsRequested || messagesRequested)
                 && selectedNotificationCategories.isEmpty()) {
             Toast.makeText(this, R.string.phone_filter_categories_required,
                     Toast.LENGTH_LONG).show();
             return false;
         }
-        if ((notificationsEnabled.isChecked() || messagesEnabled.isChecked())
+        if ((notificationsRequested || messagesRequested)
                 && notificationAppFilterMode
                 == PhoneNotificationFilter.MODE_ONLY_SELECTED
                 && selectedNotificationApps.isEmpty()) {
@@ -1400,12 +1424,12 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                     Toast.LENGTH_LONG).show();
             return false;
         }
-        if (connectorEnabled.isChecked() && selectedDeviceAddress.isEmpty()) {
+        if (connectorRequested && selectedDeviceAddress.isEmpty()) {
             Toast.makeText(this, R.string.phone_choose_required,
                     Toast.LENGTH_LONG).show();
             return false;
         }
-        if (sprutPresenceEnabled.isChecked()) {
+        if (sprutPresenceRequested) {
             if (selectedSprutPath.isEmpty()) {
                 Toast.makeText(this, R.string.phone_sprut_choose_required,
                         Toast.LENGTH_LONG).show();
@@ -1424,18 +1448,18 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 PhoneLowBatteryAlertPolicy.boundedThreshold(lowBatteryThreshold);
         boolean resetLowBatteryLatch =
                 preferences.phoneLowBatteryAlertEnabled.get()
-                        != lowBatteryAlertEnabled.isChecked()
+                        != lowBatteryAlertRequested
                 || preferences.phoneLowBatteryAlertThreshold.get()
                         != savedLowBatteryThreshold;
 
-        preferences.phoneConnectorEnabled.set(connectorEnabled.isChecked());
+        preferences.phoneConnectorEnabled.set(connectorRequested);
         preferences.phoneDeviceAddress.set(selectedDeviceAddress);
         // Classic and ANCS start with the same physical iPhone, but the BLE transport owns a
         // separate identity key and never mutates the stock Classic pairing/name.
         preferences.phoneAncsDeviceAddress.set(selectedDeviceAddress);
-        preferences.phoneNotificationsEnabled.set(notificationsEnabled.isChecked());
-        preferences.phoneMessagesEnabled.set(messagesEnabled.isChecked());
-        preferences.phoneIncludeNotificationText.set(includeNotificationText.isChecked());
+        preferences.phoneNotificationsEnabled.set(notificationsRequested);
+        preferences.phoneMessagesEnabled.set(messagesRequested);
+        preferences.phoneIncludeNotificationText.set(includeTextRequested);
         preferences.phoneStatusBarItems.set(PhoneStatusBarPolicy.serializeIds(
                 selectedStatusItems, PhoneStatusBarPolicy.statusIds()));
         preferences.phoneNotificationCategoryIds.set(
@@ -1445,19 +1469,19 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 PhoneNotificationFilter.normalizeMode(notificationAppFilterMode));
         preferences.phoneNotificationAppFilterKeys.set(
                 PhoneNotificationFilter.serializeAppKeys(selectedNotificationApps));
-        preferences.phoneLowBatteryAlertEnabled.set(lowBatteryAlertEnabled.isChecked());
+        preferences.phoneLowBatteryAlertEnabled.set(lowBatteryAlertRequested);
         preferences.phoneLowBatteryAlertThreshold.set(savedLowBatteryThreshold);
         preferences.phoneLowBatteryAlertColor.set(lowBatteryAlertColor);
         if (resetLowBatteryLatch) preferences.phoneLowBatteryAlertLatched.set(false);
         if (preferences.phoneStatusBarNotificationsEnabled.get()
-                || lowBatteryAlertEnabled.isChecked()) {
+                || lowBatteryAlertRequested) {
             List<BrickType> order = BrickType.parseOrder(preferences.brickOrder.get());
             if (!order.contains(BrickType.MEDIA)) {
                 order.add(BrickType.MEDIA);
                 preferences.brickOrder.set(BrickType.serializeOrder(order));
             }
         }
-        preferences.phoneSprutPresenceEnabled.set(sprutPresenceEnabled.isChecked());
+        preferences.phoneSprutPresenceEnabled.set(sprutPresenceRequested);
         preferences.phoneSprutPresencePath.set(selectedSprutPath);
 
         WidgetService service = WidgetService.getInstance();
