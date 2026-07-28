@@ -132,6 +132,9 @@ public final class Ha1132RegressionContractTest {
         assertTrue(uninstall.contains("window.setType(windowType)"));
         assertTrue(catalog.contains("ensureDefaultSystemVisibility("));
         assertTrue(catalog.contains("app.systemApp && !isUserFacingPhone"));
+        assertTrue(catalog.contains("defaultDialer = fallbackPhonePackage(catalog)"));
+        assertTrue(catalog.contains(
+                "return !defaultDialer.isEmpty() && defaultDialer.equals(app.packageName)"));
         assertTrue(catalog.contains("preferences.launcherSystemAppsDefaultApplied.set(true)"));
     }
 

@@ -142,6 +142,9 @@ public final class LauncherAppCatalog {
                 }
             } catch (RuntimeException ignored) {
             }
+            if (defaultDialer.isEmpty()) {
+                defaultDialer = fallbackPhonePackage(catalog);
+            }
             for (App app : catalog) {
                 if (app.systemApp && !isUserFacingPhone(app, defaultDialer)) {
                     hidden.add(app.component.flattenToString());
@@ -152,15 +155,30 @@ public final class LauncherAppCatalog {
         }
     }
 
+    @NonNull
+    private static String fallbackPhonePackage(@NonNull List<App> catalog) {
+        App best = null;
+        int bestScore = 0;
+        for (App app : catalog) {
+            if (!app.systemApp) continue;
+            String packageName = app.packageName.toLowerCase(Locale.ROOT);
+            String component = app.component.getClassName().toLowerCase(Locale.ROOT);
+            String label = app.label.trim().toLowerCase(Locale.ROOT);
+            int score = label.equals("phone") || label.equals("телефон") ? 100
+                    : packageName.contains("dialer") ? 80
+                    : component.contains("dialer") ? 70
+                    : component.contains("phoneactivity") ? 60 : 0;
+            if (score > bestScore) {
+                best = app;
+                bestScore = score;
+            }
+        }
+        return best == null ? "" : best.packageName;
+    }
+
     private static boolean isUserFacingPhone(@NonNull App app,
                                              @NonNull String defaultDialer) {
-        if (!defaultDialer.isEmpty() && defaultDialer.equals(app.packageName)) return true;
-        String packageName = app.packageName.toLowerCase(Locale.ROOT);
-        String component = app.component.getClassName().toLowerCase(Locale.ROOT);
-        String label = app.label.trim().toLowerCase(Locale.ROOT);
-        return label.equals("phone") || label.equals("телефон")
-                || packageName.contains("dialer") || component.contains("dialer")
-                || component.contains("phoneactivity");
+        return !defaultDialer.isEmpty() && defaultDialer.equals(app.packageName);
     }
 
     @NonNull
