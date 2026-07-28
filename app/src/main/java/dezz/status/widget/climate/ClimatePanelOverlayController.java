@@ -137,7 +137,8 @@ public final class ClimatePanelOverlayController {
         appContext = context.getApplicationContext();
         this.preferences = preferences;
         this.statusListener = statusListener;
-        configStore = new ClimatePanelConfigStore(preferences);
+        configStore = new ClimatePanelConfigStore(
+                preferences, preferences.floatingClimateConfigJson);
         reservationController = new ScreenReservationController(appContext);
         reservationStateStore = new ScreenReservationStateStore(appContext);
         int slop = ViewConfiguration.get(appContext).getScaledTouchSlop();

@@ -34,6 +34,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+import dezz.status.widget.launcher.LauncherSettingsMigrationRegistry;
+
 public class Preferences {
     private static final String TAG = "Preferences";
     /** New large HOME surfaces must remain opt-in when an existing layout is upgraded. */
@@ -515,6 +517,12 @@ public class Preferences {
     /** Horizontal free-frame groups. Members keep their own style/action and text size. */
     public final Str launcherHorizontalGroupsJson = new Str(
             this, "launcherHorizontalGroupsJson", "");
+    /** Recoverable, immutable snapshot taken before the flat Launcher settings migration. */
+    public final Str launcherUnifiedLegacyBackupJson = new Str(
+            this, "launcherUnifiedLegacyBackupJson", "");
+    /** Idempotent schema marker for the audited launcher-settings registry. */
+    public final Int launcherUnifiedSettingsMigrationVersion = new Int(
+            this, "launcherUnifiedSettingsMigrationVersion", 0);
     public final Str launcherFavoritePackages = new Str(this, "launcherFavoritePackages", "");
     /** Per-application HOME icon/label sizes; selection and order remain in the legacy list. */
     public final Str launcherFavoriteAppsAppearanceJson = new Str(this,
@@ -589,7 +597,11 @@ public class Preferences {
     /** Cell geometry for the WYSIWYG navigation editor; migrated from launcherPanelElementsJson. */
     public final Str launcherNavigationConfigJson = new Str(this,
             "launcherNavigationConfigJson", "");
+    /** HOME climate widgets only; the floating surface was split out by HA1132. */
     public final Str launcherClimateConfigJson = new Str(this, "launcherClimateConfigJson", "");
+    /** Independent appearance/content for the floating climate surface. */
+    public final Str floatingClimateConfigJson = new Str(this,
+            "floatingClimateConfigJson", "");
     // Optional always-on climate surface. It is deliberately independent from both the HOME
     // climate panel above and the status widget service: a user may want climate controls while
     // another application occupies the main display. Defaults are opt-in and preserve every
@@ -878,6 +890,7 @@ public class Preferences {
         prefs = deviceContext.getSharedPreferences(context.getPackageName() + "_preferences", Context.MODE_PRIVATE);
         migrateLegacyPrefsIfNeeded();
         migrateUnifiedDriverPanelIfNeeded();
+        migrateUnifiedLauncherSettingsIfNeeded();
     }
 
     @NonNull
@@ -916,6 +929,51 @@ public class Preferences {
         editor.putString(driverPanelStyle.key, DriverPanelStyle.NEW.key)
                 .putBoolean("driverPanelUnifiedHa1085", true)
                 .commit();
+    }
+
+    /**
+     * HA1132 flattens only the settings/navigation model. Existing storage keys intentionally stay
+     * unchanged so geometry, style, actions, fonts, colours and media behavior survive exactly.
+     * Before marking the migration complete, store a recoverable snapshot of every affected key.
+     */
+    private void migrateUnifiedLauncherSettingsIfNeeded() {
+        int current = prefs.getInt(launcherUnifiedSettingsMigrationVersion.key, 0);
+        if (current >= LauncherSettingsMigrationRegistry.SCHEMA_VERSION) return;
+        try {
+            JSONObject root = new JSONObject();
+            root.put("version", LauncherSettingsMigrationRegistry.SCHEMA_VERSION);
+            root.put("capturedAtMillis", System.currentTimeMillis());
+            JSONObject values = new JSONObject();
+            Map<String, ?> stored = prefs.getAll();
+            for (String key : LauncherSettingsMigrationRegistry.storageKeys()) {
+                if (!stored.containsKey(key)) continue;
+                Object value = stored.get(key);
+                if (value instanceof Set) {
+                    JSONArray array = new JSONArray();
+                    for (Object item : (Set<?>) value) array.put(String.valueOf(item));
+                    values.put(key, array);
+                } else if (value != null) {
+                    values.put(key, value);
+                }
+            }
+            root.put("values", values);
+
+            SharedPreferences.Editor editor = prefs.edit();
+            if (launcherUnifiedLegacyBackupJson.get().trim().isEmpty()) {
+                editor.putString(launcherUnifiedLegacyBackupJson.key, root.toString());
+            }
+            // The old build shared one climate document between HOME and the floating panel.
+            // Copy it once, then both surfaces evolve independently.
+            if (!prefs.contains(floatingClimateConfigJson.key)) {
+                editor.putString(floatingClimateConfigJson.key,
+                        launcherClimateConfigJson.get());
+            }
+            editor.putInt(launcherUnifiedSettingsMigrationVersion.key,
+                    LauncherSettingsMigrationRegistry.SCHEMA_VERSION);
+            editor.commit();
+        } catch (JSONException error) {
+            Log.w(TAG, "Cannot snapshot legacy launcher settings", error);
+        }
     }
 
     /** Avoids a common-to-driver package dependency for the fixed new-panel minimum. */
@@ -1211,5 +1269,6 @@ public class Preferences {
         // A full backup made by HA1084 may still select the legacy driver profile and does not
         // contain HA1085's migration marker. Preserve that active profile after import too.
         migrateUnifiedDriverPanelIfNeeded();
+        migrateUnifiedLauncherSettingsIfNeeded();
     }
 }

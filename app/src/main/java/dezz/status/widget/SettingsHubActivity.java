@@ -524,10 +524,7 @@ public final class SettingsHubActivity extends AppCompatActivity {
             return;
         }
         String action = destination.action;
-        if (SettingsDestinationCatalog.ACTION_EDIT_HOME_LAYOUT.equals(action)) {
-            startActivity(new Intent(this, LauncherActivity.class)
-                    .putExtra(LauncherActivity.EXTRA_EDIT_MODE, true));
-        } else if (SettingsDestinationCatalog.ACTION_PERMISSIONS.equals(action)) {
+        if (SettingsDestinationCatalog.ACTION_PERMISSIONS.equals(action)) {
             showPermissions();
         } else if (SettingsDestinationCatalog.ACTION_EXPORT.equals(action)) {
             exportSettings();
@@ -697,31 +694,8 @@ public final class SettingsHubActivity extends AppCompatActivity {
                 return "Профили";
             case "home_behavior":
                 return isDefaultHome() ? "Выбран как HOME" : "Другой HOME";
-            case "home_layout":
-                return "Визуально";
-            case "home_panel_content":
-                return visiblePanelCount() + " пан.";
-            case "panel_apps":
-                return countLabel(new FavoriteAppsConfigStore(preferences).load().size(),
-                        "приложение");
-            case "panel_media":
-                return enabledLabel(preferences.launcherMediaVisible.get());
-            case "panel_navigation":
-            case "panel_routes":
-                return enabledLabel(preferences.launcherNavigationVisible.get()
-                        || preferences.launcherFavoriteRoutesVisible.get());
-            case "panel_climate":
-                return enabledLabel(preferences.launcherClimateVisible.get()
-                        || preferences.climatePanelEnabled.get());
-            case "panel_vehicle":
-                return enabledLabel(preferences.launcherVehicleInfoVisible.get());
-            case "panel_information":
-                if (!preferences.launcherInformationVisible.get()) return "Выключена";
-                return new InformationPanelConfigStore(preferences).load().hasEnabledItems()
-                        ? "Включена" : "Нет статусов";
-            case "panel_actions":
-                return actionsPanelSummary(preferences.launcherActionsVisible.get(),
-                        preferences.launcherShortcutsJson.get());
+            case "panel_floating_climate":
+                return enabledLabel(preferences.climatePanelEnabled.get());
             case "panel_popup":
                 return enabledLabel(preferences.popupEnabled.get());
             case "connector_ha": {

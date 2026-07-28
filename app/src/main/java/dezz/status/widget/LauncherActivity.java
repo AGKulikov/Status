@@ -137,6 +137,8 @@ import dezz.status.widget.sprut.SprutHubController;
 public final class LauncherActivity extends AppCompatActivity {
     private static final String TAG = "LauncherActivity";
     public static final String EXTRA_EDIT_MODE = "dezz.status.widget.extra.EDIT_HOME";
+    public static final String EXTRA_SHOW_WIDGET_CATALOG =
+            "dezz.status.widget.extra.SHOW_HOME_WIDGET_CATALOG";
     public static final String EXTRA_EDIT_NAVIGATION_CONTENT =
             "dezz.status.widget.extra.EDIT_NAVIGATION_CONTENT";
     public static final String EXTRA_EDIT_MEDIA_CONTENT =
@@ -398,16 +400,28 @@ public final class LauncherActivity extends AppCompatActivity {
         if (panelsInitialized) {
             workspace.post(() -> {
                 activateGlobalElements();
-                if (requestsAnyHomeEditor(intent)) setEditMode(true);
+                applyRequestedHomeEditor(intent);
             });
         }
     }
 
     private static boolean requestsAnyHomeEditor(@Nullable Intent intent) {
         return intent != null && (intent.getBooleanExtra(EXTRA_EDIT_MODE, false)
+                || intent.getBooleanExtra(EXTRA_SHOW_WIDGET_CATALOG, false)
                 || intent.getBooleanExtra(EXTRA_EDIT_MEDIA_CONTENT, false)
                 || intent.getBooleanExtra(EXTRA_EDIT_NAVIGATION_CONTENT, false)
                 || intent.getBooleanExtra(EXTRA_EDIT_ACTIONS_CONTENT, false));
+    }
+
+    /** Settings and the in-editor plus button converge on this exact catalog method. */
+    private void applyRequestedHomeEditor(@Nullable Intent intent) {
+        if (!requestsAnyHomeEditor(intent)) return;
+        setEditMode(true);
+        if (intent != null && intent.getBooleanExtra(
+                EXTRA_SHOW_WIDGET_CATALOG, false)) {
+            intent.removeExtra(EXTRA_SHOW_WIDGET_CATALOG);
+            workspace.post(this::showLauncherWidgetCatalog);
+        }
     }
 
     private void handleStagedOrHomeNavigation(@Nullable Intent intent) {
@@ -1305,6 +1319,13 @@ public final class LauncherActivity extends AppCompatActivity {
         hint.setPadding(0, 0, 0, dp(8));
         form.addView(hint);
 
+        if (hasLauncherWidgetDetailEditor(id)) {
+            MaterialButton details = widgetEditorButton(
+                    "Дополнительные настройки содержимого");
+            details.setOnClickListener(view -> openLauncherWidgetDetailEditor(id));
+            form.addView(details, widgetEditorRow());
+        }
+
         if ((LauncherLayoutStore.MEDIA + "/" + MediaPanelConfig.PROGRESS).equals(id)) {
             TextView progressSettings = text(17, Color.WHITE, true);
             progressSettings.setText("Полоса прогресса");
@@ -1524,6 +1545,46 @@ public final class LauncherActivity extends AppCompatActivity {
                             .show());
         });
         editor.show();
+    }
+
+    private boolean hasLauncherWidgetDetailEditor(@NonNull String id) {
+        return id.startsWith(LauncherLayoutStore.APPS + "/")
+                || id.startsWith(LauncherLayoutStore.ACTIONS + "/")
+                || id.startsWith(LauncherLayoutStore.MEDIA + "/")
+                || id.startsWith(LauncherLayoutStore.NAVIGATION + "/")
+                || id.startsWith(LauncherLayoutStore.CLIMATE + "/")
+                || id.startsWith(LauncherLayoutStore.VEHICLE_INFO + "/")
+                || id.startsWith(LauncherLayoutStore.INFORMATION + "/");
+    }
+
+    /**
+     * Legacy feature-rich screens survive only as contextual editors reached from a concrete
+     * widget. They are intentionally absent from the top-level flat Launcher settings catalog.
+     */
+    private void openLauncherWidgetDetailEditor(@NonNull String id) {
+        Intent details;
+        if (id.startsWith(LauncherLayoutStore.APPS + "/")) {
+            details = new Intent(this, FavoriteAppsSettingsActivity.class);
+        } else if (id.startsWith(LauncherLayoutStore.ACTIONS + "/")) {
+            details = new Intent(this, LauncherShortcutSettingsActivity.class);
+        } else if (id.startsWith(LauncherLayoutStore.MEDIA + "/")) {
+            details = new Intent(this, MediaPanelSettingsActivity.class);
+        } else if (id.startsWith(
+                LauncherLayoutStore.NAVIGATION + "/favorite_route_")) {
+            details = new Intent(this, FavoriteRoutesSettingsActivity.class);
+        } else if (id.startsWith(LauncherLayoutStore.NAVIGATION + "/")) {
+            details = new Intent(this, NavigationPanelSettingsActivity.class);
+        } else if (id.startsWith(LauncherLayoutStore.CLIMATE + "/")) {
+            details = new Intent(this, ClimatePanelSettingsActivity.class)
+                    .putExtra(ClimatePanelSettingsActivity.EXTRA_LAUNCHER_ONLY, true);
+        } else if (id.startsWith(LauncherLayoutStore.VEHICLE_INFO + "/")) {
+            details = new Intent(this, VehicleInfoPanelSettingsActivity.class);
+        } else if (id.startsWith(LauncherLayoutStore.INFORMATION + "/")) {
+            details = new Intent(this, InformationPanelSettingsActivity.class);
+        } else {
+            return;
+        }
+        startActivity(details);
     }
 
     private void saveLauncherWidgetAppearance(
@@ -2559,7 +2620,7 @@ public final class LauncherActivity extends AppCompatActivity {
         // one from its old panel-local rectangle into the shared screen coordinate space.
         workspace.post(() -> {
             activateGlobalElements();
-            if (requestsAnyHomeEditor(getIntent())) setEditMode(true);
+            applyRequestedHomeEditor(getIntent());
         });
     }
 

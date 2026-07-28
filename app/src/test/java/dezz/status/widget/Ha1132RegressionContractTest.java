@@ -81,11 +81,21 @@ public final class Ha1132RegressionContractTest {
     @Test public void launcherSettingsAreOneCanonicalGroupWithoutLegacyPanelSection()
             throws Exception {
         String catalog = source("settings/SettingsDestinationCatalog.java");
+        String settings = source("LauncherSettingsActivity.java");
+        String migration = source("launcher/LauncherSettingsMigrationRegistry.java");
         assertTrue(catalog.contains("HOME(\"home\", \"Лаунчер\""));
-        assertTrue(catalog.contains("activity(\"panel_media\", Group.HOME"));
-        assertTrue(catalog.contains("activity(\"panel_information\", Group.HOME"));
-        assertTrue(catalog.contains("activity(\"panel_actions\", Group.HOME"));
-        assertFalse(catalog.contains("activity(\"home_panel_content\""));
+        assertTrue(catalog.contains("activity(\"home_behavior\", Group.HOME"));
+        assertFalse(catalog.contains("activity(\"panel_media\", Group.HOME"));
+        assertFalse(catalog.contains("activity(\"panel_information\", Group.HOME"));
+        assertFalse(catalog.contains("activity(\"panel_actions\", Group.HOME"));
+        assertTrue(catalog.contains("activity(\"panel_floating_climate\", Group.PANELS"));
+        assertTrue(settings.contains("EXTRA_SHOW_WIDGET_CATALOG"));
+        assertTrue(settings.contains("launcherMediaAutoResumeEnabled"));
+        assertTrue(settings.contains("launcherAllAppsColumns"));
+        assertTrue(migration.contains("SCHEMA_VERSION = 1"));
+        assertTrue(migration.contains("\"panel_media\""));
+        assertTrue(migration.contains("\"panel_climate\""));
+        assertFalse(migration.contains("\"climatePanelEnabled\""));
     }
 
     @Test public void hudRowsAreGeometryContainersWithoutImplicitSurfaceOrTextScaling()
