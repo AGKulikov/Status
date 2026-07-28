@@ -29,9 +29,13 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
+import dezz.status.widget.launcher.LauncherAppCatalog;
+import dezz.status.widget.launcher.MediaPlaybackTargetPolicy;
 import dezz.status.widget.launcher.media.MediaPanelConfig;
 import dezz.status.widget.launcher.media.MediaPanelConfigStore;
 import dezz.status.widget.launcher.media.MediaPanelView;
@@ -121,23 +125,56 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
                         .putExtra(LauncherActivity.EXTRA_EDIT_MEDIA_CONTENT, true)));
 
         addTitle(settings, "После загрузки магнитолы");
+        MediaPlaybackHistoryStore.Snapshot playbackHistory =
+                MediaPlaybackHistoryStore.read(this);
+        String fixedPackage = preferences.launcherMediaFixedPlayerPackage.get().trim();
+        MaterialSwitch fixedPlayer = new MaterialSwitch(this);
+        fixedPlayer.setText("Всегда управлять выбранным плеером");
+        fixedPlayer.setTextSize(16);
+        fixedPlayer.setMinHeight(dp(50));
+        fixedPlayer.setChecked(preferences.launcherMediaFixedPlayerEnabled.get()
+                && !fixedPackage.isEmpty());
+        fixedPlayer.setOnCheckedChangeListener((button, checked) -> {
+            String selected = preferences.launcherMediaFixedPlayerPackage.get().trim();
+            if (checked && selected.isEmpty()) {
+                preferences.launcherMediaFixedPlayerEnabled.set(false);
+                button.setChecked(false);
+                showMediaPlayerPicker();
+                return;
+            }
+            preferences.launcherMediaFixedPlayerEnabled.set(checked);
+        });
+        settings.addView(fixedPlayer, new LinearLayout.LayoutParams(match(), wrap()));
+        String selectedPlayer = fixedPackage.isEmpty()
+                ? "не выбран"
+                : applicationLabel(fixedPackage) + " · " + fixedPackage;
+        addButton(settings, "Выбрать плеер · " + selectedPlayer,
+                view -> showMediaPlayerPicker());
+        String effectiveTarget = MediaPlaybackTargetPolicy.resolve(
+                preferences.launcherMediaFixedPlayerEnabled.get(),
+                fixedPackage, playbackHistory.packageName);
+        addHint(settings, "Все кнопки — включая ручной PLAY — отправляются только пакету "
+                + (effectiveTarget.isEmpty()
+                ? "последнего обнаруженного Android-плеера"
+                : applicationLabel(effectiveTarget))
+                + ". Общая Bluetooth-команда больше не используется.");
+
         MaterialSwitch autoResume = new MaterialSwitch(this);
-        autoResume.setText("Продолжать музыку из последнего плеера");
+        autoResume.setText("Автоматически продолжать музыку после загрузки");
         autoResume.setTextSize(16);
         autoResume.setMinHeight(dp(50));
         autoResume.setChecked(preferences.launcherMediaAutoResumeEnabled.get());
         autoResume.setOnCheckedChangeListener((button, checked) ->
                 preferences.launcherMediaAutoResumeEnabled.set(checked));
         settings.addView(autoResume, new LinearLayout.LayoutParams(match(), wrap()));
-        MediaPlaybackHistoryStore.Snapshot playbackHistory =
-                MediaPlaybackHistoryStore.read(this);
         String remembered = playbackHistory.packageName.isEmpty()
                 ? "пока не определён"
                 : applicationLabel(playbackHistory.packageName) + " · "
                 + (playbackHistory.wasPlaying ? "играл" : "был на паузе");
-        addHint(settings, "Последний плеер: " + remembered + ". После загрузки отправляется "
-                + "безопасная команда PLAY именно этому приложению и только если перед "
-                + "выключением оно играло. Тот же трек и очередь восстанавливает сам плеер.");
+        addHint(settings, "Последний плеер: " + remembered + ". В обычном режиме после "
+                + "загрузки PLAY отправляется ему, только если он играл перед выключением. "
+                + "В режиме фиксированного плеера PLAY всегда адресуется выбранному приложению. "
+                + "Тот же трек и очередь восстанавливает сам плеер.");
         addSlider(settings, "Задержка команды",
                 Math.max(0, Math.min(60,
                         preferences.launcherMediaAutoResumeDelaySeconds.get())),
@@ -146,9 +183,9 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
                 value -> value + " с");
 
         addTitle(settings, "Сетка");
-        addHint(settings, "Число столбцов и строк задаёт размер ячейки внутри фактического "
-                + "размера блока. Если выбранная сетка не вмещает включённые элементы, "
-                + "приложение сохранит последний корректный размер.");
+        addHint(settings, "Число столбцов и строк задаёт точность свободных фреймов. "
+                + "Элементы можно накладывать друг на друга: занятость сетки больше не "
+                + "ограничивает перемещение и масштабирование.");
         addGridSlider(settings, "Столбцы", config.gridColumns,
                 MediaPanelConfig.MIN_GRID_COLUMNS, MediaPanelConfig.MAX_GRID_COLUMNS,
                 selected -> {
@@ -173,18 +210,13 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         settings.addView(elementList, new LinearLayout.LayoutParams(match(), wrap()));
         rebuildElementControls();
 
-        addTitle(settings, "Блок");
+        addTitle(settings, "Геометрия и цвета");
+        addHint(settings, "У медиавиджетов нет автоматических подложек и рамок. При "
+                + "необходимости добавьте отдельную подложку в режиме компоновки HOME.");
         addSlider(settings, "Расстояние между элементами", config.spacingPx, 0, 48,
                 value -> config.spacingPx = value, value -> value + " px");
         addSlider(settings, "Внутренний отступ", config.contentPaddingPx, 0, 64,
                 value -> config.contentPaddingPx = value, value -> value + " px");
-        addSlider(settings, "Скругление", config.cornerRadiusPx, 0, 96,
-                value -> config.cornerRadiusPx = value, value -> value + " px");
-        addSlider(settings, "Непрозрачность фона", config.backgroundAlpha, 0, 255,
-                value -> config.backgroundAlpha = value,
-                value -> Math.round(value * 100f / 255f) + "%");
-        addColor(settings, "Цвет фона", () -> config.backgroundColor,
-                value -> config.backgroundColor = value);
         addColor(settings, "Название", () -> config.titleColor,
                 value -> config.titleColor = value);
         addColor(settings, "Исполнитель, альбом, время и приложение",
@@ -192,20 +224,8 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
                 value -> config.secondaryColor = value);
         addColor(settings, "Кнопки", () -> config.controlColor,
                 value -> config.controlColor = value);
-        addSlider(settings, "Стекло кнопок", config.glassAlpha, 0, 160,
-                value -> config.glassAlpha = value,
-                value -> Math.round(value * 100f / 255f) + "%");
-        addSlider(settings, "Прозрачность тонкой рамки", config.outlineAlpha, 0, 160,
-                value -> config.outlineAlpha = value,
-                value -> Math.round(value * 100f / 255f) + "%");
-        addSlider(settings, "Толщина тонкой рамки", config.outlineWidthPx, 0, 8,
-                value -> config.outlineWidthPx = value, value -> value + " px");
-        addColor(settings, "Цвет стекла", () -> config.glassColor,
-                value -> config.glassColor = value);
         addColor(settings, "Акцент активной кнопки", () -> config.accentColor,
                 value -> config.accentColor = value);
-        addColor(settings, "Тонкая рамка", () -> config.outlineColor,
-                value -> config.outlineColor = value);
 
         addButton(settings, "Вернуть медиаблок по умолчанию", v ->
                 new AlertDialog.Builder(this)
@@ -450,7 +470,7 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
                 persistAndPreview();
                 if (actual != selected) {
                     seek.setProgress(actual - minimum);
-                    value.setText(actual + " · нет места");
+                    value.setText(actual + " · предел");
                 } else {
                     value.setText(String.valueOf(actual));
                 }
@@ -533,6 +553,47 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(match(), dp(62));
         lp.topMargin = dp(6);
         parent.addView(button, lp);
+    }
+
+    private void showMediaPlayerPicker() {
+        LinkedHashMap<String, LauncherAppCatalog.App> byPackage = new LinkedHashMap<>();
+        for (LauncherAppCatalog.App app : LauncherAppCatalog.loadIncludingSystem(this)) {
+            if (getPackageName().equals(app.packageName)) continue;
+            byPackage.putIfAbsent(app.packageName, app);
+        }
+        List<LauncherAppCatalog.App> choices = new ArrayList<>(byPackage.values());
+        if (choices.isEmpty()) {
+            Toast.makeText(this, "Не найдено приложений для выбора",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        CharSequence[] labels = new CharSequence[choices.size()];
+        String current = preferences.launcherMediaFixedPlayerPackage.get().trim();
+        int checked = -1;
+        for (int index = 0; index < choices.size(); index++) {
+            LauncherAppCatalog.App app = choices.get(index);
+            labels[index] = app.label + "\n" + app.packageName;
+            if (current.equals(app.packageName)) checked = index;
+        }
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Музыкальный плеер")
+                .setSingleChoiceItems(labels, checked, null)
+                .setNeutralButton("Последний плеер", (value, which) -> {
+                    preferences.launcherMediaFixedPlayerEnabled.set(false);
+                    preferences.launcherMediaFixedPlayerPackage.set("");
+                    recreate();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        dialog.setOnShowListener(ignored ->
+                dialog.getListView().setOnItemClickListener((parent, view, position, id) -> {
+                    LauncherAppCatalog.App app = choices.get(position);
+                    preferences.launcherMediaFixedPlayerPackage.set(app.packageName);
+                    preferences.launcherMediaFixedPlayerEnabled.set(true);
+                    dialog.dismiss();
+                    recreate();
+                }));
+        dialog.show();
     }
 
     @NonNull

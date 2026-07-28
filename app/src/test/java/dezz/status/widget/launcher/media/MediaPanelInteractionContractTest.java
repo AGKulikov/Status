@@ -13,10 +13,11 @@ import java.nio.file.Paths;
 
 /** Guards the touch split: surface opens the player, child controls keep their own actions. */
 public final class MediaPanelInteractionContractTest {
-    @Test public void panelSurfaceOpensYandexMusic() throws IOException {
+    @Test public void panelSurfaceOpensTheSelectedOrRememberedPlayer() throws IOException {
         String source = source("dezz/status/widget/launcher/media/MediaPanelView.java");
         assertTrue(source.contains("setOnClickListener(view ->"));
-        assertTrue(source.contains("MediaAppLauncher.launchYandexMusic(getContext())"));
+        assertTrue(source.contains("controls.openPlayer()"));
+        assertFalse(source.contains("MediaAppLauncher.launchYandexMusic(getContext())"));
     }
 
     @Test public void mediaButtonsHaveTransparentBackgroundAndConsumeClick() throws IOException {
@@ -46,6 +47,19 @@ public final class MediaPanelInteractionContractTest {
         assertTrue(source.contains("manager.setStreamVolume(AudioManager.STREAM_MUSIC"));
         assertTrue(source.contains("android.media.VOLUME_CHANGED_ACTION"));
         assertTrue(source.contains("syncSystemVolume()"));
+        assertTrue(source.contains("class ResponsiveVolumeBar extends View"));
+        assertTrue(source.contains("height * .28f"));
+        assertTrue(source.contains("height * .34f"));
+    }
+
+    @Test public void progressAndVolumeFillTheirResizableFramesWithoutImplicitSurfaces()
+            throws IOException {
+        String source = source("dezz/status/widget/launcher/media/MediaPanelView.java");
+        assertTrue(source.contains("class ResponsiveProgressBar extends View"));
+        assertTrue(source.contains("ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f"));
+        assertTrue(source.contains("setBackground(null)"));
+        assertTrue(source.contains("A launcher widget is only content plus its free geometry"));
+        assertFalse(source.contains("root.setBackground(glassBackground("));
     }
 
     @Test public void everySnapshotReappliesTrackArtworkAndPlayback() throws IOException {

@@ -2732,6 +2732,9 @@ public final class LauncherActivity extends AppCompatActivity {
                     @Override public void next() {
                         if (mediaController != null) mediaController.next();
                     }
+                    @Override public boolean openPlayer() {
+                        return mediaController != null && mediaController.openTargetPlayer();
+                    }
                 });
         return mediaPanel;
     }

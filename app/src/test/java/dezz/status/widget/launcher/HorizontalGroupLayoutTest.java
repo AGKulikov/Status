@@ -37,7 +37,7 @@ public final class HorizontalGroupLayoutTest {
 
         assertEquals(3, result.size());
         assertEquals(5, result.get(0).x);
-        assertEquals(result.get(0).width + 5, result.get(1).x);
+        assertEquals(result.get(0).x + result.get(0).width + 5, result.get(1).x);
         assertEquals(result.get(1).x + result.get(1).width + 5, result.get(2).x);
         assertEquals(300, result.get(2).x + result.get(2).width);
         assertEquals(4, result.get(0).y);

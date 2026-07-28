@@ -21,7 +21,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
-import android.view.KeyEvent;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -31,6 +30,8 @@ import java.util.Collections;
 import java.util.List;
 
 import dezz.status.widget.MediaNotificationListener;
+import dezz.status.widget.Preferences;
+import dezz.status.widget.launcher.media.MediaAppLauncher;
 
 /**
  * Chooses the active Android media session and augments it with the media broadcast used by
@@ -156,6 +157,7 @@ public final class LauncherMediaController {
     }
 
     private final Context context;
+    private final Preferences preferences;
     private final MediaSessionManager manager;
     private final AudioManager audioManager;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -264,7 +266,9 @@ public final class LauncherMediaController {
     };
 
     public LauncherMediaController(@NonNull Context context, @NonNull Listener listener) {
-        this.context = context.getApplicationContext();
+        Context app = context.getApplicationContext();
+        this.context = app == null ? context : app;
+        preferences = new Preferences(this.context);
         this.listener = listener;
         manager = (MediaSessionManager) context.getSystemService(Context.MEDIA_SESSION_SERVICE);
         audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
@@ -327,53 +331,32 @@ public final class LauncherMediaController {
     }
 
     public void playPause() {
-        MediaController controller = current;
-        if (controller == null) {
-            dispatchMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE);
-            scheduleCommandReconcile();
-            return;
-        }
-        try {
-            PlaybackState state = controller.getPlaybackState();
-            if (state != null && state.getState() == PlaybackState.STATE_PLAYING) {
-                controller.getTransportControls().pause();
-            } else {
-                controller.getTransportControls().play();
-            }
-        } catch (RuntimeException ignored) {
-            dispatchMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE);
-        }
+        String target = commandTargetPackage();
+        if (target.isEmpty()) return;
+        MediaResumeCommand.playPause(context, target);
         scheduleCommandReconcile();
     }
 
     public void previous() {
-        MediaController controller = current;
-        if (controller == null) {
-            dispatchMediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS);
-            scheduleCommandReconcile();
-            return;
-        }
-        try {
-            controller.getTransportControls().skipToPrevious();
-        } catch (RuntimeException ignored) {
-            dispatchMediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS);
-        }
+        String target = commandTargetPackage();
+        if (target.isEmpty()) return;
+        MediaResumeCommand.previous(context, target);
         scheduleCommandReconcile();
     }
 
     public void next() {
-        MediaController controller = current;
-        if (controller == null) {
-            dispatchMediaKey(KeyEvent.KEYCODE_MEDIA_NEXT);
-            scheduleCommandReconcile();
-            return;
-        }
-        try {
-            controller.getTransportControls().skipToNext();
-        } catch (RuntimeException ignored) {
-            dispatchMediaKey(KeyEvent.KEYCODE_MEDIA_NEXT);
-        }
+        String target = commandTargetPackage();
+        if (target.isEmpty()) return;
+        MediaResumeCommand.next(context, target);
         scheduleCommandReconcile();
+    }
+
+    /** Opens the same player that owns HOME transport commands. */
+    public boolean openTargetPlayer() {
+        String target = commandTargetPackage();
+        return target.isEmpty()
+                ? MediaAppLauncher.launchYandexMusic(context)
+                : MediaAppLauncher.launchPackage(context, target);
     }
 
     private void scheduleCommandReconcile() {
@@ -382,17 +365,6 @@ public final class LauncherMediaController {
         mainHandler.postDelayed(commandReconcile, COMMAND_RECONCILE_FAST_MS);
         mainHandler.postDelayed(commandReconcile, COMMAND_RECONCILE_SETTLED_MS);
         mainHandler.postDelayed(commandReconcile, COMMAND_RECONCILE_FINAL_MS);
-    }
-
-    private void dispatchMediaKey(int keyCode) {
-        if (audioManager == null) return;
-        try {
-            long now = SystemClock.uptimeMillis();
-            audioManager.dispatchMediaKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN,
-                    keyCode, 0));
-            audioManager.dispatchMediaKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_UP,
-                    keyCode, 0));
-        } catch (RuntimeException ignored) {}
     }
 
     private void registerBroadcastReceiver() {
@@ -676,8 +648,11 @@ public final class LauncherMediaController {
     private void select(@NonNull List<MediaController> controllers) {
         MediaController first = null;
         MediaController firstPlaying = null;
+        MediaController target = null;
+        MediaController targetPlaying = null;
         MediaController retained = null;
         boolean retainedPlaying = false;
+        String targetPackage = commandTargetPackage();
         try {
             for (MediaController candidate : controllers) {
                 if (candidate == null) continue;
@@ -691,6 +666,11 @@ public final class LauncherMediaController {
                 boolean playing = playback != null
                         && playback.getState() == PlaybackState.STATE_PLAYING;
                 if (playing && firstPlaying == null) firstPlaying = candidate;
+                if (!targetPackage.isEmpty()
+                        && targetPackage.equals(controllerPackage(candidate))) {
+                    if (target == null) target = candidate;
+                    if (playing && targetPlaying == null) targetPlaying = candidate;
+                }
                 if (sameSession(current, candidate)) {
                     retained = candidate;
                     retainedPlaying = playing;
@@ -701,10 +681,41 @@ public final class LauncherMediaController {
         }
         boolean keepCurrent = MediaStateFreshness.shouldKeepCurrentSession(
                 retained != null, retainedPlaying, firstPlaying != null);
-        MediaController selected = keepCurrent ? retained
-                : firstPlaying != null ? firstPlaying : first;
+        MediaController selected;
+        if (targetPlaying != null || target != null) {
+            selected = targetPlaying != null ? targetPlaying : target;
+        } else if (preferences.launcherMediaFixedPlayerEnabled.get()
+                && !targetPackage.isEmpty()) {
+            // Do not let an unrelated Bluetooth/radio session replace the fixed Android player
+            // merely because the selected app has not restored its MediaSession yet.
+            selected = null;
+        } else {
+            selected = keepCurrent ? retained : firstPlaying != null ? firstPlaying : first;
+        }
         replace(selected);
         publishSession();
+    }
+
+    @NonNull
+    private String commandTargetPackage() {
+        MediaPlaybackHistoryStore.Snapshot history = MediaPlaybackHistoryStore.read(context);
+        String target = MediaPlaybackTargetPolicy.resolve(
+                preferences.launcherMediaFixedPlayerEnabled.get(),
+                preferences.launcherMediaFixedPlayerPackage.get(),
+                history.packageName);
+        if (!target.isEmpty()) return target;
+        return controllerPackage(current);
+    }
+
+    @NonNull
+    private static String controllerPackage(@Nullable MediaController controller) {
+        if (controller == null) return "";
+        try {
+            String packageName = controller.getPackageName();
+            return packageName == null ? "" : packageName.trim();
+        } catch (RuntimeException ignored) {
+            return "";
+        }
     }
 
     private void replace(@Nullable MediaController next) {

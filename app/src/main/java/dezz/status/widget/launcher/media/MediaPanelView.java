@@ -9,10 +9,11 @@ import android.content.Context;
 import android.content.BroadcastReceiver;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.res.ColorStateList;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
 import android.os.Build;
 import android.os.Handler;
@@ -27,8 +28,6 @@ import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
-import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -55,12 +54,17 @@ public final class MediaPanelView extends FrameLayout {
         void previous();
         void playPause();
         void next();
+        boolean openPlayer();
     }
 
     /** Direct manipulation callback used only by the settings preview. */
     public interface LayoutEditor {
         void onLayoutChanged(@NonNull MediaPanelConfig value, @NonNull String movedId,
                              boolean finished);
+    }
+
+    private interface VolumeChangeListener {
+        void onProgressChanged(int value, boolean fromUser);
     }
 
     private final MediaPanelConfigStore store;
@@ -86,9 +90,9 @@ public final class MediaPanelView extends FrameLayout {
     private MarqueeOutlineTextView artist;
     private MarqueeOutlineTextView album;
     private TextView application;
-    private ProgressBar progress;
+    private ResponsiveProgressBar progress;
     private TextView timeline;
-    private SeekBar volume;
+    private ResponsiveVolumeBar volume;
     private TextView volumeLabel;
     private ImageButton playPause;
     @Nullable private android.graphics.Bitmap artworkBitmap;
@@ -310,23 +314,21 @@ public final class MediaPanelView extends FrameLayout {
         LinearLayout root = new LinearLayout(getContext());
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER_VERTICAL);
-        root.setPadding(dp(10), dp(4), dp(10), dp(7));
-        root.setBackground(glassBackground(false, Math.max(dp(10), config.cornerRadiusPx / 2)));
+        root.setPadding(0, 0, 0, 0);
+        root.setBackground(null);
         timeline = text(scaleSp(13, scalePercent), color(config.secondaryColor, Color.LTGRAY),
                 false);
         timeline.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.CENTER_VERTICAL);
         timeline.setContentDescription("Позиция и длительность трека");
         root.addView(timeline, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-        progress = new ProgressBar(getContext(), null, android.R.attr.progressBarStyleHorizontal);
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        progress = new ResponsiveProgressBar(getContext(),
+                color(config.controlColor, Color.WHITE),
+                withAlpha(color(config.secondaryColor, Color.LTGRAY), 95));
         progress.setMax(1_000);
-        progress.setProgressTintList(ColorStateList.valueOf(
-                color(config.controlColor, Color.WHITE)));
-        progress.setProgressBackgroundTintList(ColorStateList.valueOf(
-                withAlpha(color(config.secondaryColor, Color.LTGRAY), 95)));
+        progress.setMinimumHeight(dp(Math.max(2, Math.min(40, progressBarHeightDp))));
         root.addView(progress, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(Math.max(2, Math.min(40, progressBarHeightDp)))));
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         return root;
     }
 
@@ -335,35 +337,32 @@ public final class MediaPanelView extends FrameLayout {
         LinearLayout root = new LinearLayout(getContext());
         root.setGravity(Gravity.CENTER_VERTICAL);
         root.setContentDescription("Громкость музыки");
-        root.setPadding(dp(8), 0, dp(8), 0);
-        root.setBackground(glassBackground(false, Math.max(dp(10), config.cornerRadiusPx / 2)));
+        root.setPadding(0, 0, 0, 0);
+        root.setBackground(null);
         ImageView icon = new ImageView(getContext());
         icon.setImageResource(R.drawable.ic_media_volume);
         icon.setColorFilter(color(config.controlColor, Color.WHITE));
-        int iconSize = Math.max(dp(22), dp(30) * scalePercent / 100);
-        root.addView(icon, new LinearLayout.LayoutParams(iconSize, iconSize));
-        volume = new SeekBar(getContext());
+        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        root.addView(icon, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.MATCH_PARENT, .18f));
+        volume = new ResponsiveVolumeBar(getContext(),
+                color(config.controlColor, Color.WHITE),
+                withAlpha(color(config.secondaryColor, Color.LTGRAY), 95));
         volume.setMax(100);
         volume.setEnabled(controls != null && layoutEditor == null);
-        volume.setProgressTintList(ColorStateList.valueOf(color(config.controlColor, Color.WHITE)));
-        volume.setThumbTintList(ColorStateList.valueOf(color(config.controlColor, Color.WHITE)));
-        volume.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar bar, int value, boolean fromUser) {
-                if (volumeLabel != null) setTextIfChanged(volumeLabel, value + "%");
-                if (fromUser && controls != null && layoutEditor == null) setSystemVolume(value);
-            }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        volume.setOnProgressChanged((value, fromUser) -> {
+            if (volumeLabel != null) setTextIfChanged(volumeLabel, value + "%");
+            if (fromUser && controls != null && layoutEditor == null) setSystemVolume(value);
         });
         LinearLayout.LayoutParams seekLp = new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.MATCH_PARENT, 1f);
-        seekLp.leftMargin = dp(4);
         root.addView(volume, seekLp);
         volumeLabel = text(scaleSp(13, scalePercent),
                 color(config.secondaryColor, Color.LTGRAY), false);
         volumeLabel.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        volumeLabel.setMinWidth(dp(46));
         root.addView(volumeLabel, new LinearLayout.LayoutParams(
-                Math.max(dp(46), dp(58) * scalePercent / 100),
+                ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
         return root;
     }
@@ -419,8 +418,8 @@ public final class MediaPanelView extends FrameLayout {
         }
         setClickable(true);
         setOnClickListener(view -> {
-            if (!MediaAppLauncher.launchYandexMusic(getContext())) {
-                Toast.makeText(getContext(), "Яндекс Музыка не найдена",
+            if (!controls.openPlayer()) {
+                Toast.makeText(getContext(), "Выбранный музыкальный плеер не найден",
                         Toast.LENGTH_SHORT).show();
             }
         });
@@ -441,7 +440,7 @@ public final class MediaPanelView extends FrameLayout {
         value.setTextColor(textColor);
         value.setSingleLine(true);
         value.setEllipsize(TextUtils.TruncateAt.END);
-        value.setPadding(dp(6), 0, dp(6), 0);
+        value.setPadding(0, 0, 0, 0);
         if (bold) value.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         return value;
     }
@@ -564,9 +563,7 @@ public final class MediaPanelView extends FrameLayout {
             renderedArtworkBitmap = null;
             renderedArtworkOwned = false;
         } else {
-            if (!hadArtwork) {
-                artwork.setBackground(glassBackground(false, config.cornerRadiusPx / 2));
-            }
+            if (!hadArtwork) artwork.setBackground(null);
             android.graphics.Bitmap displayBitmap = copyArtworkForDisplay(artworkBitmap);
             if (displayBitmap == null) {
                 // Allocation can fail on very large or vendor hardware-backed bitmaps. In that
@@ -692,30 +689,9 @@ public final class MediaPanelView extends FrameLayout {
     }
 
     private void applySurface() {
-        int base = color(config.backgroundColor, Color.rgb(18, 25, 35));
-        GradientDrawable background = new GradientDrawable();
-        background.setColor(Color.argb(config.backgroundAlpha, Color.red(base),
-                Color.green(base), Color.blue(base)));
-        background.setCornerRadius(config.cornerRadiusPx);
-        int outline = color(config.outlineColor, Color.WHITE);
-        background.setStroke(config.outlineWidthPx, Color.argb(config.outlineAlpha,
-                Color.red(outline), Color.green(outline), Color.blue(outline)));
-        setBackground(background);
-    }
-
-    @NonNull
-    private GradientDrawable glassBackground(boolean active, int radius) {
-        int source = color(active ? config.accentColor : config.glassColor,
-                active ? Color.rgb(134, 183, 255) : Color.WHITE);
-        GradientDrawable value = new GradientDrawable();
-        int alpha = active ? Math.max(92, config.glassAlpha * 3) : config.glassAlpha;
-        value.setColor(Color.argb(Math.min(220, alpha), Color.red(source), Color.green(source),
-                Color.blue(source)));
-        int outline = color(config.outlineColor, Color.WHITE);
-        value.setStroke(config.outlineWidthPx, Color.argb(config.outlineAlpha,
-                Color.red(outline), Color.green(outline), Color.blue(outline)));
-        value.setCornerRadius(Math.max(0, radius));
-        return value;
+        // A launcher widget is only content plus its free geometry. Decorative surfaces are
+        // independent BACKDROP elements and therefore never appear implicitly behind media.
+        setBackground(null);
     }
 
     private void attachEditorDrag(@NonNull View child, @NonNull String id) {
@@ -843,6 +819,164 @@ public final class MediaPanelView extends FrameLayout {
             view.setLayoutParams(lp);
         }
         grid.requestLayout();
+    }
+
+    /**
+     * A real responsive progress bar. Android's stock horizontal ProgressBar keeps a fixed
+     * intrinsic track height even when its frame is stretched, which made the resize handles look
+     * broken. This drawable uses the full frame assigned below the independently sized text.
+     */
+    private final class ResponsiveProgressBar extends View {
+        private final Paint backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint progressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF bounds = new RectF();
+        private int maximum = 100;
+        private int value;
+
+        ResponsiveProgressBar(@NonNull Context context, int progressColor, int backgroundColor) {
+            super(context);
+            progressPaint.setColor(progressColor);
+            backgroundPaint.setColor(backgroundColor);
+        }
+
+        void setMax(int maximum) {
+            this.maximum = Math.max(1, maximum);
+            setProgress(value);
+        }
+
+        void setProgress(int progress) {
+            int next = Math.max(0, Math.min(maximum, progress));
+            if (value == next) return;
+            value = next;
+            invalidate();
+        }
+
+        int getProgress() {
+            return value;
+        }
+
+        @Override protected void onDraw(@NonNull Canvas canvas) {
+            super.onDraw(canvas);
+            float width = getWidth();
+            float height = getHeight();
+            if (width <= 0f || height <= 0f) return;
+            float radius = height / 2f;
+            bounds.set(0f, 0f, width, height);
+            canvas.drawRoundRect(bounds, radius, radius, backgroundPaint);
+            float progressWidth = width * value / Math.max(1f, maximum);
+            if (progressWidth <= 0f) return;
+            bounds.set(0f, 0f, Math.max(Math.min(width, progressWidth), height), height);
+            canvas.save();
+            canvas.clipRect(0f, 0f, progressWidth, height);
+            canvas.drawRoundRect(bounds, radius, radius, progressPaint);
+            canvas.restore();
+        }
+    }
+
+    /** Touch-capable volume track whose visual height follows its free frame. */
+    private final class ResponsiveVolumeBar extends View {
+        private final Paint backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint progressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF bounds = new RectF();
+        private int maximum = 100;
+        private int value;
+        @Nullable private VolumeChangeListener listener;
+
+        ResponsiveVolumeBar(@NonNull Context context, int progressColor, int backgroundColor) {
+            super(context);
+            progressPaint.setColor(progressColor);
+            backgroundPaint.setColor(backgroundColor);
+            setClickable(true);
+            setFocusable(true);
+        }
+
+        void setMax(int maximum) {
+            this.maximum = Math.max(1, maximum);
+            setProgress(value);
+        }
+
+        void setProgress(int progress) {
+            setProgress(progress, false);
+        }
+
+        int getProgress() {
+            return value;
+        }
+
+        void setOnProgressChanged(@Nullable VolumeChangeListener listener) {
+            this.listener = listener;
+        }
+
+        private void setProgress(int progress, boolean fromUser) {
+            int next = Math.max(0, Math.min(maximum, progress));
+            if (value == next) return;
+            value = next;
+            invalidate();
+            VolumeChangeListener callback = listener;
+            if (callback != null) callback.onProgressChanged(value, fromUser);
+        }
+
+        @Override protected void onDraw(@NonNull Canvas canvas) {
+            super.onDraw(canvas);
+            float width = getWidth();
+            float height = getHeight();
+            if (width <= 0f || height <= 0f) return;
+            float thumbRadius = Math.max(dp(4), height * .34f);
+            thumbRadius = Math.min(thumbRadius, Math.min(height / 2f, width / 2f));
+            float left = thumbRadius;
+            float right = Math.max(left, width - thumbRadius);
+            float centerY = height / 2f;
+            float trackHeight = Math.max(dp(3), height * .28f);
+            trackHeight = Math.min(trackHeight, height);
+            float trackRadius = trackHeight / 2f;
+            bounds.set(left, centerY - trackHeight / 2f,
+                    right, centerY + trackHeight / 2f);
+            canvas.drawRoundRect(bounds, trackRadius, trackRadius, backgroundPaint);
+            float x = left + (right - left) * value / Math.max(1f, maximum);
+            bounds.right = x;
+            canvas.drawRoundRect(bounds, trackRadius, trackRadius, progressPaint);
+            canvas.drawCircle(x, centerY, thumbRadius, progressPaint);
+        }
+
+        @Override public boolean onTouchEvent(@NonNull MotionEvent event) {
+            if (!isEnabled()) return false;
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    setPressed(true);
+                    if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
+                    updateFromTouch(event.getX());
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    updateFromTouch(event.getX());
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    updateFromTouch(event.getX());
+                    setPressed(false);
+                    if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(false);
+                    performClick();
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    setPressed(false);
+                    if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(false);
+                    return true;
+                default:
+                    return super.onTouchEvent(event);
+            }
+        }
+
+        private void updateFromTouch(float x) {
+            float thumbRadius = Math.max(dp(4), getHeight() * .34f);
+            thumbRadius = Math.min(thumbRadius,
+                    Math.min(getHeight() / 2f, getWidth() / 2f));
+            float available = Math.max(1f, getWidth() - thumbRadius * 2f);
+            float fraction = Math.max(0f, Math.min(1f, (x - thumbRadius) / available));
+            setProgress(Math.round(fraction * maximum), true);
+        }
+
+        @Override public boolean performClick() {
+            super.performClick();
+            return true;
+        }
     }
 
     private static int color(String value, int fallback) {

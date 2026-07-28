@@ -33,7 +33,8 @@ public final class LauncherGlobalElementContractTest {
         assertTrue(activity.contains("showLauncherWidgetCatalog"));
         assertTrue(activity.contains("frame.setOnClickListener"));
         assertTrue(activity.contains(".setNegativeButton(\"Удалить\""));
-        assertTrue(activity.contains("Вернуть удалённый виджет"));
+        assertTrue(activity.contains("showRemovedLauncherWidgets"));
+        assertTrue(activity.contains("Вернуть виджет"));
         assertTrue(activity.contains("updated.setProgressBarHeightDp(value)"));
         assertTrue(activity.contains("Новая кнопка приложения или действие"));
         assertTrue(activity.contains("updated.setEnabled(available.get(which).id, true)"));

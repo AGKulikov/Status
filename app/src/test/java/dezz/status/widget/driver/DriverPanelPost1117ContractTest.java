@@ -61,7 +61,8 @@ public final class DriverPanelPost1117ContractTest {
         assertTrue(overlay.contains("allAppsOverlayParams("));
         assertTrue(overlay.contains("drawerParams.leftMargin = drawerLeft"));
         assertTrue(overlay.contains("screenWidth, screenWidth, false"));
-        assertTrue(catalog.contains("if (hidden.isEmpty()) return loadIncludingSystem(context)"));
+        assertTrue(catalog.contains("ensureDefaultSystemVisibility(context, preferences, catalog)"));
+        assertTrue(catalog.contains("if (app.systemApp && !isUserFacingPhone"));
         assertTrue(catalog.contains("for (App app : loadIncludingSystem(context))"));
         assertTrue(catalog.contains("InstalledAppCatalog.load(context)"));
         assertTrue(catalog.contains("installed.launchable()"));

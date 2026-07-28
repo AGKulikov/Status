@@ -29,9 +29,12 @@ public final class MediaAutoResumeContractTest {
                 "\"launcherMediaAutoResumeEnabled\", false"));
         assertTrue(controller.contains(
                 "if (!preferences.launcherMediaAutoResumeEnabled.get())"));
-        assertTrue(controller.contains("private static final int MAX_ATTEMPTS = 3"));
+        assertTrue(controller.contains("private static final int MAX_ATTEMPTS = 6"));
         assertTrue(controller.contains("KEY_TARGET_PACKAGE"));
         assertTrue(controller.contains("KEY_BOOT_TOKEN"));
+        assertTrue(controller.contains("MediaPlaybackTargetPolicy.shouldAutoResume("));
+        assertTrue(preferences.contains("\"launcherMediaFixedPlayerEnabled\", false"));
+        assertTrue(preferences.contains("\"launcherMediaFixedPlayerPackage\", \"\""));
         assertTrue(boot.contains(
                 "if (!Intent.ACTION_MY_PACKAGE_REPLACED.equals(action))"));
         assertTrue(boot.contains("MediaAutoResumeController.scheduleAfterBoot(context)"));
@@ -42,9 +45,9 @@ public final class MediaAutoResumeContractTest {
             throws IOException {
         String command = source("dezz/status/widget/launcher/MediaResumeCommand.java");
 
-        assertTrue(command.contains("targetPackage.equals(controller.getPackageName())"));
+        assertTrue(command.contains("target.equals(controller.getPackageName())"));
         assertTrue(command.contains(
-                "new Intent(Intent.ACTION_MEDIA_BUTTON).setPackage(targetPackage)"));
+                "new Intent(Intent.ACTION_MEDIA_BUTTON).setPackage(target)"));
         assertTrue(command.contains("KeyEvent.KEYCODE_MEDIA_PLAY"));
         assertTrue(command.contains("Intent.FLAG_INCLUDE_STOPPED_PACKAGES"));
         assertFalse(command.contains("KEYCODE_MEDIA_PLAY_PAUSE"));

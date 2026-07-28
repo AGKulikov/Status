@@ -166,7 +166,9 @@ public final class DriverPanelHa1085ContractTest {
         assertTrue(launcher.contains("LauncherAppCatalog.loadIncludingSystem(context)"));
         assertFalse(launcher.contains("if (!app.systemApp"));
         assertTrue(overlay.contains("LauncherAppCatalog.loadVisible("));
-        assertTrue(catalog.contains("return loadIncludingSystem(context)"));
+        assertTrue(catalog.contains("ensureDefaultSystemVisibility(context, preferences, catalog)"));
+        assertTrue(catalog.contains("launcherSystemAppsDefaultApplied"));
+        assertTrue(catalog.contains("isUserFacingPhone(app, defaultDialer)"));
         assertTrue(preferences.contains("launcherAllAppsHiddenComponents"));
         assertTrue(preferences.contains("launcherAllAppsIconScalePercent"));
         assertFalse(overlay.contains("PanelElementConfigStore.APPS_GRID"));

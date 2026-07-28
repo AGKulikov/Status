@@ -67,7 +67,7 @@ public final class MediaPanelConfigTest {
         assertEquals(45, config.element(MediaPanelConfig.PLAY_PAUSE).scalePercent);
     }
 
-    @Test public void directPlacementDisplacesCollisionAndNeverStacks() {
+    @Test public void directPlacementAllowsIntentionalOverlapWithoutMovingNeighbours() {
         MediaPanelConfig config = new MediaPanelConfig();
         MediaPanelConfig.Element artwork = config.element(MediaPanelConfig.ARTWORK);
         MediaPanelConfig.Element titleBefore = config.element(MediaPanelConfig.TITLE);
@@ -80,9 +80,10 @@ public final class MediaPanelConfigTest {
         MediaPanelConfig.Element moved = config.element(MediaPanelConfig.ARTWORK);
         assertEquals(titleColumn, moved.column);
         assertEquals(titleRow, moved.row);
-        assertNoEnabledOverlap(config);
-        MediaPanelConfig.Element displacedTitle = config.element(MediaPanelConfig.TITLE);
-        assertFalse(displacedTitle.column == titleColumn && displacedTitle.row == titleRow);
+        MediaPanelConfig.Element unchangedTitle = config.element(MediaPanelConfig.TITLE);
+        assertEquals(titleColumn, unchangedTitle.column);
+        assertEquals(titleRow, unchangedTitle.row);
+        assertTrue(MediaPanelConfig.overlaps(moved, unchangedTitle));
         assertTrue(artwork.column + artwork.columnSpan <= MediaPanelConfig.GRID_COLUMNS);
     }
 
@@ -94,7 +95,6 @@ public final class MediaPanelConfigTest {
         assertEquals(2, element.columnSpan);
         assertEquals(2, element.rowSpan);
         assertEquals(175, element.scalePercent);
-        assertNoEnabledOverlap(config);
     }
 
     @Test public void leadingEdgeResizeUpdatesPositionAndSpanAtomically() {
@@ -130,7 +130,7 @@ public final class MediaPanelConfigTest {
                 config.element(MediaPanelConfig.TITLE)));
     }
 
-    @Test public void customGridRepositionsElementsWithoutOverlap() {
+    @Test public void customGridClampsEveryIndependentFrame() {
         MediaPanelConfig config = new MediaPanelConfig();
         assertTrue(config.setGridSize(16, 8));
         assertEquals(16, config.gridColumns);
@@ -141,21 +141,18 @@ public final class MediaPanelConfigTest {
             assertTrue(element.column + element.columnSpan <= config.gridColumns);
             assertTrue(element.row + element.rowSpan <= config.gridRows);
         }
-        assertNoEnabledOverlap(config);
     }
 
-    @Test public void impossibleGridKeepsLastValidLayout() {
+    @Test public void compactGridIsAlwaysAcceptedAndClampsFrames() {
         MediaPanelConfig config = new MediaPanelConfig();
-        MediaPanelConfig before = config.copy();
-        assertFalse(config.setGridSize(2, 2));
-        assertEquals(before.gridColumns, config.gridColumns);
-        assertEquals(before.gridRows, config.gridRows);
-        for (MediaPanelConfig.Element element : before.orderedElements()) {
-            MediaPanelConfig.Element actual = config.element(element.id);
-            assertEquals(element.column, actual.column);
-            assertEquals(element.row, actual.row);
-            assertEquals(element.columnSpan, actual.columnSpan);
-            assertEquals(element.rowSpan, actual.rowSpan);
+        assertTrue(config.setGridSize(2, 2));
+        assertEquals(2, config.gridColumns);
+        assertEquals(2, config.gridRows);
+        for (MediaPanelConfig.Element actual : config.orderedElements()) {
+            assertTrue(actual.column >= 0);
+            assertTrue(actual.row >= 0);
+            assertTrue(actual.column + actual.columnSpan <= 2);
+            assertTrue(actual.row + actual.rowSpan <= 2);
         }
     }
 
@@ -169,7 +166,6 @@ public final class MediaPanelConfigTest {
         assertTrue(config.setGridSize(3, 1));
         assertEquals(3, config.gridColumns);
         assertEquals(1, config.gridRows);
-        assertNoEnabledOverlap(config);
     }
 
     private static int indexOf(List<MediaPanelConfig.Element> elements, String id) {

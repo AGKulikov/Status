@@ -547,6 +547,14 @@ public class Preferences {
     /** Delay lets ECARX finish restoring its audio/player services; mSaver's proven default is 5s. */
     public final Int launcherMediaAutoResumeDelaySeconds = new Int(this,
             "launcherMediaAutoResumeDelaySeconds", 5);
+    /**
+     * Routes every HOME media action to one explicitly selected Android package. When disabled,
+     * the last real player recorded by MediaSession/mHUD is used instead.
+     */
+    public final Bool launcherMediaFixedPlayerEnabled = new Bool(this,
+            "launcherMediaFixedPlayerEnabled", false);
+    public final Str launcherMediaFixedPlayerPackage = new Str(this,
+            "launcherMediaFixedPlayerPackage", "");
     public final Bool launcherClockVisible = new Bool(this, "launcherClockVisible", true);
     public final Bool launcherNavigationVisible = new Bool(this, "launcherNavigationVisible", true);
     public final Bool launcherActionsVisible = new Bool(this, "launcherActionsVisible", true);

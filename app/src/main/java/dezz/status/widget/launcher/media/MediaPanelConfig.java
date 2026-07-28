@@ -115,19 +115,19 @@ public final class MediaPanelConfig {
             new Spec(VOLUME, "Громкость", 220, 58, 6, 4, 5, 1)));
 
     @NonNull public String backgroundColor = "#121923";
-    public int backgroundAlpha = 150;
+    public int backgroundAlpha = 0;
     public int cornerRadiusPx = 28;
-    public int spacingPx = 10;
-    public int contentPaddingPx = 12;
+    public int spacingPx = 0;
+    public int contentPaddingPx = 0;
     @NonNull public String titleColor = "#FFFFFF";
     @NonNull public String secondaryColor = "#C7D0DD";
     @NonNull public String controlColor = "#FFFFFF";
     @NonNull public String glassColor = "#FFFFFF";
-    public int glassAlpha = 30;
+    public int glassAlpha = 0;
     @NonNull public String accentColor = "#86B7FF";
     @NonNull public String outlineColor = "#FFFFFF";
-    public int outlineAlpha = 42;
-    public int outlineWidthPx = 1;
+    public int outlineAlpha = 0;
+    public int outlineWidthPx = 0;
     public int gridColumns = DEFAULT_GRID_COLUMNS;
     public int gridRows = DEFAULT_GRID_ROWS;
 
@@ -166,20 +166,9 @@ public final class MediaPanelConfig {
     public boolean setEnabled(@NonNull String id, boolean enabled) {
         Element value = elements.get(id);
         if (value == null) return false;
-        if (!enabled) {
-            value.enabled = false;
-            return false;
-        }
-        LinkedHashMap<String, Element> snapshot = snapshotElements();
-        value.enabled = true;
-        if (!displaceCollisions(value, value.column, value.row)) {
-            restoreElements(snapshot);
-            value = elements.get(id);
-            if (value == null) return false;
-            value.enabled = true;
-            normalizePlacement(value);
-        }
-        return true;
+        value.enabled = enabled;
+        normalizePlacement(value);
+        return value.enabled;
     }
 
     public void setScale(@NonNull String id, int scalePercent) {
@@ -210,33 +199,24 @@ public final class MediaPanelConfig {
     }
 
     /**
-     * Applies position and span as one transaction. Leading-edge resize handles change both;
-     * two separate mutations could otherwise displace a neighbour after only half the gesture.
+     * Applies position and span as one transaction. Media elements are independent free frames:
+     * overlap is valid and resizing one never moves another element behind the user's back.
      */
     public boolean setPlacement(@NonNull String id, int column, int row,
                                 int columnSpan, int rowSpan) {
         Element value = elements.get(id);
         if (value == null) return false;
-        LinkedHashMap<String, Element> snapshot = snapshotElements();
-        int preferredColumn = value.column;
-        int preferredRow = value.row;
         value.column = column;
         value.row = row;
         value.columnSpan = columnSpan;
         value.rowSpan = rowSpan;
         normalizePlacement(value);
-        if (!displaceCollisions(value, preferredColumn, preferredRow)) {
-            restoreElements(snapshot);
-            return false;
-        }
         return true;
     }
 
     /**
-     * Changes the editor/runtime grid without allowing saved elements to overlap. Existing spans
-     * remain cell based, so adding columns/rows really creates smaller, more precise cells. The
-     * closest valid positions are chosen in visual order; an impossibly small grid is rejected
-     * and the previous layout is left untouched.
+     * Changes grid precision without imposing an occupancy model. Every frame is scaled and
+     * clamped independently, so even a compact grid can retain deliberately overlapping widgets.
      */
     public boolean setGridSize(int columns, int rows) {
         int selectedColumns = clamp(columns, MIN_GRID_COLUMNS, MAX_GRID_COLUMNS);
@@ -245,36 +225,17 @@ public final class MediaPanelConfig {
 
         int oldColumns = gridColumns;
         int oldRows = gridRows;
-        LinkedHashMap<String, Element> snapshot = snapshotElements();
         gridColumns = selectedColumns;
         gridRows = selectedRows;
-        boolean[][] occupied = new boolean[gridRows][gridColumns];
-
         for (Element element : orderedElements()) {
             int oldColumn = element.column;
             int oldRow = element.row;
             element.columnSpan = clamp(element.columnSpan, 1, gridColumns);
             element.rowSpan = clamp(element.rowSpan, 1, gridRows);
-            int preferredColumn = scaledStart(oldColumn, oldColumns, gridColumns,
+            element.column = scaledStart(oldColumn, oldColumns, gridColumns,
                     element.columnSpan);
-            int preferredRow = scaledStart(oldRow, oldRows, gridRows, element.rowSpan);
-            if (!element.enabled) {
-                element.column = preferredColumn;
-                element.row = preferredRow;
-                continue;
-            }
-            int[] slot = nearestFree(occupied, preferredColumn, preferredRow,
-                    element.columnSpan, element.rowSpan);
-            if (slot == null) {
-                gridColumns = oldColumns;
-                gridRows = oldRows;
-                restoreElements(snapshot);
-                return false;
-            }
-            element.column = slot[0];
-            element.row = slot[1];
-            occupy(occupied, element.column, element.row,
-                    element.columnSpan, element.rowSpan);
+            element.row = scaledStart(oldRow, oldRows, gridRows, element.rowSpan);
+            normalizePlacement(element);
         }
         return true;
     }
