@@ -22,7 +22,6 @@ import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.util.TypedValue;
-import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -55,48 +54,25 @@ public final class LauncherGlobalElementProxyView extends View {
         @Nullable View resolve();
     }
 
-    public interface ConfigurationListener {
-        void onConfigure();
-    }
-
     @NonNull private final Source source;
-    @NonNull private final ConfigurationListener configurationListener;
-    @NonNull private final GestureDetector gestures;
     @NonNull private LauncherGlobalElementLayoutStore.Appearance appearance;
     @Nullable private View styledSource;
     private final Map<TextView, TextSnapshot> originalTexts = new IdentityHashMap<>();
     private final Map<ImageView, ColorFilter> originalImageFilters = new IdentityHashMap<>();
-    private boolean longPressTriggered;
-    private boolean sourceCancelled;
+    private final Map<TextView, MarqueeState> marqueeStates = new IdentityHashMap<>();
     private long lastVisualSignature = Long.MIN_VALUE;
-    private long marqueeKey = Long.MIN_VALUE;
-    private long marqueeStartedAtMs;
 
     public LauncherGlobalElementProxyView(
             @NonNull Context context,
             @NonNull Source source,
-            @NonNull LauncherGlobalElementLayoutStore.Appearance appearance,
-            @NonNull ConfigurationListener configurationListener) {
+            @NonNull LauncherGlobalElementLayoutStore.Appearance appearance) {
         super(context);
         this.source = source;
-        this.configurationListener = configurationListener;
         this.appearance = appearance.copy();
-        gestures = new GestureDetector(context,
-                new GestureDetector.SimpleOnGestureListener() {
-                    @Override public boolean onDown(@NonNull MotionEvent event) {
-                        return true;
-                    }
-
-                    @Override public void onLongPress(@NonNull MotionEvent event) {
-                        longPressTriggered = true;
-                        cancelSourceGesture();
-                        LauncherGlobalElementProxyView.this.configurationListener.onConfigure();
-                        performHapticFeedback(
-                                android.view.HapticFeedbackConstants.LONG_PRESS);
-                    }
-                });
         setClickable(true);
-        setLongClickable(true);
+        // Settings are opened by tapping the frame while explicit layout mode is active.
+        // Outside that mode a long press belongs to the live widget/application.
+        setLongClickable(false);
         setFocusable(true);
         setWillNotDraw(false);
         applySurface();
@@ -108,6 +84,7 @@ public final class LauncherGlobalElementProxyView extends View {
         appearance = value.copy();
         styledSource = null;
         lastVisualSignature = Long.MIN_VALUE;
+        marqueeStates.clear();
         applySurface();
         invalidate();
     }
@@ -164,12 +141,6 @@ public final class LauncherGlobalElementProxyView extends View {
     @Override
     public boolean onTouchEvent(@NonNull MotionEvent event) {
         View value = sourceView();
-        if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
-            longPressTriggered = false;
-            sourceCancelled = false;
-        }
-        gestures.onTouchEvent(event);
-        if (longPressTriggered) return true;
 
         LauncherGlobalElementLayoutStore.TapAction tapAction = appearance.tapAction;
         if (tapAction != LauncherGlobalElementLayoutStore.TapAction.INHERIT) {
@@ -217,22 +188,6 @@ public final class LauncherGlobalElementProxyView extends View {
         return true;
     }
 
-    private void cancelSourceGesture() {
-        if (sourceCancelled) return;
-        sourceCancelled = true;
-        View value = sourceView();
-        if (value == null) return;
-        MotionEvent cancel = MotionEvent.obtain(
-                android.os.SystemClock.uptimeMillis(),
-                android.os.SystemClock.uptimeMillis(),
-                MotionEvent.ACTION_CANCEL, 0f, 0f, 0);
-        try {
-            value.dispatchTouchEvent(cancel);
-        } finally {
-            cancel.recycle();
-        }
-    }
-
     private void launchConfiguredApp() {
         ComponentName component = ComponentName.unflattenFromString(
                 appearance.appComponent);
@@ -262,12 +217,11 @@ public final class LauncherGlobalElementProxyView extends View {
         float viewportHeight = Math.max(0f, bottom - top);
         if (viewportWidth <= 0f || viewportHeight <= 0f) return DrawTransform.EMPTY;
 
-        float sourceLeft = Math.min(source.getWidth(), source.getPaddingLeft());
-        float sourceTop = Math.min(source.getHeight(), source.getPaddingTop());
-        float sourceRight = Math.max(sourceLeft,
-                source.getWidth() - source.getPaddingRight());
-        float sourceBottom = Math.max(sourceTop,
-                source.getHeight() - source.getPaddingBottom());
+        RectF content = visualContentBounds(source);
+        float sourceLeft = content.left;
+        float sourceTop = content.top;
+        float sourceRight = content.right;
+        float sourceBottom = content.bottom;
         float sourceWidth = Math.max(1f, sourceRight - sourceLeft);
         float sourceHeight = Math.max(1f, sourceBottom - sourceTop);
         if (appearance.scaleMode == LauncherGlobalElementLayoutStore.ScaleMode.STRETCH) {
@@ -350,14 +304,11 @@ public final class LauncherGlobalElementProxyView extends View {
             float loopWidth = Math.max(1f, desiredWidth + gap);
             long key = mix(mix(text.hashCode(), viewportWidth),
                     Float.floatToIntBits(paint.getTextSize()));
+            MarqueeState state = marqueeState(source, key);
             long now = SystemClock.uptimeMillis();
-            if (marqueeKey != key) {
-                marqueeKey = key;
-                marqueeStartedAtMs = now;
-            }
             float speedPxPerSecond =
                     75f * getResources().getDisplayMetrics().density;
-            float scroll = ((now - marqueeStartedAtMs) * speedPxPerSecond / 1_000f)
+            float scroll = ((now - state.startedAtMs) * speedPxPerSecond / 1_000f)
                     % loopWidth;
             int checkpoint = canvas.save();
             canvas.clipRect(left, top, right, bottom);
@@ -369,7 +320,7 @@ public final class LauncherGlobalElementProxyView extends View {
             return;
         }
 
-        marqueeKey = Long.MIN_VALUE;
+        marqueeStates.remove(source);
         Layout.Alignment alignment = textAlignment(source.getGravity());
         StaticLayout layout = textLayout(source, text, paint, viewportWidth,
                 singleLine ? 1 : Math.max(1, source.getMaxLines()), alignment);
@@ -650,15 +601,12 @@ public final class LauncherGlobalElementProxyView extends View {
             float loopWidth = Math.max(1f, desiredWidth + gap);
             long key = mix(mix(System.identityHashCode(source), text.hashCode()),
                     Float.floatToIntBits(paint.getTextSize()));
+            MarqueeState state = marqueeState(source, key);
             long now = SystemClock.uptimeMillis();
-            if (marqueeKey != key) {
-                marqueeKey = key;
-                marqueeStartedAtMs = now;
-            }
             float speedInSourcePxPerSecond =
                     75f * getResources().getDisplayMetrics().density
                             / sourceToScreenScaleY;
-            float scroll = ((now - marqueeStartedAtMs)
+            float scroll = ((now - state.startedAtMs)
                     * speedInSourcePxPerSecond / 1_000f) % loopWidth;
             int checkpoint = canvas.save();
             canvas.clipRect(0, 0, viewportWidth, viewportHeight);
@@ -696,6 +644,51 @@ public final class LauncherGlobalElementProxyView extends View {
         canvas.concat(image.getImageMatrix());
         drawable.draw(canvas);
         canvas.restoreToCount(checkpoint);
+    }
+
+    /**
+     * Resolves the union of actually rendered descendants in source coordinates. Legacy panel
+     * cells commonly fill a complete grid row even when their content uses only a small area;
+     * importing the cell bounds made that empty bottom/right space part of the free HOME frame.
+     */
+    @NonNull
+    private static RectF visualContentBounds(@NonNull View source) {
+        RectF resolved = new RectF();
+        if (!appendVisualBounds(source, -source.getLeft(), -source.getTop(), resolved)) {
+            resolved.set(0f, 0f, Math.max(1, source.getWidth()),
+                    Math.max(1, source.getHeight()));
+        }
+        return resolved;
+    }
+
+    private static boolean appendVisualBounds(
+            @NonNull View value, float parentX, float parentY, @NonNull RectF result) {
+        if (value.getVisibility() != View.VISIBLE || value.getWidth() <= 0
+                || value.getHeight() <= 0) return false;
+        float left = parentX + value.getLeft();
+        float top = parentY + value.getTop();
+        if (value instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) value;
+            boolean found = false;
+            for (int index = 0; index < group.getChildCount(); index++) {
+                found |= appendVisualBounds(group.getChildAt(index),
+                        left - group.getScrollX(), top - group.getScrollY(), result);
+            }
+            if (found) return true;
+        }
+        RectF own = new RectF(left, top, left + value.getWidth(), top + value.getHeight());
+        if (result.isEmpty()) result.set(own); else result.union(own);
+        return true;
+    }
+
+    @NonNull
+    private MarqueeState marqueeState(@NonNull TextView source, long key) {
+        MarqueeState state = marqueeStates.get(source);
+        if (state == null || state.key != key) {
+            state = new MarqueeState(key, SystemClock.uptimeMillis());
+            marqueeStates.put(source, state);
+        }
+        return state;
     }
 
     private static long visualSignature(@Nullable View value) {
@@ -833,6 +826,16 @@ public final class LauncherGlobalElementProxyView extends View {
             target.setTypeface(typeface);
             target.setGravity(gravity);
             target.setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom);
+        }
+    }
+
+    private static final class MarqueeState {
+        final long key;
+        final long startedAtMs;
+
+        MarqueeState(long key, long startedAtMs) {
+            this.key = key;
+            this.startedAtMs = startedAtMs;
         }
     }
 }

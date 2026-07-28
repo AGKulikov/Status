@@ -344,7 +344,10 @@ public final class NavigationPanelConfig {
             if (collision) {
                 int[] free = nearestFree(element, element.column, element.row);
                 if (free == null) {
-                    element.enabled = false;
+                    // HOME widgets are independent free frames. The legacy source grid may
+                    // overlap only to keep the live data producer measured; it must never turn a
+                    // newly added widget back off because that hidden grid has no free slot.
+                    accepted.add(element);
                     continue;
                 }
                 element.column = free[0];

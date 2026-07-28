@@ -85,6 +85,21 @@ public final class HudElementConfig {
                     borderOpacityPercent = 0;
                     borderWidthPx = 0;
                     break;
+                case HORIZONTAL_GROUP:
+                    options.put("memberIds", new org.json.JSONArray());
+                    options.put("gapPx", 0);
+                    options.put("paddingLeftPx", 0);
+                    options.put("paddingTopPx", 0);
+                    options.put("paddingRightPx", 0);
+                    options.put("paddingBottomPx", 0);
+                    options.put("marginLeftPx", 0);
+                    options.put("marginTopPx", 0);
+                    options.put("marginRightPx", 0);
+                    options.put("marginBottomPx", 0);
+                    options.put("horizontalAlignment", 0);
+                    options.put("verticalAlignment", 1);
+                    options.put("distribution", 0);
+                    break;
                 case CLOCK:
                     options.put("clockMode", "SYSTEM");
                     break;
@@ -201,6 +216,9 @@ public final class HudElementConfig {
         brightness = clamp(brightness, 0, 100);
         if (options == null || options.toString().length() > MAX_OPTIONS_CHARS) {
             options = new JSONObject();
+        }
+        if (type == HudElementType.HORIZONTAL_GROUP) {
+            HudHorizontalGroup.normalizeOptions(this);
         }
     }
 

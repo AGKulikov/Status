@@ -23,6 +23,7 @@ public final class AppUninstallLauncherContractTest {
         String manifest = manifest();
         assertTrue(source.contains("new AlertDialog.Builder"));
         assertTrue(source.contains("TYPE_APPLICATION_OVERLAY"));
+        assertTrue(source.contains("window.setType(windowType)"));
         assertTrue(source.contains("pm uninstall --user 0 "));
         assertTrue(source.contains("safePackageName(target)"));
         assertTrue(source.contains("PrivilegedShell.get(context).runCommand"));

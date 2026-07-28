@@ -37,8 +37,10 @@ public final class MediaAutoResumeController {
     private static final String KEY_TARGET_PACKAGE = "targetPackage";
     private static final String KEY_COMPLETED = "completed";
     private static final int REQUEST_CODE = 0x4D41;
-    private static final int MAX_ATTEMPTS = 3;
-    private static final long[] RETRY_DELAYS_MS = {2_000L, 5_000L};
+    private static final int MAX_ATTEMPTS = 6;
+    private static final long[] RETRY_DELAYS_MS = {
+            2_000L, 5_000L, 10_000L, 15_000L, 20_000L
+    };
 
     private MediaAutoResumeController() {}
 
@@ -51,11 +53,16 @@ public final class MediaAutoResumeController {
             return;
         }
         MediaPlaybackHistoryStore.Snapshot history = MediaPlaybackHistoryStore.read(app);
-        if (!history.canResume()) {
-            Log.i(TAG, "Auto-resume skipped: the previous player was not playing");
+        boolean fixedPlayer = preferences.launcherMediaFixedPlayerEnabled.get();
+        String fixedPackage = preferences.launcherMediaFixedPlayerPackage.get();
+        if (!MediaPlaybackTargetPolicy.shouldAutoResume(fixedPlayer, fixedPackage,
+                history.packageName, history.wasPlaying)) {
+            Log.i(TAG, "Auto-resume skipped: there is no eligible target player");
             cancel(app);
             return;
         }
+        String target = MediaPlaybackTargetPolicy.resolve(fixedPlayer, fixedPackage,
+                history.packageName);
 
         long bootToken = currentBootToken(app);
         SharedPreferences state = state(app);
@@ -65,12 +72,12 @@ public final class MediaAutoResumeController {
         }
         state.edit()
                 .putLong(KEY_BOOT_TOKEN, bootToken)
-                .putString(KEY_TARGET_PACKAGE, history.packageName)
+                .putString(KEY_TARGET_PACKAGE, target)
                 .putBoolean(KEY_COMPLETED, false)
                 .commit();
         int delaySeconds = clamp(preferences.launcherMediaAutoResumeDelaySeconds.get(), 0, 60);
         schedule(app, bootToken, 0, delaySeconds * 1_000L);
-        Log.i(TAG, "Scheduled auto-resume for " + history.packageName
+        Log.i(TAG, "Scheduled auto-resume for " + target
                 + " after " + delaySeconds + " s");
     }
 

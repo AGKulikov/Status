@@ -16,6 +16,11 @@ public final class MediaInfoBroadcastReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         if (context == null || intent == null) return;
+        dezz.status.widget.diagnostics.ActionRecorder.record(
+                dezz.status.widget.diagnostics.ActionRecorder.SOURCE_SERVICE,
+                "BROADCAST_RECEIVED",
+                dezz.status.widget.diagnostics.ActionRecorder.object(
+                        "receiver", getClass().getName(), "action", intent.getAction()));
         PendingResult result = goAsync();
         MediaBroadcastRepository.processAsync(context, intent, result::finish);
     }

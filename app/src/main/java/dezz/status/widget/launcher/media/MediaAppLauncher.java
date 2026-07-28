@@ -43,6 +43,15 @@ public final class MediaAppLauncher {
                 || launchDiscovered(context, manager, Intent.CATEGORY_LEANBACK_LAUNCHER);
     }
 
+    /** Opens one exact player package selected in launcher media settings. */
+    public static boolean launchPackage(@NonNull Context context,
+                                        @NonNull String packageName) {
+        String target = packageName.trim();
+        if (target.isEmpty()) return false;
+        Intent intent = launchIntent(context.getPackageManager(), target);
+        return intent != null && start(context, intent);
+    }
+
     @Nullable
     private static Intent launchIntent(@NonNull PackageManager manager,
                                        @NonNull String packageName) {

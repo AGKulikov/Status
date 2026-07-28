@@ -24,22 +24,28 @@ import dezz.status.widget.Preferences;
 /** Versioned and defensive persistence for the climate panel's live settings. */
 public final class ClimatePanelConfigStore {
     public static final int SCHEMA_VERSION = 4;
-    private final Preferences preferences;
+    private final Preferences.Str storage;
 
     public ClimatePanelConfigStore(@NonNull Preferences preferences) {
-        this.preferences = preferences;
+        this(preferences, preferences.launcherClimateConfigJson);
+    }
+
+    /** Allows HOME and the independent floating climate panel to keep separate documents. */
+    public ClimatePanelConfigStore(@NonNull Preferences preferences,
+                                   @NonNull Preferences.Str storage) {
+        this.storage = storage;
     }
 
     @NonNull
     public ClimatePanelConfig load() {
-        String raw = preferences.launcherClimateConfigJson.get();
+        String raw = storage.get();
         ClimatePanelConfig value = decode(raw);
         if (raw != null && !raw.trim().isEmpty()) {
             try {
                 JSONObject root = new JSONObject(raw);
                 if (root.optInt("version", 0) < SCHEMA_VERSION
                         && (root.has("elements") || root.has("enabledElements"))) {
-                    preferences.launcherClimateConfigJson.set(encode(value).toString());
+                    storage.set(encode(value).toString());
                 }
             } catch (JSONException ignored) {
             }
@@ -124,7 +130,7 @@ public final class ClimatePanelConfigStore {
 
     public void save(@NonNull ClimatePanelConfig source) {
         try {
-            preferences.launcherClimateConfigJson.set(encode(source).toString());
+            storage.set(encode(source).toString());
         } catch (JSONException ignored) {
         }
     }
@@ -181,7 +187,7 @@ public final class ClimatePanelConfigStore {
     }
 
     public void reset() {
-        preferences.launcherClimateConfigJson.set("");
+        storage.set("");
     }
 
     @Nullable

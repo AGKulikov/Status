@@ -19,7 +19,8 @@ import dezz.status.widget.Preferences;
 
 /** Versioned persistence for the visual media-panel editor. */
 public final class MediaPanelConfigStore {
-    public static final int SCHEMA_VERSION = 5;
+    public static final int SCHEMA_VERSION = 6;
+    private static final int LEGACY_SURFACE_SCHEMA_VERSION = 5;
     private static final int ELEMENT_GRID_SCHEMA_VERSION = 4;
     private static final int LEGACY_FLOW_SCHEMA_VERSION = 1;
     private static final int FIXED_GRID_SCHEMA_VERSION = 2;
@@ -42,7 +43,8 @@ public final class MediaPanelConfigStore {
         try {
             JSONObject root = new JSONObject(raw);
             int version = root.optInt("version", 0);
-            if (version != SCHEMA_VERSION && version != ELEMENT_GRID_SCHEMA_VERSION
+            if (version != SCHEMA_VERSION && version != LEGACY_SURFACE_SCHEMA_VERSION
+                    && version != ELEMENT_GRID_SCHEMA_VERSION
                     && version != VARIABLE_GRID_SCHEMA_VERSION
                     && version != FIXED_GRID_SCHEMA_VERSION
                     && version != LEGACY_FLOW_SCHEMA_VERSION) return value;
@@ -65,6 +67,15 @@ public final class MediaPanelConfigStore {
             value.outlineColor = root.optString("outlineColor", value.outlineColor);
             value.outlineAlpha = root.optInt("outlineAlpha", value.outlineAlpha);
             value.outlineWidthPx = root.optInt("outlineWidthPx", value.outlineWidthPx);
+            if (version < SCHEMA_VERSION) {
+                // HA1132 removes every implicit media/widget surface. Keep colours and geometry,
+                // but migrate the old panel/glass insets to an edge-to-edge transparent frame.
+                value.backgroundAlpha = 0;
+                value.glassAlpha = 0;
+                value.outlineAlpha = 0;
+                value.outlineWidthPx = 0;
+                value.contentPaddingPx = 0;
+            }
             JSONArray elements = root.optJSONArray("elements");
             if (elements != null) {
                 Set<String> restored = new HashSet<>();

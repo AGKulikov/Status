@@ -24,6 +24,7 @@ public final class PhoneConnectorSettingsContractTest {
 
         assertTrue(source.contains("\"phoneConnectorEnabled\", false"));
         assertTrue(source.contains("new Str(this, \"phoneDeviceAddress\", \"\")"));
+        assertTrue(source.contains("\"phoneAncsDeviceAddress\", \"\""));
         assertTrue(source.contains("\"phoneNotificationsEnabled\", true"));
         assertTrue(source.contains("\"phoneMessagesEnabled\", false"));
         assertTrue(source.contains("\"phoneIncludeNotificationText\", false"));
@@ -44,6 +45,9 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.substring(source.indexOf("SECRET_PREFERENCE_KEYS"),
                 source.indexOf("public static abstract class Preference"))
                 .contains("\"phoneDeviceAddress\""));
+        assertTrue(source.substring(source.indexOf("SECRET_PREFERENCE_KEYS"),
+                source.indexOf("public static abstract class Preference"))
+                .contains("\"phoneAncsDeviceAddress\""));
     }
 
     @Test
@@ -69,10 +73,12 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("looksLikePhone(device, advertisedName)"));
         assertFalse(source.contains("looksLikePhone(device, name)"));
         assertTrue(source.contains(
-                "connectorEnabled.isChecked() && selectedDeviceAddress.isEmpty()"));
+                "connectorRequested && selectedDeviceAddress.isEmpty()"));
         assertTrue(source.contains("R.string.phone_choose_required"));
         assertTrue(source.contains(
                 "preferences.phoneDeviceAddress.set(selectedDeviceAddress)"));
+        assertTrue(source.contains(
+                "preferences.phoneAncsDeviceAddress.set(selectedDeviceAddress)"));
         assertFalse(source.contains("selectedDeviceAddress = position == 0"));
         assertFalse(source.contains("labels[0] = getString(R.string.phone_no_device)"));
     }
@@ -101,8 +107,8 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("diagnosticsHandler.removeCallbacks(diagnosticsPoll)"));
         assertTrue(source.contains("this::testAncsConnection"));
         assertTrue(source.contains("!service.reconnectPhoneForDiagnostics()"));
-        assertTrue(source.contains(
-                "!notificationsEnabled.isChecked() && !messagesEnabled.isChecked()"));
+        assertTrue(source.contains("!preferences.phoneNotificationsEnabled.get()"));
+        assertTrue(source.contains("!preferences.phoneMessagesEnabled.get()"));
         assertTrue(source.contains("localizedMapStatus(mapStatus)"));
         assertTrue(source.contains("selectedBondedPhone() == null"));
         assertTrue(source.contains("Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS"));
@@ -170,6 +176,36 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("preferences.phoneLowBatteryAlertLatched.set(false)"));
         assertFalse(source.contains("statusBarNotificationsEnabled.isChecked()"));
         assertFalse(source.contains("private MaterialSwitch statusBarNotificationsEnabled"));
+    }
+
+    @Test
+    public void partiallyRestoredSettingsNeverDereferenceMissingSwitches() throws IOException {
+        String source = javaSource("PhoneConnectorSettingsActivity.java");
+        String persist = source.substring(source.indexOf(
+                        "private boolean persistSettings(boolean showConfirmation)"),
+                source.indexOf("@SuppressLint(\"MissingPermission\")"));
+
+        assertTrue(source.contains("@Nullable MaterialSwitch value"));
+        assertTrue(source.contains(
+                "return value == null ? savedFallback : value.isChecked()"));
+        assertTrue(persist.contains(
+                "checked(connectorEnabled,\n                preferences.phoneConnectorEnabled.get())"));
+        assertTrue(persist.contains(
+                "checked(notificationsEnabled,\n                preferences.phoneNotificationsEnabled.get())"));
+        assertTrue(persist.contains(
+                "checked(messagesEnabled,\n                preferences.phoneMessagesEnabled.get())"));
+        assertTrue(persist.contains(
+                "checked(includeNotificationText,\n                preferences.phoneIncludeNotificationText.get())"));
+        assertTrue(persist.contains(
+                "checked(lowBatteryAlertEnabled,\n                preferences.phoneLowBatteryAlertEnabled.get())"));
+        assertTrue(persist.contains(
+                "checked(sprutPresenceEnabled,\n                preferences.phoneSprutPresenceEnabled.get())"));
+        assertFalse(persist.contains("connectorEnabled.isChecked()"));
+        assertFalse(persist.contains("notificationsEnabled.isChecked()"));
+        assertFalse(persist.contains("messagesEnabled.isChecked()"));
+        assertFalse(persist.contains("includeNotificationText.isChecked()"));
+        assertFalse(persist.contains("lowBatteryAlertEnabled.isChecked()"));
+        assertFalse(persist.contains("sprutPresenceEnabled.isChecked()"));
     }
 
     @Test

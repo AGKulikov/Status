@@ -1112,7 +1112,7 @@ public final class PhoneConnectorController {
         publishSnapshot(token);
 
         final long transportSession = activeAncsTransportSession;
-        final String address = selectedAddress;
+        final String address = current.ancsDeviceAddress;
         mainHandler.post(() -> startAncsTransportOnMain(
                 token, transportSession, address));
     }
@@ -3268,6 +3268,12 @@ public final class PhoneConnectorController {
         long now = System.currentTimeMillis();
         snapshot.add(value("connected", false, true, "boolean", "", now));
         snapshot.add(value("device.name", null, false, "string", "", now));
+        snapshot.add(value("transport.classic.name", null, false,
+                "string", "", now));
+        snapshot.add(value("transport.ancs.local_name",
+                IphoneAncsTransport.LOCAL_LOGICAL_NAME, false, "string", "", now));
+        snapshot.add(value("transport.ancs.remote_name",
+                IphoneAncsTransport.REMOTE_LOGICAL_NAME, false, "string", "", now));
         snapshot.add(value("profiles.hfp", null, false, "boolean", "", now));
         snapshot.add(value("profiles.map", null, false, "boolean", "", now));
         snapshot.add(value("profiles.ble", null, false, "boolean", "", now));
@@ -3321,6 +3327,15 @@ public final class PhoneConnectorController {
         snapshot.add(value("connected", connected, active, "boolean", "", now));
         snapshot.add(value("device.name", selectedName.isEmpty() ? null : selectedName,
                 !selectedName.isEmpty(), "string", "", now));
+        snapshot.add(value("transport.classic.name",
+                selectedName.isEmpty() ? null : selectedName,
+                !selectedName.isEmpty(), "string", "", now));
+        snapshot.add(value("transport.ancs.local_name",
+                IphoneAncsTransport.LOCAL_LOGICAL_NAME,
+                config != null && config.ancsNeeded(), "string", "", now));
+        snapshot.add(value("transport.ancs.remote_name",
+                IphoneAncsTransport.REMOTE_LOGICAL_NAME,
+                config != null && config.ancsNeeded(), "string", "", now));
         snapshot.add(value("profiles.hfp", hfpConnected, active, "boolean", "", now));
         snapshot.add(value("profiles.map", mapConnected, active, "boolean", "", now));
         snapshot.add(value("profiles.ble", gattConnected, active, "boolean", "", now));
@@ -3403,9 +3418,12 @@ public final class PhoneConnectorController {
         LinkedHashMap<String, Object> device = new LinkedHashMap<>();
         device.put("address", maskedAddress(selectedAddress));
         device.put("name", selectedName);
+        device.put("classic_name", selectedName);
+        device.put("ancs_local_name", IphoneAncsTransport.LOCAL_LOGICAL_NAME);
+        device.put("ancs_remote_name", IphoneAncsTransport.REMOTE_LOGICAL_NAME);
         device.put("stock_connection", stockConnectionStatus);
         device.put("ancs_setup", config != null && config.ancsNeeded()
-                ? "stock_bluetooth_required" : "disabled");
+                ? "dedicated_ble_v1" : "disabled");
         snapshot.add(value("diagnostics.device", device, !selectedAddress.isEmpty(),
                 "object", "", now));
         LinkedHashMap<String, Object> lastApp = new LinkedHashMap<>();
@@ -3906,6 +3924,7 @@ public final class PhoneConnectorController {
     private static final class Config {
         final boolean enabled;
         @NonNull final String deviceAddress;
+        @NonNull final String ancsDeviceAddress;
         final boolean notificationsEnabled;
         final boolean messagesEnabled;
         final boolean includeNotificationText;
@@ -3913,13 +3932,15 @@ public final class PhoneConnectorController {
         final int notificationAppFilterMode;
         @NonNull final Set<String> notificationAppFilterKeys;
 
-        Config(boolean enabled, @NonNull String deviceAddress, boolean notificationsEnabled,
+        Config(boolean enabled, @NonNull String deviceAddress,
+               @NonNull String ancsDeviceAddress, boolean notificationsEnabled,
                boolean messagesEnabled, boolean includeNotificationText,
                @NonNull Set<Integer> notificationCategoryIds,
                int notificationAppFilterMode,
                @NonNull Set<String> notificationAppFilterKeys) {
             this.enabled = enabled;
             this.deviceAddress = deviceAddress;
+            this.ancsDeviceAddress = ancsDeviceAddress;
             this.notificationsEnabled = notificationsEnabled;
             this.messagesEnabled = messagesEnabled;
             this.includeNotificationText = includeNotificationText;
@@ -3931,8 +3952,11 @@ public final class PhoneConnectorController {
 
         @NonNull
         static Config from(@NonNull Preferences prefs) {
+            String classicAddress = bounded(prefs.phoneDeviceAddress.get(), 64);
+            String ancsAddress = bounded(prefs.phoneAncsDeviceAddress.get(), 64);
+            if (ancsAddress.trim().isEmpty()) ancsAddress = classicAddress;
             return new Config(prefs.phoneConnectorEnabled.get(),
-                    bounded(prefs.phoneDeviceAddress.get(), 64),
+                    classicAddress, ancsAddress,
                     prefs.phoneNotificationsEnabled.get(),
                     prefs.phoneMessagesEnabled.get(),
                     prefs.phoneIncludeNotificationText.get(),
@@ -3945,7 +3969,8 @@ public final class PhoneConnectorController {
 
         @NonNull
         String signature() {
-            return enabled + "|" + deviceAddress + "|" + notificationsEnabled + "|"
+            return enabled + "|" + deviceAddress + "|" + ancsDeviceAddress
+                    + "|" + notificationsEnabled + "|"
                     + messagesEnabled + "|" + includeNotificationText + "|"
                     + PhoneNotificationFilter.serializeCategoryIds(
                     notificationCategoryIds) + "|" + notificationAppFilterMode + "|"

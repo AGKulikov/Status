@@ -33,14 +33,17 @@ public final class LauncherGlobalElementContractTest {
         assertTrue(activity.contains("showLauncherWidgetCatalog"));
         assertTrue(activity.contains("frame.setOnClickListener"));
         assertTrue(activity.contains(".setNegativeButton(\"Удалить\""));
-        assertTrue(activity.contains("Вернуть удалённый виджет"));
+        assertTrue(activity.contains("showRemovedLauncherWidgets"));
+        assertTrue(activity.contains("Вернуть виджет"));
         assertTrue(activity.contains("updated.setProgressBarHeightDp(value)"));
-        assertTrue(activity.contains("Новая кнопка приложения или действие"));
+        assertTrue(activity.contains(".setTitle(\"Добавить виджет\")"));
+        assertTrue(activity.contains("addLauncherCatalogEntry(entries.get(which))"));
         assertTrue(activity.contains("updated.setEnabled(available.get(which).id, true)"));
         String proxy = read("launcher/LauncherGlobalElementProxyView.java");
         assertTrue(proxy.contains("ScaleMode.STRETCH"));
         assertTrue(proxy.contains("Math.min(widthScale, heightScale)"));
-        assertTrue(proxy.contains("configurationListener.onConfigure()"));
+        assertTrue(proxy.contains("setLongClickable(false)"));
+        assertFalse(proxy.contains("GestureDetector"));
         assertTrue(proxy.contains("drawNestedText(canvas, (TextView) value"));
         assertFalse(proxy.contains("compensateTextScale"));
         assertTrue(proxy.contains("text.setPadding(0, 0, 0, 0)"));
@@ -55,7 +58,8 @@ public final class LauncherGlobalElementContractTest {
         String store = read("launcher/LauncherBackdropStore.java");
         String surface = read("launcher/LauncherBackdropView.java");
 
-        assertTrue(activity.contains("entries.add(\"Подложка…\")"));
+        assertTrue(read("launcher/LauncherWidgetCatalog.java")
+                .contains("Kind.BACKDROP, \"Подложка\""));
         assertTrue(activity.contains("workspace.addView(frame, Math.min(backdropIndex"));
         assertTrue(activity.contains("frame.setStayBehindSiblings(true)"));
         assertTrue(activity.contains("Тень · только HOME"));

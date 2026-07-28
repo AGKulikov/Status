@@ -26,7 +26,6 @@ import java.util.Set;
  * search are always generated from this one immutable list.</p>
  */
 public final class SettingsDestinationCatalog {
-    public static final String ACTION_EDIT_HOME_LAYOUT = "action.edit_home_layout";
     public static final String ACTION_PERMISSIONS = "action.permissions";
     public static final String ACTION_EXPORT = "action.export";
     public static final String ACTION_IMPORT = "action.import";
@@ -35,10 +34,10 @@ public final class SettingsDestinationCatalog {
     public enum Group {
         STATUS("status", "Строка состояния",
                 "Положение, состав и оформление верхней строки", "status"),
-        HOME("home", "Домашний экран",
-                "HOME, компоновка и содержимое блоков", "home"),
+        HOME("home", "Лаунчер",
+                "Все кнопки, виджеты, информация и компоновка в одном разделе", "home"),
         PANELS("panels", "Панели",
-                "Медиа, навигация, климат, датчики и быстрые действия", "panels"),
+                "Панель водителя, HUD и независимые плавающие панели", "panels"),
         SMART_HOME("smart_home", "Умный дом",
                 "Подключения Home Assistant, Sprut.hub, MQTT и iPhone", "smart_home"),
         AUTOMATION("automation", "Автоматизация",
@@ -129,65 +128,25 @@ public final class SettingsDestinationCatalog {
                 "preset", "dezz.status.widget.PresetsActivity",
                 "пресеты", "профили", "шаблоны", "оформление"));
 
-        values.add(activity("home_behavior", Group.HOME, "Поведение HOME",
-                "Полноэкранный режим, фон, сетка и шаг привязки",
+        values.add(activity("home_behavior", Group.HOME, "Лаунчер",
+                "Один плоский экран: общий пул элементов, компоновка, приложения и медиаплеер",
                 "home", "dezz.status.widget.LauncherSettingsActivity",
-                "лаунчер", "домашний экран", "фон", "сетка", "полноэкранный"));
-        values.add(action("home_layout", Group.HOME, "Компоновка на реальном HOME",
-                "Перетаскивание и изменение размера блоков за любой угол",
-                "layout", ACTION_EDIT_HOME_LAYOUT,
-                "редактор", "размер", "позиция", "блок", "панель", "сетка"));
-        values.add(activity("home_panel_content", Group.HOME, "Состав блоков",
-                "Порядок, видимость и масштаб элементов внутри блоков",
-                "panels", "dezz.status.widget.PanelElementSettingsActivity",
-                "содержимое", "элементы", "порядок", "масштаб", "блоки"));
-
-        values.add(activity("panel_apps", Group.PANELS, "Избранные приложения",
-                "Список, порядок, подписи и размеры иконок приложений",
-                "apps", "dezz.status.widget.FavoriteAppsSettingsActivity",
-                "приложения", "иконки", "избранное"));
-        values.add(activity("all_apps", Group.PANELS, "Меню «Все приложения»",
-                "Общий вид для HOME и панели водителя: масштаб, столбцы, интервалы и скрытие",
-                "apps", "dezz.status.widget.AllAppsSettingsActivity",
-                "все приложения", "лаунчер", "панель водителя", "иконки",
-                "масштаб", "расстояние", "столбцы", "скрыть", "показать"));
-        values.add(activity("panel_media", Group.PANELS, "Медиаблок",
-                "Сетка, элементы, бегущие строки, обложка, громкость и цвета",
-                "media", "dezz.status.widget.MediaPanelSettingsActivity",
-                "музыка", "трек", "альбом", "артист", "обложка", "громкость", "яндекс"));
-        values.add(activity("panel_navigation", Group.PANELS, "Навигация",
-                "Сетка маршрута, манёвры, полосы, ETA и редактор на HOME",
-                "navigation", "dezz.status.widget.NavigationPanelSettingsActivity",
-                "маршрут", "маневр", "полосы", "eta", "яндекс навигатор"));
-        values.add(activity("panel_routes", Group.PANELS, "Избранные места",
-                "Домой, работа и другие кнопки маршрутов, иконки и оформление",
-                "routes", "dezz.status.widget.FavoriteRoutesSettingsActivity",
-                "места", "домой", "работа", "координаты", "маршруты"));
-        values.add(activity("panel_climate", Group.PANELS, "Климат",
-                "Элементы, сетка, уровни, резервирование экрана и внешний оверлей",
+                "лаунчер", "домашний экран", "фон", "сетка", "полноэкранный",
+                "музыка", "медиа", "трек", "маневр", "навигация", "маршрут",
+                "климат", "информация", "кнопки", "размеры", "позиции кнопок",
+                "столбцы", "все приложения", "скрыть системные", "подложка",
+                "горизонтальный ряд"));
+        values.add(activity("panel_floating_climate", Group.PANELS,
+                "Плавающая панель климата",
+                "Отдельные от HOME оформление, состав, положение и резервирование экрана",
                 "climate", "dezz.status.widget.ClimatePanelSettingsActivity",
-                "кондиционер", "вентилятор", "авто", "сиденья", "руль", "резервирование"));
-        values.add(activity("panel_vehicle", Group.PANELS, "Информация об автомобиле",
-                "Внутренние датчики, вычисляемые показатели, подписи и цвета",
-                "vehicle", "dezz.status.widget.VehicleInfoPanelSettingsActivity",
-                "hud", "телеметрия", "топливо", "температура", "датчики"));
+                "климат", "оверлей", "плавающая", "кондиционер", "вентилятор",
+                "сиденья", "руль", "резервирование"));
         values.add(activity("panel_hud", Group.PANELS, "Отдельный HUD-дисплей",
                 "Живой редактор с сеткой, стабильный ID дисплея, навигация, автомобиль и умный дом",
                 "hud", "dezz.status.widget.HudPanelSettingsActivity",
                 "hud", "проекция", "внешний дисплей", "стрелки", "светофоры",
                 "полосы", "телеметрия", "умный дом", "сценарии", "сетка"));
-        values.add(activity("panel_information", Group.PANELS, "Блок «Информация»",
-                "Своя сетка статусов автомобиля, магнитолы и устройств умного дома",
-                "information", "dezz.status.widget.InformationPanelSettingsActivity",
-                "датчики", "статусы", "сетка", "home assistant", "sprut", "mqtt",
-                "информация"));
-        values.add(activity("panel_actions", Group.PANELS, "Кнопки и умный дом",
-                "Индивидуальная сетка, размеры и позиции кнопок — редактирование на HOME и в настройках",
-                "actions", "dezz.status.widget.LauncherShortcutSettingsActivity",
-                "быстрые действия", "ворота", "свет", "функции", "иконки",
-                "сетка", "размер", "позиция", "расположение", "home", "редактор",
-                "настройки", "редактирование",
-                "столбцы", "ряды", "показывать", "скрыть"));
         values.add(activity("driver_panel", Group.PANELS, "Панель водителя",
                 "Единая боковая панель: до 10 кнопок, Домой, Назад и штатный климат",
                 "apps", "dezz.status.widget.DriverPanelSettingsActivity",
@@ -249,10 +208,15 @@ public final class SettingsDestinationCatalog {
         values.add(action("app_import", Group.APP, "Импорт резервной копии",
                 "Восстановить несекретные настройки из ранее сохранённого JSON",
                 "import", ACTION_IMPORT, "restore", "восстановление", "json"));
-        values.add(activity("app_about", Group.APP, "Диагностика и о приложении",
+        values.add(activity("app_diagnostics", Group.APP, "Отладка и регистратор действий",
+                "Цветной журнал, полный стек ошибок и плавающее управление записью событий",
+                "diagnostics", "dezz.status.widget.DiagnosticsActivity",
+                "отладка", "журнал", "лог", "ошибка", "падение", "красный",
+                "предупреждение", "руль", "keycode", "оверлей", "запись", "json", "txt"));
+        values.add(activity("app_about", Group.APP, "О приложении и данные автомобиля",
                 "Версия, соединения и данные автомобиля → Sprut.hub",
                 "about", "dezz.status.widget.AboutActivity",
-                "версия", "диагностика", "ошибки", "соединение"));
+                "версия", "данные автомобиля", "sprut", "соединение"));
         values.add(action("app_reset", Group.APP, "Сбросить все настройки",
                 "Вернуть исходные значения после явного подтверждения",
                 "reset", ACTION_RESET, "удалить", "очистить", "по умолчанию"));

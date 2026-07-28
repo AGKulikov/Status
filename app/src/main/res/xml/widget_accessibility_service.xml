@@ -21,10 +21,11 @@
   Navigator builds which expose route ETA/distance only in their view tree.
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowsChanged|typeWindowContentChanged"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowsChanged|typeWindowContentChanged|typeViewClicked"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagRetrieveInteractiveWindows|flagIncludeNotImportantViews|flagReportViewIds"
+    android:accessibilityFlags="flagRetrieveInteractiveWindows|flagIncludeNotImportantViews|flagReportViewIds|flagRequestFilterKeyEvents"
     android:canPerformGestures="true"
+    android:canRequestFilterKeyEvents="true"
     android:canRetrieveWindowContent="true"
     android:description="@string/accessibility_service_description"
     android:notificationTimeout="50"

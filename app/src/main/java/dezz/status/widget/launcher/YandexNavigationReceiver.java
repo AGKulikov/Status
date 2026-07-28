@@ -30,6 +30,11 @@ public final class YandexNavigationReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         if (context == null || intent == null) return;
+        dezz.status.widget.diagnostics.ActionRecorder.record(
+                dezz.status.widget.diagnostics.ActionRecorder.SOURCE_SERVICE,
+                "BROADCAST_RECEIVED",
+                dezz.status.widget.diagnostics.ActionRecorder.object(
+                        "receiver", getClass().getName(), "action", intent.getAction()));
         Context applicationContext = context.getApplicationContext();
         if (applicationContext == null) applicationContext = context;
         Context targetContext = applicationContext;

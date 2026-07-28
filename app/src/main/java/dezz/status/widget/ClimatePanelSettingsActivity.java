@@ -49,8 +49,11 @@ import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
 import dezz.status.widget.shell.PrivilegedShell;
 
-/** Code-free, immediate editor for the HOME and always-on climate surfaces. */
+/** Immediate editor for either HOME climate widgets or the independent floating surface. */
 public final class ClimatePanelSettingsActivity extends AppCompatActivity {
+    public static final String EXTRA_LAUNCHER_ONLY =
+            "dezz.status.widget.extra.CLIMATE_LAUNCHER_ONLY";
+
     private interface BoolChange { void set(boolean value); }
     private interface IntChange { void set(int value); }
     private interface ColorChange { void set(@NonNull String value); }
@@ -66,6 +69,7 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
     private TextView compactPositionInfo;
     private TextView runtimeStatusInfo;
     private boolean overlayPermissionRequestInFlight;
+    private boolean launcherOnly;
     private PanelEditScheduler editScheduler;
     private final Runnable runtimeStatusRefresh = new Runnable() {
         @Override public void run() {
@@ -84,7 +88,10 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         preferences = new Preferences(this);
-        store = new ClimatePanelConfigStore(preferences);
+        launcherOnly = getIntent().getBooleanExtra(EXTRA_LAUNCHER_ONLY, false);
+        store = launcherOnly
+                ? new ClimatePanelConfigStore(preferences)
+                : new ClimatePanelConfigStore(preferences, preferences.floatingClimateConfigJson);
         config = store.load();
         editScheduler = PanelEditScheduler.onMainThread(() -> {
             config.normalize();
@@ -94,7 +101,7 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
             store.save(config);
             applyClimatePanel();
         });
-        setTitle("Климатическая панель");
+        setTitle(launcherOnly ? "Климат на лаунчере" : "Плавающая панель климата");
         View content = buildContent();
         setContentView(content);
         SettingsBackNavigation.install(this, content);
@@ -116,7 +123,8 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
         // The compact button can be dragged while this screen is not in the foreground. Always
         // show the persisted coordinates rather than the values captured during onCreate().
         updateCompactPositionInfo();
-        if (preferences.climatePanelEnabled.get() && Settings.canDrawOverlays(this)) {
+        if (!launcherOnly && preferences.climatePanelEnabled.get()
+                && Settings.canDrawOverlays(this)) {
             applyClimatePanel();
         }
         if (runtimeStatusInfo != null) {
@@ -160,9 +168,15 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
         settings.setPadding(dp(10), 0, dp(22), dp(28));
         settingsScroll.addView(settings, new ScrollView.LayoutParams(match(), wrap()));
 
-        addTitle(settings, "Панель климата");
-        addHint(settings, "Все изменения сохраняются сразу. Справа показан живой вид панели с текущими значениями автомобиля.");
+        addTitle(settings, launcherOnly
+                ? "Климатические виджеты HOME" : "Плавающая панель климата");
+        addHint(settings, launcherOnly
+                ? "Этот документ относится только к виджетам на лаунчере. Плавающая панель "
+                + "хранит отдельное оформление в разделе «Панели»."
+                : "Эта панель работает независимо от HOME. Все изменения сохраняются сразу; "
+                + "справа показан живой вид с текущими значениями автомобиля.");
 
+        if (!launcherOnly) {
         addTitle(settings, "Постоянная панель в приложениях");
         addHint(settings, "Работает независимо от основного виджета и HOME. Выберите маленькую плавающую кнопку или постоянно занятую полосу экрана.");
         permanentPanelSwitch = addSwitch(settings, "Включить постоянную климатическую панель",
@@ -256,7 +270,9 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
         addHint(settings, "Перед удалением приложения сначала используйте эту кнопку: сохранённые системные отступы будут восстановлены точно.");
         updateCompactPositionInfo();
         updateModeSettings(preferences.climatePanelMode.get());
+        }
 
+        if (launcherOnly) {
         addTitle(settings, "Блок внутри HOME");
         MaterialSwitch visible = addSwitch(settings, "Показывать блок на HOME",
                 preferences.launcherClimateVisible.get(),
@@ -267,6 +283,7 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
                 startActivity(new Intent(this, LauncherActivity.class)
                         .putExtra(LauncherActivity.EXTRA_EDIT_MODE, true)));
         addHint(settings, "В редакторе HOME блок перемещается целиком. Маркер в правом нижнем углу меняет его ширину и высоту в пикселях.");
+        }
 
         addTitle(settings, "Оформление");
         addColor(settings, "Фон", () -> config.backgroundColor,
@@ -309,8 +326,13 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
 
         addButton(settings, "Вернуть оформление по умолчанию", v ->
                 new AlertDialog.Builder(this)
-                        .setTitle("Сбросить климатический блок?")
-                        .setMessage("Оформление и выбор элементов вернутся к исходным. Размер и положение на HOME сохранятся.")
+                        .setTitle(launcherOnly
+                                ? "Сбросить климатические виджеты HOME?"
+                                : "Сбросить плавающую климатическую панель?")
+                        .setMessage("Оформление и выбор элементов вернутся к исходным. "
+                                + (launcherOnly
+                                ? "Размер и положение на HOME сохранятся."
+                                : "Размер и положение плавающего окна сохранятся."))
                         .setPositiveButton("Сбросить", (dialog, which) -> {
                             flushLiveUpdate();
                             store.reset();
@@ -365,6 +387,7 @@ public final class ClimatePanelSettingsActivity extends AppCompatActivity {
     }
 
     private void applyClimatePanel() {
+        if (launcherOnly) return;
         if (preferences.climatePanelEnabled.get()) {
             ClimatePanelService.apply(this);
             return;

@@ -34,6 +34,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+import dezz.status.widget.launcher.LauncherSettingsMigrationRegistry;
+
 public class Preferences {
     private static final String TAG = "Preferences";
     /** New large HOME surfaces must remain opt-in when an existing layout is upgraded. */
@@ -46,7 +48,7 @@ public class Preferences {
                     "mqttPassword", "sprutPassword", "sprutClientId", "haAccessToken",
                     // The paired phone is installation-specific and must not be copied into a
                     // settings backup restored on another head unit.
-                    "phoneDeviceAddress",
+                    "phoneDeviceAddress", "phoneAncsDeviceAddress",
                     // Contains both the full bearer action and fixed-endpoint token. Layout
                     // presets are routinely shared, so rules must remain device-local too.
                     "intentActionRulesJson")));
@@ -512,6 +514,15 @@ public class Preferences {
             "launcherGlobalElementsJson", "");
     /** Independent decorative HOME layers. They are always rendered below live widgets. */
     public final Str launcherBackdropsJson = new Str(this, "launcherBackdropsJson", "");
+    /** Horizontal free-frame groups. Members keep their own style/action and text size. */
+    public final Str launcherHorizontalGroupsJson = new Str(
+            this, "launcherHorizontalGroupsJson", "");
+    /** Recoverable, immutable snapshot taken before the flat Launcher settings migration. */
+    public final Str launcherUnifiedLegacyBackupJson = new Str(
+            this, "launcherUnifiedLegacyBackupJson", "");
+    /** Idempotent schema marker for the audited launcher-settings registry. */
+    public final Int launcherUnifiedSettingsMigrationVersion = new Int(
+            this, "launcherUnifiedSettingsMigrationVersion", 0);
     public final Str launcherFavoritePackages = new Str(this, "launcherFavoritePackages", "");
     /** Per-application HOME icon/label sizes; selection and order remain in the legacy list. */
     public final Str launcherFavoriteAppsAppearanceJson = new Str(this,
@@ -526,6 +537,9 @@ public class Preferences {
     /** Flattened launcher components hidden from both HOME and driver-panel catalogs. */
     public final StringSet launcherAllAppsHiddenComponents = new StringSet(
             this, "launcherAllAppsHiddenComponents");
+    /** One-time HA1132 default: system apps are hidden except the user-facing Phone app. */
+    public final Bool launcherSystemAppsDefaultApplied = new Bool(
+            this, "launcherSystemAppsDefaultApplied", false);
     public final Str launcherBackgroundColor = new Str(this, "launcherBackgroundColor", "#101827");
     public final Bool launcherShowGrid = new Bool(this, "launcherShowGrid", true);
     public final Int launcherSnapPx = new Int(this, "launcherSnapPx", 20);
@@ -541,6 +555,14 @@ public class Preferences {
     /** Delay lets ECARX finish restoring its audio/player services; mSaver's proven default is 5s. */
     public final Int launcherMediaAutoResumeDelaySeconds = new Int(this,
             "launcherMediaAutoResumeDelaySeconds", 5);
+    /**
+     * Routes every HOME media action to one explicitly selected Android package. When disabled,
+     * the last real player recorded by MediaSession/mHUD is used instead.
+     */
+    public final Bool launcherMediaFixedPlayerEnabled = new Bool(this,
+            "launcherMediaFixedPlayerEnabled", false);
+    public final Str launcherMediaFixedPlayerPackage = new Str(this,
+            "launcherMediaFixedPlayerPackage", "");
     public final Bool launcherClockVisible = new Bool(this, "launcherClockVisible", true);
     public final Bool launcherNavigationVisible = new Bool(this, "launcherNavigationVisible", true);
     public final Bool launcherActionsVisible = new Bool(this, "launcherActionsVisible", true);
@@ -575,7 +597,11 @@ public class Preferences {
     /** Cell geometry for the WYSIWYG navigation editor; migrated from launcherPanelElementsJson. */
     public final Str launcherNavigationConfigJson = new Str(this,
             "launcherNavigationConfigJson", "");
+    /** HOME climate widgets only; the floating surface was split out by HA1132. */
     public final Str launcherClimateConfigJson = new Str(this, "launcherClimateConfigJson", "");
+    /** Independent appearance/content for the floating climate surface. */
+    public final Str floatingClimateConfigJson = new Str(this,
+            "floatingClimateConfigJson", "");
     // Optional always-on climate surface. It is deliberately independent from both the HOME
     // climate panel above and the status widget service: a user may want climate controls while
     // another application occupies the main display. Defaults are opt-in and preserve every
@@ -648,6 +674,19 @@ public class Preferences {
     public final Int launcherAppsColumns = new Int(this, "launcherAppsColumns", 3);
     public final Int launcherActionsColumns = new Int(this, "launcherActionsColumns", 3);
 
+    /** Local diagnostics are opt-in because the detailed journal can grow to its cyclic limit. */
+    public final Bool debugModeEnabled = new Bool(this, "debugModeEnabled", false);
+    /** Persistent control frame used to start/stop action capture above every application. */
+    public final Bool actionRecorderOverlayVisible = new Bool(this,
+            "actionRecorderOverlayVisible", false);
+    public final Int actionRecorderOverlayX = new Int(this, "actionRecorderOverlayX", 40);
+    public final Int actionRecorderOverlayY = new Int(this, "actionRecorderOverlayY", 160);
+    public final Int actionRecorderOverlayWidth = new Int(this,
+            "actionRecorderOverlayWidth", 420);
+    /** Whole-frame alpha, 80..255. */
+    public final Int actionRecorderOverlayAlpha = new Int(this,
+            "actionRecorderOverlayAlpha", 235);
+
     public final Bool mqttEnabled = new Bool(this, "mqttEnabled", false);
     public final Str mqttHost = new Str(this, "mqttHost", "");
     public final Int mqttPort = new Int(this, "mqttPort", 1883);
@@ -667,6 +706,12 @@ public class Preferences {
     public final Bool phoneConnectorEnabled = new Bool(this,
             "phoneConnectorEnabled", false);
     public final Str phoneDeviceAddress = new Str(this, "phoneDeviceAddress", "");
+    /**
+     * Dedicated BLE/ANCS identity. It is initially copied from the selected Classic phone but is
+     * kept under a separate key so ANCS recovery never renames, re-pairs, or rewrites Classic.
+     */
+    public final Str phoneAncsDeviceAddress = new Str(this,
+            "phoneAncsDeviceAddress", "");
     public final Bool phoneNotificationsEnabled = new Bool(this,
             "phoneNotificationsEnabled", true);
     public final Bool phoneMessagesEnabled = new Bool(this,
@@ -845,6 +890,7 @@ public class Preferences {
         prefs = deviceContext.getSharedPreferences(context.getPackageName() + "_preferences", Context.MODE_PRIVATE);
         migrateLegacyPrefsIfNeeded();
         migrateUnifiedDriverPanelIfNeeded();
+        migrateUnifiedLauncherSettingsIfNeeded();
     }
 
     @NonNull
@@ -883,6 +929,51 @@ public class Preferences {
         editor.putString(driverPanelStyle.key, DriverPanelStyle.NEW.key)
                 .putBoolean("driverPanelUnifiedHa1085", true)
                 .commit();
+    }
+
+    /**
+     * HA1132 flattens only the settings/navigation model. Existing storage keys intentionally stay
+     * unchanged so geometry, style, actions, fonts, colours and media behavior survive exactly.
+     * Before marking the migration complete, store a recoverable snapshot of every affected key.
+     */
+    private void migrateUnifiedLauncherSettingsIfNeeded() {
+        int current = prefs.getInt(launcherUnifiedSettingsMigrationVersion.key, 0);
+        if (current >= LauncherSettingsMigrationRegistry.SCHEMA_VERSION) return;
+        try {
+            JSONObject root = new JSONObject();
+            root.put("version", LauncherSettingsMigrationRegistry.SCHEMA_VERSION);
+            root.put("capturedAtMillis", System.currentTimeMillis());
+            JSONObject values = new JSONObject();
+            Map<String, ?> stored = prefs.getAll();
+            for (String key : LauncherSettingsMigrationRegistry.storageKeys()) {
+                if (!stored.containsKey(key)) continue;
+                Object value = stored.get(key);
+                if (value instanceof Set) {
+                    JSONArray array = new JSONArray();
+                    for (Object item : (Set<?>) value) array.put(String.valueOf(item));
+                    values.put(key, array);
+                } else if (value != null) {
+                    values.put(key, value);
+                }
+            }
+            root.put("values", values);
+
+            SharedPreferences.Editor editor = prefs.edit();
+            if (launcherUnifiedLegacyBackupJson.get().trim().isEmpty()) {
+                editor.putString(launcherUnifiedLegacyBackupJson.key, root.toString());
+            }
+            // The old build shared one climate document between HOME and the floating panel.
+            // Copy it once, then both surfaces evolve independently.
+            if (!prefs.contains(floatingClimateConfigJson.key)) {
+                editor.putString(floatingClimateConfigJson.key,
+                        launcherClimateConfigJson.get());
+            }
+            editor.putInt(launcherUnifiedSettingsMigrationVersion.key,
+                    LauncherSettingsMigrationRegistry.SCHEMA_VERSION);
+            editor.commit();
+        } catch (JSONException error) {
+            Log.w(TAG, "Cannot snapshot legacy launcher settings", error);
+        }
     }
 
     /** Avoids a common-to-driver package dependency for the fixed new-panel minimum. */
@@ -1178,5 +1269,6 @@ public class Preferences {
         // A full backup made by HA1084 may still select the legacy driver profile and does not
         // contain HA1085's migration marker. Preserve that active profile after import too.
         migrateUnifiedDriverPanelIfNeeded();
+        migrateUnifiedLauncherSettingsIfNeeded();
     }
 }

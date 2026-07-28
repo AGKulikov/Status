@@ -100,6 +100,8 @@ public final class ClimatePanelService extends Service {
     @Override
     public int onStartCommand(@Nullable Intent intent, int flags, int startId) {
         String action = intent == null ? ACTION_APPLY : intent.getAction();
+        dezz.status.widget.diagnostics.ActionRecorder.recordServiceIntent(
+                getClass().getName(), action, startId);
         if (ACTION_RESTORE.equals(action)
                 || preferences == null
                 || !preferences.climatePanelEnabled.get()) {

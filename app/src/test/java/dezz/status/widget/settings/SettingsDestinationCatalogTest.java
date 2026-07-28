@@ -23,31 +23,23 @@ import java.util.Set;
 public final class SettingsDestinationCatalogTest {
     private static final Set<String> USER_FACING_ACTIVITIES = new HashSet<>(Arrays.asList(
             "dezz.status.widget.AboutActivity",
-            "dezz.status.widget.AllAppsSettingsActivity",
             "dezz.status.widget.AutomationSettingsActivity",
             "dezz.status.widget.ClimatePanelSettingsActivity",
+            "dezz.status.widget.DiagnosticsActivity",
             "dezz.status.widget.DriverPanelSettingsActivity",
             "dezz.status.widget.DriverFavoritesSettingsActivity",
-            "dezz.status.widget.FavoriteAppsSettingsActivity",
-            "dezz.status.widget.FavoriteRoutesSettingsActivity",
             "dezz.status.widget.HomeAssistantSettingsActivity",
             "dezz.status.widget.HudPanelSettingsActivity",
-            "dezz.status.widget.InformationPanelSettingsActivity",
             "dezz.status.widget.IntentScenarioSettingsActivity",
             "dezz.status.widget.LauncherSettingsActivity",
-            "dezz.status.widget.LauncherShortcutSettingsActivity",
             "dezz.status.widget.MainActivity",
-            "dezz.status.widget.MediaPanelSettingsActivity",
             "dezz.status.widget.MqttSettingsActivity",
-            "dezz.status.widget.NavigationPanelSettingsActivity",
-            "dezz.status.widget.PanelElementSettingsActivity",
             "dezz.status.widget.PhoneConnectorSettingsActivity",
             "dezz.status.widget.PhoneNotificationAutomationSettingsActivity",
             "dezz.status.widget.PopupSettingsActivity",
             "dezz.status.widget.PresetsActivity",
             "dezz.status.widget.ScenarioSettingsActivity",
-            "dezz.status.widget.SprutHubSettingsActivity",
-            "dezz.status.widget.VehicleInfoPanelSettingsActivity"
+            "dezz.status.widget.SprutHubSettingsActivity"
     ));
 
     @Test
@@ -99,34 +91,33 @@ public final class SettingsDestinationCatalogTest {
 
     @Test
     public void searchSupportsRussianEnglishAndNormalizedSynonyms() {
-        assertSearchContains("музыка", "panel_media");
-        assertSearchContains("информация", "panel_information");
-        assertSearchContains("манёвр", "panel_navigation");
+        assertSearchContains("музыка", "home_behavior");
+        assertSearchContains("информация", "home_behavior");
+        assertSearchContains("манёвр", "home_behavior");
         assertSearchContains("  РЕЗЕРВНАЯ   КОПИЯ ", "app_export");
         assertSearchContains("backup", "app_export");
         assertSearchContains("HOME ASSISTANT", "connector_ha");
         assertSearchContains("iphone", "connector_phone");
         assertSearchContains("sms", "connector_phone");
         assertSearchContains("android intent", "automation_intent");
-        assertSearchContains("индивидуальная сетка", "panel_actions");
-        assertSearchContains("размеры", "panel_actions");
-        assertSearchContains("позиции кнопок", "panel_actions");
-        assertSearchContains("столбцы", "panel_actions");
+        assertSearchContains("размеры", "home_behavior");
+        assertSearchContains("позиции кнопок", "home_behavior");
+        assertSearchContains("столбцы", "home_behavior");
         assertEquals(SettingsDestinationCatalog.all().size(),
                 SettingsDestinationCatalog.search("  ").size());
         assertTrue(SettingsDestinationCatalog.search("несуществующий-запрос").isEmpty());
     }
 
     @Test
-    public void actionsMetadataAdvertisesVisualHomeEditing() {
-        SettingsDestinationCatalog.Destination actions =
-                SettingsDestinationCatalog.byId("panel_actions");
-        assertNotNull(actions);
-        assertTrue(actions.subtitle.contains("Индивидуальная сетка"));
-        assertTrue(actions.subtitle.contains("размеры"));
-        assertTrue(actions.subtitle.contains("позиции"));
-        assertTrue(actions.subtitle.contains("HOME"));
-        assertTrue(actions.subtitle.contains("настройках"));
+    public void launcherMetadataAdvertisesOneFlatHomeScreen() {
+        SettingsDestinationCatalog.Destination launcher =
+                SettingsDestinationCatalog.byId("home_behavior");
+        assertNotNull(launcher);
+        assertEquals(1, SettingsDestinationCatalog.forGroup(
+                SettingsDestinationCatalog.Group.HOME).size());
+        assertTrue(launcher.subtitle.contains("Один плоский экран"));
+        assertTrue(launcher.keywords.contains("размеры"));
+        assertTrue(launcher.keywords.contains("позиции кнопок"));
     }
 
     private static void assertSearchContains(String query, String expectedId) {

@@ -119,6 +119,8 @@ public final class DriverPanelService extends Service {
     @Override
     public int onStartCommand(@Nullable Intent intent, int flags, int startId) {
         String action = intent == null ? ACTION_APPLY : intent.getAction();
+        dezz.status.widget.diagnostics.ActionRecorder.recordServiceIntent(
+                getClass().getName(), action, startId);
         if (ACTION_STOP.equals(action)
                 || preferences == null
                 || !preferences.driverPanelEnabled.get()) {

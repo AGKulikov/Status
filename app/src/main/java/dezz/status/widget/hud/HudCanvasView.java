@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Locale;
 
 import dezz.status.widget.automation.AutomationState;
+import dezz.status.widget.launcher.HorizontalGroupLayout;
 import dezz.status.widget.launcher.NavigationDataRepository;
 
 /**
@@ -232,6 +233,9 @@ public final class HudCanvasView extends View {
         unitColor = withAlpha(unitColor, Math.round(Color.alpha(unitColor) * alpha / 255f));
 
         switch (item.type) {
+            case HORIZONTAL_GROUP:
+                // Geometry-only container. A background is always an independent BACKDROP.
+                return;
             case MEDIA_ARTWORK:
                 drawBitmap(canvas, data.media() == null ? null : data.media().artwork, bounds);
                 return;
@@ -781,8 +785,19 @@ public final class HudCanvasView extends View {
     private HudElementConfig hit(float x, float y, Geometry geometry) {
         List<HudElementConfig> order = new ArrayList<>(config.drawingOrder());
         Collections.reverse(order);
+        // A group is edited as one free frame. Its member settings remain available from the
+        // group editor, so invisible children cannot steal the first tap from their container.
         for (HudElementConfig item : order) {
-            if (item.enabled && bounds(item, geometry).contains(x, y)) return item;
+            if (item.type == HudElementType.HORIZONTAL_GROUP && item.enabled
+                    && bounds(item, geometry).contains(x, y)) {
+                return item;
+            }
+        }
+        for (HudElementConfig item : order) {
+            if (item.type != HudElementType.HORIZONTAL_GROUP && item.enabled
+                    && bounds(item, geometry).contains(x, y)) {
+                return item;
+            }
         }
         return null;
     }
@@ -795,6 +810,74 @@ public final class HudCanvasView extends View {
     }
 
     private RectF bounds(HudElementConfig item, Geometry geometry) {
+        if (item.type != HudElementType.HORIZONTAL_GROUP
+                && item.type != HudElementType.BACKDROP) {
+            RectF grouped = groupedBounds(item, geometry);
+            if (grouped != null) return grouped;
+        }
+        return baseBounds(item, geometry);
+    }
+
+    @Nullable
+    private RectF groupedBounds(@NonNull HudElementConfig member,
+                                @NonNull Geometry geometry) {
+        for (HudElementConfig group : config.elements) {
+            if (!group.enabled || group.type != HudElementType.HORIZONTAL_GROUP) continue;
+            List<String> ids = HudHorizontalGroup.memberIds(group);
+            int memberIndex = ids.indexOf(member.id);
+            if (memberIndex < 0 || ids.size() < 2) continue;
+
+            RectF groupBounds = baseBounds(group, geometry);
+            int marginLeft = Math.round(HudHorizontalGroup.marginLeftPx(group) * geometry.scale);
+            int marginTop = Math.round(HudHorizontalGroup.marginTopPx(group) * geometry.scale);
+            int marginRight = Math.round(
+                    HudHorizontalGroup.marginRightPx(group) * geometry.scale);
+            int marginBottom = Math.round(
+                    HudHorizontalGroup.marginBottomPx(group) * geometry.scale);
+            float left = Math.min(groupBounds.right - 1f, groupBounds.left + marginLeft);
+            float top = Math.min(groupBounds.bottom - 1f, groupBounds.top + marginTop);
+            float right = Math.max(left + 1f, groupBounds.right - marginRight);
+            float bottom = Math.max(top + 1f, groupBounds.bottom - marginBottom);
+
+            ArrayList<HorizontalGroupLayout.Size> desired = new ArrayList<>();
+            ArrayList<String> presentIds = new ArrayList<>();
+            for (String id : ids) {
+                HudElementConfig value = find(id);
+                if (value == null || !value.enabled
+                        || value.type == HudElementType.HORIZONTAL_GROUP
+                        || value.type == HudElementType.BACKDROP) {
+                    continue;
+                }
+                RectF source = baseBounds(value, geometry);
+                desired.add(new HorizontalGroupLayout.Size(
+                        Math.max(1, Math.round(source.width())),
+                        Math.max(1, Math.round(source.height()))));
+                presentIds.add(id);
+            }
+            int presentIndex = presentIds.indexOf(member.id);
+            if (presentIndex < 0 || presentIds.size() < 2) return null;
+            List<HorizontalGroupLayout.Rect> placements = HorizontalGroupLayout.layout(
+                    Math.round(left), Math.round(top),
+                    Math.max(1, Math.round(right - left)),
+                    Math.max(1, Math.round(bottom - top)),
+                    Math.round(HudHorizontalGroup.paddingLeftPx(group) * geometry.scale),
+                    Math.round(HudHorizontalGroup.paddingTopPx(group) * geometry.scale),
+                    Math.round(HudHorizontalGroup.paddingRightPx(group) * geometry.scale),
+                    Math.round(HudHorizontalGroup.paddingBottomPx(group) * geometry.scale),
+                    Math.round(HudHorizontalGroup.gapPx(group) * geometry.scale),
+                    HudHorizontalGroup.horizontalAlignment(group),
+                    HudHorizontalGroup.verticalAlignment(group),
+                    HudHorizontalGroup.distribution(group),
+                    desired);
+            if (presentIndex >= placements.size()) return null;
+            HorizontalGroupLayout.Rect resolved = placements.get(presentIndex);
+            return new RectF(resolved.x, resolved.y,
+                    resolved.x + resolved.width, resolved.y + resolved.height);
+        }
+        return null;
+    }
+
+    private RectF baseBounds(HudElementConfig item, Geometry geometry) {
         float fineX = (float) item.options.optDouble("fineX", 0d) * geometry.scale;
         float fineY = (float) item.options.optDouble("fineY", 0d) * geometry.scale;
         float left = geometry.content.left + item.x * geometry.cellWidth + fineX;

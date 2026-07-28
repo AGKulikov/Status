@@ -74,8 +74,8 @@ public final class AllAppsSettingsActivity extends AppCompatActivity {
         TextView title = text("Меню «Все приложения»", 25, Color.WHITE);
         root.addView(title);
         TextView hint = text("Эти параметры одновременно применяются в лаунчере и в панели "
-                + "водителя. В меню попадают только обычные запускаемые приложения; системные "
-                + "приложения по-прежнему доступны в редакторе кнопок.", 14, 0xFF9A9AA0);
+                + "водителя. По умолчанию системные приложения скрыты, кроме «Телефона»; "
+                + "любой системный экран можно включить ниже.", 14, 0xFF9A9AA0);
         LinearLayout.LayoutParams hintParams = rowParams();
         hintParams.bottomMargin = dp(12);
         root.addView(hint, hintParams);
@@ -110,6 +110,7 @@ public final class AllAppsSettingsActivity extends AppCompatActivity {
         loader.execute(() -> {
             List<LauncherAppCatalog.App> values =
                     LauncherAppCatalog.loadIncludingSystem(this);
+            LauncherAppCatalog.ensureDefaultSystemVisibility(this, preferences, values);
             runOnUiThread(() -> renderApplications(values));
         });
     }

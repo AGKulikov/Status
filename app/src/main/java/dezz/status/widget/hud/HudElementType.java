@@ -15,6 +15,7 @@ import java.util.Locale;
  */
 public enum HudElementType {
     BACKDROP("Подложка", "Оформление", "", 16, 8),
+    HORIZONTAL_GROUP("Горизонтальный ряд", "Компоновка", "", 18, 5),
 
     CLOCK("Часы", "Основное", "", 7, 3),
 

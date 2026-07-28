@@ -173,6 +173,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             try {
                 dismissAllApps();
                 context.startActivity(LauncherAppCatalog.launchIntent(app));
+                scheduleRaiseAfterExternalLaunch();
             } catch (RuntimeException error) {
                 Toast.makeText(context, "Не удалось открыть " + app.label,
                         Toast.LENGTH_SHORT).show();
@@ -189,7 +190,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                     context, app.packageName, app.systemApp)) return;
             AttachedWindow current = drawerWindow;
             if (current != null) current.setTouchable(false);
-            if (!AppUninstallLauncher.request(context, app) && current != null) {
+            if (!AppUninstallLauncher.request(context, app, attachedType)
+                    && current != null) {
                 current.setTouchable(true);
             }
         }
@@ -489,6 +491,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         try {
             manager.addView(root, params);
             drawerWindow = new AttachedWindow(root, params, manager);
+            dezz.status.widget.diagnostics.ActionRecorder.recordOverlay(
+                    "driver_all_apps", "OPENED", "driver panel button");
             drawerGrid = grid;
             drawerTitle = title;
             drawerDone = done;
@@ -522,7 +526,10 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             mainHandler.post(() -> showFavorites(panelId, anchor));
             return;
         }
-        if (favoriteWindows.containsKey(panelId)) {
+        // Treat the user's logical open state as authoritative as well as the attached window.
+        // A rail refresh briefly replaces the WindowManager view; a second tap during that frame
+        // must close the same Favorites panel instead of creating/reopening another instance.
+        if (favoriteWindows.containsKey(panelId) || manuallyOpenFavorites.contains(panelId)) {
             manuallyOpenFavorites.remove(panelId);
             manuallyClosedFavorites.add(panelId);
             dismissFavoritePanel(panelId);
@@ -610,6 +617,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             for (LauncherShortcutStore.Shortcut value : values) itemIds.add(value.id);
             favoriteWindows.put(panelId, new FavoritePanelWindow(
                     config, grid, new AttachedWindow(root, params, manager), itemIds));
+            dezz.status.widget.diagnostics.ActionRecorder.recordOverlay(
+                    "driver_favorites:" + panelId, "OPENED", "driver panel button");
         } catch (RuntimeException error) {
             Log.w(TAG, "Could not show driver favorites", error);
             manuallyOpenFavorites.remove(panelId);
@@ -688,7 +697,11 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         drawerEditMode = false;
         unregisterDrawerPackageReceiver();
         unregisterDrawerUninstallReceiver();
-        if (drawer != null) drawer.remove();
+        if (drawer != null) {
+            drawer.remove();
+            dezz.status.widget.diagnostics.ActionRecorder.recordOverlay(
+                    "driver_all_apps", "CLOSED", "dismiss");
+        }
     }
 
     private void setDrawerEditMode(boolean enabled) {
@@ -767,6 +780,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         if (value == null) return;
         for (String itemId : value.itemIds) drawerSmartHomeBindings.remove(itemId);
         value.window.remove();
+        dezz.status.widget.diagnostics.ActionRecorder.recordOverlay(
+                "driver_favorites:" + panelId, "CLOSED", "dismiss");
     }
 
     private void dismissAllFavoritePanels() {
@@ -977,16 +992,17 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                         rowStyle.informationGroupDistribution == 1
                                 ? new LinearLayout.LayoutParams(
                                 ViewGroup.LayoutParams.WRAP_CONTENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT)
+                                ViewGroup.LayoutParams.WRAP_CONTENT)
                                 : new LinearLayout.LayoutParams(
-                                0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+                                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
                 tileParams.rightMargin =
                         itemIndex + 1 < rowItems.size() ? internalGap : 0;
                 row.addView(tile, tileParams);
             }
             int rowHeight = tileHeight + groupPaddingTop + groupPaddingBottom;
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, rowHeight);
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
             rowParams.leftMargin = dp(context, rowStyle.informationGroupMarginLeftPx);
             rowParams.topMargin = dp(context, rowStyle.informationGroupMarginTopPx);
             rowParams.rightMargin = dp(context, rowStyle.informationGroupMarginRightPx);
@@ -1030,11 +1046,10 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             @NonNull Context context,
             @NonNull LauncherShortcutStore.Shortcut shortcut) {
         float scaledDensity = context.getResources().getDisplayMetrics().scaledDensity;
-        // Device states may contain mode, value, availability and an error/explanation. Reserve
-        // five value lines and real font leading; the surrounding ScrollView handles any total
-        // height beyond the rail budget instead of clipping the status inside its own tile.
+        // This value is only the ScrollView budget estimate. The actual row is WRAP_CONTENT, so a
+        // long status grows naturally and scrolls instead of inheriting a hidden five-line frame.
         int text = Math.round((shortcut.informationValueTextSizeSp
-                * (shortcut.informationShowValue ? 5 : 0)
+                * (shortcut.informationShowValue ? 1 : 0)
                 + (shortcut.showTitle ? shortcut.informationLabelTextSizeSp : 0))
                 * scaledDensity * 1.18f);
         int padding = dp(context, shortcut.informationPaddingTopPx
@@ -1157,7 +1172,12 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 || widgetService.driverShortcutActionEnabled(shortcut.id, true);
         button.setAlpha(actionEnabled ? 1f : .42f);
         if (actionEnabled) {
-            button.setOnClickListener(view -> actions.execute(shortcut, view));
+            button.setOnClickListener(view -> {
+                actions.execute(shortcut, view);
+                if (shortcut.kind == LauncherShortcutStore.Kind.APP) {
+                    scheduleRaiseAfterExternalLaunch();
+                }
+            });
             if (shortcut.hasLongAction) {
                 button.setOnLongClickListener(view -> actions.executeLong(shortcut, view));
             }
@@ -1172,6 +1192,17 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             applySmartHomeState(binding);
         }
         return button;
+    }
+
+    /**
+     * Some ECARX activities create their application surface after the navigation-bar callback.
+     * Re-adding the rail transactionally once that surface exists keeps the driver panel above an
+     * app launched from the rail, matching launches performed from HOME.
+     */
+    private void scheduleRaiseAfterExternalLaunch() {
+        mainHandler.postDelayed(() -> {
+            if (preferences.driverPanelEnabled.get()) raise();
+        }, 650L);
     }
 
     private static boolean isLiveClimate(

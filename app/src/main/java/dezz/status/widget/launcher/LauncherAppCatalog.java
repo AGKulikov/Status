@@ -12,6 +12,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ApplicationInfo;
 import android.graphics.drawable.Drawable;
+import android.telecom.TelecomManager;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
@@ -110,13 +111,74 @@ public final class LauncherAppCatalog {
     @NonNull
     public static List<App> loadVisible(@NonNull Context context,
                                         @NonNull Preferences preferences) {
+        List<App> catalog = loadIncludingSystem(context);
+        ensureDefaultSystemVisibility(context, preferences, catalog);
         Set<String> hidden = preferences.launcherAllAppsHiddenComponents.get();
-        if (hidden.isEmpty()) return loadIncludingSystem(context);
         List<App> visible = new ArrayList<>();
-        for (App app : loadIncludingSystem(context)) {
+        for (App app : catalog) {
             if (!hidden.contains(app.component.flattenToString())) visible.add(app);
         }
         return visible;
+    }
+
+    /**
+     * Applies the requested first-run catalog policy without hard-coding one ECARX package name.
+     * Every system app remains available in settings and can be enabled explicitly.
+     */
+    public static void ensureDefaultSystemVisibility(
+            @NonNull Context context,
+            @NonNull Preferences preferences,
+            @NonNull List<App> catalog) {
+        if (preferences.launcherSystemAppsDefaultApplied.get()) return;
+        synchronized (LauncherAppCatalog.class) {
+            if (preferences.launcherSystemAppsDefaultApplied.get()) return;
+            Set<String> hidden = preferences.launcherAllAppsHiddenComponents.get();
+            String defaultDialer = "";
+            try {
+                TelecomManager telecom =
+                        (TelecomManager) context.getSystemService(Context.TELECOM_SERVICE);
+                if (telecom != null && telecom.getDefaultDialerPackage() != null) {
+                    defaultDialer = telecom.getDefaultDialerPackage();
+                }
+            } catch (RuntimeException ignored) {
+            }
+            if (defaultDialer.isEmpty()) {
+                defaultDialer = fallbackPhonePackage(catalog);
+            }
+            for (App app : catalog) {
+                if (app.systemApp && !isUserFacingPhone(app, defaultDialer)) {
+                    hidden.add(app.component.flattenToString());
+                }
+            }
+            preferences.launcherAllAppsHiddenComponents.set(hidden);
+            preferences.launcherSystemAppsDefaultApplied.set(true);
+        }
+    }
+
+    @NonNull
+    private static String fallbackPhonePackage(@NonNull List<App> catalog) {
+        App best = null;
+        int bestScore = 0;
+        for (App app : catalog) {
+            if (!app.systemApp) continue;
+            String packageName = app.packageName.toLowerCase(Locale.ROOT);
+            String component = app.component.getClassName().toLowerCase(Locale.ROOT);
+            String label = app.label.trim().toLowerCase(Locale.ROOT);
+            int score = label.equals("phone") || label.equals("телефон") ? 100
+                    : packageName.contains("dialer") ? 80
+                    : component.contains("dialer") ? 70
+                    : component.contains("phoneactivity") ? 60 : 0;
+            if (score > bestScore) {
+                best = app;
+                bestScore = score;
+            }
+        }
+        return best == null ? "" : best.packageName;
+    }
+
+    private static boolean isUserFacingPhone(@NonNull App app,
+                                             @NonNull String defaultDialer) {
+        return !defaultDialer.isEmpty() && defaultDialer.equals(app.packageName);
     }
 
     @NonNull

@@ -21,7 +21,8 @@ public final class MediaSourceStabilityContractTest {
         String source = controllerSource();
         assertTrue(source.contains("MediaStateFreshness.shouldKeepCurrentSession("));
         assertTrue(source.contains("sameSession(current, candidate)"));
-        assertTrue(source.contains("MediaController selected = keepCurrent ? retained"));
+        assertTrue(source.contains(
+                "selected = keepCurrent ? retained : firstPlaying != null ? firstPlaying : first"));
     }
 
     @Test public void correlatedBroadcastOwnsConflictingTrackAsOneAtomicSnapshot()

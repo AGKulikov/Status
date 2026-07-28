@@ -84,10 +84,13 @@ import dezz.status.widget.launcher.LauncherGlobalElementLayoutStore;
 import dezz.status.widget.launcher.LauncherGlobalElementProxyView;
 import dezz.status.widget.launcher.LauncherGlobalElementTag;
 import dezz.status.widget.launcher.LauncherGridView;
+import dezz.status.widget.launcher.HorizontalGroupLayout;
+import dezz.status.widget.launcher.LauncherHorizontalGroupStore;
 import dezz.status.widget.launcher.LauncherLayoutStore;
 import dezz.status.widget.launcher.LauncherMediaController;
 import dezz.status.widget.launcher.LauncherIconResolver;
 import dezz.status.widget.launcher.LauncherShortcutStore;
+import dezz.status.widget.launcher.LauncherWidgetCatalog;
 import dezz.status.widget.launcher.LauncherSafeAreaPolicy;
 import dezz.status.widget.launcher.LauncherSafeAreaResolver;
 import dezz.status.widget.launcher.NavigationDataRepository;
@@ -134,6 +137,8 @@ import dezz.status.widget.sprut.SprutHubController;
 public final class LauncherActivity extends AppCompatActivity {
     private static final String TAG = "LauncherActivity";
     public static final String EXTRA_EDIT_MODE = "dezz.status.widget.extra.EDIT_HOME";
+    public static final String EXTRA_SHOW_WIDGET_CATALOG =
+            "dezz.status.widget.extra.SHOW_HOME_WIDGET_CATALOG";
     public static final String EXTRA_EDIT_NAVIGATION_CONTENT =
             "dezz.status.widget.extra.EDIT_NAVIGATION_CONTENT";
     public static final String EXTRA_EDIT_MEDIA_CONTENT =
@@ -157,6 +162,8 @@ public final class LauncherActivity extends AppCompatActivity {
     private final Map<String, View> globalElementSources = new LinkedHashMap<>();
     private final Map<String, LauncherElementFrame> backdropFrames = new LinkedHashMap<>();
     private final Map<String, LauncherBackdropView> backdropViews = new LinkedHashMap<>();
+    private final Map<String, LauncherElementFrame> horizontalGroupFrames =
+            new LinkedHashMap<>();
     private final Handler navigationUiHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService launcherWorker = Executors.newFixedThreadPool(2, runnable -> {
         Thread thread = new Thread(() -> {
@@ -179,6 +186,7 @@ public final class LauncherActivity extends AppCompatActivity {
             if (!activityStarted || isFinishing() || isDestroyed()) return;
             syncGlobalElements();
             syncLauncherBackdrops();
+            syncLauncherHorizontalGroups();
             refreshGlobalElementVisibility();
             navigationUiHandler.postDelayed(this, GLOBAL_ELEMENT_REFRESH_MS);
         }
@@ -194,6 +202,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private LauncherLayoutStore layoutStore;
     private LauncherGlobalElementLayoutStore globalElementLayoutStore;
     private LauncherBackdropStore backdropStore;
+    private LauncherHorizontalGroupStore horizontalGroupStore;
     private PanelElementConfigStore panelElementStore;
     private LauncherActionsGridConfigStore actionsGridConfigStore;
     private NavigationPanelConfigStore navigationPanelConfigStore;
@@ -290,6 +299,7 @@ public final class LauncherActivity extends AppCompatActivity {
     @Nullable private String appliedActionsGridJson;
     @Nullable private String appliedGlobalElementsJson;
     @Nullable private String appliedLauncherBackdropsJson;
+    @Nullable private String appliedLauncherHorizontalGroupsJson;
     private int appliedAppsColumns = -1;
     private int appliedActionsColumns = -1;
     private int appsGridScalePercent = 100;
@@ -346,6 +356,7 @@ public final class LauncherActivity extends AppCompatActivity {
         layoutStore = new LauncherLayoutStore(preferences);
         globalElementLayoutStore = new LauncherGlobalElementLayoutStore(preferences);
         backdropStore = new LauncherBackdropStore(preferences);
+        horizontalGroupStore = new LauncherHorizontalGroupStore(preferences);
         panelElementStore = new PanelElementConfigStore(preferences);
         actionsGridConfigStore = new LauncherActionsGridConfigStore(preferences);
         navigationPanelConfigStore = new NavigationPanelConfigStore(preferences);
@@ -389,16 +400,28 @@ public final class LauncherActivity extends AppCompatActivity {
         if (panelsInitialized) {
             workspace.post(() -> {
                 activateGlobalElements();
-                if (requestsAnyHomeEditor(intent)) setEditMode(true);
+                applyRequestedHomeEditor(intent);
             });
         }
     }
 
     private static boolean requestsAnyHomeEditor(@Nullable Intent intent) {
         return intent != null && (intent.getBooleanExtra(EXTRA_EDIT_MODE, false)
+                || intent.getBooleanExtra(EXTRA_SHOW_WIDGET_CATALOG, false)
                 || intent.getBooleanExtra(EXTRA_EDIT_MEDIA_CONTENT, false)
                 || intent.getBooleanExtra(EXTRA_EDIT_NAVIGATION_CONTENT, false)
                 || intent.getBooleanExtra(EXTRA_EDIT_ACTIONS_CONTENT, false));
+    }
+
+    /** Settings and the in-editor plus button converge on this exact catalog method. */
+    private void applyRequestedHomeEditor(@Nullable Intent intent) {
+        if (!requestsAnyHomeEditor(intent)) return;
+        setEditMode(true);
+        if (intent != null && intent.getBooleanExtra(
+                EXTRA_SHOW_WIDGET_CATALOG, false)) {
+            intent.removeExtra(EXTRA_SHOW_WIDGET_CATALOG);
+            workspace.post(this::showLauncherWidgetCatalog);
+        }
     }
 
     private void handleStagedOrHomeNavigation(@Nullable Intent intent) {
@@ -834,12 +857,10 @@ public final class LauncherActivity extends AppCompatActivity {
 
         workspace = new FrameLayout(this);
         workspace.setClipChildren(false);
-        workspace.setLongClickable(true);
-        workspace.setOnLongClickListener(v -> {
-            if (!navigationContentEditMode && !mediaContentEditMode
-                    && !actionsContentEditMode) setEditMode(true);
-            return true;
-        });
+        // Layout mode is deliberately entered only from Settings or an explicit EDIT_HOME
+        // launcher action. A long press on the wallpaper must never unexpectedly expose editor
+        // chrome while driving.
+        workspace.setLongClickable(false);
         root.addView(workspace, match());
 
         doneButton = new MaterialButton(this);
@@ -934,6 +955,7 @@ public final class LauncherActivity extends AppCompatActivity {
         }
         syncLauncherBackdrops();
         syncGlobalElements();
+        syncLauncherHorizontalGroups();
         for (Map.Entry<String, LauncherElementFrame> entry : panels.entrySet()) {
             if (!hasGlobalFrameForPanel(entry.getKey())) continue;
             // The measured legacy hierarchy remains the live data/action source for the proxies,
@@ -966,7 +988,7 @@ public final class LauncherActivity extends AppCompatActivity {
             if (frame != null) workspace.removeView(frame);
         }
 
-        int snap = Math.max(4, preferences.launcherSnapPx.get());
+        int snap = Math.max(1, preferences.launcherSnapPx.get());
         int backdropIndex = 0;
         for (LauncherBackdropStore.Backdrop value : values) {
             LauncherElementFrame frame = backdropFrames.get(value.id);
@@ -984,7 +1006,7 @@ public final class LauncherActivity extends AppCompatActivity {
                             changed.height = height;
                             saveLauncherBackdrop(changed);
                         });
-                frame.setMinimumGeometryPx(dp(36), dp(28));
+                frame.setMinimumGeometryPx(1, 1);
                 frame.setCardBackgroundColor(Color.TRANSPARENT);
                 frame.setCardElevation(0);
                 frame.setRadius(0);
@@ -1020,6 +1042,119 @@ public final class LauncherActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Applies user-defined horizontal rows after atomic widgets exist. The row frame is visible
+     * only in explicit layout mode; at runtime it contributes no surface and cannot consume taps.
+     */
+    private void syncLauncherHorizontalGroups() {
+        if (workspace == null || horizontalGroupStore == null
+                || workspace.getWidth() <= 0 || workspace.getHeight() <= 0) return;
+        String raw = preferences.launcherHorizontalGroupsJson.get();
+        if (!Objects.equals(appliedLauncherHorizontalGroupsJson, raw)) {
+            horizontalGroupStore.load(workspace.getWidth(), workspace.getHeight());
+            appliedLauncherHorizontalGroupsJson = raw;
+        }
+        List<LauncherHorizontalGroupStore.Group> groups = horizontalGroupStore.all();
+        Set<String> retained = new LinkedHashSet<>();
+        for (LauncherHorizontalGroupStore.Group group : groups) retained.add(group.id);
+        for (String stale : new ArrayList<>(horizontalGroupFrames.keySet())) {
+            if (retained.contains(stale)) continue;
+            LauncherElementFrame frame = horizontalGroupFrames.remove(stale);
+            if (frame != null) workspace.removeView(frame);
+        }
+
+        int snap = Math.max(1, preferences.launcherSnapPx.get());
+        for (LauncherHorizontalGroupStore.Group group : groups) {
+            LauncherElementFrame frame = horizontalGroupFrames.get(group.id);
+            if (frame == null) {
+                String id = group.id;
+                frame = new LauncherElementFrame(this, id, group.name,
+                        (changedId, x, y, width, height) -> {
+                            LauncherHorizontalGroupStore.Group changed =
+                                    horizontalGroupStore.get(changedId);
+                            if (changed == null) return;
+                            changed.x = x;
+                            changed.y = y;
+                            changed.width = width;
+                            changed.height = height;
+                            saveLauncherHorizontalGroup(changed);
+                        });
+                frame.setMinimumGeometryPx(1, 1);
+                frame.setCardBackgroundColor(Color.TRANSPARENT);
+                frame.setCardElevation(0);
+                frame.setRadius(0);
+                frame.setPreserveAspectRatio(false);
+                frame.setContent(new View(this));
+                frame.setOnClickListener(view -> {
+                    if (editMode) showLauncherHorizontalGroupEditor(id);
+                });
+                FrameLayout.LayoutParams params =
+                        new FrameLayout.LayoutParams(group.width, group.height);
+                params.leftMargin = group.x;
+                params.topMargin = group.y;
+                workspace.addView(frame, params);
+                horizontalGroupFrames.put(group.id, frame);
+            } else {
+                FrameLayout.LayoutParams params =
+                        (FrameLayout.LayoutParams) frame.getLayoutParams();
+                params.width = group.width;
+                params.height = group.height;
+                params.leftMargin = group.x;
+                params.topMargin = group.y;
+                frame.setLayoutParams(params);
+            }
+            layoutLauncherHorizontalGroup(group);
+            frame.setEditMode(editMode, snap);
+            frame.setVisibility(editMode ? View.VISIBLE : View.GONE);
+            if (editMode) frame.bringToFront();
+        }
+    }
+
+    private void layoutLauncherHorizontalGroup(
+            @NonNull LauncherHorizontalGroupStore.Group group) {
+        List<LauncherElementFrame> members = new ArrayList<>();
+        List<HorizontalGroupLayout.Size> sizes = new ArrayList<>();
+        for (String id : group.memberIds) {
+            LauncherElementFrame frame = globalElementFrames.get(id);
+            if (frame == null) continue;
+            LauncherGlobalElementLayoutStore.Geometry saved =
+                    globalElementLayoutStore.get(id);
+            int width = saved == null ? Math.max(1, frame.getWidth()) : saved.width;
+            int height = saved == null ? Math.max(1, frame.getHeight()) : saved.height;
+            members.add(frame);
+            sizes.add(new HorizontalGroupLayout.Size(width, height));
+        }
+        List<HorizontalGroupLayout.Rect> placements = HorizontalGroupLayout.layout(
+                group.x, group.y, group.width, group.height,
+                group.paddingLeftPx, group.paddingTopPx,
+                group.paddingRightPx, group.paddingBottomPx,
+                group.gapPx, group.horizontalAlignment, group.verticalAlignment,
+                group.distribution, sizes);
+        for (int index = 0; index < members.size() && index < placements.size(); index++) {
+            LauncherElementFrame member = members.get(index);
+            HorizontalGroupLayout.Rect placement = placements.get(index);
+            FrameLayout.LayoutParams params =
+                    (FrameLayout.LayoutParams) member.getLayoutParams();
+            params.leftMargin = placement.x;
+            params.topMargin = placement.y;
+            params.width = placement.width;
+            params.height = placement.height;
+            member.setLayoutParams(params);
+        }
+    }
+
+    private void saveLauncherHorizontalGroup(
+            @NonNull LauncherHorizontalGroupStore.Group group) {
+        horizontalGroupStore.put(group);
+        appliedLauncherHorizontalGroupsJson =
+                preferences.launcherHorizontalGroupsJson.get();
+        syncLauncherHorizontalGroups();
+    }
+
+    private boolean isLauncherWidgetGrouped(@NonNull String id) {
+        return horizontalGroupStore != null && horizontalGroupStore.containsMember(id);
+    }
+
     private boolean hasGlobalFrameForPanel(@NonNull String panelId) {
         String prefix = panelId + "/";
         for (String id : globalElementFrames.keySet()) {
@@ -1038,7 +1173,7 @@ public final class LauncherActivity extends AppCompatActivity {
         globalElementSources.clear();
         globalElementSources.putAll(discovered);
 
-        int snap = Math.max(4, preferences.launcherSnapPx.get());
+        int snap = Math.max(1, preferences.launcherSnapPx.get());
         for (Map.Entry<String, View> entry : discovered.entrySet()) {
             String id = entry.getKey();
             View source = entry.getValue();
@@ -1055,14 +1190,13 @@ public final class LauncherActivity extends AppCompatActivity {
                 LauncherGlobalElementProxyView proxy =
                         new LauncherGlobalElementProxyView(this,
                                 () -> globalElementSources.get(id),
-                                appearance,
-                                () -> showLauncherWidgetEditor(id, label));
+                                appearance);
                 LauncherElementFrame frame = new LauncherElementFrame(this, id, label,
                         (changedId, x, y, width, height) ->
                                 globalElementLayoutStore.put(changedId,
                                         new LauncherGlobalElementLayoutStore.Geometry(
                                                 x, y, width, height)));
-                frame.setMinimumGeometryPx(dp(36), dp(28));
+                frame.setMinimumGeometryPx(1, 1);
                 frame.setCardBackgroundColor(Color.TRANSPARENT);
                 frame.setCardElevation(0);
                 frame.setRadius(0);
@@ -1128,7 +1262,7 @@ public final class LauncherActivity extends AppCompatActivity {
 
     private void refreshGlobalElementVisibility() {
         if (!globalElementsActivated) return;
-        int snap = Math.max(4, preferences.launcherSnapPx.get());
+        int snap = Math.max(1, preferences.launcherSnapPx.get());
         for (Map.Entry<String, LauncherElementFrame> entry
                 : globalElementFrames.entrySet()) {
             LauncherGlobalElementProxyView proxy = globalElementProxies.get(entry.getKey());
@@ -1139,7 +1273,8 @@ public final class LauncherActivity extends AppCompatActivity {
                     && !appearance.hidden
                     && (editMode || proxy != null && proxy.sourceIsShown());
             entry.getValue().setVisibility(visible ? View.VISIBLE : View.GONE);
-            entry.getValue().setEditMode(editMode, snap);
+            entry.getValue().setEditMode(
+                    editMode && !isLauncherWidgetGrouped(entry.getKey()), snap);
             if (proxy != null && visible) proxy.refreshFromSource();
         }
     }
@@ -1163,9 +1298,9 @@ public final class LauncherActivity extends AppCompatActivity {
     }
 
     /**
-     * Deep editor for one atomic HOME widget. It is opened by a long press on the real rendered
-     * element and writes through the same store as drag/resize, so no panel-local editor can
-     * subsequently overwrite its geometry or appearance.
+     * Deep editor for one atomic HOME widget. It is opened by a normal tap on the selected frame
+     * while explicit layout mode is active and writes through the same store as drag/resize, so
+     * no panel-local editor can subsequently overwrite its geometry or appearance.
      */
     private void showLauncherWidgetEditor(@NonNull String id, @NonNull String label) {
         if (globalElementLayoutStore == null || isFinishing() || isDestroyed()) return;
@@ -1183,6 +1318,13 @@ public final class LauncherActivity extends AppCompatActivity {
                 + "Режим «Вписать» показывает содержимое целиком и не деформирует его.");
         hint.setPadding(0, 0, 0, dp(8));
         form.addView(hint);
+
+        if (hasLauncherWidgetDetailEditor(id)) {
+            MaterialButton details = widgetEditorButton(
+                    "Дополнительные настройки содержимого");
+            details.setOnClickListener(view -> openLauncherWidgetDetailEditor(id));
+            form.addView(details, widgetEditorRow());
+        }
 
         if ((LauncherLayoutStore.MEDIA + "/" + MediaPanelConfig.PROGRESS).equals(id)) {
             TextView progressSettings = text(17, Color.WHITE, true);
@@ -1405,6 +1547,46 @@ public final class LauncherActivity extends AppCompatActivity {
         editor.show();
     }
 
+    private boolean hasLauncherWidgetDetailEditor(@NonNull String id) {
+        return id.startsWith(LauncherLayoutStore.APPS + "/")
+                || id.startsWith(LauncherLayoutStore.ACTIONS + "/")
+                || id.startsWith(LauncherLayoutStore.MEDIA + "/")
+                || id.startsWith(LauncherLayoutStore.NAVIGATION + "/")
+                || id.startsWith(LauncherLayoutStore.CLIMATE + "/")
+                || id.startsWith(LauncherLayoutStore.VEHICLE_INFO + "/")
+                || id.startsWith(LauncherLayoutStore.INFORMATION + "/");
+    }
+
+    /**
+     * Legacy feature-rich screens survive only as contextual editors reached from a concrete
+     * widget. They are intentionally absent from the top-level flat Launcher settings catalog.
+     */
+    private void openLauncherWidgetDetailEditor(@NonNull String id) {
+        Intent details;
+        if (id.startsWith(LauncherLayoutStore.APPS + "/")) {
+            details = new Intent(this, FavoriteAppsSettingsActivity.class);
+        } else if (id.startsWith(LauncherLayoutStore.ACTIONS + "/")) {
+            details = new Intent(this, LauncherShortcutSettingsActivity.class);
+        } else if (id.startsWith(LauncherLayoutStore.MEDIA + "/")) {
+            details = new Intent(this, MediaPanelSettingsActivity.class);
+        } else if (id.startsWith(
+                LauncherLayoutStore.NAVIGATION + "/favorite_route_")) {
+            details = new Intent(this, FavoriteRoutesSettingsActivity.class);
+        } else if (id.startsWith(LauncherLayoutStore.NAVIGATION + "/")) {
+            details = new Intent(this, NavigationPanelSettingsActivity.class);
+        } else if (id.startsWith(LauncherLayoutStore.CLIMATE + "/")) {
+            details = new Intent(this, ClimatePanelSettingsActivity.class)
+                    .putExtra(ClimatePanelSettingsActivity.EXTRA_LAUNCHER_ONLY, true);
+        } else if (id.startsWith(LauncherLayoutStore.VEHICLE_INFO + "/")) {
+            details = new Intent(this, VehicleInfoPanelSettingsActivity.class);
+        } else if (id.startsWith(LauncherLayoutStore.INFORMATION + "/")) {
+            details = new Intent(this, InformationPanelSettingsActivity.class);
+        } else {
+            return;
+        }
+        startActivity(details);
+    }
+
     private void saveLauncherWidgetAppearance(
             @NonNull String id,
             @NonNull LauncherGlobalElementLayoutStore.Appearance appearance) {
@@ -1544,46 +1726,378 @@ public final class LauncherActivity extends AppCompatActivity {
         editor.show();
     }
 
-    private void showLauncherWidgetCatalog() {
-        List<String> entries = new ArrayList<>();
-        List<Runnable> actions = new ArrayList<>();
-        entries.add("Подложка…");
-        actions.add(this::createLauncherBackdrop);
-        if (hasRemovedLauncherWidgets()) {
-            entries.add("Вернуть удалённый виджет…");
-            actions.add(this::showRemovedLauncherWidgets);
+    private void createLauncherHorizontalGroup() {
+        List<String> ids = new ArrayList<>();
+        List<String> labels = new ArrayList<>();
+        for (String id : globalElementFrames.keySet()) {
+            if (globalElementLayoutStore.getAppearance(id).hidden) continue;
+            ids.add(id);
+            labels.add(launcherWidgetLabel(id));
         }
-        entries.add("Новая кнопка приложения или действие…");
-        actions.add(() -> startActivity(new Intent(this,
-                LauncherShortcutSettingsActivity.class)
-                .putExtra(LauncherShortcutSettingsActivity.EXTRA_ADD_NEW, true)));
-        entries.add("Избранное приложение…");
-        actions.add(this::showFavoriteAppWidgetCatalog);
-        entries.add("Часы или дата…");
-        actions.add(() -> showSimpleWidgetCatalog(LauncherLayoutStore.CLOCK,
-                "Добавить часы или дату"));
-        entries.add("Элемент медиаплеера…");
-        actions.add(this::showMediaWidgetCatalog);
-        entries.add("Информационный статус…");
-        actions.add(() -> {
-            preferences.launcherInformationVisible.set(true);
-            startActivity(new Intent(this, InformationPanelSettingsActivity.class));
+        if (ids.size() < 2) {
+            Toast.makeText(this, "Для ряда нужны как минимум два виджета",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        boolean[] selected = new boolean[ids.size()];
+        androidx.appcompat.app.AlertDialog dialog =
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("Горизонтальный ряд")
+                        .setMultiChoiceItems(labels.toArray(new String[0]), selected,
+                                (value, which, checked) -> selected[which] = checked)
+                        .setPositiveButton("Создать", null)
+                        .setNegativeButton("Отмена", null)
+                        .create();
+        dialog.setOnShowListener(ignored ->
+                dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)
+                        .setOnClickListener(view -> {
+                            List<String> members = new ArrayList<>();
+                            int left = Integer.MAX_VALUE;
+                            int top = Integer.MAX_VALUE;
+                            int right = 0;
+                            int bottom = 0;
+                            for (int index = 0; index < selected.length; index++) {
+                                if (!selected[index]) continue;
+                                members.add(ids.get(index));
+                                LauncherElementFrame frame =
+                                        globalElementFrames.get(ids.get(index));
+                                if (frame == null) continue;
+                                FrameLayout.LayoutParams params =
+                                        (FrameLayout.LayoutParams) frame.getLayoutParams();
+                                left = Math.min(left, params.leftMargin);
+                                top = Math.min(top, params.topMargin);
+                                right = Math.max(right, params.leftMargin
+                                        + Math.max(1, params.width));
+                                bottom = Math.max(bottom, params.topMargin
+                                        + Math.max(1, params.height));
+                            }
+                            if (members.size() < 2) {
+                                Toast.makeText(this,
+                                        "Выберите как минимум два виджета",
+                                        Toast.LENGTH_SHORT).show();
+                                return;
+                            }
+                            if (left == Integer.MAX_VALUE) {
+                                left = 0;
+                                top = 0;
+                                right = Math.min(workspace.getWidth(), dp(620));
+                                bottom = Math.min(workspace.getHeight(), dp(150));
+                            }
+                            LauncherHorizontalGroupStore.Group created =
+                                    horizontalGroupStore.create(members, left, top,
+                                            Math.max(1, right - left),
+                                            Math.max(1, bottom - top));
+                            appliedLauncherHorizontalGroupsJson =
+                                    preferences.launcherHorizontalGroupsJson.get();
+                            syncLauncherHorizontalGroups();
+                            refreshGlobalElementVisibility();
+                            dialog.dismiss();
+                            showLauncherHorizontalGroupEditor(created.id);
+                        }));
+        dialog.show();
+    }
+
+    private void showLauncherHorizontalGroupEditor(@NonNull String id) {
+        LauncherHorizontalGroupStore.Group group = horizontalGroupStore.get(id);
+        if (group == null || isFinishing() || isDestroyed()) return;
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(20), dp(10), dp(20), dp(30));
+        scroll.addView(form, new ScrollView.LayoutParams(matchWidth(), wrapContent()));
+
+        TextView hint = text(13, Color.LTGRAY, false);
+        hint.setText("Элементы располагаются слева направо. Отступы и интервал могут быть "
+                + "нулевыми; размер текста каждого виджета не меняется.");
+        form.addView(hint);
+        addWidgetEditorSlider(form, "Интервал", 0, 300, group.gapPx, " px", value -> {
+            group.gapPx = value;
+            saveLauncherHorizontalGroup(group);
         });
-        entries.add("Элемент навигации…");
-        actions.add(this::showNavigationWidgetCatalog);
-        entries.add("Элемент климата…");
-        actions.add(this::showClimateWidgetCatalog);
-        entries.add("Данные автомобиля или умного дома…");
-        actions.add(() -> {
-            preferences.launcherVehicleInfoVisible.set(true);
-            startActivity(new Intent(this, VehicleInfoPanelSettingsActivity.class));
-        });
+        addWidgetEditorSlider(form, "Отступ слева", 0, 300,
+                group.paddingLeftPx, " px", value -> {
+                    group.paddingLeftPx = value;
+                    saveLauncherHorizontalGroup(group);
+                });
+        addWidgetEditorSlider(form, "Отступ сверху", 0, 300,
+                group.paddingTopPx, " px", value -> {
+                    group.paddingTopPx = value;
+                    saveLauncherHorizontalGroup(group);
+                });
+        addWidgetEditorSlider(form, "Отступ справа", 0, 300,
+                group.paddingRightPx, " px", value -> {
+                    group.paddingRightPx = value;
+                    saveLauncherHorizontalGroup(group);
+                });
+        addWidgetEditorSlider(form, "Отступ снизу", 0, 300,
+                group.paddingBottomPx, " px", value -> {
+                    group.paddingBottomPx = value;
+                    saveLauncherHorizontalGroup(group);
+                });
+
+        MaterialButton distribution = widgetEditorButton("Распределение: "
+                + (group.distribution == HorizontalGroupLayout.DISTRIBUTION_EQUAL
+                ? "равные ячейки" : "компактно"));
+        distribution.setOnClickListener(view ->
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("Распределение в ряду")
+                        .setItems(new String[]{"Компактно", "Равные ячейки"},
+                                (choice, which) -> {
+                                    group.distribution = which;
+                                    distribution.setText("Распределение: "
+                                            + (which == HorizontalGroupLayout.DISTRIBUTION_EQUAL
+                                            ? "равные ячейки" : "компактно"));
+                                    saveLauncherHorizontalGroup(group);
+                                })
+                        .show());
+        form.addView(distribution, widgetEditorRow());
+
+        MaterialButton horizontal = widgetEditorButton("По горизонтали: "
+                + groupAlignmentLabel(group.horizontalAlignment));
+        horizontal.setOnClickListener(view ->
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("Положение содержимого")
+                        .setItems(new String[]{"Слева", "По центру", "Справа"},
+                                (choice, which) -> {
+                                    group.horizontalAlignment = which;
+                                    horizontal.setText("По горизонтали: "
+                                            + groupAlignmentLabel(which));
+                                    saveLauncherHorizontalGroup(group);
+                                })
+                        .show());
+        form.addView(horizontal, widgetEditorRow());
+
+        MaterialButton vertical = widgetEditorButton("По вертикали: "
+                + groupVerticalAlignmentLabel(group.verticalAlignment));
+        vertical.setOnClickListener(view ->
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("Выравнивание элементов")
+                        .setItems(new String[]{"Сверху", "По центру", "Снизу"},
+                                (choice, which) -> {
+                                    group.verticalAlignment = which;
+                                    vertical.setText("По вертикали: "
+                                            + groupVerticalAlignmentLabel(which));
+                                    saveLauncherHorizontalGroup(group);
+                                })
+                        .show());
+        form.addView(vertical, widgetEditorRow());
+
+        MaterialButton members = widgetEditorButton(
+                "Состав ряда · " + group.memberIds.size());
+        members.setOnClickListener(view -> chooseLauncherHorizontalGroupMembers(group));
+        form.addView(members, widgetEditorRow());
+        for (String memberId : group.memberIds) {
+            String memberLabel = launcherWidgetLabel(memberId);
+            MaterialButton configure = widgetEditorButton(
+                    "Настроить виджет · " + memberLabel);
+            configure.setOnClickListener(view ->
+                    showLauncherWidgetEditor(memberId, memberLabel));
+            form.addView(configure, widgetEditorRow());
+        }
+
+        androidx.appcompat.app.AlertDialog editor =
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle(group.name)
+                        .setView(scroll)
+                        .setPositiveButton("Готово", null)
+                        .setNegativeButton("Разгруппировать", null)
+                        .create();
+        editor.setOnShowListener(ignored ->
+                editor.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE)
+                        .setOnClickListener(view ->
+                                new androidx.appcompat.app.AlertDialog.Builder(this)
+                                        .setTitle("Разгруппировать ряд?")
+                                        .setMessage("Виджеты останутся на лаунчере и снова "
+                                                + "будут редактироваться отдельно.")
+                                        .setPositiveButton("Разгруппировать",
+                                                (confirm, which) -> {
+                                                    horizontalGroupStore.remove(id);
+                                                    appliedLauncherHorizontalGroupsJson =
+                                                            preferences
+                                                                    .launcherHorizontalGroupsJson
+                                                                    .get();
+                                                    syncLauncherHorizontalGroups();
+                                                    refreshGlobalElementVisibility();
+                                                    editor.dismiss();
+                                                })
+                                        .setNegativeButton("Отмена", null)
+                                        .show()));
+        editor.show();
+    }
+
+    private void chooseLauncherHorizontalGroupMembers(
+            @NonNull LauncherHorizontalGroupStore.Group group) {
+        List<String> ids = new ArrayList<>();
+        List<String> labels = new ArrayList<>();
+        for (String id : globalElementFrames.keySet()) {
+            if (globalElementLayoutStore.getAppearance(id).hidden) continue;
+            ids.add(id);
+            labels.add(launcherWidgetLabel(id));
+        }
+        boolean[] selected = new boolean[ids.size()];
+        for (int index = 0; index < ids.size(); index++) {
+            selected[index] = group.memberIds.contains(ids.get(index));
+        }
+        androidx.appcompat.app.AlertDialog dialog =
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("Состав горизонтального ряда")
+                        .setMultiChoiceItems(labels.toArray(new String[0]), selected,
+                                (value, which, checked) -> selected[which] = checked)
+                        .setPositiveButton("Применить", null)
+                        .setNegativeButton("Отмена", null)
+                        .create();
+        dialog.setOnShowListener(ignored ->
+                dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)
+                        .setOnClickListener(view -> {
+                            List<String> members = new ArrayList<>();
+                            for (int index = 0; index < selected.length; index++) {
+                                if (selected[index]) members.add(ids.get(index));
+                            }
+                            if (members.size() < 2) {
+                                Toast.makeText(this,
+                                        "В ряду должно остаться минимум два виджета",
+                                        Toast.LENGTH_SHORT).show();
+                                return;
+                            }
+                            group.memberIds.clear();
+                            group.memberIds.addAll(members);
+                            saveLauncherHorizontalGroup(group);
+                            refreshGlobalElementVisibility();
+                            dialog.dismiss();
+                        }));
+        dialog.show();
+    }
+
+    @NonNull
+    private String launcherWidgetLabel(@NonNull String id) {
+        View source = globalElementSources.get(id);
+        LauncherGlobalElementTag tag =
+                source == null ? null : LauncherGlobalElementTag.from(source);
+        return tag == null ? id : tag.label;
+    }
+
+    @NonNull
+    private static String groupAlignmentLabel(int value) {
+        return value == 1 ? "по центру" : value == 2 ? "справа" : "слева";
+    }
+
+    @NonNull
+    private static String groupVerticalAlignmentLabel(int value) {
+        return value == 1 ? "по центру" : value == 2 ? "снизу" : "сверху";
+    }
+
+    private void showLauncherWidgetCatalog() {
+        List<LauncherWidgetCatalog.Entry> entries = LauncherWidgetCatalog.available(
+                hasRemovedLauncherWidgets(),
+                panelElementStore.load(LauncherLayoutStore.CLOCK),
+                new MediaPanelConfigStore(preferences).load(),
+                navigationPanelConfigStore.load(),
+                new ClimatePanelConfigStore(preferences).load());
+        String[] labels = new String[entries.size()];
+        for (int index = 0; index < entries.size(); index++) {
+            labels[index] = entries.get(index).label;
+        }
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("Добавить виджет")
-                .setItems(entries.toArray(new String[0]),
-                        (dialog, which) -> actions.get(which).run())
+                .setItems(labels, (dialog, which) ->
+                        addLauncherCatalogEntry(entries.get(which)))
                 .setNegativeButton("Отмена", null)
                 .show();
+    }
+
+    /** Executes one concrete entry from the shared flat HOME catalog without another submenu. */
+    private void addLauncherCatalogEntry(@NonNull LauncherWidgetCatalog.Entry entry) {
+        switch (entry.kind) {
+            case BACKDROP:
+                createLauncherBackdrop();
+                return;
+            case HORIZONTAL_GROUP:
+                createLauncherHorizontalGroup();
+                return;
+            case RESTORE:
+                showRemovedLauncherWidgets();
+                return;
+            case SHORTCUT:
+                startActivity(new Intent(this, LauncherShortcutSettingsActivity.class)
+                        .putExtra(LauncherShortcutSettingsActivity.EXTRA_ADD_NEW, true));
+                return;
+            case FAVORITE_APP:
+                showFavoriteAppWidgetCatalog();
+                return;
+            case FAVORITE_ROUTE:
+                startActivity(new Intent(this, FavoriteRoutesSettingsActivity.class));
+                return;
+            case SIMPLE:
+                enableSimpleLauncherElement(entry.panelId, entry.elementId);
+                return;
+            case MEDIA:
+                enableMediaLauncherElement(entry.elementId);
+                return;
+            case NAVIGATION:
+                enableNavigationLauncherElement(entry.elementId);
+                return;
+            case CLIMATE:
+                enableClimateLauncherElement(entry.elementId);
+                return;
+            case INFORMATION:
+                preferences.launcherInformationVisible.set(true);
+                startActivity(new Intent(this, InformationPanelSettingsActivity.class));
+                return;
+            case VEHICLE:
+                preferences.launcherVehicleInfoVisible.set(true);
+                startActivity(new Intent(this, VehicleInfoPanelSettingsActivity.class));
+                return;
+            default:
+                return;
+        }
+    }
+
+    private void enableSimpleLauncherElement(
+            @NonNull String panelId, @NonNull String elementId) {
+        PanelElementConfigStore.Panel updated = panelElementStore.load(panelId);
+        updated.setEnabled(elementId, true);
+        panelElementStore.save(updated);
+        if (LauncherLayoutStore.CLOCK.equals(panelId)) {
+            preferences.launcherClockVisible.set(true);
+            replacePanelContent(panelId, buildClockPanel());
+        } else if (LauncherLayoutStore.APPS.equals(panelId)) {
+            preferences.launcherAppsVisible.set(true);
+            replacePanelContent(panelId, buildAppsPanel());
+        }
+        setPanelVisibility(panelId, true);
+        refreshGlobalElementsAfterWidgetChange();
+    }
+
+    private void enableMediaLauncherElement(@NonNull String elementId) {
+        MediaPanelConfig updated = new MediaPanelConfigStore(preferences).load();
+        if (!updated.setEnabled(elementId, true)) return;
+        new MediaPanelConfigStore(preferences).save(updated);
+        preferences.launcherMediaVisible.set(true);
+        if (mediaPanel != null) mediaPanel.reloadConfig();
+        setPanelVisibility(LauncherLayoutStore.MEDIA, true);
+        refreshGlobalElementsAfterWidgetChange();
+    }
+
+    private void enableNavigationLauncherElement(@NonNull String elementId) {
+        NavigationPanelConfig updated = navigationPanelConfigStore.load();
+        if (!updated.setEnabled(elementId, true)) return;
+        navigationPanelConfigStore.save(updated);
+        preferences.launcherNavigationVisible.set(true);
+        replacePanelContent(LauncherLayoutStore.NAVIGATION,
+                buildCombinedNavigationPanel());
+        setPanelVisibility(LauncherLayoutStore.NAVIGATION, true);
+        updateNavigation();
+        refreshGlobalElementsAfterWidgetChange();
+    }
+
+    private void enableClimateLauncherElement(@NonNull String elementId) {
+        ClimatePanelConfig updated = new ClimatePanelConfigStore(preferences).load();
+        updated.setElementEnabled(elementId, true);
+        new ClimatePanelConfigStore(preferences).save(updated);
+        preferences.launcherClimateVisible.set(true);
+        if (climatePanel != null) climatePanel.reloadConfig();
+        setPanelVisibility(LauncherLayoutStore.CLIMATE, true);
+        refreshGlobalElementsAfterWidgetChange();
     }
 
     private boolean hasRemovedLauncherWidgets() {
@@ -1714,11 +2228,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 .setItems(labels, (dialog, which) -> {
                     MediaPanelConfig updated =
                             new MediaPanelConfigStore(preferences).load();
-                    if (!updated.setEnabled(available.get(which).id, true)) {
-                        Toast.makeText(this, "На сетке медиаплеера нет свободного места",
-                                Toast.LENGTH_LONG).show();
-                        return;
-                    }
+                    updated.setEnabled(available.get(which).id, true);
                     new MediaPanelConfigStore(preferences).save(updated);
                     preferences.launcherMediaVisible.set(true);
                     if (mediaPanel != null) mediaPanel.reloadConfig();
@@ -1748,11 +2258,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 .setTitle("Добавить элемент навигации")
                 .setItems(labels, (dialog, which) -> {
                     NavigationPanelConfig updated = navigationPanelConfigStore.load();
-                    if (!updated.setEnabled(available.get(which).id, true)) {
-                        Toast.makeText(this, "На сетке навигации нет свободного места",
-                                Toast.LENGTH_LONG).show();
-                        return;
-                    }
+                    updated.setEnabled(available.get(which).id, true);
                     navigationPanelConfigStore.save(updated);
                     preferences.launcherNavigationVisible.set(true);
                     replacePanelContent(LauncherLayoutStore.NAVIGATION,
@@ -2114,7 +2620,7 @@ public final class LauncherActivity extends AppCompatActivity {
         // one from its old panel-local rectangle into the shared screen coordinate space.
         workspace.post(() -> {
             activateGlobalElements();
-            if (requestsAnyHomeEditor(getIntent())) setEditMode(true);
+            applyRequestedHomeEditor(getIntent());
         });
     }
 
@@ -2286,6 +2792,9 @@ public final class LauncherActivity extends AppCompatActivity {
                     }
                     @Override public void next() {
                         if (mediaController != null) mediaController.next();
+                    }
+                    @Override public boolean openPlayer() {
+                        return mediaController != null && mediaController.openTargetPlayer();
                     }
                 });
         return mediaPanel;
@@ -2587,9 +3096,7 @@ public final class LauncherActivity extends AppCompatActivity {
 
             @Override public void onItemClicked(@NonNull String id) {
                 if (LauncherActionsGridConfig.ADD_TILE_ID.equals(id)) {
-                    startActivity(new Intent(LauncherActivity.this,
-                            LauncherShortcutSettingsActivity.class)
-                            .putExtra(LauncherShortcutSettingsActivity.EXTRA_ADD_NEW, true));
+                    showLauncherWidgetCatalog();
                 } else {
                     showShortcutIconSizeEditor(id);
                 }
@@ -2863,13 +3370,11 @@ public final class LauncherActivity extends AppCompatActivity {
             card.addView(stateLabel, badgeLp);
         }
         if (addButton) {
-            card.setOnClickListener(v -> startActivity(new Intent(this,
-                    LauncherShortcutSettingsActivity.class)
-                    .putExtra(LauncherShortcutSettingsActivity.EXTRA_ADD_NEW, true)));
+            card.setOnClickListener(v -> showLauncherWidgetCatalog());
         } else {
             card.setOnClickListener(v -> executeShortcut(shortcut));
-            card.setOnLongClickListener(v -> {
-                if (shortcut.hasLongAction) {
+            if (shortcut.hasLongAction) {
+                card.setOnLongClickListener(v -> {
                     LauncherShortcutStore.Shortcut action = shortcut.copy();
                     action.kind = shortcut.longKind;
                     action.target = shortcut.longTarget;
@@ -2879,11 +3384,9 @@ public final class LauncherActivity extends AppCompatActivity {
                     action.commandCycleValues = new ArrayList<>(
                             shortcut.longCommandCycleValues);
                     executeShortcut(action);
-                } else {
-                    startActivity(new Intent(this, LauncherShortcutSettingsActivity.class));
-                }
-                return true;
-            });
+                    return true;
+                });
+            }
             if (shortcut.kind == LauncherShortcutStore.Kind.CAR) {
                 ShortcutTileBinding binding = new ShortcutTileBinding(shortcut.copy(), card,
                         icon, stateLabel);
@@ -3177,7 +3680,7 @@ public final class LauncherActivity extends AppCompatActivity {
         if (vehicleInfoPanel != null) vehicleInfoPanel.setPreviewMode(enabled);
         if (informationPanel != null) informationPanel.setEditorPreviewMode(enabled);
         if (favoriteRoutesPanel != null) favoriteRoutesPanel.setPreviewMode(enabled);
-        int snap = Math.max(4, preferences.launcherSnapPx.get());
+        int snap = Math.max(1, preferences.launcherSnapPx.get());
         editorGrid.setStepPx(snap);
         editorGrid.setVisibility(enabled && preferences.launcherShowGrid.get()
                 ? View.VISIBLE : View.GONE);
@@ -3201,6 +3704,7 @@ public final class LauncherActivity extends AppCompatActivity {
         workspace.post(() -> {
             activateGlobalElements();
             syncGlobalElements();
+            syncLauncherHorizontalGroups();
             refreshGlobalElementVisibility();
         });
         Toast.makeText(this, enabled
@@ -3992,8 +4496,11 @@ public final class LauncherActivity extends AppCompatActivity {
 
         void reload() {
             apps.clear();
-            for (LauncherAppCatalog.App app
-                    : LauncherAppCatalog.loadIncludingSystem(context)) {
+            List<LauncherAppCatalog.App> catalog =
+                    LauncherAppCatalog.loadIncludingSystem(context);
+            LauncherAppCatalog.ensureDefaultSystemVisibility(
+                    context, preferences, catalog);
+            for (LauncherAppCatalog.App app : catalog) {
                 apps.add(new AppEntry(app.label, app.packageName, app.component,
                         app.systemApp));
             }

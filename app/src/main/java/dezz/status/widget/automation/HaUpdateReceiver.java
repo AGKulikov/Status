@@ -17,6 +17,13 @@ public final class HaUpdateReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        dezz.status.widget.diagnostics.ActionRecorder.record(
+                dezz.status.widget.diagnostics.ActionRecorder.SOURCE_SERVICE,
+                "BROADCAST_RECEIVED",
+                dezz.status.widget.diagnostics.ActionRecorder.object(
+                        "receiver", getClass().getName(),
+                        "action", intent == null ? null : intent.getAction()));
+        if (intent == null) return;
         if (AutomationContract.ACTION_SYNC_REQUEST.equals(intent.getAction())
                 || AutomationContract.ACTION_REFRESH.equals(intent.getAction())) {
             sendSnapshot(context, intent);
