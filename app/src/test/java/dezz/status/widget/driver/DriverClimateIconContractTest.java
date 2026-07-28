@@ -66,6 +66,17 @@ public final class DriverClimateIconContractTest {
         assertTrue(view.contains("if (!expanded) return;"));
     }
 
+    @Test
+    public void autoAndManualModesShareTemperatureToScaleSpacing() throws IOException {
+        String view = source();
+
+        assertTrue(view.contains("float scaleCenterY ="));
+        assertEquals(2, occurrences(view,
+                "drawBars(canvas, width * .12f, scaleCenterY"));
+        assertFalse(view.contains("automaticScaleY"));
+        assertFalse(view.contains("rowCenterY"));
+    }
+
     private static String source() throws IOException {
         return read(Paths.get("java", "dezz", "status", "widget", "driver",
                 "DriverClimateShortcutView.java"));
@@ -95,5 +106,15 @@ public final class DriverClimateIconContractTest {
         Path fromApp = Paths.get("src", "main").resolve(relative);
         Path file = Files.isRegularFile(fromRoot) ? fromRoot : fromApp;
         return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+    }
+
+    private static int occurrences(String value, String needle) {
+        int count = 0;
+        int offset = 0;
+        while ((offset = value.indexOf(needle, offset)) >= 0) {
+            count++;
+            offset += needle.length();
+        }
+        return count;
     }
 }

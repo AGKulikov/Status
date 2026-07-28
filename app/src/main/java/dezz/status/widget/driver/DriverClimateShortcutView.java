@@ -267,15 +267,16 @@ public final class DriverClimateShortcutView extends View {
                 ClimateFanIndicatorPolicy.fromConfirmedState(fanLabel, fanLevel);
         boolean automatic = DriverClimatePresentation.automatic(
                 autoKnown, autoActive, fanLabel);
-        float rowCenterY = height * (expanded ? .45f : .73f)
+        // AUTO and manual airflow must share the same scale anchor. Previously AUTO used a
+        // separate, higher Y coordinate, so the temperature-to-scale gap changed when the
+        // climate mode switched even though the tile itself did not move.
+        float scaleCenterY = height * (expanded ? .45f : .73f)
                 - effectiveGap * .50f;
         float detailsCenterY = height * .77f + effectiveGap * .50f;
         if (automatic) {
             // AUTO remains a plain word, but the live five-step automatic fan scale must stay
             // visible. Only decorative fan/airflow pictograms are omitted from the AUTO row.
-            float automaticScaleY = height * (expanded ? .40f : .60f)
-                    - effectiveGap * .40f;
-            drawBars(canvas, width * .12f, automaticScaleY, width * .76f, unit,
+            drawBars(canvas, width * .12f, scaleCenterY, width * .76f, unit,
                     indicator.activeSegments, ClimateFanIndicatorPolicy.AUTO_SEGMENTS, color);
             drawAutoText(canvas, width / 2f,
                     expanded ? detailsCenterY : height * .82f, unit, color);
@@ -285,7 +286,7 @@ public final class DriverClimateShortcutView extends View {
         int bars = indicator.automatic
                 ? Math.max(0, Math.min(totalBars, fanLevel))
                 : indicator.activeSegments;
-        drawBars(canvas, width * .12f, rowCenterY, width * .76f, unit,
+        drawBars(canvas, width * .12f, scaleCenterY, width * .76f, unit,
                 bars, totalBars, color);
         if (!expanded) return;
 
