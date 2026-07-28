@@ -8,6 +8,7 @@ package dezz.status.widget.launcher;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -19,8 +20,18 @@ import java.nio.file.Paths;
 
 /** Source-level guard for the shared runtime/settings actions-grid contract. */
 public final class LauncherActionsPanelEditorContractTest {
+    private static String launcherSource;
+    private static String shortcutStoreSource;
+
+    @BeforeClass
+    public static void loadSourcesOnce() throws IOException {
+        launcherSource = source("dezz/status/widget/LauncherActivity.java");
+        shortcutStoreSource =
+                source("dezz/status/widget/launcher/LauncherShortcutStore.java");
+    }
+
     @Test public void homeUsesPersistedExactCellGridAndSharedScreenEditor() throws IOException {
-        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        String launcher = launcherSource;
 
         assertTrue(launcher.contains("EXTRA_EDIT_ACTIONS_CONTENT"));
         assertTrue(launcher.contains("shortcutGrid = new PanelGridLayout(this)"));
@@ -35,7 +46,7 @@ public final class LauncherActionsPanelEditorContractTest {
     }
 
     @Test public void individualIconSizeIsNotMultipliedByGroupScale() throws IOException {
-        String launcher = source("dezz/status/widget/Launcher/LauncherActivity.java");
+        String launcher = launcherSource;
 
         assertTrue(launcher.contains(
                 ": Math.max(LauncherShortcutStore.MIN_ICON_SIZE_PX, shortcut.iconSizePx)"));
@@ -44,7 +55,7 @@ public final class LauncherActionsPanelEditorContractTest {
     }
 
     @Test public void gridRebuildKeepsSmartHomeLiveBindingAndClickPath() throws IOException {
-        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        String launcher = launcherSource;
 
         assertTrue(launcher.contains("smartHomeShortcutBindings.put(shortcut.id, binding)"));
         assertTrue(launcher.contains("applySmartHomeStates();"));
@@ -53,7 +64,7 @@ public final class LauncherActionsPanelEditorContractTest {
     }
 
     @Test public void invalidShortcutDocumentIsNeverOverwrittenWithDefaults() throws IOException {
-        String store = source("dezz/status/widget/launcher/LauncherShortcutStore.java");
+        String store = shortcutStoreSource;
         int failure = store.indexOf("catch (JSONException error)");
         int nextMethod = store.indexOf("@NonNull", failure);
         String recovery = store.substring(failure, nextMethod);
@@ -65,6 +76,14 @@ public final class LauncherActionsPanelEditorContractTest {
     }
 
     private static String source(String relative) throws IOException {
+        String githubWorkspace = System.getenv("GITHUB_WORKSPACE");
+        if (githubWorkspace != null && !githubWorkspace.trim().isEmpty()) {
+            Path fromWorkspace = Paths.get(githubWorkspace).resolve(Paths.get(
+                    "app", "src", "main", "java")).resolve(relative);
+            if (Files.isRegularFile(fromWorkspace)) {
+                return new String(Files.readAllBytes(fromWorkspace), StandardCharsets.UTF_8);
+            }
+        }
         Path cursor = Paths.get("").toAbsolutePath();
         for (int depth = 0; depth < 8 && cursor != null; depth++, cursor = cursor.getParent()) {
             Path fromRoot = cursor.resolve(Paths.get(
