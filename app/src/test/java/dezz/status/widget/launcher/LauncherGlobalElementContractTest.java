@@ -36,7 +36,8 @@ public final class LauncherGlobalElementContractTest {
         assertTrue(activity.contains("showRemovedLauncherWidgets"));
         assertTrue(activity.contains("Вернуть виджет"));
         assertTrue(activity.contains("updated.setProgressBarHeightDp(value)"));
-        assertTrue(activity.contains("Новая кнопка приложения или действие"));
+        assertTrue(activity.contains(".setTitle(\"Добавить виджет\")"));
+        assertTrue(activity.contains("addLauncherCatalogEntry(entries.get(which))"));
         assertTrue(activity.contains("updated.setEnabled(available.get(which).id, true)"));
         String proxy = read("launcher/LauncherGlobalElementProxyView.java");
         assertTrue(proxy.contains("ScaleMode.STRETCH"));

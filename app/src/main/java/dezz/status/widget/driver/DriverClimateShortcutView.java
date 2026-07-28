@@ -269,6 +269,7 @@ public final class DriverClimateShortcutView extends View {
                 autoKnown, autoActive, fanLabel);
         float rowCenterY = height * (expanded ? .45f : .73f)
                 - effectiveGap * .50f;
+        float detailsCenterY = height * .77f + effectiveGap * .50f;
         if (automatic) {
             // AUTO remains a plain word, but the live five-step automatic fan scale must stay
             // visible. Only decorative fan/airflow pictograms are omitted from the AUTO row.
@@ -277,7 +278,7 @@ public final class DriverClimateShortcutView extends View {
             drawBars(canvas, width * .12f, automaticScaleY, width * .76f, unit,
                     indicator.activeSegments, ClimateFanIndicatorPolicy.AUTO_SEGMENTS, color);
             drawAutoText(canvas, width / 2f,
-                    height * (expanded ? .58f : .82f), unit, color);
+                    expanded ? detailsCenterY : height * .82f, unit, color);
             return;
         }
         int totalBars = ClimateFanIndicatorPolicy.MANUAL_SEGMENTS;
@@ -290,7 +291,7 @@ public final class DriverClimateShortcutView extends View {
 
         if (airflowKnown) {
             drawAirflow(canvas, width / 2f,
-                    height * .77f + effectiveGap * .50f, unit,
+                    detailsCenterY, unit,
                     DriverClimatePresentation.airflowTargets(airflowLabel),
                     false, color);
         }

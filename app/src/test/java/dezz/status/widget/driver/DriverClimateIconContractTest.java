@@ -58,6 +58,10 @@ public final class DriverClimateIconContractTest {
         assertTrue(view.contains("drawAirflow("));
         assertTrue(view.contains("detailsGapPx"));
         assertTrue(view.contains("height * .14f"));
+        assertTrue(view.contains("float detailsCenterY ="));
+        assertTrue(view.contains("expanded ? detailsCenterY : height * .82f"));
+        assertTrue(view.contains("drawAirflow(canvas, width / 2f,\n"
+                + "                    detailsCenterY"));
         assertFalse(view.contains("R.drawable.ic_driver_monjaro_blow_auto_badge"));
         assertTrue(view.contains("if (!expanded) return;"));
     }
