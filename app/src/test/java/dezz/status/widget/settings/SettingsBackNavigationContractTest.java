@@ -52,6 +52,8 @@ public final class SettingsBackNavigationContractTest {
                     "binding.backButton.setOnClickListener(v -> finish())"},
             {"AutomationSettingsActivity.java", "back.setContentDescription(\"Назад\")",
                     "back.setOnClickListener(v -> finish())"},
+            {"DiagnosticsActivity.java", "back.setContentDescription(\"Назад\")",
+                    "back.setOnClickListener(view -> finish())"},
             {"HomeAssistantSettingsActivity.java",
                     "back.setContentDescription(\"Назад\")",
                     "back.setOnClickListener(view -> finish())"},
@@ -84,6 +86,7 @@ public final class SettingsBackNavigationContractTest {
             "AboutActivity.java",
             "AppSelectionActivity.java",
             "AutomationSettingsActivity.java",
+            "DiagnosticsActivity.java",
             "HomeAssistantSettingsActivity.java",
             "HudPanelSettingsActivity.java",
             "IntentScenarioSettingsActivity.java",
@@ -99,6 +102,7 @@ public final class SettingsBackNavigationContractTest {
 
     private static final String[][] PROGRAMMATIC_BACK_LABELS = {
             {"AutomationSettingsActivity.java", "Button back = button(\"‹\")"},
+            {"DiagnosticsActivity.java", "Button back = button(\"‹\")"},
             {"HomeAssistantSettingsActivity.java", "back.setText(\"‹\")"},
             {"IntentScenarioSettingsActivity.java", "back.setText(\"‹\")"},
             {"LauncherShortcutSettingsActivity.java", "back.setText(\"←  Назад\")"},
