@@ -4,6 +4,8 @@ package dezz.status.widget.integration;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import org.json.JSONArray;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -17,6 +19,8 @@ import dezz.status.widget.scenario.Input;
 import dezz.status.widget.scenario.ValueReference;
 import dezz.status.widget.scenario.ValueResolver;
 import dezz.status.widget.scenario.ValueResolverRegistry;
+import dezz.status.widget.diagnostics.ActionRecorder;
+import dezz.status.widget.diagnostics.DiagnosticJournal;
 
 /** Thread-safe in-process registry shared by HA, MQTT, Sprut.hub and the local scenario engine. */
 public final class ConnectorValueRegistry implements ValueResolver {
@@ -192,12 +196,31 @@ public final class ConnectorValueRegistry implements ValueResolver {
     private void notifyListeners(Collection<ConnectorValue> changed) {
         Collection<ConnectorValue> immutable = Collections.unmodifiableList(
                 new ArrayList<>(changed));
+        if (ActionRecorder.isRecording()) {
+            JSONArray resources = new JSONArray();
+            int visited = 0;
+            for (ConnectorValue value : immutable) {
+                if (visited++ >= 24) break;
+                resources.put(ActionRecorder.object(
+                        "type", value.connectorType.jsonName(),
+                        "connector_id", value.connectorId,
+                        "resource_id", value.resourceId,
+                        "fresh", value.fresh));
+            }
+            ActionRecorder.record(ActionRecorder.SOURCE_SERVICE,
+                    "CONNECTOR_VALUES_CHANGED", ActionRecorder.object(
+                            "count", immutable.size(),
+                            "resources", resources,
+                            "truncated", immutable.size() > resources.length()));
+        }
         for (Listener listener : listeners) {
             try {
                 listener.onValuesChanged(immutable);
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException failure) {
                 // UI/scenario consumers are isolated from transport callback threads. A broken
                 // listener must not prevent the remaining consumers from observing the update.
+                DiagnosticJournal.error("connector",
+                        "value listener failed: " + listener.getClass().getName(), failure);
             }
         }
     }

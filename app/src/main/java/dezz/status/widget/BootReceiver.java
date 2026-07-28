@@ -36,6 +36,11 @@ public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         String action = intent == null ? null : intent.getAction();
+        dezz.status.widget.diagnostics.ActionRecorder.record(
+                dezz.status.widget.diagnostics.ActionRecorder.SOURCE_SERVICE,
+                "BROADCAST_RECEIVED",
+                dezz.status.widget.diagnostics.ActionRecorder.object(
+                        "receiver", getClass().getName(), "action", action));
         if (WidgetServiceStarter.ACTION_RETRY.equals(action)) {
             WidgetServiceStarter.retryFromAlarm(context,
                     intent.getIntExtra(WidgetServiceStarter.EXTRA_RETRY_ATTEMPT, -1));

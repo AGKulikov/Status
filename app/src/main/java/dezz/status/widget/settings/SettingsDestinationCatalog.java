@@ -244,10 +244,15 @@ public final class SettingsDestinationCatalog {
         values.add(action("app_import", Group.APP, "Импорт резервной копии",
                 "Восстановить несекретные настройки из ранее сохранённого JSON",
                 "import", ACTION_IMPORT, "restore", "восстановление", "json"));
-        values.add(activity("app_about", Group.APP, "Диагностика и о приложении",
+        values.add(activity("app_diagnostics", Group.APP, "Отладка и регистратор действий",
+                "Цветной журнал, полный стек ошибок и плавающее управление записью событий",
+                "diagnostics", "dezz.status.widget.DiagnosticsActivity",
+                "отладка", "журнал", "лог", "ошибка", "падение", "красный",
+                "предупреждение", "руль", "keycode", "оверлей", "запись", "json", "txt"));
+        values.add(activity("app_about", Group.APP, "О приложении и данные автомобиля",
                 "Версия, соединения и данные автомобиля → Sprut.hub",
                 "about", "dezz.status.widget.AboutActivity",
-                "версия", "диагностика", "ошибки", "соединение"));
+                "версия", "данные автомобиля", "sprut", "соединение"));
         values.add(action("app_reset", Group.APP, "Сбросить все настройки",
                 "Вернуть исходные значения после явного подтверждения",
                 "reset", ACTION_RESET, "удалить", "очистить", "по умолчанию"));

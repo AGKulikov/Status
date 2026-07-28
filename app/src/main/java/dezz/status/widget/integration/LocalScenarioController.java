@@ -25,6 +25,7 @@ import dezz.status.widget.Preferences;
 import dezz.status.widget.automation.AutomationContract;
 import dezz.status.widget.automation.AutomationStateStore;
 import dezz.status.widget.car.CarIntegration;
+import dezz.status.widget.diagnostics.ActionRecorder;
 import dezz.status.widget.scenario.LocalAction;
 import dezz.status.widget.scenario.LocalField;
 import dezz.status.widget.scenario.Scenario;
@@ -122,6 +123,12 @@ public final class LocalScenarioController implements ConnectorValueRegistry.Lis
 
         LinkedHashSet<String> changedTargets = changedTargets(previousOverrides, overrides);
         if (changedTargets.isEmpty()) return;
+        JSONArray recordedTargets = new JSONArray();
+        for (String target : changedTargets) recordedTargets.put(target);
+        ActionRecorder.record(ActionRecorder.SOURCE_SERVICE,
+                "AUTOMATION_OVERRIDES_CHANGED", ActionRecorder.object(
+                        "count", changedTargets.size(),
+                        "targets", recordedTargets));
 
         stateStore.replaceScenarioOverrides(overrides);
         previousOverrides = Collections.unmodifiableMap(new LinkedHashMap<>(overrides));

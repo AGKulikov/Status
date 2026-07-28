@@ -135,6 +135,8 @@ public final class HudPresentationService extends Service
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent == null ? null : intent.getAction();
+        dezz.status.widget.diagnostics.ActionRecorder.recordServiceIntent(
+                getClass().getName(), action, startId);
         if (ACTION_STOP.equals(action) || !preferences.hudPanelEnabled.get()) {
             stopSelf();
             return START_NOT_STICKY;

@@ -662,6 +662,19 @@ public class Preferences {
     public final Int launcherAppsColumns = new Int(this, "launcherAppsColumns", 3);
     public final Int launcherActionsColumns = new Int(this, "launcherActionsColumns", 3);
 
+    /** Local diagnostics are opt-in because the detailed journal can grow to its cyclic limit. */
+    public final Bool debugModeEnabled = new Bool(this, "debugModeEnabled", false);
+    /** Persistent control frame used to start/stop action capture above every application. */
+    public final Bool actionRecorderOverlayVisible = new Bool(this,
+            "actionRecorderOverlayVisible", false);
+    public final Int actionRecorderOverlayX = new Int(this, "actionRecorderOverlayX", 40);
+    public final Int actionRecorderOverlayY = new Int(this, "actionRecorderOverlayY", 160);
+    public final Int actionRecorderOverlayWidth = new Int(this,
+            "actionRecorderOverlayWidth", 420);
+    /** Whole-frame alpha, 80..255. */
+    public final Int actionRecorderOverlayAlpha = new Int(this,
+            "actionRecorderOverlayAlpha", 235);
+
     public final Bool mqttEnabled = new Bool(this, "mqttEnabled", false);
     public final Str mqttHost = new Str(this, "mqttHost", "");
     public final Int mqttPort = new Int(this, "mqttPort", 1883);

@@ -13,6 +13,12 @@ import android.content.Intent;
 public final class MediaAutoResumeReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
+        dezz.status.widget.diagnostics.ActionRecorder.record(
+                dezz.status.widget.diagnostics.ActionRecorder.SOURCE_SERVICE,
+                "BROADCAST_RECEIVED",
+                dezz.status.widget.diagnostics.ActionRecorder.object(
+                        "receiver", getClass().getName(),
+                        "action", intent == null ? null : intent.getAction()));
         if (intent == null
                 || !MediaAutoResumeController.ACTION_RESUME.equals(intent.getAction())) return;
         MediaAutoResumeController.execute(context,

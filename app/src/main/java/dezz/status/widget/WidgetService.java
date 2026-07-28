@@ -1026,6 +1026,8 @@ public class WidgetService extends Service {
 
     @Override
     public int onStartCommand(@Nullable Intent intent, int flags, int startId) {
+        dezz.status.widget.diagnostics.ActionRecorder.recordServiceIntent(
+                getClass().getName(), intent == null ? null : intent.getAction(), startId);
         if (!destroyed && prefs != null
                 && ((prefs.widgetEnabled.get() && binding == null
                 && !overlayAttachRetryScheduled

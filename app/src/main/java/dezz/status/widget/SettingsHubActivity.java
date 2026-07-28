@@ -998,6 +998,7 @@ public final class SettingsHubActivity extends AppCompatActivity {
             case "permissions": return R.drawable.ic_popup_lock;
             case "export": return R.drawable.ic_export;
             case "import": return R.drawable.ic_import;
+            case "diagnostics": return R.drawable.ic_info;
             case "about": return R.drawable.ic_info;
             case "reset": return R.drawable.ic_reset;
             default: return R.drawable.ic_settings;

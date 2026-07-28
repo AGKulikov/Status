@@ -28,6 +28,7 @@ import android.os.Looper;
 import android.os.Process;
 import android.os.SystemClock;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
@@ -47,6 +48,8 @@ import java.util.Set;
 import dezz.status.widget.launcher.NavigationCollectionDemand;
 import dezz.status.widget.launcher.NavigationCollectionPolicy;
 import dezz.status.widget.launcher.NavigationDataRepository;
+import dezz.status.widget.diagnostics.ActionRecorder;
+import dezz.status.widget.diagnostics.DiagnosticJournal;
 
 /**
  * Accessibility service that reports the foreground package on every physical display and reads
@@ -68,7 +71,8 @@ public class WidgetAccessibilityService extends AccessibilityService {
     private static final int MAX_NAVIGATION_DEPTH = 45;
     private static final int BASE_ACCESSIBILITY_EVENTS =
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-                    | AccessibilityEvent.TYPE_WINDOWS_CHANGED;
+                    | AccessibilityEvent.TYPE_WINDOWS_CHANGED
+                    | AccessibilityEvent.TYPE_VIEW_CLICKED;
 
     @Nullable
     private static volatile WidgetAccessibilityService instance;
@@ -284,6 +288,18 @@ public class WidgetAccessibilityService extends AccessibilityService {
     public void onAccessibilityEvent(AccessibilityEvent event) {
         if (event == null) return;
         int type = event.getEventType();
+        if (ActionRecorder.isRecording()) {
+            CharSequence packageValue = event.getPackageName();
+            CharSequence classValue = event.getClassName();
+            ActionRecorder.record(ActionRecorder.SOURCE_ACCESSIBILITY,
+                    AccessibilityEvent.eventTypeToString(type),
+                    ActionRecorder.object(
+                            "package", packageValue == null ? "" : packageValue.toString(),
+                            "class", classValue == null ? "" : classValue.toString(),
+                            "window_id", event.getWindowId(),
+                            "action", event.getAction(),
+                            "content_change_types", event.getContentChangeTypes()));
+        }
         boolean windowChanged = type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
                 || type == AccessibilityEvent.TYPE_WINDOWS_CHANGED;
         if (windowChanged) {
@@ -307,6 +323,32 @@ public class WidgetAccessibilityService extends AccessibilityService {
     @Override
     public void onInterrupt() {
         // No-op — we don't drive any feedback streams.
+    }
+
+    @Override
+    protected boolean onKeyEvent(KeyEvent event) {
+        if (event == null) return false;
+        int displayId = -1;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            displayId = event.getDisplayId();
+        }
+        ActionRecorder.record(ActionRecorder.SOURCE_STEERING_KEY, "KEY_EVENT",
+                ActionRecorder.object(
+                        "key_code", event.getKeyCode(),
+                        "scan_code", event.getScanCode(),
+                        "action", event.getAction() == KeyEvent.ACTION_DOWN ? "DOWN" : "UP",
+                        "repeat", event.getRepeatCount(),
+                        "long_press", event.isLongPress(),
+                        "device_id", event.getDeviceId(),
+                        "source", event.getSource(),
+                        "display_id", displayId,
+                        "down_time", event.getDownTime(),
+                        "event_time", event.getEventTime()));
+        DiagnosticJournal.debug("key",
+                "keyCode=" + event.getKeyCode() + " action=" + event.getAction()
+                        + " repeat=" + event.getRepeatCount() + " display=" + displayId);
+        // Observing must never consume a steering-wheel or hardware key.
+        return false;
     }
 
     /**
@@ -384,8 +426,11 @@ public class WidgetAccessibilityService extends AccessibilityService {
         if (info == null) return;
         int desired = BASE_ACCESSIBILITY_EVENTS
                 | (needed ? AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED : 0);
-        if (info.eventTypes == desired) return;
+        int desiredFlags = info.flags
+                | AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS;
+        if (info.eventTypes == desired && info.flags == desiredFlags) return;
         info.eventTypes = desired;
+        info.flags = desiredFlags;
         try {
             setServiceInfo(info);
         } catch (RuntimeException failure) {

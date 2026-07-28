@@ -13,6 +13,12 @@ import androidx.annotation.Nullable;
 public final class AutoHoldStateReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(@NonNull Context context, @Nullable Intent intent) {
+        dezz.status.widget.diagnostics.ActionRecorder.record(
+                dezz.status.widget.diagnostics.ActionRecorder.SOURCE_SERVICE,
+                "BROADCAST_RECEIVED",
+                dezz.status.widget.diagnostics.ActionRecorder.object(
+                        "receiver", getClass().getName(),
+                        "action", intent == null ? null : intent.getAction()));
         if (intent == null || !AutoHoldStateRepository.ACTION_EXTERNAL.equals(intent.getAction())) {
             return;
         }

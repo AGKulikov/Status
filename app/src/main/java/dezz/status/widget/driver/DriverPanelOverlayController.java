@@ -491,6 +491,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         try {
             manager.addView(root, params);
             drawerWindow = new AttachedWindow(root, params, manager);
+            dezz.status.widget.diagnostics.ActionRecorder.recordOverlay(
+                    "driver_all_apps", "OPENED", "driver panel button");
             drawerGrid = grid;
             drawerTitle = title;
             drawerDone = done;
@@ -615,6 +617,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             for (LauncherShortcutStore.Shortcut value : values) itemIds.add(value.id);
             favoriteWindows.put(panelId, new FavoritePanelWindow(
                     config, grid, new AttachedWindow(root, params, manager), itemIds));
+            dezz.status.widget.diagnostics.ActionRecorder.recordOverlay(
+                    "driver_favorites:" + panelId, "OPENED", "driver panel button");
         } catch (RuntimeException error) {
             Log.w(TAG, "Could not show driver favorites", error);
             manuallyOpenFavorites.remove(panelId);
@@ -693,7 +697,11 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         drawerEditMode = false;
         unregisterDrawerPackageReceiver();
         unregisterDrawerUninstallReceiver();
-        if (drawer != null) drawer.remove();
+        if (drawer != null) {
+            drawer.remove();
+            dezz.status.widget.diagnostics.ActionRecorder.recordOverlay(
+                    "driver_all_apps", "CLOSED", "dismiss");
+        }
     }
 
     private void setDrawerEditMode(boolean enabled) {
@@ -772,6 +780,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         if (value == null) return;
         for (String itemId : value.itemIds) drawerSmartHomeBindings.remove(itemId);
         value.window.remove();
+        dezz.status.widget.diagnostics.ActionRecorder.recordOverlay(
+                "driver_favorites:" + panelId, "CLOSED", "dismiss");
     }
 
     private void dismissAllFavoritePanels() {
