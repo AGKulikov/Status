@@ -353,6 +353,9 @@
     <string name="phone_diag_disabled">выключен</string>
     <string name="phone_diag_not_supported">недоступен</string>
     <string name="phone_diag_device">Конкретный сопряжённый iPhone</string>
+    <string name="phone_diag_ancs_transport">Отдельный транспорт BLE/ANCS</string>
+    <string name="phone_diag_ancs_transport_names">%1$s ↔ %2$s; имя и сопряжение Classic Bluetooth не меняются</string>
+    <string name="phone_diag_ancs_dedicated_route">Отдельный BLE-сервис приложения и восстановление ANCS с разрешением личности iPhone</string>
     <string name="phone_diag_not_bonded">сохранённый iPhone сейчас не сопряжён</string>
     <string name="phone_diag_connection">Подключение выбранного iPhone</string>
     <string name="phone_diag_connected_selected">подключён</string>

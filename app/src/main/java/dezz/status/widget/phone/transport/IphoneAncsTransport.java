@@ -66,6 +66,8 @@ import java.util.UUID;
  * actually delivered during the same session.</p>
  */
 public final class IphoneAncsTransport {
+    public static final String LOCAL_LOGICAL_NAME = "Geely_ANCS";
+    public static final String REMOTE_LOGICAL_NAME = "iPhone_ANCS";
     private static final UUID DIAGNOSTIC_SERVICE =
             UUID.fromString("d2d9e4b0-47f1-4e44-a8bb-a932fd5a2f01");
     private static final UUID DIAGNOSTIC_CHARACTERISTIC =
@@ -99,8 +101,8 @@ public final class IphoneAncsTransport {
     private static final long CONNECT_TIMEOUT_MS = 35_000L;
     private static final long GPS_CONNECT_TIMEOUT_MS = 15_000L;
     private static final long GPS_SCAN_TIMEOUT_MS = 30_000L;
-    private static final long SAVED_PEER_SCAN_RESTART_MS = 180_000L;
-    private static final long SAVED_PEER_SCAN_RESTART_DELAY_MS = 1_000L;
+    private static final long SAVED_PEER_SCAN_RESTART_MS = 30_000L;
+    private static final long SAVED_PEER_SCAN_RESTART_DELAY_MS = 400L;
     private static final long AUTO_ANCS_WAIT_TIMEOUT_MS = 60_000L;
     private static final long GPS_POST_SECURE_DISCOVERY_DELAY_MS = 800L;
     private static final long DISCOVERY_TIMEOUT_MS = 15_000L;
@@ -323,6 +325,7 @@ public final class IphoneAncsTransport {
     private BluetoothGatt gatt;
     private BluetoothDevice activeClientTarget;
     private BluetoothDevice savedPeerScanTarget;
+    private BluetoothDevice managedSavedPeer;
     private final Object verifiedPeerLock = new Object();
     private BluetoothDevice verifiedPeer;
     private final LinkedHashMap<String, GattServerPeer> gattServerPeers =
@@ -345,6 +348,7 @@ public final class IphoneAncsTransport {
     private boolean iphoneAncsSeen;
     private boolean closing;
     private boolean retrySignalled;
+    private boolean managedReconnectEnabled;
     private boolean ancsRetryAfterBond;
     private boolean ancsAuthorizationFailureSeen;
     private boolean leBondAttemptObserved;
@@ -383,6 +387,8 @@ public final class IphoneAncsTransport {
     private Runnable scanTimeout;
     private Runnable ancsBondRetry;
     private Runnable autoAncsWaitTimeout;
+    private Runnable managedReconnectTask;
+    private int managedReconnectAttempt;
     private UUID batteryReadPendingUuid;
     private BatteryStage batteryStage = BatteryStage.NOT_STARTED;
     private boolean candidatePublishScheduled;
@@ -560,19 +566,33 @@ public final class IphoneAncsTransport {
         stopAdvertising();
         disconnect();
         resetVerifiedPeerSession();
+        managedReconnectEnabled = true;
+        managedReconnectAttempt = 0;
+        managedSavedPeer = device;
         iphonePeripheralMode = true;
         helperBootstrapMode = false;
         iphoneConnectStarted = false;
         if (!claimVerifiedPeer(device)) {
+            managedReconnectEnabled = false;
+            managedSavedPeer = null;
             iphonePeripheralMode = false;
             state("AUTO · SAVED PEER CONFLICT");
             return false;
         }
-        return startSavedPeerScan(device);
+        // The dedicated service stays visible while the Android-central fallback scans for the
+        // selected iPhone. Advertising and scanning are allowed concurrently; scan and
+        // connectGatt are never allowed concurrently.
+        boolean advertisingStarted = startGeelyAncsAdvertising();
+        boolean scanStarted = startSavedPeerScan(device);
+        return advertisingStarted || scanStarted;
     }
 
     private boolean startSavedPeerScan(@NonNull BluetoothDevice device) {
         if (closing || !iphonePeripheralMode || helperBootstrapMode) return false;
+        if (gatt != null || clientConnectInFlight || gattClientConnected) {
+            log("Identity scan не запущен: GATT connect/session уже активен");
+            return true;
+        }
         scanner = adapter == null ? null : adapter.getBluetoothLeScanner();
         if (scanner == null) {
             savedPeerScanTarget = null;
@@ -586,33 +606,33 @@ public final class IphoneAncsTransport {
             state("AUTO · SAVED PEER SCAN FAILED · EMPTY ADDRESS");
             return false;
         }
-        ScanFilter filter = new ScanFilter.Builder()
-                .setDeviceAddress(address)
-                .build();
+        // Do not put the Classic/public address into a hardware scan filter. iOS rotates its BLE
+        // private address, and several ECARX firmwares apply the filter before the controller has
+        // resolved the bond/IRK. A broad software scan lets Android return the resolved
+        // BluetoothDevice and we then apply the selected-phone gate ourselves.
         ScanSettings settings = new ScanSettings.Builder()
-                .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
-                .setCallbackType(ScanSettings.CALLBACK_TYPE_FIRST_MATCH)
-                .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
-                .setNumOfMatches(ScanSettings.MATCH_NUM_ONE_ADVERTISEMENT)
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
                 .setReportDelay(0L)
                 .build();
         savedPeerScanTarget = device;
         try {
-            scanner.startScan(Collections.singletonList(filter), settings, scanCallback);
+            scanner.startScan(Collections.emptyList(), settings, scanCallback);
             scanning = true;
-            state("AUTO · ЖДУ РЕКЛАМУ SAVED PEER");
-            log("HWGPS-style autoscan: exact address=" + address
-                    + ", LOW_POWER/FIRST_MATCH; connectGatt начнётся только после рекламы");
+            state(REMOTE_LOGICAL_NAME + " · IDENTITY SCAN");
+            log("Identity-resolving autoscan: selected=" + address
+                    + ", LOW_LATENCY/unfiltered; connectGatt начнётся только после "
+                    + "software identity + ANCS gate");
             BluetoothDevice expected = device;
             scanTimeout = () -> {
                 if (closing || helperBootstrapMode || iphoneConnectStarted
                         || !scanning || savedPeerScanTarget == null
                         || !sameDevice(savedPeerScanTarget, expected)) return;
                 log("Saved-peer autoscan работает " + SAVED_PEER_SCAN_RESTART_MS
-                        + " ms без match; перерегистрирую scan как HWGPS");
+                        + " ms без match; безопасно перерегистрирую один scan");
                 stopScan();
                 main.postDelayed(() -> {
-                    if (!closing && iphonePeripheralMode && !helperBootstrapMode
+                    if (!closing && managedReconnectEnabled
+                            && iphonePeripheralMode && !helperBootstrapMode
                             && !iphoneConnectStarted) {
                         startSavedPeerScan(expected);
                     }
@@ -642,6 +662,47 @@ public final class IphoneAncsTransport {
             log("stopScan exception: " + failure);
         }
         state("СКАНИРОВАНИЕ ОСТАНОВЛЕНО");
+    }
+
+    /**
+     * Publishes the stable application-owned Geely_ANCS identity without renaming the system
+     * Bluetooth adapter. Classic HFP/A2DP/PBAP therefore keep the stock Geely name.
+     */
+    private boolean startGeelyAncsAdvertising() {
+        if (!ensureAdapter()) return false;
+        advertiser = adapter.getBluetoothLeAdvertiser();
+        if (advertiser == null) {
+            log(LOCAL_LOGICAL_NAME + ": BluetoothLeAdvertiser недоступен; "
+                    + "продолжаю Android-central recovery");
+            return false;
+        }
+        if (advertising || advertisingPending || advertisingDesired) return true;
+
+        preparedAdvertiseSettings = new AdvertiseSettings.Builder()
+                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
+                .setConnectable(true)
+                .setTimeout(0)
+                .build();
+        preparedAdvertiseData = new AdvertiseData.Builder()
+                .setIncludeTxPowerLevel(false)
+                .addServiceUuid(new ParcelUuid(DIAGNOSTIC_SERVICE))
+                .build();
+        // A service-data logical name is independent from BluetoothAdapter#getName(). It is
+        // intentionally not setIncludeDeviceName(true), because that would expose the Classic
+        // adapter name and make the two logical transports look like one connection again.
+        preparedScanResponse = new AdvertiseData.Builder()
+                .addServiceData(new ParcelUuid(DIAGNOSTIC_SERVICE),
+                        LOCAL_LOGICAL_NAME.getBytes(StandardCharsets.UTF_8))
+                .build();
+        solicitationAdvertising = false;
+        advertisingDesired = true;
+        state(LOCAL_LOGICAL_NAME + " · STARTING");
+        log("Публикую отдельный BLE service " + DIAGNOSTIC_SERVICE
+                + " как " + LOCAL_LOGICAL_NAME
+                + "; системное имя Classic-адаптера не меняется");
+        openGattServer();
+        return gattServer != null;
     }
 
     /** Legacy comparison test. It uses only a normal public diagnostic advertisement. */
@@ -849,6 +910,10 @@ public final class IphoneAncsTransport {
 
     public void close() {
         closing = true;
+        managedReconnectEnabled = false;
+        managedSavedPeer = null;
+        if (managedReconnectTask != null) main.removeCallbacks(managedReconnectTask);
+        managedReconnectTask = null;
         stopScan();
         stopAdvertising();
         disconnect();
@@ -941,7 +1006,19 @@ public final class IphoneAncsTransport {
                 verifiedPeer = device;
                 return true;
             }
-            return sameDevice(verifiedPeer, device);
+            if (sameDevice(verifiedPeer, device)) return true;
+            // A bonded iPhone may reappear under an RPA. The custom incoming service and the
+            // following encrypted SECURE characteristic are the primary proof; a unique bonded
+            // name is only the tie-breaker that associates the resolved object with the selected
+            // Classic phone.
+            if (managedReconnectEnabled && managedSavedPeer != null
+                    && safeBondState(managedSavedPeer) == BluetoothDevice.BOND_BONDED
+                    && safeBondState(device) == BluetoothDevice.BOND_BONDED
+                    && uniqueBondedNameMatch(managedSavedPeer, device)) {
+                verifiedPeer = device;
+                return true;
+            }
+            return false;
         }
     }
 
@@ -1188,6 +1265,9 @@ public final class IphoneAncsTransport {
                 }
             }
         }
+        if (managedReconnectEnabled) {
+            scheduleManagedReconnect("incoming " + REMOTE_LOGICAL_NAME + " link lost");
+        }
     }
 
     private static String deviceKey(BluetoothDevice device) {
@@ -1216,7 +1296,8 @@ public final class IphoneAncsTransport {
                 DIAGNOSTIC_CHARACTERISTIC,
                 BluetoothGattCharacteristic.PROPERTY_READ,
                 BluetoothGattCharacteristic.PERMISSION_READ);
-        information.setValue("KX11 ANCS Test v9".getBytes(StandardCharsets.UTF_8));
+        information.setValue((LOCAL_LOGICAL_NAME + "/1")
+                .getBytes(StandardCharsets.UTF_8));
 
         BluetoothGattCharacteristic control = new BluetoothGattCharacteristic(
                 CONTROL_CHARACTERISTIC,
@@ -2438,6 +2519,19 @@ public final class IphoneAncsTransport {
     }
 
     private void state(String value) {
+        if (value != null && value.contains("ANCS READY")) {
+            managedReconnectAttempt = 0;
+            if (managedReconnectTask != null) main.removeCallbacks(managedReconnectTask);
+            managedReconnectTask = null;
+        }
+        if (!closing && managedReconnectEnabled && managedSavedPeer != null
+                && requiresControllerRetry(value)) {
+            scheduleManagedReconnect(value);
+            String recovery = REMOTE_LOGICAL_NAME + " · RECOVERING";
+            listener.onState(recovery);
+            log("STATE: " + recovery + " · reason=" + value);
+            return;
+        }
         if (!closing && !retrySignalled && requiresControllerRetry(value)) {
             retrySignalled = true;
             // Deliver the typed lifecycle signal first. The controller closes this transport and
@@ -2447,6 +2541,58 @@ public final class IphoneAncsTransport {
         }
         listener.onState(value);
         log("STATE: " + value);
+    }
+
+    /**
+     * Keeps transient status 133/discovery/CCCD failures inside one serialized transport owner.
+     * The outer controller is notified only for unrecoverable setup failures.
+     */
+    private void scheduleManagedReconnect(@NonNull String reason) {
+        if (closing || !managedReconnectEnabled || managedSavedPeer == null
+                || managedReconnectTask != null) return;
+
+        stopScan();
+        cancelClientAttemptCallbacks();
+        clearAncsRuntime();
+        clearIphonePeripheralRuntime(false);
+        iphonePeripheralMode = true;
+        helperBootstrapMode = false;
+        iphoneConnectStarted = false;
+        gattClientConnected = false;
+        clientConnectInFlight = false;
+        activeClientTarget = null;
+        BluetoothGatt previous = gatt;
+        gatt = null;
+        if (previous != null) {
+            try {
+                previous.disconnect();
+            } catch (RuntimeException ignored) {
+            }
+            try {
+                previous.close();
+            } catch (RuntimeException ignored) {
+            }
+        }
+
+        int attempt = managedReconnectAttempt++;
+        long delay = AncsReconnectPolicy.retryDelayMillis(attempt);
+        BluetoothDevice expected = managedSavedPeer;
+        managedReconnectTask = () -> {
+            managedReconnectTask = null;
+            if (closing || !managedReconnectEnabled || expected != managedSavedPeer) return;
+            iphonePeripheralMode = true;
+            helperBootstrapMode = false;
+            iphoneConnectStarted = false;
+            if (!advertising && !advertisingPending && !advertisingDesired) {
+                startGeelyAncsAdvertising();
+            }
+            if (!startSavedPeerScan(expected)) {
+                scheduleManagedReconnect("identity scan could not start");
+            }
+        };
+        main.postDelayed(managedReconnectTask, delay);
+        log("Одна recovery-сессия " + REMOTE_LOGICAL_NAME
+                + " #" + (attempt + 1) + " через " + delay + " ms · " + reason);
     }
 
     private static boolean requiresControllerRetry(@Nullable String value) {
@@ -2569,6 +2715,41 @@ public final class IphoneAncsTransport {
         return values.contains(expected);
     }
 
+    private boolean matchesManagedSavedPeer(@NonNull BluetoothDevice selected,
+                                            @NonNull BluetoothDevice observed,
+                                            boolean solicitsAncs) {
+        return AncsReconnectPolicy.candidateMayBeSelected(
+                safeAddress(selected), safeAddress(observed),
+                safeBondState(selected) == BluetoothDevice.BOND_BONDED,
+                safeBondState(observed) == BluetoothDevice.BOND_BONDED,
+                solicitsAncs, uniqueBondedNameMatch(selected, observed));
+    }
+
+    /**
+     * Name is only a supporting tie-breaker after both bond and ANCS-service checks. It is never
+     * accepted as the identity by itself.
+     */
+    private boolean uniqueBondedNameMatch(@NonNull BluetoothDevice selected,
+                                          @NonNull BluetoothDevice observed) {
+        String selectedName = safeName(selected).trim();
+        String observedName = safeName(observed).trim();
+        if (selectedName.isEmpty() || !selectedName.equals(observedName)
+                || adapter == null) return false;
+        Set<BluetoothDevice> bonded;
+        try {
+            bonded = adapter.getBondedDevices();
+        } catch (RuntimeException denied) {
+            return false;
+        }
+        int matchingNames = 0;
+        if (bonded != null) {
+            for (BluetoothDevice candidate : bonded) {
+                if (selectedName.equals(safeName(candidate).trim())) matchingNames++;
+            }
+        }
+        return matchingNames == 1;
+    }
+
     private final ScanCallback scanCallback = new ScanCallback() {
         @Override
         public void onScanResult(int callbackType, ScanResult result) {
@@ -2582,9 +2763,13 @@ public final class IphoneAncsTransport {
                 BluetoothDevice savedTarget = savedPeerScanTarget;
                 if (iphonePeripheralMode && !helperBootstrapMode
                         && savedTarget != null && !iphoneConnectStarted
-                        && sameDevice(savedTarget, result.getDevice())) {
-                    log("HWGPS-style saved-peer match: RSSI=" + result.getRssi()
-                            + " address=" + safeAddress(result.getDevice()));
+                        && matchesManagedSavedPeer(
+                        savedTarget, result.getDevice(), solicitsAncs)) {
+                    log("Identity-resolved saved-peer match: RSSI=" + result.getRssi()
+                            + " selected=" + safeAddress(savedTarget)
+                            + " observed=" + safeAddress(result.getDevice())
+                            + " ancsSolicitation=" + solicitsAncs
+                            + " bond=" + bondLabel(safeBondState(result.getDevice())));
                     connectToSavedAdvertisingIphone(result.getDevice());
                     return;
                 }
@@ -2644,6 +2829,8 @@ public final class IphoneAncsTransport {
                 advertising = true;
                 state(solicitationAdvertising
                         ? "ANCS SOLICITATION REQUESTED"
+                        : managedReconnectEnabled
+                        ? LOCAL_LOGICAL_NAME + " · ADVERTISING"
                         : "DIAGNOSTIC ADV ACTIVE");
                 log("onStartSuccess mode=" + settingsInEffect.getMode()
                         + " tx=" + settingsInEffect.getTxPowerLevel()
@@ -2666,6 +2853,10 @@ public final class IphoneAncsTransport {
                 log("onStartFailure " + errorCode + ": " + advertiseError(errorCode));
                 clearPreparedAdvertising();
                 closeGattServer();
+                if (managedReconnectEnabled && !scanning
+                        && !clientConnectInFlight && !gattClientConnected) {
+                    scheduleManagedReconnect("advertising failed " + errorCode);
+                }
             });
         }
     };
@@ -2739,12 +2930,21 @@ public final class IphoneAncsTransport {
                         updateCandidate(device, -127, false, "", "gatt-server-link");
                         if (status == GATT_SUCCESS
                                 && newState == BluetoothProfile.STATE_CONNECTED) {
-                            state("GATT SERVER LINK · В LIGHTBLUE ЗАПИШИТЕ PAIR");
-                            log("Peer станет verified только после "
-                                    + "ASCII PAIR в CONTROL " + CONTROL_CHARACTERISTIC);
+                            state(managedReconnectEnabled
+                                    ? REMOTE_LOGICAL_NAME + " · INCOMING LINK"
+                                    : "GATT SERVER LINK · В LIGHTBLUE ЗАПИШИТЕ PAIR");
+                            log(managedReconnectEnabled
+                                    ? REMOTE_LOGICAL_NAME
+                                    + " подключился к отдельному сервису "
+                                    + LOCAL_LOGICAL_NAME
+                                    + "; ожидаю защищённый PAIR/ANCS handshake"
+                                    : "Peer станет verified только после ASCII PAIR в CONTROL "
+                                    + CONTROL_CHARACTERISTIC);
                         } else if (newState == BluetoothProfile.STATE_DISCONNECTED
                                 && isVerifiedPeer(device)) {
-                            state("VERIFIED SERVER LINK DISCONNECTED");
+                            state(managedReconnectEnabled
+                                    ? REMOTE_LOGICAL_NAME + " · INCOMING LINK LOST"
+                                    : "VERIFIED SERVER LINK DISCONNECTED");
                             handleVerifiedServerLinkDisconnected(device);
                         }
                     });
@@ -2765,7 +2965,8 @@ public final class IphoneAncsTransport {
                             + " bond=" + bondLabel(safeBondState(device))));
                     if (DIAGNOSTIC_CHARACTERISTIC.equals(uuid)) {
                         sendGattReadResponse(device, requestId, offset,
-                            "KX11 ANCS Test v9".getBytes(StandardCharsets.UTF_8));
+                                (LOCAL_LOGICAL_NAME + "/1")
+                                        .getBytes(StandardCharsets.UTF_8));
                         return;
                     }
                     if (SECURE_CHARACTERISTIC.equals(uuid)) {

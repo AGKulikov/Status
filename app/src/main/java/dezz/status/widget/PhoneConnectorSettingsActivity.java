@@ -939,6 +939,11 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                         : selectedDeviceAddress.isEmpty()
                         ? getString(R.string.phone_no_device)
                         : getString(R.string.phone_diag_not_bonded)));
+        result.append('\n').append(line(ancsRequested,
+                getString(R.string.phone_diag_ancs_transport),
+                getString(R.string.phone_diag_ancs_transport_names,
+                        dezz.status.widget.phone.transport.IphoneAncsTransport.LOCAL_LOGICAL_NAME,
+                        dezz.status.widget.phone.transport.IphoneAncsTransport.REMOTE_LOGICAL_NAME)));
         result.append('\n').append(line(phoneConnected,
                 getString(R.string.phone_diag_connection),
                 phoneConnected
@@ -1120,6 +1125,9 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     @NonNull
     private String localizedAncsSetup(@NonNull String setup) {
         if ("disabled".equals(setup)) return getString(R.string.phone_diag_not_required);
+        if ("dedicated_ble_v1".equals(setup)) {
+            return getString(R.string.phone_diag_ancs_dedicated_route);
+        }
         return getString(R.string.phone_diag_ancs_stock_route);
     }
 
@@ -1422,6 +1430,9 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
 
         preferences.phoneConnectorEnabled.set(connectorEnabled.isChecked());
         preferences.phoneDeviceAddress.set(selectedDeviceAddress);
+        // Classic and ANCS start with the same physical iPhone, but the BLE transport owns a
+        // separate identity key and never mutates the stock Classic pairing/name.
+        preferences.phoneAncsDeviceAddress.set(selectedDeviceAddress);
         preferences.phoneNotificationsEnabled.set(notificationsEnabled.isChecked());
         preferences.phoneMessagesEnabled.set(messagesEnabled.isChecked());
         preferences.phoneIncludeNotificationText.set(includeNotificationText.isChecked());

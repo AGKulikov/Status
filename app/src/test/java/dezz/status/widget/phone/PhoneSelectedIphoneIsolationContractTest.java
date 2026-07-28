@@ -82,13 +82,15 @@ public final class PhoneSelectedIphoneIsolationContractTest {
         String savedPeer = method(transport, "public boolean connectSavedIphone",
                 "public void stopScan");
 
-        assertTrue(source.contains("final String address = selectedAddress"));
+        assertTrue(source.contains("final String address = current.ancsDeviceAddress"));
         assertTrue(source.contains("created.connectSavedIphone(address)"));
         assertTrue(source.contains("new AncsTransportListener(token, transportSession)"));
         assertTrue(savedPeer.contains("adapter.getRemoteDevice(address.trim())"));
-        assertTrue(savedPeer.contains("return startSavedPeerScan(device)"));
-        assertTrue(transport.contains(".setDeviceAddress(address)"));
-        assertTrue(transport.contains("sameDevice(savedTarget, result.getDevice())"));
+        assertTrue(savedPeer.contains("return advertisingStarted || scanStarted"));
+        assertFalse(transport.contains(".setDeviceAddress(address)"));
+        assertTrue(transport.contains("matchesManagedSavedPeer("));
+        assertTrue(transport.contains("uniqueBondedNameMatch("));
+        assertTrue(transport.contains("AncsReconnectPolicy.candidateMayBeSelected("));
         assertFalse(ensureGatt.contains("selectedDevice.connectGatt("));
         assertFalse(ensureGatt.contains("scheduleConnectWatchdog("));
         assertTrue(batteryOnly.contains("selectedDevice.connectGatt(context, autoConnect"));

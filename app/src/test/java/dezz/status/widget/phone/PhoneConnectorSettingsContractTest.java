@@ -24,6 +24,7 @@ public final class PhoneConnectorSettingsContractTest {
 
         assertTrue(source.contains("\"phoneConnectorEnabled\", false"));
         assertTrue(source.contains("new Str(this, \"phoneDeviceAddress\", \"\")"));
+        assertTrue(source.contains("\"phoneAncsDeviceAddress\", \"\""));
         assertTrue(source.contains("\"phoneNotificationsEnabled\", true"));
         assertTrue(source.contains("\"phoneMessagesEnabled\", false"));
         assertTrue(source.contains("\"phoneIncludeNotificationText\", false"));
@@ -44,6 +45,9 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.substring(source.indexOf("SECRET_PREFERENCE_KEYS"),
                 source.indexOf("public static abstract class Preference"))
                 .contains("\"phoneDeviceAddress\""));
+        assertTrue(source.substring(source.indexOf("SECRET_PREFERENCE_KEYS"),
+                source.indexOf("public static abstract class Preference"))
+                .contains("\"phoneAncsDeviceAddress\""));
     }
 
     @Test
@@ -73,6 +77,8 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("R.string.phone_choose_required"));
         assertTrue(source.contains(
                 "preferences.phoneDeviceAddress.set(selectedDeviceAddress)"));
+        assertTrue(source.contains(
+                "preferences.phoneAncsDeviceAddress.set(selectedDeviceAddress)"));
         assertFalse(source.contains("selectedDeviceAddress = position == 0"));
         assertFalse(source.contains("labels[0] = getString(R.string.phone_no_device)"));
     }

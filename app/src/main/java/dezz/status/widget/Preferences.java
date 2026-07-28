@@ -46,7 +46,7 @@ public class Preferences {
                     "mqttPassword", "sprutPassword", "sprutClientId", "haAccessToken",
                     // The paired phone is installation-specific and must not be copied into a
                     // settings backup restored on another head unit.
-                    "phoneDeviceAddress",
+                    "phoneDeviceAddress", "phoneAncsDeviceAddress",
                     // Contains both the full bearer action and fixed-endpoint token. Layout
                     // presets are routinely shared, so rules must remain device-local too.
                     "intentActionRulesJson")));
@@ -681,6 +681,12 @@ public class Preferences {
     public final Bool phoneConnectorEnabled = new Bool(this,
             "phoneConnectorEnabled", false);
     public final Str phoneDeviceAddress = new Str(this, "phoneDeviceAddress", "");
+    /**
+     * Dedicated BLE/ANCS identity. It is initially copied from the selected Classic phone but is
+     * kept under a separate key so ANCS recovery never renames, re-pairs, or rewrites Classic.
+     */
+    public final Str phoneAncsDeviceAddress = new Str(this,
+            "phoneAncsDeviceAddress", "");
     public final Bool phoneNotificationsEnabled = new Bool(this,
             "phoneNotificationsEnabled", true);
     public final Bool phoneMessagesEnabled = new Bool(this,

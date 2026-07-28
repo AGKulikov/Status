@@ -358,6 +358,9 @@
     <string name="phone_diag_disabled">disabled</string>
     <string name="phone_diag_not_supported">not available</string>
     <string name="phone_diag_device">Exact paired iPhone</string>
+    <string name="phone_diag_ancs_transport">Dedicated BLE/ANCS transport</string>
+    <string name="phone_diag_ancs_transport_names">%1$s ↔ %2$s; Classic Bluetooth name and pairing stay unchanged</string>
+    <string name="phone_diag_ancs_dedicated_route">Dedicated app BLE service with identity-resolving ANCS recovery</string>
     <string name="phone_diag_not_bonded">the saved iPhone is not paired</string>
     <string name="phone_diag_connection">Selected iPhone connection</string>
     <string name="phone_diag_connected_selected">connected</string>

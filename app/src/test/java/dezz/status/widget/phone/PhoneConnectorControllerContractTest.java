@@ -110,7 +110,7 @@ public final class PhoneConnectorControllerContractTest {
         assertFalse(source.contains("state.contains(\"AUTO · ЖДУ SAVED PEER\")"));
     }
 
-    @Test public void savedPeerTransportScansExactAddressBeforeOneBoundedDirectGatt()
+    @Test public void dedicatedTransportResolvesPrivateAddressAndRecoversInsideOneOwner()
             throws IOException {
         String source = controller();
         String transport = transport();
@@ -126,14 +126,19 @@ public final class PhoneConnectorControllerContractTest {
                 "@Override\n        public void onServicesDiscovered");
 
         assertTrue(source.contains("created.connectSavedIphone(address)"));
-        assertTrue(source.contains("final String address = selectedAddress"));
+        assertTrue(source.contains("final String address = current.ancsDeviceAddress"));
         assertTrue(source.contains("mainHandler.post(() -> startAncsTransportOnMain("));
         assertTrue(savedPeer.contains("adapter.getRemoteDevice(address.trim())"));
-        assertTrue(savedPeer.contains("return startSavedPeerScan(device)"));
+        assertTrue(savedPeer.contains("startGeelyAncsAdvertising()"));
+        assertTrue(savedPeer.contains("return advertisingStarted || scanStarted"));
         assertTrue(savedPeer.contains("stopScan();"));
         assertTrue(savedPeer.contains("stopAdvertising();"));
-        assertTrue(transport.contains(".setDeviceAddress(address)"));
-        assertTrue(transport.contains("ScanSettings.CALLBACK_TYPE_FIRST_MATCH"));
+        assertFalse(transport.contains(".setDeviceAddress(address)"));
+        assertTrue(transport.contains(
+                "scanner.startScan(Collections.emptyList(), settings, scanCallback)"));
+        assertTrue(transport.contains("ScanSettings.SCAN_MODE_LOW_LATENCY"));
+        assertTrue(transport.contains("matchesManagedSavedPeer("));
+        assertTrue(transport.contains("AncsReconnectPolicy.candidateMayBeSelected("));
         assertTrue(transport.contains("connectToSavedAdvertisingIphone("));
         assertTrue(transport.contains(
                 "connectIphonePeripheral(device, CONNECT_TIMEOUT_MS,"));
@@ -151,6 +156,10 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("state.contains(\"IPHONE DISCONNECTED\")"));
         assertTrue(source.contains("scheduleGattReconnect(token,"));
         assertTrue(source.contains("state.contains(\"AUTO · SERVICE CHANGED · RECONNECT\")"));
+        assertTrue(transport.contains("scheduleManagedReconnect(value)"));
+        assertTrue(transport.contains("managedReconnectTask != null"));
+        assertTrue(transport.contains("LOCAL_LOGICAL_NAME = \"Geely_ANCS\""));
+        assertTrue(transport.contains("REMOTE_LOGICAL_NAME = \"iPhone_ANCS\""));
         assertTrue(connectionCallback.contains("main.post(() ->"));
         assertFalse(connectionCallback.contains("postAtFrontOfQueue"));
     }
@@ -174,6 +183,25 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(broadcast.contains("BluetoothDevice.ACTION_ACL_DISCONNECTED"));
         assertTrue(broadcast.contains("transport != BluetoothDevice.TRANSPORT_BREDR"));
         assertTrue(broadcast.contains("scheduleGattReconnect(token,"));
+    }
+
+    @Test public void logicalBleNamesNeverRenameOrRepairClassicBluetooth()
+            throws IOException {
+        String source = controller();
+        String transport = transport();
+        String advertising = between(transport,
+                "private boolean startGeelyAncsAdvertising",
+                "public void startIncomingConnectionTest");
+
+        assertTrue(transport.contains("LOCAL_LOGICAL_NAME = \"Geely_ANCS\""));
+        assertTrue(transport.contains("REMOTE_LOGICAL_NAME = \"iPhone_ANCS\""));
+        assertTrue(advertising.contains(".addServiceUuid(new ParcelUuid(DIAGNOSTIC_SERVICE))"));
+        assertTrue(advertising.contains(".addServiceData(new ParcelUuid(DIAGNOSTIC_SERVICE)"));
+        assertFalse(advertising.contains("setIncludeDeviceName(true)"));
+        assertFalse(transport.contains("adapter.setName("));
+        assertTrue(source.contains("\"transport.ancs.local_name\""));
+        assertTrue(source.contains("\"transport.ancs.remote_name\""));
+        assertTrue(source.contains("current.ancsDeviceAddress"));
     }
 
     @Test public void protectedAncsSubscriptionsAreSerializedInsideTheTransport()
