@@ -17,7 +17,7 @@ import java.util.Set;
 
 /* loaded from: classes4.dex */
 public final class ClusterProbeActivity extends Activity {
-    static final String ACTION_STATE = "dezz.status.hudlab26.action.CLUSTER_PROBE_STATE";
+    static final String ACTION_STATE = "dezz.status.hudlab29.action.CLUSTER_PROBE_STATE";
     private static final String CLUSTER_ACTIVITY_STATE = "android.car.cluster.ClusterActivityState";
     private static final long DEFAULT_DURATION_MS = 12000;
     static final String EVENT_STARTED = "STARTED";

@@ -2023,7 +2023,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         this.clusterProbeReceiver = new BroadcastReceiver() { // from class: dezz.status.hudlab.HudLabActivity.126
             @Override // android.content.BroadcastReceiver
             public void onReceive(Context context, Intent intent) {
-                if (intent == null || !"dezz.status.hudlab26.action.CLUSTER_PROBE_STATE".equals(intent.getAction())) {
+                if (intent == null || !"dezz.status.hudlab29.action.CLUSTER_PROBE_STATE".equals(intent.getAction())) {
                     return;
                 }
                 String event = intent.getStringExtra("event");
@@ -2032,7 +2032,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                 HudLabActivity.this.appendClusterProbeTrace("ACTIVITY " + event + " · displayId=" + displayId + "\n" + state);
             }
         };
-        registerReceiver(this.clusterProbeReceiver, new IntentFilter("dezz.status.hudlab26.action.CLUSTER_PROBE_STATE"));
+        registerReceiver(this.clusterProbeReceiver, new IntentFilter("dezz.status.hudlab29.action.CLUSTER_PROBE_STATE"));
     }
 
     private void scheduleClusterProbeSamples(final int generation) {

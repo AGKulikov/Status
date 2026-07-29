@@ -97,7 +97,7 @@ jobs:
           BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
           echo "$BADGING"
           echo "$BADGING" | grep -F \
-            "package: name='dezz.status.hudlab26' versionCode='29' versionName='0.29'"
+            "package: name='dezz.status.hudlab29' versionCode='29' versionName='0.29'"
           echo "$BADGING" | grep -F "sdkVersion:'28'"
           echo "$BADGING" | grep -F "targetSdkVersion:'28'"
           if echo "$BADGING" | grep -Fq "application-debuggable"; then

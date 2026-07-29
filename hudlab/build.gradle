@@ -11,8 +11,9 @@ android {
     buildToolsVersion "36.0.0"
 
     defaultConfig {
-        // Keep the 0.28 package so 0.29 installs as an in-place update.
-        applicationId "dezz.status.hudlab26"
+        // 0.28 was signed with an unrecoverable ephemeral debug key. Keep the
+        // test installable without removing it by using a dedicated stable package.
+        applicationId "dezz.status.hudlab29"
         minSdk 28
         //noinspection ExpiredTargetSdkVersion
         targetSdkVersion 28
