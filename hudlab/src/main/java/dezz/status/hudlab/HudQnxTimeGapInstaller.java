@@ -188,6 +188,7 @@ final class HudQnxTimeGapInstaller implements Closeable {
                 try {
                     i2 = this.input.read();
                 } catch (SocketTimeoutException e) {
+                    continue;
                 }
                 if (i2 < 0) {
                     break;
@@ -213,6 +214,7 @@ final class HudQnxTimeGapInstaller implements Closeable {
                 try {
                     i2 = this.input.read();
                 } catch (SocketTimeoutException e) {
+                    continue;
                 }
                 if (i2 < 0) {
                     throw new IOException("QNX закрыл Telnet");
