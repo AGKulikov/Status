@@ -11,12 +11,13 @@ android {
     buildToolsVersion "36.0.0"
 
     defaultConfig {
-        applicationId "dezz.status.hudlab10"
+        // Keep the 0.28 package so 0.29 installs as an in-place update.
+        applicationId "dezz.status.hudlab26"
         minSdk 28
         //noinspection ExpiredTargetSdkVersion
         targetSdkVersion 28
-        versionCode 21
-        versionName "0.21"
+        versionCode 29
+        versionName "0.29"
         setProperty("archivesBaseName", "hud-lab-${versionName}")
     }
 

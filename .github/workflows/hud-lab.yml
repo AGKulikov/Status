@@ -97,7 +97,7 @@ jobs:
           BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
           echo "$BADGING"
           echo "$BADGING" | grep -F \
-            "package: name='dezz.status.hudlab10' versionCode='21' versionName='0.21'"
+            "package: name='dezz.status.hudlab26' versionCode='29' versionName='0.29'"
           echo "$BADGING" | grep -F "sdkVersion:'28'"
           echo "$BADGING" | grep -F "targetSdkVersion:'28'"
           if echo "$BADGING" | grep -Fq "application-debuggable"; then
@@ -106,7 +106,7 @@ jobs:
           fi
           MANIFEST=$("$ANDROID_HOME/build-tools/36.0.0/aapt" \
             dump xmltree "$APK" AndroidManifest.xml)
-          test "$(printf '%s\n' "$MANIFEST" | grep -c 'E: activity ')" -eq 2
+          test "$(printf '%s\n' "$MANIFEST" | grep -c 'E: activity ')" -eq 3
           if printf '%s\n' "$MANIFEST" | grep -Eq 'E: (service|receiver) '; then
             echo "HUD Lab release must not contain a service or receiver" >&2
             exit 1
@@ -117,6 +117,10 @@ jobs:
           done < <(unzip -Z1 "$APK" | grep -E '^classes.*\.dex$')
           grep -Fq 'HudDisplayStackBridgeMain' "$DEX_STRINGS"
           grep -Fq 'HudPrivilegedCommandRunner' "$DEX_STRINGS"
+          grep -Fq 'ClusterNavigationTransfer' "$DEX_STRINGS"
+          grep -Fq 'ru.yandex.yandexmaps.SplashScreen' "$DEX_STRINGS"
+          grep -Fq 'ru.yandex.yandexnavi.core.NavigatorActivity' "$DEX_STRINGS"
+          grep -Fq 'com.google.android.apps.maps.MapsActivity' "$DEX_STRINGS"
           if grep -Eq 'HudModeFallback(Service|BootReceiver)|HudModeEnforcementPolicy' \
             "$DEX_STRINGS"; then
             echo "Removed auto-repeat code leaked into release DEX" >&2
@@ -138,7 +142,7 @@ jobs:
       - name: Upload signed HUD Lab APK
         uses: actions/upload-artifact@v4
         with:
-          name: hud-lab-0.21-release-candidate
+          name: hud-lab-0.29-release-candidate
           path: |
             hudlab/build/outputs/apk/release/*.apk
             hudlab/build/outputs/apk/release/*.sha256

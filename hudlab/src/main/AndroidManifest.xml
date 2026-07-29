@@ -32,7 +32,17 @@
             android:launchMode="singleTask"
             android:noHistory="false"
             android:screenOrientation="landscape"
-            android:taskAffinity="dezz.status.hudlab10.cover"
+            android:taskAffinity="dezz.status.hudlab26.cover"
+            android:theme="@style/Theme.HudLab" />
+
+        <activity
+            android:name="dezz.status.hudlab.ClusterProbeActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape"
+            android:taskAffinity="dezz.status.hudlab26.cluster"
             android:theme="@style/Theme.HudLab" />
 
     </application>
