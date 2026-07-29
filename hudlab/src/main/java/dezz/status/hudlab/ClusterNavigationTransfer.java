@@ -1,60 +1,44 @@
 package dezz.status.hudlab;
 
 import android.app.Activity;
-import android.app.ActivityOptions;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.net.Uri;
-import android.os.Bundle;
+import android.hardware.display.DisplayManager;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
+import android.view.Display;
 
 import com.ecarx.xui.adaptapi.diminteraction.DimMenuInteraction;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Locale;
 
 /**
- * Reproduces the instrument-cluster transfer used by mNavi 2.0.
+ * Launches HUD Lab's own marker Activity on the instrument-cluster display.
  *
- * <p>This is deliberately a one-shot diagnostic. It has no service, receiver, timer loop or
- * boot-time behavior. Every transfer is initiated by a visible button in HUD Lab.</p>
+ * <p>The transition deliberately mirrors the relevant mNavi 2.0 path. No navigation
+ * application is started or stopped. The four force-stops in mNavi only clear the selected
+ * third-party navigation task; HUD Lab instead closes its own previous marker Activity.</p>
  */
 final class ClusterNavigationTransfer {
-    static final Target YANDEX_MAPS = new Target(
-            "Яндекс Карты",
-            "ru.yandex.yandexmaps",
-            "ru.yandex.yandexmaps.SplashScreen");
-    static final Target YANDEX_NAVI = new Target(
-            "Яндекс Навигатор",
-            "ru.yandex.yandexnavi",
-            "ru.yandex.yandexnavi.core.NavigatorActivity");
-    static final Target GOOGLE_MAPS = new Target(
-            "Google Maps",
-            "com.google.android.apps.maps",
-            "com.google.android.apps.maps.MapsActivity");
-
-    private static final int CENTER_DISPLAY_ID = 0;
     private static final int CLUSTER_DISPLAY_ID = 2;
     private static final int NAVI_MODE_OFF = 1;
     private static final int NAVI_MODE_FULL = 3;
-    private static final long CLUSTER_LAUNCH_DELAY_MS = 600L;
-    private static final long CENTER_LAUNCH_DELAY_MS = 200L;
+    private static final int MAX_RESET_POLLS = 4;
+    private static final long RESET_POLL_MS = 400L;
+    private static final long ARM_DELAY_MS = 500L;
+    private static final long LAUNCH_DELAY_MS = 600L;
+    private static final long PROBE_DURATION_MS = 30_000L;
 
     interface Listener {
         void onTraceChanged(String trace);
-    }
-
-    static final class Target {
-        final String label;
-        final String packageName;
-        final String activityName;
-
-        Target(String label, String packageName, String activityName) {
-            this.label = label;
-            this.packageName = packageName;
-            this.activityName = activityName;
-        }
     }
 
     private final Activity activity;
@@ -64,6 +48,9 @@ final class ClusterNavigationTransfer {
     private final StringBuilder trace = new StringBuilder();
     private int generation;
     private boolean closed;
+    private boolean startEventReceived;
+    private File journalFile;
+    private String journalError;
 
     ClusterNavigationTransfer(
             Activity activity,
@@ -74,72 +61,81 @@ final class ClusterNavigationTransfer {
         this.listener = listener;
     }
 
-    void moveToCluster(final Target target) {
-        final int operation = begin(
-                target.label + " → displayId=2",
-                "1/5 force-stop выбранного приложения через локальный ADB");
-        forceStop(target, operation, new Runnable() {
+    void showIdleStatus() {
+        if (trace.length() != 0) {
+            append("Служба запуска: " + accessibilityState());
+            return;
+        }
+        append("ТЕСТ СОБСТВЕННОГО ЭКРАНА · ещё не запускался");
+        append("Цель: Android displayId=2");
+        append("Служба запуска: " + accessibilityState());
+    }
+
+    void openAccessibilitySettings() {
+        append("Открываю «Специальные возможности». Включите «HUD Lab · запуск на приборке», затем вернитесь.");
+        try {
+            Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+            activity.startActivity(intent);
+        } catch (Throwable failure) {
+            append("ACCESSIBILITY SETTINGS ERROR · " + describe(failure));
+        }
+    }
+
+    void moveOwnScreenToCluster() {
+        final int operation = begin("СОБСТВЕННЫЙ ЭКРАН → DISPLAY 2");
+        startEventReceived = false;
+        ClusterProbeActivity.finishActive();
+        append(display2Summary());
+        append("Контекст запуска: " + accessibilityState());
+        append("До запуска закрывается только прежняя тестовая Activity HUD Lab; навигаторы не затрагиваются.");
+        captureWindowState("ДО", operation, new Runnable() {
             @Override
             public void run() {
                 if (!isCurrent(operation)) {
                     return;
                 }
-                append("2/5 проверка текущего NaviMode и точный reset 1/[0], если он не равен 3");
-                String reset = prepareDimForCluster();
-                append(reset);
-                append("3/5 switchNaviMode(3) + DIM (2,8,8,[1])");
-                append(setDimState(NAVI_MODE_FULL, true));
-                append("4/5 пауза 600 мс перед междисплейным запуском");
-                main.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (!isCurrent(operation)) {
-                            return;
-                        }
-                        launch(target, CLUSTER_DISPLAY_ID);
-                        append("5/5 ActivityOptions.setLaunchDisplayId(2) отправлен");
-                        captureWindowState(target, operation, "ПОСЛЕ ЗАПУСКА");
-                    }
-                }, CLUSTER_LAUNCH_DELAY_MS);
+                pollResetIfNeeded(operation, 1);
             }
         });
     }
 
-    void restoreToCenter(final Target target) {
-        final int operation = begin(
-                target.label + " → displayId=0",
-                "1/4 force-stop выбранного приложения через локальный ADB");
-        forceStop(target, operation, new Runnable() {
-            @Override
-            public void run() {
-                if (!isCurrent(operation)) {
-                    return;
-                }
-                append("2/4 switchNaviMode(1) + DIM (2,8,8,[0])");
-                append(setDimState(NAVI_MODE_OFF, false));
-                append("3/4 пауза 200 мс перед возвратом на центральный экран");
-                main.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (!isCurrent(operation)) {
-                            return;
-                        }
-                        launch(target, CENTER_DISPLAY_ID);
-                        append("4/4 displayId=0 + windowingMode=5 отправлен");
-                        captureWindowState(target, operation, "ПОСЛЕ ВОЗВРАТА");
-                    }
-                }, CENTER_LAUNCH_DELAY_MS);
-            }
-        });
-    }
-
-    void restoreDimOnly() {
-        int operation = begin(
-                "Восстановление навигационного слоя приборки",
-                "switchNaviMode(1) + DIM (2,8,8,[0])");
+    void restore() {
+        generation++;
+        final int operation = generation;
+        append("--- ЗАКРЫТИЕ ТЕСТА И ВОССТАНОВЛЕНИЕ DIM ---");
+        ClusterProbeActivity.finishActive();
         append(setDimState(NAVI_MODE_OFF, false));
-        append("Готово. Приложения не запускались и не останавливались.");
-        captureWindowState(null, operation, "DIM RESTORE");
+        append("Тестовая Activity закрыта; сторонние приложения не запускались и не останавливались.");
+        captureWindowState("ПОСЛЕ ЗАКРЫТИЯ", operation, null);
+    }
+
+    void onProbeEvent(String event, int displayId, String state) {
+        if (closed) {
+            return;
+        }
+        if (ClusterProbeActivity.EVENT_STARTED.equals(event)
+                || ClusterProbeActivity.EVENT_RESUMED.equals(event)
+                || ClusterProbeActivity.EVENT_UPDATED.equals(event)) {
+            startEventReceived = true;
+        }
+        append("ACTIVITY " + event + " · фактический displayId=" + displayId
+                + (state == null || state.trim().isEmpty() ? "" : "\n" + state.trim()));
+        if (ClusterProbeActivity.EVENT_STARTED.equals(event)) {
+            append(displayId == CLUSTER_DISPLAY_ID
+                    ? "РЕЗУЛЬТАТ API: УСПЕХ — Activity действительно создана на displayId=2."
+                    : "РЕЗУЛЬТАТ API: ОШИБКА МАРШРУТИЗАЦИИ — система создала Activity на displayId="
+                    + displayId + " вместо 2.");
+        }
+    }
+
+    void appendTelemetry(String value) {
+        append("КРЫЛЬЯ · " + value);
+    }
+
+    void captureManualWindowState() {
+        int operation = generation;
+        append("★★ РУЧНАЯ МЕТКА: пользователь подтвердил появление нижних крыльев.");
+        captureWindowState("РУЧНАЯ МЕТКА КРЫЛЬЕВ", operation, null);
     }
 
     void close() {
@@ -148,67 +144,157 @@ final class ClusterNavigationTransfer {
         main.removeCallbacksAndMessages(null);
     }
 
-    private int begin(String title, String firstStep) {
+    private int begin(String title) {
         generation++;
         trace.setLength(0);
-        append("mNavi exact test · " + title);
-        append(firstStep);
+        startJournal();
+        append("HUD Lab 0.30 · " + title);
+        append(journalFile == null
+                ? "ЖУРНАЛ ФАЙЛА: ERROR · " + journalError
+                : "ЖУРНАЛ ФАЙЛА: " + journalFile.getAbsolutePath());
+        append("Разобранная последовательность mNavi 2.0 без запуска навигатора.");
         return generation;
     }
 
-    private void forceStop(
-            final Target target,
-            final int operation,
-            final Runnable continuation) {
-        String packageName = target.packageName;
-        String command = "for N in 1 2 3 4; do "
-                + "su 0 am force-stop --user 0 " + packageName
-                + " >/dev/null 2>&1 || am force-stop --user 0 " + packageName
-                + " >/dev/null 2>&1; sleep 0.1; done; "
-                + "echo FORCE_STOP_OK:" + packageName;
+    /**
+     * mNavi resets 3 -> 1/[0] only when getNaviMode() is already 3. Its original loop
+     * checks the readback up to four times at 400 ms intervals, then waits 500 ms before
+     * arming mode 3 again.
+     */
+    private void pollResetIfNeeded(final int operation, final int attempt) {
+        if (!isCurrent(operation)) {
+            return;
+        }
+        Integer current = readNaviMode();
+        append("NaviMode poll " + attempt + "/" + MAX_RESET_POLLS + " = "
+                + (current == null ? "ERROR" : current));
+        if (current != null && current == NAVI_MODE_FULL) {
+            append("Режим уже 3: отправляю импульсный reset 1 + DIM [0], как mNavi.");
+            append(setDimState(NAVI_MODE_OFF, false));
+            if (attempt < MAX_RESET_POLLS) {
+                main.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        pollResetIfNeeded(operation, attempt + 1);
+                    }
+                }, RESET_POLL_MS);
+                return;
+            }
+        } else {
+            append("Предварительный reset не нужен: mNavi сразу переходит к включению режима 3.");
+        }
+        main.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                armAndLaunch(operation);
+            }
+        }, ARM_DELAY_MS);
+    }
+
+    private void armAndLaunch(final int operation) {
+        if (!isCurrent(operation)) {
+            return;
+        }
+        append("ARM: switchNaviMode(3) + DIM (2,8,8,[1])");
+        append(setDimState(NAVI_MODE_FULL, true));
+        append("Пауза 600 мс перед запуском — точное значение из mNavi.");
+        main.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                launchProbe(operation);
+            }
+        }, LAUNCH_DELAY_MS);
+    }
+
+    private void launchProbe(final int operation) {
+        if (!isCurrent(operation)) {
+            return;
+        }
+        String token = Long.toHexString(System.nanoTime());
+        try {
+            String route;
+            if (ClusterLaunchAccessibilityService.isConnected()) {
+                ClusterLaunchAccessibilityService.launchProbe(PROBE_DURATION_MS, token);
+                route = "AccessibilityService (тот же тип Context, что у mNavi)";
+            } else {
+                ClusterLaunchProtocol.start(activity, PROBE_DURATION_MS, token);
+                route = "foreground Activity fallback; служба HUD Lab не включена";
+            }
+            append("LAUNCH API: OK · " + route);
+            append(ClusterLaunchProtocol.describe());
+        } catch (Throwable failure) {
+            append("LAUNCH API: ERROR · " + describe(failure));
+            launchViaAdbFallback(operation, token);
+            return;
+        }
+        scheduleVerification(operation);
+    }
+
+    private void launchViaAdbFallback(final int operation, String token) {
+        String component = activity.getPackageName() + "/" + ClusterProbeActivity.class.getName();
+        String command = "am start --user 0 --display 2 --windowingMode 5"
+                + " -n " + component
+                + " --el duration_ms " + PROBE_DURATION_MS
+                + " --es launch_token " + token;
+        append("CONTROL ADB: " + command);
         commands.runTrusted(command, new HudPrivilegedCommandRunner.Callback() {
             @Override
             public void onFinished(String output, String error) {
                 if (!isCurrent(operation)) {
                     return;
                 }
-                if (error != null) {
-                    append("FORCE-STOP ERROR · " + error);
-                    append("Цепочка остановлена: без локального ADB это уже не точный путь mNavi.");
-                    return;
-                }
-                append(output == null || output.trim().isEmpty()
-                        ? "FORCE-STOP OK"
-                        : output.trim());
-                continuation.run();
+                append(error == null
+                        ? "CONTROL ADB RESULT:\n" + trim(output)
+                        : "CONTROL ADB ERROR · " + error);
+                scheduleVerification(operation);
             }
         });
     }
 
-    private String prepareDimForCluster() {
-        try {
-            DimMenuInteraction menu = new DimMenuInteraction(activity);
-            int current = menu.getNaviMode();
-            if (current == NAVI_MODE_FULL) {
-                return "NaviMode уже 3: предварительный reset не требуется";
+    private void scheduleVerification(final int operation) {
+        main.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (isCurrent(operation)) {
+                    captureWindowState("ПОСЛЕ +1.2с", operation, null);
+                }
             }
-            return "NaviMode=" + current + " · " + setDimState(NAVI_MODE_OFF, false);
+        }, 1200L);
+        main.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (!isCurrent(operation)) {
+                    return;
+                }
+                if (!startEventReceived) {
+                    append("РЕЗУЛЬТАТ API: onCreate/onResume тестовой Activity не получен за 3 секунды.");
+                }
+                captureWindowState("ПОСЛЕ +3.0с", operation, null);
+            }
+        }, 3000L);
+    }
+
+    private Integer readNaviMode() {
+        try {
+            Class.forName("com.ecarx.xui.adaptapi.car.Car");
+            Context context = ClusterLaunchAccessibilityService.activeContext(activity);
+            return new DimMenuInteraction(context).getNaviMode();
         } catch (Throwable failure) {
-            return "NaviMode read ERROR · " + describe(failure)
-                    + "\nПробую продолжить без условного reset.";
+            append("getNaviMode ERROR · " + describe(failure));
+            return null;
         }
     }
 
     private String setDimState(int naviMode, boolean clusterActive) {
         StringBuilder result = new StringBuilder();
+        Context context = ClusterLaunchAccessibilityService.activeContext(activity);
         try {
-            // mNavi explicitly initializes this class before constructing DimMenuInteraction.
             Class.forName("com.ecarx.xui.adaptapi.car.Car");
         } catch (Throwable failure) {
             result.append("Car init WARN · ").append(describe(failure)).append(" · ");
         }
         try {
-            DimMenuInteraction menu = new DimMenuInteraction(activity);
+            DimMenuInteraction menu = new DimMenuInteraction(context);
             boolean accepted = menu.switchNaviMode(naviMode);
             result.append("switchNaviMode(")
                     .append(naviMode)
@@ -220,8 +306,8 @@ final class ClusterNavigationTransfer {
         result.append(" · ");
         try {
             Class<?> managerClass = Class.forName("ecarx.dimprotocol.DIMProtocolManager");
-            Method getInstance = managerClass.getMethod("getInstance", Context.class);
-            Object manager = getInstance.invoke(null, activity);
+            Method getInstance = managerClass.getMethod("getInstance", android.content.Context.class);
+            Object manager = getInstance.invoke(null, context);
             Method send = managerClass.getMethod(
                     "sendMessageToDIM",
                     byte.class,
@@ -239,61 +325,90 @@ final class ClusterNavigationTransfer {
         return result.toString();
     }
 
-    private void launch(Target target, int displayId) {
-        try {
-            Intent intent = new Intent(Intent.ACTION_MAIN, Uri.parse(""));
-            intent.setClassName(target.packageName, target.activityName);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            ActivityOptions options = ActivityOptions.makeBasic();
-            options.setLaunchDisplayId(displayId);
-            Bundle bundle = options.toBundle();
-            if (displayId != CLUSTER_DISPLAY_ID && bundle != null) {
-                bundle.putInt("android.activity.SplitScreenShownPosition", 0);
-                bundle.putInt("android.activity.windowingMode", 5);
-            }
-            activity.startActivity(intent, bundle);
-        } catch (Throwable failure) {
-            append("LAUNCH ERROR · " + describe(failure));
-        }
-    }
-
     private void captureWindowState(
-            final Target target,
+            final String phase,
             final int operation,
-            final String phase) {
-        main.postDelayed(new Runnable() {
+            final Runnable continuation) {
+        String packageName = activity.getPackageName();
+        String command = "echo '--- DISPLAY 2 ---'; "
+                + "dumpsys display | grep -E -A3 -B2 'DisplayDeviceInfo|displayId 2|mDisplayId=2|local:2' "
+                + "| tail -n 120; "
+                + "echo '--- WINDOW DISPLAY CONTENT 2 ---'; "
+                + "dumpsys window displays | grep -Ei -A80 -B5 "
+                + "'mDisplayId=2|displayId=2|DisplayContent[^0-9]*2' | head -n 600; "
+                + "echo '--- WINDOW LAYERS / FRAMES ---'; "
+                + "dumpsys window windows | grep -Ei -A18 -B6 '"
+                + packageName
+                + "|ClusterProbeActivity|mDisplayId=2|displayId=2|cluster|dashboard' "
+                + "| head -n 700; "
+                + "echo '--- ACTIVITY TASKS ---'; "
+                + "dumpsys activity activities | grep -Ei -A18 -B6 '"
+                + packageName
+                + "|ClusterProbeActivity|displayId=2|mDisplayId=2|cluster|dashboard' "
+                + "| head -n 700; "
+                + "echo '--- SURFACEFLINGER RELATED STATE ---'; "
+                + "dumpsys SurfaceFlinger | grep -Ei -A10 -B6 '"
+                + packageName
+                + "|ClusterProbeActivity|cluster|dashboard|instrument|speed|rpm|range|fuel|navi|dim' "
+                + "| head -n 900";
+        commands.runTrusted(command, new HudPrivilegedCommandRunner.Callback() {
             @Override
-            public void run() {
+            public void onFinished(String output, String error) {
                 if (!isCurrent(operation)) {
                     return;
                 }
-                String packagePattern = target == null
-                        ? "com.auto_soft.monjaro_dashboard"
-                        : target.packageName + "|com.auto_soft.monjaro_dashboard";
-                String command = "echo '--- WINDOW ---'; "
-                        + "dumpsys window windows | grep -E 'mDisplayId|isVisible|"
-                        + packagePattern
-                        + "' | tail -n 120; "
-                        + "echo '--- ACTIVITY ---'; "
-                        + "dumpsys activity activities | grep -E 'mResumedActivity|displayId=|"
-                        + packagePattern
-                        + "' | tail -n 120";
-                commands.runTrusted(command, new HudPrivilegedCommandRunner.Callback() {
-                    @Override
-                    public void onFinished(String output, String error) {
-                        if (!isCurrent(operation)) {
-                            return;
-                        }
-                        if (error != null) {
-                            append(phase + " TRACE ERROR · " + error);
-                            return;
-                        }
-                        String value = output == null ? "" : output.trim();
-                        append(phase + ":\n" + (value.isEmpty() ? "совпадений нет" : value));
-                    }
-                });
+                append(error == null
+                        ? phase + " DUMPSYS:\n" + trim(output)
+                        : phase + " DUMPSYS ERROR · " + error);
+                if (continuation != null) {
+                    continuation.run();
+                }
             }
-        }, 900L);
+        });
+    }
+
+    private String display2Summary() {
+        try {
+            DisplayManager manager = (DisplayManager) activity.getSystemService("display");
+            Display display = manager == null ? null : manager.getDisplay(CLUSTER_DISPLAY_ID);
+            if (display == null) {
+                return "DISPLAY 2: НЕ НАЙДЕН в Android DisplayManager.";
+            }
+            return "DISPLAY 2: " + display.getName()
+                    + " · valid=" + display.isValid()
+                    + " · state=" + display.getState()
+                    + " · flags=0x" + Integer.toHexString(display.getFlags());
+        } catch (Throwable failure) {
+            return "DISPLAY 2 CHECK ERROR · " + describe(failure);
+        }
+    }
+
+    private String accessibilityState() {
+        boolean connected = ClusterLaunchAccessibilityService.isConnected();
+        boolean enabled = false;
+        try {
+            String setting = Settings.Secure.getString(
+                    activity.getContentResolver(),
+                    Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            String expected = new ComponentName(
+                    activity,
+                    ClusterLaunchAccessibilityService.class).flattenToString();
+            if (setting != null) {
+                for (String item : setting.split(":")) {
+                    if (expected.equalsIgnoreCase(item)) {
+                        enabled = true;
+                        break;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        if (connected) {
+            return "ПОДКЛЮЧЕНА";
+        }
+        return enabled
+                ? "включена в настройках, но Context ещё не подключён"
+                : "НЕ ВКЛЮЧЕНА — будет использован foreground fallback";
     }
 
     private boolean isCurrent(int operation) {
@@ -301,11 +416,75 @@ final class ClusterNavigationTransfer {
     }
 
     private void append(String line) {
+        if (line == null || line.trim().isEmpty()) {
+            return;
+        }
         if (trace.length() > 0) {
             trace.append('\n');
         }
         trace.append(line);
+        appendJournal(line);
         listener.onTraceChanged(trace.toString());
+    }
+
+    private void startJournal() {
+        journalFile = null;
+        journalError = null;
+        try {
+            File root = activity.getExternalFilesDir("cluster-traces");
+            if (root == null) {
+                root = new File(activity.getFilesDir(), "cluster-traces");
+            }
+            if (!root.exists() && !root.mkdirs()) {
+                throw new IllegalStateException("не удалось создать " + root);
+            }
+            String stamp = new SimpleDateFormat(
+                    "yyyyMMdd-HHmmss",
+                    Locale.ROOT).format(new Date());
+            File target = new File(root, "hudlab-cluster-" + stamp + ".txt");
+            if (!target.createNewFile()) {
+                target = new File(
+                        root,
+                        "hudlab-cluster-" + stamp + "-" + generation + ".txt");
+                if (!target.createNewFile()) {
+                    throw new IllegalStateException("имя журнала уже занято");
+                }
+            }
+            journalFile = target;
+        } catch (Throwable failure) {
+            journalError = describe(failure);
+        }
+    }
+
+    private void appendJournal(String value) {
+        File target = journalFile;
+        if (target == null) {
+            return;
+        }
+        String timestamp = new SimpleDateFormat(
+                "HH:mm:ss.SSS",
+                Locale.ROOT).format(new Date());
+        String record = "[" + timestamp + "] " + value + "\n";
+        try (FileOutputStream output = new FileOutputStream(target, true)) {
+            output.write(record.getBytes(StandardCharsets.UTF_8));
+            output.flush();
+        } catch (Throwable failure) {
+            journalError = describe(failure);
+            journalFile = null;
+        }
+    }
+
+    private static String trim(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return "нет совпадений";
+        }
+        String trimmed = value.trim();
+        int limit = 36_000;
+        return trimmed.length() <= limit
+                ? trimmed
+                : trimmed.substring(0, limit / 2)
+                + "\n…середина дампа обрезана; сохранены начало и конец…\n"
+                + trimmed.substring(trimmed.length() - (limit / 2));
     }
 
     private static String describe(Throwable failure) {

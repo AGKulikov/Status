@@ -41,9 +41,24 @@
             android:excludeFromRecents="true"
             android:exported="false"
             android:launchMode="singleTask"
+            android:resizeableActivity="true"
             android:screenOrientation="landscape"
             android:taskAffinity="dezz.status.hudlab29.cluster"
             android:theme="@style/Theme.HudLab" />
+
+        <service
+            android:name="dezz.status.hudlab.ClusterLaunchAccessibilityService"
+            android:enabled="true"
+            android:exported="true"
+            android:label="@string/cluster_launch_accessibility_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/cluster_launch_accessibility_service" />
+        </service>
 
     </application>
 

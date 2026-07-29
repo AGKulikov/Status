@@ -2,14 +2,18 @@ package dezz.status.hudlab;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.DisplayMetrics;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowInsets;
+import android.view.WindowManager;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.lang.ref.WeakReference;
@@ -19,11 +23,17 @@ import java.util.Set;
 public final class ClusterProbeActivity extends Activity {
     static final String ACTION_STATE = "dezz.status.hudlab29.action.CLUSTER_PROBE_STATE";
     private static final String CLUSTER_ACTIVITY_STATE = "android.car.cluster.ClusterActivityState";
-    private static final long DEFAULT_DURATION_MS = 12000;
+    private static final long DEFAULT_DURATION_MS = 30000;
     static final String EVENT_STARTED = "STARTED";
+    static final String EVENT_RESUMED = "RESUMED";
     static final String EVENT_STOPPED = "STOPPED";
     static final String EVENT_UPDATED = "UPDATED";
+    static final String EVENT_LAYOUT = "LAYOUT";
+    static final String EVENT_FOCUS = "FOCUS";
+    static final String EVENT_CONFIG = "CONFIG";
+    static final String EVENT_MULTI_WINDOW = "MULTI_WINDOW";
     static final String EXTRA_DURATION_MS = "duration_ms";
+    static final String EXTRA_LAUNCH_TOKEN = "launch_token";
     static final String EXTRA_EVENT = "event";
     static final String EXTRA_STATE = "state";
     private static final String STATE_EXTRAS = "android.car:activityState.extras";
@@ -47,8 +57,13 @@ public final class ClusterProbeActivity extends Activity {
 
     private String describeClusterActivityState(Intent intent) {
         Bundle extras = intent == null ? null : intent.getExtras();
+        String launch = "Activity: displayId=" + currentDisplayId()
+                + ", taskId=" + getTaskId()
+                + ", token=" + (intent == null
+                ? "нет"
+                : intent.getStringExtra(EXTRA_LAUNCH_TOKEN));
         if (extras == null) {
-            return "ClusterActivityState: extras отсутствуют";
+            return launch + "\nClusterActivityState: extras отсутствуют";
         }
         Object rawState = null;
         try {
@@ -56,7 +71,11 @@ public final class ClusterProbeActivity extends Activity {
         } catch (Throwable th) {
         }
         if (!(rawState instanceof Bundle)) {
-            return "ClusterActivityState: " + (rawState == null ? "НЕТ" : rawState.getClass().getName() + " · " + rawState) + "\nВсе extras: " + describeBundle(extras);
+            return launch + "\nClusterActivityState: "
+                    + (rawState == null
+                    ? "НЕТ"
+                    : rawState.getClass().getName() + " · " + rawState)
+                    + "\nВсе extras: " + describeBundle(extras);
         }
         Bundle state = (Bundle) rawState;
         boolean visible = state.getBoolean(STATE_VISIBLE, true);
@@ -67,7 +86,7 @@ public final class ClusterProbeActivity extends Activity {
         if (stateExtras != null) {
             out.append(", extras=").append(describeBundle(stateExtras));
         }
-        return out.append("\nВсе extras: ").append(describeBundle(extras)).toString();
+        return launch + "\n" + out.append("\nВсе extras: ").append(describeBundle(extras));
     }
 
     private static String describeBundle(Bundle bundle) {
@@ -85,9 +104,79 @@ public final class ClusterProbeActivity extends Activity {
         return out.append('}').toString();
     }
 
+    private String describeWindowGeometry(String phase) {
+        View decor = getWindow().getDecorView();
+        DisplayMetrics real = new DisplayMetrics();
+        try {
+            getWindowManager().getDefaultDisplay().getRealMetrics(real);
+        } catch (Throwable ignored) {
+        }
+        int[] location = new int[]{-1, -1};
+        Rect visibleFrame = new Rect();
+        try {
+            decor.getLocationOnScreen(location);
+            decor.getWindowVisibleDisplayFrame(visibleFrame);
+        } catch (Throwable ignored) {
+        }
+        String insetsText = "нет";
+        try {
+            WindowInsets insets = decor.getRootWindowInsets();
+            if (insets != null) {
+                insetsText = "system="
+                        + insets.getSystemWindowInsetLeft() + ","
+                        + insets.getSystemWindowInsetTop() + ","
+                        + insets.getSystemWindowInsetRight() + ","
+                        + insets.getSystemWindowInsetBottom()
+                        + " stable="
+                        + insets.getStableInsetLeft() + ","
+                        + insets.getStableInsetTop() + ","
+                        + insets.getStableInsetRight() + ","
+                        + insets.getStableInsetBottom();
+            }
+        } catch (Throwable ignored) {
+        }
+        WindowManager.LayoutParams attributes = getWindow().getAttributes();
+        Configuration configuration = getResources().getConfiguration();
+        return phase
+                + ": displayId=" + currentDisplayId()
+                + ", taskId=" + getTaskId()
+                + ", multiWindow=" + isInMultiWindowMode()
+                + "\n  real=" + real.widthPixels + "x" + real.heightPixels
+                + " densityDpi=" + real.densityDpi
+                + "\n  decor=" + decor.getWidth() + "x" + decor.getHeight()
+                + " at=" + location[0] + "," + location[1]
+                + " visibleFrame=" + visibleFrame
+                + "\n  insets=" + insetsText
+                + "\n  window: type=" + attributes.type
+                + " flags=0x" + Integer.toHexString(attributes.flags)
+                + " gravity=0x" + Integer.toHexString(attributes.gravity)
+                + " size=" + attributes.width + "x" + attributes.height
+                + " pos=" + attributes.x + "," + attributes.y
+                + "\n  config: orientation=" + configuration.orientation
+                + " uiMode=0x" + Integer.toHexString(configuration.uiMode)
+                + " densityDpi=" + configuration.densityDpi
+                + " smallestWidthDp=" + configuration.smallestScreenWidthDp
+                + " screen=" + configuration.screenWidthDp
+                + "x" + configuration.screenHeightDp + "dp";
+    }
+
+    private String describeState(Intent intent, String phase) {
+        return describeClusterActivityState(intent)
+                + "\n"
+                + describeWindowGeometry(phase);
+    }
+
     private void emit(String event, String state) {
         Intent broadcast = new Intent(ACTION_STATE).setPackage(getPackageName()).putExtra("event", event).putExtra(EXTRA_STATE, state).putExtra("display_id", currentDisplayId());
         sendBroadcast(broadcast);
+    }
+
+    private void updateAndEmit(String event, String phase) {
+        String state = describeState(getIntent(), phase);
+        if (this.detailsView != null) {
+            this.detailsView.setText(state);
+        }
+        emit(event, state);
     }
 
     private int currentDisplayId() {
@@ -106,14 +195,16 @@ public final class ClusterProbeActivity extends Activity {
         root.setBackgroundColor(Color.rgb(8, 37, 31));
         int displayId = currentDisplayId();
         TextView title = new TextView(this);
-        title.setText("HUD LAB · ТЕСТ ПРИБОРКИ\nDISPLAY ID " + displayId);
+        title.setText("HUD LAB\nСОБСТВЕННЫЙ ЭКРАН\nDISPLAY ID " + displayId);
         title.setTextColor(-1);
         title.setTextSize(34.0f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setGravity(17);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
         TextView marker = new TextView(this);
-        marker.setText("Если появились штатные нижние блоки — оставьте экран открытым.\nHUD Lab на центральном дисплее сейчас записывает изменения.");
+        marker.setText(displayId == 2
+                ? "УСПЕХ: Activity запущена на Android displayId=2"
+                : "ОШИБКА: система перенесла Activity на другой displayId");
         marker.setTextColor(Color.rgb(147, 255, 205));
         marker.setTextSize(21.0f);
         marker.setGravity(17);
@@ -123,7 +214,7 @@ public final class ClusterProbeActivity extends Activity {
         this.detailsView = details;
         details.setText(state);
         details.setTextColor(Color.rgb(255, 218, 137));
-        details.setTextSize(15.0f);
+        details.setTextSize(14.0f);
         details.setTypeface(Typeface.MONOSPACE);
         details.setGravity(17);
         root.addView(details, new LinearLayout.LayoutParams(-1, -2));
@@ -139,9 +230,27 @@ public final class ClusterProbeActivity extends Activity {
         window.setStatusBarColor(Color.BLACK);
         window.setNavigationBarColor(Color.BLACK);
         window.getDecorView().setSystemUiVisibility(5894);
-        String state = describeClusterActivityState(getIntent());
+        String state = describeState(getIntent(), "ON_CREATE");
         setContentView(makeContent(state));
         emit(EVENT_STARTED, state);
+        getWindow().getDecorView().post(new Runnable() {
+            @Override
+            public void run() {
+                updateAndEmit(EVENT_LAYOUT, "FIRST_LAYOUT");
+            }
+        });
+        this.main.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                updateAndEmit(EVENT_LAYOUT, "LAYOUT_300MS");
+            }
+        }, 300L);
+        this.main.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                updateAndEmit(EVENT_LAYOUT, "LAYOUT_1000MS");
+            }
+        }, 1000L);
         long duration = getIntent().getLongExtra(EXTRA_DURATION_MS, DEFAULT_DURATION_MS);
         this.main.postDelayed(new Runnable() { // from class: dezz.status.hudlab.ClusterProbeActivity$$ExternalSyntheticLambda0
             @Override // java.lang.Runnable
@@ -155,11 +264,35 @@ public final class ClusterProbeActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        String state = describeClusterActivityState(intent);
+        String state = describeState(intent, "ON_NEW_INTENT");
         if (this.detailsView != null) {
             this.detailsView.setText(state);
         }
         emit(EVENT_UPDATED, state);
+    }
+
+    @Override // android.app.Activity
+    protected void onResume() {
+        super.onResume();
+        updateAndEmit(EVENT_RESUMED, "ON_RESUME");
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        updateAndEmit(EVENT_FOCUS, "WINDOW_FOCUS=" + hasFocus);
+    }
+
+    @Override
+    public void onMultiWindowModeChanged(boolean isInMultiWindowMode) {
+        super.onMultiWindowModeChanged(isInMultiWindowMode);
+        updateAndEmit(EVENT_MULTI_WINDOW, "MULTI_WINDOW=" + isInMultiWindowMode);
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        updateAndEmit(EVENT_CONFIG, "CONFIG_CHANGED");
     }
 
     @Override // android.app.Activity
