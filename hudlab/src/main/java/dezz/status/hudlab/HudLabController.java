@@ -617,7 +617,12 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             this.main.post(runnable);
         }
         publishSnapshot();
-        this.worker.postDelayed(new HudLabController$$ExternalSyntheticLambda20(this), 300L);
+        this.worker.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                publishSnapshot();
+            }
+        }, 300L);
     }
 
     public String lambda$setActiveProfileDimMode$22(int i) throws Exception {
@@ -1653,7 +1658,7 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
             } catch (Throwable th) {
                 strShortFailure = shortFailure(th);
             }
-            if (hudAr == z) {
+            if (hudAr == (z ? 1 : 0)) {
                 return strShortFailure;
             }
         }
@@ -1776,8 +1781,17 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     public void onECarXCarServiceConnected(final ECarXCar eCarXCar, final CarSignalManager carSignalManager) {
         this.worker.post(new Runnable() { // from class: dezz.status.hudlab.HudLabController.11
             @Override // java.lang.Runnable
-            public final void run() throws IllegalStateException, CarNotConnectedException {
-                HudLabController.this.lambda$onECarXCarServiceConnected$42(eCarXCar, carSignalManager);
+            public final void run() {
+                try {
+                    HudLabController.this.lambda$onECarXCarServiceConnected$42(
+                            eCarXCar,
+                            carSignalManager);
+                } catch (Throwable failure) {
+                    HudLabController.this.lastCommand =
+                            "ECARX connect ERROR " + shortFailure(failure);
+                    HudLabController.this.appendLog(HudLabController.this.lastCommand);
+                    HudLabController.this.publishSnapshot();
+                }
             }
         });
     }
@@ -1811,7 +1825,12 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     }
 
     void refreshNow() {
-        this.worker.post(new HudLabController$$ExternalSyntheticLambda20(this));
+        this.worker.post(new Runnable() {
+            @Override
+            public void run() {
+                publishSnapshot();
+            }
+        });
     }
 
     void refreshUserProfileHudAr() {

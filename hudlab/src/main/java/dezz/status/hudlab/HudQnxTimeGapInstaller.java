@@ -2,7 +2,6 @@ package dezz.status.hudlab;
 
 import android.os.Handler;
 import android.os.Looper;
-import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
@@ -377,7 +376,7 @@ final class HudQnxTimeGapInstaller implements Closeable {
     }
 
     private static void remountReadOnly(QnxShell qnxShell) throws Exception {
-        qnxShell.require("mount -o remount,ro /dev/disk/uda0.713CFB34-9488-44D9-9382-401F21CCCAB3.33 /apps", AccessibilityNodeInfoCompat.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_MAX_LENGTH);
+        qnxShell.require("mount -o remount,ro /dev/disk/uda0.713CFB34-9488-44D9-9382-401F21CCCAB3.33 /apps", 20000);
     }
 
     private static boolean requestReboot(QnxShell qnxShell) {
@@ -419,7 +418,7 @@ final class HudQnxTimeGapInstaller implements Closeable {
                 sb.append('\\').append((char) (((i4 >>> 6) & 7) + 48)).append((char) (((i4 >>> 3) & 7) + 48)).append((char) ((b & 7) + 48));
                 i3++;
             }
-            qnxShell.require("printf '" + ((Object) sb) + "' >> /shared/.hudlab-timegap.block", AccessibilityNodeInfoCompat.EXTRA_DATA_TEXT_CHARACTER_LOCATION_ARG_MAX_LENGTH);
+            qnxShell.require("printf '" + ((Object) sb) + "' >> /shared/.hudlab-timegap.block", 20000);
             if (i2 == 0 || (i = i2 + 1) == length || i % 6 == 0) {
                 progress(listener, "Передача точечного блока: " + Math.round(((i2 + 1) * 100.0f) / length) + "%");
             }

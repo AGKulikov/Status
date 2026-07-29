@@ -29,7 +29,6 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
-import androidx.core.app.NotificationCompat;
 import dezz.status.hudlab.HudLabController;
 import dezz.status.hudlab.HudPrivilegedCommandRunner;
 import dezz.status.hudlab.HudQnxTimeGapInstaller;
@@ -43,7 +42,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import kotlin.text.Typography;
 
 /* loaded from: classes4.dex */
 public final class HudLabActivity extends Activity implements HudLabController.Listener {
@@ -1692,7 +1690,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         if (contextCreateDeviceProtectedStorageContext != null) {
             applicationContext = contextCreateDeviceProtectedStorageContext;
         }
-        if (!applicationContext.getSharedPreferences("hud_mode_fallback_v1", 0).edit().putBoolean("enabled", false).putString(NotificationCompat.CATEGORY_STATUS, "Удалено в HUD Lab 0.21").putLong("status_at", System.currentTimeMillis()).commit()) {
+        if (!applicationContext.getSharedPreferences("hud_mode_fallback_v1", 0).edit().putBoolean("enabled", false).putString("status", "Удалено в HUD Lab 0.21").putLong("status_at", System.currentTimeMillis()).commit()) {
             throw new IllegalStateException("не удалось снять старый fallback-флаг");
         }
     }
@@ -1720,7 +1718,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                     z3 = false;
                 }
                 z2 |= z3;
-                sb.append("\nID ").append(displayId).append(" · ").append(display.getName()).append(" · ").append(displayMetrics.widthPixels).append(Typography.times).append(displayMetrics.heightPixels).append(" · flags=0x").append(Integer.toHexString(display.getFlags())).append("\n  ").append(display);
+                sb.append("\nID ").append(displayId).append(" · ").append(display.getName()).append(" · ").append(displayMetrics.widthPixels).append('×').append(displayMetrics.heightPixels).append(" · flags=0x").append(Integer.toHexString(display.getFlags())).append("\n  ").append(display);
             }
             sb.append("\nИтог: displayId 2 ").append(z ? "найден" : "НЕ НАЙДЕН").append("; displayId 22 ").append(z2 ? "уже существует" : "не существует");
         } catch (Throwable th) {
@@ -2028,7 +2026,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                 if (intent == null || !"dezz.status.hudlab26.action.CLUSTER_PROBE_STATE".equals(intent.getAction())) {
                     return;
                 }
-                String event = intent.getStringExtra(NotificationCompat.CATEGORY_EVENT);
+                String event = intent.getStringExtra("event");
                 int displayId = intent.getIntExtra("display_id", -1);
                 String state = intent.getStringExtra("state");
                 HudLabActivity.this.appendClusterProbeTrace("ACTIVITY " + event + " · displayId=" + displayId + "\n" + state);

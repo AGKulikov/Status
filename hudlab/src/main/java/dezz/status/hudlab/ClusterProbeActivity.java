@@ -12,7 +12,6 @@ import android.view.View;
 import android.view.Window;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import androidx.core.view.ViewCompat;
 import java.lang.ref.WeakReference;
 import java.util.Set;
 
@@ -137,8 +136,8 @@ public final class ClusterProbeActivity extends Activity {
         active = new WeakReference<>(this);
         getWindow().addFlags(128);
         Window window = getWindow();
-        window.setStatusBarColor(ViewCompat.MEASURED_STATE_MASK);
-        window.setNavigationBarColor(ViewCompat.MEASURED_STATE_MASK);
+        window.setStatusBarColor(Color.BLACK);
+        window.setNavigationBarColor(Color.BLACK);
         window.getDecorView().setSystemUiVisibility(5894);
         String state = describeClusterActivityState(getIntent());
         setContentView(makeContent(state));

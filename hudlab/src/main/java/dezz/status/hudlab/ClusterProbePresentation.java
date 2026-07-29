@@ -11,7 +11,6 @@ import android.view.View;
 import android.view.Window;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import androidx.core.view.ViewCompat;
 
 /* loaded from: classes4.dex */
 final class ClusterProbePresentation extends Presentation {
@@ -62,7 +61,7 @@ final class ClusterProbePresentation extends Presentation {
         super.onCreate(savedInstanceState);
         Window window = getWindow();
         if (window != null) {
-            window.setBackgroundDrawable(new ColorDrawable(ViewCompat.MEASURED_STATE_MASK));
+            window.setBackgroundDrawable(new ColorDrawable(Color.BLACK));
             window.addFlags(896);
             window.getDecorView().setSystemUiVisibility(5894);
         }
