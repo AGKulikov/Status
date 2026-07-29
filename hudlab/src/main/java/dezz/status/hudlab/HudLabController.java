@@ -1185,145 +1185,145 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
         values.put("NetIHU 28882 prio/resource", readNetIhuActivation());
         values.put("NetDIM 30937 prio", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda22
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getNetDIMActvtPrio();
             }
         }));
         values.put("NetDIM 30938 resource", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda5
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getNetDIMActvtResourceGroup();
             }
         }));
         values.put("NetASDM 29132 prio", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda10
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getNetASDMActvtPrio();
             }
         }));
         values.put("NetASDM 29133 resource", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda12
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getNetASDMActvtResourceGroup();
             }
         }));
         values.put("NetDMM 29134 prio", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda13
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getNetDMMActvtPrio();
             }
         }));
         values.put("NetDMM 29135 resource", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda14
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getNetDMMActvtResourceGroup();
             }
         }));
         values.put("NetDVR 29136 prio", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda15
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getNetDVRActvtPrio();
             }
         }));
         values.put("NetDVR 29137 resource", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda16
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getNetDVRActvtResourceGroup();
             }
         }));
         values.put("NetPAS 29138 prio", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda17
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getNetPASActvtPrio();
             }
         }));
         values.put("NetPAS 29139 resource", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda18
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getNetPASActvtResourceGroup();
             }
         }));
         values.put("NetTCAM 31659 prio", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda23
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getNetTCAMActvtPrio();
             }
         }));
         values.put("NetTCAM 31660 resource", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda24
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getNetTCAMActvtResourceGroup();
             }
         }));
         values.put("NetVGM 31661 prio", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda25
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getNetVGMActvtPrio();
             }
         }));
         values.put("NetVGM 31662 resource", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda26
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getNetVGMActvtResourceGroup();
             }
         }));
         values.put("DisConfigNotify 30872", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda27
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getDisConfigNotify();
             }
         }));
         values.put("IHUSetDispAD 28965", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda28
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getIHUSetDispAD();
             }
         }));
         values.put("DrvrDispFeedback 30873", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda1
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getDrvrDispSetgStsSyncn();
             }
         }));
         values.put("DrvrAsscDisp 28952", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda2
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getDrvrAsscSysDisp();
             }
         }));
         values.put("DrvrAsscSts 28953", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda3
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getDrvrAsscSysSts();
             }
         }));
         values.put("NavActvMenuReq", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda4
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getNavActvMenuReq();
             }
         }));
         values.put("DIM NaviMode", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda6
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return HudLabController.this.lambda$buildClusterProbeSnapshot$20();
             }
         }));
         values.put("HUD req", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda7
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getHudActvReq();
             }
         }));
         values.put("HUD active", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda8
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getHudActvSts();
             }
         }));
         values.put("HUD status", readProbeInt(new ProbeIntReader() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda9
             @Override // dezz.status.hudlab.HudLabController.ProbeIntReader
-            public final int read() {
+            public final int read() throws Exception {
                 return signalManager.getHudSts();
             }
         }));
@@ -2041,7 +2041,7 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     void setDimNavigationMode(final int mode) {
         runCommand("DIM Navi mode=" + InstrumentClusterModes.naviModeName(mode), new Command() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda21
             @Override // dezz.status.hudlab.HudLabController.Command
-            public final String run() {
+            public final String run() throws Exception {
                 return HudLabController.this.lambda$setDimNavigationMode$26(mode);
             }
         });
@@ -2068,7 +2068,7 @@ final class HudLabController implements ECarXCarProxy.ECarXCarProxyMethod {
     void restoreDimNavigationMode() {
         runCommand("DIM Navi mode: точный откат", new Command() { // from class: dezz.status.hudlab.HudLabController$$ExternalSyntheticLambda0
             @Override // dezz.status.hudlab.HudLabController.Command
-            public final String run() {
+            public final String run() throws Exception {
                 return HudLabController.this.lambda$restoreDimNavigationMode$27();
             }
         });
