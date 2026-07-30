@@ -369,7 +369,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
             }
         });
         linearLayout.addView(button, fixedButton(m3dp(130)));
-        TextView textViewText = text("HUD Lab 0.32", 23, TEXT, true);
+        TextView textViewText = text("HUD Lab 0.33", 23, TEXT, true);
         textViewText.setPadding(m3dp(16), 0, m3dp(18), 0);
         linearLayout.addView(textViewText);
         TextView textViewText2 = text("ECARX: ОЖИДАНИЕ", 15, Color.rgb(255, 192, 92), true);
@@ -480,21 +480,15 @@ public final class HudLabActivity extends Activity implements HudLabController.L
 
     private View buildInstrumentClusterTab() {
         LinearLayout body = columnBody();
-        body.addView(sectionTitle("Точный разбор нижних «крыльев» · матрица 0.32"));
-        body.addView(note("Журнал 0.31 доказал, что тестовая Activity не была создана: ECARX подменил foreground-запуск системным PSD MessageDialog. Поэтому 0.32 сначала восстанавливает чистый эталон NaviMode 1 + opcode 8=[0], а затем раздельно отправляет только одну исследуемую команду."));
-        body.addView(note("A и B не запускают никакого приложения. C запускает собственный зелёный экран без предварительных DIM-команд. D оставляет полную последовательность mNavi для контрольного сравнения. Для C/D обязательно один раз включите службу «HUD Lab · запуск на приборке»: без неё запрос вообще не отправляется и ложного «OK» больше не будет."));
-        body.addView(note("Порядок: запустите A, отметьте «крылья есть/нет», восстановите; затем так же B и C. Каждый тест создаёт отдельный TXT-журнал с чистым эталоном, командами, readback, task/window/displayId, SurfaceFlinger и logcat. Через 22 секунды выполняется автоматическое восстановление."));
+        body.addView(sectionTitle("Точный запуск на приборке · механизм MConfig · 0.33"));
+        body.addView(note("Разбор MConfig v45 показал недостающий шаг: перед displayId=2 он трижды выполняет force-stop целевого пакета, затем создаёт новый task. Поэтому в 0.33 экран Probe вынесен в отдельный APK: HUD Lab остаётся живым контроллером и сохраняет журнал, а Probe можно завершить точно как MConfig."));
+        body.addView(note("Главный тест — F. Он выполняет: NaviMode 3 → 100 мс → DIM (2,8,8,[1]) → 200 мс → «su 0 am force-stop» Probe три раза с паузами 50 мс → ACTION_MAIN/NEW_TASK, displayId=2, windowingMode=5, SplitScreenShownPosition=0. Специальные возможности для F не нужны."));
+        body.addView(note("E — контрольный запуск того же отдельного Probe без force-stop. C/D оставлены только как воспроизведение механизма 0.32 с живым пакетом HUD Lab; именно он вызвал системный вопрос на приборке. Каждый тест создаёт отдельный TXT-журнал; через 22 секунды выполняется восстановление."));
         body.addView(commandRow(GREEN, new String[]{
-                "1 · СПЕЦВОЗМОЖНОСТИ",
                 "A · ТОЛЬКО MODE 3",
-                "B · ТОЛЬКО OPCODE 8=1"
+                "B · ТОЛЬКО OPCODE 8=1",
+                "D · LEGACY: СПЕЦВОЗМОЖНОСТИ"
         }, new Runnable[]{
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        openClusterAccessibilitySettings();
-                    }
-                },
                 new Runnable() {
                     @Override
                     public void run() {
@@ -506,11 +500,17 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                     public void run() {
                         startExactClusterOpcodeOnlyTest();
                     }
+                },
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        openClusterAccessibilitySettings();
+                    }
                 }
         }));
-        body.addView(commandRow(BLUE, new String[]{
-                "C · ЭКРАН БЕЗ ARM",
-                "D · ПОЛНАЯ mNavi",
+        body.addView(commandRow(AMBER, new String[]{
+                "C · LEGACY БЕЗ ARM",
+                "D · LEGACY 0.32",
                 "ЗАКРЫТЬ / ВОССТАНОВИТЬ"
         }, new Runnable[]{
                 new Runnable() {
@@ -532,6 +532,23 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                     }
                 }
         }));
+        body.addView(commandPair(
+                "E · PROBE БЕЗ FORCE-STOP",
+                BLUE,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        startExactClusterCompanionControlTest();
+                    }
+                },
+                "F · ТОЧНО КАК MCONFIG",
+                GREEN,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        startExactClusterMConfigTest();
+                    }
+                }));
         body.addView(commandPair(
                 "★★ КРЫЛЬЯ ЕСТЬ",
                 AMBER,
@@ -566,7 +583,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         this.clusterJournalExportStatusView = exportStatus;
         body.addView(exportStatus);
         TextView transferTrace = text(
-                "Изолированные тесты A/B/C/D ещё не запускались.",
+                "Изолированные тесты A/B/C/D/E/F ещё не запускались.",
                 13,
                 Color.rgb(255, 214, 125),
                 false);
@@ -1888,6 +1905,16 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         startExactClusterTest(ClusterNavigationTransfer.TEST_LAUNCH_WITHOUT_ARM);
     }
 
+    private void startExactClusterCompanionControlTest() {
+        startExactClusterTest(
+                ClusterNavigationTransfer.TEST_COMPANION_WITHOUT_FORCE_STOP);
+    }
+
+    private void startExactClusterMConfigTest() {
+        startExactClusterTest(
+                ClusterNavigationTransfer.TEST_EXACT_MCONFIG_SEQUENCE);
+    }
+
     private void startExactClusterTest(final int testKind) {
         final ClusterNavigationTransfer transfer = this.clusterNavigationTransfer;
         final HudLabController activeController = this.controller;
@@ -1958,7 +1985,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
 
     private void markClusterWingsResult(final boolean wingsVisible) {
         if (!this.clusterProbeRunning || !this.clusterExactTraceActive) {
-            Toast.makeText(this, "Сначала запустите один из тестов A/B/C/D", 0).show();
+            Toast.makeText(this, "Сначала запустите один из тестов A/B/C/D/E/F", 0).show();
             return;
         }
         final int generation = this.clusterProbeGeneration;
@@ -2155,7 +2182,8 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         String command = "logcat -d -v threadtime " + range
                 + " | grep -Ei 'ActivityTaskManager|ActivityManager|WindowManager|"
                 + "DisplayManager|SurfaceFlinger|Cluster|DIM|dimmenu|"
-                + "monjaro_dashboard|hudlab29|ClusterProbeActivity|ecarx|navi'"
+                + "monjaro_dashboard|hudlab29|hudlab.clusterprobe|"
+                + "ClusterProbeActivity|ecarx|navi'"
                 + " | tail -n 700";
         runner.runTrusted(command, new HudPrivilegedCommandRunner.Callback() {
             @Override
@@ -2333,14 +2361,19 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         this.clusterProbeReceiver = new BroadcastReceiver() { // from class: dezz.status.hudlab.HudLabActivity.126
             @Override // android.content.BroadcastReceiver
             public void onReceive(Context context, Intent intent) {
-                if (intent == null || !"dezz.status.hudlab29.action.CLUSTER_PROBE_STATE".equals(intent.getAction())) {
+                if (intent == null
+                        || !ClusterProbeContract.ACTION_STATE.equals(intent.getAction())) {
                     return;
                 }
-                String event = intent.getStringExtra("event");
-                int displayId = intent.getIntExtra("display_id", -1);
-                String state = intent.getStringExtra("state");
+                String event = intent.getStringExtra(ClusterProbeContract.EXTRA_EVENT);
+                int displayId = intent.getIntExtra(
+                        ClusterProbeContract.EXTRA_DISPLAY_ID,
+                        -1);
+                String state = intent.getStringExtra(ClusterProbeContract.EXTRA_STATE);
                 String launchToken = intent.getStringExtra(
-                        ClusterProbeActivity.EXTRA_LAUNCH_TOKEN);
+                        ClusterProbeContract.EXTRA_LAUNCH_TOKEN);
+                String sourcePackage = intent.getStringExtra(
+                        ClusterProbeContract.EXTRA_SOURCE_PACKAGE);
                 ClusterNavigationTransfer transfer = HudLabActivity.this.clusterNavigationTransfer;
                 boolean belongsToCurrentTest = false;
                 if (transfer != null) {
@@ -2351,14 +2384,23 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                             launchToken);
                 }
                 if (belongsToCurrentTest && HudLabActivity.this.clusterProbeStatusView != null) {
-                    HudLabActivity.this.appendClusterProbeTrace("ACTIVITY " + event + " · displayId=" + displayId + "\n" + state);
+                    HudLabActivity.this.appendClusterProbeTrace(
+                            "ACTIVITY " + event
+                                    + " · source=" + (sourcePackage == null
+                                    ? "legacy HUD Lab"
+                                    : sourcePackage)
+                                    + " · displayId=" + displayId
+                                    + "\n" + state);
                 }
-                if (belongsToCurrentTest && ClusterProbeActivity.EVENT_STOPPED.equals(event)) {
+                if (belongsToCurrentTest
+                        && ClusterProbeContract.EVENT_STOPPED.equals(event)) {
                     HudLabActivity.this.scheduleExactClusterAfterTelemetry();
                 }
             }
         };
-        registerReceiver(this.clusterProbeReceiver, new IntentFilter("dezz.status.hudlab29.action.CLUSTER_PROBE_STATE"));
+        registerReceiver(
+                this.clusterProbeReceiver,
+                new IntentFilter(ClusterProbeContract.ACTION_STATE));
     }
 
     private void scheduleClusterProbeSamples(final int generation) {
