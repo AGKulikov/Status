@@ -11,12 +11,14 @@ android {
     buildToolsVersion "36.0.0"
 
     defaultConfig {
-        applicationId "dezz.status.hudlab10"
+        // 0.28 was signed with an unrecoverable ephemeral debug key. Keep the
+        // test installable without removing it by using a dedicated stable package.
+        applicationId "dezz.status.hudlab29"
         minSdk 28
         //noinspection ExpiredTargetSdkVersion
         targetSdkVersion 28
-        versionCode 21
-        versionName "0.21"
+        versionCode 33
+        versionName "0.33"
         setProperty("archivesBaseName", "hud-lab-${versionName}")
     }
 

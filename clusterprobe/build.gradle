@@ -1,0 +1,58 @@
+/*
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+apply plugin: 'com.android.application'
+
+android {
+    namespace "dezz.status.hudlab.clusterprobe"
+
+    compileSdkVersion 36
+    buildToolsVersion "36.0.0"
+
+    defaultConfig {
+        applicationId "dezz.status.hudlab.clusterprobe"
+        minSdk 28
+        //noinspection ExpiredTargetSdkVersion
+        targetSdkVersion 28
+        versionCode 33
+        versionName "0.33"
+        setProperty("archivesBaseName", "hud-lab-cluster-probe-${versionName}")
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("KEYSTORE_FILE") ?: '../keystore.jks')
+            storePassword System.getenv("KEY_PASSWORD")
+            keyAlias System.getenv("KEY_ALIAS") ?: "status-widget-ha"
+            keyPassword System.getenv("KEY_PASSWORD")
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (System.getenv("ALLOW_UNSIGNED_RELEASE") != "true") {
+                signingConfig signingConfigs.release
+            }
+        }
+        debug {
+            debuggable true
+            if (file('../keystore.jks').exists() && System.getenv("KEY_PASSWORD")) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    applicationVariants.configureEach { variant ->
+        variant.outputs.configureEach {
+            outputFileName =
+                    "hud-lab-cluster-probe-${variant.versionName}-${variant.buildType.name}.apk"
+        }
+    }
+}

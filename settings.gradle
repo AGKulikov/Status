@@ -17,4 +17,5 @@
 
 include ':app'
 include ':hudlab'
+include ':clusterprobe'
 rootProject.name = "Status Widget HA"
