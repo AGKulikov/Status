@@ -17,13 +17,29 @@ final class ClusterLaunchProtocol {
     private ClusterLaunchProtocol() {
     }
 
-    static void start(Context context, long durationMs, String token) {
+    static void startLegacySamePackage(Context context, long durationMs, String token) {
         Intent intent = new Intent(Intent.ACTION_MAIN, Uri.parse(""));
         intent.setClassName(context.getPackageName(), ClusterProbeActivity.class.getName());
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         intent.putExtra(ClusterProbeActivity.EXTRA_DURATION_MS, durationMs);
         intent.putExtra(ClusterProbeActivity.EXTRA_LAUNCH_TOKEN, token);
 
+        start(context, intent);
+    }
+
+    static void startCompanion(Context context, long durationMs, String token) {
+        Intent intent = new Intent(Intent.ACTION_MAIN, Uri.parse(""));
+        intent.setClassName(
+                ClusterProbeContract.PROBE_PACKAGE,
+                ClusterProbeContract.PROBE_ACTIVITY);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        intent.putExtra(ClusterProbeContract.EXTRA_DURATION_MS, durationMs);
+        intent.putExtra(ClusterProbeContract.EXTRA_LAUNCH_TOKEN, token);
+
+        start(context, intent);
+    }
+
+    private static void start(Context context, Intent intent) {
         ActivityOptions options = ActivityOptions.makeBasic();
         options.setLaunchDisplayId(DISPLAY_ID);
         Bundle bundle = options.toBundle();
@@ -34,7 +50,18 @@ final class ClusterLaunchProtocol {
         context.startActivity(intent, bundle);
     }
 
-    static String describe() {
+    static String describeLegacy() {
+        return "цель=" + ClusterProbeActivity.class.getName()
+                + " (тот же пакет) · " + describeOptions();
+    }
+
+    static String describeCompanion() {
+        return "цель=" + ClusterProbeContract.PROBE_PACKAGE + "/"
+                + ClusterProbeContract.PROBE_ACTIVITY
+                + " (отдельный пакет) · " + describeOptions();
+    }
+
+    private static String describeOptions() {
         return "Intent ACTION_MAIN + FLAG_ACTIVITY_NEW_TASK"
                 + " · setLaunchDisplayId(2)"
                 + " · android.activity.SplitScreenShownPosition=0"
