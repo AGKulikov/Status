@@ -449,7 +449,7 @@ public final class SprutHubController {
         // Retrying it after a rejected email/password answer hides the useful authentication error
         // and starts a second, invalid dialogue on the same socket.
         return current.call(SprutProtocolAdapter.buildAuthParams())
-                .handle((first, failure) -> {
+                .<CompletableFuture<String>>handle((first, failure) -> {
                     if (failure == null) return authenticateModern(current, first);
                     if (current.isOfficialCloud()) {
                         // The cloud relay no longer accepts the pre-challenge account.login call:
