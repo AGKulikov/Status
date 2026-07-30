@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - 'hudlab/**'
+      - 'clusterprobe/**'
       - 'app/libs/geely/ecarx-adaptapi.jar'
       - 'settings.gradle'
       - 'build.gradle'
@@ -14,6 +15,7 @@ on:
   pull_request:
     paths:
       - 'hudlab/**'
+      - 'clusterprobe/**'
       - 'app/libs/geely/ecarx-adaptapi.jar'
       - 'settings.gradle'
       - 'build.gradle'
@@ -69,7 +71,7 @@ jobs:
             echo "Stable key is unavailable to this PR; building an unsigned release handoff"
           fi
 
-      - name: Build signed HUD Lab
+      - name: Build HUD Lab and Cluster Probe
         env:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -81,27 +83,42 @@ jobs:
               echo "KEY_PASSWORD is required with the stable keystore" >&2
               exit 1
             }
-            ./gradlew --no-daemon :hudlab:clean \
-              :hudlab:testDebugUnitTest :hudlab:assembleRelease
+            ./gradlew --no-daemon :hudlab:clean :clusterprobe:clean \
+              :hudlab:testDebugUnitTest \
+              :hudlab:assembleRelease :clusterprobe:assembleRelease
           else
             ALLOW_UNSIGNED_RELEASE=true \
-              ./gradlew --no-daemon :hudlab:clean \
-                :hudlab:testDebugUnitTest :hudlab:assembleRelease
+              ./gradlew --no-daemon :hudlab:clean :clusterprobe:clean \
+                :hudlab:testDebugUnitTest \
+                :hudlab:assembleRelease :clusterprobe:assembleRelease
           fi
 
-      - name: Verify identity, layout and stable certificate
+      - name: Verify identities, layout and stable certificates
         shell: bash
         run: |
           APK="$(find hudlab/build/outputs/apk/release -name '*.apk' -print -quit)"
+          PROBE_APK="$(find clusterprobe/build/outputs/apk/release -name '*.apk' -print -quit)"
           test -n "$APK"
+          test -n "$PROBE_APK"
           BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
           echo "$BADGING"
           echo "$BADGING" | grep -F \
-            "package: name='dezz.status.hudlab29' versionCode='32' versionName='0.32'"
+            "package: name='dezz.status.hudlab29' versionCode='33' versionName='0.33'"
           echo "$BADGING" | grep -F "sdkVersion:'28'"
           echo "$BADGING" | grep -F "targetSdkVersion:'28'"
+          PROBE_BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" \
+            dump badging "$PROBE_APK")
+          echo "$PROBE_BADGING"
+          echo "$PROBE_BADGING" | grep -F \
+            "package: name='dezz.status.hudlab.clusterprobe' versionCode='33' versionName='0.33'"
+          echo "$PROBE_BADGING" | grep -F "sdkVersion:'28'"
+          echo "$PROBE_BADGING" | grep -F "targetSdkVersion:'28'"
           if echo "$BADGING" | grep -Fq "application-debuggable"; then
             echo "HUD Lab release must not be debuggable" >&2
+            exit 1
+          fi
+          if echo "$PROBE_BADGING" | grep -Fq "application-debuggable"; then
+            echo "Cluster Probe release must not be debuggable" >&2
             exit 1
           fi
           MANIFEST=$("$ANDROID_HOME/build-tools/36.0.0/aapt" \
@@ -129,7 +146,9 @@ jobs:
           grep -Fq 'android.intent.action.CREATE_DOCUMENT' "$DEX_STRINGS"
           grep -Fq 'cluster-journal-export' "$DEX_STRINGS"
           grep -Fq 'Download/HudLabLogs' "$DEX_STRINGS"
-          grep -Fq 'LAUNCH REQUEST SENT' "$DEX_STRINGS"
+          grep -Fq 'F EXACT MCONFIG' "$DEX_STRINGS"
+          grep -Fq 'su 0 am force-stop --user 0' "$DEX_STRINGS"
+          grep -Fq 'dezz.status.hudlab.clusterprobe' "$DEX_STRINGS"
           grep -Fq 'TEST_NAVI_MODE_3_ONLY' "$DEX_STRINGS"
           if grep -Fq 'LAUNCH API: OK' "$DEX_STRINGS"; then
             echo "False-positive foreground launch result leaked into HUD Lab 0.32" >&2
@@ -145,24 +164,37 @@ jobs:
             exit 1
           fi
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$APK" >/dev/null
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" \
+            -c -P 16 -v 4 "$PROBE_APK" >/dev/null
           if [[ -f .stable-ha-signing ]]; then
             CERTS=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" \
               verify --verbose --print-certs "$APK")
+            PROBE_CERTS=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" \
+              verify --verbose --print-certs "$PROBE_APK")
             echo "$CERTS"
+            echo "$PROBE_CERTS"
             echo "$CERTS" | grep -qi \
+              "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
+            echo "$PROBE_CERTS" | grep -qi \
               "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
           elif "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$APK"; then
             echo "PR handoff unexpectedly contains a signature" >&2
             exit 1
+          elif "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$PROBE_APK"; then
+            echo "Probe handoff unexpectedly contains a signature" >&2
+            exit 1
           fi
           sha256sum "$APK" | tee "$APK.sha256"
+          sha256sum "$PROBE_APK" | tee "$PROBE_APK.sha256"
 
-      - name: Upload signed HUD Lab APK
+      - name: Upload HUD Lab 0.33 kit
         uses: actions/upload-artifact@v4
         with:
-          name: hud-lab-0.32-release-candidate
+          name: hud-lab-0.33-release-candidate
           path: |
             hudlab/build/outputs/apk/release/*.apk
             hudlab/build/outputs/apk/release/*.sha256
+            clusterprobe/build/outputs/apk/release/*.apk
+            clusterprobe/build/outputs/apk/release/*.sha256
           if-no-files-found: error
           retention-days: 30
