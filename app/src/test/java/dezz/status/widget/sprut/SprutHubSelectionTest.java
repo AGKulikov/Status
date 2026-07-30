@@ -56,6 +56,33 @@ public final class SprutHubSelectionTest {
                 new JSONArray().put(hub("OTHER", true, 1L)), "EXPECTED"));
     }
 
+    @Test public void stalePersistedSerialFallsBackToTheOnlyOnlineHub() throws Exception {
+        JSONObject stale = hub("OLD", false, 200L);
+        JSONObject live = hub("CURRENT", true, 300L);
+        assertSame(live, SprutHubSelection.selectForSession(
+                new JSONArray().put(stale).put(live), "OLD"));
+    }
+
+    @Test public void missingPersistedSerialFallsBackToTheOnlyOnlineHub() throws Exception {
+        JSONObject live = hub("CURRENT", true, 300L);
+        assertSame(live, SprutHubSelection.selectForSession(
+                new JSONArray().put(live), "NO_LONGER_PRESENT"));
+    }
+
+    @Test public void explicitSerialIsNeverGuessedWhenSeveralHubsAreOnline() throws Exception {
+        JSONArray hubs = new JSONArray()
+                .put(hub("ONE", true, 100L))
+                .put(hub("TWO", true, 200L));
+        assertNull(SprutHubSelection.selectForSession(hubs, "MISSING"));
+        assertSame(hubs.getJSONObject(0), SprutHubSelection.selectForSession(hubs, "ONE"));
+    }
+
+    @Test public void blankSerialRemainsAutomaticAcrossSessions() throws Exception {
+        JSONObject live = hub("CURRENT", true, 300L);
+        assertSame(live, SprutHubSelection.selectForSession(
+                new JSONArray().put(hub("OLD", false, 400L)).put(live), ""));
+    }
+
     private static JSONObject hub(String serial, boolean online, long lastSeen) throws Exception {
         return new JSONObject().put("serial", serial).put("online", online)
                 .put("lastSeen", lastSeen);

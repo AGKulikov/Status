@@ -82,7 +82,9 @@ public final class SprutHubRpcClientTest {
                 SprutHubRpcClient.EnvelopeMode.LOCAL_OR_CUSTOM);
 
         assertEquals("json-rpc", cloud.header("Sec-WebSocket-Protocol"));
+        assertEquals("https://beta.spruthub.ru", cloud.header("Origin"));
         assertNull(local.header("Sec-WebSocket-Protocol"));
+        assertNull(local.header("Origin"));
     }
 
     @Test public void buildsOfficialClientInfoAndDiagnosticCommandName() throws Exception {
@@ -92,7 +94,9 @@ public final class SprutHubRpcClientTest {
         assertEquals("client-id", info.getString("id"));
         assertEquals("Status Widget HA", info.getString("name"));
         assertEquals("CLIENT_DESKTOP", info.getString("type"));
-        assertEquals("", info.getString("auth"));
+        assertFalse(info.has("auth"));
+        assertEquals("", SprutHubRpcClient.buildLegacyClientInfoParams("client-id")
+                .getJSONObject("server").getJSONObject("clientInfo").getString("auth"));
         assertEquals("server.clientInfo", SprutHubRpcClient.commandName(params));
         assertEquals("room.list", SprutHubRpcClient.commandName(
                 SprutProtocolAdapter.buildRoomListParams()));
@@ -118,5 +122,14 @@ public final class SprutHubRpcClientTest {
         assertEquals("wss://beta.spruthub.ru/spruthub", normalized);
         assertEquals(SprutHubRpcClient.EnvelopeMode.OFFICIAL_CLOUD,
                 SprutHubRpcClient.envelopeModeForUrl(normalized));
+    }
+
+    @Test public void diagnosticEndpointNeverIncludesQueryOrFragment() {
+        assertEquals("wss://web.spruthub.ru/spruthub",
+                SprutHubRpcClient.diagnosticEndpoint(
+                        "wss://web.spruthub.ru/spruthub?token=must-not-leak"));
+        assertEquals("https://web.spruthub.ru",
+                SprutHubRpcClient.officialCloudOrigin(
+                        "wss://web.spruthub.ru:443/spruthub"));
     }
 }

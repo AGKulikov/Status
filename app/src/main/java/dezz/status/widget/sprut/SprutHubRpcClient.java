@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package dezz.status.widget.sprut;
 
+import android.os.SystemClock;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -24,6 +26,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import dezz.status.widget.diagnostics.DiagnosticJournal;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -73,6 +76,7 @@ public final class SprutHubRpcClient implements Closeable {
     private final Map<Long, Pending> pending = new ConcurrentHashMap<>();
     private final Listener listener;
     private final String url;
+    private final String diagnosticEndpoint;
     private final EnvelopeMode envelopeMode;
     private final String clientId;
     private final Object lock = new Object();
@@ -90,6 +94,7 @@ public final class SprutHubRpcClient implements Closeable {
     SprutHubRpcClient(@NonNull String url, @NonNull String clientId,
                       @NonNull Listener listener) {
         this.url = normalizeUrl(url);
+        diagnosticEndpoint = diagnosticEndpoint(this.url);
         envelopeMode = envelopeModeForUrl(this.url);
         String normalizedClientId = blankToNull(clientId);
         this.clientId = normalizedClientId == null
@@ -109,6 +114,8 @@ public final class SprutHubRpcClient implements Closeable {
         synchronized (lock) {
             if (stopped || socket != null) return;
             Request request = buildWebSocketRequest(url, envelopeMode);
+            DiagnosticJournal.info("spruthub.transport",
+                    "opening " + diagnosticEndpoint + "; mode=" + envelopeMode);
             socket = http.newWebSocket(request, new SocketListener());
         }
     }
@@ -139,17 +146,32 @@ public final class SprutHubRpcClient implements Closeable {
         }
     }
 
-    /** Registers the same client identity that Sprut's official web application announces. */
+    /**
+     * Registers the same client identity that Sprut clients announce.
+     *
+     * <p>The current payload omits the obsolete empty {@code auth} member. Older relays expected
+     * it, so one bounded compatibility retry keeps both revisions usable.</p>
+     */
     @NonNull
     public CompletableFuture<JSONObject> registerClientInfo() {
         if (!isOfficialCloud()) return CompletableFuture.completedFuture(new JSONObject());
-        final JSONObject params;
+        final JSONObject current;
+        final JSONObject legacy;
         try {
-            params = buildClientInfoParams(clientId);
+            current = buildClientInfoParams(clientId);
+            legacy = buildLegacyClientInfoParams(clientId);
         } catch (JSONException e) {
             return failedFuture(e);
         }
-        return call(params);
+        return call(current, 5_000L)
+                .handle((value, failure) -> {
+                    if (failure == null) return CompletableFuture.completedFuture(value);
+                    DiagnosticJournal.warn("spruthub.rpc",
+                            "server.clientInfo current payload rejected; retrying compatibility "
+                                    + "payload: " + diagnosticFailure(failure));
+                    return call(legacy, 5_000L);
+                })
+                .thenCompose(stage -> stage);
     }
 
     @NonNull
@@ -178,13 +200,16 @@ public final class SprutHubRpcClient implements Closeable {
                 return result;
             }
             pending.put(id, entry);
+            DiagnosticJournal.debug("spruthub.rpc",
+                    "send " + command + " id=" + id);
             try {
                 entry.timeout = scheduler.schedule(() -> {
                     Pending timedOut = pending.remove(id);
                     if (timedOut != null) {
-                        timedOut.future.completeExceptionally(
-                                new IOException("Sprut.hub reply timeout for "
-                                        + timedOut.command + " (id=" + id + ")"));
+                        IOException timeout = new IOException("Sprut.hub reply timeout for "
+                                + timedOut.command + " (id=" + id + ")");
+                        DiagnosticJournal.warn("spruthub.rpc", timeout.getMessage());
+                        timedOut.future.completeExceptionally(timeout);
                     }
                 }, Math.max(1_000L, timeoutMs), TimeUnit.MILLISECONDS);
             } catch (RejectedExecutionException stoppedScheduler) {
@@ -197,9 +222,10 @@ public final class SprutHubRpcClient implements Closeable {
                 Pending failed = pending.remove(id);
                 if (failed != null) {
                     failed.cancelTimeout();
-                    failed.future.completeExceptionally(
-                            new IOException("Could not queue Sprut.hub command "
-                                    + failed.command));
+                    IOException queueFailure = new IOException(
+                            "Could not queue Sprut.hub command " + failed.command);
+                    DiagnosticJournal.warn("spruthub.rpc", queueFailure.getMessage());
+                    failed.future.completeExceptionally(queueFailure);
                 }
             }
         }
@@ -240,6 +266,8 @@ public final class SprutHubRpcClient implements Closeable {
         try {
             message = new JSONObject(text);
         } catch (JSONException e) {
+            DiagnosticJournal.warn("spruthub.transport",
+                    "ignored non-JSON WebSocket message");
             return;
         }
         JSONObject event = normalizeEventMessage(message);
@@ -261,13 +289,21 @@ public final class SprutHubRpcClient implements Closeable {
             String serverMessage = error.optString("message", "Sprut.hub RPC error");
             String diagnosticCommand = entry.command
                     + (code == -1 ? "" : " [" + code + "]");
-            entry.future.completeExceptionally(new RpcException(
-                    code, diagnosticCommand + ": " + serverMessage,
-                    error.optJSONObject("data")));
+            RpcException failure = new RpcException(code,
+                    diagnosticCommand + ": " + serverMessage,
+                    error.optJSONObject("data"));
+            DiagnosticJournal.warn("spruthub.rpc",
+                    failure.getMessage() + elapsedSuffix(entry));
+            entry.future.completeExceptionally(failure);
         } else if (!message.has("result")) {
-            entry.future.completeExceptionally(new IOException(
-                    entry.command + ": malformed Sprut.hub response"));
+            IOException failure = new IOException(
+                    entry.command + ": malformed Sprut.hub response");
+            DiagnosticJournal.warn("spruthub.rpc",
+                    failure.getMessage() + elapsedSuffix(entry));
+            entry.future.completeExceptionally(failure);
         } else {
+            DiagnosticJournal.debug("spruthub.rpc",
+                    "reply " + entry.command + elapsedSuffix(entry));
             entry.future.complete(message);
         }
     }
@@ -319,6 +355,8 @@ public final class SprutHubRpcClient implements Closeable {
             // subprotocol the upgrade succeeds, but the relay is not guaranteed to select its
             // JSON command codec.
             request.header("Sec-WebSocket-Protocol", "json-rpc");
+            String origin = officialCloudOrigin(url);
+            if (origin != null) request.header("Origin", origin);
         }
         return request.build();
     }
@@ -360,9 +398,15 @@ public final class SprutHubRpcClient implements Closeable {
         info.put("id", normalizedClientId);
         info.put("name", "Status Widget HA");
         info.put("type", "CLIENT_DESKTOP");
-        info.put("auth", "");
         return new JSONObject().put("server",
                 new JSONObject().put("clientInfo", info));
+    }
+
+    @NonNull
+    static JSONObject buildLegacyClientInfoParams(@NonNull String clientId) throws JSONException {
+        JSONObject params = buildClientInfoParams(clientId);
+        params.getJSONObject("server").getJSONObject("clientInfo").put("auth", "");
+        return params;
     }
 
     @NonNull
@@ -374,6 +418,37 @@ public final class SprutHubRpcClient implements Closeable {
         if (body == null) return group;
         Iterator<String> operations = body.keys();
         return operations.hasNext() ? group + "." + operations.next() : group;
+    }
+
+    @Nullable
+    static String officialCloudOrigin(@NonNull String normalizedUrl) {
+        try {
+            URI uri = new URI(normalizedUrl);
+            String host = uri.getHost();
+            if (host == null || host.trim().isEmpty()) return null;
+            String scheme = "wss".equalsIgnoreCase(uri.getScheme()) ? "https" : "http";
+            int port = uri.getPort();
+            boolean defaultPort = port < 0 || ("https".equals(scheme) && port == 443)
+                    || ("http".equals(scheme) && port == 80);
+            return scheme + "://" + host + (defaultPort ? "" : ":" + port);
+        } catch (URISyntaxException ignored) {
+            return null;
+        }
+    }
+
+    @NonNull
+    static String diagnosticEndpoint(@NonNull String normalizedUrl) {
+        try {
+            URI uri = new URI(normalizedUrl);
+            String host = uri.getHost();
+            if (host == null || host.trim().isEmpty()) return "<invalid endpoint>";
+            String path = uri.getPath();
+            if (path == null || path.isEmpty()) path = "/";
+            return uri.getScheme() + "://" + host
+                    + (uri.getPort() < 0 ? "" : ":" + uri.getPort()) + path;
+        } catch (URISyntaxException ignored) {
+            return "<invalid endpoint>";
+        }
     }
 
     /** Converts the official cloud {@code characteristic.event + params} shape to legacy event. */
@@ -416,6 +491,9 @@ public final class SprutHubRpcClient implements Closeable {
                 }
                 open = true;
             }
+            DiagnosticJournal.info("spruthub.transport",
+                    "WebSocket open; HTTP " + response.code() + "; protocol="
+                            + firstNonBlank(response.header("Sec-WebSocket-Protocol"), "<none>"));
             try {
                 listener.onOpen();
             } catch (RuntimeException ignored) {
@@ -446,8 +524,13 @@ public final class SprutHubRpcClient implements Closeable {
         @Override
         public void onFailure(@NonNull WebSocket webSocket, @NonNull Throwable t,
                               @Nullable Response response) {
-            disconnected(webSocket, t.getMessage() == null
-                    ? t.getClass().getSimpleName() : t.getMessage());
+            String detail = t.getMessage() == null
+                    ? t.getClass().getSimpleName() : t.getMessage();
+            if (response != null) {
+                detail += "; HTTP " + response.code()
+                        + (response.message().isEmpty() ? "" : " " + response.message());
+            }
+            disconnected(webSocket, detail);
         }
 
         private void disconnected(WebSocket webSocket, String detail) {
@@ -457,6 +540,8 @@ public final class SprutHubRpcClient implements Closeable {
                 open = false;
             }
             failPending(new IOException("Sprut.hub disconnected: " + detail));
+            DiagnosticJournal.warn("spruthub.transport",
+                    "WebSocket disconnected: " + detail);
             if (!stopped) {
                 try {
                     listener.onDisconnected(detail);
@@ -470,6 +555,7 @@ public final class SprutHubRpcClient implements Closeable {
     private static final class Pending {
         final CompletableFuture<JSONObject> future;
         final String command;
+        final long startedAtMs = SystemClock.elapsedRealtime();
         @Nullable ScheduledFuture<?> timeout;
 
         Pending(CompletableFuture<JSONObject> future, String command) {
@@ -480,5 +566,30 @@ public final class SprutHubRpcClient implements Closeable {
         void cancelTimeout() {
             if (timeout != null) timeout.cancel(false);
         }
+    }
+
+    @NonNull
+    private static String elapsedSuffix(@NonNull Pending pending) {
+        return " in " + Math.max(0L,
+                SystemClock.elapsedRealtime() - pending.startedAtMs) + " ms";
+    }
+
+    @NonNull
+    private static String diagnosticFailure(@NonNull Throwable failure) {
+        Throwable current = failure;
+        while ((current instanceof java.util.concurrent.CompletionException
+                || current instanceof java.util.concurrent.ExecutionException)
+                && current.getCause() != null) {
+            current = current.getCause();
+        }
+        String message = current.getMessage();
+        return message == null || message.trim().isEmpty()
+                ? current.getClass().getSimpleName() : message;
+    }
+
+    @NonNull
+    private static String firstNonBlank(@Nullable String value, @NonNull String fallback) {
+        String normalized = blankToNull(value);
+        return normalized == null ? fallback : normalized;
     }
 }

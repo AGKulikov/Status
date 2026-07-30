@@ -85,28 +85,57 @@ public final class WidgetServiceStarter {
                 preferences.widgetEnabled.get(),
                 preferences.driverPanelEnabled.get(),
                 preferences.hudPanelEnabled.get(),
-                preferences.phoneConnectorEnabled.get());
+                preferences.phoneConnectorEnabled.get(),
+                preferences.mqttEnabled.get(),
+                preferences.sprutEnabled.get(),
+                preferences.haApiEnabled.get());
     }
 
     static boolean requiresHeadlessHost(@NonNull Preferences preferences) {
         return requiresHeadlessHost(
                 preferences.driverPanelEnabled.get(),
                 preferences.hudPanelEnabled.get(),
-                preferences.phoneConnectorEnabled.get());
+                preferences.phoneConnectorEnabled.get(),
+                preferences.mqttEnabled.get(),
+                preferences.sprutEnabled.get(),
+                preferences.haApiEnabled.get());
     }
 
     static boolean requiresIntegrationHost(boolean widgetEnabled,
                                            boolean driverPanelEnabled,
                                            boolean hudPanelEnabled,
                                            boolean phoneConnectorEnabled) {
+        return requiresIntegrationHost(widgetEnabled, driverPanelEnabled, hudPanelEnabled,
+                phoneConnectorEnabled, false, false, false);
+    }
+
+    static boolean requiresIntegrationHost(boolean widgetEnabled,
+                                           boolean driverPanelEnabled,
+                                           boolean hudPanelEnabled,
+                                           boolean phoneConnectorEnabled,
+                                           boolean mqttEnabled,
+                                           boolean sprutEnabled,
+                                           boolean haApiEnabled) {
         return widgetEnabled || requiresHeadlessHost(
-                driverPanelEnabled, hudPanelEnabled, phoneConnectorEnabled);
+                driverPanelEnabled, hudPanelEnabled, phoneConnectorEnabled,
+                mqttEnabled, sprutEnabled, haApiEnabled);
     }
 
     static boolean requiresHeadlessHost(boolean driverPanelEnabled,
                                         boolean hudPanelEnabled,
                                         boolean phoneConnectorEnabled) {
-        return driverPanelEnabled || hudPanelEnabled || phoneConnectorEnabled;
+        return requiresHeadlessHost(driverPanelEnabled, hudPanelEnabled, phoneConnectorEnabled,
+                false, false, false);
+    }
+
+    static boolean requiresHeadlessHost(boolean driverPanelEnabled,
+                                        boolean hudPanelEnabled,
+                                        boolean phoneConnectorEnabled,
+                                        boolean mqttEnabled,
+                                        boolean sprutEnabled,
+                                        boolean haApiEnabled) {
+        return driverPanelEnabled || hudPanelEnabled || phoneConnectorEnabled
+                || mqttEnabled || sprutEnabled || haApiEnabled;
     }
 
     private static void scheduleRetry(@NonNull Context app, int retryAttempt) {

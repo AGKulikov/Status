@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.automation.AutomationContract;
 import dezz.status.widget.automation.AutomationStateStore;
+import dezz.status.widget.diagnostics.DiagnosticJournal;
 import dezz.status.widget.ha.HaBrickConfig;
 import dezz.status.widget.ha.HaBrickConfigStore;
 import dezz.status.widget.integration.ActionBinding;
@@ -100,6 +101,7 @@ public final class SprutHubController {
     private volatile List<HaBrickConfig> configuredMain = Collections.emptyList();
     private volatile List<PopupItemConfig> configuredPopup = Collections.emptyList();
     private volatile int hubRevision = Integer.MAX_VALUE;
+    @NonNull private volatile String selectedSessionSerial = "";
     private volatile boolean stopped;
     private volatile boolean sessionSynced;
     private String signature = "";
@@ -198,6 +200,7 @@ public final class SprutHubController {
             sessionSynced = false;
             lastSynced = false;
             hubRevision = Integer.MAX_VALUE;
+            selectedSessionSerial = "";
             reconnectAttempt = 0;
             values.markConnectorStale(ConnectorType.SPRUTHUB,
                     SourceBinding.DEFAULT_CONNECTOR_ID);
@@ -422,20 +425,14 @@ public final class SprutHubController {
     private void authenticateAndSync(@NonNull SprutHubRpcClient current, long expectedGeneration) {
         updateState(State.AUTHENTICATING, "authorizing");
         current.clearSession();
-        authenticateModern(current)
-                .handle((token, failure) -> {
-                    if (failure == null) return CompletableFuture.completedFuture(token);
-                    current.clearSession();
-                    return authenticateLegacy(current);
-                })
-                .thenCompose(stage -> stage)
+        authenticate(current)
                 .thenCompose(token -> {
                     if (!isCurrent(current, expectedGeneration)) {
                         throw new CompletionException(new IOException("Superseded connection"));
                     }
                     current.setSession(token, null);
                     return selectHub(current, token)
-                            .thenCompose(ignored -> current.registerClientInfo())
+                            .thenCompose(ignored -> registerClientInfoBestEffort(current))
                             .thenApply(ignored -> token);
                 })
                 .thenCompose(token -> syncSnapshot(current, expectedGeneration))
@@ -447,13 +444,37 @@ public final class SprutHubController {
     }
 
     @NonNull
-    private CompletableFuture<String> authenticateModern(@NonNull SprutHubRpcClient current) {
+    private CompletableFuture<String> authenticate(@NonNull SprutHubRpcClient current) {
+        // Legacy login is a compatibility alternative only when account.auth itself is unavailable.
+        // Retrying it after a rejected email/password answer hides the useful authentication error
+        // and starts a second, invalid dialogue on the same socket.
         return current.call(SprutProtocolAdapter.buildAuthParams())
-                .thenCompose(first -> {
-                    requireQuestion(first, "auth", "QUESTION_TYPE_EMAIL");
-                    return current.call(SprutProtocolAdapter.buildAuthAnswerParams(
-                            prefs.sprutEmail.get().trim()));
+                .handle((first, failure) -> {
+                    if (failure == null) return authenticateModern(current, first);
+                    if (current.isOfficialCloud()) {
+                        // The cloud relay no longer accepts the pre-challenge account.login call:
+                        // it answers -666001 "Token not provided". Preserve the original
+                        // account.auth error and let the normal reconnect retry that flow.
+                        DiagnosticJournal.warn("spruthub.session",
+                                "account.auth cloud probe failed; legacy login is not valid: "
+                                        + safeMessage(unwrap(failure)));
+                        return failedFuture(unwrap(failure));
+                    }
+                    DiagnosticJournal.warn("spruthub.session",
+                            "account.auth probe was unavailable; using legacy login: "
+                                    + safeMessage(unwrap(failure)));
+                    current.clearSession();
+                    return authenticateLegacy(current);
                 })
+                .thenCompose(stage -> stage);
+    }
+
+    @NonNull
+    private CompletableFuture<String> authenticateModern(@NonNull SprutHubRpcClient current,
+                                                         @NonNull JSONObject first) {
+        requireQuestion(first, "auth", "QUESTION_TYPE_EMAIL");
+        return current.call(SprutProtocolAdapter.buildAuthAnswerParams(
+                        prefs.sprutEmail.get().trim()))
                 .thenCompose(email -> {
                     requireQuestion(email, "answer", "QUESTION_TYPE_PASSWORD");
                     return current.call(SprutProtocolAdapter.buildAuthAnswerParams(
@@ -484,6 +505,7 @@ public final class SprutHubController {
                 // The official relay guarantees hub.list. Do not hide a cloud protocol error and
                 // then misleadingly report it as room.list/accessory.list during the snapshot.
                 if (current.isOfficialCloud()) throw new CompletionException(failure);
+                selectedSessionSerial = configured;
                 current.setSession(token, configured);
                 return (Void) null;
             }
@@ -491,7 +513,9 @@ public final class SprutHubController {
             JSONArray hubs = body == null ? null : body.optJSONArray("hubs");
             // The cloud relay may retain an old offline row and a current online row for the
             // same physical serial. Scan duplicate rows instead of stopping at the first match.
-            JSONObject selected = SprutHubSelection.select(hubs, configured);
+            JSONObject configuredRow = configured.isEmpty()
+                    ? null : SprutHubSelection.select(hubs, configured);
+            JSONObject selected = SprutHubSelection.selectForSession(hubs, configured);
             if (current.isOfficialCloud() && selected == null) {
                 throw new CompletionException(new IOException(configured.isEmpty()
                         ? "hub.list: account has no hubs"
@@ -500,6 +524,13 @@ public final class SprutHubController {
             String selectedSerial = configured;
             if (selected != null) {
                 selectedSerial = firstNonBlank(SprutHubSelection.serialOf(selected), configured);
+                if (!configured.isEmpty() && selected != configuredRow) {
+                    DiagnosticJournal.warn("spruthub.session",
+                            "saved hub route is stale; using the account's only online hub "
+                                    + maskedSerial(selectedSerial) + " for this session");
+                    updateState(State.AUTHENTICATING,
+                            "saved hub route is stale; using the only online hub");
+                }
                 if (SprutHubSelection.presenceOf(selected)
                         == SprutHubSelection.Presence.OFFLINE) {
                     // Presence is relay metadata, not command authorization. Probe the actual
@@ -520,13 +551,28 @@ public final class SprutHubController {
                 } else if (selected.has("revision")) {
                     hubRevision = selected.optInt("revision", hubRevision);
                 }
-                if (configured.isEmpty() && !selectedSerial.isEmpty()) {
-                    prefs.sprutHubSerial.set(selectedSerial);
-                }
             }
+            // Blank in settings intentionally means auto-select on every reconnect. Older builds
+            // silently wrote the discovered value back to preferences, which recreated the exact
+            // stale-serial failure users worked around by clearing this field.
+            selectedSessionSerial = selectedSerial;
             // Preserve the token already held by the transport while adding the selected serial.
             current.setSession(token, selectedSerial);
             return (Void) null;
+        });
+    }
+
+    @NonNull
+    private CompletableFuture<JSONObject> registerClientInfoBestEffort(
+            @NonNull SprutHubRpcClient current) {
+        return current.registerClientInfo().handle((value, failure) -> {
+            if (failure == null) return value;
+            // clientInfo is advisory on older/newer relays. The routed room/accessory requests
+            // below are authoritative and provide the real compatibility verdict.
+            DiagnosticJournal.warn("spruthub.session",
+                    "server.clientInfo was unavailable; continuing with routed snapshot: "
+                            + safeMessage(unwrap(failure)));
+            return new JSONObject();
         });
     }
 
@@ -608,7 +654,7 @@ public final class SprutHubController {
                         try {
                             cached.put("schema", 1);
                             cached.put("savedAt", System.currentTimeMillis());
-                            cached.put("hubSerial", prefs.sprutHubSerial.get());
+                            cached.put("hubSerial", selectedSessionSerial);
                             cached.put("revision", hubRevision);
                             cached.put("rooms", parts.rooms);
                             cached.put("accessories", parts.accessories);
@@ -942,6 +988,15 @@ public final class SprutHubController {
     private void updateState(State state, String detail) {
         lastDetail = detail == null ? "" : detail;
         if (state != State.ONLINE) lastSynced = false;
+        String message = state + (lastDetail.isEmpty() ? "" : ": " + lastDetail);
+        if (state == State.ERROR) {
+            DiagnosticJournal.warn("spruthub.state", message);
+        } else if (state == State.CONNECTING || state == State.AUTHENTICATING
+                || state == State.SYNCING) {
+            DiagnosticJournal.debug("spruthub.state", message);
+        } else {
+            DiagnosticJournal.info("spruthub.state", message);
+        }
         listener.onConnectionChanged(state, lastDetail);
     }
 
@@ -977,6 +1032,13 @@ public final class SprutHubController {
     @Nullable private static SprutPath parsePath(String raw) {
         try { return SprutPath.parse(raw); }
         catch (IllegalArgumentException ignored) { return null; }
+    }
+
+    @NonNull
+    private static String maskedSerial(@Nullable String serial) {
+        String value = serial == null ? "" : serial.trim();
+        if (value.length() <= 4) return value.isEmpty() ? "<unknown>" : "****";
+        return "…" + value.substring(value.length() - 4);
     }
 
     private static boolean isSprut(@Nullable SourceBinding binding) {

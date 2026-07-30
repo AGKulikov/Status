@@ -37,8 +37,20 @@ public final class WidgetServiceStarterPolicyTest {
     }
 
     @Test
+    public void directConnectorsKeepTheServiceAliveWithoutTheStatusRow() {
+        assertTrue(WidgetServiceStarter.requiresHeadlessHost(
+                false, false, false, false, true, false));
+        assertTrue(WidgetServiceStarter.requiresIntegrationHost(
+                false, false, false, false, false, true, false));
+        assertTrue(WidgetServiceStarter.requiresIntegrationHost(
+                false, false, false, false, false, false, true));
+    }
+
+    @Test
     public void serviceIsNotRequiredWhenEveryConsumerIsDisabled() {
         assertFalse(WidgetServiceStarter.requiresIntegrationHost(
                 false, false, false, false));
+        assertFalse(WidgetServiceStarter.requiresIntegrationHost(
+                false, false, false, false, false, false, false));
     }
 }

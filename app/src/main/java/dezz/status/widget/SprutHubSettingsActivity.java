@@ -218,6 +218,13 @@ public final class SprutHubSettingsActivity extends AppCompatActivity {
         refresh.setOnClickListener(v -> refreshCatalog());
         connectionActions.addView(refresh, weighted());
         page.addView(connectionActions, topMargin(8));
+        Button autoHub = new Button(this);
+        autoHub.setText("Автовыбор живого хаба (очистить сохранённый serial)");
+        autoHub.setOnClickListener(v -> {
+            serial.setText("");
+            saveConnection();
+        });
+        page.addView(autoHub, topMargin(8));
 
         page.addView(heading("Устройства и характеристики", 22), topMargin(24));
         page.addView(label("Выберите не только устройство, но и конкретное значение, которое "
