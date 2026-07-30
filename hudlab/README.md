@@ -4,32 +4,34 @@ HUD Lab — отдельное диагностическое APK для физ�
 основного Status Widget. В версии 0.21 полностью удалены foreground service, boot receiver,
 автоповтор и разрешения для их запуска.
 
-## Изолированная матрица «крылья» 0.32
+## Точная последовательность MConfig и отдельный Probe APK · 0.33
 
-Журнал 0.31 показал, что foreground-запуск тестовой Activity был перехвачен системным
-`PSD MessageDialog`: HUD Lab сообщал об успешном вызове API, хотя `onCreate` на
-`displayId=2` не происходил. Одновременно перед запуском отправлялась пара
-`switchNaviMode(3) + DIM(2,8,8,[1])`, поэтому по одной трассе нельзя было определить,
-какое именно действие включает нижние штатные блоки.
+Разбор `MConfig+ v45` показал, что его перенос на Driver Display состоит не только из
+`ActivityOptions.setLaunchDisplayId(2)`. Перед запуском MConfig завершает именно целевой
+пакет три раза, а затем создаёт для него новую задачу:
 
-Версия 0.32 перед каждым опытом восстанавливает чистый эталон
-`switchNaviMode(1) + DIM(2,8,8,[0])`, ждёт стабилизации и предлагает четыре независимых
-теста:
+1. `switchNaviMode(3)`;
+2. пауза 100 мс;
+3. `DIM(2,8,8,[1])`;
+4. пауза 200 мс;
+5. три запуска `su 0 am force-stop --user 0 <package>` с паузами 50 мс;
+6. ещё через 50 мс — `ACTION_MAIN + FLAG_ACTIVITY_NEW_TASK`,
+   `setLaunchDisplayId(2)`, `windowingMode=5`, `SplitScreenShownPosition=0`.
 
-1. **A — только NaviMode 3:** отправляется один `switchNaviMode(3)`;
-2. **B — только opcode 8:** отправляется один `DIM(2,8,8,[1])`;
-3. **C — только Activity:** собственный зелёный экран запускается без NaviMode/opcode 8;
-4. **D — контроль mNavi:** полная пара `switchNaviMode(3) + DIM(2,8,8,[1])`, затем Activity.
+Завершить собственный пакет HUD Lab перед запуском нельзя: вместе с ним исчезли бы
+контроллер, ECARX-соединение и журнал. Поэтому 0.33 собирается комплектом из двух пакетов:
 
-Для C/D используется только включённая пользователем AccessibilityService. Небезопасный
-foreground fallback удалён. Успех запуска фиксируется лишь после фактического
-`onCreate/onResume` тестовой Activity и содержит её реальный `displayId`; отсутствие
-события за три секунды прямо записывается как блокировка.
+- `dezz.status.hudlab29` — HUD Lab 0.33, контроллер;
+- `dezz.status.hudlab.clusterprobe` — одноэкранная тестовая цель.
 
-Каждый опыт создаёт отдельный TXT-журнал. Кнопки `КРЫЛЬЯ ЕСТЬ` и `КРЫЛЬЕВ НЕТ` добавляют
-визуально подтверждённую метку и немедленные снимки ECARX, окон, задач, SurfaceFlinger и
-logcat. Через 22 секунды приложение автоматически возвращает
-`NaviMode 1 + DIM(2,8,8,[0])`.
+Тест **E** запускает отдельный Probe без `force-stop` как контроль. Тест **F** выполняет
+точную последовательность MConfig выше. Для E/F AccessibilityService не используется.
+Успех фиксируется только по обратному событию `onCreate/onResume` из Probe с фактическим
+`displayId`; системный диалог больше не считается успешным запуском.
+
+Устанавливать нужно оба APK. Сначала `HUD-Lab-Cluster-Probe-0.33.apk`, затем
+`HUD-Lab-0.33.apk`. Через 22 секунды либо по кнопке восстановления HUD Lab возвращает
+`NaviMode 1 + DIM(2,8,8,[0])` и завершает Probe.
 
 ## Экспорт трассы «крылья» 0.31
 
@@ -236,7 +238,8 @@ HUD‑записи отклоняются, чтобы они не могли и�
 ## Локальная проверка
 
 ```sh
-./gradlew :hudlab:testDebugUnitTest :hudlab:assembleDebug
+./gradlew :hudlab:testDebugUnitTest :hudlab:assembleDebug :clusterprobe:assembleDebug
 ```
 
-Готовый APK создаётся в `hudlab/build/outputs/apk/debug/`.
+Готовые APK создаются в `hudlab/build/outputs/apk/debug/` и
+`clusterprobe/build/outputs/apk/debug/`.
