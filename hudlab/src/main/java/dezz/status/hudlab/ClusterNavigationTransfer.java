@@ -13,7 +13,10 @@ import android.view.Display;
 import com.ecarx.xui.adaptapi.diminteraction.DimMenuInteraction;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
@@ -138,6 +141,39 @@ final class ClusterNavigationTransfer {
         captureWindowState("РУЧНАЯ МЕТКА КРЫЛЬЕВ", operation, null);
     }
 
+    synchronized boolean hasExportableJournal() {
+        return resolveJournalFile() != null;
+    }
+
+    synchronized String suggestedJournalFileName() {
+        File source = resolveJournalFile();
+        if (source != null) {
+            return source.getName();
+        }
+        String stamp = new SimpleDateFormat(
+                "yyyyMMdd-HHmmss",
+                Locale.ROOT).format(new Date());
+        return "hudlab-cluster-" + stamp + ".txt";
+    }
+
+    synchronized void writeJournalTo(OutputStream output) throws IOException {
+        if (output == null) {
+            throw new IOException("системное хранилище не открыло выходной файл");
+        }
+        File source = resolveJournalFile();
+        if (source == null) {
+            throw new IOException("журнал приборки ещё не создан");
+        }
+        byte[] buffer = new byte[16 * 1024];
+        try (FileInputStream input = new FileInputStream(source)) {
+            int count;
+            while ((count = input.read(buffer)) != -1) {
+                output.write(buffer, 0, count);
+            }
+        }
+        output.flush();
+    }
+
     void close() {
         closed = true;
         generation++;
@@ -148,7 +184,7 @@ final class ClusterNavigationTransfer {
         generation++;
         trace.setLength(0);
         startJournal();
-        append("HUD Lab 0.30 · " + title);
+        append("HUD Lab 0.31 · " + title);
         append(journalFile == null
                 ? "ЖУРНАЛ ФАЙЛА: ERROR · " + journalError
                 : "ЖУРНАЛ ФАЙЛА: " + journalFile.getAbsolutePath());
@@ -456,7 +492,7 @@ final class ClusterNavigationTransfer {
         }
     }
 
-    private void appendJournal(String value) {
+    private synchronized void appendJournal(String value) {
         File target = journalFile;
         if (target == null) {
             return;
@@ -472,6 +508,34 @@ final class ClusterNavigationTransfer {
             journalError = describe(failure);
             journalFile = null;
         }
+    }
+
+    private File resolveJournalFile() {
+        File current = journalFile;
+        if (current != null && current.isFile() && current.length() > 0L) {
+            return current;
+        }
+        File root = activity.getExternalFilesDir("cluster-traces");
+        if (root == null || !root.isDirectory()) {
+            root = new File(activity.getFilesDir(), "cluster-traces");
+        }
+        File[] candidates = root.listFiles();
+        if (candidates == null) {
+            return null;
+        }
+        File latest = null;
+        for (File candidate : candidates) {
+            if (!candidate.isFile()
+                    || !candidate.getName().startsWith("hudlab-cluster-")
+                    || !candidate.getName().endsWith(".txt")
+                    || candidate.length() <= 0L) {
+                continue;
+            }
+            if (latest == null || candidate.lastModified() > latest.lastModified()) {
+                latest = candidate;
+            }
+        }
+        return latest;
     }
 
     private static String trim(String value) {

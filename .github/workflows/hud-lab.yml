@@ -97,7 +97,7 @@ jobs:
           BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
           echo "$BADGING"
           echo "$BADGING" | grep -F \
-            "package: name='dezz.status.hudlab29' versionCode='30' versionName='0.30'"
+            "package: name='dezz.status.hudlab29' versionCode='31' versionName='0.31'"
           echo "$BADGING" | grep -F "sdkVersion:'28'"
           echo "$BADGING" | grep -F "targetSdkVersion:'28'"
           if echo "$BADGING" | grep -Fq "application-debuggable"; then
@@ -126,6 +126,9 @@ jobs:
           grep -Fq 'ClusterLaunchAccessibilityService' "$DEX_STRINGS"
           grep -Fq 'android.activity.SplitScreenShownPosition' "$DEX_STRINGS"
           grep -Fq 'android.activity.windowingMode' "$DEX_STRINGS"
+          grep -Fq 'android.intent.action.CREATE_DOCUMENT' "$DEX_STRINGS"
+          grep -Fq 'cluster-journal-export' "$DEX_STRINGS"
+          grep -Fq 'Download/HudLabLogs' "$DEX_STRINGS"
           if grep -Eq 'ru\.yandex|com\.google\.android\.apps\.maps' "$DEX_STRINGS"; then
             echo "Navigation application launch leaked into HUD Lab display test" >&2
             exit 1
@@ -151,7 +154,7 @@ jobs:
       - name: Upload signed HUD Lab APK
         uses: actions/upload-artifact@v4
         with:
-          name: hud-lab-0.30-release-candidate
+          name: hud-lab-0.31-release-candidate
           path: |
             hudlab/build/outputs/apk/release/*.apk
             hudlab/build/outputs/apk/release/*.sha256

@@ -6,6 +6,7 @@ import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -15,9 +16,13 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.hardware.display.DisplayManager;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.MediaStore;
 import android.util.DisplayMetrics;
 import android.view.Display;
 import android.view.View;
@@ -33,6 +38,9 @@ import dezz.status.hudlab.HudLabController;
 import dezz.status.hudlab.HudPrivilegedCommandRunner;
 import dezz.status.hudlab.HudQnxTimeGapInstaller;
 import dezz.status.hudlab.HudSystemDumpExporter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -46,6 +54,8 @@ import java.util.Set;
 /* loaded from: classes4.dex */
 public final class HudLabActivity extends Activity implements HudLabController.Listener {
     private static final int REQUEST_STORAGE = 401;
+    private static final int REQUEST_CREATE_CLUSTER_JOURNAL = 402;
+    private static final int REQUEST_CLUSTER_JOURNAL_STORAGE = 403;
     private ClusterSignalSnapshot clusterProbeBaseline;
     private Set<String> clusterProbeBaselineLayers;
     private boolean clusterProbeAfterScheduled;
@@ -57,6 +67,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
     private BroadcastReceiver clusterProbeReceiver;
     private boolean clusterProbeRunning;
     private TextView clusterProbeStatusView;
+    private TextView clusterJournalExportStatusView;
     private ClusterNavigationTransfer clusterNavigationTransfer;
     private TextView clusterNavigationStatusView;
     private TextView connectionBadge;
@@ -357,7 +368,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
             }
         });
         linearLayout.addView(button, fixedButton(m3dp(130)));
-        TextView textViewText = text("HUD Lab 0.30", 23, TEXT, true);
+        TextView textViewText = text("HUD Lab 0.31", 23, TEXT, true);
         textViewText.setPadding(m3dp(16), 0, m3dp(18), 0);
         linearLayout.addView(textViewText);
         TextView textViewText2 = text("ECARX: ОЖИДАНИЕ", 15, Color.rgb(255, 192, 92), true);
@@ -471,7 +482,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         body.addView(sectionTitle("Точный вывод собственного экрана HUD Lab на приборку"));
         body.addView(note("Навигатор здесь вообще не запускается. Кнопка создаёт отдельную зелёную Activity HUD Lab с крупной надписью и отправляет её на Android displayId=2. Параметры взяты непосредственно из mNavi 2.0: ACTION_MAIN, NEW_TASK, setLaunchDisplayId(2), SplitScreenShownPosition=0 и windowingMode=5. Перед запуском воспроизводится правильный импульс NaviMode 3→1/[0]→3/[1]."));
         body.addView(note("Для полного совпадения с mNavi включите один раз службу «HUD Lab · запуск на приборке» в специальных возможностях. Если она не включена, тот же Intent и тот же ActivityOptions отправляются из открытой Activity и этот fallback будет явно отмечен в журнале."));
-        body.addView(note("Чтобы найти источник нижних «крыльев», журнал сравнивает ДО / ВО ВРЕМЯ / ПОСЛЕ: ECARX resource/priority и DIM-сигналы, фактический task/window displayId, размеры окна, системные insets, ClusterActivityState, SurfaceFlinger-слои и logcat. Каждое изменение относительно состояния ДО помечается ★. Полная трасса одновременно сохраняется в отдельный TXT-файл; его путь появится первой строкой. Как только визуально увидите крылья, сразу нажмите отдельную кнопку ручной метки — в этот момент будет снят дополнительный полный срез. Экран держится 30 секунд либо закрывается третьей кнопкой."));
+        body.addView(note("Чтобы найти источник нижних «крыльев», журнал сравнивает ДО / ВО ВРЕМЯ / ПОСЛЕ: ECARX resource/priority и DIM-сигналы, фактический task/window displayId, размеры окна, системные insets, ClusterActivityState, SurfaceFlinger-слои и logcat. Каждое изменение относительно состояния ДО помечается ★. Полная трасса одновременно сохраняется в отдельный TXT-файл. Как только визуально увидите крылья, сразу нажмите отдельную кнопку ручной метки — в этот момент будет снят дополнительный полный срез. После завершения нажмите «Экспорт»: системное окно позволит выбрать папку и имя файла. Экран держится 30 секунд либо закрывается третьей кнопкой."));
         body.addView(commandRow(GREEN, new String[]{
                 "1 · СПЕЦВОЗМОЖНОСТИ",
                 "2 · ЭКРАН HUD LAB → ID 2",
@@ -505,6 +516,22 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                         markClusterWingsVisible();
                     }
                 }));
+        body.addView(singleStandaloneCommand(
+                "ЭКСПОРТ ЖУРНАЛА «КРЫЛЬЯ» В TXT",
+                BLUE,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        requestClusterJournalExport();
+                    }
+                }));
+        TextView exportStatus = note(
+                "Экспортируется только трасса из этого раздела «Приборка». "
+                        + "Если системный выбор места недоступен, файл будет сохранён "
+                        + "в Download/HudLabLogs.");
+        exportStatus.setTextIsSelectable(true);
+        this.clusterJournalExportStatusView = exportStatus;
+        body.addView(exportStatus);
         TextView transferTrace = text(
                 "Тест собственного экрана ещё не запускался.",
                 13,
@@ -3021,6 +3048,224 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         }
     }
 
+    private void requestClusterJournalExport() {
+        ClusterNavigationTransfer transfer = this.clusterNavigationTransfer;
+        if (transfer == null || !transfer.hasExportableJournal()) {
+            setClusterJournalExportStatus(
+                    "Журнал «крылья» ещё не создан. Сначала запустите тест на приборке.",
+                    false);
+            Toast.makeText(
+                    this,
+                    "Сначала запустите тест на приборке",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("text/plain");
+        intent.putExtra(Intent.EXTRA_TITLE, transfer.suggestedJournalFileName());
+        try {
+            startActivityForResult(intent, REQUEST_CREATE_CLUSTER_JOURNAL);
+        } catch (Throwable unavailable) {
+            setClusterJournalExportStatus(
+                    "Системный выбор папки недоступен; сохраняю резервную копию "
+                            + "в Download/HudLabLogs.",
+                    true);
+            requestClusterJournalDownloadsFallback();
+        }
+    }
+
+    private void requestClusterJournalDownloadsFallback() {
+        if (Build.VERSION.SDK_INT >= 29) {
+            exportClusterJournalToMediaStore();
+            return;
+        }
+        if (checkSelfPermission("android.permission.WRITE_EXTERNAL_STORAGE") != 0) {
+            requestPermissions(
+                    new String[]{"android.permission.WRITE_EXTERNAL_STORAGE"},
+                    REQUEST_CLUSTER_JOURNAL_STORAGE);
+            return;
+        }
+        exportClusterJournalToLegacyDownloads();
+    }
+
+    private void saveClusterJournalToUri(final Uri uri) {
+        final ClusterNavigationTransfer transfer = this.clusterNavigationTransfer;
+        if (transfer == null || uri == null) {
+            setClusterJournalExportStatus("Не получен файл назначения для экспорта.", false);
+            return;
+        }
+        setClusterJournalExportStatus("Сохраняю выбранную трассу «крылья»…", true);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try (OutputStream output =
+                             HudLabActivity.this.getContentResolver()
+                                     .openOutputStream(uri, "w")) {
+                    transfer.writeJournalTo(output);
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            setClusterJournalExportStatus(
+                                    "Журнал «крылья» сохранён в выбранный файл:\n" + uri,
+                                    true);
+                            Toast.makeText(
+                                    HudLabActivity.this,
+                                    "Журнал приборки сохранён",
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    });
+                } catch (final Throwable failure) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            setClusterJournalExportStatus(
+                                    "Ошибка экспорта: " + describeFailure(failure),
+                                    false);
+                            Toast.makeText(
+                                    HudLabActivity.this,
+                                    "Не удалось сохранить журнал",
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    });
+                }
+            }
+        }, "cluster-journal-export").start();
+    }
+
+    private void exportClusterJournalToMediaStore() {
+        final ClusterNavigationTransfer transfer = this.clusterNavigationTransfer;
+        if (transfer == null || !transfer.hasExportableJournal()) {
+            setClusterJournalExportStatus("Журнал «крылья» ещё не создан.", false);
+            return;
+        }
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.MediaColumns.DISPLAY_NAME, transfer.suggestedJournalFileName());
+        values.put(MediaStore.MediaColumns.MIME_TYPE, "text/plain");
+        values.put(
+                MediaStore.MediaColumns.RELATIVE_PATH,
+                Environment.DIRECTORY_DOWNLOADS + "/HudLabLogs");
+        Uri target;
+        try {
+            target = getContentResolver().insert(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    values);
+        } catch (Throwable failure) {
+            setClusterJournalExportStatus(
+                    "Не удалось открыть Download/HudLabLogs: " + describeFailure(failure),
+                    false);
+            return;
+        }
+        if (target == null) {
+            setClusterJournalExportStatus(
+                    "Система не создала файл в Download/HudLabLogs.",
+                    false);
+            return;
+        }
+        saveClusterJournalToUri(target);
+    }
+
+    private void exportClusterJournalToLegacyDownloads() {
+        final ClusterNavigationTransfer transfer = this.clusterNavigationTransfer;
+        if (transfer == null || !transfer.hasExportableJournal()) {
+            setClusterJournalExportStatus("Журнал «крылья» ещё не создан.", false);
+            return;
+        }
+        final File directory = new File(
+                Environment.getExternalStoragePublicDirectory(
+                        Environment.DIRECTORY_DOWNLOADS),
+                "HudLabLogs");
+        final File target = uniqueExportFile(
+                directory,
+                transfer.suggestedJournalFileName());
+        setClusterJournalExportStatus(
+                "Сохраняю резервную копию в " + target.getAbsolutePath() + "…",
+                true);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (!directory.exists() && !directory.mkdirs()) {
+                        throw new IllegalStateException(
+                                "не удалось создать " + directory.getAbsolutePath());
+                    }
+                    try (FileOutputStream output = new FileOutputStream(target, false)) {
+                        transfer.writeJournalTo(output);
+                    }
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            setClusterJournalExportStatus(
+                                    "Журнал «крылья» сохранён:\n"
+                                            + target.getAbsolutePath(),
+                                    true);
+                            Toast.makeText(
+                                    HudLabActivity.this,
+                                    "Журнал сохранён в Download/HudLabLogs",
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    });
+                } catch (final Throwable failure) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            setClusterJournalExportStatus(
+                                    "Ошибка экспорта: " + describeFailure(failure),
+                                    false);
+                            Toast.makeText(
+                                    HudLabActivity.this,
+                                    "Не удалось сохранить журнал",
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    });
+                }
+            }
+        }, "cluster-journal-downloads-export").start();
+    }
+
+    private static File uniqueExportFile(File directory, String requestedName) {
+        File candidate = new File(directory, requestedName);
+        if (!candidate.exists()) {
+            return candidate;
+        }
+        int dot = requestedName.lastIndexOf('.');
+        String stem = dot > 0 ? requestedName.substring(0, dot) : requestedName;
+        String extension = dot > 0 ? requestedName.substring(dot) : "";
+        for (int index = 1; index < 10_000; index++) {
+            candidate = new File(
+                    directory,
+                    stem + "-" + index + extension);
+            if (!candidate.exists()) {
+                return candidate;
+            }
+        }
+        return new File(
+                directory,
+                stem + "-" + System.currentTimeMillis() + extension);
+    }
+
+    private static String describeFailure(Throwable failure) {
+        Throwable current = failure;
+        while (current.getCause() != null && current.getCause() != current) {
+            current = current.getCause();
+        }
+        String message = current.getMessage();
+        return current.getClass().getSimpleName()
+                + (message == null || message.trim().isEmpty()
+                ? ""
+                : " · " + message.trim());
+    }
+
+    private void setClusterJournalExportStatus(String value, boolean success) {
+        TextView status = this.clusterJournalExportStatusView;
+        if (status != null) {
+            status.setText(value);
+            status.setTextColor(success
+                    ? Color.rgb(125, 220, 168)
+                    : Color.rgb(255, 125, 125));
+        }
+    }
+
     public void restoreDisplayStack2() {
         runDisplayStackCommand("restore", "Отправляется аварийный возврат physical local:2 → layerStack 2…");
     }
@@ -3329,8 +3574,36 @@ public final class HudLabActivity extends Activity implements HudLabController.L
     }
 
     @Override // android.app.Activity
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_CREATE_CLUSTER_JOURNAL) {
+            return;
+        }
+        if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+            saveClusterJournalToUri(data.getData());
+        } else {
+            setClusterJournalExportStatus(
+                    "Экспорт отменён. Журнал остаётся внутри HUD Lab и его можно "
+                            + "сохранить позже.",
+                    true);
+        }
+    }
+
+    @Override // android.app.Activity
     public void onRequestPermissionsResult(int i, String[] strArr, int[] iArr) {
         super.onRequestPermissionsResult(i, strArr, iArr);
+        if (i == REQUEST_CLUSTER_JOURNAL_STORAGE) {
+            if (iArr.length > 0 && iArr[0] == 0) {
+                exportClusterJournalToLegacyDownloads();
+            } else {
+                setClusterJournalExportStatus(
+                        "Нет доступа к Download. Разрешите доступ к файлам "
+                                + "или используйте системный выбор места.",
+                        false);
+                Toast.makeText(this, "Доступ к файлам не выдан", 1).show();
+            }
+            return;
+        }
         if (i != REQUEST_STORAGE) {
             return;
         }
