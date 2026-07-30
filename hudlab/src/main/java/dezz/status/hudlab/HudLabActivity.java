@@ -60,6 +60,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
     private Set<String> clusterProbeBaselineLayers;
     private boolean clusterProbeAfterScheduled;
     private boolean clusterExactTraceActive;
+    private int clusterExactTestKind;
     private int clusterProbeGeneration;
     private boolean clusterProbeLaunchStarted;
     private String clusterProbeLogcatStart;
@@ -368,7 +369,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
             }
         });
         linearLayout.addView(button, fixedButton(m3dp(130)));
-        TextView textViewText = text("HUD Lab 0.31", 23, TEXT, true);
+        TextView textViewText = text("HUD Lab 0.32", 23, TEXT, true);
         textViewText.setPadding(m3dp(16), 0, m3dp(18), 0);
         linearLayout.addView(textViewText);
         TextView textViewText2 = text("ECARX: ОЖИДАНИЕ", 15, Color.rgb(255, 192, 92), true);
@@ -479,19 +480,43 @@ public final class HudLabActivity extends Activity implements HudLabController.L
 
     private View buildInstrumentClusterTab() {
         LinearLayout body = columnBody();
-        body.addView(sectionTitle("Точный вывод собственного экрана HUD Lab на приборку"));
-        body.addView(note("Навигатор здесь вообще не запускается. Кнопка создаёт отдельную зелёную Activity HUD Lab с крупной надписью и отправляет её на Android displayId=2. Параметры взяты непосредственно из mNavi 2.0: ACTION_MAIN, NEW_TASK, setLaunchDisplayId(2), SplitScreenShownPosition=0 и windowingMode=5. Перед запуском воспроизводится правильный импульс NaviMode 3→1/[0]→3/[1]."));
-        body.addView(note("Для полного совпадения с mNavi включите один раз службу «HUD Lab · запуск на приборке» в специальных возможностях. Если она не включена, тот же Intent и тот же ActivityOptions отправляются из открытой Activity и этот fallback будет явно отмечен в журнале."));
-        body.addView(note("Чтобы найти источник нижних «крыльев», журнал сравнивает ДО / ВО ВРЕМЯ / ПОСЛЕ: ECARX resource/priority и DIM-сигналы, фактический task/window displayId, размеры окна, системные insets, ClusterActivityState, SurfaceFlinger-слои и logcat. Каждое изменение относительно состояния ДО помечается ★. Полная трасса одновременно сохраняется в отдельный TXT-файл. Как только визуально увидите крылья, сразу нажмите отдельную кнопку ручной метки — в этот момент будет снят дополнительный полный срез. После завершения нажмите «Экспорт»: системное окно позволит выбрать папку и имя файла. Экран держится 30 секунд либо закрывается третьей кнопкой."));
+        body.addView(sectionTitle("Точный разбор нижних «крыльев» · матрица 0.32"));
+        body.addView(note("Журнал 0.31 доказал, что тестовая Activity не была создана: ECARX подменил foreground-запуск системным PSD MessageDialog. Поэтому 0.32 сначала восстанавливает чистый эталон NaviMode 1 + opcode 8=[0], а затем раздельно отправляет только одну исследуемую команду."));
+        body.addView(note("A и B не запускают никакого приложения. C запускает собственный зелёный экран без предварительных DIM-команд. D оставляет полную последовательность mNavi для контрольного сравнения. Для C/D обязательно один раз включите службу «HUD Lab · запуск на приборке»: без неё запрос вообще не отправляется и ложного «OK» больше не будет."));
+        body.addView(note("Порядок: запустите A, отметьте «крылья есть/нет», восстановите; затем так же B и C. Каждый тест создаёт отдельный TXT-журнал с чистым эталоном, командами, readback, task/window/displayId, SurfaceFlinger и logcat. Через 22 секунды выполняется автоматическое восстановление."));
         body.addView(commandRow(GREEN, new String[]{
                 "1 · СПЕЦВОЗМОЖНОСТИ",
-                "2 · ЭКРАН HUD LAB → ID 2",
-                "ЗАКРЫТЬ / ВЕРНУТЬ DIM"
+                "A · ТОЛЬКО MODE 3",
+                "B · ТОЛЬКО OPCODE 8=1"
         }, new Runnable[]{
                 new Runnable() {
                     @Override
                     public void run() {
                         openClusterAccessibilitySettings();
+                    }
+                },
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        startExactClusterModeOnlyTest();
+                    }
+                },
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        startExactClusterOpcodeOnlyTest();
+                    }
+                }
+        }));
+        body.addView(commandRow(BLUE, new String[]{
+                "C · ЭКРАН БЕЗ ARM",
+                "D · ПОЛНАЯ mNavi",
+                "ЗАКРЫТЬ / ВОССТАНОВИТЬ"
+        }, new Runnable[]{
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        startExactClusterLaunchOnlyTest();
                     }
                 },
                 new Runnable() {
@@ -507,13 +532,21 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                     }
                 }
         }));
-        body.addView(singleCommand(
-                "★★ МЕТКА: НИЖНИЕ КРЫЛЬЯ ПОЯВИЛИСЬ",
+        body.addView(commandPair(
+                "★★ КРЫЛЬЯ ЕСТЬ",
                 AMBER,
                 new Runnable() {
                     @Override
                     public void run() {
                         markClusterWingsVisible();
+                    }
+                },
+                "☆☆ КРЫЛЬЕВ НЕТ",
+                GREEN,
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        markClusterWingsAbsent();
                     }
                 }));
         body.addView(singleStandaloneCommand(
@@ -533,7 +566,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         this.clusterJournalExportStatusView = exportStatus;
         body.addView(exportStatus);
         TextView transferTrace = text(
-                "Тест собственного экрана ещё не запускался.",
+                "Изолированные тесты A/B/C/D ещё не запускались.",
                 13,
                 Color.rgb(255, 214, 125),
                 false);
@@ -1840,6 +1873,22 @@ public final class HudLabActivity extends Activity implements HudLabController.L
     }
 
     private void startExactClusterTextTest() {
+        startExactClusterTest(ClusterNavigationTransfer.TEST_FULL_MNAVI_SEQUENCE);
+    }
+
+    private void startExactClusterModeOnlyTest() {
+        startExactClusterTest(ClusterNavigationTransfer.TEST_NAVI_MODE_3_ONLY);
+    }
+
+    private void startExactClusterOpcodeOnlyTest() {
+        startExactClusterTest(ClusterNavigationTransfer.TEST_OPCODE_8_ONLY);
+    }
+
+    private void startExactClusterLaunchOnlyTest() {
+        startExactClusterTest(ClusterNavigationTransfer.TEST_LAUNCH_WITHOUT_ARM);
+    }
+
+    private void startExactClusterTest(final int testKind) {
         final ClusterNavigationTransfer transfer = this.clusterNavigationTransfer;
         final HudLabController activeController = this.controller;
         if (transfer == null || activeController == null) {
@@ -1855,17 +1904,33 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         this.clusterProbeDisplayId = 2;
         this.clusterProbeRunning = true;
         this.clusterExactTraceActive = true;
+        this.clusterExactTestKind = testKind;
         this.clusterProbeAfterScheduled = false;
+        this.clusterProbeLaunchStarted = false;
         this.clusterProbeBaseline = null;
         this.clusterProbeBaselineLayers = null;
         this.clusterProbeLogcatStart = null;
         this.clusterProbeTrace.clear();
-        activeController.captureClusterProbeState(
-                "ДО ЗАПУСКА",
-                new HudLabController.ClusterProbeCallback() {
+        transfer.prepareTest(
+                testKind,
+                new Runnable() {
                     @Override
-                    public void onCaptured(ClusterSignalSnapshot snapshot) {
-                        captureExactClusterBaseline(generation, snapshot, transfer);
+                    public void run() {
+                        if (generation != HudLabActivity.this.clusterProbeGeneration
+                                || !HudLabActivity.this.clusterProbeRunning) {
+                            return;
+                        }
+                        activeController.captureClusterProbeState(
+                                "ЧИСТЫЙ ЭТАЛОН ДО ТЕСТА",
+                                new HudLabController.ClusterProbeCallback() {
+                                    @Override
+                                    public void onCaptured(ClusterSignalSnapshot snapshot) {
+                                        captureExactClusterBaseline(
+                                                generation,
+                                                snapshot,
+                                                transfer);
+                                    }
+                                });
                     }
                 });
     }
@@ -1875,24 +1940,41 @@ public final class HudLabActivity extends Activity implements HudLabController.L
             setClusterNavigationTrace("ERROR: контроллер теста displayId=2 ещё не готов");
             return;
         }
+        if (!this.clusterProbeRunning) {
+            this.clusterNavigationTransfer.restore();
+            Toast.makeText(this, "NaviMode 1 + opcode 8=[0] отправлены", 0).show();
+            return;
+        }
         scheduleExactClusterAfterTelemetry();
     }
 
     private void markClusterWingsVisible() {
+        markClusterWingsResult(true);
+    }
+
+    private void markClusterWingsAbsent() {
+        markClusterWingsResult(false);
+    }
+
+    private void markClusterWingsResult(final boolean wingsVisible) {
         if (!this.clusterProbeRunning || !this.clusterExactTraceActive) {
-            Toast.makeText(this, "Сначала запустите тест собственного экрана", 0).show();
+            Toast.makeText(this, "Сначала запустите один из тестов A/B/C/D", 0).show();
             return;
         }
         final int generation = this.clusterProbeGeneration;
         ClusterNavigationTransfer transfer = this.clusterNavigationTransfer;
         if (transfer != null) {
-            transfer.captureManualWindowState();
+            transfer.captureManualWindowState(wingsVisible);
         }
-        appendClusterProbeTrace("★★ РУЧНАЯ МЕТКА: НИЖНИЕ КРЫЛЬЯ ВИДНЫ");
+        appendClusterProbeTrace(wingsVisible
+                ? "★★ РУЧНОЙ РЕЗУЛЬТАТ: НИЖНИЕ КРЫЛЬЯ ВИДНЫ"
+                : "☆☆ РУЧНОЙ РЕЗУЛЬТАТ: НИЖНИХ КРЫЛЬЕВ НЕТ");
         HudLabController activeController = this.controller;
         if (activeController != null) {
             activeController.captureClusterProbeState(
-                    "★★ МЕТКА КРЫЛЬЕВ",
+                    wingsVisible
+                            ? "★★ МЕТКА · КРЫЛЬЯ ЕСТЬ"
+                            : "☆☆ МЕТКА · КРЫЛЬЕВ НЕТ",
                     new HudLabController.ClusterProbeCallback() {
                         @Override
                         public void onCaptured(ClusterSignalSnapshot snapshot) {
@@ -1904,8 +1986,11 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                         }
                     });
         }
-        captureSurfaceLayers(generation, "★★ МЕТКА КРЫЛЬЕВ", null);
-        captureClusterLogcat(generation, "★★ МЕТКА КРЫЛЬЕВ");
+        String phase = wingsVisible
+                ? "★★ МЕТКА · КРЫЛЬЯ ЕСТЬ"
+                : "☆☆ МЕТКА · КРЫЛЬЕВ НЕТ";
+        captureSurfaceLayers(generation, phase, null);
+        captureClusterLogcat(generation, phase);
     }
 
     private void captureExactClusterBaseline(
@@ -1971,7 +2056,6 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         this.clusterProbeBaselineLayers = layers == null
                 ? null
                 : new LinkedHashSet<>(parseSurfaceLayers(layers));
-        transfer.moveOwnScreenToCluster();
         appendClusterProbeTrace(snapshot.formatAgainst(snapshot));
         appendClusterProbeTrace(this.clusterProbeBaselineLayers == null
                 ? "LAYERS ДО: локальный shell недоступен"
@@ -1980,6 +2064,7 @@ public final class HudLabActivity extends Activity implements HudLabController.L
         appendClusterProbeTrace(logcatStart == null
                 ? "LOGCAT ДО: точная временная метка недоступна"
                 : "LOGCAT ДО: начало трассы " + logcatStart);
+        transfer.executePreparedTest(this.clusterExactTestKind);
         scheduleExactClusterDuringTelemetry(generation);
     }
 
@@ -2015,6 +2100,18 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                 captureClusterLogcat(generation, "ВО ВРЕМЯ +13.0с");
             }
         }, 13000L);
+        this.clusterProbeHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (generation == HudLabActivity.this.clusterProbeGeneration
+                        && HudLabActivity.this.clusterProbeRunning
+                        && !HudLabActivity.this.clusterProbeAfterScheduled) {
+                    appendClusterProbeTrace(
+                            "АВТОВОССТАНОВЛЕНИЕ +22с: NaviMode 1 + opcode 8=[0].");
+                    scheduleExactClusterAfterTelemetry();
+                }
+            }
+        }, 22000L);
     }
 
     private void scheduleExactClusterAfterTelemetry() {
@@ -2242,14 +2339,21 @@ public final class HudLabActivity extends Activity implements HudLabController.L
                 String event = intent.getStringExtra("event");
                 int displayId = intent.getIntExtra("display_id", -1);
                 String state = intent.getStringExtra("state");
+                String launchToken = intent.getStringExtra(
+                        ClusterProbeActivity.EXTRA_LAUNCH_TOKEN);
                 ClusterNavigationTransfer transfer = HudLabActivity.this.clusterNavigationTransfer;
+                boolean belongsToCurrentTest = false;
                 if (transfer != null) {
-                    transfer.onProbeEvent(event, displayId, state);
+                    belongsToCurrentTest = transfer.onProbeEvent(
+                            event,
+                            displayId,
+                            state,
+                            launchToken);
                 }
-                if (HudLabActivity.this.clusterProbeStatusView != null) {
+                if (belongsToCurrentTest && HudLabActivity.this.clusterProbeStatusView != null) {
                     HudLabActivity.this.appendClusterProbeTrace("ACTIVITY " + event + " · displayId=" + displayId + "\n" + state);
                 }
-                if (ClusterProbeActivity.EVENT_STOPPED.equals(event)) {
+                if (belongsToCurrentTest && ClusterProbeActivity.EVENT_STOPPED.equals(event)) {
                     HudLabActivity.this.scheduleExactClusterAfterTelemetry();
                 }
             }

@@ -167,7 +167,16 @@ public final class ClusterProbeActivity extends Activity {
     }
 
     private void emit(String event, String state) {
-        Intent broadcast = new Intent(ACTION_STATE).setPackage(getPackageName()).putExtra("event", event).putExtra(EXTRA_STATE, state).putExtra("display_id", currentDisplayId());
+        Intent launchIntent = getIntent();
+        String launchToken = launchIntent == null
+                ? null
+                : launchIntent.getStringExtra(EXTRA_LAUNCH_TOKEN);
+        Intent broadcast = new Intent(ACTION_STATE)
+                .setPackage(getPackageName())
+                .putExtra(EXTRA_EVENT, event)
+                .putExtra(EXTRA_STATE, state)
+                .putExtra(EXTRA_LAUNCH_TOKEN, launchToken)
+                .putExtra("display_id", currentDisplayId());
         sendBroadcast(broadcast);
     }
 

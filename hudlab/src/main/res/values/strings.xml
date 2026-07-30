@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">HUD Lab 0.31</string>
+    <string name="app_name">HUD Lab 0.32</string>
     <string name="cluster_launch_accessibility_label">HUD Lab · запуск на приборке</string>
     <string name="cluster_launch_accessibility_description">Ручной запуск тестового экрана HUD Lab на приборной панели</string>
 </resources>

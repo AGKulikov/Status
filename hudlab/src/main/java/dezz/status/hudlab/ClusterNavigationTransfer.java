@@ -31,12 +31,15 @@ import java.util.Locale;
  * third-party navigation task; HUD Lab instead closes its own previous marker Activity.</p>
  */
 final class ClusterNavigationTransfer {
+    static final int TEST_NAVI_MODE_3_ONLY = 1;
+    static final int TEST_OPCODE_8_ONLY = 2;
+    static final int TEST_LAUNCH_WITHOUT_ARM = 3;
+    static final int TEST_FULL_MNAVI_SEQUENCE = 4;
+
     private static final int CLUSTER_DISPLAY_ID = 2;
     private static final int NAVI_MODE_OFF = 1;
     private static final int NAVI_MODE_FULL = 3;
-    private static final int MAX_RESET_POLLS = 4;
-    private static final long RESET_POLL_MS = 400L;
-    private static final long ARM_DELAY_MS = 500L;
+    private static final long CLEAN_BASELINE_DELAY_MS = 900L;
     private static final long LAUNCH_DELAY_MS = 600L;
     private static final long PROBE_DURATION_MS = 30_000L;
 
@@ -52,6 +55,9 @@ final class ClusterNavigationTransfer {
     private int generation;
     private boolean closed;
     private boolean startEventReceived;
+    private String expectedLaunchToken;
+    private int preparedOperation = -1;
+    private int preparedTestKind;
     private File journalFile;
     private String journalError;
 
@@ -84,27 +90,76 @@ final class ClusterNavigationTransfer {
         }
     }
 
-    void moveOwnScreenToCluster() {
-        final int operation = begin("СОБСТВЕННЫЙ ЭКРАН → DISPLAY 2");
+    void prepareTest(final int testKind, final Runnable ready) {
+        if (!isSupportedTest(testKind)) {
+            throw new IllegalArgumentException("неизвестный тест приборки: " + testKind);
+        }
+        final int operation = begin(testTitle(testKind));
+        preparedOperation = operation;
+        preparedTestKind = testKind;
         startEventReceived = false;
+        expectedLaunchToken = null;
         ClusterProbeActivity.finishActive();
         append(display2Summary());
         append("Контекст запуска: " + accessibilityState());
-        append("До запуска закрывается только прежняя тестовая Activity HUD Lab; навигаторы не затрагиваются.");
-        captureWindowState("ДО", operation, new Runnable() {
+        append("Навигаторы не запускаются и не останавливаются.");
+        append("ПОДГОТОВКА ЧИСТОГО ЭТАЛОНА: NaviMode 1 + opcode 8=[0].");
+        append(setDimState(NAVI_MODE_OFF, false));
+        append("Команды выше относятся только к подготовке эталона. "
+                + "После паузы будет отправлено ровно одно исследуемое воздействие.");
+        main.postDelayed(new Runnable() {
             @Override
             public void run() {
                 if (!isCurrent(operation)) {
                     return;
                 }
-                pollResetIfNeeded(operation, 1);
+                captureWindowState("ЧИСТЫЙ ЭТАЛОН ДО ТЕСТА", operation, ready);
             }
-        });
+        }, CLEAN_BASELINE_DELAY_MS);
+    }
+
+    void executePreparedTest(int testKind) {
+        final int operation = preparedOperation;
+        if (!isCurrent(operation) || preparedTestKind != testKind) {
+            append("ТЕСТ НЕ ЗАПУЩЕН: подготовленный эталон устарел.");
+            return;
+        }
+        append("--- ИССЛЕДУЕМОЕ ВОЗДЕЙСТВИЕ ---");
+        if (testKind == TEST_NAVI_MODE_3_ONLY) {
+            append("A: отправляю ТОЛЬКО switchNaviMode(3). Opcode 8 не отправляется.");
+            append(switchNaviModeOnly(NAVI_MODE_FULL));
+            scheduleVerification(operation, false);
+            return;
+        }
+        if (testKind == TEST_OPCODE_8_ONLY) {
+            append("B: отправляю ТОЛЬКО DIM (2,8,8,[1]). NaviMode не меняется.");
+            append(sendRawDimOnly(true));
+            scheduleVerification(operation, false);
+            return;
+        }
+        if (testKind == TEST_LAUNCH_WITHOUT_ARM) {
+            append("C: запускаю Activity без switchNaviMode и без opcode 8.");
+            launchProbe(operation);
+            return;
+        }
+        append("D: полная последовательность mNavi: switchNaviMode(3) "
+                + "+ DIM (2,8,8,[1]), затем запуск через 600 мс.");
+        append(setDimState(NAVI_MODE_FULL, true));
+        main.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                launchProbe(operation);
+            }
+        }, LAUNCH_DELAY_MS);
     }
 
     void restore() {
         generation++;
         final int operation = generation;
+        preparedOperation = -1;
+        preparedTestKind = 0;
+        expectedLaunchToken = null;
+        main.removeCallbacksAndMessages(null);
         append("--- ЗАКРЫТИЕ ТЕСТА И ВОССТАНОВЛЕНИЕ DIM ---");
         ClusterProbeActivity.finishActive();
         append(setDimState(NAVI_MODE_OFF, false));
@@ -112,14 +167,20 @@ final class ClusterNavigationTransfer {
         captureWindowState("ПОСЛЕ ЗАКРЫТИЯ", operation, null);
     }
 
-    void onProbeEvent(String event, int displayId, String state) {
+    boolean onProbeEvent(String event, int displayId, String state, String launchToken) {
         if (closed) {
-            return;
+            return false;
+        }
+        if (expectedLaunchToken == null || !expectedLaunchToken.equals(launchToken)) {
+            append("ACTIVITY EVENT IGNORED · event=" + event
+                    + " · token=" + (launchToken == null ? "нет" : launchToken)
+                    + " · текущий тест не ожидал этот запуск.");
+            return false;
         }
         if (ClusterProbeActivity.EVENT_STARTED.equals(event)
                 || ClusterProbeActivity.EVENT_RESUMED.equals(event)
                 || ClusterProbeActivity.EVENT_UPDATED.equals(event)) {
-            startEventReceived = true;
+            startEventReceived |= displayId == CLUSTER_DISPLAY_ID;
         }
         append("ACTIVITY " + event + " · фактический displayId=" + displayId
                 + (state == null || state.trim().isEmpty() ? "" : "\n" + state.trim()));
@@ -129,16 +190,24 @@ final class ClusterNavigationTransfer {
                     : "РЕЗУЛЬТАТ API: ОШИБКА МАРШРУТИЗАЦИИ — система создала Activity на displayId="
                     + displayId + " вместо 2.");
         }
+        return true;
     }
 
     void appendTelemetry(String value) {
         append("КРЫЛЬЯ · " + value);
     }
 
-    void captureManualWindowState() {
+    void captureManualWindowState(boolean wingsVisible) {
         int operation = generation;
-        append("★★ РУЧНАЯ МЕТКА: пользователь подтвердил появление нижних крыльев.");
-        captureWindowState("РУЧНАЯ МЕТКА КРЫЛЬЕВ", operation, null);
+        append(wingsVisible
+                ? "★★ РУЧНОЙ РЕЗУЛЬТАТ: НИЖНИЕ КРЫЛЬЯ ВИДНЫ."
+                : "☆☆ РУЧНОЙ РЕЗУЛЬТАТ: НИЖНИХ КРЫЛЬЕВ НЕТ.");
+        captureWindowState(
+                wingsVisible
+                        ? "РУЧНАЯ МЕТКА · КРЫЛЬЯ ЕСТЬ"
+                        : "РУЧНАЯ МЕТКА · КРЫЛЬЕВ НЕТ",
+                operation,
+                null);
     }
 
     synchronized boolean hasExportableJournal() {
@@ -184,110 +253,52 @@ final class ClusterNavigationTransfer {
         generation++;
         trace.setLength(0);
         startJournal();
-        append("HUD Lab 0.31 · " + title);
+        append("HUD Lab 0.32 · " + title);
         append(journalFile == null
                 ? "ЖУРНАЛ ФАЙЛА: ERROR · " + journalError
                 : "ЖУРНАЛ ФАЙЛА: " + journalFile.getAbsolutePath());
-        append("Разобранная последовательность mNavi 2.0 без запуска навигатора.");
+        append("Изолированная матрица DIM/NaviMode по разобранной последовательности mNavi 2.0.");
         return generation;
-    }
-
-    /**
-     * mNavi resets 3 -> 1/[0] only when getNaviMode() is already 3. Its original loop
-     * checks the readback up to four times at 400 ms intervals, then waits 500 ms before
-     * arming mode 3 again.
-     */
-    private void pollResetIfNeeded(final int operation, final int attempt) {
-        if (!isCurrent(operation)) {
-            return;
-        }
-        Integer current = readNaviMode();
-        append("NaviMode poll " + attempt + "/" + MAX_RESET_POLLS + " = "
-                + (current == null ? "ERROR" : current));
-        if (current != null && current == NAVI_MODE_FULL) {
-            append("Режим уже 3: отправляю импульсный reset 1 + DIM [0], как mNavi.");
-            append(setDimState(NAVI_MODE_OFF, false));
-            if (attempt < MAX_RESET_POLLS) {
-                main.postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        pollResetIfNeeded(operation, attempt + 1);
-                    }
-                }, RESET_POLL_MS);
-                return;
-            }
-        } else {
-            append("Предварительный reset не нужен: mNavi сразу переходит к включению режима 3.");
-        }
-        main.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                armAndLaunch(operation);
-            }
-        }, ARM_DELAY_MS);
-    }
-
-    private void armAndLaunch(final int operation) {
-        if (!isCurrent(operation)) {
-            return;
-        }
-        append("ARM: switchNaviMode(3) + DIM (2,8,8,[1])");
-        append(setDimState(NAVI_MODE_FULL, true));
-        append("Пауза 600 мс перед запуском — точное значение из mNavi.");
-        main.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                launchProbe(operation);
-            }
-        }, LAUNCH_DELAY_MS);
     }
 
     private void launchProbe(final int operation) {
         if (!isCurrent(operation)) {
             return;
         }
-        String token = Long.toHexString(System.nanoTime());
-        try {
-            String route;
-            if (ClusterLaunchAccessibilityService.isConnected()) {
-                ClusterLaunchAccessibilityService.launchProbe(PROBE_DURATION_MS, token);
-                route = "AccessibilityService (тот же тип Context, что у mNavi)";
-            } else {
-                ClusterLaunchProtocol.start(activity, PROBE_DURATION_MS, token);
-                route = "foreground Activity fallback; служба HUD Lab не включена";
-            }
-            append("LAUNCH API: OK · " + route);
-            append(ClusterLaunchProtocol.describe());
-        } catch (Throwable failure) {
-            append("LAUNCH API: ERROR · " + describe(failure));
-            launchViaAdbFallback(operation, token);
+        if (!ClusterLaunchAccessibilityService.isConnected()) {
+            append("LAUNCH НЕ ОТПРАВЛЕН: служба «HUD Lab · запуск на приборке» "
+                    + "не подключена. Foreground fallback отключён, потому что в 0.31 "
+                    + "его перехватывал PSD MessageDialog и создавал ложный результат.");
+            scheduleVerification(operation, true);
             return;
         }
-        scheduleVerification(operation);
+        String token = Long.toHexString(System.nanoTime());
+        expectedLaunchToken = token;
+        try {
+            ClusterLaunchAccessibilityService.launchProbe(PROBE_DURATION_MS, token);
+            append("LAUNCH REQUEST SENT · AccessibilityService "
+                    + "(тот же тип Context, что у mNavi). Это ещё НЕ подтверждение запуска.");
+            append(ClusterLaunchProtocol.describe());
+        } catch (Throwable failure) {
+            expectedLaunchToken = null;
+            append("LAUNCH API: ERROR · " + describe(failure));
+            scheduleVerification(operation, true);
+            return;
+        }
+        scheduleVerification(operation, true);
     }
 
-    private void launchViaAdbFallback(final int operation, String token) {
-        String component = activity.getPackageName() + "/" + ClusterProbeActivity.class.getName();
-        String command = "am start --user 0 --display 2 --windowingMode 5"
-                + " -n " + component
-                + " --el duration_ms " + PROBE_DURATION_MS
-                + " --es launch_token " + token;
-        append("CONTROL ADB: " + command);
-        commands.runTrusted(command, new HudPrivilegedCommandRunner.Callback() {
+    private void scheduleVerification(final int operation, final boolean expectProbe) {
+        main.postDelayed(new Runnable() {
             @Override
-            public void onFinished(String output, String error) {
-                if (!isCurrent(operation)) {
-                    return;
+            public void run() {
+                if (isCurrent(operation)) {
+                    Integer mode = readNaviMode();
+                    append("READBACK +0.5с: NaviMode="
+                            + (mode == null ? "ERROR" : mode));
                 }
-                append(error == null
-                        ? "CONTROL ADB RESULT:\n" + trim(output)
-                        : "CONTROL ADB ERROR · " + error);
-                scheduleVerification(operation);
             }
-        });
-    }
-
-    private void scheduleVerification(final int operation) {
+        }, 500L);
         main.postDelayed(new Runnable() {
             @Override
             public void run() {
@@ -302,8 +313,9 @@ final class ClusterNavigationTransfer {
                 if (!isCurrent(operation)) {
                     return;
                 }
-                if (!startEventReceived) {
-                    append("РЕЗУЛЬТАТ API: onCreate/onResume тестовой Activity не получен за 3 секунды.");
+                if (expectProbe && !startEventReceived) {
+                    append("РЕЗУЛЬТАТ ЗАПУСКА: БЛОКИРОВАНО — "
+                            + "onCreate/onResume Activity на displayId=2 не получен за 3 секунды.");
                 }
                 captureWindowState("ПОСЛЕ +3.0с", operation, null);
             }
@@ -322,6 +334,10 @@ final class ClusterNavigationTransfer {
     }
 
     private String setDimState(int naviMode, boolean clusterActive) {
+        return switchNaviModeOnly(naviMode) + " · " + sendRawDimOnly(clusterActive);
+    }
+
+    private String switchNaviModeOnly(int naviMode) {
         StringBuilder result = new StringBuilder();
         Context context = ClusterLaunchAccessibilityService.activeContext(activity);
         try {
@@ -339,7 +355,12 @@ final class ClusterNavigationTransfer {
         } catch (Throwable failure) {
             result.append("switchNaviMode ERROR · ").append(describe(failure));
         }
-        result.append(" · ");
+        return result.toString();
+    }
+
+    private String sendRawDimOnly(boolean clusterActive) {
+        StringBuilder result = new StringBuilder();
+        Context context = ClusterLaunchAccessibilityService.activeContext(activity);
         try {
             Class<?> managerClass = Class.forName("ecarx.dimprotocol.DIMProtocolManager");
             Method getInstance = managerClass.getMethod("getInstance", android.content.Context.class);
@@ -359,6 +380,26 @@ final class ClusterNavigationTransfer {
             result.append("raw DIM ERROR · ").append(describe(failure));
         }
         return result.toString();
+    }
+
+    private static boolean isSupportedTest(int testKind) {
+        return testKind >= TEST_NAVI_MODE_3_ONLY
+                && testKind <= TEST_FULL_MNAVI_SEQUENCE;
+    }
+
+    private static String testTitle(int testKind) {
+        switch (testKind) {
+            case TEST_NAVI_MODE_3_ONLY:
+                return "A · ТОЛЬКО NAVIMODE 3";
+            case TEST_OPCODE_8_ONLY:
+                return "B · ТОЛЬКО OPCODE 8=[1]";
+            case TEST_LAUNCH_WITHOUT_ARM:
+                return "C · ЭКРАН БЕЗ ARM";
+            case TEST_FULL_MNAVI_SEQUENCE:
+                return "D · ПОЛНАЯ ПОСЛЕДОВАТЕЛЬНОСТЬ mNavi";
+            default:
+                return "НЕИЗВЕСТНЫЙ ТЕСТ";
+        }
     }
 
     private void captureWindowState(
@@ -444,7 +485,7 @@ final class ClusterNavigationTransfer {
         }
         return enabled
                 ? "включена в настройках, но Context ещё не подключён"
-                : "НЕ ВКЛЮЧЕНА — будет использован foreground fallback";
+                : "НЕ ВКЛЮЧЕНА — тесты C/D не отправят запрос запуска";
     }
 
     private boolean isCurrent(int operation) {
