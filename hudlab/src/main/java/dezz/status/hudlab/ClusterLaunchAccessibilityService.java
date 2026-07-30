@@ -30,7 +30,7 @@ public final class ClusterLaunchAccessibilityService extends AccessibilityServic
         if (service == null) {
             throw new IllegalStateException("AccessibilityService не подключена");
         }
-        ClusterLaunchProtocol.start(service, durationMs, token);
+        ClusterLaunchProtocol.startLegacySamePackage(service, durationMs, token);
     }
 
     @Override
