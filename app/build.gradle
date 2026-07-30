@@ -112,6 +112,9 @@ dependencies {
     implementation 'androidx.concurrent:concurrent-futures:1.3.0'
     implementation libs.material
     implementation libs.okhttp
+    // Sprut's current cloud login proves password knowledge with
+    // Argon2id -> HKDF-SHA256 -> Ed25519 instead of sending the password.
+    implementation libs.bouncycastle
     implementation libs.recyclerview
 
     // eCarX AdaptAPI (Geely flavor only) — class-jar converted from the vendor-distributed

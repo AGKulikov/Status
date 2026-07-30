@@ -49,6 +49,20 @@ public final class SprutConnectionRegressionContractTest {
         assertFalse(modernAnswers.contains("authenticateLegacy(current)"));
     }
 
+    @Test public void modernLoginAcceptsPasswordProofChallengeWithoutLoggingItsData()
+            throws Exception {
+        String controller = source("SprutHubController.java");
+        String modernAnswers = between(controller,
+                "private CompletableFuture<String> authenticateModern(",
+                "private CompletableFuture<String> authenticateLegacy(");
+
+        assertTrue(modernAnswers.contains("\"QUESTION_TYPE_PASSWORD\""));
+        assertTrue(modernAnswers.contains("\"QUESTION_TYPE_CHALLENGE\""));
+        assertTrue(modernAnswers.contains("SprutCloudChallenge.answer("));
+        assertTrue(modernAnswers.contains("CompletableFuture.supplyAsync("));
+        assertFalse(modernAnswers.contains("challengeData +"));
+    }
+
     @Test public void exportedJournalContainsTransportRpcAndStateStages() throws Exception {
         String controller = source("SprutHubController.java");
         String rpc = source("SprutHubRpcClient.java");

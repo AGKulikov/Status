@@ -475,12 +475,38 @@ public final class SprutHubController {
         requireQuestion(first, "auth", "QUESTION_TYPE_EMAIL");
         return current.call(SprutProtocolAdapter.buildAuthAnswerParams(
                         prefs.sprutEmail.get().trim()))
-                .thenCompose(email -> {
-                    requireQuestion(email, "answer", "QUESTION_TYPE_PASSWORD");
-                    return current.call(SprutProtocolAdapter.buildAuthAnswerParams(
-                            prefs.sprutPassword.get()));
-                })
+                .thenCompose(email -> answerPasswordQuestion(current, email))
                 .thenApply(this::extractToken);
+    }
+
+    @NonNull
+    private CompletableFuture<JSONObject> answerPasswordQuestion(
+            @NonNull SprutHubRpcClient current, @NonNull JSONObject response) {
+        String type = questionType(response, "answer");
+        if ("QUESTION_TYPE_PASSWORD".equals(type)) {
+            // Older hubs explicitly request the plaintext answer.
+            return current.call(SprutProtocolAdapter.buildAuthAnswerParams(
+                    prefs.sprutPassword.get()));
+        }
+        if (!"QUESTION_TYPE_CHALLENGE".equals(type)) {
+            return failedFuture(new IOException(
+                    "Expected password or challenge question, got " + type));
+        }
+        JSONObject body = commandBody(response, "account", "answer");
+        JSONObject question = body == null ? null : body.optJSONObject("question");
+        String challengeData = question == null ? "" : question.optString("data", "");
+        DiagnosticJournal.info("spruthub.session",
+                "answering current cloud password-proof challenge");
+        return CompletableFuture.supplyAsync(() -> {
+                    try {
+                        return SprutCloudChallenge.answer(
+                                prefs.sprutPassword.get(), challengeData);
+                    } catch (IOException failure) {
+                        throw new CompletionException(failure);
+                    }
+                }, scheduler)
+                .thenCompose(answer -> current.call(
+                        SprutProtocolAdapter.buildAuthAnswerParams(answer)));
     }
 
     @NonNull
@@ -1001,13 +1027,18 @@ public final class SprutHubController {
     }
 
     private void requireQuestion(JSONObject response, String operation, String expected) {
-        JSONObject body = commandBody(response, "account", operation);
-        JSONObject question = body == null ? null : body.optJSONObject("question");
-        String actual = question == null ? "" : question.optString("type", "");
+        String actual = questionType(response, operation);
         if (!expected.equals(actual)) {
             throw new CompletionException(new IOException(
                     "Expected " + expected + ", got " + actual));
         }
+    }
+
+    @NonNull
+    private String questionType(JSONObject response, String operation) {
+        JSONObject body = commandBody(response, "account", operation);
+        JSONObject question = body == null ? null : body.optJSONObject("question");
+        return question == null ? "" : question.optString("type", "");
     }
 
     private String extractToken(JSONObject response) {
