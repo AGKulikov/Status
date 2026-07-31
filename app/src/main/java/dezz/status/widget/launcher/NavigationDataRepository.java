@@ -58,6 +58,17 @@ public final class NavigationDataRepository {
     public static final String ACTION_YANDEX_ARRIVAL = "com.yandex.ARRIVAL";
     public static final String ACTION_YANDEX_TIME = "com.yandex.TIME";
     public static final String ACTION_YANDEX_DISTANCE = "com.yandex.DISTANCE";
+    public static final String ACTION_YANDEX_MANEUVER = "com.yandex.MANEUVER";
+    /** Historical producer spelling retained by the supplied Navigator build. */
+    public static final String ACTION_YANDEX_NEXT = "com.yandex.NIXT";
+    public static final String ACTION_YANDEX_NEXT_COMPAT = "com.yandex.NEXT";
+    public static final String ACTION_YANDEX_NEXT_STREET = "com.yandex.NEXTSTREET";
+    public static final String ACTION_YANDEX_MANEUVER_DISTANCE = "com.yandex.MANEUVER_DIST";
+    public static final String ACTION_YANDEX_SPEED_LIMIT = "com.yandex.SPEEDLIMIT";
+    public static final String ACTION_YANDEX_ROUTE = "com.yandex.ROUTE";
+    public static final String ACTION_YANDEX_ROUTE_CLEAR = "com.yandex.ROUTE_CLEAR";
+    public static final String ACTION_YANDEX_DESTINATION = "com.yandex.DESTINATION";
+    public static final String ACTION_MONJARO_ROUTE_JAMS = "plus.monjaro.ROUTE_JAMS";
     public static final String EXTRA_BROADCAST_ARRIVAL = "Arrival_text";
     public static final String EXTRA_BROADCAST_TIME = "Time_text";
     public static final String EXTRA_BROADCAST_DISTANCE = "Distance_text";
@@ -113,6 +124,11 @@ public final class NavigationDataRepository {
     private static final String PREF_MANEUVER_TITLE = "maneuverTitle";
     private static final String PREF_MANEUVER_TEXT = "maneuverText";
     private static final String PREF_MANEUVER_SUBTEXT = "maneuverSubtext";
+    private static final String PREF_STREET = "street";
+    private static final String PREF_DESTINATION = "destination";
+    private static final String PREF_TURN_DISTANCE = "turnDistance";
+    private static final String PREF_ROUTE_POINTS = "routePoints";
+    private static final String PREF_ROUTE_JAMS = "routeJams";
     private static final String PREF_SPEED_LIMIT = "speedLimit";
     private static final String PREF_MANEUVER_IMAGE_UPDATED_AT = "maneuverImageUpdatedAt";
     private static final String PREF_LANES = "lanes";
@@ -148,6 +164,7 @@ public final class NavigationDataRepository {
     private static final long TIMESTAMP_WRITE_INTERVAL_MS = 60_000L;
     private static final int MAX_REMOTE_VIEW_NODES = 1_000;
     private static final int MAX_TRAFFIC_LIGHTS = 8;
+    private static final int MAX_ROUTE_PAYLOAD_CHARS = 196_608;
     private static final int UNKNOWN_BOOT_COUNT = -1;
     private static final long BOOT_EPOCH_TOLERANCE_MS = 5L * 60L * 1000L;
 
@@ -206,6 +223,11 @@ public final class NavigationDataRepository {
         @NonNull public final String maneuverTitle;
         @NonNull public final String maneuverText;
         @NonNull public final String maneuverSubtext;
+        @NonNull public final String street;
+        @NonNull public final String destination;
+        @NonNull public final String turnDistance;
+        @NonNull public final String routePoints;
+        @NonNull public final String routeJams;
         @NonNull public final String speedLimit;
         @NonNull public final String trafficColor;
         @NonNull public final String trafficCountdown;
@@ -238,6 +260,8 @@ public final class NavigationDataRepository {
                 String maneuverTitle, String maneuverText, String speedLimit,
                 String trafficColor, String trafficCountdown, String trafficArrow,
                 boolean trafficAvailable, String maneuverSubtext,
+                String street, String destination, String turnDistance,
+                String routePoints, String routeJams,
                 List<TrafficLight> trafficLights, String lanes, String laneDistance,
                 double laneDistanceMeters, double laneLatitude, double laneLongitude,
                 boolean laneAlongRoute, List<LaneRecord> laneRecords, String laneRawLanes,
@@ -253,6 +277,11 @@ public final class NavigationDataRepository {
             this.maneuverTitle = maneuverTitle;
             this.maneuverText = maneuverText;
             this.maneuverSubtext = maneuverSubtext;
+            this.street = street;
+            this.destination = destination;
+            this.turnDistance = turnDistance;
+            this.routePoints = routePoints;
+            this.routeJams = routeJams;
             this.speedLimit = speedLimit;
             this.trafficColor = trafficColor;
             this.trafficCountdown = trafficCountdown;
@@ -495,6 +524,21 @@ public final class NavigationDataRepository {
                 || ACTION_DEBUG_NAVIGATION_UPDATE.equals(action)) {
             return updateFromMonjaroNavigation(context, intent);
         }
+        if (ACTION_YANDEX_ROUTE_CLEAR.equals(action)) {
+            clear(context);
+            return true;
+        }
+        if (ACTION_YANDEX_MANEUVER.equals(action)
+                || ACTION_YANDEX_NEXT.equals(action)
+                || ACTION_YANDEX_NEXT_COMPAT.equals(action)
+                || ACTION_YANDEX_NEXT_STREET.equals(action)
+                || ACTION_YANDEX_MANEUVER_DISTANCE.equals(action)
+                || ACTION_YANDEX_SPEED_LIMIT.equals(action)
+                || ACTION_YANDEX_ROUTE.equals(action)
+                || ACTION_YANDEX_DESTINATION.equals(action)
+                || ACTION_MONJARO_ROUTE_JAMS.equals(action)) {
+            return updateFromOriginalNavigatorChannel(context, intent);
+        }
         if (ACTION_MONJARO_LANE_SIGN_DISTANCE.equals(action)
                 || ACTION_YANDEX_LANE_SIGN.equals(action)
                 || ACTION_YANDEX_LANE_DISTANCE.equals(action)) {
@@ -600,6 +644,9 @@ public final class NavigationDataRepository {
                     || !prefs.getString(PREF_DISTANCE, "").isEmpty()
                     || !prefs.getString(PREF_MANEUVER_TITLE, "").isEmpty()
                     || !prefs.getString(PREF_MANEUVER_TEXT, "").isEmpty()
+                    || !prefs.getString(PREF_STREET, "").isEmpty()
+                    || !prefs.getString(PREF_DESTINATION, "").isEmpty()
+                    || !prefs.getString(PREF_ROUTE_POINTS, "").isEmpty()
                     || !prefs.getString(PREF_SPEED_LIMIT, "").isEmpty()
                     || prefs.getLong(PREF_TRAFFIC_UPDATED_AT, 0L) > 0
                     || prefs.getLong(PREF_LANE_UPDATED_AT, 0L) > 0
@@ -613,6 +660,9 @@ public final class NavigationDataRepository {
                     .remove(PREF_SOURCE_PACKAGE)
                     .remove(PREF_SOURCE_KEY).remove(PREF_MANEUVER_TITLE)
                     .remove(PREF_MANEUVER_TEXT).remove(PREF_MANEUVER_SUBTEXT)
+                    .remove(PREF_STREET).remove(PREF_DESTINATION)
+                    .remove(PREF_TURN_DISTANCE).remove(PREF_ROUTE_POINTS)
+                    .remove(PREF_ROUTE_JAMS)
                     .remove(PREF_SPEED_LIMIT).remove(PREF_MANEUVER_IMAGE_UPDATED_AT)
                     .remove(PREF_LANES).remove(PREF_LANE_DISTANCE)
                     .remove(PREF_LANE_DISTANCE_METERS).remove(PREF_LANE_LATITUDE)
@@ -674,7 +724,12 @@ public final class NavigationDataRepository {
                 prefs.getString(PREF_MANEUVER_TEXT, ""),
                 prefs.getString(PREF_SPEED_LIMIT, ""),
                 trafficColor, trafficCountdown, trafficArrow, trafficAvailable,
-                prefs.getString(PREF_MANEUVER_SUBTEXT, ""), trafficLights,
+                prefs.getString(PREF_MANEUVER_SUBTEXT, ""),
+                prefs.getString(PREF_STREET, ""),
+                prefs.getString(PREF_DESTINATION, ""),
+                prefs.getString(PREF_TURN_DISTANCE, ""),
+                prefs.getString(PREF_ROUTE_POINTS, ""),
+                prefs.getString(PREF_ROUTE_JAMS, ""), trafficLights,
                 prefs.getString(PREF_LANES, ""), prefs.getString(PREF_LANE_DISTANCE, ""),
                 doublePreference(prefs, PREF_LANE_DISTANCE_METERS, Double.NaN),
                 doublePreference(prefs, PREF_LANE_LATITUDE, Double.NaN),
@@ -709,7 +764,92 @@ public final class NavigationDataRepository {
                 prefs.getString(PREF_DISTANCE, ""),
                 prefs.getString(PREF_MANEUVER_TITLE, ""),
                 prefs.getString(PREF_MANEUVER_TEXT, ""),
-                prefs.getString(PREF_MANEUVER_SUBTEXT, ""));
+                prefs.getString(PREF_MANEUVER_SUBTEXT, ""))
+                || !prefs.getString(PREF_STREET, "").isEmpty()
+                || !prefs.getString(PREF_DESTINATION, "").isEmpty()
+                || !prefs.getString(PREF_ROUTE_POINTS, "").isEmpty();
+    }
+
+    /**
+     * Consumes the independent scalar channels emitted by the supplied original Navigator mod.
+     * Each value remains separate so the visual HUD editor can place and filter it independently.
+     */
+    private static boolean updateFromOriginalNavigatorChannel(@NonNull Context context,
+            @NonNull Intent intent) {
+        String action = intent.getAction();
+        Bundle extras = intent.getExtras();
+        if (action == null) return false;
+
+        String preference;
+        String next;
+        int maximum = 4_096;
+        boolean primaryRouteEvidence = true;
+        boolean graphicChanged = false;
+        if (ACTION_YANDEX_MANEUVER.equals(action)) {
+            preference = PREF_MANEUVER_TITLE;
+            next = firstText(extras, "Maneuver_text", "maneuver_text", "maneuver",
+                    "title", "text", "value");
+            if (intent.hasExtra("image_bytes") || intent.hasExtra("maneuver_bitmap")
+                    || intent.hasExtra("image")) {
+                graphicChanged = NavigationGraphicStore.saveFromIntent(context,
+                        NavigationGraphicStore.MANEUVER, intent, "image_bytes",
+                        "maneuver_bitmap", "image");
+            }
+        } else if (ACTION_YANDEX_NEXT.equals(action)
+                || ACTION_YANDEX_NEXT_COMPAT.equals(action)) {
+            preference = PREF_MANEUVER_SUBTEXT;
+            next = firstText(extras, "Nixt_text", "Next_text", "next_text",
+                    "next", "subtext", "text", "value");
+        } else if (ACTION_YANDEX_NEXT_STREET.equals(action)) {
+            preference = PREF_STREET;
+            next = firstText(extras, "NextStreet_text", "next_street", "street",
+                    "title", "text", "value");
+        } else if (ACTION_YANDEX_MANEUVER_DISTANCE.equals(action)) {
+            preference = PREF_TURN_DISTANCE;
+            next = firstText(extras, "ManeuverDist_text", "maneuver_distance",
+                    "turn_distance", "distance", "text", "value");
+        } else if (ACTION_YANDEX_SPEED_LIMIT.equals(action)) {
+            preference = PREF_SPEED_LIMIT;
+            next = firstText(extras, "SpeedLimit_text", "speedlimit", "speed_limit",
+                    "limit", "text", "value");
+            primaryRouteEvidence = false;
+        } else if (ACTION_YANDEX_ROUTE.equals(action)) {
+            preference = PREF_ROUTE_POINTS;
+            maximum = MAX_ROUTE_PAYLOAD_CHARS;
+            next = firstText(extras, "Route_text", "route_points", "route",
+                    "points", "geometry", "data", "value");
+        } else if (ACTION_YANDEX_DESTINATION.equals(action)) {
+            preference = PREF_DESTINATION;
+            next = firstText(extras, "Destination_text", "destination",
+                    "address", "title", "text", "value");
+        } else if (ACTION_MONJARO_ROUTE_JAMS.equals(action)) {
+            preference = PREF_ROUTE_JAMS;
+            maximum = MAX_ROUTE_PAYLOAD_CHARS;
+            next = firstText(extras, "route_jams", "jams", "json", "data", "value");
+            primaryRouteEvidence = false;
+        } else {
+            return false;
+        }
+        next = boundedText(next, maximum);
+
+        synchronized (NavigationDataRepository.class) {
+            SharedPreferences prefs = preferences(context);
+            String previous = prefs.getString(preference, "");
+            boolean changed = !Objects.equals(previous, next);
+            long now = System.currentTimeMillis();
+            SharedPreferences.Editor editor = prefs.edit().putString(preference, next)
+                    .putString(PREF_SOURCE_PACKAGE, PACKAGE_YANDEX_NAVIGATOR)
+                    .putString(PREF_SOURCE_KEY, "broadcast:" + action);
+            if (primaryRouteEvidence && (!next.isEmpty() || graphicChanged)) {
+                editor.putBoolean(PREF_ROUTE_ACTIVE, true)
+                        .putBoolean(PREF_ROUTE_CONFIRMED, true)
+                        .putLong(PREF_UPDATED_AT, now);
+            }
+            if (graphicChanged) editor.putLong(PREF_MANEUVER_IMAGE_UPDATED_AT, now);
+            editor.apply();
+            if (changed || graphicChanged) notifyChanged(context);
+            return true;
+        }
     }
 
     private static boolean updateFromMonjaroNavigation(@NonNull Context context,
@@ -719,6 +859,14 @@ public final class NavigationDataRepository {
         String maneuver = text(value(extras, "text"));
         String subtext = text(value(extras, "subtext"));
         String speedLimit = text(value(extras, "speedlimit"));
+        String street = boundedText(firstText(extras, "next_street", "street"), 4_096);
+        String destination = boundedText(firstText(extras, "destination", "address"), 4_096);
+        String turnDistance = boundedText(firstText(extras,
+                "turn_distance", "maneuver_distance"), 4_096);
+        String routePoints = boundedText(firstText(extras,
+                "route_points", "route", "geometry"), MAX_ROUTE_PAYLOAD_CHARS);
+        String routeJams = boundedText(firstText(extras,
+                "route_jams", "jams"), MAX_ROUTE_PAYLOAD_CHARS);
         boolean hasSpeedLimitField = extras != null && extras.containsKey("speedlimit");
         List<String> values = new ArrayList<>();
         if (!subtext.isEmpty()) values.add(subtext);
@@ -757,7 +905,9 @@ public final class NavigationDataRepository {
         }
         boolean routeActiveSignal = NavigationRouteStatePolicy.monjaroRouteActive(
                 explicitStateStored, explicitlyActive, parsed.hasData(), title, maneuver,
-                subtext, imageStored);
+                subtext, imageStored)
+                || !street.isEmpty() || !destination.isEmpty()
+                || !turnDistance.isEmpty() || !routePoints.isEmpty();
         if (!routeActiveSignal) {
             // Auxiliary data can arrive with no route at all. It may update the vehicle speed
             // warning or clear an old maneuver image, but it must not refresh PREF_UPDATED_AT or
@@ -772,7 +922,8 @@ public final class NavigationDataRepository {
             persist(context, parsed, sourcePackage, "broadcast:plus.monjaro", true);
         }
         if (!parsed.hasData() && title.isEmpty() && maneuver.isEmpty() && subtext.isEmpty()
-                && speedLimit.isEmpty()) {
+                && speedLimit.isEmpty() && street.isEmpty() && destination.isEmpty()
+                && turnDistance.isEmpty() && routePoints.isEmpty() && routeJams.isEmpty()) {
             if (imageStored) {
                 long now = System.currentTimeMillis();
                 preferences(context).edit().putLong(PREF_MANEUVER_IMAGE_UPDATED_AT, now)
@@ -793,10 +944,20 @@ public final class NavigationDataRepository {
         boolean changed = !title.equals(prefs.getString(PREF_MANEUVER_TITLE, ""))
                 || !maneuver.equals(prefs.getString(PREF_MANEUVER_TEXT, ""))
                 || !subtext.equals(prefs.getString(PREF_MANEUVER_SUBTEXT, ""))
+                || !street.equals(prefs.getString(PREF_STREET, ""))
+                || !destination.equals(prefs.getString(PREF_DESTINATION, ""))
+                || !turnDistance.equals(prefs.getString(PREF_TURN_DISTANCE, ""))
+                || !routePoints.equals(prefs.getString(PREF_ROUTE_POINTS, ""))
+                || !routeJams.equals(prefs.getString(PREF_ROUTE_JAMS, ""))
                 || !speedLimit.equals(prefs.getString(PREF_SPEED_LIMIT, ""));
         SharedPreferences.Editor editor = prefs.edit().putString(PREF_MANEUVER_TITLE, title)
                 .putString(PREF_MANEUVER_TEXT, maneuver)
                 .putString(PREF_MANEUVER_SUBTEXT, subtext)
+                .putString(PREF_STREET, street)
+                .putString(PREF_DESTINATION, destination)
+                .putString(PREF_TURN_DISTANCE, turnDistance)
+                .putString(PREF_ROUTE_POINTS, routePoints)
+                .putString(PREF_ROUTE_JAMS, routeJams)
                 .putString(PREF_SPEED_LIMIT, speedLimit)
                 .putString(PREF_SOURCE_PACKAGE, sourcePackage)
                 .putString(PREF_SOURCE_KEY, "broadcast:plus.monjaro")
@@ -1293,6 +1454,29 @@ public final class NavigationDataRepository {
     @NonNull
     private static String text(@Nullable Object value) {
         return value == null ? "" : String.valueOf(value).trim();
+    }
+
+    @NonNull
+    private static String firstText(@Nullable Bundle extras, @NonNull String... keys) {
+        if (extras == null) return "";
+        for (String key : keys) {
+            Object candidate;
+            try { candidate = extras.get(key); }
+            catch (RuntimeException ignored) { continue; }
+            if (candidate instanceof String || candidate instanceof CharSequence
+                    || candidate instanceof Number) {
+                String result = text(candidate);
+                if (!result.isEmpty()) return result;
+            }
+        }
+        return "";
+    }
+
+    @NonNull
+    private static String boundedText(@Nullable String raw, int maximum) {
+        String value = raw == null ? "" : raw.trim();
+        if (value.length() > maximum || value.indexOf('\u0000') >= 0) return "";
+        return value;
     }
 
     private static void persist(Context context, NavigationDataParser.Parsed parsed,

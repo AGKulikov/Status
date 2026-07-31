@@ -69,7 +69,8 @@ public final class HudPanelConfigTest {
         assertEquals("#FF123456", decoded.backgroundColor);
         assertEquals(61, decoded.backgroundOpacityPercent);
         assertEquals(24, decoded.cornerRadiusPx);
-        assertEquals(HudElementType.BACKDROP, restored.drawingOrder().get(0).type);
+        assertEquals(HudElementType.NAV_MAP, restored.drawingOrder().get(0).type);
+        assertEquals(HudElementType.BACKDROP, restored.drawingOrder().get(1).type);
     }
 
     @Test public void ordinaryHudWidgetCannotRetainAutomaticBackground() {
@@ -81,5 +82,25 @@ public final class HudPanelConfigTest {
 
         assertEquals("#00000000", clock.backgroundColor);
         assertEquals(0, clock.backgroundOpacityPercent);
+    }
+
+    @Test public void oldLayoutReceivesOneFullViewportNavigatorMap() {
+        HudPanelConfig restored = HudPanelConfig.fromJson("{"
+                + "\"schema\":3,"
+                + "\"gridColumns\":44,"
+                + "\"gridRows\":18,"
+                + "\"elements\":[]"
+                + "}");
+
+        int maps = 0;
+        for (HudElementConfig item : restored.elements) {
+            if (item.type != HudElementType.NAV_MAP) continue;
+            maps++;
+            assertEquals(0, item.x);
+            assertEquals(0, item.y);
+            assertEquals(44, item.width);
+            assertEquals(18, item.height);
+        }
+        assertEquals(1, maps);
     }
 }

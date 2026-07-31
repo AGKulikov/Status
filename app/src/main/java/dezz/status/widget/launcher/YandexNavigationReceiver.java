@@ -24,7 +24,7 @@ public final class YandexNavigationReceiver extends BroadcastReceiver {
      * thread. A single worker deliberately preserves update/clear order across all navigation
      * channels (a pool could resurrect an image after its later CLEAR broadcast).
      */
-    private static final int MAX_PENDING_BROADCASTS = 8;
+    private static final int MAX_PENDING_BROADCASTS = 24;
     private static final ThreadPoolExecutor WORKER = createWorker();
 
     @Override
@@ -67,6 +67,7 @@ public final class YandexNavigationReceiver extends BroadcastReceiver {
     private static boolean isExplicitClearAction(String action) {
         return NavigationDataRepository.ACTION_MONJARO_NAVIGATION_ENDED.equals(action)
                 || NavigationDataRepository.ACTION_DEBUG_NAVIGATION_ENDED.equals(action)
+                || NavigationDataRepository.ACTION_YANDEX_ROUTE_CLEAR.equals(action)
                 || NavigationDataRepository.ACTION_YANDEX_LANES_BITMAP_CLEAR.equals(action)
                 || NavigationDataRepository.ACTION_YANDEX_JAM_IMAGE_CLEAR.equals(action)
                 || NavigationDataRepository.ACTION_MONJARO_RAINBOW_IMAGE_CLEAR.equals(action)
@@ -181,6 +182,7 @@ public final class YandexNavigationReceiver extends BroadcastReceiver {
             String action = intent.getAction();
             return NavigationDataRepository.ACTION_MONJARO_NAVIGATION_ENDED.equals(action)
                     || NavigationDataRepository.ACTION_DEBUG_NAVIGATION_ENDED.equals(action)
+                    || NavigationDataRepository.ACTION_YANDEX_ROUTE_CLEAR.equals(action)
                     || ((NavigationDataRepository.ACTION_MONJARO_NAVIGATION_UPDATE.equals(action)
                     || NavigationDataRepository.ACTION_DEBUG_NAVIGATION_UPDATE.equals(action))
                     && !intent.getBooleanExtra("route_active", true));

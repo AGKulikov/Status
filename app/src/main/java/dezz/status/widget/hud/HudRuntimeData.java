@@ -57,6 +57,7 @@ public final class HudRuntimeData {
     @NonNull private final LauncherMediaController mediaController;
     @NonNull private final CarIntegration carIntegration;
     @NonNull private final AutomationStateStore retainedAutomation;
+    @NonNull private final NavigatorMapFrameProvider navigatorMap;
     @NonNull private final Map<String, CarIntegration.TelemetryValue> telemetry = new HashMap<>();
     @NonNull private final Map<String, ConnectorValue> connectorValues = new HashMap<>();
     @NonNull private HudPanelConfig config;
@@ -65,6 +66,8 @@ public final class HudRuntimeData {
     @Nullable private WidgetService attachedHost;
     private boolean started;
     private boolean navigationReceiverRegistered;
+    @NonNull private final NavigatorMapFrameProvider.Listener navigatorMapListener =
+            this::notifyChanged;
 
     private final CarIntegration.TelemetryListener telemetryListener = value -> {
         telemetry.put(value.id, value);
@@ -106,6 +109,7 @@ public final class HudRuntimeData {
         });
         carIntegration = CarIntegrations.get(this.context);
         retainedAutomation = new AutomationStateStore(this.context);
+        navigatorMap = NavigatorMapFrameProvider.get(this.context);
     }
 
     public void start() {
@@ -122,6 +126,7 @@ public final class HudRuntimeData {
             navigationReceiverRegistered = false;
         }
         refreshNavigation();
+        navigatorMap.attach(config, navigatorMapListener);
         reconfigureVehicleSubscription();
         WidgetServiceStarter.startIfNeeded(context);
         attachIntegrationHost();
@@ -133,6 +138,7 @@ public final class HudRuntimeData {
         if (!started) return;
         started = false;
         main.removeCallbacks(ticker);
+        navigatorMap.detach(navigatorMapListener);
         mediaController.stop();
         carIntegration.unsubscribeTelemetry(telemetryListener);
         WidgetService host = attachedHost;
@@ -151,12 +157,17 @@ public final class HudRuntimeData {
 
     public void updateConfig(@NonNull HudPanelConfig next) {
         config = next;
-        if (started) reconfigureVehicleSubscription();
+        if (started) {
+            navigatorMap.update(next, navigatorMapListener);
+            reconfigureVehicleSubscription();
+        }
         notifyChanged();
     }
 
     @Nullable public NavigationDataRepository.Snapshot navigation() { return navigation; }
     @Nullable public LauncherMediaController.Snapshot media() { return media; }
+    @Nullable public android.graphics.Bitmap navigatorMapFrame() { return navigatorMap.frame(); }
+    @NonNull public String navigatorMapState() { return navigatorMap.state(); }
 
     @NonNull
     public AutomationState automation(@NonNull HudElementConfig item) {
@@ -205,8 +216,19 @@ public final class HudRuntimeData {
                         : firstNonEmpty(navigation.maneuverTitle, navigation.maneuverText, "Маршрут");
             case NAV_MANEUVER_SUBTEXT:
                 return navigation == null ? "—" : emptyDash(navigation.maneuverSubtext);
+            case NAV_STREET:
+                return navigation == null ? "—" : emptyDash(navigation.street);
+            case NAV_DESTINATION:
+                return navigation == null ? "—" : emptyDash(navigation.destination);
             case NAV_TURN_DISTANCE:
+                return navigation == null ? "—"
+                        : firstNonEmpty(navigation.turnDistance, navigation.distance, "—");
+            case NAV_DISTANCE_LEFT:
                 return navigation == null ? "—" : emptyDash(navigation.distance);
+            case NAV_TIME_LEFT:
+                return navigation == null ? "—" : emptyDash(navigation.duration);
+            case NAV_ARRIVAL_TIME:
+                return navigation == null ? "—" : emptyDash(navigation.arrival);
             case NAV_LANE_DISTANCE:
                 return navigation == null ? "—" : emptyDash(navigation.laneDistance);
             case NAV_COMBINED:
@@ -226,6 +248,8 @@ public final class HudRuntimeData {
             case NAV_TRAFFIC_LIGHTS:
                 if (navigation == null) return "—";
                 return join(navigation.trafficColor, navigation.trafficCountdown, " ");
+            case NAV_SPEED:
+                return telemetryText(item);
             case NAV_JAM_PROGRESS:
                 return navigation == null ? "—" : join(navigation.duration,
                         navigation.distance, " · ");
@@ -315,6 +339,7 @@ public final class HudRuntimeData {
     private double normalizedVehicleValue(HudElementConfig item, double value) {
         switch (item.type) {
             case CAR_SPEED:
+            case NAV_SPEED:
                 return value * 3.72d;
             case FUEL_LEVEL:
                 return value / 1_000d;
@@ -330,7 +355,9 @@ public final class HudRuntimeData {
     @NonNull
     private static String defaultUnit(HudElementConfig item, String sourceUnit) {
         switch (item.type) {
-            case CAR_SPEED: return "км/ч";
+            case CAR_SPEED:
+            case NAV_SPEED:
+                return "км/ч";
             case FUEL_LEVEL:
             case FUEL_REFILL: return "л";
             case FUEL_RANGE: return sourceUnit.isEmpty() ? "км" : sourceUnit;
@@ -493,6 +520,8 @@ public final class HudRuntimeData {
                     navigationReadQueued.set(false);
                     if (!started) return;
                     navigation = result;
+                    navigatorMap.updateRoutePoints(
+                            result == null ? "" : result.routePoints);
                     notifyChanged();
                 });
             });

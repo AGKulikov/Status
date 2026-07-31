@@ -2,6 +2,7 @@
 package dezz.status.widget.hud;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -15,7 +16,7 @@ import java.util.Set;
 
 /** Versioned, exportable HUD layout and presentation settings. */
 public final class HudPanelConfig {
-    public static final int SCHEMA_VERSION = 3;
+    public static final int SCHEMA_VERSION = 4;
     /** Safety-only document limit; the editor imposes no practical backdrop count limit. */
     public static final int MAX_ELEMENTS = 4_096;
     public static final int MAX_JSON_CHARS = 1_048_576;
@@ -65,6 +66,8 @@ public final class HudPanelConfig {
     @NonNull
     public static HudPanelConfig defaults() {
         HudPanelConfig out = new HudPanelConfig();
+        out.elements.add(positioned(HudElementType.NAV_MAP,
+                1, 0, 0, 44, 18, -100));
         out.elements.add(positioned(HudElementType.CLOCK, 1, 0, 0, 7, 3, 0));
         out.elements.add(positioned(HudElementType.NAV_MANEUVER_ARROW,
                 1, 0, 3, 10, 12, 1));
@@ -182,7 +185,8 @@ public final class HudPanelConfig {
         ArrayList<HudElementConfig> result = new ArrayList<>(elements);
         result.sort(Comparator
                 .comparingInt((HudElementConfig item) ->
-                        item.type == HudElementType.BACKDROP ? 0 : 1)
+                        item.type == HudElementType.NAV_MAP ? 0
+                                : item.type == HudElementType.BACKDROP ? 1 : 2)
                 .thenComparingInt(item -> item.zIndex));
         return result;
     }
@@ -274,11 +278,23 @@ public final class HudPanelConfig {
                     }
                 }
             }
+            if (schema < 4 && out.findFirst(HudElementType.NAV_MAP) == null) {
+                out.elements.add(positioned(HudElementType.NAV_MAP,
+                        1, 0, 0, 44, 18, -100));
+            }
             out.normalize();
             return out;
         } catch (JSONException error) {
             throw new IllegalArgumentException("Invalid HUD configuration", error);
         }
+    }
+
+    @Nullable
+    private HudElementConfig findFirst(@NonNull HudElementType type) {
+        for (HudElementConfig item : elements) {
+            if (item.type == type) return item;
+        }
+        return null;
     }
 
     @NonNull
