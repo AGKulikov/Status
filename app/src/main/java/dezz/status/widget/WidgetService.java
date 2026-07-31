@@ -124,6 +124,8 @@ import dezz.status.widget.ha.api.HaApiController;
 import dezz.status.widget.ha.api.HaEntityCatalog;
 import dezz.status.widget.ha.api.HaWebSocketConnector;
 import dezz.status.widget.mqtt.MqttController;
+import dezz.status.widget.phone.PhoneAppIconStore;
+import dezz.status.widget.phone.PhoneBluetoothIndicatorPolicy;
 import dezz.status.widget.phone.PhoneConnectorController;
 import dezz.status.widget.phone.PhoneLowBatteryAlertPolicy;
 import dezz.status.widget.phone.PhoneNotificationAutomation;
@@ -415,6 +417,14 @@ public class WidgetService extends Service {
     private WiFiState wifiState = WiFiState.OFF;
     private BluetoothState bluetoothState = BluetoothState.OFF;
     private final Set<String> btConnectedAddrs = new HashSet<>();
+    /** True while the current direct iPhone transport reports an active ANCS profile. */
+    private boolean phoneAncsReady;
+    /**
+     * Session-scoped proof that ANCS delivered a real notification to this head unit.
+     * A connected profile alone is deliberately insufficient: the solid icon means that the
+     * complete end-to-end notification path has actually worked in the current session.
+     */
+    private boolean phoneNotificationDeliveryConfirmed;
     private boolean btReceiverRegistered = false;
     /** Invalidates asynchronous profile snapshots after status tracking is stopped or reseeded. */
     private int bluetoothTrackingGeneration;
@@ -1318,6 +1328,8 @@ public class WidgetService extends Service {
         lastLocationUpdateTime = 0L;
         btConnectedAddrs.clear();
         bluetoothState = BluetoothState.OFF;
+        phoneAncsReady = false;
+        phoneNotificationDeliveryConfirmed = false;
         lastMediaSubtitle = null;
         removeStatusOverlaySafely(reason);
         binding = null;
@@ -2088,6 +2100,13 @@ public class WidgetService extends Service {
                     && Boolean.FALSE.equals(value.rawValue)) {
                 sessionEnded = true;
             }
+            if ("profiles.ancs".equals(value.resourceId)) {
+                phoneAncsReady = value.fresh && value.available && value.readable
+                        && Boolean.TRUE.equals(value.rawValue);
+                if (!phoneAncsReady) {
+                    phoneNotificationDeliveryConfirmed = false;
+                }
+            }
             if ("notifications.latest".equals(value.resourceId)) {
                 latestNotification = value;
             } else if ("notifications.items".equals(value.resourceId)) {
@@ -2098,6 +2117,8 @@ public class WidgetService extends Service {
         }
         if (!phoneValueChanged) return;
         if (sessionEnded) {
+            phoneAncsReady = false;
+            phoneNotificationDeliveryConfirmed = false;
             observedPhoneNotificationKeys.clear();
             clearPhonePopupNotification();
             if (activePhoneBatteryAlertText != null) {
@@ -2115,6 +2136,13 @@ public class WidgetService extends Service {
             rememberPhoneNotificationItems(notificationItems);
             rememberPhoneNotificationKey(latestKey);
             if (latestIsNew) {
+                if (!sessionEnded && phoneAncsReady
+                        && latestNotification.fresh
+                        && latestNotification.available
+                        && latestNotification.readable
+                        && latestNotification.rawValue instanceof Map<?, ?>) {
+                    phoneNotificationDeliveryConfirmed = true;
+                }
                 if (prefs.phoneStatusBarNotificationsEnabled.get()
                         || prefs.phonePopupNotificationsEnabled.get()) {
                     Set<String> selected = PhoneStatusBarPolicy.parseIds(
@@ -2147,6 +2175,7 @@ public class WidgetService extends Service {
         if (binding != null) {
             renderPhoneStatusBricks();
             applyBrickVisibility(currentBrickSet());
+            updateBluetoothStatus();
         }
         schedulePopupRefresh();
     }
@@ -3159,14 +3188,21 @@ public class WidgetService extends Service {
                 String text = PhoneStatusBarPolicy.notificationFieldText(
                         presentation, fieldId);
                 boolean visible = selectedFields.contains(fieldId) && !text.isEmpty();
+                JSONObject patch = new JSONObject()
+                        .put("text", text)
+                        .put("visible", visible)
+                        .put("fresh", true)
+                        .put("source", "phone")
+                        .put("updated_at", now)
+                        .put("expires_at", expiresAt);
+                if (PhoneStatusBarPolicy.FIELD_APPLICATION.equals(fieldId)) {
+                    patch.put("icon", presentation.iconCached
+                            && !presentation.appIdentifier.isEmpty()
+                            ? "phone-app:" + presentation.appIdentifier
+                            : "");
+                }
                 automationStates.apply(AutomationContract.SCOPE_POPUP, automationId,
-                        new JSONObject()
-                                .put("text", text)
-                                .put("visible", visible)
-                                .put("fresh", true)
-                                .put("source", "phone")
-                                .put("updated_at", now)
-                                .put("expires_at", expiresAt));
+                        patch);
                 onAutomationStateChanged(AutomationContract.SCOPE_POPUP, automationId);
             }
         } catch (JSONException | RuntimeException failure) {
@@ -3218,10 +3254,24 @@ public class WidgetService extends Service {
                     .put("source", "phone")
                     .put("updated_at", now)
                     .put("expires_at", expiresAt);
+            boolean useIconLayout = presentation.iconCached
+                    && !presentation.appIdentifier.isEmpty()
+                    && PhoneAppIconStore.get(this).hasIcon(presentation.appIdentifier);
+            String shownOverlay = useIconLayout
+                    ? PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID
+                    : PhoneNotificationAutomation.OVERLAY_ID;
+            String hiddenOverlay = useIconLayout
+                    ? PhoneNotificationAutomation.OVERLAY_ID
+                    : PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID;
             automationStates.apply(AutomationContract.SCOPE_OVERLAY,
-                    PhoneNotificationAutomation.OVERLAY_ID, overlay);
+                    hiddenOverlay,
+                    new JSONObject().put("visible", false).put("fresh", false)
+                            .put("updated_at", now));
+            onAutomationStateChanged(AutomationContract.SCOPE_OVERLAY, hiddenOverlay);
+            automationStates.apply(AutomationContract.SCOPE_OVERLAY,
+                    shownOverlay, overlay);
             onAutomationStateChanged(AutomationContract.SCOPE_OVERLAY,
-                    PhoneNotificationAutomation.OVERLAY_ID);
+                    shownOverlay);
             activePhonePopupNotificationExpiresAt =
                     android.os.SystemClock.elapsedRealtime() + seconds * 1_000L;
             mainHandler.removeCallbacks(phonePopupNotificationExpiry);
@@ -3239,12 +3289,15 @@ public class WidgetService extends Service {
         if (automationStates == null) return;
         try {
             long now = System.currentTimeMillis();
-            automationStates.apply(AutomationContract.SCOPE_OVERLAY,
+            for (String overlayId : new String[]{
                     PhoneNotificationAutomation.OVERLAY_ID,
-                    new JSONObject().put("visible", false).put("fresh", false)
-                            .put("updated_at", now));
-            onAutomationStateChanged(AutomationContract.SCOPE_OVERLAY,
-                    PhoneNotificationAutomation.OVERLAY_ID);
+                    PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID}) {
+                automationStates.apply(AutomationContract.SCOPE_OVERLAY,
+                        overlayId,
+                        new JSONObject().put("visible", false).put("fresh", false)
+                                .put("updated_at", now));
+                onAutomationStateChanged(AutomationContract.SCOPE_OVERLAY, overlayId);
+            }
             clearPhoneNotificationFieldsIfInactive();
         } catch (JSONException | RuntimeException failure) {
             Log.w(TAG, "Could not clear phone notification popup", failure);
@@ -3492,6 +3545,7 @@ public class WidgetService extends Service {
         // cannot be the first event that establishes the configured widget height.
         applyMediaLineStructure();
         binding.mediaTitleText.setMarqueeText(subtitle);
+        syncMediaProgressWidth();
 
         // Duration: format ms → "M:SS" / "H:MM:SS". Hidden when the user opted out or the
         // player doesn't expose a positive duration (live streams, podcast pre-buffer).
@@ -3545,6 +3599,32 @@ public class WidgetService extends Service {
 
         updateMediaProgress(playing);
         schedulePopupRefresh();
+    }
+
+    /**
+     * Keep the timeline under the actually rendered title, not under the whole title row.
+     * The row may additionally contain duration and the play indicator, while marquee mode keeps
+     * a second internal copy of the text. Neither must make the line longer than the visible song.
+     */
+    private void syncMediaProgressWidth() {
+        if (binding == null) return;
+        binding.mediaTitleText.post(() -> {
+            if (binding == null) return;
+            CharSequence source = binding.mediaTitleText.getMarqueeSourceText();
+            float measured = binding.mediaTitleText.getPaint()
+                    .measureText(source, 0, source.length());
+            int viewportWidth = binding.mediaTitleText.getWidth();
+            int targetWidth = MediaProgressWidthPolicy.width(
+                    measured,
+                    binding.mediaTitleText.getCompoundPaddingLeft(),
+                    binding.mediaTitleText.getCompoundPaddingRight(),
+                    viewportWidth);
+            ViewGroup.LayoutParams params = binding.mediaProgressBar.getLayoutParams();
+            if (params.width != targetWidth) {
+                params.width = targetWidth;
+                binding.mediaProgressBar.setLayoutParams(params);
+            }
+        });
     }
 
     /**
@@ -3914,8 +3994,33 @@ public class WidgetService extends Service {
         bluetoothState = newState;
         if (binding != null) {
             updateIconStatus(ICON_TYPE_BT, binding.bluetoothStatusIcon, bluetoothState.ordinal());
+            PhoneBluetoothIndicatorPolicy.Appearance phoneAppearance =
+                    PhoneBluetoothIndicatorPolicy.resolve(
+                            bluetoothState == BluetoothState.CONNECTED,
+                            isPhoneConnectorLinkPresent(),
+                            phoneNotificationDeliveryConfirmed);
+            if (phoneAppearance != PhoneBluetoothIndicatorPolicy.Appearance.DEFAULT) {
+                // Use one deliberately simple rune. The previous "hide the body and enlarge the
+                // bitmap halo" trick produced two muddy, overlapping silhouettes on the KX11.
+                binding.bluetoothStatusIcon.setImageResource(
+                        phoneAppearance == PhoneBluetoothIndicatorPolicy.Appearance.PHONE_SOLID
+                                ? R.drawable.ic_status_bt_phone_solid
+                                : R.drawable.ic_status_bt_phone_outline);
+                binding.bluetoothStatusIcon.setDrawIcon(true);
+                Context context = themedContext == null ? this : themedContext;
+                ImageViewCompat.setImageTintList(binding.bluetoothStatusIcon,
+                        ColorStateList.valueOf(ContextCompat.getColor(
+                                context, R.color.status_bluetooth)));
+            }
         }
         schedulePopupRefresh();
+    }
+
+    private boolean isPhoneConnectorLinkPresent() {
+        if (phoneAncsReady || phoneNotificationDeliveryConfirmed) return true;
+        ConnectorValue connected = phoneStatusValues.get("connected");
+        return connected != null && connected.fresh && connected.available
+                && connected.readable && Boolean.TRUE.equals(connected.rawValue);
     }
 
     private void updateForegroundAppTracking() {
@@ -4434,6 +4539,8 @@ public class WidgetService extends Service {
         }
         phoneStatusValues.clear();
         observedPhoneNotificationKeys.clear();
+        phoneAncsReady = false;
+        phoneNotificationDeliveryConfirmed = false;
         activePhoneNotification = null;
         activePhoneNotificationFields = Collections.emptySet();
         activePhoneBatteryAlertText = null;

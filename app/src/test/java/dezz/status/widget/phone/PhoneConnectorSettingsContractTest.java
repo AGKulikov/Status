@@ -96,7 +96,9 @@ public final class PhoneConnectorSettingsContractTest {
         assertFalse(source.contains("ACTION_NOTIFICATION_LISTENER_SETTINGS"));
         assertFalse(source.contains("phone_notification_access"));
         assertFalse(source.contains("Manifest.permission.READ_SMS"));
-        assertFalse(source.contains("requestPermissions("));
+        assertFalse(source.contains("Manifest.permission.BIND_NOTIFICATION_LISTENER_SERVICE"));
+        assertTrue(source.contains("REQUEST_ICON_STORAGE"));
+        assertTrue(source.contains("WRITE_EXTERNAL_STORAGE"));
         assertTrue(source.contains("\"diagnostics.sms\".equals(value.resourceId)"));
         assertTrue(source.contains("\"diagnostics.device\".equals(value.resourceId)"));
         assertTrue(source.contains("device.get(\"stock_connection\")"));

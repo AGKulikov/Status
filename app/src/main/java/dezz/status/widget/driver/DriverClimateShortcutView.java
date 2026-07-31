@@ -24,6 +24,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.content.res.AppCompatResources;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -49,6 +50,7 @@ public final class DriverClimateShortcutView extends View {
     private static final String FAN = "climate.fan";
     private static final String AUTO = "climate.auto";
     private static final String AIRFLOW = "climate.airflow";
+    private static final String IGNITION = "ISensor.ignition_state";
     private static final Set<String> CONTROL_IDS = new LinkedHashSet<>(
             Arrays.asList(POWER, TEMP_DRIVER, FAN, AUTO, AIRFLOW));
     /** Exact opaque components inside MonjaroPanel's ic_temperature.png. */
@@ -73,9 +75,12 @@ public final class DriverClimateShortcutView extends View {
     private final boolean detailed;
     private final int detailsGapPx;
     private final CarIntegration.ControlStateListener listener = this::onControlState;
+    private final CarIntegration.TelemetryListener ignitionListener = this::onIgnitionState;
     private final Runnable expiry = this::expireStaleState;
 
     private boolean subscribed;
+    private DriverClimateIgnitionPolicy.State ignitionState =
+            DriverClimateIgnitionPolicy.State.UNKNOWN;
     private boolean powerKnown;
     private boolean powerActive;
     private long powerObservedAtMillis;
@@ -161,6 +166,7 @@ public final class DriverClimateShortcutView extends View {
         if (!subscribed) {
             subscribed = true;
             integration.subscribeControlStates(CONTROL_IDS, listener);
+            integration.subscribeTelemetry(Collections.singleton(IGNITION), ignitionListener);
         }
     }
 
@@ -169,9 +175,23 @@ public final class DriverClimateShortcutView extends View {
         if (subscribed) {
             subscribed = false;
             integration.unsubscribeControlStates(listener);
+            integration.unsubscribeTelemetry(ignitionListener);
         }
         removeCallbacks(expiry);
         super.onDetachedFromWindow();
+    }
+
+    private void onIgnitionState(@NonNull CarIntegration.TelemetryValue value) {
+        if (!IGNITION.equals(value.id)) return;
+        DriverClimateIgnitionPolicy.State previous = ignitionState;
+        ignitionState = DriverClimateIgnitionPolicy.fromRaw(value.value);
+        if (previous == DriverClimateIgnitionPolicy.State.OFF
+                && ignitionState == DriverClimateIgnitionPolicy.State.ACTIVE
+                && subscribed) {
+            integration.unsubscribeControlStates(listener);
+            integration.subscribeControlStates(CONTROL_IDS, listener);
+        }
+        invalidate();
     }
 
     private void onControlState(@NonNull CarControlState state) {
@@ -241,7 +261,8 @@ public final class DriverClimateShortcutView extends View {
         // Extended climate fits the ordinary rail slot and adds only AUTO/airflow. In particular,
         // there is no decorative fan blade competing with the level scale.
         boolean expanded = detailed;
-        boolean powerOff = ClimatePowerStatePolicy.isConfirmedOff(
+        boolean powerOff = ignitionState == DriverClimateIgnitionPolicy.State.OFF
+                || ClimatePowerStatePolicy.isConfirmedOff(
                 powerKnown, powerActive,
                 fanKnown, fanActive,
                 airflowKnown, airflowActive);

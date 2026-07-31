@@ -53,6 +53,7 @@ import java.util.Set;
 import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.phone.PhoneAppCatalog;
+import dezz.status.widget.phone.PhoneAppIconStore;
 import dezz.status.widget.phone.PhoneLowBatteryAlertPolicy;
 import dezz.status.widget.phone.PhoneNotificationFilter;
 import dezz.status.widget.phone.PhoneStatusBarPolicy;
@@ -77,6 +78,7 @@ import dezz.status.widget.sprut.SprutProtocolAdapter;
  */
 public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     private static final String PHONE_MIRROR_CHANNEL_ID = "phone_mirror";
+    private static final int REQUEST_ICON_STORAGE = 11135;
 
     private Preferences preferences;
     private MaterialSwitch connectorEnabled;
@@ -152,6 +154,7 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         refreshDeviceSummary();
         refreshSprutSummary();
         refreshDiagnostics();
+        ensureIconStoragePermission();
     }
 
     @Override
@@ -542,6 +545,13 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         for (PhoneAppCatalog.FilterApp app : PhoneAppCatalog.filterApps()) {
             result.put(app.key, new AppFilterChoice(app.key, app.label));
         }
+        for (PhoneAppIconStore.App app : PhoneAppIconStore.get(this).catalog()) {
+            String key = PhoneAppCatalog.filterKey(app.identifier);
+            if (!key.isEmpty()) {
+                result.put(key, new AppFilterChoice(
+                        key, app.name + " · " + app.identifier));
+            }
+        }
         WidgetService service = WidgetService.getInstance();
         if (service != null) {
             for (ConnectorValue value : service.connectorValueSnapshot()) {
@@ -568,6 +578,44 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         List<AppFilterChoice> sorted = new ArrayList<>(result.values());
         sorted.sort(Comparator.comparing(value -> value.label, String.CASE_INSENSITIVE_ORDER));
         return sorted;
+    }
+
+    private void ensureIconStoragePermission() {
+        if (ContextCompat.checkSelfPermission(
+                this, "android.permission.WRITE_EXTERNAL_STORAGE")
+                == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            PhoneAppIconStore.get(this).promoteToExternalStorage();
+            return;
+        }
+        requestPermissions(new String[]{
+                "android.permission.READ_EXTERNAL_STORAGE",
+                "android.permission.WRITE_EXTERNAL_STORAGE"
+        }, REQUEST_ICON_STORAGE);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode,
+            @NonNull String[] permissions,
+            @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQUEST_ICON_STORAGE) return;
+        boolean granted = false;
+        for (int result : grantResults) {
+            if (result == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                granted = true;
+            }
+        }
+        if (granted) {
+            PhoneAppIconStore.get(this).promoteToExternalStorage();
+            Toast.makeText(this,
+                    "Иконки будут храниться в /sdcard/StatusWidget/ANCS-icons",
+                    Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(this,
+                    "Иконки временно сохраняются внутри приложения",
+                    Toast.LENGTH_LONG).show();
+        }
     }
 
     private static void addObservedAppFilter(

@@ -212,6 +212,27 @@ public final class PhoneStatusBarPolicyTest {
                         PhoneStatusBarPolicy.FIELD_TEXT)));
     }
 
+    @Test public void notificationCarriesOnlyExplicitCachedAppIconIdentity() {
+        Map<String, Object> raw = notificationMap(
+                18L, 102L, "Telegram", "Алексей", "Сообщение");
+        raw.put("app_id", "PH.TELEGRA.Telegraph");
+        raw.put("category_id", 4);
+        raw.put("icon_cached", true);
+        PhoneStatusBarPolicy.NotificationPresentation presentation =
+                PhoneStatusBarPolicy.notification(latest(raw),
+                        new LinkedHashSet<>(PhoneStatusBarPolicy.notificationFieldIds()));
+        assertNotNull(presentation);
+        assertEquals("ph.telegra.telegraph", presentation.appIdentifier);
+        assertEquals(4, presentation.categoryId);
+        assertTrue(presentation.iconCached);
+
+        raw.put("icon_cached", false);
+        presentation = PhoneStatusBarPolicy.notification(latest(raw),
+                new LinkedHashSet<>(PhoneStatusBarPolicy.notificationFieldIds()));
+        assertNotNull(presentation);
+        assertTrue(!presentation.iconCached);
+    }
+
     @Test public void notificationRejectsStaleUnavailableWrongAndIncompleteValues() {
         Map<String, Object> complete = notificationMap(
                 7L, 100L, "Дом", "Дом", "Закрыто");

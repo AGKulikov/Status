@@ -125,7 +125,9 @@ public final class Ha1132RegressionContractTest {
 
         assertTrue(driver.contains("|| manuallyOpenFavorites.contains(panelId)"));
         assertTrue(driver.contains("scheduleRaiseAfterExternalLaunch()"));
-        assertTrue(driver.contains("ViewGroup.LayoutParams.WRAP_CONTENT, 1f"));
+        assertTrue(driver.contains("InformationSection topSection = buildInformationSection("));
+        assertTrue(driver.contains("ViewGroup.LayoutParams.MATCH_PARENT, topHeight"));
+        assertTrue(driver.contains("ViewGroup.LayoutParams.MATCH_PARENT, bottomHeight"));
         assertTrue(driver.contains("shortcut.informationShowValue ? 1 : 0"));
         assertTrue(driver.contains(
                 "AppUninstallLauncher.request(context, app, attachedType)"));

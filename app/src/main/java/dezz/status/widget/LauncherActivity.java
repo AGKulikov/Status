@@ -68,6 +68,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 import dezz.status.widget.launcher.CombinedNavigationPanelPolicy;
+import dezz.status.widget.launcher.EcarxSystemStatusBarPolicy;
 import dezz.status.widget.launcher.AppDrawerTileView;
 import dezz.status.widget.launcher.AppDrawerUninstallPolicy;
 import dezz.status.widget.launcher.AppUninstallLauncher;
@@ -545,6 +546,7 @@ public final class LauncherActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        EcarxSystemStatusBarPolicy.applyStored(this);
         if (preferences.launcherImmersive.get()) {
             applyImmersive();
         } else {

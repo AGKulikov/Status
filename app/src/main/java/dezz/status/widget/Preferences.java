@@ -544,6 +544,10 @@ public class Preferences {
     public final Bool launcherShowGrid = new Bool(this, "launcherShowGrid", true);
     public final Int launcherSnapPx = new Int(this, "launcherSnapPx", 20);
     public final Bool launcherImmersive = new Bool(this, "launcherImmersive", true);
+    public final Bool launcherHideSystemStatusBar = new Bool(this,
+            "launcherHideSystemStatusBar", false);
+    public final Str launcherSystemStatusBarOriginalPolicy = new Str(this,
+            "launcherSystemStatusBarOriginalPolicy", "__unset__");
     /** Explicit HOME chain requested for ECARX: HOME -> our launcher -> windowed Navigator. */
     public final Bool launcherHomeOpensWindowedNavigator = new Bool(this,
             "launcherHomeOpensWindowedNavigator", false);

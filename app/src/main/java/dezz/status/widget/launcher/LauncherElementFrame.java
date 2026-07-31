@@ -72,6 +72,8 @@ public final class LauncherElementFrame extends MaterialCardView {
         setRadius(0);
         setCardElevation(0);
         setCardBackgroundColor(Color.TRANSPARENT);
+        setStrokeWidth(0);
+        setStrokeColor(Color.TRANSPARENT);
         setUseCompatPadding(false);
         setPreventCornerOverlap(false);
 
@@ -118,6 +120,11 @@ public final class LauncherElementFrame extends MaterialCardView {
         boolean modeChanged = editMode != enabled;
         editMode = enabled;
         this.snapPx = normalizedSnap;
+        // MaterialCardView may restore its themed stroke after reattachment. Clear it on every
+        // binding pass, including the common no-op transition to non-edit mode.
+        setStrokeWidth(0);
+        setStrokeColor(Color.TRANSPARENT);
+        setCardElevation(0);
         if (!modeChanged) return;
         editBadge.setVisibility(enabled ? VISIBLE : GONE);
         for (ImageView handle : resizeHandles) {
@@ -125,8 +132,6 @@ public final class LauncherElementFrame extends MaterialCardView {
         }
         // The four handles and the badge are sufficient editor chrome. Drawing a rectangle around
         // every item made those technical contours look like real launcher underlays.
-        setStrokeWidth(0);
-        setCardElevation(0);
         setClickable(enabled);
     }
 

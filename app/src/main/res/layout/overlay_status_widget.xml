@@ -171,7 +171,7 @@
 
         <dezz.status.widget.MediaProgressBar
             android:id="@+id/mediaProgressBar"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="3sp"
             android:layout_marginTop="2sp"
             android:visibility="gone"

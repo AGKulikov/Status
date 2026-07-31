@@ -1355,6 +1355,11 @@ public final class PhoneConnectorController {
             return;
         }
 
+        String cleanAppIdentifier = bounded(item.appIdentifier, 512);
+        String cleanAppName = bounded(item.appName, 256);
+        PhoneAppIconStore.Observation iconObservation =
+                PhoneAppIconStore.get(context).observe(
+                        cleanAppIdentifier, cleanAppName, item.categoryId);
         boolean appleMessage = isAppleMessagesApp(item.appIdentifier);
         boolean allowed = config.notificationsEnabled
                 || config.messagesEnabled && appleMessage;
@@ -1369,8 +1374,6 @@ public final class PhoneConnectorController {
             return;
         }
 
-        String cleanAppIdentifier = bounded(item.appIdentifier, 512);
-        String cleanAppName = bounded(item.appName, 256);
         if (!cleanAppIdentifier.isEmpty() && !cleanAppName.isEmpty()) {
             cacheAppDisplayName(cleanAppIdentifier, cleanAppName);
         }
@@ -1385,7 +1388,7 @@ public final class PhoneConnectorController {
                 || appDisplayNames.containsKey(cleanAppIdentifier);
         NotificationRecord record = new NotificationRecord(
                 notification, item.categoryId, System.currentTimeMillis(), false,
-                observedAtElapsedMs);
+                observedAtElapsedMs, iconObservation.iconWasCached);
         notificationCache.remove(item.uid);
         notificationCache.put(item.uid, record);
         trimNotificationCache();
@@ -1402,6 +1405,7 @@ public final class PhoneConnectorController {
         String displayName = bounded(rawDisplayName, 256).trim();
         if (appIdentifier.isEmpty() || displayName.isEmpty()) return;
         cacheAppDisplayName(appIdentifier, displayName);
+        PhoneAppIconStore.get(context).updateName(appIdentifier, displayName);
         boolean changed = false;
         Iterator<Map.Entry<Long, NotificationRecord>> iterator =
                 notificationCache.entrySet().iterator();
@@ -2100,6 +2104,11 @@ public final class PhoneConnectorController {
         Config current = config;
         AncsProtocol.Event pendingEvent = pendingAncsEvents.get(uid);
         int categoryId = pendingEvent == null ? 0 : pendingEvent.categoryId;
+        PhoneAppIconStore.Observation iconObservation =
+                PhoneAppIconStore.get(context).observe(
+                        notification.appIdentifier,
+                        displayNameFor(notification.appIdentifier),
+                        categoryId);
         boolean appleMessage = isAppleMessagesApp(notification.appIdentifier);
         boolean allowed = current != null && (current.notificationsEnabled
                 || current.messagesEnabled && appleMessage)
@@ -2122,7 +2131,8 @@ public final class PhoneConnectorController {
         } else if (!removedAttributeUids.contains(uid)) {
             pendingAncsEvents.remove(uid);
             NotificationRecord record = new NotificationRecord(
-                    notification, categoryId, System.currentTimeMillis());
+                    notification, categoryId, System.currentTimeMillis(), true,
+                    SystemClock.elapsedRealtime(), iconObservation.iconWasCached);
             notificationCache.remove(uid);
             notificationCache.put(uid, record);
             trimNotificationCache();
@@ -2151,6 +2161,10 @@ public final class PhoneConnectorController {
         String cleanName = bounded(displayName, 256);
         cacheAppDisplayName(appIdentifier, cleanName.isEmpty()
                 ? PhoneAppCatalog.displayNameFallback(appIdentifier) : cleanName);
+        PhoneAppIconStore.get(context).updateName(appIdentifier,
+                cleanName.isEmpty()
+                        ? PhoneAppCatalog.displayNameFallback(appIdentifier)
+                        : cleanName);
         if (appIdentifier.equals(lastAppIdentifier)) {
             lastAppName = displayNameFor(appIdentifier);
         }
@@ -3461,6 +3475,8 @@ public final class PhoneConnectorController {
             value.put("application", application);
             value.put("icon", PhoneAppCatalog.iconKey(
                     item.notification.appIdentifier, item.categoryId));
+            value.put("icon_cached", item.iconAvailableForPresentation);
+            value.put("category_id", item.categoryId);
             value.put("category", AncsProtocol.categoryLabel(item.categoryId));
             value.put("date", item.notification.date);
             value.put("received_at", item.receivedAt);
@@ -3872,27 +3888,36 @@ public final class PhoneConnectorController {
         final int categoryId;
         final long receivedAt;
         final long observedAtElapsedMs;
+        final boolean iconAvailableForPresentation;
         boolean presented;
 
         NotificationRecord(@NonNull AncsProtocol.Notification notification, int categoryId,
                            long receivedAt) {
             this(notification, categoryId, receivedAt, true,
-                    SystemClock.elapsedRealtime());
+                    SystemClock.elapsedRealtime(), false);
         }
 
         NotificationRecord(@NonNull AncsProtocol.Notification notification, int categoryId,
                            long receivedAt, boolean presented) {
             this(notification, categoryId, receivedAt, presented,
-                    SystemClock.elapsedRealtime());
+                    SystemClock.elapsedRealtime(), false);
         }
 
         NotificationRecord(@NonNull AncsProtocol.Notification notification, int categoryId,
                            long receivedAt, boolean presented, long observedAtElapsedMs) {
+            this(notification, categoryId, receivedAt, presented,
+                    observedAtElapsedMs, false);
+        }
+
+        NotificationRecord(@NonNull AncsProtocol.Notification notification, int categoryId,
+                           long receivedAt, boolean presented, long observedAtElapsedMs,
+                           boolean iconAvailableForPresentation) {
             this.notification = notification;
             this.categoryId = categoryId;
             this.receivedAt = receivedAt;
             this.presented = presented;
             this.observedAtElapsedMs = observedAtElapsedMs;
+            this.iconAvailableForPresentation = iconAvailableForPresentation;
         }
     }
 

@@ -234,6 +234,14 @@ public final class PhoneStatusBarPolicy {
         Long uid = exactLong(raw.get("uid"), 0L, MAX_ANCS_UID);
         Long receivedAt = exactLong(raw.get("received_at"), 1L, Long.MAX_VALUE);
         if (uid == null || receivedAt == null) return null;
+        String appIdentifier = PhoneNotificationFilter.normalizeAppKey(
+                raw.get("app_id") instanceof String ? (String) raw.get("app_id") : "");
+        int categoryId = raw.get("category_id") instanceof Number
+                ? PhoneNotificationFilter.normalizeCategoryId(
+                ((Number) raw.get("category_id")).intValue())
+                : 0;
+        boolean iconCached = Boolean.TRUE.equals(raw.get("icon_cached"))
+                && !appIdentifier.isEmpty();
 
         String application = "";
         String topic = "";
@@ -271,7 +279,10 @@ public final class PhoneStatusBarPolicy {
                 application,
                 topic,
                 body,
-                combined);
+                combined,
+                appIdentifier,
+                categoryId,
+                iconCached);
     }
 
     /** Stable identity used to suppress replay when removing a newer item reveals an older one. */
@@ -366,10 +377,16 @@ public final class PhoneStatusBarPolicy {
         public final String body;
         /** Topic and body combined in their canonical order for one-line rendering. */
         public final String text;
+        /** Normalized iOS bundle identifier used for the persistent app icon. */
+        public final String appIdentifier;
+        public final int categoryId;
+        /** Snapshot taken before the current delivery starts its asynchronous download. */
+        public final boolean iconCached;
 
         private NotificationPresentation(String key, long uid, long receivedAt,
                                          String application, String topic, String body,
-                                         String text) {
+                                         String text, String appIdentifier,
+                                         int categoryId, boolean iconCached) {
             this.key = key;
             this.uid = uid;
             this.receivedAt = receivedAt;
@@ -377,6 +394,9 @@ public final class PhoneStatusBarPolicy {
             this.topic = topic;
             this.body = body;
             this.text = text;
+            this.appIdentifier = appIdentifier;
+            this.categoryId = categoryId;
+            this.iconCached = iconCached;
         }
     }
 

@@ -23,7 +23,7 @@ public final class PopupItemConfigStore {
     public List<PopupItemConfig> load() {
         ArrayList<PopupItemConfig> result = new ArrayList<>();
         Set<String> ids = new HashSet<>();
-        Set<String> automationIds = new HashSet<>();
+        Set<String> automationIdsByOverlay = new HashSet<>();
         try {
             JSONArray array = new JSONArray(prefs.popupItemsJson.get());
             for (int i = 0; i < array.length(); i++) {
@@ -31,7 +31,8 @@ public final class PopupItemConfigStore {
                 if (object == null) continue;
                 try {
                     PopupItemConfig config = PopupItemConfig.fromJson(object, i);
-                    if (ids.add(config.id) && automationIds.add(config.automationId)) {
+                    String stateKey = config.overlayId + '\u0000' + config.automationId;
+                    if (ids.add(config.id) && automationIdsByOverlay.add(stateKey)) {
                         result.add(config);
                     }
                 } catch (IllegalArgumentException ignored) {}
@@ -41,8 +42,8 @@ public final class PopupItemConfigStore {
         return result;
     }
 
-    /** Tiles owned by one overlay. Connector subscriptions may still use {@link #load()} to
-     * flatten the catalog because automation ids remain globally unique. */
+    /** Tiles owned by one overlay. One live state may intentionally be rendered in several
+     * overlays, but remains unique inside each individual overlay. */
     @NonNull
     public List<PopupItemConfig> load(@NonNull String overlayId) {
         String safeOverlayId = dezz.status.widget.automation.AutomationContract
@@ -57,11 +58,12 @@ public final class PopupItemConfigStore {
     public void save(@NonNull List<PopupItemConfig> configs) throws JSONException {
         JSONArray array = new JSONArray();
         Set<String> ids = new HashSet<>();
-        Set<String> automationIds = new HashSet<>();
+        Set<String> automationIdsByOverlay = new HashSet<>();
         int order = 0;
         for (PopupItemConfig config : configs) {
             if (config == null || !ids.add(config.id)) continue;
-            if (!automationIds.add(config.automationId)) {
+            String stateKey = config.overlayId + '\u0000' + config.automationId;
+            if (!automationIdsByOverlay.add(stateKey)) {
                 throw new IllegalArgumentException("Duplicate automation ID: " + config.automationId);
             }
             config.order = order++;

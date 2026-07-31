@@ -128,9 +128,14 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         page.addView(label("Размер и положение окна, компоновка иконки и текста, шрифты, "
                 + "цвета, рамка, фон, прозрачность и внутренние отступы настраиваются "
                 + "в обычном визуальном редакторе."), topMargin(5));
-        Button appearance = button("Настроить окно и содержимое");
-        appearance.setOnClickListener(view -> openPopupEditor());
-        page.addView(appearance, topMargin(10));
+        Button firstAppearance = button("Настроить первое уведомление · без иконки");
+        firstAppearance.setOnClickListener(view ->
+                openPopupEditor(PhoneNotificationAutomation.OVERLAY_ID));
+        page.addView(firstAppearance, topMargin(10));
+        Button cachedAppearance = button("Настроить повторные · с иконкой");
+        cachedAppearance.setOnClickListener(view ->
+                openPopupEditor(PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID));
+        page.addView(cachedAppearance, topMargin(8));
 
         page.addView(heading("Условия отдельных полей", 20), topMargin(20));
         page.addView(label("Приложение, тема и текст проверяются независимо. Одно условие "
@@ -249,11 +254,11 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
                 });
     }
 
-    private void openPopupEditor() {
+    private void openPopupEditor(@NonNull String overlayId) {
         try {
             PhoneNotificationAutomation.ensureConfigured(prefs);
             startActivity(PopupSettingsActivity.editIntent(
-                    this, PhoneNotificationAutomation.OVERLAY_ID));
+                    this, overlayId));
         } catch (Exception error) {
             showError(error);
         }

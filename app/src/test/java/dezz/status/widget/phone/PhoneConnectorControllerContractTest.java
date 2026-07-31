@@ -315,7 +315,7 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(incoming.contains("boolean hasDisplayName"));
         assertTrue(incoming.contains("new NotificationRecord(\n"
                 + "                notification, item.categoryId, System.currentTimeMillis(), false,\n"
-                + "                observedAtElapsedMs)"));
+                + "                observedAtElapsedMs, iconObservation.iconWasCached)"));
         assertTrue(incoming.contains(
                 "if (hasDisplayName) {\n"
                         + "            presentAncsNotification(token, record, true)"));

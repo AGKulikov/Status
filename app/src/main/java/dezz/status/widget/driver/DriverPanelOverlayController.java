@@ -19,6 +19,7 @@ import android.hardware.display.DisplayManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
@@ -96,6 +97,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private static final int DISPLAY_ID = Display.DEFAULT_DISPLAY;
     private static final long PROXY_TAP_SETTLE_MS = 70L;
     private static final long PROXY_TAP_WATCHDOG_MS = 15_000L;
+    /** One physical press can be delivered by both the rail view and the service action. */
+    private static final long FAVORITES_TOGGLE_DEBOUNCE_MS = 350L;
 
     private final Context appContext;
     private final Preferences preferences;
@@ -113,6 +116,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private final Map<String, FavoritePanelWindow> favoriteWindows = new LinkedHashMap<>();
     private final Set<String> manuallyOpenFavorites = new LinkedHashSet<>();
     private final Set<String> manuallyClosedFavorites = new LinkedHashSet<>();
+    private final Map<String, Long> lastFavoriteToggleAt = new HashMap<>();
     private final Map<String, ConnectorValue> smartHomeValues = new HashMap<>();
     private Map<String, IntentActionRule> smartHomeRules = Collections.emptyMap();
     @Nullable private WidgetService smartHomeValueService;
@@ -526,6 +530,13 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             mainHandler.post(() -> showFavorites(panelId, anchor));
             return;
         }
+        long now = SystemClock.uptimeMillis();
+        Long previousToggle = lastFavoriteToggleAt.get(panelId);
+        if (previousToggle != null
+                && now - previousToggle < FAVORITES_TOGGLE_DEBOUNCE_MS) {
+            return;
+        }
+        lastFavoriteToggleAt.put(panelId, now);
         // Treat the user's logical open state as authoritative as well as the attached window.
         // A rail refresh briefly replaces the WindowManager view; a second tap during that frame
         // must close the same Favorites panel instead of creating/reopening another instance.
@@ -992,9 +1003,9 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                         rowStyle.informationGroupDistribution == 1
                                 ? new LinearLayout.LayoutParams(
                                 ViewGroup.LayoutParams.WRAP_CONTENT,
-                                ViewGroup.LayoutParams.WRAP_CONTENT)
+                                ViewGroup.LayoutParams.MATCH_PARENT)
                                 : new LinearLayout.LayoutParams(
-                                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+                                0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
                 tileParams.rightMargin =
                         itemIndex + 1 < rowItems.size() ? internalGap : 0;
                 row.addView(tile, tileParams);
@@ -1002,7 +1013,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             int rowHeight = tileHeight + groupPaddingTop + groupPaddingBottom;
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT);
+                    Math.max(1, rowHeight));
             rowParams.leftMargin = dp(context, rowStyle.informationGroupMarginLeftPx);
             rowParams.topMargin = dp(context, rowStyle.informationGroupMarginTopPx);
             rowParams.rightMargin = dp(context, rowStyle.informationGroupMarginRightPx);
@@ -1046,15 +1057,16 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             @NonNull Context context,
             @NonNull LauncherShortcutStore.Shortcut shortcut) {
         float scaledDensity = context.getResources().getDisplayMetrics().scaledDensity;
-        // This value is only the ScrollView budget estimate. The actual row is WRAP_CONTENT, so a
-        // long status grows naturally and scrolls instead of inheriting a hidden five-line frame.
+        // This is both the ScrollView budget and the minimum concrete row height. Supplying that
+        // height is essential: MATCH_PARENT information tiles otherwise reserve space in the
+        // panel while their parent row still measures to zero.
         int text = Math.round((shortcut.informationValueTextSizeSp
                 * (shortcut.informationShowValue ? 1 : 0)
                 + (shortcut.showTitle ? shortcut.informationLabelTextSizeSp : 0))
                 * scaledDensity * 1.18f);
         int padding = dp(context, shortcut.informationPaddingTopPx
                 + shortcut.informationPaddingBottomPx);
-        int icon = shortcut.informationIconSizePx + padding;
+        int icon = dp(context, shortcut.informationIconSizePx) + padding;
         return Math.max(1, Math.max(icon, text + padding));
     }
 
@@ -1173,7 +1185,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         button.setAlpha(actionEnabled ? 1f : .42f);
         if (actionEnabled) {
             button.setOnClickListener(view -> {
-                actions.execute(shortcut, view);
+                executeShortcut(shortcut, view);
                 if (shortcut.kind == LauncherShortcutStore.Kind.APP) {
                     scheduleRaiseAfterExternalLaunch();
                 }
@@ -1192,6 +1204,16 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             applySmartHomeState(binding);
         }
         return button;
+    }
+
+    private void executeShortcut(@NonNull LauncherShortcutStore.Shortcut shortcut,
+                                 @Nullable View anchor) {
+        if (shortcut.kind == LauncherShortcutStore.Kind.BUILTIN
+                && LauncherShortcutStore.isDriverFavoritesTarget(shortcut.target)) {
+            showFavorites(LauncherShortcutStore.driverFavoritesPanelId(shortcut.target), anchor);
+            return;
+        }
+        actions.execute(shortcut, anchor);
     }
 
     /**
@@ -1627,7 +1649,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                     || widgetService.driverShortcutActionEnabled(shortcut.id, true);
             if (enabled && LauncherShortcutStore.isInteractive(shortcut)) {
                 tile.setOnClickListener(view -> {
-                    actions.execute(shortcut, view);
+                    executeShortcut(shortcut, view);
                     if (shortcut.closeFavoritePanelAfterAction) {
                         manuallyOpenFavorites.remove(panelId);
                         dismissFavoritePanel(panelId);

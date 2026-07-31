@@ -1244,6 +1244,7 @@ public final class IphoneAncsTransport {
     }
 
     private void handleVerifiedServerLinkDisconnected(BluetoothDevice device) {
+        boolean encryptedHandshakeIncomplete = !secureAttConfirmed || !iphoneAncsSeen;
         cancelClientAttemptCallbacks();
         log("VERIFIED GATT SERVER LINK disconnected: " + safeAddress(device)
                 + "; pending same-peer client attach остановлен");
@@ -1266,6 +1267,12 @@ public final class IphoneAncsTransport {
             }
         }
         if (managedReconnectEnabled) {
+            if (encryptedHandshakeIncomplete) {
+                log("Encrypted handshake не завершён; пересоздаю GATT server/advertiser "
+                        + "без сброса Classic pairing");
+                stopAdvertising();
+                resetVerifiedPeerSession();
+            }
             scheduleManagedReconnect("incoming " + REMOTE_LOGICAL_NAME + " link lost");
         }
     }

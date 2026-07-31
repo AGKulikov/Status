@@ -4,6 +4,8 @@ package dezz.status.widget.popup;
 import android.content.res.ColorStateList;
 import android.graphics.PixelFormat;
 import android.graphics.Typeface;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.os.Handler;
@@ -44,6 +46,7 @@ import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.automation.AutomationStateStore;
 import dezz.status.widget.integration.ActionBinding;
 import dezz.status.widget.integration.ActionDispatcher;
+import dezz.status.widget.phone.PhoneAppIconStore;
 import dezz.status.widget.phone.PhoneNotificationAutomation;
 
 /** Independent fixed-pixel, draggable, touchable popup grid controlled by retained HA state. */
@@ -374,7 +377,12 @@ public final class PopupOverlayController {
 
         String iconId = item.icon;
         if (builtin != null && PopupIconCatalog.resolve(builtin.iconId) != 0) iconId = builtin.iconId;
-        if (state.icon != null && PopupIconCatalog.resolve(state.icon) != 0) iconId = state.icon;
+        String phoneAppIdentifier = null;
+        if (state.icon != null && state.icon.startsWith("phone-app:")) {
+            phoneAppIdentifier = state.icon.substring("phone-app:".length()).trim();
+        } else if (state.icon != null && PopupIconCatalog.resolve(state.icon) != 0) {
+            iconId = state.icon;
+        }
         FrameLayout iconBox = new FrameLayout(context);
         GradientDrawable iconBg = new GradientDrawable();
         int iconBgBase = AutomationState.parseColor(item.iconBackgroundColor, 0x00000000);
@@ -389,9 +397,19 @@ public final class PopupOverlayController {
         ImageView icon = new ImageView(context);
         icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
         int iconRes = PopupIconCatalog.resolve(iconId);
-        if (iconRes != 0) icon.setImageResource(iconRes);
-        ImageViewCompat.setImageTintList(icon, ColorStateList.valueOf(
-                AutomationState.parseColor(item.iconColor, 0xFFFFFFFF)));
+        Drawable appIcon = phoneAppIdentifier == null ? null
+                : PhoneAppIconStore.get(context).drawable(phoneAppIdentifier);
+        if (appIcon != null) {
+            icon.setImageDrawable(appIcon);
+            ImageViewCompat.setImageTintList(icon, appIcon instanceof BitmapDrawable
+                    ? null
+                    : ColorStateList.valueOf(
+                            AutomationState.parseColor(item.iconColor, 0xFFFFFFFF)));
+        } else {
+            if (iconRes != 0) icon.setImageResource(iconRes);
+            ImageViewCompat.setImageTintList(icon, ColorStateList.valueOf(
+                    AutomationState.parseColor(item.iconColor, 0xFFFFFFFF)));
+        }
         icon.setAlpha(item.iconAlpha / 255f);
         iconBox.addView(icon, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,

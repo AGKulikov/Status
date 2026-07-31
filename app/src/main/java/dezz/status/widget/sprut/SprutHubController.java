@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Objects;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -506,7 +507,42 @@ public final class SprutHubController {
                     }
                 }, scheduler)
                 .thenCompose(answer -> current.call(
-                        SprutProtocolAdapter.buildAuthAnswerParams(answer)));
+                                SprutProtocolAdapter.buildAuthAnswerParams(answer))
+                        .<CompletableFuture<JSONObject>>handle((value, failure) -> {
+                            if (failure == null) {
+                                return CompletableFuture.completedFuture(value);
+                            }
+                            Throwable cause = unwrap(failure);
+                            if (!isChallengeResultParserFailure(cause)) {
+                                return failedFuture(cause);
+                            }
+                            /*
+                             * The beta relay briefly shipped an account.answer parser that
+                             * treated the proof as a serialized result instead of a string. A
+                             * normal Base64 signature can begin with '/', producing:
+                             * "Unknown character format in result: /". Retry exactly once with
+                             * the same proof JSON-quoted; no password or challenge data is logged
+                             * and a genuine authentication failure is never retried.
+                             */
+                            DiagnosticJournal.warn("spruthub.session",
+                                    "cloud challenge parser rejected raw Base64; "
+                                            + "retrying quoted-result compatibility format");
+                            return current.call(SprutProtocolAdapter.buildAuthAnswerParams(
+                                    JSONObject.quote(answer)));
+                        })
+                        .thenCompose(stage -> stage));
+    }
+
+    static boolean isChallengeResultParserFailure(@NonNull Throwable failure) {
+        if (!(failure instanceof SprutHubRpcClient.RpcException)) return false;
+        SprutHubRpcClient.RpcException rpc = (SprutHubRpcClient.RpcException) failure;
+        if (rpc.code != -32602) return false;
+        String message = rpc.getMessage();
+        if (message == null) return false;
+        String normalized = message.toLowerCase(Locale.ROOT);
+        return normalized.contains("failed to parse")
+                && normalized.contains("character format")
+                && normalized.contains("result");
     }
 
     @NonNull
