@@ -32,7 +32,8 @@ public final class NavigationRouteLivenessContractTest {
     public void speedLimitIsNotPartOfLegacyPrimaryEvidence() throws IOException {
         String repository = source("dezz/status/widget/launcher/NavigationDataRepository.java");
         int start = repository.indexOf("private static boolean hasMainRouteEvidence");
-        int end = repository.indexOf("private static boolean updateFromMonjaroNavigation", start);
+        int end = repository.indexOf(
+                "private static boolean updateFromOriginalNavigatorChannel", start);
         String method = repository.substring(start, end);
         assertTrue(method.contains("NavigationRouteStatePolicy.hasPrimaryEvidence"));
         assertFalse(method.contains("PREF_SPEED_LIMIT"));
