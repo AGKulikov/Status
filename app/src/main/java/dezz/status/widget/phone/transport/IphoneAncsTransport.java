@@ -579,12 +579,11 @@ public final class IphoneAncsTransport {
             state("AUTO · SAVED PEER CONFLICT");
             return false;
         }
-        // The dedicated service stays visible while the Android-central fallback scans for the
-        // selected iPhone. Advertising and scanning are allowed concurrently; scan and
-        // connectGatt are never allowed concurrently.
-        boolean advertisingStarted = startGeelyAncsAdvertising();
-        boolean scanStarted = startSavedPeerScan(device);
-        return advertisingStarted || scanStarted;
+        // Daily operation has exactly one BLE owner: scan as Android central, stop that scan on
+        // the selected identity, then create one connectGatt(false, TRANSPORT_LE). The diagnostic
+        // GATT server/advertiser is a manual Helper bootstrap only; running it here creates a
+        // competing peripheral-role link on ECARX and can leave the real ANCS client unencrypted.
+        return startSavedPeerScan(device);
     }
 
     private boolean startSavedPeerScan(@NonNull BluetoothDevice device) {
@@ -776,10 +775,16 @@ public final class IphoneAncsTransport {
                 "Helper-filtered scan; Android создаёт bootstrap BLE link первым");
     }
 
-    private void connectToSavedAdvertisingIphone(@NonNull BluetoothDevice device) {
+    private void connectToSavedAdvertisingIphone(@NonNull BluetoothDevice device,
+                                                  boolean solicitsAncs) {
         BluetoothDevice expected = savedPeerScanTarget;
         if (!iphonePeripheralMode || helperBootstrapMode || iphoneConnectStarted
-                || expected == null || !sameDevice(expected, device)) return;
+                || expected == null) return;
+        // The scan callback already passed the selected-phone gate. Re-check it here because iOS
+        // commonly rotates from the saved Classic/public address to a bonded BLE private address;
+        // requiring sameDevice() a second time discarded the valid resolved peer just before
+        // connectGatt and was the reason the phone never reached ANCS discovery.
+        if (!matchesManagedSavedPeer(expected, device, solicitsAncs)) return;
         iphoneConnectStarted = true;
         stopScan();
         if (!claimVerifiedPeer(device)) {
@@ -789,7 +794,7 @@ public final class IphoneAncsTransport {
         }
         connectIphonePeripheral(device, CONNECT_TIMEOUT_MS,
                 "GPS-STYLE · SAVED PEER CONNECTING",
-                "HWGPS-style exact-address scan match; direct GATT after advertisement");
+                "selected identity resolved; one direct GATT after advertisement");
     }
 
     private void connectIphonePeripheral(BluetoothDevice device, long timeoutMs,
@@ -2590,9 +2595,6 @@ public final class IphoneAncsTransport {
             iphonePeripheralMode = true;
             helperBootstrapMode = false;
             iphoneConnectStarted = false;
-            if (!advertising && !advertisingPending && !advertisingDesired) {
-                startGeelyAncsAdvertising();
-            }
             if (!startSavedPeerScan(expected)) {
                 scheduleManagedReconnect("identity scan could not start");
             }
@@ -2777,7 +2779,7 @@ public final class IphoneAncsTransport {
                             + " observed=" + safeAddress(result.getDevice())
                             + " ancsSolicitation=" + solicitsAncs
                             + " bond=" + bondLabel(safeBondState(result.getDevice())));
-                    connectToSavedAdvertisingIphone(result.getDevice());
+                    connectToSavedAdvertisingIphone(result.getDevice(), solicitsAncs);
                     return;
                 }
                 if (iphonePeripheralMode

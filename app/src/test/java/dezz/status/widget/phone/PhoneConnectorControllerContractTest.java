@@ -129,8 +129,8 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("final String address = current.ancsDeviceAddress"));
         assertTrue(source.contains("mainHandler.post(() -> startAncsTransportOnMain("));
         assertTrue(savedPeer.contains("adapter.getRemoteDevice(address.trim())"));
-        assertTrue(savedPeer.contains("startGeelyAncsAdvertising()"));
-        assertTrue(savedPeer.contains("return advertisingStarted || scanStarted"));
+        assertFalse(savedPeer.contains("startGeelyAncsAdvertising()"));
+        assertTrue(savedPeer.contains("return startSavedPeerScan(device)"));
         assertTrue(savedPeer.contains("stopScan();"));
         assertTrue(savedPeer.contains("stopAdvertising();"));
         assertFalse(transport.contains(".setDeviceAddress(address)"));
@@ -140,6 +140,10 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(transport.contains("matchesManagedSavedPeer("));
         assertTrue(transport.contains("AncsReconnectPolicy.candidateMayBeSelected("));
         assertTrue(transport.contains("connectToSavedAdvertisingIphone("));
+        assertTrue(transport.contains(
+                "connectToSavedAdvertisingIphone(result.getDevice(), solicitsAncs)"));
+        assertTrue(transport.contains(
+                "matchesManagedSavedPeer(expected, device, solicitsAncs)"));
         assertTrue(transport.contains(
                 "connectIphonePeripheral(device, CONNECT_TIMEOUT_MS,"));
         assertTrue(transport.contains("CONNECT_TIMEOUT_MS = 35_000L"));

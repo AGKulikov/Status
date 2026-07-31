@@ -56,6 +56,7 @@ import dezz.status.widget.scenario.ScenarioPresets;
 public final class SprutHubController {
     private static final String TAG = "SprutHubController";
     private static final int MAX_BUFFERED_EVENTS = 4_096;
+    private static final int MAX_CLOUD_CHALLENGE_RESTARTS = 6;
     private static final long[] RECONNECT_DELAYS_MS = {1_000L, 2_000L, 5_000L, 10_000L, 30_000L};
     private static volatile SprutHubController activeInstance;
     private static volatile String lastDetail = "not started";
@@ -476,13 +477,14 @@ public final class SprutHubController {
         requireQuestion(first, "auth", "QUESTION_TYPE_EMAIL");
         return current.call(SprutProtocolAdapter.buildAuthAnswerParams(
                         prefs.sprutEmail.get().trim()))
-                .thenCompose(email -> answerPasswordQuestion(current, email))
+                .thenCompose(email -> answerPasswordQuestion(current, email, 0))
                 .thenApply(this::extractToken);
     }
 
     @NonNull
     private CompletableFuture<JSONObject> answerPasswordQuestion(
-            @NonNull SprutHubRpcClient current, @NonNull JSONObject response) {
+            @NonNull SprutHubRpcClient current, @NonNull JSONObject response,
+            int challengeRestart) {
         String type = questionType(response, "answer");
         if ("QUESTION_TYPE_PASSWORD".equals(type)) {
             // Older hubs explicitly request the plaintext answer.
@@ -506,8 +508,20 @@ public final class SprutHubController {
                         throw new CompletionException(failure);
                     }
                 }, scheduler)
-                .thenCompose(answer -> current.call(
-                                SprutProtocolAdapter.buildAuthAnswerParams(answer))
+                .thenCompose(answer -> {
+                    /*
+                     * beta.spruthub.ru currently routes account.answer through a result-token
+                     * parser before the account handler. A perfectly valid standard-Base64
+                     * Ed25519 signature can begin with '/' or '+'. Such a proof is rejected as
+                     * syntax (-32602) before Sprut gets a chance to verify it. The official web
+                     * client creates a fresh random challenge on every restarted auth dialogue,
+                     * so restart that dialogue instead of changing or quoting the signature.
+                     */
+                    if (hasParserUnsafeProofPrefix(answer)) {
+                        return restartCloudChallenge(current, challengeRestart,
+                                "generated proof has a relay-unsafe Base64 prefix");
+                    }
+                    return current.call(SprutProtocolAdapter.buildAuthAnswerParams(answer))
                         .<CompletableFuture<JSONObject>>handle((value, failure) -> {
                             if (failure == null) {
                                 return CompletableFuture.completedFuture(value);
@@ -516,21 +530,42 @@ public final class SprutHubController {
                             if (!isChallengeResultParserFailure(cause)) {
                                 return failedFuture(cause);
                             }
-                            /*
-                             * The beta relay briefly shipped an account.answer parser that
-                             * treated the proof as a serialized result instead of a string. A
-                             * normal Base64 signature can begin with '/', producing:
-                             * "Unknown character format in result: /". Retry exactly once with
-                             * the same proof JSON-quoted; no password or challenge data is logged
-                             * and a genuine authentication failure is never retried.
-                             */
-                            DiagnosticJournal.warn("spruthub.session",
-                                    "cloud challenge parser rejected raw Base64; "
-                                            + "retrying quoted-result compatibility format");
-                            return current.call(SprutProtocolAdapter.buildAuthAnswerParams(
-                                    JSONObject.quote(answer)));
+                            return restartCloudChallenge(current, challengeRestart,
+                                    "relay rejected the proof before verification");
                         })
-                        .thenCompose(stage -> stage));
+                        .thenCompose(stage -> stage);
+                });
+    }
+
+    @NonNull
+    private CompletableFuture<JSONObject> restartCloudChallenge(
+            @NonNull SprutHubRpcClient current, int completedRestarts,
+            @NonNull String reason) {
+        if (completedRestarts >= MAX_CLOUD_CHALLENGE_RESTARTS) {
+            return failedFuture(new IOException(
+                    "Sprut.hub relay repeatedly rejected password-proof encoding"));
+        }
+        int nextRestart = completedRestarts + 1;
+        DiagnosticJournal.warn("spruthub.session",
+                reason + "; requesting fresh challenge " + nextRestart + "/"
+                        + MAX_CLOUD_CHALLENGE_RESTARTS);
+        current.clearSession();
+        return current.call(SprutProtocolAdapter.buildAuthParams())
+                .thenCompose(first -> {
+                    requireQuestion(first, "auth", "QUESTION_TYPE_EMAIL");
+                    return current.call(SprutProtocolAdapter.buildAuthAnswerParams(
+                            prefs.sprutEmail.get().trim()));
+                })
+                .thenCompose(email -> answerPasswordQuestion(
+                        current, email, nextRestart));
+    }
+
+    static boolean hasParserUnsafeProofPrefix(@NonNull String answer) {
+        if (answer.isEmpty()) return true;
+        char first = answer.charAt(0);
+        return !((first >= 'A' && first <= 'Z')
+                || (first >= 'a' && first <= 'z')
+                || (first >= '0' && first <= '9'));
     }
 
     static boolean isChallengeResultParserFailure(@NonNull Throwable failure) {

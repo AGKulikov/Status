@@ -96,7 +96,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private static final String TAG = "DriverPanelOverlay";
     private static final int DISPLAY_ID = Display.DEFAULT_DISPLAY;
     private static final long PROXY_TAP_SETTLE_MS = 70L;
-    private static final long PROXY_TAP_WATCHDOG_MS = 15_000L;
+    /** Accessibility callbacks are not reliable on ECARX; never block repeat taps for seconds. */
+    private static final long PROXY_TAP_HARD_RESTORE_MS = 450L;
     /** One physical press can be delivered by both the rail view and the service action. */
     private static final long FAVORITES_TOGGLE_DEBOUNCE_MS = 350L;
 
@@ -666,7 +667,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         }, 90L);
         mainHandler.postDelayed(() -> {
             if (generation == proxyTapGeneration) setPanelTouchable(true);
-        }, PROXY_TAP_WATCHDOG_MS);
+        }, PROXY_TAP_HARD_RESTORE_MS);
         // updateViewLayout() is asynchronous on Android. Wait for one short WindowManager
         // relayout before injecting the gesture, otherwise the still-interactive rail can consume
         // the synthetic tap even though its opaque pixels never left the screen.

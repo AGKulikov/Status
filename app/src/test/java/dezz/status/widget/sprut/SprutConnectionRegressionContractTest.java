@@ -60,6 +60,9 @@ public final class SprutConnectionRegressionContractTest {
         assertTrue(modernAnswers.contains("\"QUESTION_TYPE_CHALLENGE\""));
         assertTrue(modernAnswers.contains("SprutCloudChallenge.answer("));
         assertTrue(modernAnswers.contains("CompletableFuture.supplyAsync("));
+        assertTrue(modernAnswers.contains("restartCloudChallenge("));
+        assertTrue(modernAnswers.contains("hasParserUnsafeProofPrefix(answer)"));
+        assertFalse(modernAnswers.contains("JSONObject.quote(answer)"));
         assertFalse(modernAnswers.contains("challengeData +"));
     }
 

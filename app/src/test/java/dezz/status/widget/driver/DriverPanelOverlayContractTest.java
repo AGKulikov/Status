@@ -60,7 +60,8 @@ public class DriverPanelOverlayContractTest {
         assertFalse(fallbackSource.contains("applyPreferences()"));
         assertTrue(source.contains("PROXY_TAP_SETTLE_MS = 70L"));
         assertTrue(source.contains("}, PROXY_TAP_SETTLE_MS);"));
-        assertTrue(source.contains("PROXY_TAP_WATCHDOG_MS = 15_000L"));
+        assertTrue(source.contains("PROXY_TAP_HARD_RESTORE_MS = 450L"));
+        assertFalse(source.contains("PROXY_TAP_WATCHDOG_MS"));
         assertTrue(source.contains(
                 "WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED"));
 
