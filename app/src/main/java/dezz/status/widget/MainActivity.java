@@ -299,6 +299,10 @@ public class MainActivity extends AppCompatActivity {
                 return getString(R.string.brick_title_home_assistant);
             case PHONE_STATUS:
                 return getString(R.string.brick_title_phone_status);
+            case PHONE_CELLULAR:
+                return getString(R.string.brick_title_phone_cellular);
+            case PHONE_BATTERY:
+                return getString(R.string.brick_title_phone_battery);
             default:
                 return "";
         }

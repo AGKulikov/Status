@@ -142,6 +142,20 @@ public final class PhoneStatusBarPolicyTest {
         assertNull(PhoneStatusBarPolicy.display("unknown", current("connected", true)));
     }
 
+    @Test public void iconPercentRejectsStaleWrongOrOutOfRangePhoneData() {
+        assertEquals(Integer.valueOf(13), PhoneStatusBarPolicy.percentValue(
+                "network.signal", current("network.signal", 12.6d)));
+        assertEquals(Integer.valueOf(20), PhoneStatusBarPolicy.percentValue(
+                "battery.level", current("battery.level", 20)));
+        assertNull(PhoneStatusBarPolicy.percentValue("battery.level",
+                current("battery.level", 101)));
+        assertNull(PhoneStatusBarPolicy.percentValue("battery.level",
+                value(ConnectorType.PHONE, "battery.level", 50,
+                        false, true, true)));
+        assertNull(PhoneStatusBarPolicy.percentValue("battery.level",
+                current("network.signal", 50)));
+    }
+
     @Test public void latestNotificationUsesStableKeyAndSelectedCanonicalFields() {
         ConnectorValue latest = latest(notificationMap(
                 4_294_967_295L, 1_721_234_567_890L,

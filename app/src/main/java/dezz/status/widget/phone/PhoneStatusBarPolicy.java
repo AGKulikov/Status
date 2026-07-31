@@ -210,6 +210,14 @@ public final class PhoneStatusBarPolicy {
         return display(statusItem(itemId), value);
     }
 
+    /** Returns a rounded 0..100 value only for a current readable PHONE percentage source. */
+    public static Integer percentValue(String resourceId, ConnectorValue value) {
+        if (!eligible(value, resourceId)) return null;
+        Double percent = finiteNumber(value.rawValue);
+        if (percent == null || percent < 0d || percent > 100d) return null;
+        return (int) Math.round(percent);
+    }
+
     /**
      * Extracts a safe presentation of the latest real-time notification.
      *

@@ -50,7 +50,7 @@ public final class DriverPanelPost1117ContractTest {
     }
 
     @Test
-    public void applicationDrawerIsOnScreenModalAndIncludesSystemPhone() throws Exception {
+    public void applicationDrawerPreservesDriverRailAndIncludesSystemPhone() throws Exception {
         String overlay = read("driver/DriverPanelOverlayController.java");
         String catalog = read("launcher/LauncherAppCatalog.java");
         String launcher = read("LauncherActivity.java");
@@ -59,8 +59,10 @@ public final class DriverPanelPost1117ContractTest {
         assertTrue(overlay.contains("if (drawerEditMode) setDrawerEditMode(false)"));
         assertTrue(overlay.contains("else dismissAllApps()"));
         assertTrue(overlay.contains("allAppsOverlayParams("));
-        assertTrue(overlay.contains("drawerParams.leftMargin = drawerLeft"));
-        assertTrue(overlay.contains("screenWidth, screenWidth, false"));
+        assertTrue(overlay.contains(
+                "attachedType, drawerWidth, metrics.heightPixels, drawerWindowX"));
+        assertTrue(overlay.contains("FLAG_NOT_TOUCH_MODAL"));
+        assertFalse(overlay.contains("drawerParams.leftMargin = drawerLeft"));
         assertTrue(catalog.contains("ensureDefaultSystemVisibility(context, preferences, catalog)"));
         assertTrue(catalog.contains("if (app.systemApp && !isUserFacingPhone"));
         assertTrue(catalog.contains(

@@ -57,17 +57,17 @@ public final class Ha1136RegressionContractTest {
         assertTrue(source.contains("itunes.apple.com/lookup?bundleId="));
     }
 
-    @Test public void bluetoothUsesOneOutlineOrFilledVectorAndResetsPerAncsSession()
+    @Test public void bluetoothUsesOneOutlineOrFilledVectorFromTheLiveAncsFeed()
             throws Exception {
         String widget = javaSource("WidgetService.java");
         String outline = resource("drawable/ic_status_bt_phone_outline.xml");
         String solid = resource("drawable/ic_status_bt_phone_solid.xml");
         assertTrue(widget.contains("PhoneBluetoothIndicatorPolicy.resolve("));
-        assertTrue(widget.contains("phoneNotificationDeliveryConfirmed = true"));
-        assertTrue(widget.contains("if (!phoneAncsReady)"));
-        assertTrue(widget.contains("phoneNotificationDeliveryConfirmed = false"));
+        assertTrue(widget.contains("isPhoneNotificationPathAvailable()"));
+        assertTrue(widget.contains("phoneStatusValues.get(\"notifications.items\")"));
+        assertFalse(widget.contains("phoneNotificationDeliveryConfirmed"));
         assertTrue(outline.contains("android:fillColor=\"#00000000\""));
-        assertTrue(outline.contains("android:strokeWidth=\"1.1\""));
+        assertTrue(outline.contains("android:strokeWidth=\"0.75\""));
         assertTrue(solid.contains("android:fillColor=\"@android:color/white\""));
         assertFalse(solid.contains("android:strokeWidth"));
     }

@@ -12,12 +12,12 @@ public final class PhoneBluetoothIndicatorPolicy {
     }
 
     public static Appearance resolve(boolean classicBluetoothConnected,
-                                     boolean selectedPhoneConnected,
-                                     boolean notificationDeliveredInCurrentSession) {
-        if (!classicBluetoothConnected || !selectedPhoneConnected) {
+                                     boolean selectedPhoneConfigured,
+                                     boolean notificationPathActiveNow) {
+        if (!classicBluetoothConnected || !selectedPhoneConfigured) {
             return Appearance.DEFAULT;
         }
-        return notificationDeliveredInCurrentSession
+        return notificationPathActiveNow
                 ? Appearance.PHONE_SOLID
                 : Appearance.PHONE_OUTLINE;
     }

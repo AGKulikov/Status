@@ -55,6 +55,8 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -198,6 +200,7 @@ public class WidgetService extends Service {
     private static final int STYLE_COLOR = 1;
 
     private static final long INTERNET_PROBE_INTERVAL_MS = 30_000L;
+    private static final long WIFI_SIGNAL_REFRESH_INTERVAL_MS = 2_000L;
 
     /** Cross-fade duration for the entire overlay (show/hide / per-app hide). */
     private static final int OVERLAY_FADE_DURATION_MS = 500;
@@ -415,16 +418,12 @@ public class WidgetService extends Service {
     private float initialTouchY;
     private GnssState gnssState = GnssState.OFF;
     private WiFiState wifiState = WiFiState.OFF;
+    /** 0 = disconnected, 1..4 = progressively stronger RSSI. */
+    private int wifiSignalLevel;
     private BluetoothState bluetoothState = BluetoothState.OFF;
     private final Set<String> btConnectedAddrs = new HashSet<>();
     /** True while the current direct iPhone transport reports an active ANCS profile. */
     private boolean phoneAncsReady;
-    /**
-     * Session-scoped proof that ANCS delivered a real notification to this head unit.
-     * A connected profile alone is deliberately insufficient: the solid icon means that the
-     * complete end-to-end notification path has actually worked in the current session.
-     */
-    private boolean phoneNotificationDeliveryConfirmed;
     private boolean btReceiverRegistered = false;
     /** Invalidates asynchronous profile snapshots after status tracking is stopped or reseeded. */
     private int bluetoothTrackingGeneration;
@@ -680,6 +679,7 @@ public class WidgetService extends Service {
             if (wifiState == WiFiState.OFF) {
                 setWifiStatus(WiFiState.NO_INTERNET);
             }
+            refreshWifiSignalLevel();
             mainHandler.post(() -> probeReachability());
         }
 
@@ -701,6 +701,7 @@ public class WidgetService extends Service {
                 } else {
                     setWifiStatus(WiFiState.NO_INTERNET);
                 }
+                refreshWifiSignalLevel();
             } else {
                 setWifiStatus(WiFiState.OFF);
             }
@@ -714,6 +715,14 @@ public class WidgetService extends Service {
                 probeReachability();
             }
             mainHandler.postDelayed(this, INTERNET_PROBE_INTERVAL_MS);
+        }
+    };
+
+    private final Runnable wifiSignalRefreshRunnable = new Runnable() {
+        @Override public void run() {
+            if (destroyed || !networkCallbackRegistered) return;
+            refreshWifiSignalLevel();
+            mainHandler.postDelayed(this, WIFI_SIGNAL_REFRESH_INTERVAL_MS);
         }
     };
 
@@ -1234,10 +1243,13 @@ public class WidgetService extends Service {
         applyWifiBrickSettings();
         applyGpsBrickSettings();
         applyBluetoothBrickSettings();
+        applyPhoneCellularBrickSettings();
+        applyPhoneBatteryBrickSettings();
         applyIndoorTempBrickSettings();
         applyOutdoorTempBrickSettings();
         renderHomeAssistantBricks(true);
         renderPhoneStatusBricks(true);
+        updatePhoneIndicators();
         applyBrickVisibility(bricksSet);
 
         binding.overlayContainer.setPadding(
@@ -1329,7 +1341,6 @@ public class WidgetService extends Service {
         btConnectedAddrs.clear();
         bluetoothState = BluetoothState.OFF;
         phoneAncsReady = false;
-        phoneNotificationDeliveryConfirmed = false;
         lastMediaSubtitle = null;
         removeStatusOverlaySafely(reason);
         binding = null;
@@ -1496,10 +1507,13 @@ public class WidgetService extends Service {
         applyWifiBrickSettings();
         applyGpsBrickSettings();
         applyBluetoothBrickSettings();
+        applyPhoneCellularBrickSettings();
+        applyPhoneBatteryBrickSettings();
         applyIndoorTempBrickSettings();
         applyOutdoorTempBrickSettings();
         renderHomeAssistantBricks(true);
         renderPhoneStatusBricks(true);
+        updatePhoneIndicators();
 
         applyBrickVisibility(bricksSet);
         applyOverlayPosition();
@@ -1638,10 +1652,14 @@ public class WidgetService extends Service {
         }
         mainHandler.removeCallbacks(reachabilityProbeRunnable);
         mainHandler.postDelayed(reachabilityProbeRunnable, INTERNET_PROBE_INTERVAL_MS);
+        mainHandler.removeCallbacks(wifiSignalRefreshRunnable);
+        refreshWifiSignalLevel();
+        mainHandler.postDelayed(wifiSignalRefreshRunnable, WIFI_SIGNAL_REFRESH_INTERVAL_MS);
     }
 
     private void stopConnectivityTracking() {
         mainHandler.removeCallbacks(reachabilityProbeRunnable);
+        mainHandler.removeCallbacks(wifiSignalRefreshRunnable);
         ConnectivityManager manager = connectivityManager;
         if (manager != null && networkCallbackRegistered) {
             try {
@@ -1652,6 +1670,7 @@ public class WidgetService extends Service {
         }
         networkCallbackRegistered = false;
         connectivityManager = null;
+        wifiSignalLevel = 0;
     }
 
     @SuppressLint("MissingPermission")
@@ -1949,6 +1968,10 @@ public class WidgetService extends Service {
                 return binding.homeAssistantContainer;
             case PHONE_STATUS:
                 return binding.phoneStatusContainer;
+            case PHONE_CELLULAR:
+                return binding.phoneCellularStatusIcon;
+            case PHONE_BATTERY:
+                return binding.phoneBatteryStatusIcon;
             default:
                 return null;
         }
@@ -2103,9 +2126,6 @@ public class WidgetService extends Service {
             if ("profiles.ancs".equals(value.resourceId)) {
                 phoneAncsReady = value.fresh && value.available && value.readable
                         && Boolean.TRUE.equals(value.rawValue);
-                if (!phoneAncsReady) {
-                    phoneNotificationDeliveryConfirmed = false;
-                }
             }
             if ("notifications.latest".equals(value.resourceId)) {
                 latestNotification = value;
@@ -2118,7 +2138,6 @@ public class WidgetService extends Service {
         if (!phoneValueChanged) return;
         if (sessionEnded) {
             phoneAncsReady = false;
-            phoneNotificationDeliveryConfirmed = false;
             observedPhoneNotificationKeys.clear();
             clearPhonePopupNotification();
             if (activePhoneBatteryAlertText != null) {
@@ -2136,13 +2155,6 @@ public class WidgetService extends Service {
             rememberPhoneNotificationItems(notificationItems);
             rememberPhoneNotificationKey(latestKey);
             if (latestIsNew) {
-                if (!sessionEnded && phoneAncsReady
-                        && latestNotification.fresh
-                        && latestNotification.available
-                        && latestNotification.readable
-                        && latestNotification.rawValue instanceof Map<?, ?>) {
-                    phoneNotificationDeliveryConfirmed = true;
-                }
                 if (prefs.phoneStatusBarNotificationsEnabled.get()
                         || prefs.phonePopupNotificationsEnabled.get()) {
                     Set<String> selected = PhoneStatusBarPolicy.parseIds(
@@ -2174,6 +2186,7 @@ public class WidgetService extends Service {
 
         if (binding != null) {
             renderPhoneStatusBricks();
+            updatePhoneIndicators();
             applyBrickVisibility(currentBrickSet());
             updateBluetoothStatus();
         }
@@ -2261,6 +2274,56 @@ public class WidgetService extends Service {
             container.setTranslationY(prefs.phoneStatus.adjustY.get());
             container.setAlpha(prefs.phoneStatus.contentAlpha.get() / 255f);
         }
+    }
+
+    private void updatePhoneIndicators() {
+        if (binding == null || prefs == null) return;
+
+        Integer signal = phonePercent("network.signal");
+        OutlineImageView cellular = binding.phoneCellularStatusIcon;
+        cellular.setImageResource(R.drawable.ic_status_iphone_cellular_level);
+        cellular.setImageLevel(cellularBars(signal) * 2500);
+        cellular.setDrawIcon(true);
+        ImageViewCompat.setImageTintList(cellular, null);
+        applyConfiguredIconOutline(cellular, prefs.phoneCellular);
+        cellular.setBadgeText(null, 0, 0);
+        cellular.setBadgeDrawable(null);
+
+        Integer battery = phonePercent("battery.level");
+        OutlineImageView batteryIcon = binding.phoneBatteryStatusIcon;
+        batteryIcon.setImageResource(R.drawable.ic_status_iphone_battery);
+        batteryIcon.setImageLevel(batteryDrawableLevel(battery));
+        batteryIcon.setDrawIcon(true);
+        Context context = themedContext != null ? themedContext : this;
+        int batteryColor = battery != null && battery <= 10
+                ? ContextCompat.getColor(context, R.color.iphone_battery_critical)
+                : battery != null && battery <= 20
+                ? ContextCompat.getColor(context, R.color.iphone_battery_low)
+                : ContextCompat.getColor(context, android.R.color.white);
+        ImageViewCompat.setImageTintList(batteryIcon, ColorStateList.valueOf(batteryColor));
+        applyConfiguredIconOutline(batteryIcon, prefs.phoneBattery);
+        batteryIcon.setBadgeText(null, 0, 0);
+        batteryIcon.setBadgeDrawable(null);
+    }
+
+    @Nullable
+    private Integer phonePercent(@NonNull String resourceId) {
+        return PhoneStatusBarPolicy.percentValue(resourceId, phoneStatusValues.get(resourceId));
+    }
+
+    private static int cellularBars(@Nullable Integer percent) {
+        if (percent == null || percent <= 0) return 0;
+        if (percent <= 25) return 1;
+        if (percent <= 50) return 2;
+        if (percent <= 75) return 3;
+        return 4;
+    }
+
+    private static int batteryDrawableLevel(@Nullable Integer percent) {
+        int bounded = percent == null ? 0 : Math.max(0, Math.min(100, percent));
+        // The fill occupies x=4..25 inside a 32-unit viewport. Translate 0..100% so the clip
+        // starts at the inner left edge and ends before the terminal cap.
+        return 1250 + Math.round(bounded * 65.63f);
     }
 
     private void applyPhoneStatusTextStyle(@NonNull OutlineTextView view) {
@@ -2511,6 +2574,28 @@ public class WidgetService extends Service {
         binding.bluetoothStatusIcon.setAlpha(prefs.bluetooth.contentAlpha.get() / 255f);
     }
 
+    private void applyPhoneCellularBrickSettings() {
+        ViewGroup.LayoutParams layout = binding.phoneCellularStatusIcon.getLayoutParams();
+        layout.width = Math.round(prefs.phoneCellular.size.get() * 1.17f);
+        layout.height = prefs.phoneCellular.size.get();
+        binding.phoneCellularStatusIcon.setLayoutParams(layout);
+        applyHorizontalMargins(binding.phoneCellularStatusIcon,
+                prefs.phoneCellular.marginStart.get(), prefs.phoneCellular.marginEnd.get());
+        binding.phoneCellularStatusIcon.setTranslationY(prefs.phoneCellular.adjustY.get());
+        binding.phoneCellularStatusIcon.setAlpha(prefs.phoneCellular.contentAlpha.get() / 255f);
+    }
+
+    private void applyPhoneBatteryBrickSettings() {
+        ViewGroup.LayoutParams layout = binding.phoneBatteryStatusIcon.getLayoutParams();
+        layout.width = Math.round(prefs.phoneBattery.size.get() * 1.6f);
+        layout.height = prefs.phoneBattery.size.get();
+        binding.phoneBatteryStatusIcon.setLayoutParams(layout);
+        applyHorizontalMargins(binding.phoneBatteryStatusIcon,
+                prefs.phoneBattery.marginStart.get(), prefs.phoneBattery.marginEnd.get());
+        binding.phoneBatteryStatusIcon.setTranslationY(prefs.phoneBattery.adjustY.get());
+        binding.phoneBatteryStatusIcon.setAlpha(prefs.phoneBattery.contentAlpha.get() / 255f);
+    }
+
     private void applySingleLineTextBrick(OutlineTextView view, Preferences.TextBrickPrefs p) {
         view.setTextColor(ContextCompat.getColor(themedContext, R.color.text_primary));
         view.setOutlineColor(textOutlineColor(p.outlineAlpha.get()));
@@ -2607,6 +2692,10 @@ public class WidgetService extends Service {
                 && binding.homeAssistantContainer.getChildCount() > 0;
         boolean phoneStatusActive = bricksSet.contains(BrickType.PHONE_STATUS)
                 && hasVisiblePhoneStatusValues();
+        boolean phoneCellularActive = bricksSet.contains(BrickType.PHONE_CELLULAR)
+                && phonePercent("network.signal") != null;
+        boolean phoneBatteryActive = bricksSet.contains(BrickType.PHONE_BATTERY)
+                && phonePercent("battery.level") != null;
         BrickTarget[] targets = {
                 resolveTarget(BrickType.TIME, bricksSet.contains(BrickType.TIME),
                         binding.timeText, prefs.time.contentAlpha.get()),
@@ -2626,6 +2715,10 @@ public class WidgetService extends Service {
                         binding.homeAssistantContainer, prefs.homeAssistant.contentAlpha.get()),
                 resolveTarget(BrickType.PHONE_STATUS, phoneStatusActive,
                         binding.phoneStatusContainer, prefs.phoneStatus.contentAlpha.get()),
+                resolveTarget(BrickType.PHONE_CELLULAR, phoneCellularActive,
+                        binding.phoneCellularStatusIcon, prefs.phoneCellular.contentAlpha.get()),
+                resolveTarget(BrickType.PHONE_BATTERY, phoneBatteryActive,
+                        binding.phoneBatteryStatusIcon, prefs.phoneBattery.contentAlpha.get()),
         };
 
         // Media has the extra session gate, so we build its BrickTarget here. In particular, the
@@ -2803,6 +2896,16 @@ public class WidgetService extends Service {
                 return new PopupOverlayController.BuiltinValue(
                         joinedVisibleText(binding.phoneStatusContainer), "#FFFFFFFF",
                         "phone", binding.phoneStatusContainer.getVisibility() == View.VISIBLE);
+            case "builtin.phone_cellular":
+                Integer signal = phonePercent("network.signal");
+                return new PopupOverlayController.BuiltinValue(
+                        signal == null ? "" : signal + "%", "#FFFFFFFF",
+                        "phone", signal != null);
+            case "builtin.phone_battery":
+                Integer battery = phonePercent("battery.level");
+                return new PopupOverlayController.BuiltinValue(
+                        battery == null ? "" : battery + "%", "#FFFFFFFF",
+                        "battery", battery != null);
             default:
                 return null;
         }
@@ -3020,6 +3123,12 @@ public class WidgetService extends Service {
         }
         if (bricks.contains(BrickType.BLUETOOTH)) {
             h = Math.max(h, prefs.bluetooth.size.get());
+        }
+        if (bricks.contains(BrickType.PHONE_CELLULAR)) {
+            h = Math.max(h, prefs.phoneCellular.size.get());
+        }
+        if (bricks.contains(BrickType.PHONE_BATTERY)) {
+            h = Math.max(h, prefs.phoneBattery.size.get());
         }
         // Car bricks only contribute to the height floor when the vehicle actually renders them
         // (same isBrickSupported gate as applyBrickVisibility) — otherwise a preset from another
@@ -3997,8 +4106,8 @@ public class WidgetService extends Service {
             PhoneBluetoothIndicatorPolicy.Appearance phoneAppearance =
                     PhoneBluetoothIndicatorPolicy.resolve(
                             bluetoothState == BluetoothState.CONNECTED,
-                            isPhoneConnectorLinkPresent(),
-                            phoneNotificationDeliveryConfirmed);
+                            hasSelectedPhoneConfiguration(),
+                            isPhoneNotificationPathAvailable());
             if (phoneAppearance != PhoneBluetoothIndicatorPolicy.Appearance.DEFAULT) {
                 // Use one deliberately simple rune. The previous "hide the body and enlarge the
                 // bitmap halo" trick produced two muddy, overlapping silhouettes on the KX11.
@@ -4011,16 +4120,34 @@ public class WidgetService extends Service {
                 ImageViewCompat.setImageTintList(binding.bluetoothStatusIcon,
                         ColorStateList.valueOf(ContextCompat.getColor(
                                 context, R.color.status_bluetooth)));
+                if (prefs.bluetooth.outlineAlpha.get() > 0) {
+                    binding.bluetoothStatusIcon.setOutlineWidth(
+                            Math.min(1, Math.max(0, prefs.bluetooth.outlineWidth.get())));
+                }
             }
         }
         schedulePopupRefresh();
     }
 
     private boolean isPhoneConnectorLinkPresent() {
-        if (phoneAncsReady || phoneNotificationDeliveryConfirmed) return true;
         ConnectorValue connected = phoneStatusValues.get("connected");
         return connected != null && connected.fresh && connected.available
                 && connected.readable && Boolean.TRUE.equals(connected.rawValue);
+    }
+
+    private boolean hasSelectedPhoneConfiguration() {
+        return prefs != null && !prefs.phoneDeviceAddress.get().trim().isEmpty();
+    }
+
+    /** A live ANCS subscription and a currently readable notification feed are both required. */
+    private boolean isPhoneNotificationPathAvailable() {
+        ConnectorValue profile = phoneStatusValues.get("profiles.ancs");
+        boolean profileActive = profile != null && profile.fresh && profile.available
+                && profile.readable && Boolean.TRUE.equals(profile.rawValue);
+        ConnectorValue notifications = phoneStatusValues.get("notifications.items");
+        boolean feedActive = notifications != null && notifications.fresh
+                && notifications.available && notifications.readable;
+        return phoneAncsReady && profileActive && feedActive;
     }
 
     private void updateForegroundAppTracking() {
@@ -4334,18 +4461,51 @@ public class WidgetService extends Service {
 
     private void setWifiStatus(WiFiState newState) {
         if (destroyed || binding == null || prefs == null || !prefs.widgetEnabled.get()) return;
-        if (wifiState == newState) {
-            return;
-        }
+        if (wifiState == newState) return;
         wifiState = newState;
+        if (newState == WiFiState.OFF) wifiSignalLevel = 0;
+        else wifiSignalLevel = readWifiSignalLevel();
         updateWifiStatus();
     }
 
     private void updateWifiStatus() {
         if (binding != null) {
-            updateIconStatus(ICON_TYPE_WIFI, binding.wifiStatusIcon, wifiState.ordinal());
+            OutlineImageView icon = binding.wifiStatusIcon;
+            icon.setImageResource(R.drawable.ic_status_iphone_wifi_level);
+            icon.setImageLevel(wifiSignalLevel * 2500);
+            icon.setDrawIcon(true);
+            ImageViewCompat.setImageTintList(icon, null);
+            applyConfiguredIconOutline(icon, prefs.wifi);
+            icon.setBadgeText(null, 0, 0);
+            if (wifiState == WiFiState.LIMITED_INTERNET) {
+                Drawable flag = ContextCompat.getDrawable(this, R.drawable.ic_badge_ru_flag);
+                icon.setBadgeDrawable(flag == null ? null : flag.mutate());
+            } else {
+                icon.setBadgeDrawable(null);
+            }
         }
         schedulePopupRefresh();
+    }
+
+    private void refreshWifiSignalLevel() {
+        int next = wifiState == WiFiState.OFF ? 0 : readWifiSignalLevel();
+        if (next == wifiSignalLevel) return;
+        wifiSignalLevel = next;
+        updateWifiStatus();
+    }
+
+    private int readWifiSignalLevel() {
+        try {
+            WifiManager manager = (WifiManager) getApplicationContext()
+                    .getSystemService(Context.WIFI_SERVICE);
+            WifiInfo info = manager == null ? null : manager.getConnectionInfo();
+            if (info == null || info.getNetworkId() < 0) return 0;
+            return Math.max(1, Math.min(4,
+                    WifiManager.calculateSignalLevel(info.getRssi(), 4) + 1));
+        } catch (RuntimeException unavailable) {
+            Log.w(TAG, "Could not read Wi-Fi RSSI", unavailable);
+            return wifiState == WiFiState.OFF ? 0 : 1;
+        }
     }
 
     private void setGnssStatus(GnssState newState) {
@@ -4403,15 +4563,7 @@ public class WidgetService extends Service {
             ImageViewCompat.setImageTintList(icon, ColorStateList.valueOf(tint));
         }
 
-        int outlineAlpha = iconPrefs.outlineAlpha.get();
-        if (outlineAlpha > 0) {
-            int haloColor = (ContextCompat.getColor(ctx, R.color.text_outline) & 0x00FFFFFF)
-                    | (outlineAlpha << 24);
-            icon.setOutlineColor(haloColor);
-            icon.setOutlineWidth(iconPrefs.outlineWidth.get());
-        } else {
-            icon.setOutlineWidth(0);
-        }
+        applyConfiguredIconOutline(icon, iconPrefs);
 
         // Whitelist (Russian-only internet) — overlay a small flag badge regardless of style.
         if (iconType == ICON_TYPE_WIFI && stateIdx == WiFiState.LIMITED_INTERNET.ordinal()) {
@@ -4473,6 +4625,20 @@ public class WidgetService extends Service {
         } else {
             icon.setBadgeText(null, 0, 0);
         }
+    }
+
+    private void applyConfiguredIconOutline(@NonNull OutlineImageView icon,
+                                            @NonNull Preferences.IconBrickPrefs iconPrefs) {
+        Context context = themedContext != null ? themedContext : this;
+        int outlineAlpha = Math.max(0, Math.min(255, iconPrefs.outlineAlpha.get()));
+        if (outlineAlpha <= 0) {
+            icon.setOutlineWidth(0);
+            return;
+        }
+        int haloColor = (ContextCompat.getColor(context, R.color.text_outline) & 0x00FFFFFF)
+                | (outlineAlpha << 24);
+        icon.setOutlineColor(haloColor);
+        icon.setOutlineWidth(iconPrefs.outlineWidth.get());
     }
 
     // Wi-Fi state colours by ordinal (OFF, NO_INTERNET, LIMITED_INTERNET, INTERNET).
@@ -4540,7 +4706,6 @@ public class WidgetService extends Service {
         phoneStatusValues.clear();
         observedPhoneNotificationKeys.clear();
         phoneAncsReady = false;
-        phoneNotificationDeliveryConfirmed = false;
         activePhoneNotification = null;
         activePhoneNotificationFields = Collections.emptySet();
         activePhoneBatteryAlertText = null;
@@ -4659,6 +4824,7 @@ public class WidgetService extends Service {
         int iconResource = 0;
         int iconTint = ContextCompat.getColor(
                 themedContext != null ? themedContext : this, R.color.text_primary);
+        int iconLevel = 10000;
         int outlineColor = ContextCompat.getColor(
                 themedContext != null ? themedContext : this, R.color.text_outline);
         int outlineWidth = 0;
@@ -4688,8 +4854,9 @@ public class WidgetService extends Service {
                 active = known;
                 break;
             case WIFI:
-                iconType = ICON_TYPE_WIFI;
-                state = wifiState.ordinal();
+                iconResource = R.drawable.ic_status_iphone_wifi_level;
+                iconTint = 0; // Preserve per-arc gray/green vector colors.
+                iconLevel = wifiSignalLevel * 2500;
                 iconPrefs = prefs.wifi;
                 active = wifiState == WiFiState.INTERNET
                         || wifiState == WiFiState.LIMITED_INTERNET;
@@ -4732,6 +4899,31 @@ public class WidgetService extends Service {
                 text = joinedVisibleText(binding.phoneStatusContainer);
                 known = !text.isEmpty();
                 active = known;
+                break;
+            case PHONE_CELLULAR:
+                Integer signal = phonePercent("network.signal");
+                known = signal != null;
+                active = known && signal > 0;
+                text = known ? signal + "%" : "";
+                iconResource = R.drawable.ic_status_iphone_cellular_level;
+                iconTint = 0; // Active/inactive bars carry their own colors.
+                iconLevel = cellularBars(signal) * 2500;
+                iconPrefs = prefs.phoneCellular;
+                break;
+            case PHONE_BATTERY:
+                Integer battery = phonePercent("battery.level");
+                known = battery != null;
+                active = known;
+                text = known ? battery + "%" : "";
+                iconResource = R.drawable.ic_status_iphone_battery;
+                iconLevel = batteryDrawableLevel(battery);
+                iconPrefs = prefs.phoneBattery;
+                Context context = themedContext != null ? themedContext : this;
+                iconTint = battery != null && battery <= 10
+                        ? ContextCompat.getColor(context, R.color.iphone_battery_critical)
+                        : battery != null && battery <= 20
+                        ? ContextCompat.getColor(context, R.color.iphone_battery_low)
+                        : ContextCompat.getColor(context, android.R.color.white);
                 break;
             default:
                 return null;
@@ -4786,8 +4978,32 @@ public class WidgetService extends Service {
                 badgeText = String.valueOf(btConnectedAddrs.size());
                 badgeBackground = styleBackground;
             }
+            if (iconType == ICON_TYPE_BT) {
+                PhoneBluetoothIndicatorPolicy.Appearance appearance =
+                        PhoneBluetoothIndicatorPolicy.resolve(
+                                bluetoothState == BluetoothState.CONNECTED,
+                                hasSelectedPhoneConfiguration(),
+                                isPhoneNotificationPathAvailable());
+                if (appearance != PhoneBluetoothIndicatorPolicy.Appearance.DEFAULT) {
+                    iconResource = appearance
+                            == PhoneBluetoothIndicatorPolicy.Appearance.PHONE_SOLID
+                            ? R.drawable.ic_status_bt_phone_solid
+                            : R.drawable.ic_status_bt_phone_outline;
+                    iconTint = ContextCompat.getColor(
+                            themedContext != null ? themedContext : this,
+                            R.color.status_bluetooth);
+                    if (outlineWidth > 0) outlineWidth = Math.min(1, outlineWidth);
+                }
+            }
+        } else if (iconResource != 0 && iconPrefs != null) {
+            int outlineAlpha = Math.max(0, Math.min(255, iconPrefs.outlineAlpha.get()));
+            outlineWidth = outlineAlpha <= 0 ? 0 : iconPrefs.outlineWidth.get();
+            outlineColor = (outlineColor & 0x00FFFFFF) | (outlineAlpha << 24);
+            if (type == BrickType.WIFI && wifiState == WiFiState.LIMITED_INTERNET) {
+                badgeDrawableResource = R.drawable.ic_badge_ru_flag;
+            }
         }
-        return new StatusBrickSnapshot(text, iconResource, iconTint,
+        return new StatusBrickSnapshot(text, iconResource, iconTint, iconLevel,
                 outlineColor, outlineWidth, badgeText, badgeBackground, badgeForeground,
                 badgeDrawableResource, known, active);
     }

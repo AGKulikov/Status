@@ -13,6 +13,8 @@ public final class StatusBrickSnapshot {
     @NonNull public final String text;
     public final int iconResource;
     public final int iconTint;
+    /** Drawable level (0..10000), used by signal bars and clipped battery fill. */
+    public final int iconLevel;
     public final int outlineColor;
     public final int outlineWidth;
     @Nullable public final String badgeText;
@@ -25,6 +27,7 @@ public final class StatusBrickSnapshot {
     public StatusBrickSnapshot(@NonNull String text,
                                int iconResource,
                                int iconTint,
+                               int iconLevel,
                                int outlineColor,
                                int outlineWidth,
                                @Nullable String badgeText,
@@ -36,6 +39,7 @@ public final class StatusBrickSnapshot {
         this.text = text;
         this.iconResource = iconResource;
         this.iconTint = iconTint;
+        this.iconLevel = iconLevel;
         this.outlineColor = outlineColor;
         this.outlineWidth = outlineWidth;
         this.badgeText = badgeText;

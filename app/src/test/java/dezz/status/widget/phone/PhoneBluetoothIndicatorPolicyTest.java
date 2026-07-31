@@ -15,7 +15,7 @@ public final class PhoneBluetoothIndicatorPolicyTest {
                 PhoneBluetoothIndicatorPolicy.resolve(true, true, false));
     }
 
-    @Test public void ActualNotificationDeliveryFillsTheSameGlyph() {
+    @Test public void activeNotificationPathFillsTheSameGlyph() {
         assertEquals(PhoneBluetoothIndicatorPolicy.Appearance.PHONE_SOLID,
                 PhoneBluetoothIndicatorPolicy.resolve(true, true, true));
     }

@@ -38,7 +38,11 @@ public enum BrickType {
      *
      * <p>Keep this appended: enum ordinals are RecyclerView stable ids in existing installs.</p>
      */
-    PHONE_STATUS;
+    PHONE_STATUS,
+    /** iPhone cellular signal rendered as the familiar four ascending bars. */
+    PHONE_CELLULAR,
+    /** Exact paired-iPhone battery level rendered as an iPhone battery glyph. */
+    PHONE_BATTERY;
 
     /** Stable id used by Home Assistant/MQTT visibility commands. Never derive this from ordinal. */
     public String automationId() {
@@ -53,6 +57,8 @@ public enum BrickType {
             case OUTDOOR_TEMP: return "builtin.outdoor_temp";
             case HOME_ASSISTANT: return "builtin.home_assistant";
             case PHONE_STATUS: return "builtin.phone_status";
+            case PHONE_CELLULAR: return "builtin.phone_cellular";
+            case PHONE_BATTERY: return "builtin.phone_battery";
             default: throw new IllegalStateException("Unknown brick type " + this);
         }
     }

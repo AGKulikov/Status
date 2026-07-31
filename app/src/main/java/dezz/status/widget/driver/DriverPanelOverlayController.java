@@ -100,6 +100,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private static final long PROXY_TAP_HARD_RESTORE_MS = 450L;
     /** One physical press can be delivered by both the rail view and the service action. */
     private static final long FAVORITES_TOGGLE_DEBOUNCE_MS = 350L;
+    /** Let the rail button process the same outside-touch before closing its open drawer. */
+    private static final long FAVORITES_OUTSIDE_DISMISS_DELAY_MS = 120L;
 
     private final Context appContext;
     private final Preferences preferences;
@@ -118,6 +120,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private final Set<String> manuallyOpenFavorites = new LinkedHashSet<>();
     private final Set<String> manuallyClosedFavorites = new LinkedHashSet<>();
     private final Map<String, Long> lastFavoriteToggleAt = new HashMap<>();
+    private final Map<String, Runnable> pendingFavoriteOutsideDismissals = new HashMap<>();
     private final Map<String, ConnectorValue> smartHomeValues = new HashMap<>();
     private Map<String, IntentActionRule> smartHomeRules = Collections.emptyMap();
     @Nullable private WidgetService smartHomeValueService;
@@ -480,18 +483,19 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         gridParams.topMargin = 84;
         drawer.addView(grid, gridParams);
 
-        // The full-screen modal root receives an outside tap while the actual drawer leaves the
-        // driver rail visible. Its child position uses physical display coordinates, independent
-        // of ECARX's shifted system-window origin.
+        // Attach only over the application area. A full-screen opaque root would cover the custom
+        // driver rail with a black copy of the OEM edge even though the drawer child started after
+        // it. Keeping the rail outside this window also lets its All Apps button toggle the drawer.
         int drawerWidth = Math.max(1, metrics.widthPixels - physicalWidth);
         int drawerLeft = profile.side.get() == 0 ? physicalWidth : 0;
+        int drawerWindowX = DriverPanelLayoutPolicy.panelWindowX(
+                metrics.widthPixels, metrics.widthPixels, false) + drawerLeft;
         FrameLayout.LayoutParams drawerParams = new FrameLayout.LayoutParams(
-                drawerWidth, ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
                 Gravity.TOP | Gravity.LEFT);
-        drawerParams.leftMargin = drawerLeft;
         root.addView(drawer, drawerParams);
         WindowManager.LayoutParams params = allAppsOverlayParams(
-                attachedType, metrics.widthPixels, metrics.heightPixels,
+                attachedType, drawerWidth, metrics.heightPixels, drawerWindowX,
                 "Status Widget all applications");
         try {
             manager.addView(root, params);
@@ -531,6 +535,10 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             mainHandler.post(() -> showFavorites(panelId, anchor));
             return;
         }
+        // ACTION_OUTSIDE is delivered to the open drawer before the same physical tap reaches
+        // its rail button. Cancel that deferred outside close so this method sees the still-open
+        // logical state and performs one real close instead of immediately reopening the drawer.
+        cancelPendingFavoriteOutsideDismiss(panelId);
         long now = SystemClock.uptimeMillis();
         Long previousToggle = lastFavoriteToggleAt.get(panelId);
         if (previousToggle != null
@@ -571,9 +579,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         root.setClickable(true);
         root.setOnTouchListener((view, event) -> {
             if (event.getActionMasked() != MotionEvent.ACTION_OUTSIDE) return false;
-            manuallyOpenFavorites.remove(panelId);
-            manuallyClosedFavorites.add(panelId);
-            dismissFavoritePanel(panelId);
+            scheduleFavoriteOutsideDismiss(panelId);
             return true;
         });
 
@@ -675,8 +681,10 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             if (generation != proxyTapGeneration) return;
             if (WidgetAccessibilityService.performTap(target.x, target.y, success -> {
                 if (generation != proxyTapGeneration) return;
-                if (success) restore.run();
-                else fallbackStockClimateTap(target, generation);
+                // A cancelled callback can arrive after ECARX has already consumed the tap while
+                // replacing its climate surface. Retrying here generated a second click and could
+                // toggle the panel back to its original state. One accepted gesture means one tap.
+                restore.run();
             })) return;
             fallbackStockClimateTap(target, generation);
         }, PROXY_TAP_SETTLE_MS);
@@ -797,11 +805,35 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     }
 
     private void dismissAllFavoritePanels() {
+        for (Runnable pending : new ArrayList<>(pendingFavoriteOutsideDismissals.values())) {
+            mainHandler.removeCallbacks(pending);
+        }
+        pendingFavoriteOutsideDismissals.clear();
         List<String> ids = new ArrayList<>(favoriteWindows.keySet());
         for (String id : ids) dismissFavoritePanel(id);
         manuallyOpenFavorites.clear();
         manuallyClosedFavorites.clear();
         drawerSmartHomeBindings.clear();
+    }
+
+    private void scheduleFavoriteOutsideDismiss(@NonNull String panelId) {
+        cancelPendingFavoriteOutsideDismiss(panelId);
+        Runnable pending = new Runnable() {
+            @Override public void run() {
+                if (pendingFavoriteOutsideDismissals.get(panelId) != this) return;
+                pendingFavoriteOutsideDismissals.remove(panelId);
+                manuallyOpenFavorites.remove(panelId);
+                manuallyClosedFavorites.add(panelId);
+                dismissFavoritePanel(panelId);
+            }
+        };
+        pendingFavoriteOutsideDismissals.put(panelId, pending);
+        mainHandler.postDelayed(pending, FAVORITES_OUTSIDE_DISMISS_DELAY_MS);
+    }
+
+    private void cancelPendingFavoriteOutsideDismiss(@NonNull String panelId) {
+        Runnable pending = pendingFavoriteOutsideDismissals.remove(panelId);
+        if (pending != null) mainHandler.removeCallbacks(pending);
     }
 
     private void refreshFavoriteWindows() {
@@ -1349,17 +1381,17 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
     @NonNull
     private static WindowManager.LayoutParams allAppsOverlayParams(
-            int type, int screenWidth, int screenHeight, @NonNull String title) {
+            int type, int width, int screenHeight, int x, @NonNull String title) {
         int flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                 | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                 | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
                 | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED;
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                Math.max(1, screenWidth), Math.max(1, screenHeight), type, flags,
+                Math.max(1, width), Math.max(1, screenHeight), type, flags,
                 PixelFormat.OPAQUE);
         params.gravity = Gravity.TOP | Gravity.LEFT;
-        params.x = DriverPanelLayoutPolicy.panelWindowX(
-                screenWidth, screenWidth, false);
+        params.x = Math.max(0, x);
         params.y = 0;
         params.setTitle(title);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {

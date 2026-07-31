@@ -36,6 +36,8 @@ public final class StatusBarInformationCatalog {
         result.add(vehicle(BrickType.OUTDOOR_TEMP, "ISensor.ambient_temp",
                 "Температура за бортом", "°C"));
         result.add(system(BrickType.PHONE_STATUS, "Статусы iPhone", ""));
+        result.add(system(BrickType.PHONE_CELLULAR, "Сотовая сеть iPhone", "%"));
+        result.add(system(BrickType.PHONE_BATTERY, "Батарея iPhone", "%"));
         return result;
     }
 
@@ -101,6 +103,10 @@ public final class StatusBarInformationCatalog {
                 return "calendar";
             case PHONE_STATUS:
                 return "phone_notification";
+            case PHONE_CELLULAR:
+                return "status_phone_cellular";
+            case PHONE_BATTERY:
+                return "status_phone_battery";
             case TIME:
             default:
                 return "notification";

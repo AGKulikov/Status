@@ -447,8 +447,9 @@ public final class InformationPanelView extends FrameLayout {
                 views.icon.setImageResource(status.iconResource);
                 views.resolvedIconKey = statusKey;
             }
-            ImageViewCompat.setImageTintList(views.icon,
-                    ColorStateList.valueOf(status.iconTint));
+            views.icon.setImageLevel(status.iconLevel);
+            ImageViewCompat.setImageTintList(views.icon, status.iconTint == 0 ? null
+                    : ColorStateList.valueOf(status.iconTint));
             views.icon.setOutlineColor(status.outlineColor);
             views.icon.setOutlineWidth(status.outlineWidth);
             views.icon.setBadgeText(status.badgeText,

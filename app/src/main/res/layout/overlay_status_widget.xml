@@ -205,6 +205,30 @@
         android:src="@drawable/ic_status_bt_off"
         tools:ignore="ContentDescription" />
 
+    <dezz.status.widget.OutlineImageView
+        android:id="@+id/phoneCellularStatusIcon"
+        android:layout_width="100sp"
+        android:layout_height="100sp"
+        android:layout_gravity="center_vertical"
+        android:paddingHorizontal="4sp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_status_iphone_cellular_level"
+        android:visibility="gone"
+        tools:ignore="ContentDescription"
+        tools:visibility="visible" />
+
+    <dezz.status.widget.OutlineImageView
+        android:id="@+id/phoneBatteryStatusIcon"
+        android:layout_width="145sp"
+        android:layout_height="100sp"
+        android:layout_gravity="center_vertical"
+        android:paddingHorizontal="4sp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_status_iphone_battery"
+        android:visibility="gone"
+        tools:ignore="ContentDescription"
+        tools:visibility="visible" />
+
     <!-- Car-specific bricks (fed by the flavor's CarIntegration). Direct children of the
          container like every other brick so status-bar mode can re-parent them. -->
     <dezz.status.widget.OutlineTextView

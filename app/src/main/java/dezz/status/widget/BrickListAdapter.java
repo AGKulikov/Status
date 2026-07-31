@@ -155,6 +155,10 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
                 return R.string.brick_title_home_assistant;
             case PHONE_STATUS:
                 return R.string.brick_title_phone_status;
+            case PHONE_CELLULAR:
+                return R.string.brick_title_phone_cellular;
+            case PHONE_BATTERY:
+                return R.string.brick_title_phone_battery;
             default:
                 return 0;
         }
@@ -532,6 +536,20 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
                     showBluetoothBlock(false);
                     showMediaBlock(false);
                     break;
+                case PHONE_CELLULAR:
+                    bindIconBrick(prefs.phoneCellular);
+                    showDateBlock(false);
+                    showGpsBlock(false);
+                    showBluetoothBlock(false);
+                    showMediaBlock(false);
+                    break;
+                case PHONE_BATTERY:
+                    bindIconBrick(prefs.phoneBattery);
+                    showDateBlock(false);
+                    showGpsBlock(false);
+                    showBluetoothBlock(false);
+                    showMediaBlock(false);
+                    break;
             }
 
             bindHideBlock(type);
@@ -733,6 +751,10 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
                     return activity.getString(R.string.brick_title_home_assistant);
                 case PHONE_STATUS:
                     return activity.getString(R.string.brick_title_phone_status);
+                case PHONE_CELLULAR:
+                    return activity.getString(R.string.brick_title_phone_cellular);
+                case PHONE_BATTERY:
+                    return activity.getString(R.string.brick_title_phone_battery);
                 default:
                     return "";
             }
@@ -985,10 +1007,10 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
             });
             refreshMediaSourceSectionVisibility();
 
-            // Upper bound = 80% of the current screen width — gives a useful range on both phones
-            // and car head units without locking it to the XML default.
+            // The media row may occupy the complete physical status-row width. HA1138 capped this
+            // at 80% (1408 px on the KX11), which made a full-width layout impossible.
             int screenW = activity.getResources().getDisplayMetrics().widthPixels;
-            float upper = Math.max(brickMediaMaxWidthSlider.getValueFrom() + 1F, screenW * 0.8F);
+            float upper = Math.max(brickMediaMaxWidthSlider.getValueFrom() + 1F, screenW);
             brickMediaMaxWidthSlider.setValueTo(upper);
             bindIntSlider(brickMediaMaxWidthSlider, prefs.media.maxWidth, sizeFormatter());
 

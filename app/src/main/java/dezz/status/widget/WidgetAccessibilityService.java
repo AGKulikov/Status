@@ -195,31 +195,49 @@ public class WidgetAccessibilityService extends AccessibilityService {
         WidgetAccessibilityService current = instance;
         if (current == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return false;
         Handler main = new Handler(Looper.getMainLooper());
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return dispatchTap(current, main, x, y, callback);
+        }
+        // Existing callers enter from the main thread. Keep the public helper safe for a future
+        // worker-thread caller, but do not claim a second injection is required merely because an
+        // already accepted gesture is later cancelled by an ECARX window transition.
         main.post(() -> {
-            try {
-                Path path = new Path();
-                path.moveTo(Math.max(0, x), Math.max(0, y));
-                GestureDescription gesture = new GestureDescription.Builder()
-                        .addStroke(new GestureDescription.StrokeDescription(path, 0L, 80L))
-                        .build();
-                boolean accepted = current.dispatchGesture(gesture,
-                        new GestureResultCallback() {
-                            @Override public void onCompleted(
-                                    GestureDescription gestureDescription) {
-                                callback.onFinished(true);
-                            }
-
-                            @Override public void onCancelled(
-                                    GestureDescription gestureDescription) {
-                                callback.onFinished(false);
-                            }
-                        }, main);
-                if (!accepted) callback.onFinished(false);
-            } catch (RuntimeException error) {
+            if (!dispatchTap(current, main, x, y, callback)) {
                 callback.onFinished(false);
             }
         });
         return true;
+    }
+
+    /**
+     * @return {@code true} only when Android accepted this exact gesture for dispatch.
+     */
+    private static boolean dispatchTap(@NonNull WidgetAccessibilityService current,
+                                       @NonNull Handler main,
+                                       int x,
+                                       int y,
+                                       @NonNull TapCallback callback) {
+        try {
+            Path path = new Path();
+            path.moveTo(Math.max(0, x), Math.max(0, y));
+            GestureDescription gesture = new GestureDescription.Builder()
+                    .addStroke(new GestureDescription.StrokeDescription(path, 0L, 80L))
+                    .build();
+            return current.dispatchGesture(gesture,
+                    new GestureResultCallback() {
+                        @Override public void onCompleted(
+                                GestureDescription gestureDescription) {
+                            callback.onFinished(true);
+                        }
+
+                        @Override public void onCancelled(
+                                GestureDescription gestureDescription) {
+                            callback.onFinished(false);
+                        }
+                    }, main);
+        } catch (RuntimeException error) {
+            return false;
+        }
     }
 
     /**
