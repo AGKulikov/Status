@@ -56,6 +56,9 @@ public class MediaNotificationListener extends NotificationListenerService {
             boolean foundRoute;
             try {
                 foundRoute = refreshActiveNavigationNotifications();
+            } catch (OutOfMemoryError memoryPressure) {
+                NavigationDataRepository.releaseDecodedGraphics();
+                foundRoute = false;
             } catch (RuntimeException | LinkageError ignored) {
                 // A third-party RemoteViews/Bundle is untrusted input. Keep the collector thread
                 // alive and let the watchdog or Accessibility fallback recover later.
@@ -193,7 +196,7 @@ public class MediaNotificationListener extends NotificationListenerService {
         StatusBarNotification[] active;
         try {
             active = getActiveNotifications();
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException | OutOfMemoryError ignored) {
             return false;
         }
         if (active == null) active = new StatusBarNotification[0];
@@ -208,6 +211,9 @@ public class MediaNotificationListener extends NotificationListenerService {
             NavigationDataRepository.NotificationCandidate candidate;
             try {
                 candidate = NavigationDataRepository.inspectNotification(this, notification);
+            } catch (OutOfMemoryError memoryPressure) {
+                NavigationDataRepository.releaseDecodedGraphics();
+                break;
             } catch (RuntimeException | LinkageError ignored) {
                 continue;
             }

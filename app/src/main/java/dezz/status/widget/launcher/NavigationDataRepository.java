@@ -596,6 +596,11 @@ public final class NavigationDataRepository {
         return true;
     }
 
+    /** Releases decoded navigation images after a low-memory rejection; files remain intact. */
+    public static void releaseDecodedGraphics() {
+        NavigationGraphicStore.evictAll();
+    }
+
     /** Clears data only if the removed notification was the current source. */
     public static void removeIfSource(@NonNull Context context,
             @NonNull StatusBarNotification sbn) {

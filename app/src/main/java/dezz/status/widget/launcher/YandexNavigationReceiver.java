@@ -24,17 +24,27 @@ public final class YandexNavigationReceiver extends BroadcastReceiver {
      * thread. A single worker deliberately preserves update/clear order across all navigation
      * channels (a pool could resurrect an image after its later CLEAR broadcast).
      */
-    private static final int MAX_PENDING_BROADCASTS = 24;
+    // Route-image broadcasts can each retain a Binder-backed bitmap. Keep the queue small and
+    // proactively coalesce per channel so opening Navigator cannot retain dozens of old frames
+    // in the shared HOME/Status Widget process on the 2 GB Android 9 head unit.
+    private static final int MAX_PENDING_BROADCASTS = 8;
     private static final ThreadPoolExecutor WORKER = createWorker();
 
     @Override
     public void onReceive(Context context, Intent intent) {
         if (context == null || intent == null) return;
-        dezz.status.widget.diagnostics.ActionRecorder.record(
-                dezz.status.widget.diagnostics.ActionRecorder.SOURCE_SERVICE,
-                "BROADCAST_RECEIVED",
-                dezz.status.widget.diagnostics.ActionRecorder.object(
-                        "receiver", getClass().getName(), "action", intent.getAction()));
+        try {
+            dezz.status.widget.diagnostics.ActionRecorder.record(
+                    dezz.status.widget.diagnostics.ActionRecorder.SOURCE_SERVICE,
+                    "BROADCAST_RECEIVED",
+                    dezz.status.widget.diagnostics.ActionRecorder.object(
+                            "receiver", getClass().getName(), "action", intent.getAction()));
+        } catch (OutOfMemoryError memoryPressure) {
+            NavigationGraphicStore.evictAll();
+            return;
+        } catch (RuntimeException | LinkageError ignored) {
+            // Diagnostics must never turn an untrusted Navigator broadcast into a process crash.
+        }
         Context applicationContext = context.getApplicationContext();
         if (applicationContext == null) applicationContext = context;
         Context targetContext = applicationContext;
@@ -43,17 +53,42 @@ public final class YandexNavigationReceiver extends BroadcastReceiver {
         try {
             snapshot = snapshotForWorker(intent);
             pendingResult = goAsync();
+        } catch (OutOfMemoryError memoryPressure) {
+            NavigationGraphicStore.evictAll();
+            return;
         } catch (Throwable failure) {
             reportNonFatal("Could not snapshot navigation broadcast", failure);
             return;
         }
         NavigationTask task = new NavigationTask(targetContext, snapshot, pendingResult);
         try {
+            coalesceQueuedUpdates(task);
             WORKER.execute(task);
+        } catch (OutOfMemoryError memoryPressure) {
+            task.finish();
+            NavigationGraphicStore.evictAll();
+            releaseQueuedPayloads();
         } catch (Throwable failure) {
             // The process may be shutting down and reject new tasks. Never leak a PendingResult.
             task.finish();
             reportNonFatal("Could not enqueue navigation broadcast", failure);
+        }
+    }
+
+    private static void coalesceQueuedUpdates(NavigationTask incoming) {
+        BlockingQueue<Runnable> queue = WORKER.getQueue();
+        for (Runnable value : queue) {
+            if (!(value instanceof NavigationTask)) continue;
+            NavigationTask queued = (NavigationTask) value;
+            if (incoming.supersedes(queued) && queue.remove(queued)) queued.finish();
+        }
+    }
+
+    private static void releaseQueuedPayloads() {
+        BlockingQueue<Runnable> queue = WORKER.getQueue();
+        Runnable value;
+        while ((value = queue.poll()) != null) {
+            if (value instanceof NavigationTask) ((NavigationTask) value).finish();
         }
     }
 
@@ -145,6 +180,11 @@ public final class YandexNavigationReceiver extends BroadcastReceiver {
         @Override public void run() {
             try {
                 NavigationDataRepository.updateFromYandexBroadcast(context, intent);
+            } catch (OutOfMemoryError memoryPressure) {
+                // The sender owns the source bitmap. Release our decoded cache and all queued
+                // stale payloads; this one rejected frame must not terminate Status Widget.
+                NavigationGraphicStore.evictAll();
+                releaseQueuedPayloads();
             } catch (Throwable failure) {
                 // This receiver is exported for mHUD/MConfig. A malformed Parcelable/extra from
                 // another process (including a Parcelable class-initialization/linkage failure)

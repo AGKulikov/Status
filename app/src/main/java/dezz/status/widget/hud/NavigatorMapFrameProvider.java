@@ -6,6 +6,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.PixelFormat;
 import android.media.Image;
@@ -14,6 +15,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.util.Log;
 import android.view.Surface;
 
 import androidx.annotation.NonNull;
@@ -24,6 +26,8 @@ import java.nio.ByteBuffer;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.UUID;
+
+import dezz.status.widget.diagnostics.DiagnosticJournal;
 
 /**
  * Direct cross-process surface connection between Status Widget and the original Navigator mod.
@@ -50,16 +54,18 @@ public final class NavigatorMapFrameProvider {
     private static final long ACK_RETRY_MS = 3_000L;
     private static final long FRAME_RETRY_MS = 7_000L;
     private static final long READER_RECREATE_MS = 14_000L;
+    private static final long BRIDGE_CHECK_INTERVAL_MS = 10_000L;
+    private static final long FAILURE_LOG_INTERVAL_MS = 10_000L;
     private static final int MAX_ROUTE_CHARS = 196_608;
+    private static final String TAG = "NavigatorMapProvider";
 
     @Nullable private static NavigatorMapFrameProvider instance;
 
     @NonNull private final Context context;
     @NonNull private final Handler main = new Handler(Looper.getMainLooper());
     @NonNull private final Map<Listener, HudPanelConfig> clients = new IdentityHashMap<>();
-    @NonNull private final int[] pixels =
-            new int[HudViewportPolicy.SAFE_WIDTH * HudViewportPolicy.SAFE_HEIGHT];
-    @NonNull private final Bitmap[] frameBuffers = new Bitmap[3];
+    @Nullable private int[] pixels;
+    @NonNull private final Bitmap[] frameBuffers = new Bitmap[2];
 
     @Nullable private HandlerThread imageThread;
     @Nullable private Handler imageHandler;
@@ -74,47 +80,64 @@ public final class NavigatorMapFrameProvider {
     private long lastConnectAt;
     private long lastAckAt;
     private long lastFrameAt;
+    private long lastBridgeCheckAt;
+    private long lastFailureLogAt;
+    private boolean bridgeAvailable;
     private boolean ackRegistered;
 
     private final BroadcastReceiver ackReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context ignored, Intent intent) {
-            if (!ACTION_ACK.equals(intent.getAction())
-                    || intent.getIntExtra("contract_version", 0) != CONTRACT_VERSION
-                    || !session.equals(intent.getStringExtra("session"))) {
-                return;
-            }
-            lastAckAt = SystemClock.elapsedRealtime();
-            String nextState = bounded(intent.getStringExtra("state"), 64);
-            String detail = bounded(intent.getStringExtra("detail"), 320);
-            state = (nextState.isEmpty() ? "ACK" : nextState)
-                    + (detail.isEmpty() ? "" : " · " + detail);
-            notifyClients();
+            runGuarded("navigator ACK", () -> acceptAck(intent));
         }
     };
 
+    private void acceptAck(@Nullable Intent intent) {
+        if (intent == null) return;
+        if (!ACTION_ACK.equals(intent.getAction())
+                || intent.getIntExtra("contract_version", 0) != CONTRACT_VERSION
+                || !session.equals(intent.getStringExtra("session"))) {
+            return;
+        }
+        lastAckAt = SystemClock.elapsedRealtime();
+        String nextState = bounded(intent.getStringExtra("state"), 64);
+        String detail = bounded(intent.getStringExtra("detail"), 320);
+        state = (nextState.isEmpty() ? "ACK" : nextState)
+                + (detail.isEmpty() ? "" : " · " + detail);
+        notifyClients();
+    }
+
     private final Runnable watchdog = new Runnable() {
         @Override public void run() {
-            if (clients.isEmpty()) return;
-            HudElementConfig selected = chooseMapConfig();
-            if (selected == null) {
-                stopConnection();
-                return;
-            }
-            mapConfig = selected;
-            ensureReader();
-            long now = SystemClock.elapsedRealtime();
-            if (lastAckAt <= 0L || now - lastAckAt >= ACK_RETRY_MS) {
-                sendConnect(true);
-            } else if (lastFrameAt <= 0L || now - lastFrameAt >= FRAME_RETRY_MS) {
-                if (now - lastConnectAt >= READER_RECREATE_MS) {
-                    recreateReader();
-                } else {
-                    sendConnect(true);
-                }
-            }
-            main.postDelayed(this, ACK_RETRY_MS);
+            runGuarded("watchdog", NavigatorMapFrameProvider.this::watchdogTick);
         }
     };
+
+    private void watchdogTick() {
+        if (clients.isEmpty()) return;
+        HudElementConfig selected = chooseMapConfig();
+        if (selected == null) {
+            stopConnection();
+            return;
+        }
+        mapConfig = selected;
+        if (!navigatorBridgeAvailable()) {
+            releaseUnavailableBridge();
+            main.postDelayed(watchdog, READER_RECREATE_MS);
+            return;
+        }
+        ensureReader();
+        long now = SystemClock.elapsedRealtime();
+        if (lastAckAt <= 0L || now - lastAckAt >= ACK_RETRY_MS) {
+            sendConnect(true);
+        } else if (lastFrameAt <= 0L || now - lastFrameAt >= FRAME_RETRY_MS) {
+            if (now - lastConnectAt >= READER_RECREATE_MS) {
+                recreateReader();
+            } else {
+                sendConnect(true);
+            }
+        }
+        main.postDelayed(watchdog, ACK_RETRY_MS);
+    }
 
     private NavigatorMapFrameProvider(@NonNull Context source) {
         Context app = source.getApplicationContext();
@@ -182,6 +205,12 @@ public final class NavigatorMapFrameProvider {
             stopConnection();
             return;
         }
+        if (!navigatorBridgeAvailable()) {
+            releaseUnavailableBridge();
+            main.removeCallbacks(watchdog);
+            main.postDelayed(watchdog, READER_RECREATE_MS);
+            return;
+        }
         ensureReader();
         sendConnect(false);
         main.removeCallbacks(watchdog);
@@ -203,6 +232,12 @@ public final class NavigatorMapFrameProvider {
 
     private void ensureReader() {
         if (reader != null && reader.getSurface().isValid()) return;
+        if (reader != null || imageThread != null) closeReader();
+        pixels = new int[HudViewportPolicy.SAFE_WIDTH * HudViewportPolicy.SAFE_HEIGHT];
+        for (int index = 0; index < frameBuffers.length; index++) {
+            frameBuffers[index] = Bitmap.createBitmap(HudViewportPolicy.SAFE_WIDTH,
+                    HudViewportPolicy.SAFE_HEIGHT, Bitmap.Config.ARGB_8888);
+        }
         imageThread = new HandlerThread("navigator-map-frames",
                 android.os.Process.THREAD_PRIORITY_DISPLAY);
         imageThread.start();
@@ -210,10 +245,6 @@ public final class NavigatorMapFrameProvider {
         reader = ImageReader.newInstance(HudViewportPolicy.SAFE_WIDTH,
                 HudViewportPolicy.SAFE_HEIGHT, PixelFormat.RGBA_8888, 3);
         reader.setOnImageAvailableListener(this::consumeLatestImage, imageHandler);
-        for (int index = 0; index < frameBuffers.length; index++) {
-            frameBuffers[index] = Bitmap.createBitmap(HudViewportPolicy.SAFE_WIDTH,
-                    HudViewportPolicy.SAFE_HEIGHT, Bitmap.Config.ARGB_8888);
-        }
         session = UUID.randomUUID().toString();
         frame = null;
         writeBuffer = 0;
@@ -240,6 +271,8 @@ public final class NavigatorMapFrameProvider {
             int rowStride = plane.getRowStride();
             int width = HudViewportPolicy.SAFE_WIDTH;
             int height = HudViewportPolicy.SAFE_HEIGHT;
+            int[] targetPixels = pixels;
+            if (targetPixels == null) return;
             for (int y = 0; y < height; y++) {
                 int row = y * rowStride;
                 int output = y * width;
@@ -249,22 +282,24 @@ public final class NavigatorMapFrameProvider {
                     int green = bytes.get(offset + 1) & 0xFF;
                     int blue = bytes.get(offset + 2) & 0xFF;
                     int alpha = bytes.get(offset + 3) & 0xFF;
-                    pixels[output + x] = (alpha << 24) | (red << 16) | (green << 8) | blue;
+                    targetPixels[output + x] =
+                            (alpha << 24) | (red << 16) | (green << 8) | blue;
                 }
             }
             Bitmap target = frameBuffers[writeBuffer++ % frameBuffers.length];
-            target.setPixels(pixels, 0, width, 0, 0, width, height);
+            if (target == null) return;
+            target.setPixels(targetPixels, 0, width, 0, 0, width, height);
             frame = target;
             lastFrameAt = SystemClock.elapsedRealtime();
             state = "CONNECTED · кадры 728×190";
-            main.post(this::notifyClients);
-        } catch (RuntimeException ignored) {
+            main.post(() -> runGuarded("frame notification", this::notifyClients));
+        } catch (RuntimeException | LinkageError | OutOfMemoryError failure) {
             state = "Ошибка чтения кадра карты";
-            main.post(this::notifyClients);
+            main.post(() -> handleProviderFailure("frame reader", failure));
         } finally {
             if (image != null) {
                 try { image.close(); }
-                catch (RuntimeException ignored) {}
+                catch (RuntimeException | LinkageError ignored) {}
             }
         }
     }
@@ -311,7 +346,7 @@ public final class NavigatorMapFrameProvider {
             configurationSignature = signature;
             lastConnectAt = now;
             state = "Подключение к исходному навигатору…";
-        } catch (RuntimeException error) {
+        } catch (RuntimeException | LinkageError error) {
             state = "Навигатор с HUD-контрактом не найден: "
                     + error.getClass().getSimpleName();
         }
@@ -350,15 +385,19 @@ public final class NavigatorMapFrameProvider {
         reader = null;
         if (current != null) {
             try { current.setOnImageAvailableListener(null, null); }
-            catch (RuntimeException ignored) {}
+            catch (RuntimeException | LinkageError ignored) {}
             try { current.close(); }
-            catch (RuntimeException ignored) {}
+            catch (RuntimeException | LinkageError ignored) {}
         }
         HandlerThread thread = imageThread;
         imageThread = null;
         imageHandler = null;
-        if (thread != null) thread.quitSafely();
+        if (thread != null) {
+            try { thread.quitSafely(); }
+            catch (RuntimeException | LinkageError ignored) {}
+        }
         frame = null;
+        pixels = null;
         for (int index = 0; index < frameBuffers.length; index++) {
             frameBuffers[index] = null;
         }
@@ -373,7 +412,7 @@ public final class NavigatorMapFrameProvider {
             ContextCompat.registerReceiver(context, ackReceiver,
                     new IntentFilter(ACTION_ACK), ContextCompat.RECEIVER_EXPORTED);
             ackRegistered = true;
-        } catch (RuntimeException error) {
+        } catch (RuntimeException | LinkageError error) {
             state = "Не удалось включить канал подтверждения навигатора";
         }
     }
@@ -381,20 +420,87 @@ public final class NavigatorMapFrameProvider {
     private void unregisterAckReceiver() {
         if (!ackRegistered) return;
         try { context.unregisterReceiver(ackReceiver); }
-        catch (RuntimeException ignored) {}
+        catch (RuntimeException | LinkageError ignored) {}
         ackRegistered = false;
     }
 
     private void notifyClients() {
         for (Listener listener : clients.keySet().toArray(new Listener[0])) {
             try { listener.onNavigatorMapFrameChanged(); }
-            catch (RuntimeException ignored) {}
+            catch (RuntimeException | LinkageError ignored) {}
         }
     }
 
     private void runOnMain(@NonNull Runnable action) {
-        if (Looper.myLooper() == Looper.getMainLooper()) action.run();
-        else main.post(action);
+        Runnable guarded = () -> runGuarded("client update", action);
+        if (Looper.myLooper() == Looper.getMainLooper()) guarded.run();
+        else main.post(guarded);
+    }
+
+    private void runGuarded(@NonNull String operation, @NonNull Runnable action) {
+        try {
+            action.run();
+        } catch (RuntimeException | LinkageError | OutOfMemoryError failure) {
+            handleProviderFailure(operation, failure);
+        }
+    }
+
+    private void handleProviderFailure(@NonNull String operation,
+                                       @NonNull Throwable failure) {
+        try { main.removeCallbacks(watchdog); }
+        catch (RuntimeException ignored) {}
+        // Closing the local consumer invalidates the Surface in the producer as well. Avoid any
+        // additional Binder transaction while Android is already reporting a broken transition.
+        try { closeReader(); }
+        catch (RuntimeException | LinkageError | OutOfMemoryError ignored) {}
+        configurationSignature = "";
+        state = "Источник карты временно недоступен";
+        reportProviderFailure(operation, failure);
+        try { notifyClients(); }
+        catch (RuntimeException | LinkageError | OutOfMemoryError ignored) {}
+        if (!clients.isEmpty() && chooseMapConfig() != null) {
+            try { main.postDelayed(watchdog, READER_RECREATE_MS); }
+            catch (RuntimeException ignored) {}
+        }
+    }
+
+    private void reportProviderFailure(@NonNull String operation, @NonNull Throwable failure) {
+        if (failure instanceof OutOfMemoryError) return;
+        long now = SystemClock.elapsedRealtime();
+        if (lastFailureLogAt != 0L && now - lastFailureLogAt < FAILURE_LOG_INTERVAL_MS) return;
+        lastFailureLogAt = now;
+        String detail = operation + " rejected " + failure.getClass().getSimpleName();
+        try { Log.w(TAG, detail); }
+        catch (RuntimeException | LinkageError ignored) {}
+        try { DiagnosticJournal.warn("navigator-map", detail); }
+        catch (RuntimeException | LinkageError ignored) {}
+    }
+
+    private boolean navigatorBridgeAvailable() {
+        long now = SystemClock.elapsedRealtime();
+        if (lastBridgeCheckAt != 0L && now - lastBridgeCheckAt < BRIDGE_CHECK_INTERVAL_MS) {
+            return bridgeAvailable;
+        }
+        lastBridgeCheckAt = now;
+        try {
+            android.content.pm.ServiceInfo service = context.getPackageManager().getServiceInfo(
+                    new ComponentName(NAVIGATOR_PACKAGE, NAVIGATOR_SERVICE), 0);
+            bridgeAvailable = service.enabled && service.applicationInfo != null
+                    && service.applicationInfo.enabled;
+        } catch (PackageManager.NameNotFoundException
+                 | RuntimeException | LinkageError ignored) {
+            bridgeAvailable = false;
+        }
+        return bridgeAvailable;
+    }
+
+    private void releaseUnavailableBridge() {
+        boolean changed = reader != null
+                || !"Навигатор не предоставляет канал карты HUD".equals(state);
+        closeReader();
+        configurationSignature = "";
+        state = "Навигатор не предоставляет канал карты HUD";
+        if (changed) notifyClients();
     }
 
     @NonNull

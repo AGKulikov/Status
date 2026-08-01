@@ -61,6 +61,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
@@ -105,6 +106,7 @@ import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.car.CarTelemetryExporter;
 import dezz.status.widget.databinding.OverlayStatusWidgetBinding;
+import dezz.status.widget.diagnostics.DiagnosticJournal;
 import dezz.status.widget.automation.AutomationContract;
 import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.automation.AutomationStateStore;
@@ -234,6 +236,7 @@ public class WidgetService extends Service {
     private static final float STATE_ICON_GAP_RATIO = 0.25f;
     private static final long FOREGROUND_APP_CHECK_INTERVAL_MS = 2_000L;
     private static final long FOREGROUND_APP_LOOKBACK_MS = 60_000L;
+    private static final long FOREGROUND_FAILURE_LOG_INTERVAL_MS = 10_000L;
     private static final String GNSSSHARE_CLIENT_PACKAGE = "dezz.gnssshare.client";
     private static final String GNSSSHARE_SATELLITE_STATUS_ACTION = "dezz.gnssshare.action.SATELLITE_STATUS";
     /** Satellite count extra. A value of {@code -1} means "no satellite data" (badge hidden). */
@@ -482,6 +485,7 @@ public class WidgetService extends Service {
     private UsageStatsManager usageStatsManager = null;
     private Set<String> hiddenInPackages;
     private String lastForegroundPackage;
+    private long lastForegroundFailureLogElapsed;
     private boolean overlayHiddenByApp = false;
 
     /**
@@ -612,8 +616,10 @@ public class WidgetService extends Service {
     private final Runnable foregroundAppCheckRunnable = new Runnable() {
         @Override
         public void run() {
-            checkForegroundApp();
-            mainHandler.postDelayed(this, FOREGROUND_APP_CHECK_INTERVAL_MS);
+            safeCheckForegroundApp("poll");
+            if (!destroyed) {
+                mainHandler.postDelayed(this, FOREGROUND_APP_CHECK_INTERVAL_MS);
+            }
         }
     };
 
@@ -1474,7 +1480,7 @@ public class WidgetService extends Service {
         if (haConfigs != null) configuredMainBricks = haConfigs.loadMain();
         hiddenInPackages = prefs.hideInPackages.get();
         rebuildEffectiveHideLists();
-        updateForegroundAppTracking();
+        safeUpdateForegroundAppTracking("preferences applied");
         updateThemedContext();
         ConnectorValue currentPhoneBattery = phoneStatusValues.get("battery.level");
         if (currentPhoneBattery != null) {
@@ -4177,7 +4183,7 @@ public class WidgetService extends Service {
             // If accessibility just connected, recompute once now — we won't get an event
             // until something actually changes on a display.
             if (accessibilityActive) {
-                checkForegroundApp();
+                safeCheckForegroundApp("tracking path changed");
             }
         } else {
             mainHandler.removeCallbacks(foregroundAppCheckRunnable);
@@ -4192,7 +4198,7 @@ public class WidgetService extends Service {
      * Recomputes visibility based on the package on <i>our</i> display.
      */
     public void onForegroundDisplayMapUpdated() {
-        mainHandler.post(this::checkForegroundApp);
+        mainHandler.post(() -> safeCheckForegroundApp("display map update"));
     }
 
     /**
@@ -4201,7 +4207,39 @@ public class WidgetService extends Service {
      * push vs. UsageStats poll).
      */
     public void onForegroundTrackingPathChanged() {
-        mainHandler.post(this::updateForegroundAppTracking);
+        mainHandler.post(() -> safeUpdateForegroundAppTracking("accessibility state"));
+    }
+
+    private void safeCheckForegroundApp(@NonNull String operation) {
+        try {
+            checkForegroundApp();
+        } catch (RuntimeException | LinkageError | OutOfMemoryError failure) {
+            reportForegroundFailure(operation, failure);
+        }
+    }
+
+    private void safeUpdateForegroundAppTracking(@NonNull String operation) {
+        try {
+            updateForegroundAppTracking();
+        } catch (RuntimeException | LinkageError | OutOfMemoryError failure) {
+            reportForegroundFailure(operation, failure);
+        }
+    }
+
+    private void reportForegroundFailure(@NonNull String operation,
+                                         @NonNull Throwable failure) {
+        if (failure instanceof OutOfMemoryError) return;
+        long now = SystemClock.elapsedRealtime();
+        if (lastForegroundFailureLogElapsed != 0L
+                && now - lastForegroundFailureLogElapsed < FOREGROUND_FAILURE_LOG_INTERVAL_MS) {
+            return;
+        }
+        lastForegroundFailureLogElapsed = now;
+        String detail = operation + " rejected " + failure.getClass().getSimpleName();
+        try { Log.w(TAG, detail); }
+        catch (RuntimeException | LinkageError ignored) {}
+        try { DiagnosticJournal.warn("navigator-foreground", detail); }
+        catch (RuntimeException | LinkageError ignored) {}
     }
 
     private void checkForegroundApp() {

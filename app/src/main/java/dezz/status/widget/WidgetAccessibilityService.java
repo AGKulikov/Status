@@ -67,6 +67,7 @@ import dezz.status.widget.diagnostics.DiagnosticJournal;
 public class WidgetAccessibilityService extends AccessibilityService {
     private static final String TAG = "WidgetA11yService";
     private static final long NAVIGATION_MISSING_GRACE_MS = 1_500L;
+    private static final long FRAMEWORK_FAILURE_LOG_INTERVAL_MS = 10_000L;
     private static final int MAX_NAVIGATION_NODES = 1_500;
     private static final int MAX_NAVIGATION_DEPTH = 45;
     private static final int BASE_ACCESSIBILITY_EVENTS =
@@ -85,6 +86,7 @@ public class WidgetAccessibilityService extends AccessibilityService {
     private NavigationCollectionDemand navigationDemand;
     private volatile boolean serviceConnected;
     private volatile long lastNavigationScanElapsed;
+    private long lastFrameworkFailureLogElapsed;
     /** Accessed only on {@link #navigationThread}; prevents event storms postponing a scan. */
     private long nextNavigationScanElapsed;
     private static final class NavigationWindowScan {
@@ -104,7 +106,8 @@ public class WidgetAccessibilityService extends AccessibilityService {
             NavigationWindowScan scan;
             try {
                 scan = scanNavigationWindows();
-            } catch (RuntimeException | LinkageError ignored) {
+            } catch (RuntimeException | LinkageError | OutOfMemoryError failure) {
+                reportFrameworkFailure("navigation window scan", failure);
                 scheduleNavigationWatchdog(false);
                 return;
             }
@@ -293,7 +296,7 @@ public class WidgetAccessibilityService extends AccessibilityService {
             navigationDemand.start(this::onNavigationDemandChanged);
         }
         updateNavigationEventSubscription(navigationDemand.isNeeded());
-        seedFromCurrentWindows();
+        seedFromCurrentWindowsSafely("service connection");
         if (navigationDemand.isNeeded()) requestNavigationScan(true);
         Log.i(TAG, "Connected. Seeded " + foregroundByDisplay.size() + " display(s).");
         WidgetService widget = WidgetService.getInstance();
@@ -305,6 +308,17 @@ public class WidgetAccessibilityService extends AccessibilityService {
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
         if (event == null) return;
+        try {
+            handleAccessibilityEvent(event);
+        } catch (RuntimeException | LinkageError | OutOfMemoryError failure) {
+            // ECARX may invalidate an AccessibilityWindowInfo while Navigator replaces its
+            // transparent splash/map windows. A stale framework object is a failed sample, not
+            // a reason to terminate the Status Widget process.
+            reportFrameworkFailure("accessibility event", failure);
+        }
+    }
+
+    private void handleAccessibilityEvent(@NonNull AccessibilityEvent event) {
         int type = event.getEventType();
         if (ActionRecorder.isRecording()) {
             CharSequence packageValue = event.getPackageName();
@@ -323,9 +337,10 @@ public class WidgetAccessibilityService extends AccessibilityService {
         if (windowChanged) {
             // The event itself carries one package, but we want a coherent snapshot of every
             // display, not only the one which changed.
-            seedFromCurrentWindows();
-            WidgetService widget = WidgetService.getInstance();
-            if (widget != null) widget.onForegroundDisplayMapUpdated();
+            if (seedFromCurrentWindowsSafely("window transition")) {
+                WidgetService widget = WidgetService.getInstance();
+                if (widget != null) widget.onForegroundDisplayMapUpdated();
+            }
         }
 
         CharSequence packageName = event.getPackageName();
@@ -389,24 +404,49 @@ public class WidgetAccessibilityService extends AccessibilityService {
      * matters only on multi-display devices, which all run Android 10+/Auto so this fallback
      * is just for completeness.
      */
-    private void seedFromCurrentWindows() {
-        Map<Integer, String> next = new HashMap<>();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            android.util.SparseArray<List<AccessibilityWindowInfo>> all = getWindowsOnAllDisplays();
-            for (int i = 0; i < all.size(); i++) {
-                int displayId = all.keyAt(i);
-                String pkg = topApplicationPackage(all.valueAt(i));
-                if (pkg != null) next.put(displayId, pkg);
+    private boolean seedFromCurrentWindowsSafely(@NonNull String reason) {
+        try {
+            Map<Integer, String> next = new HashMap<>();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                android.util.SparseArray<List<AccessibilityWindowInfo>> all =
+                        getWindowsOnAllDisplays();
+                if (all == null) return false;
+                for (int i = 0; i < all.size(); i++) {
+                    int displayId = all.keyAt(i);
+                    String pkg = topApplicationPackage(all.valueAt(i));
+                    if (pkg != null) next.put(displayId, pkg);
+                }
+            } else {
+                List<AccessibilityWindowInfo> windows = getWindows();
+                String pkg = topApplicationPackage(windows);
+                if (pkg != null) next.put(android.view.Display.DEFAULT_DISPLAY, pkg);
             }
-        } else {
-            List<AccessibilityWindowInfo> windows = getWindows();
-            String pkg = topApplicationPackage(windows);
-            if (pkg != null) next.put(android.view.Display.DEFAULT_DISPLAY, pkg);
+            // Publish only a complete snapshot. If Android invalidates one of Navigator's
+            // windows halfway through the read, the last coherent display map remains active.
+            synchronized (foregroundByDisplay) {
+                foregroundByDisplay.clear();
+                foregroundByDisplay.putAll(next);
+            }
+            return true;
+        } catch (RuntimeException | LinkageError | OutOfMemoryError failure) {
+            reportFrameworkFailure(reason, failure);
+            return false;
         }
-        synchronized (foregroundByDisplay) {
-            foregroundByDisplay.clear();
-            foregroundByDisplay.putAll(next);
+    }
+
+    private void reportFrameworkFailure(@NonNull String operation, @NonNull Throwable failure) {
+        if (failure instanceof OutOfMemoryError) return;
+        long now = SystemClock.elapsedRealtime();
+        if (lastFrameworkFailureLogElapsed != 0L
+                && now - lastFrameworkFailureLogElapsed < FRAMEWORK_FAILURE_LOG_INTERVAL_MS) {
+            return;
         }
+        lastFrameworkFailureLogElapsed = now;
+        String detail = operation + " rejected " + failure.getClass().getSimpleName();
+        try { Log.w(TAG, detail); }
+        catch (RuntimeException | LinkageError ignored) {}
+        try { DiagnosticJournal.warn("navigator-window", detail); }
+        catch (RuntimeException | LinkageError ignored) {}
     }
 
     private void ensureNavigationWorker() {
@@ -622,21 +662,33 @@ public class WidgetAccessibilityService extends AccessibilityService {
         int bestLayer = Integer.MIN_VALUE;
         for (AccessibilityWindowInfo w : windows) {
             if (w == null) continue;
-            if (w.getType() != AccessibilityWindowInfo.TYPE_APPLICATION) continue;
-            int layer = w.getLayer();
-            if (layer > bestLayer) {
-                bestLayer = layer;
-                best = w;
+            try {
+                if (w.getType() != AccessibilityWindowInfo.TYPE_APPLICATION) continue;
+                int layer = w.getLayer();
+                if (layer > bestLayer) {
+                    bestLayer = layer;
+                    best = w;
+                }
+            } catch (RuntimeException | LinkageError ignored) {
+                // A window can disappear between getWindows() and this read.
             }
         }
         if (best == null) return null;
-        android.view.accessibility.AccessibilityNodeInfo root = best.getRoot();
+        android.view.accessibility.AccessibilityNodeInfo root;
+        try {
+            root = best.getRoot();
+        } catch (RuntimeException | LinkageError ignored) {
+            return null;
+        }
         if (root == null) return null;
         try {
             CharSequence pkg = root.getPackageName();
             return pkg == null ? null : pkg.toString();
+        } catch (RuntimeException | LinkageError ignored) {
+            return null;
         } finally {
-            root.recycle();
+            try { root.recycle(); }
+            catch (RuntimeException | LinkageError ignored) {}
         }
     }
 }
