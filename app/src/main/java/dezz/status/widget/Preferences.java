@@ -897,7 +897,8 @@ public class Preferences {
     public Preferences(Context context) {
         appContext = context.getApplicationContext();
         final Context deviceContext = context.getApplicationContext().createDeviceProtectedStorageContext();
-        prefs = deviceContext.getSharedPreferences(context.getPackageName() + "_preferences", Context.MODE_PRIVATE);
+        prefs = deviceContext.getSharedPreferences(context.getPackageName() + "_preferences",
+                AppProcessPolicy.preferenceMode());
         migrateLegacyPrefsIfNeeded();
         migrateUnifiedDriverPanelIfNeeded();
         migrateUnifiedLauncherSettingsIfNeeded();

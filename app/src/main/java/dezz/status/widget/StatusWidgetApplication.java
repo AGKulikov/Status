@@ -45,14 +45,25 @@ import dezz.status.widget.launcher.EcarxSystemStatusBarPolicy;
 public class StatusWidgetApplication extends Application {
     /** Filename inside {@code getCacheDir()} holding the last crash report. */
     public static final String CRASH_FILE = "last_crash.txt";
+    /** A HUD renderer failure is diagnostic only and must not masquerade as a main-process crash. */
+    public static final String HUD_CRASH_FILE = "last_hud_crash.txt";
 
     @Override
     public void onCreate() {
         super.onCreate();
+        boolean hudProcess = AppProcessPolicy.isHudProcess();
         Preferences preferences = new Preferences(this);
-        DiagnosticJournal.initialize(this, preferences.debugModeEnabled.get());
+        DiagnosticJournal.initialize(this,
+                !hudProcess && preferences.debugModeEnabled.get());
+        installCrashHandler(hudProcess);
+        if (hudProcess) {
+            // HUD owns ImageReader, SurfaceFlinger and external-display callbacks in a dedicated
+            // process. Do not duplicate the status-row bootstrap, recorder overlay or lifecycle
+            // observers there. If vendor/native code terminates :hud, Android keeps WidgetService,
+            // the driver panel and the status row alive in the untouched main process.
+            return;
+        }
         ActionRecorder.initialize(this);
-        installCrashHandler();
         registerLifecycleJournal();
         MainThreadWatchdog.setEnabled(preferences.debugModeEnabled.get());
         if (preferences.actionRecorderOverlayVisible.get()) {
@@ -61,16 +72,18 @@ public class StatusWidgetApplication extends Application {
         EcarxSystemStatusBarPolicy.applyStored(this);
     }
 
-    private void installCrashHandler() {
+    private void installCrashHandler(boolean hudProcess) {
         Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
             try {
-                ActionRecorder.record(ActionRecorder.SOURCE_SERVICE, "PROCESS_CRASH",
-                        ActionRecorder.object(
-                                "thread", thread.getName(),
-                                "exception", throwable.getClass().getName()));
+                if (!hudProcess) {
+                    ActionRecorder.record(ActionRecorder.SOURCE_SERVICE, "PROCESS_CRASH",
+                            ActionRecorder.object(
+                                    "thread", thread.getName(),
+                                    "exception", throwable.getClass().getName()));
+                }
                 DiagnosticJournal.recordCrash(thread, throwable);
-                writeCrashLog(thread, throwable);
+                writeCrashLog(thread, throwable, hudProcess);
             } catch (Throwable ignored) {
                 // Never let the crash handler itself crash — that would kill the process without
                 // delegating to the default handler.
@@ -81,15 +94,19 @@ public class StatusWidgetApplication extends Application {
         });
     }
 
-    private void writeCrashLog(Thread thread, Throwable throwable) throws Exception {
-        File file = new File(getCacheDir(), CRASH_FILE);
+    private void writeCrashLog(Thread thread, Throwable throwable, boolean hudProcess)
+            throws Exception {
+        File file = new File(getCacheDir(), hudProcess ? HUD_CRASH_FILE : CRASH_FILE);
         try (PrintWriter out = new PrintWriter(new FileWriter(file))) {
-            out.println("Status Widget crash report");
+            out.println(hudProcess
+                    ? "Status Widget isolated HUD crash report"
+                    : "Status Widget crash report");
             out.println("Time: " + new Date());
             out.println("Thread: " + thread.getName());
             out.println("Device: " + Build.MANUFACTURER + " " + Build.MODEL);
             out.println("Android: " + Build.VERSION.RELEASE + " (SDK " + Build.VERSION.SDK_INT + ")");
             out.println("App version: " + VersionGetter.getAppVersionName(this));
+            out.println("Process: " + AppProcessPolicy.currentProcessLabel());
             out.println("Action recorder active: " + ActionRecorder.isRecording());
             out.println();
             throwable.printStackTrace(out);

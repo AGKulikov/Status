@@ -278,6 +278,7 @@
             android:directBootAware="true"
             android:enabled="true"
             android:exported="false"
+            android:process=":hud"
             android:stopWithTask="false" />
 
         <service

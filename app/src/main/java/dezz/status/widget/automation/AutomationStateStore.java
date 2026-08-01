@@ -15,6 +15,8 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import dezz.status.widget.AppProcessPolicy;
+
 /**
  * Device-protected persistent runtime cache. MQTT retained messages and Broadcast updates pass
  * through exactly the same merge operation, so source switching cannot change UI semantics.
@@ -30,7 +32,7 @@ public final class AutomationStateStore {
     public AutomationStateStore(@NonNull Context context) {
         Context device = context.getApplicationContext().createDeviceProtectedStorageContext();
         prefs = device.getSharedPreferences(context.getPackageName() + PREF_SUFFIX,
-                Context.MODE_PRIVATE);
+                AppProcessPolicy.preferenceMode());
     }
 
     @NonNull

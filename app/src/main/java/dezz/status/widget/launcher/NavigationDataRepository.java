@@ -1553,7 +1553,8 @@ public final class NavigationDataRepository {
     @NonNull
     private static SharedPreferences preferences(@NonNull Context context) {
         Context storage = context.createDeviceProtectedStorageContext();
-        SharedPreferences prefs = storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        SharedPreferences prefs = storage.getSharedPreferences(PREFS,
+                dezz.status.widget.AppProcessPolicy.preferenceMode());
         ensureCurrentBootSession(context, prefs);
         return prefs;
     }

@@ -37,10 +37,16 @@ public final class HudPresentationService extends Service
             "ru.natro.statuswidget.internal.HUD_CONFIG_CHANGED";
     public static final String ACTION_STOP =
             "ru.natro.statuswidget.internal.STOP_HUD_PANEL";
+    public static final String ACTION_DATA_CHANGED =
+            "ru.natro.statuswidget.internal.HUD_DATA_CHANGED";
+    private static final String EXTRA_CONFIG_JSON =
+            "ru.natro.statuswidget.internal.HUD_CONFIG_JSON";
 
     private static final String TAG = "HudPresentation";
     private static final String CHANNEL_ID = "HudDisplayChannel";
     private static final int NOTIFICATION_ID = 0x485544;
+    /** Stay well below Android's process-wide Binder transaction limit. */
+    private static final int MAX_COMMAND_CONFIG_CHARS = 240_000;
     private static final long SYSTEM_SURFACE_RETRY_MS = 60_000L;
     @Nullable private static volatile HudPresentationService instance;
     @NonNull private static volatile String runtimeDetail = "HUD не запущен";
@@ -62,46 +68,59 @@ public final class HudPresentationService extends Service
         Context app = applicationContext(context);
         Preferences prefs = new Preferences(app);
         if (!prefs.hudPanelEnabled.get()) {
-            HudPresentationService current = instance;
-            if (current != null) {
-                try {
-                    app.startService(new Intent(app, HudPresentationService.class)
-                            .setAction(ACTION_STOP));
-                } catch (RuntimeException ignored) {
-                    app.stopService(new Intent(app, HudPresentationService.class));
-                }
-            }
+            try { app.stopService(new Intent(app, HudPresentationService.class)); }
+            catch (RuntimeException ignored) {}
+            HudRuntimeStatusStore.write(app, "HUD выключен");
             return;
         }
-        try {
-            ContextCompat.startForegroundService(app,
-                    new Intent(app, HudPresentationService.class).setAction(ACTION_APPLY));
-        } catch (RuntimeException failure) {
-            Log.e(TAG, "Could not start HUD service", failure);
-        }
+        sendCommand(app, ACTION_APPLY, prefs.hudPanelConfigJson.get());
     }
 
     public static void notifyConfigChanged(@NonNull Context context) {
-        HudPresentationService current = instance;
-        if (current != null) {
-            current.main.post(current::reloadAndReconcile);
-        } else if (new Preferences(context).hudPanelEnabled.get()) {
-            apply(context);
-        }
+        Context app = applicationContext(context);
+        Preferences prefs = new Preferences(app);
+        if (!prefs.hudPanelEnabled.get()) return;
+        // The caller's in-memory SharedPreferences already contains the just-saved document.
+        // Passing it with the command avoids an apply()/disk race in the isolated :hud process.
+        sendCommand(app, ACTION_CONFIG_CHANGED, prefs.hudPanelConfigJson.get());
     }
 
     public static void notifyAutomationChanged(@NonNull Context context) {
         HudPresentationService current = instance;
         if (current != null) current.main.post(() -> {
+            if (current.data != null) current.data.refreshCrossProcessState();
             if (current.systemSurfaceWindow != null) {
                 current.systemSurfaceWindow.invalidateHud();
             }
             if (current.overlayWindow != null) current.overlayWindow.invalidateHud();
             if (current.presentation != null) current.presentation.invalidateHud();
         });
+        else {
+            Context app = applicationContext(context);
+            Preferences prefs = new Preferences(app);
+            if (prefs.hudPanelEnabled.get()) {
+                sendCommand(app, ACTION_DATA_CHANGED, null);
+            }
+        }
     }
 
     @NonNull public static String runtimeDetail() { return runtimeDetail; }
+    @NonNull public static String runtimeDetail(@NonNull Context context) {
+        return instance != null ? runtimeDetail : HudRuntimeStatusStore.read(context);
+    }
+
+    private static void sendCommand(@NonNull Context app, @NonNull String action,
+                                    @Nullable String configJson) {
+        Intent command = new Intent(app, HudPresentationService.class).setAction(action);
+        if (configJson != null && configJson.length() <= MAX_COMMAND_CONFIG_CHARS) {
+            command.putExtra(EXTRA_CONFIG_JSON, configJson);
+        }
+        try {
+            ContextCompat.startForegroundService(app, command);
+        } catch (RuntimeException failure) {
+            Log.e(TAG, "Could not send HUD command " + action, failure);
+        }
+    }
 
     @Override
     public void onCreate() {
@@ -137,18 +156,26 @@ public final class HudPresentationService extends Service
         String action = intent == null ? null : intent.getAction();
         dezz.status.widget.diagnostics.ActionRecorder.recordServiceIntent(
                 getClass().getName(), action, startId);
-        if (ACTION_STOP.equals(action) || !preferences.hudPanelEnabled.get()) {
+        if (ACTION_STOP.equals(action)) {
             stopSelf();
             return START_NOT_STICKY;
         }
-        reloadAndReconcile();
+        boolean commandHasConfig = applyCommandConfig(intent);
+        if (ACTION_DATA_CHANGED.equals(action)) {
+            if (data != null) data.refreshCrossProcessState();
+            invalidateHudSurfaces();
+        } else {
+            // Very large editor documents intentionally travel through the file-backed settings
+            // store rather than risking TransactionTooLargeException on Android 9.
+            reloadAndReconcile(!commandHasConfig);
+        }
         return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
         instance = null;
-        runtimeDetail = "HUD не запущен";
+        setRuntimeDetail("HUD не запущен");
         dismissPresentation("service stopped");
         if (data != null) data.stop();
         if (displayManager != null) {
@@ -167,14 +194,40 @@ public final class HudPresentationService extends Service
     @Override public void onDisplayChanged(int displayId) { reconcilePresentation(); }
 
     private void reloadAndReconcile() {
-        if (preferences == null || !preferences.hudPanelEnabled.get()) {
-            stopSelf();
-            return;
+        reloadAndReconcile(true);
+    }
+
+    private void reloadAndReconcile(boolean reloadPreferences) {
+        if (reloadPreferences) {
+            // Constructing a new wrapper with MODE_MULTI_PROCESS asks API 28 to reload the
+            // device-protected preference file after an explicit command from the main process.
+            preferences = new Preferences(this);
+            store = new HudPanelStore(preferences);
+            config = store.load();
         }
-        config = store.load();
         if (data != null) data.updateConfig(config);
         reconcileStockHudCarPreference();
         reconcilePresentation();
+    }
+
+    private boolean applyCommandConfig(@Nullable Intent intent) {
+        if (intent == null || !intent.hasExtra(EXTRA_CONFIG_JSON)) return false;
+        String raw = intent.getStringExtra(EXTRA_CONFIG_JSON);
+        if (raw == null) return false;
+        try {
+            config = HudPanelConfig.fromJson(raw);
+            if (data != null) data.updateConfig(config);
+            return true;
+        } catch (RuntimeException invalid) {
+            Log.w(TAG, "Rejected invalid cross-process HUD configuration", invalid);
+            return false;
+        }
+    }
+
+    private void invalidateHudSurfaces() {
+        if (systemSurfaceWindow != null) systemSurfaceWindow.invalidateHud();
+        if (overlayWindow != null) overlayWindow.invalidateHud();
+        if (presentation != null) presentation.invalidateHud();
     }
 
     /**
@@ -210,21 +263,21 @@ public final class HudPresentationService extends Service
         HudDisplaySelector.Candidate candidate = HudDisplaySelector.select(this, config);
         if (candidate == null) {
             dismissPresentation("display unavailable");
-            runtimeDetail = config.displayId < 0
+            setRuntimeDetail(config.displayId < 0
                     ? "HUD не привязан — выберите точный Display ID в настройках"
-                    : "Ожидание HUD с Display ID " + config.displayId;
+                    : "Ожидание HUD с Display ID " + config.displayId);
             updateNotification(runtimeDetail);
             return;
         }
         if (!HudViewportPolicy.containsCompleteHudPlane(
                 candidate.width, candidate.height)) {
             dismissPresentation("display is smaller than fixed HUD plane");
-            runtimeDetail = "ID " + candidate.id + ": поверхность "
+            setRuntimeDetail("ID " + candidate.id + ": поверхность "
                     + candidate.width + "×" + candidate.height
                     + " меньше обязательных "
                     + HudViewportPolicy.MIN_SURFACE_WIDTH + "×"
                     + HudViewportPolicy.MIN_SURFACE_HEIGHT
-                    + "; вывод заблокирован";
+                    + "; вывод заблокирован");
             updateNotification(runtimeDetail);
             return;
         }
@@ -234,7 +287,7 @@ public final class HudPresentationService extends Service
             if (systemSurfaceWindow != null) systemSurfaceWindow.updateConfig(config);
             if (overlayWindow != null) overlayWindow.updateConfig(config);
             if (presentation != null) presentation.updateConfig(config);
-            runtimeDetail = runtimeDetail(candidate);
+            setRuntimeDetail(runtimeDetail(candidate));
             updateNotification(runtimeDetail);
             return;
         }
@@ -245,13 +298,13 @@ public final class HudPresentationService extends Service
         try {
             shownUniqueId = identity;
             showOnDisplay(display);
-            runtimeDetail = runtimeDetail(candidate);
+            setRuntimeDetail(runtimeDetail(candidate));
             updateNotification(runtimeDetail);
         } catch (RuntimeException failure) {
             systemSurfaceWindow = null;
             presentation = null;
             shownUniqueId = null;
-            runtimeDetail = "HUD найден, но окно пока недоступно";
+            setRuntimeDetail("HUD найден, но окно пока недоступно");
             updateNotification(runtimeDetail);
             Log.w(TAG, "Could not show HUD presentation", failure);
         }
@@ -275,10 +328,10 @@ public final class HudPresentationService extends Service
                             // presents correctly, but prevents the custom panel from disappearing
                             // if an OEM compositor accepts a buffer on the wrong physical output.
                             // The direct opaque frame still masks the stock HUD.
-                            runtimeDetail = "HUD: ID " + display.getDisplayId()
+                            setRuntimeDetail("HUD: ID " + display.getDisplayId()
                                     + " · системный слой " + readyWindow.layerStack()
                                     + " · кадр принят SurfaceFlinger"
-                                    + " · окно 728×190 @ (0,720)";
+                                    + " · окно 728×190 @ (0,720)");
                             updateNotification(runtimeDetail);
                         }
 
@@ -299,8 +352,9 @@ public final class HudPresentationService extends Service
                                             fallbackFailure);
                                 }
                             }
-                            runtimeDetail = "HUD: обычный overlay; системная маска недоступна — "
-                                    + detail;
+                            setRuntimeDetail(
+                                    "HUD: обычный overlay; системная маска недоступна — "
+                                            + detail);
                             updateNotification(runtimeDetail);
                         }
                     });
@@ -409,6 +463,11 @@ public final class HudPresentationService extends Service
     private void updateNotification(@NonNull String text) {
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager != null) manager.notify(NOTIFICATION_ID, notification(text));
+    }
+
+    private void setRuntimeDetail(@NonNull String detail) {
+        runtimeDetail = detail;
+        HudRuntimeStatusStore.write(this, detail);
     }
 
     @NonNull

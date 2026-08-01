@@ -295,9 +295,20 @@ public class WidgetAccessibilityService extends AccessibilityService {
             navigationDemand = new NavigationCollectionDemand(this);
             navigationDemand.start(this::onNavigationDemandChanged);
         }
-        updateNavigationEventSubscription(navigationDemand.isNeeded());
-        seedFromCurrentWindowsSafely("service connection");
-        if (navigationDemand.isNeeded()) requestNavigationScan(true);
+        boolean windowTraversalAllowed = supportsSafeWindowTraversal();
+        updateNavigationEventSubscription(
+                navigationDemand.isNeeded() && windowTraversalAllowed);
+        if (windowTraversalAllowed) {
+            seedFromCurrentWindowsSafely("service connection");
+            if (navigationDemand.isNeeded()) requestNavigationScan(true);
+        } else {
+            // Android 9/ECARX can terminate the client process in native framework code while
+            // unparcelling Navigator's rapidly replaced AccessibilityWindowInfo tree. A Java
+            // catch cannot contain that failure. Foreground tracking therefore uses only the
+            // small event package below, while navigation content continues through the normal
+            // broadcast/notification contracts and never asks this firmware for a window tree.
+            Log.i(TAG, "Android 9 safe mode: accessibility window traversal disabled");
+        }
         Log.i(TAG, "Connected. Seeded " + foregroundByDisplay.size() + " display(s).");
         WidgetService widget = WidgetService.getInstance();
         if (widget != null) {
@@ -320,8 +331,9 @@ public class WidgetAccessibilityService extends AccessibilityService {
 
     private void handleAccessibilityEvent(@NonNull AccessibilityEvent event) {
         int type = event.getEventType();
+        CharSequence packageValue = event.getPackageName();
+        String eventPackage = packageValue == null ? "" : packageValue.toString().trim();
         if (ActionRecorder.isRecording()) {
-            CharSequence packageValue = event.getPackageName();
             CharSequence classValue = event.getClassName();
             ActionRecorder.record(ActionRecorder.SOURCE_ACCESSIBILITY,
                     AccessibilityEvent.eventTypeToString(type),
@@ -335,22 +347,50 @@ public class WidgetAccessibilityService extends AccessibilityService {
         boolean windowChanged = type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
                 || type == AccessibilityEvent.TYPE_WINDOWS_CHANGED;
         if (windowChanged) {
-            // The event itself carries one package, but we want a coherent snapshot of every
-            // display, not only the one which changed.
-            if (seedFromCurrentWindowsSafely("window transition")) {
+            boolean foregroundChanged;
+            if (supportsSafeWindowTraversal()) {
+                // Android 10+ can provide a coherent framework snapshot. Android 9 deliberately
+                // takes the event-only path below and never calls getWindows()/getRoot().
+                foregroundChanged = seedFromCurrentWindowsSafely("window transition");
+            } else {
+                foregroundChanged = publishAndroidNineForegroundEvent(type, eventPackage);
+            }
+            if (foregroundChanged) {
                 WidgetService widget = WidgetService.getInstance();
                 if (widget != null) widget.onForegroundDisplayMapUpdated();
             }
         }
 
-        CharSequence packageName = event.getPackageName();
         if (canCollectNavigation() && (windowChanged || NavigationDataRepository.isYandexPackage(
-                packageName == null ? null : packageName.toString()))) {
+                eventPackage))) {
             // Debouncing coalesces the many TYPE_WINDOW_CONTENT_CHANGED events emitted while
             // Navigator updates distance/ETA. The actual read uses the complete tree, so a
             // maneuver distance such as "500 м" cannot overwrite the full remaining route.
             requestNavigationScan(false);
         }
+    }
+
+    /**
+     * API 28 has no reliable display id on AccessibilityEvent. It is nevertheless safer to retain
+     * one event-derived default-display package than to ask the ECARX framework to materialize
+     * Navigator's complete window tree in the Status Widget process.
+     */
+    private boolean publishAndroidNineForegroundEvent(int eventType,
+                                                       @NonNull String packageName) {
+        if (eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                || packageName.isEmpty() || packageName.equals(getPackageName())) {
+            return false;
+        }
+        synchronized (foregroundByDisplay) {
+            String previous = foregroundByDisplay.put(
+                    android.view.Display.DEFAULT_DISPLAY, packageName);
+            return !packageName.equals(previous);
+        }
+    }
+
+    /** Android 9 ECARX window traversal is a native-process hazard and cannot be caught in Java. */
+    private static boolean supportsSafeWindowTraversal() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q;
     }
 
     @Override
@@ -472,16 +512,19 @@ public class WidgetAccessibilityService extends AccessibilityService {
 
     private void onNavigationDemandChanged(boolean needed) {
         if (!serviceConnected) return;
-        updateNavigationEventSubscription(needed);
-        if (needed) {
+        boolean collectFromWindows = needed && supportsSafeWindowTraversal();
+        updateNavigationEventSubscription(collectFromWindows);
+        if (collectFromWindows) {
             ensureNavigationWorker();
             requestNavigationScan(true);
         } else {
             stopNavigationWorker();
-            // Only discard our own fallback source. Notification/broadcast sources retain their
-            // independent lifecycle and can still serve another enabled consumer.
-            NavigationDataRepository.clearIfAccessibilitySourceMissing(
-                    WidgetAccessibilityService.this, Collections.emptySet());
+            if (!needed) {
+                // Only discard our own fallback source. Notification/broadcast sources retain
+                // their independent lifecycle and can still serve another enabled consumer.
+                NavigationDataRepository.clearIfAccessibilitySourceMissing(
+                        WidgetAccessibilityService.this, Collections.emptySet());
+            }
         }
     }
 
@@ -509,7 +552,8 @@ public class WidgetAccessibilityService extends AccessibilityService {
 
     private boolean canCollectNavigation() {
         NavigationCollectionDemand demand = navigationDemand;
-        return serviceConnected && demand != null && demand.isNeeded();
+        return supportsSafeWindowTraversal()
+                && serviceConnected && demand != null && demand.isNeeded();
     }
 
     private void requestNavigationScan(boolean immediate) {

@@ -56,7 +56,7 @@ public final class HudRuntimeData {
     @NonNull private final AtomicBoolean navigationReadQueued = new AtomicBoolean();
     @NonNull private final LauncherMediaController mediaController;
     @NonNull private final CarIntegration carIntegration;
-    @NonNull private final AutomationStateStore retainedAutomation;
+    @NonNull private AutomationStateStore retainedAutomation;
     @NonNull private final NavigatorMapFrameProvider navigatorMap;
     @NonNull private final Map<String, CarIntegration.TelemetryValue> telemetry = new HashMap<>();
     @NonNull private final Map<String, ConnectorValue> connectorValues = new HashMap<>();
@@ -162,6 +162,15 @@ public final class HudRuntimeData {
             reconfigureVehicleSubscription();
         }
         notifyChanged();
+    }
+
+    /** Reloads file-backed automation state after a command crosses into the isolated HUD process. */
+    public void refreshCrossProcessState() {
+        runOnMain(() -> {
+            retainedAutomation = new AutomationStateStore(context);
+            refreshNavigation();
+            notifyChanged();
+        });
     }
 
     @Nullable public NavigationDataRepository.Snapshot navigation() { return navigation; }
@@ -534,6 +543,11 @@ public final class HudRuntimeData {
         if (!started) return;
         try { listener.onHudDataChanged(); }
         catch (RuntimeException ignored) {}
+    }
+
+    private void runOnMain(@NonNull Runnable action) {
+        if (Looper.myLooper() == Looper.getMainLooper()) action.run();
+        else main.post(action);
     }
 
     @NonNull

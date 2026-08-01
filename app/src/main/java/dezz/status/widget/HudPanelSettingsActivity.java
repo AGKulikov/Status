@@ -1403,7 +1403,7 @@ public final class HudPanelSettingsActivity extends AppCompatActivity {
                 : " · " + config.displayWidth + "×" + config.displayHeight);
         status.setText((preferences.hudPanelEnabled.get() ? "Включён" : "Выключен")
                 + " · " + selectedDisplay + "\n"
-                + HudPresentationService.runtimeDetail() + "\n"
+                + HudPresentationService.runtimeDetail(this) + "\n"
                 + runtime.navigatorMapState());
     }
 
