@@ -15,6 +15,8 @@ public final class StatusBrickSnapshot {
     public final int iconTint;
     /** Drawable level (0..10000), used by signal bars and clipped battery fill. */
     public final int iconLevel;
+    /** Live number rendered inside the iPhone battery body; null for every other icon. */
+    @Nullable public final Integer batteryPercent;
     public final int outlineColor;
     public final int outlineWidth;
     @Nullable public final String badgeText;
@@ -28,6 +30,7 @@ public final class StatusBrickSnapshot {
                                int iconResource,
                                int iconTint,
                                int iconLevel,
+                               @Nullable Integer batteryPercent,
                                int outlineColor,
                                int outlineWidth,
                                @Nullable String badgeText,
@@ -40,6 +43,7 @@ public final class StatusBrickSnapshot {
         this.iconResource = iconResource;
         this.iconTint = iconTint;
         this.iconLevel = iconLevel;
+        this.batteryPercent = batteryPercent;
         this.outlineColor = outlineColor;
         this.outlineWidth = outlineWidth;
         this.badgeText = badgeText;

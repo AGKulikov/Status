@@ -2311,6 +2311,7 @@ public class WidgetService extends Service {
         batteryIcon.setDrawIcon(true);
         int batteryColor = phoneBatteryColor(battery);
         ImageViewCompat.setImageTintList(batteryIcon, ColorStateList.valueOf(batteryColor));
+        batteryIcon.setBatteryPercent(battery, batteryColor);
         applyConfiguredIconOutline(batteryIcon, prefs.phoneBattery);
         batteryIcon.setBadgeText(null, 0, 0);
         batteryIcon.setBadgeDrawable(null);
@@ -4887,6 +4888,7 @@ public class WidgetService extends Service {
         int iconTint = ContextCompat.getColor(
                 themedContext != null ? themedContext : this, R.color.text_primary);
         int iconLevel = 10000;
+        Integer batteryPercent = null;
         int outlineColor = ContextCompat.getColor(
                 themedContext != null ? themedContext : this, R.color.text_outline);
         int outlineWidth = 0;
@@ -4981,6 +4983,7 @@ public class WidgetService extends Service {
                 iconLevel = batteryDrawableLevel(battery);
                 iconPrefs = prefs.phoneBattery;
                 iconTint = phoneBatteryColor(battery);
+                batteryPercent = battery;
                 break;
             default:
                 return null;
@@ -5060,7 +5063,7 @@ public class WidgetService extends Service {
                 badgeDrawableResource = R.drawable.ic_badge_ru_flag;
             }
         }
-        return new StatusBrickSnapshot(text, iconResource, iconTint, iconLevel,
+        return new StatusBrickSnapshot(text, iconResource, iconTint, iconLevel, batteryPercent,
                 outlineColor, outlineWidth, badgeText, badgeBackground, badgeForeground,
                 badgeDrawableResource, known, active);
     }
