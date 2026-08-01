@@ -1,0 +1,64 @@
+/*
+ * Copyright © 2025-2026 Dezz (https://github.com/DezzK)
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+package dezz.status.widget.launcher;
+
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+/** Keeps the application stack above ECARX/Yandex freeform application windows. */
+public final class LauncherAllAppsOverlayContractTest {
+    @Test public void allAppsUsesInteractiveApplicationOverlayWhenPermissionExists()
+            throws IOException {
+        String launcher = source();
+        int start = launcher.indexOf("private void showAllApps()");
+        int end = launcher.indexOf("private void refreshFavorites()", start);
+        String method = launcher.substring(start, end);
+        assertTrue(method.contains("Permissions.checkOverlayPermission(this)"));
+        assertTrue(method.contains("TYPE_APPLICATION_OVERLAY"));
+        assertTrue(method.indexOf("dialogWindow.setType(") < method.indexOf("dialog.show()"));
+        assertTrue(method.contains("dismissAllAppsDialog()"));
+        assertTrue(method.contains("AppUninstallLauncher.request("));
+        assertTrue(method.contains("AppDrawerUninstallPolicy.canUninstall("));
+        assertTrue(method.contains("setAllAppsEditMode(true)"));
+        assertTrue(method.contains("allAppsUninstallInProgress"));
+        assertTrue(method.contains("lastAppCatalogLoadElapsed = 0L"));
+        int uninstall = method.indexOf("void uninstall(");
+        int dismiss = method.indexOf("dismissAllAppsDialog();", uninstall);
+        int request = method.indexOf("AppUninstallLauncher.request(", uninstall);
+        assertTrue(uninstall >= 0);
+        assertTrue(dismiss < 0);
+        assertTrue(request >= 0);
+        assertTrue(method.contains("setAllAppsConfirmationActive(true)"));
+        assertTrue(method.contains("FLAG_NOT_TOUCHABLE"));
+        assertTrue(method.contains("Color.rgb(10, 13, 18)"));
+        assertTrue(launcher.contains("allAppsUninstallReceiver"));
+        assertTrue(launcher.contains("finishAllAppsUninstallFlow()"));
+        assertTrue(!method.contains("appCatalog.toggleFavorite(entry.packageName)"));
+    }
+
+    @Test public void overlayDialogIsReleasedWhenLauncherStops() throws IOException {
+        String launcher = source();
+        int start = launcher.indexOf("protected void onStop()");
+        int end = launcher.indexOf("protected void onDestroy()", start);
+        String stop = launcher.substring(start, end);
+        assertTrue(stop.contains("if (!allAppsUninstallInProgress) dismissAllAppsDialog()"));
+    }
+
+    private static String source() throws IOException {
+        String relative = "dezz/status/widget/LauncherActivity.java";
+        Path fromRoot = Paths.get("app", "src", "main", "java").resolve(relative);
+        Path fromApp = Paths.get("src", "main", "java").resolve(relative);
+        Path file = Files.isRegularFile(fromRoot) ? fromRoot : fromApp;
+        return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+    }
+}
