@@ -79,12 +79,16 @@ public final class Ha1139RegressionContractTest {
         assertTrue(full.contains("@color/iphone_signal_green"));
     }
 
-    @Test public void bluetoothFillRequiresTheCurrentlyReadableAncsFeed() throws Exception {
+    @Test public void bluetoothKeepsAncsAsDataButUsesOneMonochromeGlyph() throws Exception {
         String widget = source("WidgetService.java");
+        String policy = source("phone/PhoneBluetoothIndicatorPolicy.java");
         assertTrue(widget.contains("isPhoneNotificationPathAvailable()"));
         assertTrue(widget.contains("phoneStatusValues.get(\"notifications.items\")"));
         assertTrue(widget.contains("return phoneAncsReady && profileActive && feedActive"));
-        assertTrue(widget.contains("Math.min(1, Math.max(0, prefs.bluetooth.outlineWidth.get()))"));
+        assertTrue(policy.contains("PHONE_MONO"));
+        assertTrue(widget.contains("binding.bluetoothStatusIcon.setOutlineWidth(0)"));
+        assertFalse(widget.contains(
+                "Math.min(1, Math.max(0, prefs.bluetooth.outlineWidth.get()))"));
     }
 
     @Test public void mediaWidthSliderAllowsTheWholePhysicalRow() throws Exception {
