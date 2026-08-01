@@ -71,10 +71,19 @@ jobs:
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
       run: |
+        set -euo pipefail
         test -n "$KEY_PASSWORD" || { echo "KEY_PASSWORD is required" >&2; exit 1; }
-        ./gradlew --no-daemon testGeelyDebugUnitTest
-        ./gradlew --no-daemon assembleGeelyRelease
+        # Never package a release from stale incremental outputs. A previous local HA1147
+        # artifact retained dex files but omitted resources.arsc and every res/ entry.
+        ./gradlew --no-daemon --no-configuration-cache clean
+        ./gradlew --no-daemon --no-configuration-cache --max-workers=1 testGeelyDebugUnitTest
+        ./gradlew --no-daemon --no-configuration-cache --max-workers=1 assembleGeelyRelease
         APK="app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}-release.apk"
+        test -f "$APK"
+        unzip -Z1 "$APK" | grep -Fx 'resources.arsc'
+        RESOURCE_ENTRIES=$(unzip -Z1 "$APK" | grep -c '^res/')
+        test "$RESOURCE_ENTRIES" -gt 500
+        "$ANDROID_HOME/build-tools/36.0.0/aapt" dump resources "$APK" >/dev/null
         BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
         echo "$BADGING"
         echo "$BADGING" | grep -F "package: name='ru.natro.statuswidget'"
@@ -89,6 +98,14 @@ jobs:
         "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/apk-certs.txt
         grep -qi "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75" /tmp/apk-certs.txt
         mv "$APK" "app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}.apk"
+
+    - name: Upload verified installable APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: status-widget-ha-${{ steps.version.outputs.version }}-release
+        path: app/build/outputs/apk/geely/release/status-widget-ha-${{ steps.version.outputs.version }}.apk
+        if-no-files-found: error
+        retention-days: 30
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
