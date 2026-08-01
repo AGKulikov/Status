@@ -13,8 +13,8 @@ import org.junit.Test;
 public final class Ha1136RegressionContractTest {
     @Test public void favoritesRepeatTapUsesOneLogicalTogglePath() throws Exception {
         String source = javaSource("driver/DriverPanelOverlayController.java");
-        assertTrue(source.contains("FAVORITES_TOGGLE_DEBOUNCE_MS = 350L"));
-        assertTrue(source.contains("lastFavoriteToggleAt.get(panelId)"));
+        assertTrue(source.contains(
+                "panelToggleGate.accept(\"favorites:\" + panelId, pressToken(anchor), now)"));
         assertTrue(source.contains("manuallyOpenFavorites.contains(panelId)"));
         assertTrue(source.contains("private void executeShortcut("));
         assertTrue(source.contains("LauncherShortcutStore.isDriverFavoritesTarget("));

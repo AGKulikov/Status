@@ -326,6 +326,8 @@ public final class IphoneAncsTransport {
     private BluetoothDevice activeClientTarget;
     private BluetoothDevice savedPeerScanTarget;
     private BluetoothDevice managedSavedPeer;
+    /** Last BLE identity that already passed the selected-phone gate in this live session. */
+    private BluetoothDevice managedResolvedPeer;
     private final Object verifiedPeerLock = new Object();
     private BluetoothDevice verifiedPeer;
     private final LinkedHashMap<String, GattServerPeer> gattServerPeers =
@@ -569,6 +571,7 @@ public final class IphoneAncsTransport {
         managedReconnectEnabled = true;
         managedReconnectAttempt = 0;
         managedSavedPeer = device;
+        managedResolvedPeer = null;
         iphonePeripheralMode = true;
         helperBootstrapMode = false;
         iphoneConnectStarted = false;
@@ -584,6 +587,22 @@ public final class IphoneAncsTransport {
         // GATT server/advertiser is a manual Helper bootstrap only; running it here creates a
         // competing peripheral-role link on ECARX and can leave the real ANCS client unencrypted.
         return startSavedPeerScan(device);
+    }
+
+    /**
+     * Explicit recovery hook for ECARX builds that report ACL loss but omit the GATT callback.
+     * Keeping the current transport alive preserves Android's resolved iOS BLE identity; closing
+     * and recreating it here is exactly what made recovery depend on toggling car Bluetooth.
+     */
+    public void requestSavedPeerReconnect(@NonNull String reason) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            main.post(() -> requestSavedPeerReconnect(reason));
+            return;
+        }
+        if (closing || !managedReconnectEnabled || managedSavedPeer == null) return;
+        scheduleManagedReconnect(reason.trim().isEmpty()
+                ? "selected iPhone ACL link lost" : reason);
+        state(REMOTE_LOGICAL_NAME + " · RECOVERING");
     }
 
     private boolean startSavedPeerScan(@NonNull BluetoothDevice device) {
@@ -792,6 +811,7 @@ public final class IphoneAncsTransport {
             state("AUTO · SAVED PEER CONFLICT");
             return;
         }
+        managedResolvedPeer = device;
         connectIphonePeripheral(device, CONNECT_TIMEOUT_MS,
                 "GPS-STYLE · SAVED PEER CONNECTING",
                 "selected identity resolved; one direct GATT after advertisement");
@@ -917,6 +937,7 @@ public final class IphoneAncsTransport {
         closing = true;
         managedReconnectEnabled = false;
         managedSavedPeer = null;
+        managedResolvedPeer = null;
         if (managedReconnectTask != null) main.removeCallbacks(managedReconnectTask);
         managedReconnectTask = null;
         stopScan();
@@ -2563,6 +2584,13 @@ public final class IphoneAncsTransport {
         if (closing || !managedReconnectEnabled || managedSavedPeer == null
                 || managedReconnectTask != null) return;
 
+        // Retain only an identity that was already selected and used by this managed GATT owner.
+        // Android commonly returns this resolved object without ANCS solicitation after a link
+        // drop; it remains safe to reuse inside the same in-memory session.
+        BluetoothDevice activeResolved = activeClientTarget != null
+                ? activeClientTarget : gatt == null ? null : gatt.getDevice();
+        if (activeResolved != null) managedResolvedPeer = activeResolved;
+
         stopScan();
         cancelClientAttemptCallbacks();
         clearAncsRuntime();
@@ -2731,7 +2759,8 @@ public final class IphoneAncsTransport {
                 safeAddress(selected), safeAddress(observed),
                 safeBondState(selected) == BluetoothDevice.BOND_BONDED,
                 safeBondState(observed) == BluetoothDevice.BOND_BONDED,
-                solicitsAncs, uniqueBondedNameMatch(selected, observed));
+                solicitsAncs, uniqueBondedNameMatch(selected, observed),
+                sameDevice(managedResolvedPeer, observed));
     }
 
     /**
@@ -3065,6 +3094,9 @@ public final class IphoneAncsTransport {
 
     private void handleIphonePeripheralConnectionState(BluetoothGatt callbackGatt,
                                                        int status, int newState) {
+        if (managedReconnectEnabled && callbackGatt.getDevice() != null) {
+            managedResolvedPeer = callbackGatt.getDevice();
+        }
         if (status != GATT_SUCCESS) {
             cancelConnectTimeout();
             clientConnectInFlight = false;

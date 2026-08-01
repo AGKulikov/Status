@@ -651,8 +651,8 @@ public final class PhoneConnectorController {
             // ordinary GATT callback arrives too.
             if (config != null && config.ancsNeeded()
                     && transport != BluetoothDevice.TRANSPORT_BREDR) {
-                scheduleGattReconnect(token,
-                        "Selected iPhone ACL link disconnected", "retrying");
+                requestManagedAncsReconnect(token,
+                        "Selected iPhone ACL link disconnected");
             }
         } else if (ACTION_HFP_CONNECTION.equals(action)) {
             int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE,
@@ -1279,6 +1279,15 @@ public final class PhoneConnectorController {
             gattConnected = true;
             ancsReady = false;
             ancsStatus = "negotiating";
+            updateConnected(token);
+            return;
+        }
+        if (state.contains("RECOVERING") || state.contains("IDENTITY SCAN")) {
+            cancelStableAncsReadyReset();
+            gattConnected = false;
+            ancsReady = false;
+            ancsStatus = "retrying";
+            updateMessageAvailability();
             updateConnected(token);
             return;
         }
@@ -2900,6 +2909,32 @@ public final class PhoneConnectorController {
 
     private void scheduleGattReconnect(long token, @NonNull String detail) {
         scheduleGattReconnect(token, detail, "retrying");
+    }
+
+    /**
+     * Do not destroy a healthy ANCS owner merely because ECARX emitted ACL_DISCONNECTED. The
+     * live transport knows the resolved BLE identity and can recover without a car-Bluetooth
+     * power cycle. If that owner vanished concurrently, fall back to the normal outer restart.
+     */
+    private void requestManagedAncsReconnect(long token, @NonNull String detail) {
+        IphoneAncsTransport current = ancsTransport;
+        long transportSession = activeAncsTransportSession;
+        if (current == null) {
+            scheduleGattReconnect(token, detail, "retrying");
+            return;
+        }
+        mainHandler.post(() -> {
+            if (isCurrent(token) && current == ancsTransport
+                    && transportSession == activeAncsTransportSession) {
+                current.requestSavedPeerReconnect(detail);
+                return;
+            }
+            Handler handler = worker;
+            if (handler != null) {
+                handler.post(() -> runIfCurrent(token,
+                        () -> scheduleGattReconnect(token, detail, "retrying")));
+            }
+        });
     }
 
     private void scheduleGattReconnect(long token, @NonNull String detail,

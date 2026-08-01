@@ -98,10 +98,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private static final long PROXY_TAP_SETTLE_MS = 70L;
     /** Accessibility callbacks are not reliable on ECARX; never block repeat taps for seconds. */
     private static final long PROXY_TAP_HARD_RESTORE_MS = 450L;
-    /** One physical press can be delivered by both the rail view and the service action. */
-    private static final long FAVORITES_TOGGLE_DEBOUNCE_MS = 350L;
-    /** Let the rail button process the same outside-touch before closing its open drawer. */
-    private static final long FAVORITES_OUTSIDE_DISMISS_DELAY_MS = 120L;
+    /** Let a busy ECARX rail process the same outside-touch before closing its open drawer. */
+    private static final long FAVORITES_OUTSIDE_DISMISS_DELAY_MS = 450L;
 
     private final Context appContext;
     private final Preferences preferences;
@@ -119,7 +117,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private final Map<String, FavoritePanelWindow> favoriteWindows = new LinkedHashMap<>();
     private final Set<String> manuallyOpenFavorites = new LinkedHashSet<>();
     private final Set<String> manuallyClosedFavorites = new LinkedHashSet<>();
-    private final Map<String, Long> lastFavoriteToggleAt = new HashMap<>();
+    private final DriverPanelToggleGate panelToggleGate = new DriverPanelToggleGate();
     private final Map<String, Runnable> pendingFavoriteOutsideDismissals = new HashMap<>();
     private final Map<String, ConnectorValue> smartHomeValues = new HashMap<>();
     private Map<String, IntentActionRule> smartHomeRules = Collections.emptyMap();
@@ -156,6 +154,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     @Nullable private TextView drawerTitle;
     @Nullable private TextView drawerDone;
     private boolean drawerEditMode;
+    /** Logical state is updated synchronously before WindowManager work. */
+    private boolean allAppsRequestedOpen;
     private boolean drawerPackageReceiverRegistered;
     private boolean drawerUninstallReceiverRegistered;
     private int drawerAppsGridScalePercent = 100;
@@ -387,23 +387,32 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     }
 
     @Override
-    public void showAllApps() {
+    public void showAllApps(@Nullable View anchor) {
         if (Looper.myLooper() != Looper.getMainLooper()) {
-            mainHandler.post(this::showAllApps);
+            mainHandler.post(() -> showAllApps(anchor));
             return;
         }
-        if (drawerWindow != null) {
+        if (!panelToggleGate.accept("all_apps", pressToken(anchor),
+                SystemClock.uptimeMillis())) return;
+        if (allAppsRequestedOpen || drawerWindow != null) {
             dismissAllApps();
             return;
         }
+        allAppsRequestedOpen = true;
         Display display = defaultDisplay();
-        if (display == null) return;
+        if (display == null) {
+            allAppsRequestedOpen = false;
+            return;
+        }
         // Use the rail's successfully attached ECARX system layer. The drawer is added later on
         // the same layer, so it stays above floating navigation/application windows as well as
         // above the rail itself. Portable builds naturally keep TYPE_APPLICATION_OVERLAY here.
         Context context = windowContext(display, attachedType);
         WindowManager manager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
-        if (manager == null) return;
+        if (manager == null) {
+            allAppsRequestedOpen = false;
+            return;
+        }
 
         DisplayMetrics metrics = new DisplayMetrics();
         display.getRealMetrics(metrics);
@@ -508,6 +517,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             registerDrawerPackageReceiver();
             registerDrawerUninstallReceiver();
         } catch (RuntimeException error) {
+            allAppsRequestedOpen = false;
             Log.w(TAG, "Could not show all-apps drawer", error);
             Toast.makeText(appContext, "Не удалось открыть список приложений",
                     Toast.LENGTH_SHORT).show();
@@ -540,12 +550,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         // logical state and performs one real close instead of immediately reopening the drawer.
         cancelPendingFavoriteOutsideDismiss(panelId);
         long now = SystemClock.uptimeMillis();
-        Long previousToggle = lastFavoriteToggleAt.get(panelId);
-        if (previousToggle != null
-                && now - previousToggle < FAVORITES_TOGGLE_DEBOUNCE_MS) {
-            return;
-        }
-        lastFavoriteToggleAt.put(panelId, now);
+        if (!panelToggleGate.accept("favorites:" + panelId, pressToken(anchor), now)) return;
         // Treat the user's logical open state as authoritative as well as the attached window.
         // A rail refresh briefly replaces the WindowManager view; a second tap during that frame
         // must close the same Favorites panel instead of creating/reopening another instance.
@@ -709,6 +714,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
     private void dismissAllApps() {
         drawerGeneration++;
+        allAppsRequestedOpen = false;
         AttachedWindow drawer = drawerWindow;
         drawerWindow = null;
         drawerGrid = null;
@@ -1217,6 +1223,14 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 || widgetService.driverShortcutActionEnabled(shortcut.id, true);
         button.setAlpha(actionEnabled ? 1f : .42f);
         if (actionEnabled) {
+            if (isPanelOverlayToggle(shortcut)) {
+                button.setOnTouchListener((view, event) -> {
+                    if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                        view.setTag(R.id.driver_panel_press_token, event.getDownTime());
+                    }
+                    return false;
+                });
+            }
             button.setOnClickListener(view -> {
                 executeShortcut(shortcut, view);
                 if (shortcut.kind == LauncherShortcutStore.Kind.APP) {
@@ -1247,6 +1261,26 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             return;
         }
         actions.execute(shortcut, anchor);
+    }
+
+    private static boolean isPanelOverlayToggle(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        if (shortcut.kind == LauncherShortcutStore.Kind.BUILTIN) {
+            if (LauncherShortcutStore.isDriverFavoritesTarget(shortcut.target)
+                    || LauncherShortcutStore.Builtin.ALL_APPS.key.equals(shortcut.target)) {
+                return true;
+            }
+        }
+        return shortcut.hasLongAction
+                && shortcut.longKind == LauncherShortcutStore.Kind.BUILTIN
+                && (LauncherShortcutStore.isDriverFavoritesTarget(shortcut.longTarget)
+                || LauncherShortcutStore.Builtin.ALL_APPS.key.equals(shortcut.longTarget));
+    }
+
+    private static long pressToken(@Nullable View anchor) {
+        if (anchor == null) return 0L;
+        Object value = anchor.getTag(R.id.driver_panel_press_token);
+        return value instanceof Number ? ((Number) value).longValue() : 0L;
     }
 
     /**

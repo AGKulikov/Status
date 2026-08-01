@@ -375,6 +375,16 @@ public class Preferences {
         }
     }
 
+    /** iPhone battery brick adds the optional percentage rendered inside the solid body. */
+    public static final class PhoneBatteryBrickPrefs extends IconBrickPrefs {
+        public final Bool showPercentage;
+
+        public PhoneBatteryBrickPrefs(Preferences p) {
+            super(p, "phoneBattery");
+            showPercentage = new Bool(p, "phoneBatteryShowPercentage", true);
+        }
+    }
+
     /** Persisted generation marker retained only for one-time HA1084 migration. */
     public enum DriverPanelStyle {
         OLD("old"),
@@ -467,7 +477,7 @@ public class Preferences {
     public final GpsBrickPrefs gps = new GpsBrickPrefs(this);
     public final BluetoothBrickPrefs bluetooth = new BluetoothBrickPrefs(this);
     public final IconBrickPrefs phoneCellular = new IconBrickPrefs(this, "phoneCellular");
-    public final IconBrickPrefs phoneBattery = new IconBrickPrefs(this, "phoneBattery");
+    public final PhoneBatteryBrickPrefs phoneBattery = new PhoneBatteryBrickPrefs(this);
     // Car-specific temperature bricks (fed by the flavor's CarIntegration).
     public final TextBrickPrefs indoorTemp = new TextBrickPrefs(this, "indoorTemp", 40);
     public final TextBrickPrefs outdoorTemp = new TextBrickPrefs(this, "outdoorTemp", 40);

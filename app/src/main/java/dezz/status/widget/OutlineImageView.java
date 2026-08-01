@@ -138,12 +138,7 @@ public class OutlineImageView extends AppCompatImageView {
         }
     }
 
-    /**
-     * Draws the live percentage inside the iPhone-style battery body. The number intentionally
-     * omits the percent sign, matching iOS. Its part over the filled battery uses a contrasting
-     * colour, while the part over the empty body keeps the battery colour, so values remain
-     * legible at every charge level without replacing the real clipped fill.
-     */
+    /** Draws the optional live number inside the solid iPhone-style battery body. */
     public void setBatteryPercent(@Nullable Integer percent, int fillColor) {
         Integer bounded = percent == null ? null : Math.max(0, Math.min(100, percent));
         if (!java.util.Objects.equals(this.batteryPercent, bounded)
@@ -233,12 +228,12 @@ public class OutlineImageView extends AppCompatImageView {
         displayed.offset(getPaddingLeft(), getPaddingTop());
         if (displayed.isEmpty()) return;
 
-        // The battery vector uses a 32x20 viewport. x=4..25 and y=4.5..15.5 are the inner body;
-        // x=28.5..32 is the terminal and must not shift the percentage away from the body centre.
-        float innerLeft = displayed.left + displayed.width() * (4f / 32f);
-        float innerRight = displayed.left + displayed.width() * (25f / 32f);
-        float innerTop = displayed.top + displayed.height() * (4.5f / 20f);
-        float innerBottom = displayed.top + displayed.height() * (15.5f / 20f);
+        // The vector uses a 32x20 viewport. Keep the terminal outside the text geometry so the
+        // number is centred in the rounded body exactly like the iPhone status-bar icon.
+        float innerLeft = displayed.left + displayed.width() * (1.5f / 32f);
+        float innerRight = displayed.left + displayed.width() * (27.5f / 32f);
+        float innerTop = displayed.top + displayed.height() * (3.5f / 20f);
+        float innerBottom = displayed.top + displayed.height() * (16.5f / 20f);
         float centerX = displayed.left + displayed.width() * (14.5f / 32f);
 
         String text = String.valueOf(batteryPercent);
@@ -256,20 +251,8 @@ public class OutlineImageView extends AppCompatImageView {
         float centerY = (innerTop + innerBottom) / 2f
                 - (metrics.ascent + metrics.descent) / 2f;
 
-        // Empty section: same semantic colour as the outline, visible on the dark status row.
-        batteryPercentPaint.setColor(batteryFillColor);
+        batteryPercentPaint.setColor(contrastColor(batteryFillColor));
         canvas.drawText(text, centerX, centerY, batteryPercentPaint);
-
-        // Filled section: inverse text colour, clipped at the exact live percentage boundary.
-        float fillRight = innerLeft
-                + (innerRight - innerLeft) * (batteryPercent / 100f);
-        if (fillRight > innerLeft) {
-            int save = canvas.save();
-            canvas.clipRect(innerLeft, innerTop, fillRight, innerBottom);
-            batteryPercentPaint.setColor(contrastColor(batteryFillColor));
-            canvas.drawText(text, centerX, centerY, batteryPercentPaint);
-            canvas.restoreToCount(save);
-        }
     }
 
     private static int contrastColor(int background) {

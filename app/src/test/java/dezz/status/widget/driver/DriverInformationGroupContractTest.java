@@ -26,7 +26,10 @@ public final class DriverInformationGroupContractTest {
         assertTrue(settings.contains("Распределение в ряду"));
         assertTrue(settings.contains("Внешние отступы ряда"));
         assertTrue(settings.contains("Внутренние отступы ряда"));
+        assertTrue(settings.contains("spacingSlider(form, label, 120, current"));
+        assertTrue(settings.contains("zero.setOnClickListener(view -> seek.setProgress(0))"));
         assertTrue(settings.contains("addPreviewInformationRows"));
+        assertTrue(settings.contains("previewInformationTileHeight(item)"));
         assertTrue(overlay.contains("row.setOrientation(LinearLayout.HORIZONTAL)"));
         assertTrue(overlay.contains("informationGroupDistribution == 1"));
         assertTrue(overlay.contains("scroll.setVerticalScrollBarEnabled(rows.size() > 3)"));

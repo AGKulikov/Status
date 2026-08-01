@@ -2307,11 +2307,12 @@ public class WidgetService extends Service {
         Integer battery = phonePercent("battery.level");
         OutlineImageView batteryIcon = binding.phoneBatteryStatusIcon;
         batteryIcon.setImageResource(R.drawable.ic_status_iphone_battery);
-        batteryIcon.setImageLevel(batteryDrawableLevel(battery));
+        batteryIcon.setImageLevel(10_000);
         batteryIcon.setDrawIcon(true);
         int batteryColor = phoneBatteryColor(battery);
         ImageViewCompat.setImageTintList(batteryIcon, ColorStateList.valueOf(batteryColor));
-        batteryIcon.setBatteryPercent(battery, batteryColor);
+        batteryIcon.setBatteryPercent(
+                prefs.phoneBattery.showPercentage.get() ? battery : null, batteryColor);
         applyConfiguredIconOutline(batteryIcon, prefs.phoneBattery);
         batteryIcon.setBadgeText(null, 0, 0);
         batteryIcon.setBadgeDrawable(null);
@@ -2348,13 +2349,6 @@ public class WidgetService extends Service {
         if (percent <= 50) return 2;
         if (percent <= 75) return 3;
         return 4;
-    }
-
-    private static int batteryDrawableLevel(@Nullable Integer percent) {
-        int bounded = percent == null ? 0 : Math.max(0, Math.min(100, percent));
-        // The fill occupies x=4..25 inside a 32-unit viewport. Translate 0..100% so the clip
-        // starts at the inner left edge and ends before the terminal cap.
-        return 1250 + Math.round(bounded * 65.63f);
     }
 
     private void applyPhoneStatusTextStyle(@NonNull OutlineTextView view) {
@@ -4980,10 +4974,10 @@ public class WidgetService extends Service {
                 active = known;
                 text = known ? battery + "%" : "";
                 iconResource = R.drawable.ic_status_iphone_battery;
-                iconLevel = batteryDrawableLevel(battery);
+                iconLevel = 10_000;
                 iconPrefs = prefs.phoneBattery;
                 iconTint = phoneBatteryColor(battery);
-                batteryPercent = battery;
+                batteryPercent = prefs.phoneBattery.showPercentage.get() ? battery : null;
                 break;
             default:
                 return null;

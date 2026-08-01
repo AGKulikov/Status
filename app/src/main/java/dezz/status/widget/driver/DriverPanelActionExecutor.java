@@ -37,7 +37,7 @@ import dezz.status.widget.shell.PrivilegedShell;
 /** Executes the same shortcut model outside {@code LauncherActivity}. */
 final class DriverPanelActionExecutor {
     interface Host {
-        void showAllApps();
+        void showAllApps(@Nullable View anchor);
         void showFavorites(@NonNull String panelId, @Nullable View anchor);
         void triggerStockClimate();
     }
@@ -141,7 +141,7 @@ final class DriverPanelActionExecutor {
                 host.triggerStockClimate();
                 return;
             case ALL_APPS:
-                host.showAllApps();
+                host.showAllApps(anchor);
                 return;
             case FAVORITES:
                 host.showFavorites(LauncherShortcutStore.driverFavoritesPanelId(rawTarget),

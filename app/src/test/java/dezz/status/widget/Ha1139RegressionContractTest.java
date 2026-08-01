@@ -29,7 +29,7 @@ public final class Ha1139RegressionContractTest {
     @Test public void favoriteRailTapWinsOverTheSameOutsideTouch() throws Exception {
         String controller = source("driver/DriverPanelOverlayController.java");
 
-        assertTrue(controller.contains("FAVORITES_OUTSIDE_DISMISS_DELAY_MS = 120L"));
+        assertTrue(controller.contains("FAVORITES_OUTSIDE_DISMISS_DELAY_MS = 450L"));
         assertTrue(controller.contains("scheduleFavoriteOutsideDismiss(panelId)"));
         assertTrue(controller.contains("cancelPendingFavoriteOutsideDismiss(panelId);"));
         assertTrue(controller.contains(
@@ -38,7 +38,7 @@ public final class Ha1139RegressionContractTest {
 
     @Test public void driverAllAppsWindowNeverCoversTheRail() throws Exception {
         String controller = source("driver/DriverPanelOverlayController.java");
-        String method = between(controller, "public void showAllApps()",
+        String method = between(controller, "public void showAllApps(@Nullable View anchor)",
                 "public void showFavorites(");
 
         assertTrue(method.contains("metrics.widthPixels - physicalWidth"));
