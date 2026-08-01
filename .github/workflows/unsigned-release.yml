@@ -66,11 +66,16 @@ jobs:
           test "$(git rev-parse HEAD)" = "$HEAD_SHA"
           test ! -e keystore.jks
           chmod +x gradlew
-          ./gradlew --no-daemon clean
-          ./gradlew --no-daemon testGeelyDebugUnitTest
-          ./gradlew --no-daemon assembleGeelyRelease
+          ./gradlew --no-daemon --no-configuration-cache clean
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 testGeelyDebugUnitTest
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 assembleGeelyRelease
 
           APK="app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}-release.apk"
+          test -f "$APK"
+          unzip -Z1 "$APK" | grep -Fx 'resources.arsc'
+          RESOURCE_ENTRIES=$(unzip -Z1 "$APK" | grep -c '^res/')
+          test "$RESOURCE_ENTRIES" -gt 500
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump resources "$APK" >/dev/null
           BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
           echo "$BADGING"
           echo "$BADGING" | grep -F \

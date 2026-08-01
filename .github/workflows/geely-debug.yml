@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - 'rewrite/**'
+      - 'release/**'
   pull_request:
 
 # A feature branch with an open PR must produce one build, not an identical push build followed
@@ -48,7 +49,7 @@ jobs:
       - name: Decode stable update keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          REQUIRE_STABLE: ${{ github.event_name != 'pull_request' }}
+          REQUIRE_STABLE: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
         shell: bash
         run: |
           if [[ -n "$KEYSTORE_BASE64" ]]; then
@@ -61,29 +62,63 @@ jobs:
             echo "Stable keystore secret is unavailable; fork/PR build will use debug signing"
           fi
 
-      - name: Test and build geelyDebug
+      - name: Test and build APK
+        id: build
         env:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        shell: bash
         run: |
-          # CI revisions live above the earlier hand-built HA14..HA24 line, so every artifact is
-          # accepted by Android as an upgrade. Four digits are reserved by build.gradle.
-          REVISION=$((1000 + GITHUB_RUN_NUMBER))
-          export VERSION_NAME="v2.8.2-ha${REVISION}"
-          export VERSION_CODE=$((208020000 + REVISION))
+          set -euo pipefail
+          SOURCE_BRANCH="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if [[ "$SOURCE_BRANCH" =~ ^release/(v2\.8\.2-ha([0-9]+))$ ]]; then
+            export VERSION_NAME="${BASH_REMATCH[1]}"
+            REVISION="${BASH_REMATCH[2]}"
+            export VERSION_CODE=$((208020000 + REVISION))
+            BUILD_TASK="assembleGeelyRelease"
+            APK_DIR="app/build/outputs/apk/geely/release"
+            ARTIFACT_NAME="status-widget-ha-${VERSION_NAME}-release"
+            test -f .stable-update-signing
+            test -n "$KEY_PASSWORD"
+          else
+            # CI revisions live above the earlier hand-built HA14..HA24 line, so every artifact is
+            # accepted by Android as an upgrade. Four digits are reserved by build.gradle.
+            REVISION=$((1000 + GITHUB_RUN_NUMBER))
+            export VERSION_NAME="v2.8.2-ha${REVISION}"
+            export VERSION_CODE=$((208020000 + REVISION))
+            BUILD_TASK="assembleGeelyDebug"
+            APK_DIR="app/build/outputs/apk/geely/debug"
+            ARTIFACT_NAME="status-widget-ha-geelyDebug"
+          fi
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "apk_dir=$APK_DIR" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
           # Keep unit tests and APK assembly in separate Gradle invocations.
           # Running both task graphs together can make D8 see duplicate
           # non-namespaced AndroidX R classes in this legacy project.
-          ./gradlew --no-daemon clean
-          ./gradlew --no-daemon testGeelyDebugUnitTest
-          ./gradlew --no-daemon assembleGeelyDebug
+          # A clean, single-worker resource pipeline is mandatory: the broken HA1147 archive
+          # contained dex files but silently omitted resources.arsc and every res/ entry.
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 clean
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 testGeelyDebugUnitTest
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 "$BUILD_TASK"
 
       - name: Verify APK identity, alignment and signature
+        env:
+          APK_DIR: ${{ steps.build.outputs.apk_dir }}
+          VERSION_NAME: ${{ steps.build.outputs.version_name }}
+          VERSION_CODE: ${{ steps.build.outputs.version_code }}
         shell: bash
         run: |
-          APK="$(find app/build/outputs/apk/geely/debug -name '*.apk' -print -quit)"
+          set -euo pipefail
+          APK="$(find "$APK_DIR" -name '*.apk' -print -quit)"
           test -n "$APK"
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep "package: name='ru.natro.statuswidget'"
+          unzip -Z1 "$APK" | grep -Fx 'resources.arsc'
+          RESOURCE_ENTRIES=$(unzip -Z1 "$APK" | grep -c '^res/')
+          test "$RESOURCE_ENTRIES" -gt 500
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump resources "$APK" >/dev/null
+          BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
+          echo "$BADGING" | grep -F "package: name='ru.natro.statuswidget' versionCode='${VERSION_CODE}' versionName='${VERSION_NAME}'"
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$APK"
           CERTS=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK")
           echo "$CERTS"
@@ -95,9 +130,9 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: status-widget-ha-geelyDebug
+          name: ${{ steps.build.outputs.artifact_name }}
           path: |
-            app/build/outputs/apk/geely/debug/*.apk
-            app/build/outputs/apk/geely/debug/*.sha256
+            ${{ steps.build.outputs.apk_dir }}/*.apk
+            ${{ steps.build.outputs.apk_dir }}/*.sha256
           if-no-files-found: error
           retention-days: 30
