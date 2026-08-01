@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Filled counterpart: selected only while the live ANCS notification path is readable. -->
+    <path
+        android:fillColor="@android:color/white"
+        android:fillType="evenOdd"
+        android:strokeLineJoin="round"
+        android:pathData="M10.55,1.55 L18.45,7.55 L14.02,12 L18.45,16.45 L10.55,22.45 L10.55,14.35 L7.05,17.72 L5.55,16.20 L9.92,12 L5.55,7.80 L7.05,6.28 L10.55,9.65 Z M12.65,5.86 L15.25,7.84 L12.65,10.35 Z M12.65,13.65 L15.25,16.16 L12.65,18.14 Z" />
+</vector>

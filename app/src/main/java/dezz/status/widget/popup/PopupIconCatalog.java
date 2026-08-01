@@ -62,8 +62,8 @@ public final class PopupIconCatalog {
             case "climate": return R.drawable.ic_car_climate;
             case "scenario": return R.drawable.ic_section_content;
             case "wifi": return R.drawable.ic_status_filled_wifi_internet;
-            case "gps": return R.drawable.ic_status_filled_gps_good;
-            case "bluetooth": return R.drawable.ic_status_filled_bt_connected;
+            case "gps": return R.drawable.ic_status_iphone_gps_active;
+            case "bluetooth": return R.drawable.ic_status_iphone_bluetooth_solid;
             default: return 0;
         }
     }

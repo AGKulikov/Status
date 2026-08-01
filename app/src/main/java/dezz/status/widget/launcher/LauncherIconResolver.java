@@ -215,8 +215,8 @@ public final class LauncherIconResolver {
             case "car": return R.drawable.ic_smart_car;
             case "location": return R.drawable.ic_smart_location;
             case "status_wifi": return R.drawable.ic_status_iphone_wifi_level;
-            case "status_gps": return R.drawable.ic_status_gps_good;
-            case "status_bluetooth": return R.drawable.ic_status_bt_connected;
+            case "status_gps": return R.drawable.ic_status_iphone_gps_active;
+            case "status_bluetooth": return R.drawable.ic_status_iphone_bluetooth_solid;
             case "status_phone_cellular": return R.drawable.ic_status_iphone_cellular_level;
             case "status_phone_battery": return R.drawable.ic_status_iphone_battery;
             case "devices": return R.drawable.ic_section_widget;

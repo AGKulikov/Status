@@ -218,6 +218,12 @@ public final class PhoneStatusBarPolicy {
         return (int) Math.round(percent);
     }
 
+    /** Returns an exact current PHONE boolean without coercing text or stale cached values. */
+    public static Boolean booleanValue(String resourceId, ConnectorValue value) {
+        if (!eligible(value, resourceId) || !(value.rawValue instanceof Boolean)) return null;
+        return (Boolean) value.rawValue;
+    }
+
     /**
      * Extracts a safe presentation of the latest real-time notification.
      *

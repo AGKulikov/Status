@@ -165,8 +165,11 @@ public class WidgetService extends Service {
                     R.drawable.ic_status_wifi_whitelist,
                     R.drawable.ic_status_wifi_internet
             },
-            { R.drawable.ic_status_gps_off, R.drawable.ic_status_gps_bad, R.drawable.ic_status_gps_good },
-            { R.drawable.ic_status_bt_off, R.drawable.ic_status_bt_no_device, R.drawable.ic_status_bt_connected }
+            { R.drawable.ic_status_iphone_gps_off, R.drawable.ic_status_iphone_gps_searching,
+                    R.drawable.ic_status_iphone_gps_active },
+            { R.drawable.ic_status_iphone_bluetooth_off,
+                    R.drawable.ic_status_iphone_bluetooth_outline,
+                    R.drawable.ic_status_iphone_bluetooth_solid }
     };
     private static final int[][] DESIGN_SOLID = {
             {
@@ -175,8 +178,11 @@ public class WidgetService extends Service {
                     R.drawable.ic_status_filled_wifi_whitelist,
                     R.drawable.ic_status_filled_wifi_internet
             },
-            { R.drawable.ic_status_filled_gps_off, R.drawable.ic_status_filled_gps_bad, R.drawable.ic_status_filled_gps_good },
-            { R.drawable.ic_status_filled_bt_off, R.drawable.ic_status_filled_bt_no_device, R.drawable.ic_status_filled_bt_connected }
+            { R.drawable.ic_status_iphone_gps_off, R.drawable.ic_status_iphone_gps_searching,
+                    R.drawable.ic_status_iphone_gps_active },
+            { R.drawable.ic_status_iphone_bluetooth_off,
+                    R.drawable.ic_status_iphone_bluetooth_outline,
+                    R.drawable.ic_status_iphone_bluetooth_solid }
     };
     private static final int[][] DESIGN_BARS = {
             {
@@ -185,8 +191,11 @@ public class WidgetService extends Service {
                     R.drawable.ic_status_bars_wifi_whitelist,
                     R.drawable.ic_status_bars_wifi_internet
             },
-            { R.drawable.ic_status_bars_gps_off, R.drawable.ic_status_bars_gps_bad, R.drawable.ic_status_bars_gps_good },
-            { R.drawable.ic_status_bars_bt_off, R.drawable.ic_status_bars_bt_no_device, R.drawable.ic_status_bars_bt_connected }
+            { R.drawable.ic_status_iphone_gps_off, R.drawable.ic_status_iphone_gps_searching,
+                    R.drawable.ic_status_iphone_gps_active },
+            { R.drawable.ic_status_iphone_bluetooth_off,
+                    R.drawable.ic_status_iphone_bluetooth_outline,
+                    R.drawable.ic_status_iphone_bluetooth_solid }
     };
     private static final int[][][] ICON_DESIGNS = { DESIGN_CLASSIC, DESIGN_SOLID, DESIGN_BARS };
 
@@ -2300,12 +2309,7 @@ public class WidgetService extends Service {
         batteryIcon.setImageResource(R.drawable.ic_status_iphone_battery);
         batteryIcon.setImageLevel(batteryDrawableLevel(battery));
         batteryIcon.setDrawIcon(true);
-        Context context = themedContext != null ? themedContext : this;
-        int batteryColor = battery != null && battery <= 10
-                ? ContextCompat.getColor(context, R.color.iphone_battery_critical)
-                : battery != null && battery <= 20
-                ? ContextCompat.getColor(context, R.color.iphone_battery_low)
-                : ContextCompat.getColor(context, android.R.color.white);
+        int batteryColor = phoneBatteryColor(battery);
         ImageViewCompat.setImageTintList(batteryIcon, ColorStateList.valueOf(batteryColor));
         applyConfiguredIconOutline(batteryIcon, prefs.phoneBattery);
         batteryIcon.setBadgeText(null, 0, 0);
@@ -2315,6 +2319,26 @@ public class WidgetService extends Service {
     @Nullable
     private Integer phonePercent(@NonNull String resourceId) {
         return PhoneStatusBarPolicy.percentValue(resourceId, phoneStatusValues.get(resourceId));
+    }
+
+    @Nullable
+    private Boolean phoneBoolean(@NonNull String resourceId) {
+        return PhoneStatusBarPolicy.booleanValue(resourceId, phoneStatusValues.get(resourceId));
+    }
+
+    private int phoneBatteryColor(@Nullable Integer battery) {
+        Boolean charging = phoneBoolean("battery.charging");
+        Boolean externalPower = phoneBoolean("battery.external_power");
+        boolean chargingNow = Boolean.TRUE.equals(charging)
+                || (charging == null && Boolean.TRUE.equals(externalPower));
+        Context context = themedContext != null ? themedContext : this;
+        return chargingNow
+                ? ContextCompat.getColor(context, R.color.iphone_battery_charging)
+                : battery != null && battery <= 10
+                ? ContextCompat.getColor(context, R.color.iphone_battery_critical)
+                : battery != null && battery <= 20
+                ? ContextCompat.getColor(context, R.color.iphone_battery_low)
+                : ContextCompat.getColor(context, android.R.color.white);
     }
 
     private static int cellularBars(@Nullable Integer percent) {
@@ -4119,8 +4143,8 @@ public class WidgetService extends Service {
                 // bitmap halo" trick produced two muddy, overlapping silhouettes on the KX11.
                 binding.bluetoothStatusIcon.setImageResource(
                         phoneAppearance == PhoneBluetoothIndicatorPolicy.Appearance.PHONE_SOLID
-                                ? R.drawable.ic_status_bt_phone_solid
-                                : R.drawable.ic_status_bt_phone_outline);
+                                ? R.drawable.ic_status_iphone_bluetooth_solid
+                                : R.drawable.ic_status_iphone_bluetooth_outline);
                 binding.bluetoothStatusIcon.setDrawIcon(true);
                 Context context = themedContext == null ? this : themedContext;
                 ImageViewCompat.setImageTintList(binding.bluetoothStatusIcon,
@@ -4711,7 +4735,7 @@ public class WidgetService extends Service {
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
-        return new NotificationCompat.Builder(this, CHANNEL_ID).setContentTitle(getString(R.string.app_name)).setContentText(getString(R.string.notification_content)).setSmallIcon(R.drawable.ic_status_gps_good).setContentIntent(pendingIntent).setOngoing(true).build();
+        return new NotificationCompat.Builder(this, CHANNEL_ID).setContentTitle(getString(R.string.app_name)).setContentText(getString(R.string.notification_content)).setSmallIcon(R.drawable.ic_status_iphone_gps_active).setContentIntent(pendingIntent).setOngoing(true).build();
     }
 
     private void savePosition() {
@@ -4956,12 +4980,7 @@ public class WidgetService extends Service {
                 iconResource = R.drawable.ic_status_iphone_battery;
                 iconLevel = batteryDrawableLevel(battery);
                 iconPrefs = prefs.phoneBattery;
-                Context context = themedContext != null ? themedContext : this;
-                iconTint = battery != null && battery <= 10
-                        ? ContextCompat.getColor(context, R.color.iphone_battery_critical)
-                        : battery != null && battery <= 20
-                        ? ContextCompat.getColor(context, R.color.iphone_battery_low)
-                        : ContextCompat.getColor(context, android.R.color.white);
+                iconTint = phoneBatteryColor(battery);
                 break;
             default:
                 return null;
@@ -5025,8 +5044,8 @@ public class WidgetService extends Service {
                 if (appearance != PhoneBluetoothIndicatorPolicy.Appearance.DEFAULT) {
                     iconResource = appearance
                             == PhoneBluetoothIndicatorPolicy.Appearance.PHONE_SOLID
-                            ? R.drawable.ic_status_bt_phone_solid
-                            : R.drawable.ic_status_bt_phone_outline;
+                            ? R.drawable.ic_status_iphone_bluetooth_solid
+                            : R.drawable.ic_status_iphone_bluetooth_outline;
                     iconTint = ContextCompat.getColor(
                             themedContext != null ? themedContext : this,
                             R.color.status_bluetooth);

@@ -156,6 +156,20 @@ public final class PhoneStatusBarPolicyTest {
                 current("network.signal", 50)));
     }
 
+    @Test public void iconBooleanAcceptsOnlyCurrentExactPhoneFlags() {
+        assertEquals(Boolean.TRUE, PhoneStatusBarPolicy.booleanValue(
+                "battery.charging", current("battery.charging", true)));
+        assertEquals(Boolean.FALSE, PhoneStatusBarPolicy.booleanValue(
+                "battery.external_power", current("battery.external_power", false)));
+        assertNull(PhoneStatusBarPolicy.booleanValue("battery.charging",
+                current("battery.charging", "true")));
+        assertNull(PhoneStatusBarPolicy.booleanValue("battery.charging",
+                value(ConnectorType.PHONE, "battery.charging", true,
+                        false, true, true)));
+        assertNull(PhoneStatusBarPolicy.booleanValue("battery.charging",
+                current("battery.external_power", true)));
+    }
+
     @Test public void latestNotificationUsesStableKeyAndSelectedCanonicalFields() {
         ConnectorValue latest = latest(notificationMap(
                 4_294_967_295L, 1_721_234_567_890L,
