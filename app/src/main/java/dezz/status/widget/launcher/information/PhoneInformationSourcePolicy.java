@@ -60,9 +60,6 @@ public final class PhoneInformationSourcePolicy {
                     "батарея источник battery source"),
             source("battery.charging", "", "Зарядка iPhone", "boolean", "",
                     "заряжается charging power"),
-            source("battery.charging_estimated", "",
-                    "Статус зарядки рассчитан", "boolean", "",
-                    "зарядка точность estimated charging"),
             source("battery.charging_source", "",
                     "Источник статуса зарядки", "string", "",
                     "зарядка источник charging source"),
@@ -222,14 +219,14 @@ public final class PhoneInformationSourcePolicy {
             case "battery.level_source:ble_bas":
             case "battery.charging_source:ble_bas":
                 return "BLE BAS";
+            case "battery.charging_source:ble_bas_level_status":
+                return "BLE BAS 1.1 · Battery Level Status";
+            case "battery.charging_source:ble_bas_power_state":
+                return "BLE BAS · Battery Power State";
             case "battery.level_source:hfp_ecarx": return "HFP/ECARX";
             case "battery.level_source:android_broadcast": return "Android Bluetooth";
             case "battery.charging_source:hfp_vendor": return "HFP/OEM";
             case "battery.charging_source:android_metadata": return "Метаданные Android";
-            case "battery.charging_source:bas_trend": return "Оценка по BLE BAS";
-            case "battery.charging_source:hfp_trend": return "Оценка по HFP";
-            case "battery.charging_source:ecarx_trend": return "Оценка по ECARX";
-            case "battery.charging_source:system_trend": return "Оценка Android";
             case "battery.charge_state:charging": return "Заряжается";
             case "battery.charge_state:discharging": return "Разряжается";
             case "battery.charge_state:idle": return "Зарядка не активна";

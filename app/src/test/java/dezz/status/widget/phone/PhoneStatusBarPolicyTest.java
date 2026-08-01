@@ -34,7 +34,6 @@ public final class PhoneStatusBarPolicyTest {
                         "battery.level",
                         "battery.level_source",
                         "battery.charging",
-                        "battery.charging_estimated",
                         "battery.charging_source",
                         "battery.external_power",
                         "battery.charge_state",

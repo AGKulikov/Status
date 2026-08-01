@@ -23,6 +23,7 @@ public final class Ha1142IphoneStatusIconTest {
         assertTrue(count(widget, "phoneBatteryColor(battery)") >= 2);
         assertTrue(widget.contains("phoneBoolean(\"battery.charging\")"));
         assertTrue(widget.contains("phoneBoolean(\"battery.external_power\")"));
+        assertTrue(widget.contains("|| Boolean.TRUE.equals(externalPower)"));
         assertTrue(widget.contains("R.color.iphone_battery_charging"));
         assertTrue(policy.contains("public static Boolean booleanValue"));
         assertTrue(colors.contains("name=\"iphone_battery_charging\">#30D158"));

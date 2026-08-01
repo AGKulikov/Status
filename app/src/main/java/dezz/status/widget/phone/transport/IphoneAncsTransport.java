@@ -228,12 +228,12 @@ public final class IphoneAncsTransport {
 
     private enum BatteryStage {
         NOT_STARTED,
-        READ_LEVEL,
-        SUBSCRIBE_LEVEL,
-        READ_POWER,
-        SUBSCRIBE_POWER,
         READ_LEVEL_STATUS,
         SUBSCRIBE_LEVEL_STATUS,
+        READ_POWER,
+        SUBSCRIBE_POWER,
+        READ_LEVEL,
+        SUBSCRIBE_LEVEL,
         COMPLETE
     }
 
@@ -2151,8 +2151,11 @@ public final class IphoneAncsTransport {
             log("BAS 0x180F отсутствует; остаются HFP/OEM/broadcast источники заряда");
             return;
         }
-        batteryStage = BatteryStage.READ_LEVEL;
-        log("BAS fallback найден: level=" + (batteryLevel != null)
+        // Battery Level Status carries the authoritative external-power and charge-state bits.
+        // Read and subscribe to it before percentage-only characteristics, so a slow optional
+        // CCCD cannot postpone the charger state by several watchdog intervals.
+        batteryStage = BatteryStage.READ_LEVEL_STATUS;
+        log("BAS explicit-state probe: level=" + (batteryLevel != null)
                 + " power=" + (batteryPower != null)
                 + " levelStatus=" + (batteryLevelStatus != null));
     }
@@ -2179,32 +2182,32 @@ public final class IphoneAncsTransport {
         }
         while (true) {
             switch (batteryStage) {
-                case READ_LEVEL:
-                    batteryStage = BatteryStage.SUBSCRIBE_LEVEL;
-                    if (startOptionalBatteryRead(callbackGatt, batteryLevel)) return;
+                case READ_LEVEL_STATUS:
+                    batteryStage = BatteryStage.SUBSCRIBE_LEVEL_STATUS;
+                    if (startOptionalBatteryRead(callbackGatt, batteryLevelStatus)) return;
                     break;
-                case SUBSCRIBE_LEVEL:
+                case SUBSCRIBE_LEVEL_STATUS:
                     batteryStage = BatteryStage.READ_POWER;
-                    if (startOptionalBatterySubscription(callbackGatt, batteryLevel,
-                            DescriptorStage.BATTERY_LEVEL)) return;
+                    if (startOptionalBatterySubscription(callbackGatt, batteryLevelStatus,
+                            DescriptorStage.BATTERY_LEVEL_STATUS)) return;
                     break;
                 case READ_POWER:
                     batteryStage = BatteryStage.SUBSCRIBE_POWER;
                     if (startOptionalBatteryRead(callbackGatt, batteryPower)) return;
                     break;
                 case SUBSCRIBE_POWER:
-                    batteryStage = BatteryStage.READ_LEVEL_STATUS;
+                    batteryStage = BatteryStage.READ_LEVEL;
                     if (startOptionalBatterySubscription(callbackGatt, batteryPower,
                             DescriptorStage.BATTERY_POWER)) return;
                     break;
-                case READ_LEVEL_STATUS:
-                    batteryStage = BatteryStage.SUBSCRIBE_LEVEL_STATUS;
-                    if (startOptionalBatteryRead(callbackGatt, batteryLevelStatus)) return;
+                case READ_LEVEL:
+                    batteryStage = BatteryStage.SUBSCRIBE_LEVEL;
+                    if (startOptionalBatteryRead(callbackGatt, batteryLevel)) return;
                     break;
-                case SUBSCRIBE_LEVEL_STATUS:
+                case SUBSCRIBE_LEVEL:
                     batteryStage = BatteryStage.COMPLETE;
-                    if (startOptionalBatterySubscription(callbackGatt, batteryLevelStatus,
-                            DescriptorStage.BATTERY_LEVEL_STATUS)) return;
+                    if (startOptionalBatterySubscription(callbackGatt, batteryLevel,
+                            DescriptorStage.BATTERY_LEVEL)) return;
                     break;
                 case NOT_STARTED:
                 case COMPLETE:
