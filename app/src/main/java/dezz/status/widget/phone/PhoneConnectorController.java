@@ -81,6 +81,7 @@ public final class PhoneConnectorController {
     private static final long GATT_DISCOVERY_TIMEOUT_MS = 15_000L;
     private static final long DEVICE_RESCAN_MS = 15_000L;
     private static final long ANCS_STABLE_READY_RESET_MS = 50_000L;
+    private static final long ADAPTER_RECOVERY_WATCHDOG_MS = 40_000L;
     private static final long APP_DISPLAY_NAME_WAIT_TIMEOUT_MS = 15_000L;
     private static final long BATTERY_TREND_MAX_AGE_MS = 20L * 60L * 1_000L;
     private static final int DESIRED_GATT_MTU = 512;
@@ -173,6 +174,8 @@ public final class PhoneConnectorController {
     private static final String BLUETOOTH_SENDER_PERMISSION =
             "android.permission.BLUETOOTH_PRIVILEGED";
     private static final int SUMMARY_NOTIFICATION_ID = 0x50484f4e;
+    /** Process-wide cooldown survives controller reconfiguration inside the service process. */
+    private static volatile long lastAdapterRecoveryElapsedMs;
 
     /** Decouples Bluetooth presence from an optional Sprut.hub runtime. */
     public interface PresenceSink {
@@ -219,6 +222,8 @@ public final class PhoneConnectorController {
     private String smsStatus = "stopped";
     private String stockConnectionStatus = "stopped";
     private boolean ancsReady;
+    private boolean ancsWasReadyThisSession;
+    private boolean adapterRecoveryInProgress;
     private boolean smsAvailable;
     private boolean hfpBatteryKnown;
     private boolean hfpChargingKnown;
@@ -287,6 +292,8 @@ public final class PhoneConnectorController {
     @Nullable private Runnable gattReconnectTask;
     @Nullable private Runnable ancsPublicationRetryTask;
     @Nullable private Runnable ancsStableReadyTask;
+    @Nullable private Runnable ancsAdapterEscalationTask;
+    @Nullable private Runnable adapterRecoveryWatchdog;
     @Nullable private Runnable stockConnectionTask;
     @Nullable private Runnable oemGattRefreshTask;
     private int ancsPublicationRetryCount;
@@ -494,6 +501,8 @@ public final class PhoneConnectorController {
         smsStatus = diagnostic;
         stockConnectionStatus = diagnostic;
         ancsReady = false;
+        ancsWasReadyThisSession = false;
+        adapterRecoveryInProgress = false;
         smsAvailable = false;
         hfpBatteryKnown = false;
         hfpChargingKnown = false;
@@ -602,6 +611,10 @@ public final class PhoneConnectorController {
         if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
             int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
                     BluetoothAdapter.STATE_OFF);
+            if (adapterRecoveryInProgress) {
+                handleAdapterRecoveryState(token, state);
+                return;
+            }
             if (state == BluetoothAdapter.STATE_ON && selectedDevice == null) {
                 selectAndConnect(token);
             } else if (state != BluetoothAdapter.STATE_ON) {
@@ -1265,6 +1278,8 @@ public final class PhoneConnectorController {
         if (state.contains("ANCS READY")) {
             gattConnected = true;
             ancsReady = true;
+            ancsWasReadyThisSession = true;
+            cancelAncsAdapterEscalation();
             ancsAuthorizedThisRun = true;
             ancsStatus = "ready";
             lastError = "";
@@ -1283,6 +1298,7 @@ public final class PhoneConnectorController {
             return;
         }
         if (state.contains("RECOVERING") || state.contains("IDENTITY SCAN")) {
+            scheduleAncsAdapterEscalation(token, state);
             cancelStableAncsReadyReset();
             gattConnected = false;
             ancsReady = false;
@@ -1353,6 +1369,7 @@ public final class PhoneConnectorController {
         synchronized (lifecycleLock) {
             if (isCurrentLocked(token)) ancsTransportStartPending = false;
         }
+        scheduleAncsAdapterEscalation(token, detail);
         scheduleGattReconnect(token, detail, "retrying");
     }
 
@@ -1942,6 +1959,8 @@ public final class PhoneConnectorController {
     private void maybeFinishAncsSetup(long token) {
         if (!ancsReady && ancsDataSubscribed && ancsNotificationSubscribed) {
             ancsReady = true;
+            ancsWasReadyThisSession = true;
+            cancelAncsAdapterEscalation();
             ancsAuthorizedThisRun = true;
             forceDirectGatt = false;
             reconnectAttempt = 0;
@@ -2917,6 +2936,7 @@ public final class PhoneConnectorController {
      * power cycle. If that owner vanished concurrently, fall back to the normal outer restart.
      */
     private void requestManagedAncsReconnect(long token, @NonNull String detail) {
+        scheduleAncsAdapterEscalation(token, detail);
         IphoneAncsTransport current = ancsTransport;
         long transportSession = activeAncsTransportSession;
         if (current == null) {
@@ -2940,6 +2960,10 @@ public final class PhoneConnectorController {
     private void scheduleGattReconnect(long token, @NonNull String detail,
                                        @NonNull String visibleStatus) {
         if (!isCurrent(token)) return;
+        // Every controller-owned ANCS/GATT failure reaches this method. Arming here covers both
+        // the modern saved-peer transport and the legacy in-process GATT path without depending
+        // on one vendor-specific disconnect callback being delivered.
+        scheduleAncsAdapterEscalation(token, detail);
         cancelStableAncsReadyReset();
         lastError = bounded(detail, 512);
         ancsStatus = visibleStatus;
@@ -3060,6 +3084,148 @@ public final class PhoneConnectorController {
         cancelStableAncsReadyReset();
         cancelStockConnectionRequest();
         cancelOemGattRefresh();
+        cancelAncsAdapterEscalation();
+        cancelAdapterRecoveryWatchdog();
+    }
+
+    /**
+     * ECARX can leave its BLE controller wedged after an iPhone link loss: closing and reopening
+     * GATT clients then never restores ANCS, while a manual radio off/on does so immediately.
+     * Preserve normal reconnects for thirty seconds, then automate that proven final step only
+     * for a phone whose ANCS subscription was already healthy in this controller session.
+     */
+    private void scheduleAncsAdapterEscalation(long token, @NonNull String reason) {
+        if (!ancsWasReadyThisSession || ancsReady || adapterRecoveryInProgress
+                || ancsAdapterEscalationTask != null
+                || config == null || !config.ancsNeeded()) return;
+        Handler handler = worker;
+        if (handler == null) return;
+        Runnable escalation = () -> runIfCurrent(token, () -> {
+            ancsAdapterEscalationTask = null;
+            long now = SystemClock.elapsedRealtime();
+            if (!AncsAdapterRecoveryPolicy.mayReset(
+                    ancsWasReadyThisSession, ancsReady, adapterRecoveryInProgress,
+                    now, lastAdapterRecoveryElapsedMs)) return;
+            startAdapterRecovery(token, reason);
+        });
+        ancsAdapterEscalationTask = escalation;
+        handler.postDelayed(escalation, AncsAdapterRecoveryPolicy.ESCALATION_DELAY_MS);
+        Log.w(TAG, "ANCS recovery watchdog armed: " + reason);
+    }
+
+    private void startAdapterRecovery(long token, @NonNull String reason) {
+        BluetoothAdapter adapter = bluetoothAdapter();
+        if (adapter == null || adapterRecoveryInProgress) return;
+        adapterRecoveryInProgress = true;
+        lastAdapterRecoveryElapsedMs = SystemClock.elapsedRealtime();
+        lastError = bounded("Automatic Bluetooth stack recovery after ANCS loss: "
+                + reason, 512);
+        ancsStatus = "bluetooth_stack_recovery";
+        closeAncsTransport();
+        cancelGattWatchdogs();
+        cancelGattReconnect();
+        cancelAncsPublicationRetry();
+        cancelDeviceRescan();
+        cancelStockConnectionRequest();
+        cancelOemGattRefresh();
+        BluetoothGatt previous = gatt;
+        gatt = null;
+        refreshGattCache(previous);
+        closeGatt(previous);
+        gattConnected = false;
+        resetAncsSession(token, "bluetooth_stack_recovery");
+        updateConnected(token);
+        Log.w(TAG, "ANCS did not recover; cycling the Android 9 Bluetooth adapter once");
+        boolean accepted;
+        try {
+            accepted = adapter.isEnabled() ? adapter.disable() : adapter.enable();
+        } catch (RuntimeException denied) {
+            accepted = false;
+            lastError = "Bluetooth stack recovery denied: " + safeMessage(denied);
+        }
+        if (!accepted) {
+            adapterRecoveryInProgress = false;
+            scheduleGattReconnect(token, lastError.isEmpty()
+                    ? "Bluetooth stack recovery was rejected" : lastError, "retrying");
+            return;
+        }
+        scheduleAdapterRecoveryWatchdog(token);
+    }
+
+    private void handleAdapterRecoveryState(long token, int state) {
+        BluetoothAdapter adapter = bluetoothAdapter();
+        if (state == BluetoothAdapter.STATE_OFF) {
+            invalidateSelectedPhone(token, "bluetooth_stack_recovery");
+            boolean accepted = false;
+            try {
+                accepted = adapter != null && adapter.enable();
+            } catch (RuntimeException denied) {
+                lastError = "Bluetooth restart denied: " + safeMessage(denied);
+            }
+            if (!accepted) {
+                adapterRecoveryInProgress = false;
+                scheduleDeviceRescan(token);
+            }
+            return;
+        }
+        if (state == BluetoothAdapter.STATE_ON) finishAdapterRecovery(token);
+    }
+
+    private void finishAdapterRecovery(long token) {
+        if (!adapterRecoveryInProgress) return;
+        adapterRecoveryInProgress = false;
+        cancelAdapterRecoveryWatchdog();
+        reconnectAttempt = 0;
+        ancsStatus = "connecting_after_bluetooth_recovery";
+        lastError = "";
+        selectedDevice = null;
+        selectedAddress = "";
+        selectedName = "";
+        selectAndConnect(token);
+        Log.i(TAG, "Bluetooth adapter restarted; selected iPhone reconnect resumed");
+    }
+
+    private void scheduleAdapterRecoveryWatchdog(long token) {
+        cancelAdapterRecoveryWatchdog();
+        Handler handler = worker;
+        if (handler == null) return;
+        Runnable watchdog = () -> runIfCurrent(token, () -> {
+            adapterRecoveryWatchdog = null;
+            if (!adapterRecoveryInProgress) return;
+            BluetoothAdapter adapter = bluetoothAdapter();
+            if (adapter != null && adapter.isEnabled()) {
+                finishAdapterRecovery(token);
+                return;
+            }
+            boolean accepted = false;
+            try {
+                accepted = adapter != null && adapter.enable();
+            } catch (RuntimeException denied) {
+                lastError = "Bluetooth recovery timeout: " + safeMessage(denied);
+            }
+            if (accepted) {
+                scheduleAdapterRecoveryWatchdog(token);
+            } else {
+                adapterRecoveryInProgress = false;
+                ancsStatus = "bluetooth_recovery_failed";
+                publishSnapshot(token);
+                scheduleDeviceRescan(token);
+            }
+        });
+        adapterRecoveryWatchdog = watchdog;
+        handler.postDelayed(watchdog, ADAPTER_RECOVERY_WATCHDOG_MS);
+    }
+
+    private void cancelAncsAdapterEscalation() {
+        Runnable task = ancsAdapterEscalationTask;
+        if (task != null && worker != null) worker.removeCallbacks(task);
+        ancsAdapterEscalationTask = null;
+    }
+
+    private void cancelAdapterRecoveryWatchdog() {
+        Runnable task = adapterRecoveryWatchdog;
+        if (task != null && worker != null) worker.removeCallbacks(task);
+        adapterRecoveryWatchdog = null;
     }
 
     private void cancelDeviceRescan() {

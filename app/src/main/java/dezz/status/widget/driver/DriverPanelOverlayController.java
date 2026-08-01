@@ -992,13 +992,17 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         if (information.isEmpty()) return new InformationSection(null, 0);
         LinkedHashMap<String, List<LauncherShortcutStore.Shortcut>> rows =
                 new LinkedHashMap<>();
+        WidgetService widgetService = WidgetService.getInstance();
+        boolean ancsReady = widgetService != null && widgetService.isPhoneAncsReady();
         for (LauncherShortcutStore.Shortcut shortcut : information) {
+            if (shortcut.informationGroupAncsOnly && !ancsReady) continue;
             String group = shortcut.informationGroup.trim();
             // Empty groups are intentionally unique; every named group is unlimited and may mix
             // status-bar, vehicle, phone and smart-home information sources.
             String key = group.isEmpty() ? "\u0000" + shortcut.id : group;
             rows.computeIfAbsent(key, ignored -> new ArrayList<>()).add(shortcut);
         }
+        if (rows.isEmpty()) return new InformationSection(null, 0);
 
         ScrollView scroll = new ScrollView(context);
         scroll.setFillViewport(false);

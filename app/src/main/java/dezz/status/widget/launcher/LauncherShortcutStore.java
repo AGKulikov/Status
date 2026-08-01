@@ -21,6 +21,7 @@ import dezz.status.widget.Fonts;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.driver.DriverFavoritesPanelConfig;
+import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.SourceBinding;
 
 /** Versioned, ordered collection of user-created HOME icons. */
@@ -100,6 +101,8 @@ public final class LauncherShortcutStore {
         public int informationPlacement = 0;
         /** Named information-row settings; duplicated on members for backward-compatible JSON. */
         public int informationGroupGapPx = 0;
+        /** Hide the complete named row unless the live Apple ANCS subscription is ready. */
+        public boolean informationGroupAncsOnly = false;
         public int informationGroupMarginLeftPx = 0;
         public int informationGroupMarginTopPx = 0;
         public int informationGroupMarginRightPx = 0;
@@ -177,6 +180,7 @@ public final class LauncherShortcutStore {
             value.informationGroup = informationGroup;
             value.informationPlacement = informationPlacement;
             value.informationGroupGapPx = informationGroupGapPx;
+            value.informationGroupAncsOnly = informationGroupAncsOnly;
             value.informationGroupMarginLeftPx = informationGroupMarginLeftPx;
             value.informationGroupMarginTopPx = informationGroupMarginTopPx;
             value.informationGroupMarginRightPx = informationGroupMarginRightPx;
@@ -246,6 +250,9 @@ public final class LauncherShortcutStore {
 
     private static final String DRIVER_FAVORITES_TARGET_PREFIX = "favorites:";
     private static final String FAVORITE_ROUTE_TARGET_PREFIX = "route:";
+    private static final String PHONE_CELLULAR_INFO_TARGET =
+            "info:system:system.status.phone_cellular";
+    private static final String PHONE_OPERATOR_RESOURCE = "network.operator";
 
     @NonNull
     public static String driverFavoritesTarget(@NonNull String panelId) {
@@ -350,6 +357,7 @@ public final class LauncherShortcutStore {
                 if (value == null) throw new JSONException("item");
                 shortcuts.add(value);
             }
+            if (migrateCombinedPhoneCellularRows()) save();
         } catch (JSONException error) {
             // A partial import or a future schema must never overwrite the user's only copy of
             // actions, RULE bindings and long-press commands with defaults. Keep the last valid
@@ -357,6 +365,43 @@ public final class LauncherShortcutStore {
             shortcuts.clear();
             shortcuts.addAll(previous.isEmpty() ? defaults() : previous);
         }
+    }
+
+    /**
+     * HA1145 folds the carrier name into the cellular-status tile. Remove only the exact old
+     * direct operator member when both items already share one explicit horizontal row; an
+     * operator tile in another row or a standalone layout remains a deliberate user choice.
+     */
+    private boolean migrateCombinedPhoneCellularRows() {
+        List<String> duplicateIds = new ArrayList<>();
+        for (Shortcut cellular : shortcuts) {
+            String group = cellular.informationGroup.trim();
+            if (cellular.kind != Kind.INFO || group.isEmpty()
+                    || !PHONE_CELLULAR_INFO_TARGET.equals(cellular.target)) continue;
+            boolean paired = false;
+            for (Shortcut candidate : shortcuts) {
+                if (candidate == cellular || candidate.kind != Kind.INFO
+                        || candidate.informationPlacement != cellular.informationPlacement
+                        || !group.equals(candidate.informationGroup.trim())
+                        || !isDirectPhoneOperator(candidate)) continue;
+                duplicateIds.add(candidate.id);
+                paired = true;
+            }
+            if (paired && "Сотовая сеть iPhone".equals(cellular.title)) {
+                cellular.title = "Оператор и сигнал iPhone";
+            }
+        }
+        if (duplicateIds.isEmpty()) return false;
+        shortcuts.removeIf(value -> duplicateIds.contains(value.id));
+        return true;
+    }
+
+    private static boolean isDirectPhoneOperator(@NonNull Shortcut value) {
+        SourceBinding binding = value.stateBinding;
+        return binding != null && binding.isBound()
+                && binding.connectorType == ConnectorType.PHONE
+                && PHONE_OPERATOR_RESOURCE.equals(binding.resourceId)
+                && binding.valuePath.trim().isEmpty();
     }
 
     @NonNull
@@ -648,6 +693,7 @@ public final class LauncherShortcutStore {
                 .put("informationGroup", value.informationGroup)
                 .put("informationPlacement", value.informationPlacement)
                 .put("informationGroupGapPx", value.informationGroupGapPx)
+                .put("informationGroupAncsOnly", value.informationGroupAncsOnly)
                 .put("informationGroupMarginLeftPx",
                         value.informationGroupMarginLeftPx)
                 .put("informationGroupMarginTopPx",
@@ -766,6 +812,8 @@ public final class LauncherShortcutStore {
             value.informationPlacement = json.optInt("informationPlacement", 0);
             value.informationGroupGapPx =
                     json.optInt("informationGroupGapPx", 0);
+            value.informationGroupAncsOnly =
+                    json.optBoolean("informationGroupAncsOnly", false);
             if (!json.optBoolean("edgeToEdgeContent", false)) {
                 // HA1130 serialized implicit 10/7 content insets and a 4 px group gap into every
                 // item. Remove exactly those legacy defaults once; explicit newer values remain.

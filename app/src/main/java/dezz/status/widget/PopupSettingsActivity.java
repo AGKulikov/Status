@@ -643,7 +643,7 @@ public final class PopupSettingsActivity extends AppCompatActivity {
             case OUTDOOR_TEMP: return "Температура снаружи";
             case HOME_ASSISTANT: return "Устройства умного дома";
             case PHONE_STATUS: return "Статусы iPhone";
-            case PHONE_CELLULAR: return "Сотовая сеть iPhone";
+            case PHONE_CELLULAR: return "Оператор и сигнал iPhone";
             case PHONE_BATTERY: return "Батарея iPhone";
             default: return type.name();
         }

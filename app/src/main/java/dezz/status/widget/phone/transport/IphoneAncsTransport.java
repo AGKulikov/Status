@@ -41,6 +41,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.nio.charset.StandardCharsets;
+import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -2604,6 +2605,7 @@ public final class IphoneAncsTransport {
         BluetoothGatt previous = gatt;
         gatt = null;
         if (previous != null) {
+            refreshGattCache(previous);
             try {
                 previous.disconnect();
             } catch (RuntimeException ignored) {
@@ -2630,6 +2632,18 @@ public final class IphoneAncsTransport {
         main.postDelayed(managedReconnectTask, delay);
         log("Одна recovery-сессия " + REMOTE_LOGICAL_NAME
                 + " #" + (attempt + 1) + " через " + delay + " ms · " + reason);
+    }
+
+    /** Clears Android 9's cached ANCS handles before registering the next saved-peer client. */
+    private static boolean refreshGattCache(@Nullable BluetoothGatt value) {
+        if (value == null) return false;
+        try {
+            Method refresh = value.getClass().getMethod("refresh");
+            Object result = refresh.invoke(value);
+            return !(result instanceof Boolean) || (Boolean) result;
+        } catch (Throwable unavailable) {
+            return false;
+        }
     }
 
     private static boolean requiresControllerRetry(@Nullable String value) {

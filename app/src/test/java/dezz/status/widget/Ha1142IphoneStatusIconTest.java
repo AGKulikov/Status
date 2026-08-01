@@ -32,22 +32,23 @@ public final class Ha1142IphoneStatusIconTest {
         String widget = source("WidgetService.java");
         String resolver = source("launcher/LauncherIconResolver.java");
         String gps = resource("drawable/ic_status_iphone_gps_active.xml");
-        String bluetooth = resource("drawable/ic_status_iphone_bluetooth_outline.xml");
+        String bluetooth = resource("drawable/ic_status_iphone_bluetooth_solid.xml");
 
         assertTrue(count(widget, "R.drawable.ic_status_iphone_gps_active") >= 3);
-        assertTrue(count(widget, "R.drawable.ic_status_iphone_bluetooth_outline") >= 4);
+        assertTrue(count(widget, "R.drawable.ic_status_iphone_bluetooth_solid") >= 5);
         assertTrue(resolver.contains("R.drawable.ic_status_iphone_gps_active"));
         assertTrue(resolver.contains("R.drawable.ic_status_iphone_bluetooth_solid"));
         assertTrue(gps.contains("Location fill"));
-        assertTrue(bluetooth.contains("strokeWidth=\"1.35\""));
+        assertTrue(bluetooth.contains("fillColor=\"@android:color/white\""));
     }
 
-    @Test public void bluetoothFillStillDependsOnLiveNotificationPath() throws Exception {
+    @Test public void bluetoothUsesOneMonochromeGlyphForTheConnectedIphone() throws Exception {
         String widget = source("WidgetService.java");
-        assertTrue(widget.contains("isPhoneNotificationPathAvailable()"));
-        assertTrue(widget.contains("PhoneBluetoothIndicatorPolicy.Appearance.PHONE_SOLID"));
+        String policy = source("phone/PhoneBluetoothIndicatorPolicy.java");
+        assertTrue(policy.contains("Appearance.PHONE_MONO"));
         assertTrue(widget.contains("R.drawable.ic_status_iphone_bluetooth_solid"));
-        assertTrue(widget.contains("R.drawable.ic_status_iphone_bluetooth_outline"));
+        assertTrue(widget.contains("binding.bluetoothStatusIcon.setOutlineWidth(0)"));
+        assertTrue(!widget.contains("PhoneBluetoothIndicatorPolicy.Appearance.PHONE_SOLID"));
     }
 
     private static int count(String value, String needle) {

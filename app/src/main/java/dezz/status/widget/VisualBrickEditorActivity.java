@@ -49,6 +49,7 @@ import dezz.status.widget.popup.PopupItemConfig;
 import dezz.status.widget.popup.PopupItemConfigStore;
 import dezz.status.widget.popup.PopupOverlayConfig;
 import dezz.status.widget.popup.PopupOverlayConfigStore;
+import dezz.status.widget.popup.SmartHomeTileColorPolicy;
 import dezz.status.widget.scenario.Input;
 import dezz.status.widget.scenario.Operator;
 import dezz.status.widget.scenario.Output;
@@ -1055,7 +1056,10 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         previewValue.setVisibility(popup.showStatus ? View.VISIBLE : View.GONE);
         int iconDrawable = PopupIconCatalog.resolve(popup.icon);
         if (iconDrawable != 0) previewIcon.setImageResource(iconDrawable);
-        previewIcon.setColorFilter(parseColor(popup.iconColor));
+        String liveContentColor = tested == null
+                ? popup.defaultTextColor : tested.color;
+        previewIcon.setColorFilter(parseColor(SmartHomeTileColorPolicy.contentColor(
+                popup.sourceBinding, popup.iconColor, liveContentColor)));
         previewIcon.setAlpha(popup.iconAlpha / 255f);
         ViewGroup.LayoutParams iconParams = previewIcon.getLayoutParams();
         iconParams.width = dp(Math.min(120, popup.iconSize));
@@ -1066,7 +1070,8 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         previewIcon.setRotation(popup.iconRotation);
         previewTitle.setText(popup.title);
         previewTitle.setTextSize(Math.min(64, popup.titleSize));
-        previewTitle.setTextColor(parseColor(popup.titleColor));
+        previewTitle.setTextColor(parseColor(SmartHomeTileColorPolicy.contentColor(
+                popup.sourceBinding, popup.titleColor, liveContentColor)));
         previewTitle.setAlpha(popup.titleAlpha / 255f);
         previewTitle.setGravity(Gravity.CENTER);
         previewTitle.setTypeface(Fonts.resolve(this, popup.titleFontFamily,

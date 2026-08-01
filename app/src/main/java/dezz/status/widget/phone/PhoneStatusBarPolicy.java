@@ -224,6 +224,12 @@ public final class PhoneStatusBarPolicy {
         return (Boolean) value.rawValue;
     }
 
+    /** Returns one exact current PHONE string without adding a status-row prefix. */
+    public static String textValue(String resourceId, ConnectorValue value) {
+        if (!eligible(value, resourceId) || !(value.rawValue instanceof String)) return null;
+        return singleLine(value.rawValue, MAX_STATUS_TEXT_CODE_POINTS);
+    }
+
     /**
      * Extracts a safe presentation of the latest real-time notification.
      *

@@ -4,8 +4,7 @@ package dezz.status.widget.phone;
 public final class PhoneBluetoothIndicatorPolicy {
     public enum Appearance {
         DEFAULT,
-        PHONE_OUTLINE,
-        PHONE_SOLID
+        PHONE_MONO
     }
 
     private PhoneBluetoothIndicatorPolicy() {
@@ -17,8 +16,8 @@ public final class PhoneBluetoothIndicatorPolicy {
         if (!classicBluetoothConnected || !selectedPhoneConfigured) {
             return Appearance.DEFAULT;
         }
-        return notificationPathActiveNow
-                ? Appearance.PHONE_SOLID
-                : Appearance.PHONE_OUTLINE;
+        // Notification readiness remains a data state (and may gate driver rows), but it must
+        // not split the Bluetooth rune into separately styled outline/body variants.
+        return Appearance.PHONE_MONO;
     }
 }

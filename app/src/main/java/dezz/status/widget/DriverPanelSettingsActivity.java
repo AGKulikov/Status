@@ -387,36 +387,47 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         });
         body.addView(size, new LinearLayout.LayoutParams(match(), dp(42)));
 
-        TextView gapValue = text(shortcut.gapAfterPx < 0
-                        ? "Отступ после кнопки: общий"
-                        : "Отступ после кнопки: " + shortcut.gapAfterPx + " px",
-                13, 0xFFC7C7CC);
-        body.addView(gapValue, topMargin(dp(6)));
-        SeekBar buttonGap = new SeekBar(this);
-        buttonGap.setMax(81);
-        buttonGap.setProgress(shortcut.gapAfterPx + 1);
-        buttonGap.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            int selected = shortcut.gapAfterPx;
+        if (shortcut.kind == LauncherShortcutStore.Kind.INFO
+                && !shortcut.informationGroup.trim().isEmpty()) {
+            // The previous card exposed gapAfterPx here even though a horizontal information
+            // row is rendered from informationGroupGapPx. That made the visible control a no-op
+            // for exactly the layout it claimed to edit.
+            spacingSlider(body, "Расстояние между информационными иконками", 120,
+                    shortcut.informationGroupGapPx, selected ->
+                            applyInformationGroupSetting(shortcut,
+                                    value -> value.informationGroupGapPx = selected));
+        } else {
+            TextView gapValue = text(shortcut.gapAfterPx < 0
+                            ? "Отступ после кнопки: общий"
+                            : "Отступ после кнопки: " + shortcut.gapAfterPx + " px",
+                    13, 0xFFC7C7CC);
+            body.addView(gapValue, topMargin(dp(6)));
+            SeekBar buttonGap = new SeekBar(this);
+            buttonGap.setMax(81);
+            buttonGap.setProgress(shortcut.gapAfterPx + 1);
+            buttonGap.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                int selected = shortcut.gapAfterPx;
 
-            @Override public void onProgressChanged(SeekBar seekBar, int progress,
-                                                    boolean fromUser) {
-                selected = progress - 1;
-                gapValue.setText(selected < 0
-                        ? "Отступ после кнопки: общий"
-                        : "Отступ после кнопки: " + selected + " px");
-            }
+                @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                                                        boolean fromUser) {
+                    selected = progress - 1;
+                    gapValue.setText(selected < 0
+                            ? "Отступ после кнопки: общий"
+                            : "Отступ после кнопки: " + selected + " px");
+                }
 
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {
-            }
+                @Override public void onStartTrackingTouch(SeekBar seekBar) {
+                }
 
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {
-                shortcut.gapAfterPx = selected;
-                store.upsert(shortcut);
-                refreshPreview();
-                applyPanel();
-            }
-        });
-        body.addView(buttonGap, new LinearLayout.LayoutParams(match(), dp(42)));
+                @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                    shortcut.gapAfterPx = selected;
+                    store.upsert(shortcut);
+                    refreshPreview();
+                    applyPanel();
+                }
+            });
+            body.addView(buttonGap, new LinearLayout.LayoutParams(match(), dp(42)));
+        }
 
         LinearLayout controls = new LinearLayout(this);
         controls.setOrientation(LinearLayout.HORIZONTAL);
@@ -861,10 +872,15 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 .show());
         form.addView(vertical, rowParams());
 
-        slider(form, "Расстояние между элементами", 0, 120,
-                shortcut.informationGroupGapPx, " px", selected ->
+        spacingSlider(form, "Расстояние между информационными иконками", 120,
+                shortcut.informationGroupGapPx, selected ->
                         applyInformationGroupSetting(shortcut,
                                 value -> value.informationGroupGapPx = selected));
+
+        addSwitch(form, "Показывать ряд только при подключении ANCS",
+                shortcut.informationGroupAncsOnly, checked ->
+                        applyInformationGroupSetting(shortcut,
+                                value -> value.informationGroupAncsOnly = checked));
 
         title(form, "Внешние отступы ряда");
         groupSlider(form, shortcut, "Слева",
@@ -975,6 +991,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             @NonNull LauncherShortcutStore.Shortcut target) {
         target.informationPlacement = source.informationPlacement;
         target.informationGroupGapPx = source.informationGroupGapPx;
+        target.informationGroupAncsOnly = source.informationGroupAncsOnly;
         target.informationGroupMarginLeftPx = source.informationGroupMarginLeftPx;
         target.informationGroupMarginTopPx = source.informationGroupMarginTopPx;
         target.informationGroupMarginRightPx = source.informationGroupMarginRightPx;

@@ -1984,7 +1984,7 @@ public class WidgetService extends Service {
             case PHONE_STATUS:
                 return binding.phoneStatusContainer;
             case PHONE_CELLULAR:
-                return binding.phoneCellularStatusIcon;
+                return binding.phoneCellularContainer;
             case PHONE_BATTERY:
                 return binding.phoneBatteryStatusIcon;
             default:
@@ -2125,6 +2125,7 @@ public class WidgetService extends Service {
     /** Applies one immutable PHONE registry burst on the main thread. */
     private void onPhoneValuesChanged(@NonNull List<ConnectorValue> changedValues) {
         if (destroyed || prefs == null) return;
+        boolean previousAncsReady = phoneAncsReady;
         ConnectorValue latestNotification = null;
         ConnectorValue notificationItems = null;
         ConnectorValue batteryLevel = null;
@@ -2204,6 +2205,11 @@ public class WidgetService extends Service {
             updatePhoneIndicators();
             applyBrickVisibility(currentBrickSet());
             updateBluetoothStatus();
+        }
+        if (previousAncsReady != phoneAncsReady && prefs.driverPanelEnabled.get()) {
+            // ANCS-gated information rows are structural: rebuilding only on the actual profile
+            // transition lets controls reclaim the row's height and avoids polling the rail.
+            DriverPanelService.apply(this);
         }
         schedulePopupRefresh();
     }
@@ -2303,6 +2309,10 @@ public class WidgetService extends Service {
         applyConfiguredIconOutline(cellular, prefs.phoneCellular);
         cellular.setBadgeText(null, 0, 0);
         cellular.setBadgeDrawable(null);
+        String operator = phoneText("network.operator");
+        binding.phoneCellularOperatorText.setText(operator);
+        binding.phoneCellularOperatorText.setVisibility(
+                operator.isEmpty() ? View.GONE : View.VISIBLE);
 
         Integer battery = phonePercent("battery.level");
         OutlineImageView batteryIcon = binding.phoneBatteryStatusIcon;
@@ -2326,6 +2336,13 @@ public class WidgetService extends Service {
     @Nullable
     private Boolean phoneBoolean(@NonNull String resourceId) {
         return PhoneStatusBarPolicy.booleanValue(resourceId, phoneStatusValues.get(resourceId));
+    }
+
+    @NonNull
+    private String phoneText(@NonNull String resourceId) {
+        String value = PhoneStatusBarPolicy.textValue(
+                resourceId, phoneStatusValues.get(resourceId));
+        return value == null ? "" : value;
     }
 
     private int phoneBatteryColor(@Nullable Integer battery) {
@@ -2604,10 +2621,18 @@ public class WidgetService extends Service {
         layout.width = Math.round(prefs.phoneCellular.size.get() * 1.17f);
         layout.height = prefs.phoneCellular.size.get();
         binding.phoneCellularStatusIcon.setLayoutParams(layout);
-        applyHorizontalMargins(binding.phoneCellularStatusIcon,
+        binding.phoneCellularOperatorText.setTextSize(TypedValue.COMPLEX_UNIT_PX,
+                Math.max(12, Math.round(prefs.phoneCellular.size.get() * .42f)));
+        binding.phoneCellularOperatorText.setTextColor(
+                ContextCompat.getColor(themedContext, R.color.text_primary));
+        binding.phoneCellularOperatorText.setOutlineColor(
+                textOutlineColor(prefs.phoneCellular.outlineAlpha.get()));
+        binding.phoneCellularOperatorText.setOutlineWidth(
+                prefs.phoneCellular.outlineWidth.get());
+        applyHorizontalMargins(binding.phoneCellularContainer,
                 prefs.phoneCellular.marginStart.get(), prefs.phoneCellular.marginEnd.get());
-        binding.phoneCellularStatusIcon.setTranslationY(prefs.phoneCellular.adjustY.get());
-        binding.phoneCellularStatusIcon.setAlpha(prefs.phoneCellular.contentAlpha.get() / 255f);
+        binding.phoneCellularContainer.setTranslationY(prefs.phoneCellular.adjustY.get());
+        binding.phoneCellularContainer.setAlpha(prefs.phoneCellular.contentAlpha.get() / 255f);
     }
 
     private void applyPhoneBatteryBrickSettings() {
@@ -2718,7 +2743,8 @@ public class WidgetService extends Service {
         boolean phoneStatusActive = bricksSet.contains(BrickType.PHONE_STATUS)
                 && hasVisiblePhoneStatusValues();
         boolean phoneCellularActive = bricksSet.contains(BrickType.PHONE_CELLULAR)
-                && phonePercent("network.signal") != null;
+                && (phonePercent("network.signal") != null
+                || !phoneText("network.operator").isEmpty());
         boolean phoneBatteryActive = bricksSet.contains(BrickType.PHONE_BATTERY)
                 && phonePercent("battery.level") != null;
         BrickTarget[] targets = {
@@ -2741,7 +2767,7 @@ public class WidgetService extends Service {
                 resolveTarget(BrickType.PHONE_STATUS, phoneStatusActive,
                         binding.phoneStatusContainer, prefs.phoneStatus.contentAlpha.get()),
                 resolveTarget(BrickType.PHONE_CELLULAR, phoneCellularActive,
-                        binding.phoneCellularStatusIcon, prefs.phoneCellular.contentAlpha.get()),
+                        binding.phoneCellularContainer, prefs.phoneCellular.contentAlpha.get()),
                 resolveTarget(BrickType.PHONE_BATTERY, phoneBatteryActive,
                         binding.phoneBatteryStatusIcon, prefs.phoneBattery.contentAlpha.get()),
         };
@@ -2923,9 +2949,11 @@ public class WidgetService extends Service {
                         "phone", binding.phoneStatusContainer.getVisibility() == View.VISIBLE);
             case "builtin.phone_cellular":
                 Integer signal = phonePercent("network.signal");
+                String operator = phoneText("network.operator");
                 return new PopupOverlayController.BuiltinValue(
-                        signal == null ? "" : signal + "%", "#FFFFFFFF",
-                        "phone", signal != null);
+                        !operator.isEmpty() ? operator : signal == null ? "" : signal + "%",
+                        "#FFFFFFFF",
+                        "phone", signal != null || !operator.isEmpty());
             case "builtin.phone_battery":
                 Integer battery = phonePercent("battery.level");
                 return new PopupOverlayController.BuiltinValue(
@@ -4134,21 +4162,16 @@ public class WidgetService extends Service {
                             hasSelectedPhoneConfiguration(),
                             isPhoneNotificationPathAvailable());
             if (phoneAppearance != PhoneBluetoothIndicatorPolicy.Appearance.DEFAULT) {
-                // Use one deliberately simple rune. The previous "hide the body and enlarge the
-                // bitmap halo" trick produced two muddy, overlapping silhouettes on the KX11.
+                // One flat SF-style rune and one tint. ANCS readiness is intentionally not
+                // encoded by a separately coloured body/outline anymore.
                 binding.bluetoothStatusIcon.setImageResource(
-                        phoneAppearance == PhoneBluetoothIndicatorPolicy.Appearance.PHONE_SOLID
-                                ? R.drawable.ic_status_iphone_bluetooth_solid
-                                : R.drawable.ic_status_iphone_bluetooth_outline);
+                        R.drawable.ic_status_iphone_bluetooth_solid);
                 binding.bluetoothStatusIcon.setDrawIcon(true);
                 Context context = themedContext == null ? this : themedContext;
                 ImageViewCompat.setImageTintList(binding.bluetoothStatusIcon,
                         ColorStateList.valueOf(ContextCompat.getColor(
                                 context, R.color.status_bluetooth)));
-                if (prefs.bluetooth.outlineAlpha.get() > 0) {
-                    binding.bluetoothStatusIcon.setOutlineWidth(
-                            Math.min(1, Math.max(0, prefs.bluetooth.outlineWidth.get())));
-                }
+                binding.bluetoothStatusIcon.setOutlineWidth(0);
             }
         }
         schedulePopupRefresh();
@@ -4851,6 +4874,11 @@ public class WidgetService extends Service {
         return instance != null;
     }
 
+    /** Current live ANCS subscription, used by driver rows that explicitly opt into this gate. */
+    public boolean isPhoneAncsReady() {
+        return !destroyed && phoneAncsReady;
+    }
+
     /**
      * Read-only same-process geometry for HOME safe-area calculation.
      *
@@ -4960,9 +4988,10 @@ public class WidgetService extends Service {
                 break;
             case PHONE_CELLULAR:
                 Integer signal = phonePercent("network.signal");
-                known = signal != null;
-                active = known && signal > 0;
-                text = known ? signal + "%" : "";
+                String operator = phoneText("network.operator");
+                known = signal != null || !operator.isEmpty();
+                active = !operator.isEmpty() || signal != null && signal > 0;
+                text = !operator.isEmpty() ? operator : known ? signal + "%" : "";
                 iconResource = R.drawable.ic_status_iphone_cellular_level;
                 iconTint = 0; // Active/inactive bars carry their own colors.
                 iconLevel = cellularBars(signal) * 2500;
@@ -5039,14 +5068,11 @@ public class WidgetService extends Service {
                                 hasSelectedPhoneConfiguration(),
                                 isPhoneNotificationPathAvailable());
                 if (appearance != PhoneBluetoothIndicatorPolicy.Appearance.DEFAULT) {
-                    iconResource = appearance
-                            == PhoneBluetoothIndicatorPolicy.Appearance.PHONE_SOLID
-                            ? R.drawable.ic_status_iphone_bluetooth_solid
-                            : R.drawable.ic_status_iphone_bluetooth_outline;
+                    iconResource = R.drawable.ic_status_iphone_bluetooth_solid;
                     iconTint = ContextCompat.getColor(
                             themedContext != null ? themedContext : this,
                             R.color.status_bluetooth);
-                    if (outlineWidth > 0) outlineWidth = Math.min(1, outlineWidth);
+                    outlineWidth = 0;
                 }
             }
         } else if (iconResource != 0 && iconPrefs != null) {

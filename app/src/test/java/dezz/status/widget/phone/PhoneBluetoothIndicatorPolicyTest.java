@@ -10,13 +10,13 @@ public final class PhoneBluetoothIndicatorPolicyTest {
                 PhoneBluetoothIndicatorPolicy.resolve(true, false, false));
     }
 
-    @Test public void phoneAndMusicConnectionUsesCleanBlueOutline() {
-        assertEquals(PhoneBluetoothIndicatorPolicy.Appearance.PHONE_OUTLINE,
+    @Test public void phoneAndMusicConnectionUsesOneMonochromeGlyph() {
+        assertEquals(PhoneBluetoothIndicatorPolicy.Appearance.PHONE_MONO,
                 PhoneBluetoothIndicatorPolicy.resolve(true, true, false));
     }
 
-    @Test public void activeNotificationPathFillsTheSameGlyph() {
-        assertEquals(PhoneBluetoothIndicatorPolicy.Appearance.PHONE_SOLID,
+    @Test public void notificationReadinessDoesNotRepaintTheGlyphBody() {
+        assertEquals(PhoneBluetoothIndicatorPolicy.Appearance.PHONE_MONO,
                 PhoneBluetoothIndicatorPolicy.resolve(true, true, true));
     }
 

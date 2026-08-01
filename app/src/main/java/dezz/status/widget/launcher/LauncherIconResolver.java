@@ -97,7 +97,7 @@ public final class LauncherIconResolver {
             new Preset("status_wifi", "Wi‑Fi статусной строки"),
             new Preset("status_gps", "GPS статусной строки"),
             new Preset("status_bluetooth", "Bluetooth статусной строки"),
-            new Preset("status_phone_cellular", "Сотовая сеть iPhone"),
+            new Preset("status_phone_cellular", "Оператор и сигнал iPhone"),
             new Preset("status_phone_battery", "Батарея iPhone"),
             new Preset("devices", "Умный дом"),
             new Preset("scenario", "Сценарий"),

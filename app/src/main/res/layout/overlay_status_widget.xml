@@ -205,17 +205,38 @@
         android:src="@drawable/ic_status_bt_off"
         tools:ignore="ContentDescription" />
 
-    <dezz.status.widget.OutlineImageView
-        android:id="@+id/phoneCellularStatusIcon"
-        android:layout_width="100sp"
-        android:layout_height="100sp"
+    <LinearLayout
+        android:id="@+id/phoneCellularContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_gravity="center_vertical"
-        android:paddingHorizontal="4sp"
-        android:scaleType="fitCenter"
-        android:src="@drawable/ic_status_iphone_cellular_level"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
         android:visibility="gone"
-        tools:ignore="ContentDescription"
-        tools:visibility="visible" />
+        tools:visibility="visible">
+
+        <dezz.status.widget.OutlineImageView
+            android:id="@+id/phoneCellularStatusIcon"
+            android:layout_width="100sp"
+            android:layout_height="100sp"
+            android:paddingHorizontal="4sp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_status_iphone_cellular_level"
+            tools:ignore="ContentDescription" />
+
+        <dezz.status.widget.OutlineTextView
+            android:id="@+id/phoneCellularOperatorText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4sp"
+            android:fontFamily="@font/roboto_condensed_medium"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:textColor="@color/text_primary"
+            android:visibility="gone"
+            tools:text="beeline"
+            tools:visibility="visible" />
+    </LinearLayout>
 
     <dezz.status.widget.OutlineImageView
         android:id="@+id/phoneBatteryStatusIcon"
