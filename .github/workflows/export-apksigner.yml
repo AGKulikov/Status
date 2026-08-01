@@ -1,0 +1,31 @@
+name: Export Android signer tool
+
+on:
+  push:
+    branches: ['tools/apksigner36-ha1140']
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install Android build tools 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;36.0.0"
+          mkdir -p signer-tool/lib
+          cp "$ANDROID_HOME/build-tools/36.0.0/apksigner" signer-tool/
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" signer-tool/lib/
+          chmod +x signer-tool/apksigner
+
+      - name: Upload signer tool
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apksigner-36
+          path: signer-tool
+          if-no-files-found: error
+          retention-days: 1
