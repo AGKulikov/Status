@@ -3,7 +3,8 @@ package dezz.status.widget.phone;
 
 /** Pure guard rails for the last-resort Android 9 Bluetooth-controller recovery. */
 public final class AncsAdapterRecoveryPolicy {
-    public static final long ESCALATION_DELAY_MS = 30_000L;
+    /** Let the retained autoConnect owner and its serialized scan fallback finish first. */
+    public static final long ESCALATION_DELAY_MS = 150_000L;
     public static final long RESET_COOLDOWN_MS = 5L * 60L * 1_000L;
 
     private AncsAdapterRecoveryPolicy() {

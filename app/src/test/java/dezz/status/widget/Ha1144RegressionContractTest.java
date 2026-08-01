@@ -18,7 +18,8 @@ public final class Ha1144RegressionContractTest {
         String transport = source("phone/transport/IphoneAncsTransport.java");
 
         assertTrue(controller.contains("requestManagedAncsReconnect(token,"));
-        assertTrue(controller.contains("current.requestSavedPeerReconnect(detail)"));
+        assertTrue(controller.contains(
+                "current.requestSavedPeerReconnect(detail, confirmedLeLoss)"));
         assertTrue(controller.contains(
                 "state.contains(\"RECOVERING\") || state.contains(\"IDENTITY SCAN\")"));
         assertTrue(controller.contains("ancsReady = false"));

@@ -58,11 +58,10 @@ public final class PhoneConnectorPolicyTest {
         assertNull(PhoneConnectorPolicy.decodeBatteryLevelStatus(new byte[] {0x01, 0, 0, 0}));
     }
 
-    @Test public void batteryTrendOnlyInfersDirectionFromTwoValidDifferentSamples() {
+    @Test public void batteryTrendOnlyInfersPositiveChargingEvidence() {
         assertEquals(Boolean.TRUE,
                 PhoneConnectorPolicy.inferChargingFromLevelTrend(41, 42));
-        assertEquals(Boolean.FALSE,
-                PhoneConnectorPolicy.inferChargingFromLevelTrend(42, 41));
+        assertNull(PhoneConnectorPolicy.inferChargingFromLevelTrend(42, 41));
         assertNull(PhoneConnectorPolicy.inferChargingFromLevelTrend(42, 42));
         assertNull(PhoneConnectorPolicy.inferChargingFromLevelTrend(null, 42));
         assertNull(PhoneConnectorPolicy.inferChargingFromLevelTrend(42, 101));

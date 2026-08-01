@@ -190,6 +190,7 @@ public final class PhoneConnectorController {
     private final PresenceSink presenceSink;
     private final Object lifecycleLock = new Object();
     private final Handler mainHandler;
+    private final PhoneTelemetryStore telemetryStore;
 
     private long generation;
     private boolean running;
@@ -257,6 +258,10 @@ public final class PhoneConnectorController {
     private String batteryChargingSource = "";
     private String batteryChargeState = "";
     private String batteryChargeLevel = "";
+    @Nullable private PhoneTelemetryStore.Record retainedTelemetry;
+    private boolean batteryLiveSeenThisConnection;
+    private boolean networkLiveSeenThisConnection;
+    private boolean telemetryStale;
     @Nullable private Boolean networkAvailable;
     @Nullable private Integer networkSignal;
     @Nullable private Boolean networkRoaming;
@@ -352,6 +357,7 @@ public final class PhoneConnectorController {
         this.values = Objects.requireNonNull(values, "values");
         this.presenceSink = presenceSink == null ? NO_PRESENCE_SINK : presenceSink;
         this.mainHandler = new Handler(Looper.getMainLooper());
+        this.telemetryStore = new PhoneTelemetryStore(this.context);
     }
 
     /**
@@ -415,6 +421,7 @@ public final class PhoneConnectorController {
                 refreshGattCache(previous);
                 closeGatt(previous);
                 gattConnected = false;
+                persistCurrentTelemetry();
                 clearBasData();
                 resetAncsSession(token, "connecting");
                 forceDirectGatt = true;
@@ -536,6 +543,10 @@ public final class PhoneConnectorController {
         batteryChargingSource = "";
         batteryChargeState = "";
         batteryChargeLevel = "";
+        retainedTelemetry = null;
+        batteryLiveSeenThisConnection = false;
+        networkLiveSeenThisConnection = false;
+        telemetryStale = false;
         networkAvailable = null;
         networkSignal = null;
         networkRoaming = null;
@@ -652,6 +663,7 @@ public final class PhoneConnectorController {
             int transport = intent.getIntExtra(EXTRA_ACL_TRANSPORT,
                     BluetoothDevice.TRANSPORT_AUTO);
             if (transport != BluetoothDevice.TRANSPORT_LE) {
+                persistCurrentTelemetry();
                 hfpConnected = false;
                 clearHfpData();
                 clearGenericBatteryData();
@@ -665,13 +677,17 @@ public final class PhoneConnectorController {
             if (config != null && config.ancsNeeded()
                     && transport != BluetoothDevice.TRANSPORT_BREDR) {
                 requestManagedAncsReconnect(token,
-                        "Selected iPhone ACL link disconnected");
+                        "Selected iPhone ACL link disconnected",
+                        transport == BluetoothDevice.TRANSPORT_LE);
             }
         } else if (ACTION_HFP_CONNECTION.equals(action)) {
             int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE,
                     BluetoothProfile.STATE_DISCONNECTED);
             hfpConnected = state == BluetoothProfile.STATE_CONNECTED;
-            if (!hfpConnected) clearHfpData();
+            if (!hfpConnected) {
+                persistCurrentTelemetry();
+                clearHfpData();
+            }
             updateConnected(token);
         } else if (ACTION_MAP_CONNECTION.equals(action)) {
             int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE,
@@ -711,12 +727,14 @@ public final class PhoneConnectorController {
                 observeBatteryTrend("system", raw);
                 readCachedBluetoothCharging(device);
                 refreshBatteryValues();
+                markTelemetryUpdated(true, false);
                 publishSnapshot(token);
             }
         }
     }
 
     private void invalidateSelectedPhone(long token, @NonNull String status) {
+        persistCurrentTelemetry();
         replaceOemPowerObservation(null);
         closeAncsTransport();
         BluetoothGatt previous = gatt;
@@ -776,6 +794,7 @@ public final class PhoneConnectorController {
         cancelDeviceRescan();
         selectedAddress = safeAddress(selected);
         selectedName = safeName(selected);
+        restoreRetainedTelemetry(selectedAddress);
         startOemPowerObservation(token, selectedAddress);
         updateConnected(token);
         queryInitialProfileState(token, adapter, BluetoothProfile.A2DP);
@@ -828,6 +847,7 @@ public final class PhoneConnectorController {
         observeBatteryTrend("ecarx", normalized);
         readCachedBluetoothCharging(selectedDevice);
         refreshBatteryValues();
+        markTelemetryUpdated(true, false);
         publishSnapshot(token);
     }
 
@@ -1344,7 +1364,6 @@ public final class PhoneConnectorController {
                 || state.contains("CCCD_WRITE_EXCEPTION")
                 || state.contains("CCCD_WRITE_TIMEOUT")
                 || state.contains("CCCD_FAILED_")
-                || state.contains("BAS OPERATION TIMEOUT")
                 || state.contains("ANCS DATA DESYNC")
                 || state.contains("ANCS WAIT TIMEOUT")
                 || state.contains("SECURE READ FAILED")
@@ -1599,6 +1618,7 @@ public final class PhoneConnectorController {
         }
         cancelGattWatchdogs();
         gattConnected = false;
+        persistCurrentTelemetry();
         clearBasData();
         resetAncsSession(token, "disconnected");
         updateConnected(token);
@@ -2362,10 +2382,13 @@ public final class PhoneConnectorController {
             basChargeLevel = decoded.chargeLevel;
         }
         refreshBatteryValues();
+        markTelemetryUpdated(true, false);
         publishSnapshot(token);
     }
 
     private void applyHfpEvent(long token, @NonNull Intent intent) {
+        boolean batteryUpdated = false;
+        boolean networkUpdated = false;
         Integer rawBattery = intExtra(intent, EXTRA_HFP_BATTERY, "battery_level",
                 "batteryLevel");
         if (rawBattery != null) {
@@ -2375,6 +2398,7 @@ public final class PhoneConnectorController {
                 hfpBatteryLevel = normalized;
                 hfpBatteryUpdatedAt = SystemClock.elapsedRealtime();
                 observeBatteryTrend("hfp", normalized);
+                batteryUpdated = true;
             }
         }
         Integer rawSignal = intExtra(intent, EXTRA_HFP_NETWORK_SIGNAL,
@@ -2382,10 +2406,12 @@ public final class PhoneConnectorController {
                 "network_signal", "signal", "signal_level");
         if (rawSignal != null) {
             networkSignal = PhoneConnectorPolicy.normalizeHfpSignal(rawSignal);
+            networkUpdated = true;
         }
         Integer status = intExtra(intent, EXTRA_HFP_NETWORK_STATUS, "network_status");
         if (status != null) {
             networkAvailable = status != 0;
+            networkUpdated = true;
             if (!networkAvailable) {
                 networkSignal = null;
                 networkRoaming = null;
@@ -2396,17 +2422,26 @@ public final class PhoneConnectorController {
         if (status == null || status != 0) {
             Boolean roaming = booleanExtra(intent, EXTRA_HFP_NETWORK_ROAMING,
                     "network_roaming", "roaming");
-            if (roaming != null) networkRoaming = roaming;
+            if (roaming != null) {
+                networkRoaming = roaming;
+                networkUpdated = true;
+            }
             String operator = stringExtra(intent, EXTRA_HFP_OPERATOR, "operator_name",
                     "operator");
-            if (operator != null) networkOperator = bounded(operator, 256);
+            if (operator != null) {
+                networkOperator = bounded(operator, 256);
+                networkUpdated = true;
+            }
 
             // Network generation is an optional vendor extension. Read known aliases, but do
             // not reflect into hidden Bluetooth classes or assume a particular OEM bundle.
             String type = stringExtra(intent,
                     "android.bluetooth.headsetclient.extra.NETWORK_TYPE",
                     "network_type", "networkType", "phone_network_type");
-            if (type != null) networkType = bounded(type, 64);
+            if (type != null) {
+                networkType = bounded(type, 64);
+                networkUpdated = true;
+            }
         }
         Boolean charging = booleanExtra(intent,
                 "android.bluetooth.headsetclient.extra.BATTERY_CHARGING",
@@ -2415,6 +2450,7 @@ public final class PhoneConnectorController {
             hfpChargingKnown = true;
             hfpBatteryCharging = charging;
             hfpChargingUpdatedAt = SystemClock.elapsedRealtime();
+            batteryUpdated = true;
         }
         Boolean voiceRecognition = booleanExtra(intent, EXTRA_HFP_VOICE_RECOGNITION,
                 "voice_recognition", "voiceRecognition");
@@ -2423,6 +2459,9 @@ public final class PhoneConnectorController {
                 "in_band_ring", "inBandRing");
         if (inBandRing != null) inBandRingSupported = inBandRing;
         refreshBatteryValues();
+        if (batteryUpdated || networkUpdated) {
+            markTelemetryUpdated(batteryUpdated, networkUpdated);
+        }
         publishSnapshot(token);
     }
 
@@ -2531,6 +2570,91 @@ public final class PhoneConnectorController {
         }
     }
 
+    private void restoreRetainedTelemetry(@NonNull String address) {
+        retainedTelemetry = telemetryStore.load(address, System.currentTimeMillis());
+        batteryLiveSeenThisConnection = false;
+        networkLiveSeenThisConnection = false;
+        telemetryStale = retainedTelemetry != null;
+    }
+
+    private void markTelemetryUpdated(boolean battery, boolean network) {
+        if (battery) batteryLiveSeenThisConnection = true;
+        if (network) networkLiveSeenThisConnection = true;
+        telemetryStale = false;
+        persistCurrentTelemetry();
+    }
+
+    private void markTelemetryDisconnected() {
+        batteryLiveSeenThisConnection = false;
+        networkLiveSeenThisConnection = false;
+        telemetryStale = retainedTelemetryFresh(System.currentTimeMillis());
+    }
+
+    private void persistCurrentTelemetry() {
+        if (selectedAddress.isEmpty()) return;
+        PhoneTelemetryStore.Record previous = retainedTelemetry;
+        long now = System.currentTimeMillis();
+        Integer savedBatteryLevel = batteryLiveSeenThisConnection
+                ? batteryLevel : previous == null ? null : previous.batteryLevel;
+        String savedBatteryLevelSource = batteryLiveSeenThisConnection
+                ? batteryLevelSource : previous == null ? "" : previous.batteryLevelSource;
+        Boolean savedCharging = batteryLiveSeenThisConnection
+                ? batteryCharging : previous == null ? null : previous.batteryCharging;
+        Boolean savedChargingEstimated = batteryLiveSeenThisConnection
+                ? batteryChargingEstimated
+                : previous == null ? null : previous.batteryChargingEstimated;
+        String savedChargingSource = batteryLiveSeenThisConnection
+                ? batteryChargingSource
+                : previous == null ? "" : previous.batteryChargingSource;
+        Boolean savedExternalPower = batteryLiveSeenThisConnection
+                ? batteryExternalPower
+                : previous == null ? null : previous.batteryExternalPower;
+        String savedChargeState = batteryLiveSeenThisConnection
+                ? batteryChargeState : previous == null ? "" : previous.batteryChargeState;
+        String savedChargeLevel = batteryLiveSeenThisConnection
+                ? batteryChargeLevel : previous == null ? "" : previous.batteryChargeLevel;
+        Boolean savedNetworkAvailable = networkLiveSeenThisConnection
+                ? networkAvailable : previous == null ? null : previous.networkAvailable;
+        Integer savedNetworkSignal = networkLiveSeenThisConnection
+                ? networkSignal : previous == null ? null : previous.networkSignal;
+        Boolean savedNetworkRoaming = networkLiveSeenThisConnection
+                ? networkRoaming : previous == null ? null : previous.networkRoaming;
+        String savedNetworkOperator = networkLiveSeenThisConnection
+                ? networkOperator : previous == null ? "" : previous.networkOperator;
+        String savedNetworkType = networkLiveSeenThisConnection
+                ? networkType : previous == null ? "" : previous.networkType;
+        long batteryUpdatedAt = batteryLiveSeenThisConnection
+                ? now : previous == null ? 0L : previous.batteryUpdatedAtWallMs;
+        long networkUpdatedAt = networkLiveSeenThisConnection
+                ? now : previous == null ? 0L : previous.networkUpdatedAtWallMs;
+        PhoneTelemetryStore.Record next = new PhoneTelemetryStore.Record(
+                selectedAddress, batteryUpdatedAt, networkUpdatedAt,
+                savedBatteryLevel, savedBatteryLevelSource,
+                savedCharging, savedChargingEstimated, savedChargingSource,
+                savedExternalPower, savedChargeState, savedChargeLevel,
+                savedNetworkAvailable, savedNetworkSignal, savedNetworkRoaming,
+                savedNetworkOperator, savedNetworkType);
+        if (!next.hasUsefulData()) return;
+        retainedTelemetry = next;
+        telemetryStore.save(next);
+    }
+
+    private boolean retainedTelemetryFresh(long nowWallMs) {
+        return retainedTelemetry != null
+                && PhoneTelemetryStore.isFresh(
+                retainedTelemetry.updatedAtWallMs, nowWallMs);
+    }
+
+    private boolean retainedBatteryFresh(long nowWallMs) {
+        return retainedTelemetry != null && PhoneTelemetryStore.isFresh(
+                retainedTelemetry.batteryUpdatedAtWallMs, nowWallMs);
+    }
+
+    private boolean retainedNetworkFresh(long nowWallMs) {
+        return retainedTelemetry != null && PhoneTelemetryStore.isFresh(
+                retainedTelemetry.networkUpdatedAtWallMs, nowWallMs);
+    }
+
     private void refreshBatteryValues() {
         if (basBatteryKnown && basBatteryUpdatedAt >= hfpBatteryUpdatedAt
                 && basBatteryUpdatedAt >= genericBatteryUpdatedAt) {
@@ -2591,7 +2715,17 @@ public final class PhoneConnectorController {
     private void observeBatteryTrend(@NonNull String source, int level) {
         Integer previous = batteryTrendLevels.put(source, level);
         Boolean inferred = PhoneConnectorPolicy.inferChargingFromLevelTrend(previous, level);
-        if (inferred == null) return;
+        if (inferred == null) {
+            // A falling percentage is not an explicit "not charging" signal, but it invalidates
+            // an older positive trend estimate from this same source. Return to unknown rather
+            // than leaving the battery green for the rest of the estimate TTL.
+            if (previous != null && level < previous && source.equals(batteryTrendSource)) {
+                batteryTrendCharging = null;
+                batteryTrendSource = "";
+                batteryTrendUpdatedAt = 0L;
+            }
+            return;
+        }
         batteryTrendCharging = inferred;
         batteryTrendSource = source;
         batteryTrendUpdatedAt = SystemClock.elapsedRealtime();
@@ -2617,6 +2751,8 @@ public final class PhoneConnectorController {
         basChargingUpdatedAt = 0L;
         clearBatteryTrendSource("bas");
         refreshBatteryValues();
+        batteryLiveSeenThisConnection = hfpBatteryKnown || hfpChargingKnown
+                || genericBatteryKnown || metadataBatteryCharging != null;
     }
 
     private void clearHfpData() {
@@ -2637,6 +2773,9 @@ public final class PhoneConnectorController {
         inBandRingSupported = null;
         clearHfpCallData();
         refreshBatteryValues();
+        networkLiveSeenThisConnection = false;
+        batteryLiveSeenThisConnection = basBatteryKnown || basChargingKnown
+                || genericBatteryKnown || metadataBatteryCharging != null;
     }
 
     private void clearGenericBatteryData() {
@@ -2647,6 +2786,8 @@ public final class PhoneConnectorController {
         metadataChargingUpdatedAt = 0L;
         clearBatteryTrendSource("system");
         refreshBatteryValues();
+        batteryLiveSeenThisConnection = basBatteryKnown || basChargingKnown
+                || hfpBatteryKnown || hfpChargingKnown;
     }
 
     /**
@@ -2655,15 +2796,16 @@ public final class PhoneConnectorController {
      * gated on a particular Geely firmware, in which case explicit protocol sources and the
      * clearly-labelled percentage trend continue to work.
      */
-    private void readCachedBluetoothCharging(@Nullable BluetoothDevice device) {
+    private boolean readCachedBluetoothCharging(@Nullable BluetoothDevice device) {
         if (device == null || !isSelected(device)
-                || basChargingKnown || hfpChargingKnown) return;
+                || basChargingKnown || hfpChargingKnown) return false;
         byte[] payload = reflectedBluetoothMetadata(device, METADATA_MAIN_CHARGING);
         Boolean charging =
                 PhoneConnectorPolicy.decodeBluetoothChargingMetadata(payload);
-        if (charging == null) return;
+        if (charging == null) return false;
         metadataBatteryCharging = charging;
         metadataChargingUpdatedAt = SystemClock.elapsedRealtime();
+        return true;
     }
 
     private void beginMapSession() {
@@ -2841,8 +2983,10 @@ public final class PhoneConnectorController {
     private void updateConnected(long token) {
         boolean next = aclConnected || hfpConnected || mapConnected || gattConnected;
         if (next) {
-            readCachedBluetoothCharging(selectedDevice);
+            boolean explicitChargingObserved =
+                    readCachedBluetoothCharging(selectedDevice);
             refreshBatteryValues();
+            if (explicitChargingObserved) markTelemetryUpdated(true, false);
         }
         if (connected == next) {
             publishSnapshot(token);
@@ -2860,11 +3004,19 @@ public final class PhoneConnectorController {
     }
 
     private void clearDisconnectedData(long token) {
+        persistCurrentTelemetry();
         clearBasData();
         clearHfpData();
         clearGenericBatteryData();
         batteryLevel = null;
         batteryCharging = null;
+        batteryChargingEstimated = null;
+        batteryExternalPower = null;
+        batteryLevelSource = "";
+        batteryChargingSource = "";
+        batteryChargeState = "";
+        batteryChargeLevel = "";
+        markTelemetryDisconnected();
         resetAncsSession(token, "disconnected");
         endMapSession("disconnected");
         cancelAllMirroredNotifications();
@@ -2935,8 +3087,9 @@ public final class PhoneConnectorController {
      * live transport knows the resolved BLE identity and can recover without a car-Bluetooth
      * power cycle. If that owner vanished concurrently, fall back to the normal outer restart.
      */
-    private void requestManagedAncsReconnect(long token, @NonNull String detail) {
-        scheduleAncsAdapterEscalation(token, detail);
+    private void requestManagedAncsReconnect(long token, @NonNull String detail,
+                                             boolean confirmedLeLoss) {
+        if (confirmedLeLoss) scheduleAncsAdapterEscalation(token, detail);
         IphoneAncsTransport current = ancsTransport;
         long transportSession = activeAncsTransportSession;
         if (current == null) {
@@ -2946,7 +3099,7 @@ public final class PhoneConnectorController {
         mainHandler.post(() -> {
             if (isCurrent(token) && current == ancsTransport
                     && transportSession == activeAncsTransportSession) {
-                current.requestSavedPeerReconnect(detail);
+                current.requestSavedPeerReconnect(detail, confirmedLeLoss);
                 return;
             }
             Handler handler = worker;
@@ -2981,6 +3134,7 @@ public final class PhoneConnectorController {
         }
         closeGatt(previous);
         gattConnected = false;
+        persistCurrentTelemetry();
         clearBasData();
         resetAncsSession(token, visibleStatus);
         updateConnected(token);
@@ -3091,7 +3245,8 @@ public final class PhoneConnectorController {
     /**
      * ECARX can leave its BLE controller wedged after an iPhone link loss: closing and reopening
      * GATT clients then never restores ANCS, while a manual radio off/on does so immediately.
-     * Preserve normal reconnects for thirty seconds, then automate that proven final step only
+     * Preserve the retained autoConnect owner and its complete fallback cycle first, then
+     * automate that proven final step only
      * for a phone whose ANCS subscription was already healthy in this controller session.
      */
     private void scheduleAncsAdapterEscalation(long token, @NonNull String reason) {
@@ -3509,6 +3664,8 @@ public final class PhoneConnectorController {
         snapshot.add(value("network.type", null, false, "string", "", now));
         snapshot.add(value("network.signal", null, false, "number", "%", now));
         snapshot.add(value("network.roaming", null, false, "boolean", "", now));
+        snapshot.add(value("telemetry.stale", null, false, "boolean", "", now));
+        snapshot.add(value("telemetry.updated_at", null, false, "number", "ms", now));
         snapshot.add(value("call.active", null, false, "boolean", "", now));
         snapshot.add(value("call.state", null, false, "string", "", now));
         snapshot.add(value("call.direction", null, false, "string", "", now));
@@ -3538,6 +3695,72 @@ public final class PhoneConnectorController {
     @NonNull
     private List<ConnectorValue> buildSnapshot(boolean active) {
         long now = System.currentTimeMillis();
+        PhoneTelemetryStore.Record retained = retainedTelemetry;
+        boolean retainedBatteryAvailable = retainedBatteryFresh(now);
+        boolean retainedNetworkAvailable = retainedNetworkFresh(now);
+
+        boolean retainedBatteryLevel = batteryLevel == null && retainedBatteryAvailable
+                && retained.batteryLevel != null;
+        Integer effectiveBatteryLevel = batteryLevel != null
+                ? batteryLevel : retainedBatteryLevel ? retained.batteryLevel : null;
+        String effectiveBatteryLevelSource = batteryLevel != null
+                ? batteryLevelSource : retainedBatteryLevel ? retained.batteryLevelSource : "";
+        boolean retainedCharging = batteryCharging == null && retainedBatteryAvailable
+                && retained.batteryCharging != null;
+        Boolean effectiveCharging = batteryCharging != null
+                ? batteryCharging : retainedCharging ? retained.batteryCharging : null;
+        Boolean effectiveChargingEstimated = batteryCharging != null
+                ? batteryChargingEstimated
+                : retainedCharging ? retained.batteryChargingEstimated : null;
+        String effectiveChargingSource = batteryCharging != null
+                ? batteryChargingSource
+                : retainedCharging ? retained.batteryChargingSource : "";
+        boolean retainedExternalPower = batteryExternalPower == null
+                && retainedBatteryAvailable && retained.batteryExternalPower != null;
+        Boolean effectiveExternalPower = batteryExternalPower != null
+                ? batteryExternalPower
+                : retainedExternalPower ? retained.batteryExternalPower : null;
+        boolean retainedChargeState = batteryChargeState.isEmpty()
+                && retainedBatteryAvailable && !retained.batteryChargeState.isEmpty();
+        String effectiveChargeState = !batteryChargeState.isEmpty()
+                ? batteryChargeState
+                : retainedChargeState ? retained.batteryChargeState : "";
+        boolean retainedChargeLevel = batteryChargeLevel.isEmpty()
+                && retainedBatteryAvailable && !retained.batteryChargeLevel.isEmpty();
+        String effectiveChargeLevel = !batteryChargeLevel.isEmpty()
+                ? batteryChargeLevel
+                : retainedChargeLevel ? retained.batteryChargeLevel : "";
+
+        // A current explicit "network unavailable" event invalidates all older carrier data.
+        boolean networkExplicitlyUnavailable = networkLiveSeenThisConnection
+                && Boolean.FALSE.equals(networkAvailable);
+        boolean retainedNetworkAvailability = networkAvailable == null
+                && retainedNetworkAvailable && retained.networkAvailable != null;
+        Boolean effectiveNetworkAvailability = networkAvailable != null
+                ? networkAvailable
+                : retainedNetworkAvailability ? retained.networkAvailable : null;
+        boolean retainedSignal = !networkExplicitlyUnavailable && networkSignal == null
+                && retainedNetworkAvailable && retained.networkSignal != null;
+        Integer effectiveSignal = networkSignal != null
+                ? networkSignal : retainedSignal ? retained.networkSignal : null;
+        boolean retainedRoaming = !networkExplicitlyUnavailable && networkRoaming == null
+                && retainedNetworkAvailable && retained.networkRoaming != null;
+        Boolean effectiveRoaming = networkRoaming != null
+                ? networkRoaming : retainedRoaming ? retained.networkRoaming : null;
+        boolean retainedOperator = !networkExplicitlyUnavailable && networkOperator.isEmpty()
+                && retainedNetworkAvailable && !retained.networkOperator.isEmpty();
+        String effectiveOperator = !networkOperator.isEmpty()
+                ? networkOperator : retainedOperator ? retained.networkOperator : "";
+        boolean retainedNetworkType = !networkExplicitlyUnavailable && networkType.isEmpty()
+                && retainedNetworkAvailable && !retained.networkType.isEmpty();
+        String effectiveNetworkType = !networkType.isEmpty()
+                ? networkType : retainedNetworkType ? retained.networkType : "";
+        boolean staleTelemetryUsed = retainedBatteryLevel || retainedCharging
+                || retainedExternalPower || retainedChargeState || retainedChargeLevel
+                || retainedNetworkAvailability || retainedSignal || retainedRoaming
+                || retainedOperator || retainedNetworkType;
+        telemetryStale = staleTelemetryUsed;
+
         List<ConnectorValue> snapshot = new ArrayList<>();
         snapshot.add(value("connected", connected, active, "boolean", "", now));
         snapshot.add(value("device.name", selectedName.isEmpty() ? null : selectedName,
@@ -3555,37 +3778,43 @@ public final class PhoneConnectorController {
         snapshot.add(value("profiles.map", mapConnected, active, "boolean", "", now));
         snapshot.add(value("profiles.ble", gattConnected, active, "boolean", "", now));
         snapshot.add(value("profiles.ancs", ancsReady, active, "boolean", "", now));
-        snapshot.add(value("battery.level", batteryLevel,
-                connected && batteryLevel != null, "number", "%", now));
+        snapshot.add(value("battery.level", effectiveBatteryLevel,
+                effectiveBatteryLevel != null, "number", "%", now));
         snapshot.add(value("battery.level_source",
-                batteryLevelSource.isEmpty() ? null : batteryLevelSource,
-                connected && !batteryLevelSource.isEmpty(), "string", "", now));
-        snapshot.add(value("battery.charging", batteryCharging,
-                connected && batteryCharging != null, "boolean", "", now));
-        snapshot.add(value("battery.charging_estimated", batteryChargingEstimated,
-                connected && batteryChargingEstimated != null, "boolean", "", now));
+                effectiveBatteryLevelSource.isEmpty() ? null : effectiveBatteryLevelSource,
+                !effectiveBatteryLevelSource.isEmpty(), "string", "", now));
+        snapshot.add(value("battery.charging", effectiveCharging,
+                effectiveCharging != null, "boolean", "", now));
+        snapshot.add(value("battery.charging_estimated", effectiveChargingEstimated,
+                effectiveChargingEstimated != null, "boolean", "", now));
         snapshot.add(value("battery.charging_source",
-                batteryChargingSource.isEmpty() ? null : batteryChargingSource,
-                connected && !batteryChargingSource.isEmpty(), "string", "", now));
-        snapshot.add(value("battery.external_power", batteryExternalPower,
-                connected && batteryExternalPower != null, "boolean", "", now));
+                effectiveChargingSource.isEmpty() ? null : effectiveChargingSource,
+                !effectiveChargingSource.isEmpty(), "string", "", now));
+        snapshot.add(value("battery.external_power", effectiveExternalPower,
+                effectiveExternalPower != null, "boolean", "", now));
         snapshot.add(value("battery.charge_state",
-                batteryChargeState.isEmpty() ? null : batteryChargeState,
-                connected && !batteryChargeState.isEmpty(), "string", "", now));
+                effectiveChargeState.isEmpty() ? null : effectiveChargeState,
+                !effectiveChargeState.isEmpty(), "string", "", now));
         snapshot.add(value("battery.charge_level",
-                batteryChargeLevel.isEmpty() ? null : batteryChargeLevel,
-                connected && !batteryChargeLevel.isEmpty(), "string", "", now));
-        snapshot.add(value("network.available", networkAvailable,
-                connected && networkAvailable != null, "boolean", "", now));
+                effectiveChargeLevel.isEmpty() ? null : effectiveChargeLevel,
+                !effectiveChargeLevel.isEmpty(), "string", "", now));
+        snapshot.add(value("network.available", effectiveNetworkAvailability,
+                effectiveNetworkAvailability != null, "boolean", "", now));
         snapshot.add(value("network.operator",
-                networkOperator.isEmpty() ? null : networkOperator,
-                connected && !networkOperator.isEmpty(), "string", "", now));
-        snapshot.add(value("network.type", networkType.isEmpty() ? null : networkType,
-                connected && !networkType.isEmpty(), "string", "", now));
-        snapshot.add(value("network.signal", networkSignal,
-                connected && networkSignal != null, "number", "%", now));
-        snapshot.add(value("network.roaming", networkRoaming,
-                connected && networkRoaming != null, "boolean", "", now));
+                effectiveOperator.isEmpty() ? null : effectiveOperator,
+                !effectiveOperator.isEmpty(), "string", "", now));
+        snapshot.add(value("network.type",
+                effectiveNetworkType.isEmpty() ? null : effectiveNetworkType,
+                !effectiveNetworkType.isEmpty(), "string", "", now));
+        snapshot.add(value("network.signal", effectiveSignal,
+                effectiveSignal != null, "number", "%", now));
+        snapshot.add(value("network.roaming", effectiveRoaming,
+                effectiveRoaming != null, "boolean", "", now));
+        snapshot.add(value("telemetry.stale", staleTelemetryUsed,
+                true, "boolean", "", now));
+        snapshot.add(value("telemetry.updated_at",
+                staleTelemetryUsed && retained != null ? retained.updatedAtWallMs : null,
+                staleTelemetryUsed && retained != null, "number", "ms", now));
         snapshot.add(value("call.active", callActive,
                 hfpConnected && callActive != null, "boolean", "", now));
         snapshot.add(value("call.state", callState.isEmpty() ? null : callState,

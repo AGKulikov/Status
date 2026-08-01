@@ -98,8 +98,9 @@ public final class PhoneConnectorControllerContractTest {
                 "listener.onBatteryCharacteristic(uuid, copy)"));
         assertTrue(transport.contains(
                 "listener.onBatteryCharacteristic(uuid, value.clone())"));
-        assertTrue(transport.contains("state(\"BAS OPERATION TIMEOUT"));
-        assertTrue(source.contains("state.contains(\"BAS OPERATION TIMEOUT\")"));
+        assertTrue(transport.contains("optional operation skipped, ANCS stays READY"));
+        assertFalse(transport.contains("state(\"BAS OPERATION TIMEOUT"));
+        assertFalse(source.contains("state.contains(\"BAS OPERATION TIMEOUT\")"));
         assertTrue(transportListener.contains("applyBatteryCharacteristic("));
 
         assertTrue(source.contains("ensureLegacyBatteryGatt(token)"));
@@ -130,7 +131,8 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("mainHandler.post(() -> startAncsTransportOnMain("));
         assertTrue(savedPeer.contains("adapter.getRemoteDevice(address.trim())"));
         assertFalse(savedPeer.contains("startGeelyAncsAdvertising()"));
-        assertTrue(savedPeer.contains("return startSavedPeerScan(device)"));
+        assertTrue(savedPeer.contains(
+                "return startManagedBackgroundAttach(device, \"initial selected-phone attach\")"));
         assertTrue(savedPeer.contains("stopScan();"));
         assertTrue(savedPeer.contains("stopAdvertising();"));
         assertFalse(transport.contains(".setDeviceAddress(address)"));
@@ -153,9 +155,10 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(clientConnect.contains("activeClientAutoConnect = false"));
         assertTrue(clientConnect.contains("main.postDelayed(connectTimeout, timeoutMs)"));
         assertFalse(clientConnect.contains("autoConnect=true"));
+        assertTrue(disconnect.contains("establishedAutoOwner"));
+        assertTrue(disconnect.contains("awaitBackgroundAutoReconnect(callbackGatt"));
         assertTrue(disconnect.contains("closeClientGatt(callbackGatt)"));
         assertTrue(disconnect.contains("state(\"GPS-STYLE · IPHONE DISCONNECTED\")"));
-        assertFalse(disconnect.contains("if (activeClientAutoConnect)"));
         assertFalse(source.contains("state.contains(\"AUTO · ЖДУ SAVED PEER\")"));
         assertTrue(source.contains("state.contains(\"IPHONE DISCONNECTED\")"));
         assertTrue(source.contains("scheduleGattReconnect(token,"));
@@ -464,7 +467,8 @@ public final class PhoneConnectorControllerContractTest {
                 "call.audio_state", "call.audio_wideband",
                 "voice_assistant.active", "ringtone.in_band",
                 "network.available", "network.operator", "network.type",
-                "network.signal", "network.roaming", "notifications.count",
+                "network.signal", "network.roaming", "telemetry.stale",
+                "telemetry.updated_at", "notifications.count",
                 "notifications.latest", "notifications.items", "messages.unread",
                 "messages.latest", "diagnostics.device", "diagnostics.ancs",
                 "diagnostics.sms", "diagnostics.last_app", "diagnostics.last_error"

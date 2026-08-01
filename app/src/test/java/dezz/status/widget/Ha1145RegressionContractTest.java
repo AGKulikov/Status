@@ -65,7 +65,7 @@ public final class Ha1145RegressionContractTest {
         String policy = source("phone/AncsAdapterRecoveryPolicy.java");
         String transport = source("phone/transport/IphoneAncsTransport.java");
 
-        assertTrue(policy.contains("ESCALATION_DELAY_MS = 30_000L"));
+        assertTrue(policy.contains("ESCALATION_DELAY_MS = 150_000L"));
         assertTrue(policy.contains("RESET_COOLDOWN_MS = 5L * 60L * 1_000L"));
         assertTrue(controller.contains("ancsWasReadyThisSession"));
         assertTrue(controller.contains("adapter.disable()"));

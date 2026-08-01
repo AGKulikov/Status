@@ -97,9 +97,10 @@ public final class PhoneConnectorPolicy {
     }
 
     /**
-     * A percentage trend can only estimate charging. It is deliberately separate from explicit
-     * BAS/HFP state so callers can label the result and expire it instead of presenting a guess as
-     * authoritative.
+     * A rising percentage can weakly estimate charging. A falling value never proves that the
+     * phone is not connected to power (thermal hold, optimized charging and measurement jitter
+     * all violate that assumption), so it remains unknown until an explicit protocol signal is
+     * available.
      */
     @Nullable
     public static Boolean inferChargingFromLevelTrend(@Nullable Integer previousLevel,
@@ -110,7 +111,7 @@ public final class PhoneConnectorPolicy {
                 || previousLevel.equals(currentLevel)) {
             return null;
         }
-        return currentLevel > previousLevel;
+        return currentLevel > previousLevel ? Boolean.TRUE : null;
     }
 
     /**
