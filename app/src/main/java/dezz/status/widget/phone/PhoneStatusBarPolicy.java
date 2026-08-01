@@ -45,8 +45,6 @@ public final class PhoneStatusBarPolicy {
                     status("battery.level_source", "Источник уровня заряда",
                             "Источник АКБ", Kind.CODE),
                     status("battery.charging", "Зарядка iPhone", "", Kind.CHARGING),
-                    status("battery.charging_estimated", "Точность статуса зарядки",
-                            "Статус зарядки", Kind.ESTIMATED),
                     status("battery.charging_source", "Источник статуса зарядки",
                             "Источник зарядки", Kind.CODE),
                     status("battery.external_power", "Внешнее питание iPhone",
@@ -464,12 +462,12 @@ public final class PhoneStatusBarPolicy {
             case "battery.level_source:hfp_ecarx": return "HFP/ECARX";
             case "battery.level_source:android_broadcast": return "Android Bluetooth";
             case "battery.charging_source:ble_bas": return "BLE BAS";
+            case "battery.charging_source:ble_bas_level_status":
+                return "BLE BAS 1.1 · Battery Level Status";
+            case "battery.charging_source:ble_bas_power_state":
+                return "BLE BAS · Battery Power State";
             case "battery.charging_source:hfp_vendor": return "HFP/OEM";
             case "battery.charging_source:android_metadata": return "Android metadata";
-            case "battery.charging_source:bas_trend": return "изменение BLE BAS";
-            case "battery.charging_source:hfp_trend": return "изменение HFP";
-            case "battery.charging_source:ecarx_trend": return "изменение ECARX";
-            case "battery.charging_source:system_trend": return "изменение Android";
             case "battery.charge_state:charging": return "заряжается";
             case "battery.charge_state:discharging": return "разряжается";
             case "battery.charge_state:idle": return "зарядка не активна";

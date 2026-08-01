@@ -1076,15 +1076,13 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     private String localizedBatterySource(@NonNull String source) {
         switch (source) {
             case "ble_bas": return "BLE BAS";
+            case "ble_bas_level_status": return "BLE BAS 1.1 · Battery Level Status";
+            case "ble_bas_power_state": return "BLE BAS · Battery Power State";
             case "hfp_ecarx": return "HFP/ECARX";
             case "android_broadcast": return "Android Bluetooth";
             case "hfp_vendor": return "HFP/OEM";
             case "android_metadata":
                 return getString(R.string.phone_diag_source_android_metadata);
-            case "bas_trend": return getString(R.string.phone_diag_source_bas_trend);
-            case "hfp_trend": return getString(R.string.phone_diag_source_hfp_trend);
-            case "ecarx_trend": return getString(R.string.phone_diag_source_ecarx_trend);
-            case "system_trend": return getString(R.string.phone_diag_source_android_trend);
             default: return source;
         }
     }

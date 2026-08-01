@@ -97,24 +97,6 @@ public final class PhoneConnectorPolicy {
     }
 
     /**
-     * A rising percentage can weakly estimate charging. A falling value never proves that the
-     * phone is not connected to power (thermal hold, optimized charging and measurement jitter
-     * all violate that assumption), so it remains unknown until an explicit protocol signal is
-     * available.
-     */
-    @Nullable
-    public static Boolean inferChargingFromLevelTrend(@Nullable Integer previousLevel,
-                                                       @Nullable Integer currentLevel) {
-        if (previousLevel == null || currentLevel == null
-                || previousLevel < 0 || previousLevel > 100
-                || currentLevel < 0 || currentLevel > 100
-                || previousLevel.equals(currentLevel)) {
-            return null;
-        }
-        return currentLevel > previousLevel ? Boolean.TRUE : null;
-    }
-
-    /**
      * Decodes Android's cached {@code BluetoothDevice.METADATA_MAIN_CHARGING} value.
      *
      * <p>The system API documents this metadata as a UTF-8 string stored in a byte array.

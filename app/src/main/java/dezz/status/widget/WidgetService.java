@@ -2349,7 +2349,7 @@ public class WidgetService extends Service {
         Boolean charging = phoneBoolean("battery.charging");
         Boolean externalPower = phoneBoolean("battery.external_power");
         boolean chargingNow = Boolean.TRUE.equals(charging)
-                || (charging == null && Boolean.TRUE.equals(externalPower));
+                || Boolean.TRUE.equals(externalPower);
         Context context = themedContext != null ? themedContext : this;
         return chargingNow
                 ? ContextCompat.getColor(context, R.color.iphone_battery_charging)

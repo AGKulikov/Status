@@ -155,11 +155,15 @@ final class PhoneTelemetryStore {
             this.updatedAtWallMs = Math.max(batteryUpdatedAtWallMs, networkUpdatedAtWallMs);
             this.batteryLevel = batteryLevel;
             this.batteryLevelSource = text(batteryLevelSource);
-            this.batteryCharging = batteryCharging;
-            this.batteryChargingEstimated = batteryChargingEstimated;
-            this.batteryChargingSource = text(batteryChargingSource);
+            String chargingSource = text(batteryChargingSource);
+            boolean calculatedCharging = Boolean.TRUE.equals(batteryChargingEstimated)
+                    || chargingSource.endsWith("_trend");
+            boolean explicitCharging = batteryCharging != null && !calculatedCharging;
+            this.batteryCharging = explicitCharging ? batteryCharging : null;
+            this.batteryChargingEstimated = explicitCharging ? Boolean.FALSE : null;
+            this.batteryChargingSource = explicitCharging ? chargingSource : "";
             this.batteryExternalPower = batteryExternalPower;
-            this.batteryChargeState = text(batteryChargeState);
+            this.batteryChargeState = calculatedCharging ? "" : text(batteryChargeState);
             this.batteryChargeLevel = text(batteryChargeLevel);
             this.networkAvailable = networkAvailable;
             this.networkSignal = networkSignal;

@@ -431,8 +431,11 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("PhoneConnectorPolicy.normalizeHfpBattery"));
         assertTrue(source.contains("BATTERY_LEVEL_STATUS"));
         assertTrue(source.contains("decodeBatteryLevelStatus"));
-        assertTrue(source.contains("inferChargingFromLevelTrend"));
-        assertTrue(source.contains("BATTERY_TREND_MAX_AGE_MS"));
+        assertFalse(source.contains("inferChargingFromLevelTrend"));
+        assertFalse(source.contains("BATTERY_TREND_MAX_AGE_MS"));
+        assertFalse(source.contains("batteryChargingSource = batteryTrendSource"));
+        assertTrue(source.contains("batteryChargingEstimated = false"));
+        assertTrue(source.contains("ble_bas_level_status"));
         assertTrue(source.contains("METADATA_MAIN_CHARGING = 19"));
         assertTrue(source.contains("reflectedBluetoothMetadata("));
         assertTrue(source.contains("decodeBluetoothChargingMetadata"));

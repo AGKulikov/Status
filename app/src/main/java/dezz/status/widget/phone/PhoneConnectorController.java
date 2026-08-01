@@ -83,7 +83,6 @@ public final class PhoneConnectorController {
     private static final long ANCS_STABLE_READY_RESET_MS = 50_000L;
     private static final long ADAPTER_RECOVERY_WATCHDOG_MS = 40_000L;
     private static final long APP_DISPLAY_NAME_WAIT_TIMEOUT_MS = 15_000L;
-    private static final long BATTERY_TREND_MAX_AGE_MS = 20L * 60L * 1_000L;
     private static final int DESIRED_GATT_MTU = 512;
     private static final int GATT_INSUFFICIENT_AUTHENTICATION = 5;
     private static final int GATT_INSUFFICIENT_AUTHORIZATION = 8;
@@ -230,15 +229,19 @@ public final class PhoneConnectorController {
     private boolean hfpChargingKnown;
     private boolean basBatteryKnown;
     private boolean basChargingKnown;
+    private boolean basLevelStatusChargingKnown;
+    private boolean basPowerStateChargingKnown;
     private boolean genericBatteryKnown;
-    private final Map<String, Integer> batteryTrendLevels = new LinkedHashMap<>();
     @Nullable private Integer hfpBatteryLevel;
     @Nullable private Integer basBatteryLevel;
     @Nullable private Integer genericBatteryLevel;
     @Nullable private Boolean hfpBatteryCharging;
     @Nullable private Boolean basBatteryCharging;
+    @Nullable private Boolean basLevelStatusBatteryCharging;
+    @Nullable private Boolean basPowerStateBatteryCharging;
     @Nullable private Boolean metadataBatteryCharging;
     @Nullable private Boolean basExternalPower;
+    private String basChargingSource = "";
     private String basChargeState = "";
     private String basChargeLevel = "";
     private long hfpBatteryUpdatedAt;
@@ -246,12 +249,11 @@ public final class PhoneConnectorController {
     private long genericBatteryUpdatedAt;
     private long hfpChargingUpdatedAt;
     private long basChargingUpdatedAt;
+    private long basLevelStatusChargingUpdatedAt;
+    private long basPowerStateChargingUpdatedAt;
     private long metadataChargingUpdatedAt;
-    private long batteryTrendUpdatedAt;
     @Nullable private Integer batteryLevel;
     @Nullable private Boolean batteryCharging;
-    @Nullable private Boolean batteryTrendCharging;
-    private String batteryTrendSource = "";
     @Nullable private Boolean batteryChargingEstimated;
     @Nullable private Boolean batteryExternalPower;
     private String batteryLevelSource = "";
@@ -515,14 +517,19 @@ public final class PhoneConnectorController {
         hfpChargingKnown = false;
         basBatteryKnown = false;
         basChargingKnown = false;
+        basLevelStatusChargingKnown = false;
+        basPowerStateChargingKnown = false;
         genericBatteryKnown = false;
         hfpBatteryLevel = null;
         basBatteryLevel = null;
         genericBatteryLevel = null;
         hfpBatteryCharging = null;
         basBatteryCharging = null;
+        basLevelStatusBatteryCharging = null;
+        basPowerStateBatteryCharging = null;
         metadataBatteryCharging = null;
         basExternalPower = null;
+        basChargingSource = "";
         basChargeState = "";
         basChargeLevel = "";
         hfpBatteryUpdatedAt = 0L;
@@ -530,11 +537,9 @@ public final class PhoneConnectorController {
         genericBatteryUpdatedAt = 0L;
         hfpChargingUpdatedAt = 0L;
         basChargingUpdatedAt = 0L;
+        basLevelStatusChargingUpdatedAt = 0L;
+        basPowerStateChargingUpdatedAt = 0L;
         metadataChargingUpdatedAt = 0L;
-        batteryTrendLevels.clear();
-        batteryTrendCharging = null;
-        batteryTrendSource = "";
-        batteryTrendUpdatedAt = 0L;
         batteryLevel = null;
         batteryCharging = null;
         batteryChargingEstimated = null;
@@ -724,7 +729,6 @@ public final class PhoneConnectorController {
                 genericBatteryKnown = true;
                 genericBatteryLevel = raw;
                 genericBatteryUpdatedAt = SystemClock.elapsedRealtime();
-                observeBatteryTrend("system", raw);
                 readCachedBluetoothCharging(device);
                 refreshBatteryValues();
                 markTelemetryUpdated(true, false);
@@ -844,7 +848,6 @@ public final class PhoneConnectorController {
         hfpBatteryKnown = true;
         hfpBatteryLevel = normalized;
         hfpBatteryUpdatedAt = SystemClock.elapsedRealtime();
-        observeBatteryTrend("ecarx", normalized);
         readCachedBluetoothCharging(selectedDevice);
         refreshBatteryValues();
         markTelemetryUpdated(true, false);
@@ -2352,15 +2355,12 @@ public final class PhoneConnectorController {
             basBatteryKnown = true;
             basBatteryLevel = raw;
             basBatteryUpdatedAt = SystemClock.elapsedRealtime();
-            observeBatteryTrend("bas", raw);
         } else if (BATTERY_POWER_STATE.equals(uuid)) {
             Boolean decoded = PhoneConnectorPolicy.decodeBatteryPowerState(raw);
-            if (decoded != null) {
-                basChargingKnown = true;
-                basBatteryCharging = decoded;
-                basChargingUpdatedAt = SystemClock.elapsedRealtime();
-                basChargeState = decoded ? "charging" : "not_charging";
-            }
+            basPowerStateChargingKnown = decoded != null;
+            basPowerStateBatteryCharging = decoded;
+            basPowerStateChargingUpdatedAt = SystemClock.elapsedRealtime();
+            selectBasChargingState();
         } else if (BATTERY_LEVEL_STATUS.equals(uuid)) {
             PhoneConnectorPolicy.BatteryLevelStatus decoded =
                     PhoneConnectorPolicy.decodeBatteryLevelStatus(payload);
@@ -2370,16 +2370,17 @@ public final class PhoneConnectorController {
                 basBatteryKnown = true;
                 basBatteryLevel = decoded.level;
                 basBatteryUpdatedAt = now;
-                observeBatteryTrend("bas", decoded.level);
             }
-            if (decoded.charging != null) {
-                basChargingKnown = true;
-                basBatteryCharging = decoded.charging;
-                basChargingUpdatedAt = now;
-            }
+            // Every Battery Level Status packet replaces the previous state, including an
+            // explicit transition to "unknown". Keeping an older TRUE here would leave the
+            // battery green after the charger was removed.
+            basLevelStatusChargingKnown = decoded.charging != null;
+            basLevelStatusBatteryCharging = decoded.charging;
+            basLevelStatusChargingUpdatedAt = now;
             basExternalPower = decoded.externalPower;
             basChargeState = decoded.chargeState;
             basChargeLevel = decoded.chargeLevel;
+            selectBasChargingState();
         }
         refreshBatteryValues();
         markTelemetryUpdated(true, false);
@@ -2397,7 +2398,6 @@ public final class PhoneConnectorController {
                 hfpBatteryKnown = true;
                 hfpBatteryLevel = normalized;
                 hfpBatteryUpdatedAt = SystemClock.elapsedRealtime();
-                observeBatteryTrend("hfp", normalized);
                 batteryUpdated = true;
             }
         }
@@ -2671,7 +2671,8 @@ public final class PhoneConnectorController {
                 && basChargingUpdatedAt >= metadataChargingUpdatedAt) {
             batteryCharging = basBatteryCharging;
             batteryChargingEstimated = false;
-            batteryChargingSource = "ble_bas";
+            batteryChargingSource = basChargingSource.isEmpty()
+                    ? "ble_bas" : basChargingSource;
             batteryExternalPower = basExternalPower;
             batteryChargeState = basChargeState;
             batteryChargeLevel = basChargeLevel;
@@ -2680,7 +2681,7 @@ public final class PhoneConnectorController {
             batteryCharging = metadataBatteryCharging;
             batteryChargingEstimated = false;
             batteryChargingSource = "android_metadata";
-            batteryExternalPower = null;
+            batteryExternalPower = basExternalPower;
             batteryChargeLevel = "";
             batteryChargeState = Boolean.TRUE.equals(metadataBatteryCharging)
                     ? "charging" : "not_charging";
@@ -2688,20 +2689,10 @@ public final class PhoneConnectorController {
             batteryCharging = hfpBatteryCharging;
             batteryChargingEstimated = false;
             batteryChargingSource = "hfp_vendor";
-            batteryExternalPower = null;
+            batteryExternalPower = basExternalPower;
             batteryChargeLevel = "";
             batteryChargeState = Boolean.TRUE.equals(hfpBatteryCharging)
                     ? "charging" : "not_charging";
-        } else if (batteryTrendCharging != null
-                && SystemClock.elapsedRealtime() - batteryTrendUpdatedAt
-                <= BATTERY_TREND_MAX_AGE_MS) {
-            batteryCharging = batteryTrendCharging;
-            batteryChargingEstimated = true;
-            batteryChargingSource = batteryTrendSource + "_trend";
-            batteryExternalPower = null;
-            batteryChargeLevel = "";
-            batteryChargeState = Boolean.TRUE.equals(batteryTrendCharging)
-                    ? "charging" : "discharging";
         } else {
             batteryCharging = null;
             batteryChargingEstimated = null;
@@ -2712,47 +2703,55 @@ public final class PhoneConnectorController {
         }
     }
 
-    private void observeBatteryTrend(@NonNull String source, int level) {
-        Integer previous = batteryTrendLevels.put(source, level);
-        Boolean inferred = PhoneConnectorPolicy.inferChargingFromLevelTrend(previous, level);
-        if (inferred == null) {
-            // A falling percentage is not an explicit "not charging" signal, but it invalidates
-            // an older positive trend estimate from this same source. Return to unknown rather
-            // than leaving the battery green for the rest of the estimate TTL.
-            if (previous != null && level < previous && source.equals(batteryTrendSource)) {
-                batteryTrendCharging = null;
-                batteryTrendSource = "";
-                batteryTrendUpdatedAt = 0L;
-            }
+    /**
+     * Selects one explicit BAS charging signal. Battery Level Status is the adopted BAS 1.1
+     * source and therefore wins while it contains a known charge state; the deprecated Battery
+     * Power State is retained only as an explicit fallback. Unknown never reuses a stale value.
+     */
+    private void selectBasChargingState() {
+        if (basLevelStatusChargingKnown) {
+            basChargingKnown = true;
+            basBatteryCharging = basLevelStatusBatteryCharging;
+            basChargingUpdatedAt = basLevelStatusChargingUpdatedAt;
+            basChargingSource = "ble_bas_level_status";
             return;
         }
-        batteryTrendCharging = inferred;
-        batteryTrendSource = source;
-        batteryTrendUpdatedAt = SystemClock.elapsedRealtime();
-    }
-
-    private void clearBatteryTrendSource(@NonNull String source) {
-        batteryTrendLevels.remove(source);
-        if (!source.equals(batteryTrendSource)) return;
-        batteryTrendCharging = null;
-        batteryTrendSource = "";
-        batteryTrendUpdatedAt = 0L;
+        if (basPowerStateChargingKnown) {
+            basChargingKnown = true;
+            basBatteryCharging = basPowerStateBatteryCharging;
+            basChargingUpdatedAt = basPowerStateChargingUpdatedAt;
+            basChargingSource = "ble_bas_power_state";
+            basChargeState = Boolean.TRUE.equals(basPowerStateBatteryCharging)
+                    ? "charging" : "not_charging";
+            return;
+        }
+        basChargingKnown = false;
+        basBatteryCharging = null;
+        basChargingUpdatedAt = 0L;
+        basChargingSource = "";
     }
 
     private void clearBasData() {
         basBatteryKnown = false;
         basChargingKnown = false;
+        basLevelStatusChargingKnown = false;
+        basPowerStateChargingKnown = false;
         basBatteryLevel = null;
         basBatteryCharging = null;
+        basLevelStatusBatteryCharging = null;
+        basPowerStateBatteryCharging = null;
         basExternalPower = null;
+        basChargingSource = "";
         basChargeState = "";
         basChargeLevel = "";
         basBatteryUpdatedAt = 0L;
         basChargingUpdatedAt = 0L;
-        clearBatteryTrendSource("bas");
+        basLevelStatusChargingUpdatedAt = 0L;
+        basPowerStateChargingUpdatedAt = 0L;
         refreshBatteryValues();
         batteryLiveSeenThisConnection = hfpBatteryKnown || hfpChargingKnown
-                || genericBatteryKnown || metadataBatteryCharging != null;
+                || genericBatteryKnown || metadataBatteryCharging != null
+                || basExternalPower != null;
     }
 
     private void clearHfpData() {
@@ -2762,8 +2761,6 @@ public final class PhoneConnectorController {
         hfpBatteryCharging = null;
         hfpBatteryUpdatedAt = 0L;
         hfpChargingUpdatedAt = 0L;
-        clearBatteryTrendSource("hfp");
-        clearBatteryTrendSource("ecarx");
         networkAvailable = null;
         networkSignal = null;
         networkRoaming = null;
@@ -2775,6 +2772,7 @@ public final class PhoneConnectorController {
         refreshBatteryValues();
         networkLiveSeenThisConnection = false;
         batteryLiveSeenThisConnection = basBatteryKnown || basChargingKnown
+                || basExternalPower != null
                 || genericBatteryKnown || metadataBatteryCharging != null;
     }
 
@@ -2784,17 +2782,17 @@ public final class PhoneConnectorController {
         genericBatteryUpdatedAt = 0L;
         metadataBatteryCharging = null;
         metadataChargingUpdatedAt = 0L;
-        clearBatteryTrendSource("system");
         refreshBatteryValues();
         batteryLiveSeenThisConnection = basBatteryKnown || basChargingKnown
+                || basExternalPower != null
                 || hfpBatteryKnown || hfpChargingKnown;
     }
 
     /**
      * Reads the framework's already-cached charging bit without opening another radio link.
      * This is a best-effort complement to BAS/HFP: the SystemApi can be absent or permission
-     * gated on a particular Geely firmware, in which case explicit protocol sources and the
-     * clearly-labelled percentage trend continue to work.
+     * gated on a particular Geely firmware. In that case the charging state remains unknown;
+     * a change in battery percentage is deliberately never treated as charger state.
      */
     private boolean readCachedBluetoothCharging(@Nullable BluetoothDevice device) {
         if (device == null || !isSelected(device)

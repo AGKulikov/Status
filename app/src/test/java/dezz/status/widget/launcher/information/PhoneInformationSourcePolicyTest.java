@@ -146,7 +146,7 @@ public final class PhoneInformationSourcePolicyTest {
     @Test public void technicalPhoneCodesAreLocalizedForInformationTiles() {
         ConnectorValue chargingSource = ConnectorValue.current(
                 ConnectorType.PHONE, "default", "battery.charging_source",
-                "ecarx_trend", true, true, false,
+                "ble_bas_level_status", true, true, false,
                 "string", "", Collections.emptyMap());
         ConnectorValue call = ConnectorValue.current(
                 ConnectorType.PHONE, "default", "call.state",
@@ -157,7 +157,7 @@ public final class PhoneInformationSourcePolicyTest {
                 "android_metadata", true, true, false,
                 "string", "", Collections.emptyMap());
 
-        assertEquals("Оценка по ECARX",
+        assertEquals("BLE BAS 1.1 · Battery Level Status",
                 PhoneInformationSourcePolicy.displayValue(chargingSource, ""));
         assertEquals("Входящий",
                 PhoneInformationSourcePolicy.displayValue(call, ""));

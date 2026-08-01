@@ -58,13 +58,25 @@ public final class PhoneConnectorPolicyTest {
         assertNull(PhoneConnectorPolicy.decodeBatteryLevelStatus(new byte[] {0x01, 0, 0, 0}));
     }
 
-    @Test public void batteryTrendOnlyInfersPositiveChargingEvidence() {
-        assertEquals(Boolean.TRUE,
-                PhoneConnectorPolicy.inferChargingFromLevelTrend(41, 42));
-        assertNull(PhoneConnectorPolicy.inferChargingFromLevelTrend(42, 41));
-        assertNull(PhoneConnectorPolicy.inferChargingFromLevelTrend(42, 42));
-        assertNull(PhoneConnectorPolicy.inferChargingFromLevelTrend(null, 42));
-        assertNull(PhoneConnectorPolicy.inferChargingFromLevelTrend(42, 101));
+    @Test public void basPowerStateKeepsExternalPowerSeparateFromActiveCharging() {
+        // Wired power remains connected while a full battery is discharging only by leakage.
+        int pluggedIdle = 1 | 1 << 1 | 3 << 5 | 1 << 7;
+        PhoneConnectorPolicy.BatteryLevelStatus idle =
+                PhoneConnectorPolicy.decodeBatteryLevelStatus(new byte[] {
+                        0x00, (byte) pluggedIdle, (byte) (pluggedIdle >>> 8)
+                });
+        assertEquals(Boolean.FALSE, idle.charging);
+        assertEquals(Boolean.TRUE, idle.externalPower);
+        assertEquals("idle", idle.chargeState);
+
+        // A charger may be known while the battery charge state itself is still unknown.
+        int pluggedUnknown = 1 | 1 << 1;
+        PhoneConnectorPolicy.BatteryLevelStatus unknown =
+                PhoneConnectorPolicy.decodeBatteryLevelStatus(new byte[] {
+                        0x00, (byte) pluggedUnknown, (byte) (pluggedUnknown >>> 8)
+                });
+        assertNull(unknown.charging);
+        assertEquals(Boolean.TRUE, unknown.externalPower);
     }
 
     @Test public void decodesOnlyExplicitAndroidBluetoothChargingMetadata() {
