@@ -29,6 +29,7 @@ import dezz.status.widget.Preferences;
 import dezz.status.widget.WidgetService;
 import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarControlDescriptor;
+import dezz.status.widget.car.CarThreeLevelCyclePolicy;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.driver.DriverFavoritesPanelConfig;
 import dezz.status.widget.driver.DriverFavoritesPanelStore;
@@ -362,6 +363,12 @@ public final class ShortcutActionPicker {
             chooseRange(existing, control);
             return;
         }
+        List<Double> ascending = CarThreeLevelCyclePolicy.orderedValues(control, false);
+        if (!ascending.isEmpty()) {
+            chooseThreeLevelBehavior(existing, control, ascending,
+                    CarThreeLevelCyclePolicy.orderedValues(control, true));
+            return;
+        }
         List<String> labels = new ArrayList<>();
         List<CarControlCommand.Operation> operations = new ArrayList<>();
         List<Double> values = new ArrayList<>();
@@ -392,6 +399,35 @@ public final class ShortcutActionPicker {
                     }
                 })
                 .setNegativeButton("Отмена", null).show();
+    }
+
+    private void chooseThreeLevelBehavior(
+            @Nullable LauncherShortcutStore.Shortcut existing,
+            @NonNull CarControlDescriptor control,
+            @NonNull List<Double> ascending,
+            @NonNull List<Double> descending) {
+        List<String> labels = new ArrayList<>();
+        labels.add("Цикл уровней 1 → 2 → 3");
+        labels.add("Цикл уровней 3 → 2 → 1");
+        labels.add("Выбрать собственный набор уровней…");
+        for (CarControlDescriptor.Option option : control.options) {
+            labels.add("Установить: " + option.label);
+        }
+        new AlertDialog.Builder(activity).setTitle(control.label)
+                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
+                    if (which == 0) {
+                        saveCarCycle(existing, control, ascending);
+                    } else if (which == 1) {
+                        saveCarCycle(existing, control, descending);
+                    } else if (which == 2) {
+                        chooseCycleSubset(existing, control);
+                    } else {
+                        CarControlDescriptor.Option option = control.options.get(which - 3);
+                        saveCar(existing, control, CarControlCommand.Operation.SET, option.value);
+                    }
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
     }
 
     private void chooseCycleSubset(@Nullable LauncherShortcutStore.Shortcut existing,

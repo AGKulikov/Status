@@ -1268,18 +1268,22 @@ public final class PhoneConnectorController {
     /** Applies only values delivered by the authenticated iPhone Helper channel. */
     private void applyHelperTelemetry(long token, @NonNull IphoneHelperTelemetry telemetry) {
         long now = SystemClock.elapsedRealtime();
-        if (telemetry.kind == IphoneHelperTelemetry.Kind.POWER) {
+        boolean hasPower = telemetry.kind == IphoneHelperTelemetry.Kind.POWER
+                || telemetry.kind == IphoneHelperTelemetry.Kind.SNAPSHOT;
+        boolean hasNetwork = telemetry.kind == IphoneHelperTelemetry.Kind.NETWORK
+                || telemetry.kind == IphoneHelperTelemetry.Kind.SNAPSHOT;
+        if (hasPower) {
             helperBatteryLevel = telemetry.batteryLevel;
             helperExternalPower = telemetry.externalPower;
             helperChargeState = telemetry.chargeState;
             helperPowerUpdatedAtElapsed = now;
             refreshBatteryValues();
-            markTelemetryUpdated(true, false);
-        } else {
+        }
+        if (hasNetwork) {
             helperNetworkType = telemetry.networkType;
             helperNetworkUpdatedAtElapsed = now;
-            markTelemetryUpdated(false, true);
         }
+        markTelemetryUpdated(hasPower, hasNetwork);
         scheduleHelperTelemetryExpiry(token);
         publishSnapshot(token);
     }

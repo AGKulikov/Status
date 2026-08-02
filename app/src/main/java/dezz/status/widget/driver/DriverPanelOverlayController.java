@@ -977,22 +977,38 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         LinearLayout controlHost = new LinearLayout(context);
         controlHost.setOrientation(LinearLayout.VERTICAL);
         controlHost.setGravity(Gravity.CENTER);
+        boolean compactSpacing = false;
+        for (LauncherShortcutStore.Shortcut shortcut : controls) {
+            if (shortcut.gapBeforePx >= 0 || shortcut.gapAfterPx >= 0) {
+                compactSpacing = true;
+                break;
+            }
+        }
         for (LauncherShortcutStore.Shortcut shortcut : controls) {
             View button = shortcutButton(context, shortcut, false);
             registerFavoriteAnchors(shortcut, button);
             boolean expandedClimate = isExpandedClimate(shortcut);
+            int itemGapBefore = shortcut.gapBeforePx < 0 ? 0 : shortcut.gapBeforePx;
             int itemGap = shortcut.gapAfterPx < 0 ? gap : shortcut.gapAfterPx;
             LinearLayout.LayoutParams itemParams;
             if (shortcut.kind == LauncherShortcutStore.Kind.DIVIDER) {
                 itemParams = new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         shortcut.dividerThicknessPx + Math.max(4, itemGap));
+            } else if (compactSpacing) {
+                // An explicit per-button spacing setting switches the rail to natural-height
+                // layout. A 32 px Back icon now occupies 32 px, instead of receiving the same
+                // weighted slot as a 76 px climate tile; before/after margins become literal.
+                itemParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT);
             } else {
                 itemParams = new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, 0,
                         DriverPanelLayoutPolicy.shortcutWeight(expandedClimate));
             }
-            itemParams.setMargins(4, 0, 4, Math.max(0, itemGap));
+            itemParams.setMargins(4, Math.max(0, itemGapBefore),
+                    4, Math.max(0, itemGap));
             controlHost.addView(button, itemParams);
         }
         if (!controls.isEmpty()) {

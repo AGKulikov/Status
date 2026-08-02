@@ -31,6 +31,24 @@ public final class IphoneHelperTelemetryTest {
         assertEquals("", parse("TEL2;N;-;3").networkType);
     }
 
+    @Test public void parsesAtomicTel3SnapshotWithinLegacyAttPayload() {
+        String frame = "TEL3;60;1;C;6;44";
+        assertTrue(frame.getBytes(StandardCharsets.UTF_8).length <= 20);
+        IphoneHelperTelemetry value = parse(frame);
+        assertEquals(IphoneHelperTelemetry.Kind.SNAPSHOT, value.kind);
+        assertEquals(Integer.valueOf(60), value.batteryLevel);
+        assertEquals(Boolean.TRUE, value.externalPower);
+        assertEquals("charging", value.chargeState);
+        assertEquals("LTE", value.networkType);
+        assertEquals(44, value.sequence);
+
+        IphoneHelperTelemetry unknown = parse("TEL3;-;-;X;-;45");
+        assertNull(unknown.batteryLevel);
+        assertNull(unknown.externalPower);
+        assertEquals("unknown", unknown.chargeState);
+        assertEquals("", unknown.networkType);
+    }
+
     @Test public void rejectsMalformedOrUntrustedVocabulary() {
         assertNull(IphoneHelperTelemetry.parse(null));
         assertNull(raw("TEL1;N;LTE;1"));
@@ -38,6 +56,8 @@ public final class IphoneHelperTelemetryTest {
         assertNull(raw("TEL2;P;50;maybe;C;1"));
         assertNull(raw("TEL2;N;WIFI;1"));
         assertNull(raw("TEL2;N;LTE;10000"));
+        assertNull(raw("TEL3;60;1;C;Z;1"));
+        assertNull(raw("TEL3;60;1;C;6;10000"));
     }
 
     private static IphoneHelperTelemetry parse(String value) {

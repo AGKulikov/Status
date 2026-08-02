@@ -17,14 +17,17 @@ import java.util.Locale;
  * <p>The wire format deliberately fits the default 20-byte ATT payload:</p>
  * <ul>
  *     <li>{@code TEL2;P;60;1;C;42} — 60%, external power present, charging;</li>
- *     <li>{@code TEL2;N;LTE;43} — current cellular radio technology.</li>
+ *     <li>{@code TEL2;N;LTE;43} — current cellular radio technology;</li>
+ *     <li>{@code TEL3;60;1;C;6;44} — one atomic v3 snapshot containing both groups.</li>
  * </ul>
+ * TEL3 uses a compact network code so the complete snapshot fits a 20-byte ATT notification.
  * Unknown values are represented by {@code -}. No value is inferred on Android.</p>
  */
 public final class IphoneHelperTelemetry {
-    private static final String PREFIX = "TEL2";
+    private static final String PREFIX_V2 = "TEL2";
+    private static final String PREFIX_V3 = "TEL3";
 
-    public enum Kind { POWER, NETWORK }
+    public enum Kind { POWER, NETWORK, SNAPSHOT }
 
     @NonNull public final Kind kind;
     @Nullable public final Integer batteryLevel;
@@ -53,9 +56,23 @@ public final class IphoneHelperTelemetry {
         String frame = new String(payload, StandardCharsets.UTF_8).trim();
         if (frame.isEmpty()) return null;
         String[] fields = frame.split(";", -1);
-        if (fields.length < 4 || !PREFIX.equalsIgnoreCase(fields[0])) return null;
-        String kind = fields[1].trim().toUpperCase(Locale.US);
+        if (fields.length < 4) return null;
+        String prefix = fields[0].trim().toUpperCase(Locale.US);
         try {
+            if (PREFIX_V3.equals(prefix) && fields.length == 6) {
+                Integer level = nullablePercent(fields[1]);
+                Boolean power = nullableBoolean(fields[2]);
+                String state = normalizeChargeState(fields[3]);
+                String type = networkTypeFromCompactCode(fields[4]);
+                int sequence = sequence(fields[5]);
+                if (level == null && !"-".equals(fields[1].trim())) return null;
+                if (power == null && !"-".equals(fields[2].trim())) return null;
+                if (state.isEmpty() || type == null) return null;
+                return new IphoneHelperTelemetry(
+                        Kind.SNAPSHOT, level, power, state, type, sequence);
+            }
+            if (!PREFIX_V2.equals(prefix)) return null;
+            String kind = fields[1].trim().toUpperCase(Locale.US);
             if ("P".equals(kind) && fields.length == 6) {
                 Integer level = nullablePercent(fields[2]);
                 Boolean power = nullableBoolean(fields[3]);
@@ -78,6 +95,28 @@ public final class IphoneHelperTelemetry {
             return null;
         }
         return null;
+    }
+
+    /** Compact TEL3 vocabulary. Values stay stable on the wire across iOS SDK spellings. */
+    @Nullable
+    private static String networkTypeFromCompactCode(@NonNull String raw) {
+        switch (raw.trim().toUpperCase(Locale.US)) {
+            case "-": return "";
+            case "1": return "5G";
+            case "2": return "5G_UC";
+            case "3": return "5G_PLUS";
+            case "4": return "5G_UW";
+            case "5": return "5G_E";
+            case "6": return "LTE";
+            case "7": return "4G";
+            case "8": return "3G";
+            case "9": return "E";
+            case "A": return "G";
+            case "B": return "1X";
+            case "C": return "SOS";
+            case "D": return "SAT";
+            default: return null;
+        }
     }
 
     @Nullable

@@ -79,6 +79,9 @@ public final class IphoneAncsTransport {
             UUID.fromString("d2d9e4b2-47f1-4e44-a8bb-a932fd5a2f01");
     private static final UUID SECURE_CHARACTERISTIC =
             UUID.fromString("d2d9e4b3-47f1-4e44-a8bb-a932fd5a2f01");
+    /** Dedicated Helper v8 telemetry endpoint; B3 remains the encrypted handshake. */
+    private static final UUID TELEMETRY_CHARACTERISTIC =
+            UUID.fromString("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f01");
     private static final UUID GENERIC_ATTRIBUTE_SERVICE =
             UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
     private static final UUID SERVICE_CHANGED =
@@ -122,6 +125,10 @@ public final class IphoneAncsTransport {
     /** The first encrypted ANCS CCCD may wait while the user accepts iPhone pairing. */
     private static final long ANCS_DESCRIPTOR_WRITE_TIMEOUT_MS = 90_000L;
     private static final long BATTERY_OPERATION_TIMEOUT_MS = 5_000L;
+    private static final long HELPER_TELEMETRY_READ_TIMEOUT_MS = 5_000L;
+    private static final long HELPER_TELEMETRY_POLL_MS = 15_000L;
+    private static final long HELPER_TELEMETRY_BUSY_RETRY_MS = 1_000L;
+    private static final long HELPER_SERVICE_REDISCOVERY_MS = 30_000L;
     private static final long BOND_TIMEOUT_MS = 90_000L;
     private static final long ANCS_REQUEST_GAP_MS = 120L;
     private static final long LIVE_NOTIFICATION_MAX_AGE_MS = 15_000L;
@@ -140,7 +147,7 @@ public final class IphoneAncsTransport {
         void onNotification(NotificationItem item);
         void onAppName(String appIdentifier, String displayName);
         void onBatteryCharacteristic(UUID characteristicUuid, byte[] value);
-        /** Authenticated v2 helper telemetry received on the encrypted application channel. */
+        /** Authenticated Helper telemetry received on the encrypted application channel. */
         default void onHelperTelemetry(IphoneHelperTelemetry telemetry) {}
     }
 
@@ -366,6 +373,7 @@ public final class IphoneAncsTransport {
     private boolean iphoneSecureConfirmed;
     private boolean iphoneHelperTelemetrySubscriptionAttempted;
     private boolean iphoneHelperTelemetrySubscribed;
+    private boolean iphoneHelperTelemetryReadPending;
     private boolean iphonePostSecureDiscoveryScheduled;
     private boolean iphoneAncsSeen;
     private boolean closing;
@@ -394,6 +402,7 @@ public final class IphoneAncsTransport {
     private BluetoothGattCharacteristic batteryLevel;
     private BluetoothGattCharacteristic batteryLevelStatus;
     private BluetoothGattCharacteristic iphoneSecureCharacteristic;
+    private BluetoothGattCharacteristic iphoneTelemetryCharacteristic;
     private Request activeRequest;
     private AncsProtocol.NotificationAccumulator notificationAccumulator;
     private AncsProtocol.AppNameAccumulator appNameAccumulator;
@@ -402,6 +411,8 @@ public final class IphoneAncsTransport {
     private Runnable discoveryTimeout;
     private Runnable descriptorWriteTimeout;
     private Runnable batteryReadTimeout;
+    private Runnable helperTelemetryReadTimeout;
+    private Runnable helperTelemetryPoll;
     private Runnable bondTimeout;
     private Runnable secureConnectStart;
     private Runnable nextClientAttempt;
@@ -1230,12 +1241,14 @@ public final class IphoneAncsTransport {
     }
 
     private void clearIphonePeripheralRuntime(boolean clearMode) {
+        cancelHelperTelemetryRecovery();
         iphonePairAttempted = false;
         iphonePairWritePending = false;
         iphoneSecureReadPending = false;
         iphoneSecureConfirmed = false;
         iphoneHelperTelemetrySubscriptionAttempted = false;
         iphoneHelperTelemetrySubscribed = false;
+        iphoneHelperTelemetryReadPending = false;
         iphonePostSecureDiscoveryScheduled = false;
         iphoneAncsSeen = false;
         ancsRetryAfterBond = false;
@@ -1243,6 +1256,7 @@ public final class IphoneAncsTransport {
         leBondAttemptObserved = false;
         ancsBondRetryCount = 0;
         iphoneSecureCharacteristic = null;
+        iphoneTelemetryCharacteristic = null;
         if (clearMode) {
             iphonePeripheralMode = false;
             helperBootstrapMode = false;
@@ -1599,12 +1613,22 @@ public final class IphoneAncsTransport {
                         | BluetoothGattCharacteristic.PERMISSION_WRITE_ENCRYPTED);
         secure.setValue("SECURE ATT OK".getBytes(StandardCharsets.UTF_8));
 
+        BluetoothGattCharacteristic telemetry = new BluetoothGattCharacteristic(
+                TELEMETRY_CHARACTERISTIC,
+                BluetoothGattCharacteristic.PROPERTY_READ
+                        | BluetoothGattCharacteristic.PROPERTY_WRITE,
+                BluetoothGattCharacteristic.PERMISSION_READ_ENCRYPTED
+                        | BluetoothGattCharacteristic.PERMISSION_WRITE_ENCRYPTED);
+        telemetry.setValue("TEL3;-;-;X;-;0".getBytes(StandardCharsets.UTF_8));
+
         boolean informationAdded = service.addCharacteristic(information);
         boolean controlAdded = service.addCharacteristic(control);
         boolean secureAdded = service.addCharacteristic(secure);
+        boolean telemetryAdded = service.addCharacteristic(telemetry);
         log("Diagnostic characteristics: INFO=" + informationAdded
-                + " CONTROL=" + controlAdded + " SECURE=" + secureAdded);
-        if (!informationAdded || !controlAdded || !secureAdded) {
+                + " CONTROL=" + controlAdded + " SECURE=" + secureAdded
+                + " TELEMETRY=" + telemetryAdded);
+        if (!informationAdded || !controlAdded || !secureAdded || !telemetryAdded) {
             state("GATT_CHARACTERISTIC_ADD_FAILED");
             advertisingDesired = false;
             clearPreparedAdvertising();
@@ -1830,6 +1854,15 @@ public final class IphoneAncsTransport {
             BluetoothGattService helper = callbackGatt.getService(DIAGNOSTIC_SERVICE);
             iphoneSecureCharacteristic = helper == null ? null
                     : helper.getCharacteristic(SECURE_CHARACTERISTIC);
+            BluetoothGattCharacteristic discoveredTelemetry = helper == null ? null
+                    : helper.getCharacteristic(TELEMETRY_CHARACTERISTIC);
+            if ((iphoneTelemetryCharacteristic == null) != (discoveredTelemetry == null)) {
+                iphoneHelperTelemetrySubscriptionAttempted = false;
+                iphoneHelperTelemetrySubscribed = false;
+            }
+            iphoneTelemetryCharacteristic = discoveredTelemetry;
+            log("Helper telemetry endpoint="
+                    + (iphoneTelemetryCharacteristic != null ? "TEL3/B4" : "legacy TEL2/B3"));
         }
         // HA1122 exposed BAS even while iOS had not published ANCS yet. Prepare the optional
         // battery work immediately, then serialize it behind any Service Changed/ANCS CCCD.
@@ -1840,8 +1873,10 @@ public final class IphoneAncsTransport {
             cancelAutoAncsWaitTimeout();
             iphoneAncsSeen = iphonePeripheralMode;
             if (gattReady) {
-                log("ANCS уже READY; проверяю появившийся Helper TEL2 без перезапуска ANCS");
+                log("ANCS уже READY; проверяю появившийся Helper TEL3 без перезапуска ANCS");
                 if (!startOptionalHelperTelemetrySubscription(callbackGatt)) {
+                    scheduleHelperTelemetryRecovery(callbackGatt,
+                            HELPER_TELEMETRY_BUSY_RETRY_MS);
                     sendNextRequest();
                 }
                 return;
@@ -1900,6 +1935,7 @@ public final class IphoneAncsTransport {
                 + (iphonePeripheralMode
                 ? " после прямого Android-central подключения"
                 : ""));
+        scheduleHelperTelemetryRecovery(callbackGatt, HELPER_TELEMETRY_BUSY_RETRY_MS);
         subscribeServiceChangedIfAvailable(callbackGatt);
         sendNextRequest();
     }
@@ -1933,7 +1969,7 @@ public final class IphoneAncsTransport {
         boolean optional = descriptorStage == DescriptorStage.SERVICE_CHANGED;
         optional = optional || descriptorStage == DescriptorStage.HELPER_TELEMETRY;
         String optionalName = descriptorStage == DescriptorStage.HELPER_TELEMETRY
-                ? "Helper TEL2" : "Service Changed";
+                ? "Helper TEL3" : "Service Changed";
         boolean local;
         try {
             local = callbackGatt.setCharacteristicNotification(characteristic, true);
@@ -2023,9 +2059,12 @@ public final class IphoneAncsTransport {
         if (descriptorStage == DescriptorStage.HELPER_TELEMETRY) {
             descriptorStage = DescriptorStage.NONE;
             iphoneHelperTelemetrySubscribed = status == GATT_SUCCESS;
+            if (status != GATT_SUCCESS) {
+                iphoneHelperTelemetrySubscriptionAttempted = false;
+            }
             log(status == GATT_SUCCESS
-                    ? "Helper TEL2 notification subscription enabled"
-                    : "Helper TEL2 optional CCCD skipped · status=" + status);
+                    ? "Helper telemetry notification subscription enabled"
+                    : "Helper telemetry optional CCCD skipped · status=" + status);
             continueAfterHelperTelemetrySubscription(callbackGatt);
             return;
         }
@@ -2109,14 +2148,16 @@ public final class IphoneAncsTransport {
             }
             return;
         }
-        if (SECURE_CHARACTERISTIC.equals(uuid) && iphonePeripheralMode) {
+        if ((TELEMETRY_CHARACTERISTIC.equals(uuid) || SECURE_CHARACTERISTIC.equals(uuid))
+                && iphonePeripheralMode) {
             IphoneHelperTelemetry telemetry = IphoneHelperTelemetry.parse(value);
             if (telemetry != null) {
                 listener.onHelperTelemetry(telemetry);
-                log("Helper TEL2 notification accepted: kind=" + telemetry.kind
+                log("Helper telemetry notification accepted: kind=" + telemetry.kind
                         + " seq=" + telemetry.sequence);
+                scheduleHelperTelemetryRecovery(callbackGatt, HELPER_TELEMETRY_POLL_MS);
             } else {
-                log("Helper SECURE notification ignored: not a TEL2 frame");
+                log("Helper notification ignored: malformed TEL2/TEL3 frame");
             }
             return;
         }
@@ -2153,7 +2194,8 @@ public final class IphoneAncsTransport {
             case SERVICE_CHANGED:
                 return SERVICE_CHANGED.equals(uuid);
             case HELPER_TELEMETRY:
-                return SECURE_CHARACTERISTIC.equals(uuid);
+                return TELEMETRY_CHARACTERISTIC.equals(uuid)
+                        || SECURE_CHARACTERISTIC.equals(uuid);
             case DATA_SOURCE:
                 return AncsProtocol.DATA_SOURCE.equals(uuid);
             case NOTIFICATION_SOURCE:
@@ -2174,44 +2216,164 @@ public final class IphoneAncsTransport {
     }
 
     /**
-     * Helper v7 also publishes TEL2 on the Android-central fallback link.  This route is crucial
-     * on KX11 units where ANCS is alive but iOS never connects back to Android's diagnostic GATT
-     * server, which is why v6 could show notifications yet never deliver charge/network frames.
+     * Helper v8 publishes one atomic TEL3 snapshot on B4. Older Helper v7 builds can still notify
+     * the split TEL2 frames on B3. Both endpoints share the already-working Android-central ANCS
+     * link, so telemetry never needs a second BLE connection.
      */
     private boolean startOptionalHelperTelemetrySubscription(BluetoothGatt callbackGatt) {
-        BluetoothGattCharacteristic secure = iphoneSecureCharacteristic;
-        if (!iphonePeripheralMode || callbackGatt != gatt || secure == null
+        BluetoothGattCharacteristic telemetry = helperTelemetryEndpoint();
+        if (!iphonePeripheralMode || callbackGatt != gatt || telemetry == null
                 || iphoneHelperTelemetrySubscribed
                 || iphoneHelperTelemetrySubscriptionAttempted
                 || descriptorStage != DescriptorStage.NONE) return false;
-        if ((secure.getProperties() & BluetoothGattCharacteristic.PROPERTY_NOTIFY) == 0) {
-            log("Helper SECURE has no NOTIFY property; v6 telemetry fallback unavailable");
+        if ((telemetry.getProperties() & BluetoothGattCharacteristic.PROPERTY_NOTIFY) == 0) {
+            log("Helper telemetry endpoint has no NOTIFY; periodic encrypted READ remains active");
             iphoneHelperTelemetrySubscriptionAttempted = true;
+            scheduleHelperTelemetryRecovery(callbackGatt, HELPER_TELEMETRY_BUSY_RETRY_MS);
             return false;
         }
         iphoneHelperTelemetrySubscriptionAttempted = true;
         descriptorStage = DescriptorStage.HELPER_TELEMETRY;
-        boolean started = subscribe(callbackGatt, secure, false);
+        boolean started = subscribe(callbackGatt, telemetry, false);
         if (!started) {
             descriptorStage = DescriptorStage.NONE;
-            log("Helper TEL2 optional subscription did not start");
+            iphoneHelperTelemetrySubscriptionAttempted = false;
+            log("Helper telemetry optional subscription did not start");
+            scheduleHelperTelemetryRecovery(callbackGatt, HELPER_TELEMETRY_BUSY_RETRY_MS);
         } else {
-            state(gattReady ? "ANCS READY · ВКЛЮЧАЮ TEL2" : "GPS-LINK · ВКЛЮЧАЮ TEL2");
+            state(gattReady ? "ANCS READY · ВКЛЮЧАЮ TEL3" : "GPS-LINK · ВКЛЮЧАЮ TEL3");
         }
         return started;
     }
 
+    private BluetoothGattCharacteristic helperTelemetryEndpoint() {
+        return iphoneTelemetryCharacteristic != null
+                ? iphoneTelemetryCharacteristic : iphoneSecureCharacteristic;
+    }
+
     private void continueAfterHelperTelemetrySubscription(BluetoothGatt callbackGatt) {
+        scheduleHelperTelemetryRecovery(callbackGatt, 200L);
         if (gattReady) finishAncsReadySetup(callbackGatt);
         else scheduleIphonePostSecureDiscovery(callbackGatt);
     }
 
     private void finishAncsReadySetup(BluetoothGatt callbackGatt) {
         prepareBatteryBootstrap(callbackGatt);
-        log("Обе ANCS-подписки включены; TEL2 Helper="
+        log("Обе ANCS-подписки включены; Helper telemetry="
                 + (iphoneHelperTelemetrySubscribed ? "READY" : "UNAVAILABLE")
-                + "; BAS diagnostics follow in the serialized GATT queue");
+                + "; encrypted TEL3 READ and BAS diagnostics use the serialized GATT queue");
         sendNextRequest();
+    }
+
+    /**
+     * Keeps Helper telemetry alive independently of notification delivery. Notifications are the
+     * low-latency path; an encrypted B4 read is the deterministic snapshot/recovery path. If the
+     * Helper service was published after ANCS discovery, the same GATT owner periodically repeats
+     * service discovery instead of opening a competing connection.
+     */
+    private void scheduleHelperTelemetryRecovery(BluetoothGatt expectedGatt, long delayMs) {
+        if (!iphonePeripheralMode || expectedGatt == null || expectedGatt != gatt
+                || !gattClientConnected) return;
+        if (helperTelemetryPoll != null) main.removeCallbacks(helperTelemetryPoll);
+        helperTelemetryPoll = () -> {
+            helperTelemetryPoll = null;
+            if (!iphonePeripheralMode || expectedGatt != gatt || !gattClientConnected) return;
+
+            BluetoothGattCharacteristic endpoint = helperTelemetryEndpoint();
+            boolean busy = discoveryPending || descriptorStage != DescriptorStage.NONE
+                    || activeRequest != null || batteryReadPendingUuid != null
+                    || iphoneHelperTelemetryReadPending;
+            if (endpoint == null) {
+                if (!busy) {
+                    log("Helper B4/B3 пока не найден; повторяю discovery на существующем ANCS link");
+                    discoverServices(expectedGatt);
+                }
+                scheduleHelperTelemetryRecovery(expectedGatt,
+                        busy ? HELPER_TELEMETRY_BUSY_RETRY_MS
+                                : HELPER_SERVICE_REDISCOVERY_MS);
+                return;
+            }
+
+            boolean legacyWithoutNotify = iphoneTelemetryCharacteristic == null
+                    && (endpoint.getProperties()
+                    & BluetoothGattCharacteristic.PROPERTY_NOTIFY) == 0;
+            if (legacyWithoutNotify) {
+                if (!busy) {
+                    log("Legacy Helper B3 не передаёт telemetry; ищу выделенный B4 повторным discovery");
+                    discoverServices(expectedGatt);
+                }
+                scheduleHelperTelemetryRecovery(expectedGatt,
+                        busy ? HELPER_TELEMETRY_BUSY_RETRY_MS
+                                : HELPER_SERVICE_REDISCOVERY_MS);
+                return;
+            }
+
+            if (!iphoneHelperTelemetrySubscribed
+                    && !iphoneHelperTelemetrySubscriptionAttempted
+                    && !busy
+                    && (endpoint.getProperties()
+                    & BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0) {
+                if (startOptionalHelperTelemetrySubscription(expectedGatt)) return;
+            }
+
+            if (!busy && startHelperTelemetryRead(expectedGatt)) return;
+            scheduleHelperTelemetryRecovery(expectedGatt,
+                    busy ? HELPER_TELEMETRY_BUSY_RETRY_MS : HELPER_TELEMETRY_POLL_MS);
+        };
+        main.postDelayed(helperTelemetryPoll, Math.max(1L, delayMs));
+    }
+
+    private boolean startHelperTelemetryRead(BluetoothGatt callbackGatt) {
+        BluetoothGattCharacteristic telemetry = iphoneTelemetryCharacteristic;
+        if (callbackGatt != gatt || telemetry == null || iphoneHelperTelemetryReadPending
+                || discoveryPending || descriptorStage != DescriptorStage.NONE
+                || activeRequest != null || batteryReadPendingUuid != null
+                || (telemetry.getProperties()
+                & BluetoothGattCharacteristic.PROPERTY_READ) == 0) {
+            return false;
+        }
+        boolean started;
+        try {
+            started = callbackGatt.readCharacteristic(telemetry);
+        } catch (RuntimeException failure) {
+            started = false;
+            log("Helper TEL3 read exception: " + failure);
+        }
+        if (!started) {
+            log("Helper TEL3 encrypted read did not start");
+            return false;
+        }
+        iphoneHelperTelemetryReadPending = true;
+        scheduleHelperTelemetryReadTimeout(callbackGatt);
+        log("Helper TEL3 encrypted read started");
+        return true;
+    }
+
+    private void scheduleHelperTelemetryReadTimeout(BluetoothGatt expectedGatt) {
+        cancelHelperTelemetryReadTimeout();
+        helperTelemetryReadTimeout = () -> {
+            helperTelemetryReadTimeout = null;
+            if (expectedGatt != gatt || !iphoneHelperTelemetryReadPending) return;
+            iphoneHelperTelemetryReadPending = false;
+            log("Helper TEL3 read callback timeout; ANCS remains active");
+            scheduleHelperTelemetryRecovery(expectedGatt, HELPER_TELEMETRY_BUSY_RETRY_MS);
+            sendNextRequest();
+        };
+        main.postDelayed(helperTelemetryReadTimeout, HELPER_TELEMETRY_READ_TIMEOUT_MS);
+    }
+
+    private void cancelHelperTelemetryReadTimeout() {
+        if (helperTelemetryReadTimeout != null) {
+            main.removeCallbacks(helperTelemetryReadTimeout);
+        }
+        helperTelemetryReadTimeout = null;
+    }
+
+    private void cancelHelperTelemetryRecovery() {
+        if (helperTelemetryPoll != null) main.removeCallbacks(helperTelemetryPoll);
+        helperTelemetryPoll = null;
+        cancelHelperTelemetryReadTimeout();
+        iphoneHelperTelemetryReadPending = false;
     }
 
     private void prepareBatteryBootstrap(BluetoothGatt callbackGatt) {
@@ -2222,11 +2384,11 @@ public final class IphoneAncsTransport {
                 service == null ? null : service.getCharacteristic(BATTERY_LEVEL_STATUS);
         if (batteryLevel == null && batteryLevelStatus == null) {
             batteryStage = BatteryStage.COMPLETE;
-            log("BAS 0x180F отсутствует; видимый процент ожидается только от Helper TEL2");
+            log("BAS 0x180F отсутствует; видимый процент ожидается только от Helper TEL3");
             return;
         }
         // Battery Level Status is retained only as an optional percentage source. Its charging
-        // bits are ignored by the controller; TEL2 from iPhone Helper is authoritative.
+        // bits are ignored by the controller; TEL3 from iPhone Helper is authoritative.
         batteryStage = BatteryStage.READ_LEVEL_STATUS;
         log("BAS percentage probe: level=" + (batteryLevel != null)
                 + " levelStatus=" + (batteryLevelStatus != null));
@@ -2248,6 +2410,7 @@ public final class IphoneAncsTransport {
         BluetoothGatt callbackGatt = gatt;
         if (!gattClientConnected || callbackGatt == null || activeRequest != null
                 || !requests.isEmpty() || batteryReadPendingUuid != null
+                || iphoneHelperTelemetryReadPending
                 || descriptorStage != DescriptorStage.NONE) {
             return;
         }
@@ -2431,7 +2594,8 @@ public final class IphoneAncsTransport {
 
     private void sendNextRequest() {
         if (gatt == null || activeRequest != null) return;
-        if (batteryReadPendingUuid != null || descriptorStage != DescriptorStage.NONE) return;
+        if (batteryReadPendingUuid != null || iphoneHelperTelemetryReadPending
+                || descriptorStage != DescriptorStage.NONE) return;
         if (!gattReady || controlPoint == null) {
             advanceBatteryBootstrapIfIdle();
             return;
@@ -2705,6 +2869,7 @@ public final class IphoneAncsTransport {
         cancelConnectTimeout();
         cancelDiscoveryTimeout();
         cancelDescriptorWriteTimeout();
+        cancelHelperTelemetryRecovery();
         resetBatteryBootstrap();
         cancelBondTimeout();
         requestTimeout = null;
@@ -2724,8 +2889,10 @@ public final class IphoneAncsTransport {
         controlPoint = null;
         serviceChanged = null;
         iphoneSecureCharacteristic = null;
+        iphoneTelemetryCharacteristic = null;
         iphoneHelperTelemetrySubscriptionAttempted = false;
         iphoneHelperTelemetrySubscribed = false;
+        iphoneHelperTelemetryReadPending = false;
         descriptorStage = DescriptorStage.NONE;
         gattReady = false;
         discoveryPending = false;
@@ -2764,7 +2931,10 @@ public final class IphoneAncsTransport {
             }
             if (expectedStage == DescriptorStage.HELPER_TELEMETRY) {
                 iphoneHelperTelemetrySubscribed = false;
-                log("Helper TEL2 optional CCCD callback timeout; ANCS link stays active");
+                iphoneHelperTelemetrySubscriptionAttempted = false;
+                log("Helper telemetry optional CCCD callback timeout; ANCS link stays active");
+                scheduleHelperTelemetryRecovery(expectedGatt,
+                        HELPER_TELEMETRY_BUSY_RETRY_MS);
                 continueAfterHelperTelemetrySubscription(expectedGatt);
                 return;
             }
@@ -3416,6 +3586,16 @@ public final class IphoneAncsTransport {
                         main.post(() -> handleSecureAttSuccess(device, "READ"));
                         return;
                     }
+                    if (TELEMETRY_CHARACTERISTIC.equals(uuid)) {
+                        if (!isVerifiedPeer(device)) {
+                            sendGattServerResponse(device, requestId,
+                                    STATUS_INSUFFICIENT_AUTHORIZATION, 0, null);
+                            return;
+                        }
+                        sendGattReadResponse(device, requestId, offset,
+                                "TEL3;-;-;X;-;0".getBytes(StandardCharsets.UTF_8));
+                        return;
+                    }
                     sendGattServerResponse(device, requestId,
                             BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, 0, null);
                 }
@@ -3443,7 +3623,7 @@ public final class IphoneAncsTransport {
                             + " ascii=`" + asciiCommand(rawValue) + "`"
                             + " type=" + typeLabel(safeType(device))
                             + " bond=" + bondLabel(safeBondState(device))
-                            : "GATT SERVER WRITE TEL2: kind=" + diagnosticTelemetry.kind
+                            : "GATT SERVER WRITE TELEMETRY: kind=" + diagnosticTelemetry.kind
                             + " seq=" + diagnosticTelemetry.sequence
                             + " peer=" + safeAddress(device)));
                     int status = BluetoothGatt.GATT_SUCCESS;
@@ -3467,7 +3647,8 @@ public final class IphoneAncsTransport {
                         } else {
                             successAction = () -> handlePairCommand(device);
                         }
-                    } else if (SECURE_CHARACTERISTIC.equals(uuid)) {
+                    } else if (SECURE_CHARACTERISTIC.equals(uuid)
+                            || TELEMETRY_CHARACTERISTIC.equals(uuid)) {
                         String command = asciiCommand(value);
                         IphoneHelperTelemetry telemetry = IphoneHelperTelemetry.parse(value);
                         if (!isVerifiedPeer(device)) {
@@ -3480,10 +3661,13 @@ public final class IphoneAncsTransport {
                                 log("Helper telemetry accepted: kind=" + telemetry.kind
                                         + " seq=" + telemetry.sequence);
                             };
+                        } else if (TELEMETRY_CHARACTERISTIC.equals(uuid)) {
+                            status = BluetoothGatt.GATT_FAILURE;
+                            main.post(() -> log("TELEMETRY write rejected: malformed TEL3/TEL2"));
                         } else if (!"ANCS".equals(command)) {
                             status = BluetoothGatt.GATT_FAILURE;
                             main.post(() -> log("SECURE command отклонена: `" + command
-                                    + "`; ожидается ASCII ANCS или TEL2"));
+                                    + "`; ожидается ASCII ANCS или TEL2/TEL3"));
                         } else {
                             successAction = () -> handleSecureAttSuccess(device, "WRITE");
                         }
@@ -3703,6 +3887,24 @@ public final class IphoneAncsTransport {
             main.post(() -> {
                 if (callbackGatt != gatt) return;
                 UUID uuid = characteristic.getUuid();
+                if (TELEMETRY_CHARACTERISTIC.equals(uuid)
+                        && iphoneHelperTelemetryReadPending) {
+                    cancelHelperTelemetryReadTimeout();
+                    iphoneHelperTelemetryReadPending = false;
+                    IphoneHelperTelemetry telemetry = status == GATT_SUCCESS
+                            ? IphoneHelperTelemetry.parse(copy) : null;
+                    if (telemetry != null) {
+                        listener.onHelperTelemetry(telemetry);
+                        log("Helper TEL3 encrypted read accepted: kind=" + telemetry.kind
+                                + " seq=" + telemetry.sequence);
+                    } else {
+                        log("Helper TEL3 encrypted read unavailable · status=" + status
+                                + " value=" + AdvertisementParser.hex(copy, 80));
+                    }
+                    scheduleHelperTelemetryRecovery(callbackGatt, HELPER_TELEMETRY_POLL_MS);
+                    sendNextRequest();
+                    return;
+                }
                 if ((BATTERY_LEVEL.equals(uuid) || BATTERY_LEVEL_STATUS.equals(uuid))
                         && uuid.equals(batteryReadPendingUuid)) {
                     cancelBatteryReadTimeout();

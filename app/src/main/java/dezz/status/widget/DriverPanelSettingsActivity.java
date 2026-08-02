@@ -397,36 +397,8 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                             applyInformationGroupSetting(shortcut,
                                     value -> value.informationGroupGapPx = selected));
         } else {
-            TextView gapValue = text(shortcut.gapAfterPx < 0
-                            ? "Отступ после кнопки: общий"
-                            : "Отступ после кнопки: " + shortcut.gapAfterPx + " px",
-                    13, 0xFFC7C7CC);
-            body.addView(gapValue, topMargin(dp(6)));
-            SeekBar buttonGap = new SeekBar(this);
-            buttonGap.setMax(81);
-            buttonGap.setProgress(shortcut.gapAfterPx + 1);
-            buttonGap.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                int selected = shortcut.gapAfterPx;
-
-                @Override public void onProgressChanged(SeekBar seekBar, int progress,
-                                                        boolean fromUser) {
-                    selected = progress - 1;
-                    gapValue.setText(selected < 0
-                            ? "Отступ после кнопки: общий"
-                            : "Отступ после кнопки: " + selected + " px");
-                }
-
-                @Override public void onStartTrackingTouch(SeekBar seekBar) {
-                }
-
-                @Override public void onStopTrackingTouch(SeekBar seekBar) {
-                    shortcut.gapAfterPx = selected;
-                    store.upsert(shortcut);
-                    refreshPreview();
-                    applyPanel();
-                }
-            });
-            body.addView(buttonGap, new LinearLayout.LayoutParams(match(), dp(42)));
+            buttonGapSlider(body, shortcut, true);
+            buttonGapSlider(body, shortcut, false);
         }
 
         LinearLayout controls = new LinearLayout(this);
@@ -1587,6 +1559,44 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         });
         block.addView(seek, new LinearLayout.LayoutParams(match(), dp(42)));
         host.addView(block, rowParams());
+    }
+
+    /** Per-control rail spacing. -1 keeps the old evenly distributed panel layout. */
+    private void buttonGapSlider(@NonNull LinearLayout host,
+                                 @NonNull LauncherShortcutStore.Shortcut shortcut,
+                                 boolean before) {
+        String label = before ? "Отступ до кнопки" : "Отступ после кнопки";
+        int current = before ? shortcut.gapBeforePx : shortcut.gapAfterPx;
+        TextView value = text(current < 0
+                        ? label + ": общий"
+                        : label + ": " + current + " px",
+                13, 0xFFC7C7CC);
+        host.addView(value, topMargin(dp(6)));
+        SeekBar seek = new SeekBar(this);
+        seek.setMax(81);
+        seek.setProgress(current + 1);
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            int selected = current;
+
+            @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                                                    boolean fromUser) {
+                selected = progress - 1;
+                value.setText(selected < 0
+                        ? label + ": общий"
+                        : label + ": " + selected + " px");
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                if (before) shortcut.gapBeforePx = selected;
+                else shortcut.gapAfterPx = selected;
+                store.upsert(shortcut);
+                refreshPreview();
+                applyPanel();
+            }
+        });
+        host.addView(seek, new LinearLayout.LayoutParams(match(), dp(42)));
     }
 
     /** Four-side spacing control with a dedicated zero action usable on a car touchscreen. */

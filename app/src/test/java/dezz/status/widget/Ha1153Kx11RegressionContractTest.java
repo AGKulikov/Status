@@ -19,7 +19,7 @@ public final class Ha1153Kx11RegressionContractTest {
         assertTrue(transport.contains("HELPER_TELEMETRY"));
         assertTrue(transport.contains("BluetoothGattCharacteristic.PROPERTY_NOTIFY"));
         assertTrue(transport.contains("startOptionalHelperTelemetrySubscription"));
-        assertTrue(transport.contains("Helper TEL2 notification accepted"));
+        assertTrue(transport.contains("Helper telemetry notification accepted"));
         assertTrue(transport.contains("listener.onHelperTelemetry(telemetry)"));
     }
 
