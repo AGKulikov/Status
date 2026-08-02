@@ -976,7 +976,6 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         }
         LinearLayout controlHost = new LinearLayout(context);
         controlHost.setOrientation(LinearLayout.VERTICAL);
-        controlHost.setGravity(Gravity.CENTER);
         boolean compactSpacing = false;
         for (LauncherShortcutStore.Shortcut shortcut : controls) {
             if (shortcut.gapBeforePx >= 0 || shortcut.gapAfterPx >= 0) {
@@ -984,21 +983,34 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 break;
             }
         }
+        // Explicit per-button insets make every button a true wrap-content cell. Keeping CENTER
+        // here would put all unused rail height above/below that compact cluster and make the
+        // controls appear to have unexplained external spacing.
+        controlHost.setGravity(compactSpacing
+                ? Gravity.TOP | Gravity.CENTER_HORIZONTAL : Gravity.CENTER);
         for (LauncherShortcutStore.Shortcut shortcut : controls) {
             View button = shortcutButton(context, shortcut, false);
             registerFavoriteAnchors(shortcut, button);
             boolean expandedClimate = isExpandedClimate(shortcut);
-            int itemGapBefore = shortcut.gapBeforePx < 0 ? 0 : shortcut.gapBeforePx;
-            int itemGap = shortcut.gapAfterPx < 0 ? gap : shortcut.gapAfterPx;
+            int internalTop = compactSpacing
+                    ? Math.max(0, shortcut.gapBeforePx) : 0;
+            int internalBottom = compactSpacing
+                    ? Math.max(0, shortcut.gapAfterPx) : 0;
             LinearLayout.LayoutParams itemParams;
             if (shortcut.kind == LauncherShortcutStore.Kind.DIVIDER) {
                 itemParams = new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
-                        shortcut.dividerThicknessPx + Math.max(4, itemGap));
+                        shortcut.dividerThicknessPx
+                                + (compactSpacing ? internalTop + internalBottom
+                                : Math.max(4, gap)));
             } else if (compactSpacing) {
-                // An explicit per-button spacing setting switches the rail to natural-height
-                // layout. A 32 px Back icon now occupies 32 px, instead of receiving the same
-                // weighted slot as a 76 px climate tile; before/after margins become literal.
+                // Values are internal top/bottom padding, not outside margins. Therefore a
+                // 32 px Back icon with both values at zero is a genuinely 32 px-high button and
+                // does not reserve a hidden weighted slot around itself.
+                button.setMinimumHeight(0);
+                button.setMinimumWidth(0);
+                button.setPadding(button.getPaddingLeft(), internalTop,
+                        button.getPaddingRight(), internalBottom);
                 itemParams = new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -1007,8 +1019,9 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                         ViewGroup.LayoutParams.MATCH_PARENT, 0,
                         DriverPanelLayoutPolicy.shortcutWeight(expandedClimate));
             }
-            itemParams.setMargins(4, Math.max(0, itemGapBefore),
-                    4, Math.max(0, itemGap));
+            // Only the narrow rail edge inset remains external. Vertical spacing belongs to the
+            // button itself, so adjacent controls meet exactly when both values are zero.
+            itemParams.setMargins(4, 0, 4, 0);
             controlHost.addView(button, itemParams);
         }
         if (!controls.isEmpty()) {
