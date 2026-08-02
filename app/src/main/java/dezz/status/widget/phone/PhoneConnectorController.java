@@ -1305,10 +1305,10 @@ public final class PhoneConnectorController {
         }
         Runnable expiry = () -> runIfCurrent(token, () -> {
             helperTelemetryExpiryTask = null;
-            long now = SystemClock.elapsedRealtime();
+            long checkedAt = SystemClock.elapsedRealtime();
             boolean changed = false;
             if (helperPowerUpdatedAtElapsed > 0L
-                    && now - helperPowerUpdatedAtElapsed >= HELPER_TELEMETRY_TIMEOUT_MS) {
+                    && checkedAt - helperPowerUpdatedAtElapsed >= HELPER_TELEMETRY_TIMEOUT_MS) {
                 helperBatteryLevel = null;
                 helperExternalPower = null;
                 helperChargeState = "";
@@ -1316,7 +1316,7 @@ public final class PhoneConnectorController {
                 changed = true;
             }
             if (helperNetworkUpdatedAtElapsed > 0L
-                    && now - helperNetworkUpdatedAtElapsed >= HELPER_TELEMETRY_TIMEOUT_MS) {
+                    && checkedAt - helperNetworkUpdatedAtElapsed >= HELPER_TELEMETRY_TIMEOUT_MS) {
                 helperNetworkType = "";
                 helperNetworkUpdatedAtElapsed = 0L;
                 changed = true;
