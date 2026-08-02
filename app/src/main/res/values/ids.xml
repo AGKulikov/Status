@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="settings_back_button" type="id" />
+    <item name="settings_back_base_padding" type="id" />
+    <item name="launcher_global_element_id" type="id" />
+    <item name="driver_panel_press_token" type="id" />
+</resources>
