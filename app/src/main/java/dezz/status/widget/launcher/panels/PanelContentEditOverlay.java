@@ -49,6 +49,10 @@ public final class PanelContentEditOverlay extends View {
     public interface Model {
         int columns();
         int rows();
+        /** Physical gap between neighboring cells; legacy HOME models have none. */
+        default int cellGapPx() {
+            return 0;
+        }
         @NonNull List<Item> items();
         boolean setPlacement(@NonNull String id, int column, int row,
                              int columnSpan, int rowSpan);
@@ -128,12 +132,17 @@ public final class PanelContentEditOverlay extends View {
         if (current == null) return;
         int columns = Math.max(1, current.columns());
         int rows = Math.max(1, current.rows());
+        float gap = safeGap(current, getWidth(), getHeight());
+        float cellWidth = Math.max(1f,
+                (getWidth() - gap * (columns - 1)) / columns);
+        float cellHeight = Math.max(1f,
+                (getHeight() - gap * (rows - 1)) / rows);
         for (int column = 1; column < columns; column++) {
-            float x = column * getWidth() / (float) columns;
+            float x = column * (cellWidth + gap) - gap / 2f;
             canvas.drawLine(x, 0, x, getHeight(), gridPaint);
         }
         for (int row = 1; row < rows; row++) {
-            float y = row * getHeight() / (float) rows;
+            float y = row * (cellHeight + gap) - gap / 2f;
             canvas.drawLine(0, y, getWidth(), y, gridPaint);
         }
         for (Item item : safeItems(current)) {
@@ -181,8 +190,13 @@ public final class PanelContentEditOverlay extends View {
                 return true;
             case MotionEvent.ACTION_MOVE:
                 if (selectedId == null) return true;
-                float cellWidth = getWidth() / (float) Math.max(1, current.columns());
-                float cellHeight = getHeight() / (float) Math.max(1, current.rows());
+                int columns = Math.max(1, current.columns());
+                int rows = Math.max(1, current.rows());
+                float gap = safeGap(current, getWidth(), getHeight());
+                float cellWidth = Math.max(1f,
+                        (getWidth() - gap * (columns - 1)) / columns) + gap;
+                float cellHeight = Math.max(1f,
+                        (getHeight() - gap * (rows - 1)) / rows) + gap;
                 int deltaColumn = Math.round((event.getX() - downX)
                         / Math.max(1f, cellWidth));
                 int deltaRow = Math.round((event.getY() - downY)
@@ -254,11 +268,29 @@ public final class PanelContentEditOverlay extends View {
                           @NonNull RectF destination) {
         int columns = Math.max(1, current.columns());
         int rows = Math.max(1, current.rows());
+        float gap = safeGap(current, getWidth(), getHeight());
+        float cellWidth = Math.max(1f,
+                (getWidth() - gap * (columns - 1)) / columns);
+        float cellHeight = Math.max(1f,
+                (getHeight() - gap * (rows - 1)) / rows);
         destination.set(
-                item.column * getWidth() / (float) columns,
-                item.row * getHeight() / (float) rows,
-                (item.column + item.columnSpan) * getWidth() / (float) columns,
-                (item.row + item.rowSpan) * getHeight() / (float) rows);
+                item.column * (cellWidth + gap),
+                item.row * (cellHeight + gap),
+                item.column * (cellWidth + gap)
+                        + item.columnSpan * cellWidth + (item.columnSpan - 1) * gap,
+                item.row * (cellHeight + gap)
+                        + item.rowSpan * cellHeight + (item.rowSpan - 1) * gap);
+    }
+
+    private static float safeGap(@NonNull Model model, int width, int height) {
+        int columns = Math.max(1, model.columns());
+        int rows = Math.max(1, model.rows());
+        int requested = Math.max(0, model.cellGapPx());
+        int horizontalLimit = columns <= 1 ? requested
+                : Math.max(0, (Math.max(1, width) - columns) / (columns - 1));
+        int verticalLimit = rows <= 1 ? requested
+                : Math.max(0, (Math.max(1, height) - rows) / (rows - 1));
+        return Math.min(requested, Math.min(horizontalLimit, verticalLimit));
     }
 
     private void drawResizeHandles(@NonNull Canvas canvas, @NonNull RectF bounds) {

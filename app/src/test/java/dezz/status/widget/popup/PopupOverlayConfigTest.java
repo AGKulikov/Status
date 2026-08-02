@@ -59,6 +59,11 @@ public final class PopupOverlayConfigTest {
         source.textFontFamily = "monospace";
         source.textBold = false;
         source.textItalic = true;
+        source.iconBackgroundColor = "#FF34C759";
+        source.iconBackgroundAlpha = 211;
+        source.iconPadding = 7;
+        source.iconCornerRadius = 31;
+        source.iconAlignment = 2;
 
         PopupItemConfig restored = PopupItemConfig.fromJson(source.toJson(), 0);
 
@@ -71,6 +76,11 @@ public final class PopupOverlayConfigTest {
         assertEquals("monospace", restored.textFontFamily);
         assertFalse(restored.textBold);
         assertTrue(restored.textItalic);
+        assertEquals("#FF34C759", restored.iconBackgroundColor);
+        assertEquals(211, restored.iconBackgroundAlpha);
+        assertEquals(7, restored.iconPadding);
+        assertEquals(31, restored.iconCornerRadius);
+        assertEquals(2, restored.iconAlignment);
     }
 
     @Test

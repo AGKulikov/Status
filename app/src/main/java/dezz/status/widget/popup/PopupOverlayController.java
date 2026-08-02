@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package dezz.status.widget.popup;
 
+import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.PixelFormat;
 import android.graphics.Typeface;
@@ -16,6 +17,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewConfiguration;
+import android.view.ViewOutlineProvider;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -30,6 +32,7 @@ import androidx.core.widget.ImageViewCompat;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Collections;
@@ -41,6 +44,7 @@ import java.util.UUID;
 import dezz.status.widget.OutlineTextView;
 import dezz.status.widget.Fonts;
 import dezz.status.widget.Preferences;
+import dezz.status.widget.VisualBrickEditorActivity;
 import dezz.status.widget.automation.AutomationContract;
 import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.automation.AutomationStateStore;
@@ -48,6 +52,8 @@ import dezz.status.widget.integration.ActionBinding;
 import dezz.status.widget.integration.ActionDispatcher;
 import dezz.status.widget.phone.PhoneAppIconStore;
 import dezz.status.widget.phone.PhoneNotificationAutomation;
+import dezz.status.widget.phone.PhoneNotificationPreviewIconFactory;
+import dezz.status.widget.launcher.panels.PanelContentEditOverlay;
 
 /** Independent fixed-pixel, draggable, touchable popup grid controlled by retained HA state. */
 public final class PopupOverlayController {
@@ -86,13 +92,22 @@ public final class PopupOverlayController {
     private final Set<String> pendingActions = new HashSet<>();
     private final Map<String, Long> lastActionAtByItem = new HashMap<>();
     private boolean destroyed;
+    /** Ephemeral WYSIWYG session. It never writes fake notification data to retained state. */
+    private boolean editorPreview;
+    /** While one reserved phone layout is edited, the other one must not cover it. */
+    private boolean editorPreviewSuppressed;
     /** Prevent connector updates from replacing the touched View between DOWN and UP. */
     private boolean touchInProgress;
     private boolean refreshDeferred;
     private List<PopupItemConfig> currentItems = Collections.emptyList();
+    /** Actual auto-placement resolved during the last render, used by the direct grid editor. */
+    private final Map<String, int[]> renderedPlacements = new HashMap<>();
+    /** Live tile Views stay attached while the edit gesture is in progress. */
+    private final Map<String, View> renderedTiles = new HashMap<>();
     private final Runnable stateRefresh = () -> {
         PopupOverlayConfig config = PopupOverlayController.this.currentConfig;
-        if (destroyed || config == null || !config.enabled) return;
+        if (destroyed || config == null || (!config.enabled && !editorPreview)
+                || editorPreviewSuppressed) return;
         if (touchInProgress) {
             refreshDeferred = true;
             return;
@@ -110,6 +125,12 @@ public final class PopupOverlayController {
     private int startY;
     private boolean rootDragging;
     @Nullable private PopupOverlayConfig currentConfig;
+
+    /** Manager-owned mode switch; call applyPreferences after changing it. */
+    public void setEditorPreviewMode(boolean active, boolean suppressed) {
+        editorPreview = active;
+        editorPreviewSuppressed = suppressed;
+    }
 
     public PopupOverlayController(@NonNull android.content.Context context,
                                   @NonNull Preferences prefs,
@@ -152,7 +173,8 @@ public final class PopupOverlayController {
         }
         main.removeCallbacks(stateRefresh);
         currentConfig = overlayConfigs.find(overlayId);
-        if (currentConfig == null || !currentConfig.enabled) {
+        if (currentConfig == null || (!currentConfig.enabled && !editorPreview)
+                || editorPreviewSuppressed) {
             currentItems = Collections.emptyList();
             setOverlayVisible(false);
             return;
@@ -178,7 +200,7 @@ public final class PopupOverlayController {
             refreshDeferred = true;
             return;
         }
-        if (!config.enabled) {
+        if ((!config.enabled && !editorPreview) || editorPreviewSuppressed) {
             setOverlayVisible(false);
             return;
         }
@@ -205,6 +227,8 @@ public final class PopupOverlayController {
         touchInProgress = false;
         refreshDeferred = false;
         currentItems = Collections.emptyList();
+        renderedPlacements.clear();
+        renderedTiles.clear();
         main.removeCallbacksAndMessages(null);
         if (root != null) {
             try { windowManager.removeView(root); } catch (Exception ignored) {}
@@ -253,7 +277,8 @@ public final class PopupOverlayController {
         try { windowManager.updateViewLayout(root, params); } catch (Exception ignored) {}
 
         GradientDrawable bg = new GradientDrawable();
-        AutomationState overlayState = states.get(AutomationContract.SCOPE_OVERLAY, overlayId);
+        AutomationState overlayState = editorPreview ? AutomationState.missing()
+                : states.get(AutomationContract.SCOPE_OVERLAY, overlayId);
         String configuredBackground = overlayState.backgroundColor == null
                 ? config.backgroundColor : overlayState.backgroundColor;
         int base = AutomationState.parseColor(configuredBackground, 0xFF000000);
@@ -271,20 +296,26 @@ public final class PopupOverlayController {
             return;
         }
         root.removeAllViews();
+        renderedPlacements.clear();
+        renderedTiles.clear();
         PopupOverlayConfig config = currentConfig;
-        if (config == null || !states.effectiveVisibility(AutomationContract.SCOPE_OVERLAY,
-                overlayId, config.defaultVisible)) {
+        if (config == null || editorPreviewSuppressed
+                || (!editorPreview && !states.effectiveVisibility(
+                AutomationContract.SCOPE_OVERLAY, overlayId, config.defaultVisible))) {
             setOverlayVisible(false);
             return;
         }
 
         int rows = clamp(config.rows, 1, 50);
         int columns = clamp(config.columns, 1, 50);
-        int gap = clamp(config.cellGap, 0, 500);
-        int left = clamp(config.paddingLeft, 0, params.width / 2);
-        int right = clamp(config.paddingRight, 0, params.width / 2);
-        int top = clamp(config.paddingTop, 0, params.height / 2);
-        int bottom = clamp(config.paddingBottom, 0, params.height / 2);
+        int left = clamp(config.paddingLeft, 0, Math.max(0, params.width - columns));
+        int right = clamp(config.paddingRight, 0,
+                Math.max(0, params.width - left - columns));
+        int top = clamp(config.paddingTop, 0, Math.max(0, params.height - rows));
+        int bottom = clamp(config.paddingBottom, 0,
+                Math.max(0, params.height - top - rows));
+        int gap = safeGridGap(config.cellGap, columns, rows,
+                params.width - left - right, params.height - top - bottom);
         int usableWidth = Math.max(columns, params.width - left - right - gap * (columns - 1));
         int usableHeight = Math.max(rows, params.height - top - bottom - gap * (rows - 1));
         int cellWidth = Math.max(1, usableWidth / columns);
@@ -300,8 +331,10 @@ public final class PopupOverlayController {
             String stateId = PopupItemConfig.TYPE_BUILTIN.equals(item.type)
                     && !item.builtinId.isEmpty() ? item.builtinId : item.automationId;
             AutomationState state = states.get(stateScope, stateId);
-            if (!state.visible) continue;
-            if (PhoneNotificationAutomation.isFieldAutomationId(stateId)
+            boolean previewField = editorPreview
+                    && PhoneNotificationAutomation.isFieldAutomationId(stateId);
+            if (!previewField && !state.visible) continue;
+            if (!previewField && PhoneNotificationAutomation.isFieldAutomationId(stateId)
                     && (!state.fresh || state.text == null || state.text.isEmpty()
                     || (state.expiresAt > 0L && now >= state.expiresAt))) {
                 // A local condition may override visibility but never the lifetime/content of a
@@ -313,7 +346,11 @@ public final class PopupOverlayController {
                     ? builtinProvider.getBuiltinValue(item.builtinId) : null;
             if (PopupItemConfig.TYPE_BUILTIN.equals(item.type) && builtin == null) continue;
             if (builtin != null && !builtin.visible) continue;
-            TilePresentation presentation = resolvePresentation(item, state, builtin, now);
+            TilePresentation presentation = previewField
+                    ? new TilePresentation(
+                    PhoneNotificationAutomation.editorPreviewText(stateId),
+                    item.defaultTextColor, false, false)
+                    : resolvePresentation(item, state, builtin, now);
             // Transparent is a value-rule shorthand for hiding the complete device. Filter it
             // before grid placement so the cell is released and another tile can occupy it.
             if (AutomationState.isFullyTransparentColor(presentation.color)) continue;
@@ -322,8 +359,9 @@ public final class PopupOverlayController {
             int[] position = findPosition(used, item.row, item.column, spanY, spanX);
             if (position == null) continue;
             mark(used, position[0], position[1], spanY, spanX);
+            renderedPlacements.put(item.id, new int[]{position[1], position[0], spanX, spanY});
 
-            View tile = buildTile(item, state, builtin, presentation);
+            View tile = buildTile(item, state, builtin, presentation, previewField);
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                     spanX * cellWidth + (spanX - 1) * gap,
                     spanY * cellHeight + (spanY - 1) * gap);
@@ -332,9 +370,256 @@ public final class PopupOverlayController {
             tile.setTranslationY(item.adjustY);
             tile.setTranslationX(item.adjustX);
             root.addView(tile, lp);
+            renderedTiles.put(item.id, tile);
             visibleCount++;
         }
-        setOverlayVisible(visibleCount > 0);
+        if (editorPreview) attachEditorChrome(left, top, right, bottom);
+        setOverlayVisible(visibleCount > 0 || editorPreview);
+    }
+
+    /**
+     * Adds launcher-style edit chrome over the real WindowManager surface. The fake notification
+     * remains rendered underneath, so every drag/resize is a genuine WYSIWYG operation.
+     */
+    private void attachEditorChrome(int left, int top, int right, int bottom) {
+        if (root == null) return;
+        PanelContentEditOverlay grid = new PanelContentEditOverlay(context);
+        grid.setModel(new EditorGridModel(), new PanelContentEditOverlay.Listener() {
+            @Override public void onPlacementChanged(@NonNull String id, boolean finished) {
+                applyEditorPlacementsToViews();
+                if (finished) persistEditorPlacements();
+            }
+
+            @Override public void onItemClicked(@NonNull String id) {
+                try {
+                    Intent edit = VisualBrickEditorActivity.intent(context,
+                            VisualBrickEditorActivity.SURFACE_POPUP, id, overlayId)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(edit);
+                } catch (RuntimeException failure) {
+                    Toast.makeText(context, "Не удалось открыть точные настройки: "
+                            + failure.getMessage(), Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+        grid.setEditing(true);
+        FrameLayout.LayoutParams gridParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        gridParams.setMargins(left, top, right, bottom);
+        root.addView(grid, gridParams);
+
+        TextView move = new TextView(context);
+        move.setText("✥  Переместить окно");
+        move.setTextColor(0xFFFFFFFF);
+        move.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        move.setGravity(Gravity.CENTER);
+        move.setPadding(dp(10), 0, dp(10), 0);
+        GradientDrawable handleBackground = new GradientDrawable();
+        handleBackground.setColor(0xE62278D7);
+        handleBackground.setCornerRadius(dp(12));
+        handleBackground.setStroke(dp(1), 0xFFFFFFFF);
+        move.setBackground(handleBackground);
+        move.setOnTouchListener(this::dragEditorWindow);
+        FrameLayout.LayoutParams moveParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(38), Gravity.TOP | Gravity.END);
+        moveParams.setMargins(dp(4), dp(4), dp(4), 0);
+        root.addView(move, moveParams);
+    }
+
+    /** Moves/resizes the real content together with the edit outline without rebuilding Views. */
+    private void applyEditorPlacementsToViews() {
+        PopupOverlayConfig config = currentConfig;
+        if (root == null || params == null || config == null) return;
+        int rows = clamp(config.rows, 1, 50);
+        int columns = clamp(config.columns, 1, 50);
+        int left = clamp(config.paddingLeft, 0, Math.max(0, params.width - columns));
+        int right = clamp(config.paddingRight, 0,
+                Math.max(0, params.width - left - columns));
+        int top = clamp(config.paddingTop, 0, Math.max(0, params.height - rows));
+        int bottom = clamp(config.paddingBottom, 0,
+                Math.max(0, params.height - top - rows));
+        int gap = safeGridGap(config.cellGap, columns, rows,
+                params.width - left - right, params.height - top - bottom);
+        int usableWidth = Math.max(columns,
+                params.width - left - right - gap * (columns - 1));
+        int usableHeight = Math.max(rows,
+                params.height - top - bottom - gap * (rows - 1));
+        int cellWidth = Math.max(1, usableWidth / columns);
+        int cellHeight = Math.max(1, usableHeight / rows);
+        for (Map.Entry<String, View> entry : renderedTiles.entrySet()) {
+            int[] placement = renderedPlacements.get(entry.getKey());
+            if (placement == null) continue;
+            FrameLayout.LayoutParams tileParams = new FrameLayout.LayoutParams(
+                    placement[2] * cellWidth + (placement[2] - 1) * gap,
+                    placement[3] * cellHeight + (placement[3] - 1) * gap);
+            tileParams.leftMargin = left + placement[0] * (cellWidth + gap);
+            tileParams.topMargin = top + placement[1] * (cellHeight + gap);
+            entry.getValue().setLayoutParams(tileParams);
+        }
+    }
+
+    private final class EditorGridModel implements PanelContentEditOverlay.Model {
+        @Override public int columns() {
+            return currentConfig == null ? 1 : Math.max(1, currentConfig.columns);
+        }
+
+        @Override public int rows() {
+            return currentConfig == null ? 1 : Math.max(1, currentConfig.rows);
+        }
+
+        @Override public int cellGapPx() {
+            return currentConfig == null ? 0 : Math.max(0, currentConfig.cellGap);
+        }
+
+        @NonNull @Override public List<PanelContentEditOverlay.Item> items() {
+            List<PanelContentEditOverlay.Item> result = new ArrayList<>();
+            for (PopupItemConfig item : currentItems) {
+                if (!item.enabled) continue;
+                int[] placement = renderedPlacements.get(item.id);
+                if (placement == null) continue;
+                result.add(new PanelContentEditOverlay.Item(item.id, item.name,
+                        placement[0], placement[1], placement[2], placement[3]));
+            }
+            return result;
+        }
+
+        @Override public boolean setPlacement(@NonNull String id, int column, int row,
+                                              int columnSpan, int rowSpan) {
+            int safeColumns = columns();
+            int safeRows = rows();
+            if (column < 0 || row < 0 || columnSpan < 1 || rowSpan < 1
+                    || column + columnSpan > safeColumns || row + rowSpan > safeRows) {
+                return false;
+            }
+            PopupItemConfig target = null;
+            for (PopupItemConfig item : currentItems) {
+                if (item.id.equals(id)) {
+                    target = item;
+                    break;
+                }
+            }
+            if (target == null) return false;
+            int[] previous = renderedPlacements.get(id);
+            if (previous != null && previous[0] == column && previous[1] == row
+                    && previous[2] == columnSpan && previous[3] == rowSpan) return false;
+            List<Map.Entry<String, int[]>> collisions = new ArrayList<>();
+            for (Map.Entry<String, int[]> entry : renderedPlacements.entrySet()) {
+                if (id.equals(entry.getKey())) continue;
+                int[] other = entry.getValue();
+                if (rectanglesOverlap(column, row, columnSpan, rowSpan,
+                        other[0], other[1], other[2], other[3])) collisions.add(entry);
+            }
+            if (!collisions.isEmpty()) {
+                // A full 1×3 notification grid has no empty cell. Match HOME's editor behavior:
+                // dragging one same-sized field onto another swaps them instead of refusing the
+                // gesture. Complex multi-cell collisions remain fail-closed.
+                if (previous == null || collisions.size() != 1
+                        || previous[2] != columnSpan || previous[3] != rowSpan) return false;
+                Map.Entry<String, int[]> collision = collisions.get(0);
+                int[] otherPlacement = collision.getValue();
+                if (otherPlacement[2] != previous[2] || otherPlacement[3] != previous[3]
+                        || placementCollidesWithPeer(collision.getKey(), id,
+                        previous[0], previous[1], otherPlacement[2], otherPlacement[3])) {
+                    return false;
+                }
+                PopupItemConfig otherItem = findCurrentItem(collision.getKey());
+                if (otherItem == null) return false;
+                otherItem.column = previous[0];
+                otherItem.row = previous[1];
+                renderedPlacements.put(otherItem.id, new int[]{previous[0], previous[1],
+                        otherPlacement[2], otherPlacement[3]});
+            }
+            target.column = column;
+            target.row = row;
+            target.columnSpan = columnSpan;
+            target.rowSpan = rowSpan;
+            renderedPlacements.put(id, new int[]{column, row, columnSpan, rowSpan});
+            return true;
+        }
+    }
+
+    @Nullable
+    private PopupItemConfig findCurrentItem(@NonNull String id) {
+        for (PopupItemConfig item : currentItems) if (item.id.equals(id)) return item;
+        return null;
+    }
+
+    private boolean placementCollidesWithPeer(@NonNull String movingId,
+                                              @NonNull String ignoredId,
+                                              int column, int row,
+                                              int columnSpan, int rowSpan) {
+        for (Map.Entry<String, int[]> entry : renderedPlacements.entrySet()) {
+            if (movingId.equals(entry.getKey()) || ignoredId.equals(entry.getKey())) continue;
+            int[] other = entry.getValue();
+            if (rectanglesOverlap(column, row, columnSpan, rowSpan,
+                    other[0], other[1], other[2], other[3])) return true;
+        }
+        return false;
+    }
+
+    private void persistEditorPlacements() {
+        try {
+            configs.save(overlayId, currentItems);
+            applyPreferences();
+        } catch (JSONException | RuntimeException failure) {
+            Toast.makeText(context, "Не удалось сохранить компоновку: "
+                    + failure.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private boolean dragEditorWindow(View view, MotionEvent event) {
+        if (params == null) return false;
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                if (!beginTouch()) return false;
+                startX = params.x;
+                startY = params.y;
+                touchX = event.getRawX();
+                touchY = event.getRawY();
+                rootDragging = false;
+                view.setPressed(true);
+                return true;
+            case MotionEvent.ACTION_MOVE:
+                float dx = event.getRawX() - touchX;
+                float dy = event.getRawY() - touchY;
+                if (Math.abs(dx) > dragThreshold / 3f || Math.abs(dy) > dragThreshold / 3f) {
+                    rootDragging = true;
+                }
+                if (rootDragging) {
+                    params.x = startX + Math.round(dx);
+                    params.y = startY + Math.round(dy);
+                    try { windowManager.updateViewLayout(root, params); }
+                    catch (Exception ignored) {}
+                }
+                return true;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                view.setPressed(false);
+                if (rootDragging) saveCurrentPosition();
+                rootDragging = false;
+                finishTouch();
+                return true;
+            default:
+                return touchInProgress;
+        }
+    }
+
+    private static boolean rectanglesOverlap(int x, int y, int width, int height,
+                                             int otherX, int otherY,
+                                             int otherWidth, int otherHeight) {
+        return x < otherX + otherWidth && x + width > otherX
+                && y < otherY + otherHeight && y + height > otherY;
+    }
+
+    /** Keeps every configured cell and gap inside the physical popup viewport. */
+    private static int safeGridGap(int requested, int columns, int rows,
+                                   int availableWidth, int availableHeight) {
+        int candidate = clamp(requested, 0, 500);
+        int horizontalLimit = columns <= 1 ? candidate
+                : Math.max(0, (Math.max(1, availableWidth) - columns) / (columns - 1));
+        int verticalLimit = rows <= 1 ? candidate
+                : Math.max(0, (Math.max(1, availableHeight) - rows) / (rows - 1));
+        return Math.min(candidate, Math.min(horizontalLimit, verticalLimit));
     }
 
     /** GONE alone is not reliable on every OEM WindowManager; NOT_TOUCHABLE guarantees that
@@ -353,16 +638,18 @@ public final class PopupOverlayController {
 
     private View buildTile(PopupItemConfig item, AutomationState state,
                            @Nullable BuiltinValue builtin,
-                           @NonNull TilePresentation presentation) {
+                           @NonNull TilePresentation presentation,
+                           boolean previewField) {
         LinearLayout tile = new LinearLayout(context);
         tile.setOrientation(item.orientation == 1 ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
         tile.setGravity(Gravity.CENTER);
         tile.setPadding(item.padding, item.padding, item.padding, item.padding);
 
-        String bgValue = state.backgroundColor == null ? item.backgroundColor : state.backgroundColor;
+        String bgValue = previewField || state.backgroundColor == null
+                ? item.backgroundColor : state.backgroundColor;
         int bgBase = AutomationState.parseColor(bgValue, 0xFF28282C);
         GradientDrawable bg = new GradientDrawable();
-        int tileAlpha = state.backgroundColor == null
+        int tileAlpha = previewField || state.backgroundColor == null
                 ? clamp(item.backgroundAlpha, 0, 255) : (bgBase >>> 24);
         bg.setColor((bgBase & 0x00FFFFFF) | (tileAlpha << 24));
         bg.setCornerRadius(item.cornerRadius);
@@ -378,9 +665,10 @@ public final class PopupOverlayController {
         String iconId = item.icon;
         if (builtin != null && PopupIconCatalog.resolve(builtin.iconId) != 0) iconId = builtin.iconId;
         String phoneAppIdentifier = null;
-        if (state.icon != null && state.icon.startsWith("phone-app:")) {
+        if (!previewField && state.icon != null && state.icon.startsWith("phone-app:")) {
             phoneAppIdentifier = state.icon.substring("phone-app:".length()).trim();
-        } else if (state.icon != null && PopupIconCatalog.resolve(state.icon) != 0) {
+        } else if (!previewField && state.icon != null
+                && PopupIconCatalog.resolve(state.icon) != 0) {
             iconId = state.icon;
         }
         FrameLayout iconBox = new FrameLayout(context);
@@ -390,6 +678,8 @@ public final class PopupOverlayController {
                 | (clamp(item.iconBackgroundAlpha, 0, 255) << 24));
         iconBg.setCornerRadius(item.iconCornerRadius);
         iconBox.setBackground(iconBg);
+        iconBox.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
+        iconBox.setClipToOutline(item.iconCornerRadius > 0);
         iconBox.setPadding(item.iconPadding, item.iconPadding, item.iconPadding, item.iconPadding);
         iconBox.setTranslationX(item.iconAdjustX);
         iconBox.setTranslationY(item.iconAdjustY);
@@ -397,13 +687,20 @@ public final class PopupOverlayController {
         ImageView icon = new ImageView(context);
         icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
         int iconRes = PopupIconCatalog.resolve(iconId);
-        Drawable appIcon = phoneAppIdentifier == null ? null
+        boolean previewApplicationIcon = previewField
+                && PhoneNotificationAutomation.isIconOverlayId(overlayId)
+                && PhoneNotificationAutomation.APPLICATION_AUTOMATION_ID.equals(
+                item.automationId);
+        Drawable appIcon = previewApplicationIcon
+                ? PhoneNotificationPreviewIconFactory.create(context, item.iconSize)
+                : phoneAppIdentifier == null ? null
                 : PhoneAppIconStore.get(context).drawable(phoneAppIdentifier);
         String renderedIconColor = SmartHomeTileColorPolicy.contentColor(
                 item.sourceBinding, item.iconColor, presentation.color);
         if (appIcon != null) {
             icon.setImageDrawable(appIcon);
-            ImageViewCompat.setImageTintList(icon, appIcon instanceof BitmapDrawable
+            ImageViewCompat.setImageTintList(icon,
+                    appIcon instanceof BitmapDrawable || previewApplicationIcon
                     ? null
                     : ColorStateList.valueOf(
                             AutomationState.parseColor(renderedIconColor, 0xFFFFFFFF)));
@@ -794,5 +1091,9 @@ public final class PopupOverlayController {
     private static int withAlpha(int color, int alpha) {
         int combined = ((color >>> 24) * clamp(alpha, 0, 255) + 127) / 255;
         return (color & 0x00FFFFFF) | (combined << 24);
+    }
+
+    private int dp(int value) {
+        return Math.round(value * context.getResources().getDisplayMetrics().density);
     }
 }

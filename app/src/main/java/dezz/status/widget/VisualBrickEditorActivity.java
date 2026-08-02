@@ -15,10 +15,12 @@ import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ArrayAdapter;
 import android.widget.SeekBar;
@@ -26,9 +28,11 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.widget.ImageViewCompat;
 import androidx.core.widget.NestedScrollView;
 
 import com.google.android.material.button.MaterialButton;
@@ -50,6 +54,9 @@ import dezz.status.widget.popup.PopupItemConfigStore;
 import dezz.status.widget.popup.PopupOverlayConfig;
 import dezz.status.widget.popup.PopupOverlayConfigStore;
 import dezz.status.widget.popup.SmartHomeTileColorPolicy;
+import dezz.status.widget.phone.PhoneNotificationAutomation;
+import dezz.status.widget.phone.PhoneNotificationEditorPreviewSession;
+import dezz.status.widget.phone.PhoneNotificationPreviewIconFactory;
 import dezz.status.widget.scenario.Input;
 import dezz.status.widget.scenario.Operator;
 import dezz.status.widget.scenario.Output;
@@ -65,6 +72,8 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
     public static final String SURFACE_POPUP = "popup";
     private static final String EXTRA_SURFACE = "surface";
     private static final String EXTRA_ID = "id";
+    private static final String EXTRA_PHONE_NOTIFICATION_PREVIEW_ID =
+            "phone_notification_preview_id";
 
     private Preferences prefs;
     private String surface;
@@ -72,6 +81,8 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
     @Nullable private HaBrickConfig main;
     @Nullable private PopupItemConfig popup;
     private LinearLayout preview;
+    private FrameLayout previewIconBox;
+    private LinearLayout previewTextGroup;
     private TextView previewTitle;
     private TextView previewValue;
     private ImageView previewIcon;
@@ -82,6 +93,8 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
     private Handler liveHandler;
     private boolean screenReady;
     private boolean liveApplyScheduled;
+    @Nullable private String phoneNotificationPreviewId;
+    @Nullable private PhoneNotificationEditorPreviewSession previewSession;
 
     /** Fast enough to look live while avoiding a full overlay rebuild for every touch sample. */
     private static final long LIVE_APPLY_INTERVAL_MS = 120L;
@@ -111,6 +124,13 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
                 .putExtra(EXTRA_SURFACE, surface).putExtra(EXTRA_ID, id);
     }
 
+    public static Intent intent(Context context, String surface, String id,
+                                @NonNull String phoneNotificationPreviewId) {
+        return intent(context, surface, id)
+                .putExtra(EXTRA_PHONE_NOTIFICATION_PREVIEW_ID,
+                        phoneNotificationPreviewId);
+    }
+
     @Override protected void onCreate(@Nullable Bundle state) {
         super.onCreate(state);
         liveHandler = new Handler(Looper.getMainLooper());
@@ -122,18 +142,32 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
             finish();
             return;
         }
+        String requestedPreview = getIntent().getStringExtra(
+                EXTRA_PHONE_NOTIFICATION_PREVIEW_ID);
+        if (popup != null && PhoneNotificationAutomation.isNotificationOverlayId(
+                requestedPreview) && requestedPreview.equals(popup.overlayId)) {
+            phoneNotificationPreviewId = requestedPreview;
+            previewSession = new PhoneNotificationEditorPreviewSession(this, requestedPreview);
+        }
         View screen = buildScreen();
         setContentView(screen);
         dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(this, screen);
         screenReady = true;
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        if (previewSession != null) previewSession.onResume();
+    }
+
     @Override protected void onPause() {
         flushLiveApply();
+        if (previewSession != null) previewSession.onPause();
         super.onPause();
     }
 
     @Override protected void onDestroy() {
+        if (previewSession != null) previewSession.close();
         if (liveHandler != null) liveHandler.removeCallbacksAndMessages(null);
         super.onDestroy();
     }
@@ -176,17 +210,31 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         page.addView(autoSave, topMargin(8));
         liveStatus = label("Готово к настройке");
         page.addView(liveStatus, topMargin(3));
+        if (phoneNotificationPreviewId != null) {
+            TextView liveOverlay = label("Настоящий тестовый оверлей остаётся на экране: "
+                    + "каждое изменение ниже сразу видно в нём.");
+            liveOverlay.setTextColor(0xFF81C784);
+            page.addView(liveOverlay, topMargin(4));
+        }
 
         preview = column();
         preview.setGravity(Gravity.CENTER);
         preview.setMinimumHeight(dp(130));
         preview.setPadding(dp(16), dp(16), dp(16), dp(16));
+        previewIconBox = new FrameLayout(this);
         previewIcon = new ImageView(this);
+        previewIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        previewIconBox.addView(previewIcon, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+                Gravity.CENTER));
+        previewTextGroup = column();
+        previewTextGroup.setGravity(Gravity.CENTER);
         previewTitle = new TextView(this);
         previewValue = new TextView(this);
-        preview.addView(previewIcon, new LinearLayout.LayoutParams(dp(52), dp(52)));
-        preview.addView(previewTitle, matchWrap());
-        preview.addView(previewValue, matchWrap());
+        previewTextGroup.addView(previewTitle, matchWrap());
+        previewTextGroup.addView(previewValue, matchWrap());
+        preview.addView(previewIconBox, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        preview.addView(previewTextGroup, matchWrap());
         page.addView(preview, topMargin(14));
 
         if (main != null) buildMainEditor(page); else buildPopupEditor(page);
@@ -302,6 +350,19 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
                 value -> { c.iconAlpha = value; onConfigChanged(); }, " / 255");
         addColor(page, "Цвет иконки", c.iconColor,
                 value -> { c.iconColor = value; onConfigChanged(); });
+        addColor(page, "Цвет подложки иконки", c.iconBackgroundColor,
+                value -> { c.iconBackgroundColor = value; onConfigChanged(); });
+        addSlider(page, "Прозрачность подложки иконки", 0, 255,
+                c.iconBackgroundAlpha,
+                value -> { c.iconBackgroundAlpha = value; onConfigChanged(); }, " / 255");
+        addSlider(page, "Внутренний отступ иконки", 0, 80, c.iconPadding,
+                value -> { c.iconPadding = value; onConfigChanged(); }, " px");
+        addSlider(page, "Скругление краёв иконки", 0, 100, c.iconCornerRadius,
+                value -> { c.iconCornerRadius = value; onConfigChanged(); }, " px");
+        Button iconAlignment = button("Выравнивание иконки: "
+                + iconAlignmentLabel(c.iconAlignment));
+        iconAlignment.setOnClickListener(v -> chooseIconAlignment(iconAlignment));
+        page.addView(iconAlignment, topMargin(6));
         addSlider(page, "Сдвиг иконки по горизонтали", -200, 200, c.iconAdjustX,
                 value -> { c.iconAdjustX = value; onConfigChanged(); }, " px");
         addSlider(page, "Сдвиг иконки по вертикали", -200, 200, c.iconAdjustY,
@@ -1034,7 +1095,9 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         preview.setVisibility(hiddenByRule ? View.GONE : View.VISIBLE);
         if (hiddenByRule) return;
         if (main != null) {
-            previewIcon.setVisibility(View.GONE);
+            preview.setOrientation(LinearLayout.VERTICAL);
+            previewIconBox.setVisibility(View.GONE);
+            previewTextGroup.setVisibility(View.VISIBLE);
             previewTitle.setVisibility(View.GONE);
             previewValue.setVisibility(View.VISIBLE);
             String normalText = main.defaultText.isEmpty() ? main.name : main.defaultText;
@@ -1051,23 +1114,53 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
             preview.setBackground(bg);
             return;
         }
-        previewIcon.setVisibility(popup.iconSize > 0 ? View.VISIBLE : View.GONE);
+        preview.setOrientation(popup.orientation == 1
+                ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+        preview.setGravity(Gravity.CENTER);
+        previewIconBox.setVisibility(popup.iconSize > 0 ? View.VISIBLE : View.GONE);
+        previewTextGroup.setVisibility(View.VISIBLE);
         previewTitle.setVisibility(popup.showTitle ? View.VISIBLE : View.GONE);
         previewValue.setVisibility(popup.showStatus ? View.VISIBLE : View.GONE);
+        boolean phoneAppPreview = phoneNotificationPreviewId != null
+                && PhoneNotificationAutomation.isIconOverlayId(phoneNotificationPreviewId)
+                && PhoneNotificationAutomation.APPLICATION_AUTOMATION_ID.equals(
+                popup.automationId);
         int iconDrawable = PopupIconCatalog.resolve(popup.icon);
-        if (iconDrawable != 0) previewIcon.setImageResource(iconDrawable);
         String liveContentColor = tested == null
                 ? popup.defaultTextColor : tested.color;
-        previewIcon.setColorFilter(parseColor(SmartHomeTileColorPolicy.contentColor(
-                popup.sourceBinding, popup.iconColor, liveContentColor)));
+        if (phoneAppPreview) {
+            previewIcon.setImageDrawable(PhoneNotificationPreviewIconFactory.create(
+                    this, popup.iconSize));
+            ImageViewCompat.setImageTintList(previewIcon, null);
+        } else {
+            if (iconDrawable != 0) previewIcon.setImageResource(iconDrawable);
+            ImageViewCompat.setImageTintList(previewIcon,
+                    android.content.res.ColorStateList.valueOf(parseColor(
+                            SmartHomeTileColorPolicy.contentColor(popup.sourceBinding,
+                                    popup.iconColor, liveContentColor))));
+        }
         previewIcon.setAlpha(popup.iconAlpha / 255f);
-        ViewGroup.LayoutParams iconParams = previewIcon.getLayoutParams();
-        iconParams.width = dp(Math.min(120, popup.iconSize));
-        iconParams.height = dp(Math.min(120, popup.iconSize));
-        previewIcon.setLayoutParams(iconParams);
-        previewIcon.setTranslationX(popup.iconAdjustX);
-        previewIcon.setTranslationY(popup.iconAdjustY);
-        previewIcon.setRotation(popup.iconRotation);
+        int previewIconSize = dp(Math.min(120, popup.iconSize));
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(
+                previewIconSize, previewIconSize);
+        iconParams.gravity = popup.iconAlignment == 0 ? Gravity.START
+                : popup.iconAlignment == 2 ? Gravity.END : Gravity.CENTER;
+        previewIconBox.setLayoutParams(iconParams);
+        GradientDrawable iconBackground = new GradientDrawable();
+        iconBackground.setColor(withAlpha(parseColor(popup.iconBackgroundColor),
+                popup.iconBackgroundAlpha));
+        iconBackground.setCornerRadius(dp(Math.min(100, popup.iconCornerRadius)));
+        previewIconBox.setBackground(iconBackground);
+        previewIconBox.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
+        previewIconBox.setClipToOutline(popup.iconCornerRadius > 0);
+        int iconPadding = dp(Math.min(80, popup.iconPadding));
+        previewIconBox.setPadding(iconPadding, iconPadding, iconPadding, iconPadding);
+        previewIconBox.setTranslationX(popup.iconAdjustX);
+        previewIconBox.setTranslationY(popup.iconAdjustY);
+        previewIconBox.setRotation(popup.iconRotation);
+        previewTextGroup.setLayoutParams(popup.orientation == 1
+                ? new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                : matchWrap());
         previewTitle.setText(popup.title);
         previewTitle.setTextSize(Math.min(64, popup.titleSize));
         previewTitle.setTextColor(parseColor(SmartHomeTileColorPolicy.contentColor(
@@ -1076,7 +1169,9 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         previewTitle.setGravity(Gravity.CENTER);
         previewTitle.setTypeface(Fonts.resolve(this, popup.titleFontFamily,
                 popup.titleBold, popup.titleItalic));
-        String normalText = popup.defaultText.isEmpty() ? "Актуальный статус" : popup.defaultText;
+        String normalText = phoneNotificationPreviewId == null
+                ? (popup.defaultText.isEmpty() ? "Актуальный статус" : popup.defaultText)
+                : PhoneNotificationAutomation.editorPreviewText(popup.automationId);
         previewValue.setText(tested == null ? normalText : tested.text);
         previewValue.setTextSize(Math.min(72, popup.textSize));
         previewValue.setTextColor(parseColor(tested == null
@@ -1118,6 +1213,29 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         if (liveApplyScheduled) return;
         liveApplyScheduled = true;
         liveHandler.postDelayed(this::persistLive, LIVE_APPLY_INTERVAL_MS);
+    }
+
+    private void chooseIconAlignment(@NonNull Button button) {
+        if (popup == null) return;
+        String[] labels = {"Слева / сверху", "По центру", "Справа / снизу"};
+        new AlertDialog.Builder(this)
+                .setTitle("Выравнивание иконки")
+                .setSingleChoiceItems(labels, Math.max(0, Math.min(2, popup.iconAlignment)),
+                        (dialog, which) -> {
+                            popup.iconAlignment = which;
+                            button.setText("Выравнивание иконки: "
+                                    + iconAlignmentLabel(which));
+                            onConfigChanged();
+                            dialog.dismiss();
+                        })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private static String iconAlignmentLabel(int value) {
+        if (value <= 0) return "слева / сверху";
+        if (value >= 2) return "справа / снизу";
+        return "по центру";
     }
 
     private void chooseFont(Button button, String current, StringConsumer consumer) {

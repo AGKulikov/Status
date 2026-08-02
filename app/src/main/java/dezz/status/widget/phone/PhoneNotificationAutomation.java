@@ -29,6 +29,9 @@ public final class PhoneNotificationAutomation {
     public static final String OVERLAY_ID = "phone_notifications";
     public static final String OVERLAY_WITH_ICON_ID = "phone_notifications_icon";
 
+    /** iOS app icons use a continuous corner close to 22% of the icon side. */
+    public static final float IOS_APP_ICON_CORNER_RATIO = 0.2237f;
+
     private static final String LEGACY_ITEM_ID = "phone_notification_latest";
     private static final String LEGACY_AUTOMATION_ID = "phone_notification_latest";
 
@@ -76,6 +79,33 @@ public final class PhoneNotificationAutomation {
 
     public static boolean isFieldAutomationId(@Nullable String automationId) {
         return automationId != null && FIELD_AUTOMATION_IDS.contains(automationId.trim());
+    }
+
+    public static boolean isNotificationOverlayId(@Nullable String overlayId) {
+        return OVERLAY_ID.equals(overlayId) || OVERLAY_WITH_ICON_ID.equals(overlayId);
+    }
+
+    public static boolean isIconOverlayId(@Nullable String overlayId) {
+        return OVERLAY_WITH_ICON_ID.equals(overlayId);
+    }
+
+    /** Stable sample strings used only while the visual editor owns the preview session. */
+    @NonNull
+    public static String editorPreviewText(@NonNull String automationId) {
+        switch (automationId) {
+            case APPLICATION_AUTOMATION_ID:
+                return "Сообщения";
+            case TOPIC_AUTOMATION_ID:
+                return "Новое уведомление";
+            case TEXT_AUTOMATION_ID:
+                return "Тестовый текст уведомления с iPhone";
+            default:
+                return "Тестовое уведомление";
+        }
+    }
+
+    public static int defaultAppIconCornerRadius(int iconSize) {
+        return Math.max(0, Math.round(Math.max(0, iconSize) * IOS_APP_ICON_CORNER_RATIO));
     }
 
     public static void ensureConfigured(@NonNull Preferences prefs) throws JSONException {
@@ -200,6 +230,9 @@ public final class PhoneNotificationAutomation {
             item.column = 0;
             item.icon = dynamicAppIcon ? "phone" : "notification";
             item.iconSize = dynamicAppIcon ? 72 : 0;
+            if (dynamicAppIcon) {
+                item.iconCornerRadius = defaultAppIconCornerRadius(item.iconSize);
+            }
             item.orientation = 1;
             item.showTitle = !iconOnly;
             item.showStatus = !iconOnly;

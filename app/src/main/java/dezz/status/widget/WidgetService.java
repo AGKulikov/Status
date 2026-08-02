@@ -468,6 +468,17 @@ public class WidgetService extends Service {
         }
     };
     private final Runnable popupRefresh = this::applyPopupPreferencesSafely;
+    private static final long PHONE_EDITOR_PREVIEW_HANDOFF_MS = 450L;
+    @Nullable private String activePhoneEditorPreviewOverlayId;
+    @Nullable private String pendingPhoneEditorPreviewStopId;
+    private final Runnable phoneEditorPreviewStop = () -> {
+        String requested = pendingPhoneEditorPreviewStopId;
+        pendingPhoneEditorPreviewStopId = null;
+        if (destroyed || requested == null
+                || !requested.equals(activePhoneEditorPreviewOverlayId)) return;
+        if (popupOverlay != null) popupOverlay.stopEditorPreview(requested);
+        activePhoneEditorPreviewOverlayId = null;
+    };
 
     private void schedulePopupRefresh() {
         if (destroyed) return;
@@ -1770,6 +1781,36 @@ public class WidgetService extends Service {
         if (sprutController != null) sprutController.reapplyPopupBindings();
         if (haApiController != null) haApiController.reapplyPopupBindings();
         applyPopupPreferencesSafely();
+    }
+
+    /** Starts or hands off the non-persistent WYSIWYG phone-notification preview. */
+    public void startPhoneNotificationEditorPreview(@NonNull String overlayId) {
+        if (!PhoneNotificationAutomation.isNotificationOverlayId(overlayId)) return;
+        mainHandler.post(() -> {
+            if (destroyed) return;
+            mainHandler.removeCallbacks(phoneEditorPreviewStop);
+            pendingPhoneEditorPreviewStopId = null;
+            ensurePhoneNotificationPopupConfigured();
+            ensurePopupOverlayManager();
+            if (popupOverlay == null) return;
+            activePhoneEditorPreviewOverlayId = overlayId;
+            popupOverlay.startEditorPreview(overlayId);
+        });
+    }
+
+    /**
+     * Delayed release lets PopupSettingsActivity hand the same preview to the precise tile editor
+     * without a visible hide/show flash. Leaving settings altogether still removes it promptly.
+     */
+    public void schedulePhoneNotificationEditorPreviewStop(@NonNull String overlayId) {
+        if (!PhoneNotificationAutomation.isNotificationOverlayId(overlayId)) return;
+        mainHandler.post(() -> {
+            if (destroyed || !overlayId.equals(activePhoneEditorPreviewOverlayId)) return;
+            pendingPhoneEditorPreviewStopId = overlayId;
+            mainHandler.removeCallbacks(phoneEditorPreviewStop);
+            mainHandler.postDelayed(phoneEditorPreviewStop,
+                    PHONE_EDITOR_PREVIEW_HANDOFF_MS);
+        });
     }
 
     /** Live main-row appearance/rule update without restarting an offline connector. */

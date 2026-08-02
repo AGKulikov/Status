@@ -36,6 +36,8 @@ import java.util.function.IntConsumer;
 import dezz.status.widget.integration.ActionBinding;
 import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.SourceBinding;
+import dezz.status.widget.phone.PhoneNotificationAutomation;
+import dezz.status.widget.phone.PhoneNotificationEditorPreviewSession;
 import dezz.status.widget.popup.PopupItemConfig;
 import dezz.status.widget.popup.PopupItemConfigStore;
 import dezz.status.widget.popup.PopupOverlayConfig;
@@ -46,6 +48,8 @@ import dezz.status.widget.settings.AppleColorPickerDialog;
 /** Human-facing catalog and editor for any number of independent floating overlays. */
 public final class PopupSettingsActivity extends AppCompatActivity {
     public static final String EXTRA_OVERLAY_ID = "popup_overlay_id";
+    public static final String EXTRA_PHONE_NOTIFICATION_PREVIEW_ID =
+            "phone_notification_preview_id";
 
     private Preferences prefs;
     private PopupOverlayConfigStore overlayStore;
@@ -57,10 +61,21 @@ public final class PopupSettingsActivity extends AppCompatActivity {
     private LinearLayout host;
     private TextView geometryPreview;
     private boolean firstResume = true;
+    @Nullable private String phoneNotificationPreviewId;
+    @Nullable private PhoneNotificationEditorPreviewSession previewSession;
 
     public static Intent editIntent(@NonNull Context context, @NonNull String overlayId) {
         return new Intent(context, PopupSettingsActivity.class)
                 .putExtra(EXTRA_OVERLAY_ID, overlayId);
+    }
+
+    public static Intent editPhoneNotificationIntent(@NonNull Context context,
+                                                      @NonNull String overlayId) {
+        if (!PhoneNotificationAutomation.isNotificationOverlayId(overlayId)) {
+            throw new IllegalArgumentException("Unsupported phone notification overlay");
+        }
+        return editIntent(context, overlayId)
+                .putExtra(EXTRA_PHONE_NOTIFICATION_PREVIEW_ID, overlayId);
     }
 
     @Override protected void onCreate(@Nullable Bundle state) {
@@ -69,18 +84,36 @@ public final class PopupSettingsActivity extends AppCompatActivity {
         overlayStore = new PopupOverlayConfigStore(prefs);
         itemStore = new PopupItemConfigStore(prefs);
         selectedOverlayId = getIntent().getStringExtra(EXTRA_OVERLAY_ID);
+        String requestedPreview = getIntent().getStringExtra(
+                EXTRA_PHONE_NOTIFICATION_PREVIEW_ID);
+        if (PhoneNotificationAutomation.isNotificationOverlayId(requestedPreview)
+                && requestedPreview.equals(selectedOverlayId)) {
+            phoneNotificationPreviewId = requestedPreview;
+            previewSession = new PhoneNotificationEditorPreviewSession(this, requestedPreview);
+        }
         reload();
         showContent();
     }
 
     @Override protected void onResume() {
         super.onResume();
+        if (previewSession != null) previewSession.onResume();
         if (firstResume) {
             firstResume = false;
             return;
         }
         reload();
         showContent();
+    }
+
+    @Override protected void onPause() {
+        if (previewSession != null) previewSession.onPause();
+        super.onPause();
+    }
+
+    @Override protected void onDestroy() {
+        if (previewSession != null) previewSession.close();
+        super.onDestroy();
     }
 
     private void showContent() {
@@ -134,6 +167,14 @@ public final class PopupSettingsActivity extends AppCompatActivity {
         page.addView(header(overlay.name, this::finish), matchWrap());
         page.addView(label("ID: " + overlay.id
                 + " · позиция сохраняется после перетаскивания окна"), topMargin(5));
+        if (phoneNotificationPreviewId != null) {
+            TextView liveHint = label("Живой тестовый оверлей уже показан поверх этого экрана. "
+                    + "Перетаскивайте плитки по сетке, тяните выбранную плитку за угол, "
+                    + "а ручкой «Переместить окно» двигайте весь оверлей. Тап по плитке "
+                    + "открывает её точные размеры и оформление.");
+            liveHint.setTextColor(0xFF81C784);
+            page.addView(liveHint, topMargin(8));
+        }
 
         LinearLayout toggles = row();
         CheckBox enabled = check("Оверлей включён", overlay.enabled);
@@ -328,8 +369,12 @@ public final class PopupSettingsActivity extends AppCompatActivity {
         Button up = button("↑"); up.setOnClickListener(v -> moveItem(item, -1)); actions.addView(up);
         Button down = button("↓"); down.setOnClickListener(v -> moveItem(item, 1)); actions.addView(down);
         Button edit = button("Оформление и правила");
-        edit.setOnClickListener(v -> startActivity(VisualBrickEditorActivity.intent(this,
-                VisualBrickEditorActivity.SURFACE_POPUP, item.id)));
+        edit.setOnClickListener(v -> startActivity(phoneNotificationPreviewId == null
+                ? VisualBrickEditorActivity.intent(this,
+                VisualBrickEditorActivity.SURFACE_POPUP, item.id)
+                : VisualBrickEditorActivity.intent(this,
+                VisualBrickEditorActivity.SURFACE_POPUP, item.id,
+                phoneNotificationPreviewId)));
         actions.addView(edit, weighted());
         Button delete = button("Удалить");
         delete.setOnClickListener(v -> confirmDeleteItem(item));

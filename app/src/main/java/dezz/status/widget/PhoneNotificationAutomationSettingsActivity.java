@@ -257,7 +257,7 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
     private void openPopupEditor(@NonNull String overlayId) {
         try {
             PhoneNotificationAutomation.ensureConfigured(prefs);
-            startActivity(PopupSettingsActivity.editIntent(
+            startActivity(PopupSettingsActivity.editPhoneNotificationIntent(
                     this, overlayId));
         } catch (Exception error) {
             showError(error);

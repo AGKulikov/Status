@@ -2,6 +2,7 @@
 package dezz.status.widget.popup;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -14,6 +15,7 @@ import dezz.status.widget.Preferences;
 import dezz.status.widget.automation.AutomationContract;
 import dezz.status.widget.automation.AutomationStateStore;
 import dezz.status.widget.integration.ActionDispatcher;
+import dezz.status.widget.phone.PhoneNotificationAutomation;
 
 /** Owns one WindowManager-backed controller per configured floating overlay. */
 public final class PopupOverlayManager {
@@ -27,6 +29,7 @@ public final class PopupOverlayManager {
     private final Map<String, PopupOverlayController> controllers = new LinkedHashMap<>();
     /** Canonical state key -> overlay ids that actually render it. */
     private final Map<String, Set<String>> stateOwners = new LinkedHashMap<>();
+    @Nullable private String editorPreviewOverlayId;
     private boolean destroyed;
 
     public PopupOverlayManager(@NonNull android.content.Context context,
@@ -61,6 +64,11 @@ public final class PopupOverlayManager {
                         builtinProvider, config.id, overlayConfigs);
                 controllers.put(config.id, controller);
             }
+            boolean previewActive = config.id.equals(editorPreviewOverlayId);
+            boolean previewSuppressed = editorPreviewOverlayId != null
+                    && PhoneNotificationAutomation.isNotificationOverlayId(config.id)
+                    && !previewActive;
+            controller.setEditorPreviewMode(previewActive, previewSuppressed);
             List<PopupItemConfig> items = itemsByOverlay.get(config.id);
             controller.applyPreferences(config, items == null
                     ? java.util.Collections.emptyList() : items);
@@ -74,6 +82,25 @@ public final class PopupOverlayManager {
             entry.getValue().destroy();
             iterator.remove();
         }
+    }
+
+    /** Shows one reserved phone layout with non-persistent sample values and direct edit chrome. */
+    public synchronized void startEditorPreview(@NonNull String overlayId) {
+        if (destroyed || !PhoneNotificationAutomation.isNotificationOverlayId(overlayId)) return;
+        editorPreviewOverlayId = overlayId;
+        applyPreferences();
+    }
+
+    /** A stale delayed stop from the parent settings screen cannot close a newer editor. */
+    public synchronized void stopEditorPreview(@NonNull String overlayId) {
+        if (destroyed || !overlayId.equals(editorPreviewOverlayId)) return;
+        editorPreviewOverlayId = null;
+        applyPreferences();
+    }
+
+    @Nullable
+    public synchronized String editorPreviewOverlayId() {
+        return editorPreviewOverlayId;
     }
 
     public synchronized void onStateChanged(@NonNull String scope, @NonNull String id) {
@@ -110,5 +137,6 @@ public final class PopupOverlayManager {
         for (PopupOverlayController controller : controllers.values()) controller.destroy();
         controllers.clear();
         stateOwners.clear();
+        editorPreviewOverlayId = null;
     }
 }
