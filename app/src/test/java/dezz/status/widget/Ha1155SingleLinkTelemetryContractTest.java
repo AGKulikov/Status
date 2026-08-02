@@ -31,6 +31,9 @@ public final class Ha1155SingleLinkTelemetryContractTest {
         assertTrue(ancsSubscribe > initialRead);
         assertTrue(transport.contains("iphoneServiceSetupDeferredForHelperRead"));
         assertTrue(transport.contains("handleServices(callbackGatt, GATT_SUCCESS)"));
+        assertTrue(transport.contains("battery=\" + telemetry.batteryLevel"));
+        assertTrue(transport.contains("externalPower=\" + telemetry.externalPower"));
+        assertTrue(transport.contains("network=\" + (telemetry.networkType.isEmpty()"));
     }
 
     @Test public void establishedAutoConnectOwnerIsNeverClosedByWatchdog() throws Exception {
@@ -51,6 +54,9 @@ public final class Ha1155SingleLinkTelemetryContractTest {
         assertTrue(overlay.contains("ViewGroup.LayoutParams.WRAP_CONTENT"));
         assertTrue(settings.contains("Внутренний отступ сверху"));
         assertTrue(settings.contains("Внутренний отступ снизу"));
+        assertTrue(settings.contains("авто (равномерный режим)"));
+        assertTrue(settings.contains("shortcut.gapAfterPx = 0"));
+        assertTrue(settings.contains("shortcut.gapBeforePx = 0"));
     }
 
     private static String source(String relative) throws Exception {

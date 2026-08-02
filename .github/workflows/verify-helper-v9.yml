@@ -1,0 +1,68 @@
+name: Verify iPhone Helper v9
+
+on:
+  push:
+    branches:
+      - 'release/v*'
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v9/**'
+      - '.github/workflows/verify-helper-v9.yml'
+  pull_request:
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v9/**'
+      - '.github/workflows/verify-helper-v9.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-helper:
+    name: Compile Helper v9 without signing
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Validate project settings
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v9/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            CODE_SIGNING_ALLOWED=NO \
+            -showBuildSettings >/tmp/helper-v9-build-settings.txt
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper' \
+            /tmp/helper-v9-build-settings.txt
+          grep -q 'MARKETING_VERSION = 9.0' /tmp/helper-v9-build-settings.txt
+
+      - name: Compile Helper v9
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v9/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            SYMROOT="$RUNNER_TEMP/KX11ANCSHelperProducts" \
+            OBJROOT="$RUNNER_TEMP/KX11ANCSHelperIntermediates" \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Verify single-link architecture
+        run: |
+          set -euo pipefail
+          source=ios/KX11-iPhone-ANCS-Helper-v9/KX11ANCSHelper/ViewController.swift
+          plist=ios/KX11-iPhone-ANCS-Helper-v9/KX11ANCSHelper/Info.plist
+          ! grep -q 'CBCentralManager' "$source"
+          ! grep -q 'scanForPeripherals' "$source"
+          ! grep -q '<string>bluetooth-central</string>' "$plist"
+          grep -q 'CBPeripheralManagerOptionRestoreIdentifierKey' "$source"
+          grep -q 'properties: \[.read, .notify\]' "$source"
+          grep -q '<string>bluetooth-peripheral</string>' "$plist"

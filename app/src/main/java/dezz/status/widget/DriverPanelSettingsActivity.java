@@ -1590,7 +1590,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 : "Внутренний отступ снизу";
         int current = before ? shortcut.gapBeforePx : shortcut.gapAfterPx;
         TextView value = text(current < 0
-                        ? label + ": общий"
+                        ? label + ": авто (равномерный режим)"
                         : label + ": " + current + " px",
                 13, 0xFFC7C7CC);
         host.addView(value, topMargin(dp(6)));
@@ -1604,15 +1604,27 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                                                     boolean fromUser) {
                 selected = progress - 1;
                 value.setText(selected < 0
-                        ? label + ": общий"
+                        ? label + ": авто (равномерный режим)"
                         : label + ": " + selected + " px");
             }
 
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
 
             @Override public void onStopTrackingTouch(SeekBar seekBar) {
-                if (before) shortcut.gapBeforePx = selected;
-                else shortcut.gapAfterPx = selected;
+                if (before) {
+                    shortcut.gapBeforePx = selected;
+                    // The first explicit edit switches this button from a weighted slot to its
+                    // natural height. Make the other side explicit zero as well so the editor
+                    // and runtime never combine "auto" with compact geometry ambiguously.
+                    if (selected >= 0 && shortcut.gapAfterPx < 0) {
+                        shortcut.gapAfterPx = 0;
+                    }
+                } else {
+                    shortcut.gapAfterPx = selected;
+                    if (selected >= 0 && shortcut.gapBeforePx < 0) {
+                        shortcut.gapBeforePx = 0;
+                    }
+                }
                 store.upsert(shortcut);
                 refreshPreview();
                 applyPanel();

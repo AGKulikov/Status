@@ -3949,6 +3949,11 @@ public final class IphoneAncsTransport {
                     if (telemetry != null) {
                         listener.onHelperTelemetry(telemetry);
                         log("Helper B4 atomic read accepted: kind=" + telemetry.kind
+                                + " battery=" + telemetry.batteryLevel
+                                + " externalPower=" + telemetry.externalPower
+                                + " chargeState=" + telemetry.chargeState
+                                + " network=" + (telemetry.networkType.isEmpty()
+                                ? "unknown" : telemetry.networkType)
                                 + " seq=" + telemetry.sequence);
                     } else {
                         log("Helper B4 atomic read unavailable · status=" + status
