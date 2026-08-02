@@ -29,8 +29,9 @@ public final class Ha1146AncsReliabilityContractTest {
         assertTrue(callback.contains("activeClientAutoConnect && activeClientEstablished"));
         assertTrue(callback.contains("awaitBackgroundAutoReconnect(callbackGatt"));
         assertTrue(autoWait.contains("if (closing || gatt != expected"));
-        assertTrue(autoWait.contains("closeClientGatt(expected)"));
-        assertTrue(autoWait.contains("scheduleSavedPeerDirectFallback"));
+        assertTrue(autoWait.contains("rearmExistingAutoConnectOwner"));
+        assertFalse(autoWait.contains("closeClientGatt(expected)"));
+        assertFalse(autoWait.contains("scheduleSavedPeerDirectFallback"));
     }
 
     @Test public void ambiguousAclLossProbesBeforeDestroyingAHealthyAncsLink()
