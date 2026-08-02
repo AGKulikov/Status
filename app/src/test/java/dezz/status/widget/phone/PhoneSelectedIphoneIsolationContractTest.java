@@ -96,7 +96,7 @@ public final class PhoneSelectedIphoneIsolationContractTest {
         assertFalse(ensureGatt.contains("selectedDevice.connectGatt("));
         assertFalse(ensureGatt.contains("scheduleConnectWatchdog("));
         assertTrue(batteryOnly.contains("selectedDevice.connectGatt(context, autoConnect"));
-        assertTrue(batteryOnly.contains("config == null || config.ancsNeeded()"));
+        assertTrue(batteryOnly.contains("config == null || config.transportNeeded()"));
         assertTrue(source.contains("proxy.getConnectedDevices()"));
         assertTrue(source.contains("if (isSelected(device))"));
         assertTrue(source.contains("transportSession != activeAncsTransportSession"));
