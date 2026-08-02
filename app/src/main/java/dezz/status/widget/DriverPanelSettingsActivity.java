@@ -1277,10 +1277,30 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             }
         }
         addPreviewInformationRows(rail, topInformation, width);
+        boolean compactSpacing = false;
+        for (LauncherShortcutStore.Shortcut value : controls) {
+            if (value.gapBeforePx >= 0 || value.gapAfterPx >= 0) {
+                compactSpacing = true;
+                break;
+            }
+        }
+        rail.setGravity(compactSpacing
+                ? Gravity.TOP | Gravity.CENTER_HORIZONTAL : Gravity.CENTER);
         for (LauncherShortcutStore.Shortcut value : controls) {
             FrameLayout cell = previewShortcutCell(value, width);
-            rail.addView(cell, new LinearLayout.LayoutParams(match(), 0,
-                    DriverPanelLayoutPolicy.shortcutWeight(false)));
+            LinearLayout.LayoutParams cellParams;
+            if (compactSpacing) {
+                cell.setMinimumHeight(0);
+                cell.setPadding(cell.getPaddingLeft(),
+                        Math.round(Math.max(0, value.gapBeforePx) * .62f),
+                        cell.getPaddingRight(),
+                        Math.round(Math.max(0, value.gapAfterPx) * .62f));
+                cellParams = new LinearLayout.LayoutParams(match(), wrap());
+            } else {
+                cellParams = new LinearLayout.LayoutParams(match(), 0,
+                        DriverPanelLayoutPolicy.shortcutWeight(false));
+            }
+            rail.addView(cell, cellParams);
         }
         addPreviewInformationRows(rail, bottomInformation, width);
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, screenHeight,
@@ -1561,11 +1581,13 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         host.addView(block, rowParams());
     }
 
-    /** Per-control rail spacing. -1 keeps the old evenly distributed panel layout. */
+    /** Per-control internal padding. -1 keeps the legacy evenly distributed panel layout. */
     private void buttonGapSlider(@NonNull LinearLayout host,
                                  @NonNull LauncherShortcutStore.Shortcut shortcut,
                                  boolean before) {
-        String label = before ? "Отступ до кнопки" : "Отступ после кнопки";
+        String label = before
+                ? "Внутренний отступ сверху"
+                : "Внутренний отступ снизу";
         int current = before ? shortcut.gapBeforePx : shortcut.gapAfterPx;
         TextView value = text(current < 0
                         ? label + ": общий"
