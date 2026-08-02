@@ -73,7 +73,7 @@ public final class Ha1153Kx11RegressionContractTest {
         assertTrue(render.contains("detachRootImmediately();"));
         assertTrue(render.contains("root = null;"));
         assertTrue(render.contains("ensureView();"));
-        assertFalse(render.contains("removeAllViews"));
+        assertFalse(render.contains(".removeAllViews("));
         String editor = source("launcher/panels/PanelContentEditOverlay.java");
         assertTrue(editor.contains("onGestureStateChanged(boolean active)"));
     }

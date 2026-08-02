@@ -28,7 +28,8 @@ public final class Ha1136RegressionContractTest {
         assertTrue(source.contains("ViewGroup.LayoutParams.MATCH_PARENT, topHeight"));
         assertTrue(source.contains("ViewGroup.LayoutParams.MATCH_PARENT, bottomHeight"));
         assertTrue(source.contains("ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f"));
-        assertTrue(source.contains("dp(context, shortcut.informationIconSizePx) + padding"));
+        assertTrue(source.contains("shortcut.informationIconSizePx + padding"));
+        assertFalse(source.contains("dp(context, shortcut.informationIconSizePx) + padding"));
     }
 
     @Test public void phonePopupHasTwoEditableLayoutsWithoutCrossOverlayIdCollision()
