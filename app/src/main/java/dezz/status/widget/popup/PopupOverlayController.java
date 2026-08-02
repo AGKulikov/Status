@@ -35,6 +35,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -125,6 +126,9 @@ public final class PopupOverlayController {
      * popup detached while its child tree is rebuilt, then attach the finished tree atomically.
      */
     private boolean rootAdded;
+    /** Every currently attached generation; normally one, briefly two during a frame-safe swap. */
+    private final Set<FrameLayout> attachedRoots =
+            Collections.newSetFromMap(new IdentityHashMap<>());
     private float touchX;
     private float touchY;
     private int startX;
@@ -236,7 +240,7 @@ public final class PopupOverlayController {
         renderedPlacements.clear();
         renderedTiles.clear();
         main.removeCallbacksAndMessages(null);
-        detachRootImmediately();
+        detachAllRootsImmediately();
         root = null;
         params = null;
     }
@@ -298,13 +302,16 @@ public final class PopupOverlayController {
             refreshDeferred = true;
             return;
         }
-        // Never structurally mutate a ViewGroup that ViewRootImpl has ever measured. The KX11
-        // Android 9 build can retain a stale mChildrenCount after removeAllViews(), after which
-        // ViewGroup.resolveDrawables() dereferences a null child. Discard the whole detached root
-        // and build a fresh tree off-window instead.
-        detachRootImmediately();
+        // Never structurally mutate a ViewGroup that ViewRootImpl has ever measured. Build the
+        // replacement completely off-window, attach it, and retire the old generation only after
+        // the replacement reaches its first pre-draw. Detaching first caused the visible 1–2
+        // frame blink on every connector-state refresh in the KX11 launcher.
+        FrameLayout previousRoot = root;
+        WindowManager.LayoutParams previousParams = params;
+        boolean previousAdded = rootAdded;
         root = null;
         params = null;
+        rootAdded = false;
         ensureView();
         updateWindowGeometry();
         if (root == null || params == null) return;
@@ -386,7 +393,20 @@ public final class PopupOverlayController {
             visibleCount++;
         }
         if (editorPreview) attachEditorChrome(left, top, right, bottom);
-        setOverlayVisible(visibleCount > 0 || editorPreview);
+        boolean visible = visibleCount > 0 || editorPreview;
+        setOverlayVisible(visible);
+        if (!visible) return;
+        if (rootAdded && root != null) {
+            retireOlderRootsAfterFirstDraw(root);
+        } else if (previousAdded && previousRoot != null && previousParams != null) {
+            // A transient WindowManager failure must leave the already rendered generation on
+            // screen. It is safer to display one stale frame than to flash an empty launcher.
+            root = previousRoot;
+            params = previousParams;
+            rootAdded = attachedRoots.contains(previousRoot)
+                    || previousRoot.isAttachedToWindow();
+            if (rootAdded) attachedRoots.add(previousRoot);
+        }
     }
 
     /**
@@ -662,15 +682,17 @@ public final class PopupOverlayController {
             }
         }
         if (!visible) {
-            detachRootImmediately();
+            detachAllRootsImmediately();
             return;
         }
         if (rootAdded) return;
         try {
             windowManager.addView(root, params);
             rootAdded = true;
+            attachedRoots.add(root);
         } catch (RuntimeException failure) {
             rootAdded = root.isAttachedToWindow();
+            if (rootAdded) attachedRoots.add(root);
             if (!rootAdded) {
                 Toast.makeText(context, "Не удалось создать всплывающий оверлей: "
                         + failure.getMessage(), Toast.LENGTH_LONG).show();
@@ -678,16 +700,52 @@ public final class PopupOverlayController {
         }
     }
 
-    /** Detaches synchronously before any child-array mutation on the KX11 Android 9 build. */
-    private void detachRootImmediately() {
-        FrameLayout current = root;
-        if (current == null || !rootAdded) return;
+    /** Retires the previous complete trees only after the replacement is ready to draw. */
+    private void retireOlderRootsAfterFirstDraw(@NonNull FrameLayout replacement) {
+        List<FrameLayout> retiring = new ArrayList<>(attachedRoots);
+        retiring.remove(replacement);
+        if (retiring.isEmpty()) return;
+        replacement.getViewTreeObserver().addOnPreDrawListener(
+                new android.view.ViewTreeObserver.OnPreDrawListener() {
+                    private boolean handled;
+
+                    @Override public boolean onPreDraw() {
+                        if (handled) return true;
+                        handled = true;
+                        android.view.ViewTreeObserver observer =
+                                replacement.getViewTreeObserver();
+                        if (observer.isAlive()) observer.removeOnPreDrawListener(this);
+                        // Run after this traversal so the replacement contributes a compositor
+                        // frame before any previous surface is removed.
+                        main.post(() -> {
+                            for (FrameLayout retired : retiring) {
+                                detachRootImmediately(retired);
+                            }
+                        });
+                        return true;
+                    }
+                });
+        replacement.invalidate();
+    }
+
+    private void detachAllRootsImmediately() {
+        List<FrameLayout> attached = new ArrayList<>(attachedRoots);
+        for (FrameLayout candidate : attached) detachRootImmediately(candidate);
+        // A failed add may not have entered the set but can still report itself attached.
+        if (root != null && root.isAttachedToWindow()) detachRootImmediately(root);
+    }
+
+    /** Detaches one complete, immutable generation on the KX11 Android 9 build. */
+    private void detachRootImmediately(@Nullable FrameLayout current) {
+        if (current == null || (!attachedRoots.contains(current)
+                && !current.isAttachedToWindow())) return;
         try {
             windowManager.removeViewImmediate(current);
         } catch (RuntimeException ignored) {
             // A simultaneous service teardown may have removed it already.
         } finally {
-            rootAdded = false;
+            attachedRoots.remove(current);
+            if (current == root) rootAdded = false;
         }
     }
 

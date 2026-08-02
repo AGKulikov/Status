@@ -59,6 +59,16 @@ public final class Ha1155SingleLinkTelemetryContractTest {
         assertTrue(settings.contains("shortcut.gapBeforePx = 0"));
     }
 
+    @Test public void popupRefreshUsesFrameSafeDoubleBufferInsteadOfBlinking() throws Exception {
+        String popup = source("popup/PopupOverlayController.java");
+        String render = between(popup, "private void renderItems()",
+                "/**\n     * Adds launcher-style edit chrome");
+        assertFalse(render.contains("detachRootImmediately();"));
+        assertTrue(render.contains("retireOlderRootsAfterFirstDraw(root)"));
+        assertTrue(popup.contains("addOnPreDrawListener"));
+        assertTrue(popup.contains("attachedRoots.add(root)"));
+    }
+
     private static String source(String relative) throws Exception {
         Path root = Paths.get("app", "src", "main", "java", "dezz", "status", "widget")
                 .resolve(relative);
