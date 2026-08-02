@@ -70,10 +70,11 @@ public final class Ha1153Kx11RegressionContractTest {
         String overlay = source("popup/PopupOverlayController.java");
         String render = between(overlay, "private void renderItems()",
                 "/**\n     * Adds launcher-style edit chrome");
-        assertTrue(render.contains("detachRootImmediately();"));
+        assertTrue(render.contains("retireOlderRootsAfterFirstDraw(root)"));
         assertTrue(render.contains("root = null;"));
         assertTrue(render.contains("ensureView();"));
         assertFalse(render.contains(".removeAllViews("));
+        assertTrue(overlay.contains("addOnPreDrawListener"));
         String editor = source("launcher/panels/PanelContentEditOverlay.java");
         assertTrue(editor.contains("onGestureStateChanged(boolean active)"));
     }

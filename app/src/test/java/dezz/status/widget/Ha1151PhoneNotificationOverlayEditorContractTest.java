@@ -51,11 +51,12 @@ public final class Ha1151PhoneNotificationOverlayEditorContractTest {
         assertTrue(controller.contains("swaps them instead of refusing"));
         String render = between(controller, "private void renderItems()",
                 "/**\n     * Adds launcher-style edit chrome");
-        assertTrue(render.contains("detachRootImmediately();"));
+        assertTrue(render.contains("retireOlderRootsAfterFirstDraw(root)"));
         assertTrue(render.contains("root = null;"));
         assertTrue(render.contains("ensureView();"));
         assertFalse(render.contains("root.removeAllViews();"));
         assertTrue(controller.contains("windowManager.removeViewImmediate(current)"));
+        assertTrue(controller.contains("addOnPreDrawListener"));
         assertTrue(controller.contains("root.setLayoutDirection(View.LAYOUT_DIRECTION_LTR)"));
         assertTrue(controller.contains("onGestureStateChanged(boolean active)"));
     }
