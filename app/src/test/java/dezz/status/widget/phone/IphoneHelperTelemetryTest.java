@@ -49,6 +49,28 @@ public final class IphoneHelperTelemetryTest {
         assertEquals("", unknown.networkType);
     }
 
+    @Test public void parsesFixedBinarySnapshotAndRejectsCorruption() {
+        byte[] frame = binary(60, 0x0F, 2, 0x1234);
+        IphoneHelperTelemetry value = IphoneHelperTelemetry.parse(frame);
+        assertTrue(value != null);
+        assertEquals(IphoneHelperTelemetry.Kind.SNAPSHOT, value.kind);
+        assertEquals(Integer.valueOf(60), value.batteryLevel);
+        assertEquals(Boolean.TRUE, value.externalPower);
+        assertEquals("charging", value.chargeState);
+        assertEquals("LTE", value.networkType);
+        assertEquals(0x1234, value.sequence);
+
+        frame[2] = 61;
+        assertNull(IphoneHelperTelemetry.parse(frame));
+
+        IphoneHelperTelemetry unplugged = IphoneHelperTelemetry.parse(
+                binary(9, 0x05, 4, 7));
+        assertTrue(unplugged != null);
+        assertEquals(Boolean.FALSE, unplugged.externalPower);
+        assertEquals("unplugged", unplugged.chargeState);
+        assertEquals("3G", unplugged.networkType);
+    }
+
     @Test public void rejectsMalformedOrUntrustedVocabulary() {
         assertNull(IphoneHelperTelemetry.parse(null));
         assertNull(raw("TEL1;N;LTE;1"));
@@ -68,5 +90,22 @@ public final class IphoneHelperTelemetryTest {
 
     private static IphoneHelperTelemetry raw(String value) {
         return IphoneHelperTelemetry.parse(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static byte[] binary(int level, int flags, int network, int sequence) {
+        byte[] value = new byte[] {
+                (byte) 0xA5, 1, (byte) level, (byte) flags, (byte) network,
+                (byte) sequence, (byte) (sequence >>> 8), 0
+        };
+        int crc = 0;
+        for (int index = 0; index < value.length - 1; index++) {
+            crc ^= value[index] & 0xFF;
+            for (int bit = 0; bit < 8; bit++) {
+                crc = (crc & 0x80) != 0 ? ((crc << 1) ^ 0x07) & 0xFF
+                        : (crc << 1) & 0xFF;
+            }
+        }
+        value[value.length - 1] = (byte) crc;
+        return value;
     }
 }
