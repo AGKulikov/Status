@@ -92,7 +92,9 @@ public class DriverPanelOverlayContractTest {
         assertTrue(climateSource.contains("AIRFLOW_LEGS"));
         assertTrue(source.contains("private static boolean isExpandedClimate("));
         assertTrue(source.contains("// HA1085 keeps the detailed climate tile"));
-        assertTrue(source.contains("DriverPanelLayoutPolicy.shortcutWeight(expandedClimate)"));
+        assertFalse(source.contains("DriverPanelLayoutPolicy.shortcutWeight(expandedClimate)"));
+        assertTrue(source.contains("DriverControlSpacingPolicy.resolve("));
+        assertTrue(source.contains("ViewGroup.LayoutParams.WRAP_CONTENT"));
         assertTrue(source.contains("DriverPanelLayoutPolicy.shortcutIconHeight("));
         assertTrue(source.contains("boolean liveClimate = isLiveClimate(shortcut)"));
         assertTrue(source.contains("boolean stockClimateAction = isStockClimateAction(shortcut)"));

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package dezz.status.widget;
 
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.nio.charset.StandardCharsets;
@@ -60,7 +61,8 @@ public final class Ha1154HelperAndDriverFavoritesContractTest {
         assertTrue(store.contains(".put(\"gapBeforePx\", value.gapBeforePx)"));
         assertTrue(settings.contains("buttonGapSlider(body, shortcut, true)"));
         assertTrue(settings.contains("buttonGapSlider(body, shortcut, false)"));
-        assertTrue(overlay.contains("boolean compactSpacing = false"));
+        assertFalse(overlay.contains("compactSpacing"));
+        assertTrue(overlay.contains("DriverControlSpacingPolicy.resolve("));
         assertTrue(overlay.contains("ViewGroup.LayoutParams.WRAP_CONTENT"));
         assertTrue(overlay.contains("button.setPadding(button.getPaddingLeft(), internalTop"));
         assertTrue(overlay.contains("itemParams.setMargins(4, 0, 4, 0)"));
