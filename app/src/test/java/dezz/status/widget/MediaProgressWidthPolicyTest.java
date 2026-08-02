@@ -20,4 +20,9 @@ public final class MediaProgressWidthPolicyTest {
     @Test public void invalidMeasurementsFailToOneVisiblePixel() {
         assertEquals(1, MediaProgressWidthPolicy.width(Float.NaN, -4, -9, 0));
     }
+
+    @Test public void timelineStartsAfterAnInlinePlaybackIcon() {
+        assertEquals(34, MediaProgressWidthPolicy.leadingMargin(38, 4));
+        assertEquals(0, MediaProgressWidthPolicy.leadingMargin(0, 8));
+    }
 }

@@ -59,6 +59,9 @@ import dezz.status.widget.Preferences;
 import dezz.status.widget.R;
 import dezz.status.widget.WidgetAccessibilityService;
 import dezz.status.widget.WidgetService;
+import dezz.status.widget.car.CarControlCommand;
+import dezz.status.widget.car.CarControlState;
+import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.launcher.HighResolutionAppIconLoader;
 import dezz.status.widget.launcher.AppDrawerTileView;
@@ -71,6 +74,7 @@ import dezz.status.widget.launcher.LauncherIconResolver;
 import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.launcher.SmartHomeShortcutStateBindingPolicy;
 import dezz.status.widget.launcher.SmartHomeShortcutStatePolicy;
+import dezz.status.widget.popup.SmartHomeTileColorPolicy;
 import dezz.status.widget.launcher.apps.FavoriteAppConfig;
 import dezz.status.widget.launcher.apps.FavoriteAppsConfigStore;
 import dezz.status.widget.integration.ConnectorValue;
@@ -111,8 +115,12 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         return thread;
     });
     private final DriverPanelActionExecutor actions;
+    private final CarIntegration carIntegration;
     private final Map<String, SmartHomeBinding> panelSmartHomeBindings = new HashMap<>();
     private final Map<String, SmartHomeBinding> drawerSmartHomeBindings = new HashMap<>();
+    private final Map<String, CarStateBinding> panelCarBindings = new HashMap<>();
+    private final Map<String, CarStateBinding> drawerCarBindings = new HashMap<>();
+    private final Map<String, CarControlState> carControlStates = new HashMap<>();
     private final Map<String, View> favoritePanelAnchors = new HashMap<>();
     private final Map<String, FavoritePanelWindow> favoriteWindows = new LinkedHashMap<>();
     private final Set<String> manuallyOpenFavorites = new LinkedHashSet<>();
@@ -147,6 +155,9 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             mainHandler.postDelayed(this, current == null ? 250L : 2_000L);
         }
     };
+    private final CarIntegration.ControlStateListener carStateListener = state ->
+            mainHandler.post(() -> applyCarControlState(state));
+    private final Runnable refreshCarStateSubscription = this::resubscribeCarControls;
 
     private final List<AttachedWindow> panelWindows = new ArrayList<>();
     @Nullable private AttachedWindow drawerWindow;
@@ -217,6 +228,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         this.preferences = preferences;
         this.statusListener = statusListener;
         this.actions = new DriverPanelActionExecutor(appContext, preferences, this);
+        this.carIntegration = CarIntegrations.get(appContext);
     }
 
     int getAttachedWindowType() {
@@ -235,9 +247,12 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         List<AttachedWindow> previousWindows = new ArrayList<>(panelWindows);
         Map<String, SmartHomeBinding> previousBindings =
                 new HashMap<>(panelSmartHomeBindings);
+        Map<String, CarStateBinding> previousCarBindings =
+                new HashMap<>(panelCarBindings);
         Map<String, View> previousFavoriteAnchors = new HashMap<>(favoritePanelAnchors);
         panelWindows.clear();
         panelSmartHomeBindings.clear();
+        panelCarBindings.clear();
         favoritePanelAnchors.clear();
         smartHomeRules = loadSmartHomeRules();
         mainHandler.removeCallbacks(ensureSmartHomeValueSubscription);
@@ -246,6 +261,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             removeWindows(previousWindows);
             dismissAllApps();
             dismissAllFavoritePanels();
+            scheduleCarStateSubscriptionRefresh();
             statusListener.onStatus("stopped", "Панель водителя выключена");
             return;
         }
@@ -254,6 +270,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         if (display == null) {
             panelWindows.addAll(previousWindows);
             panelSmartHomeBindings.putAll(previousBindings);
+            panelCarBindings.putAll(previousCarBindings);
             favoritePanelAnchors.putAll(previousFavoriteAnchors);
             refreshFavoriteWindows();
             statusListener.onStatus("error", "Основной дисплей не найден");
@@ -304,6 +321,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 panelWindows.addAll(successorWindows);
                 retireAfterFirstDraw(previousWindows, successorWindows);
                 refreshFavoriteWindows();
+                scheduleCarStateSubscriptionRefresh();
                 reconcileAutomatedFavoritePanels();
                 String mode = type == WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                         ? "обычный overlay" : "системный ECARX";
@@ -318,12 +336,14 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 removeWindows(panelWindows);
                 panelWindows.clear();
                 panelSmartHomeBindings.clear();
+                panelCarBindings.clear();
                 Log.w(TAG, "Window type " + type + " rejected", error);
             }
         }
         // A rejected refresh must leave the last fully covering panel in place.
         panelWindows.addAll(previousWindows);
         panelSmartHomeBindings.putAll(previousBindings);
+        panelCarBindings.putAll(previousCarBindings);
         favoritePanelAnchors.putAll(previousFavoriteAnchors);
         refreshFavoriteWindows();
         statusListener.onStatus("error", failure == null
@@ -379,6 +399,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         dismissAllFavoritePanels();
         detachPanel();
         mainHandler.removeCallbacks(ensureSmartHomeValueSubscription);
+        mainHandler.removeCallbacks(refreshCarStateSubscription);
+        carIntegration.unsubscribeControlStates(carStateListener);
         if (smartHomeValueService != null) {
             smartHomeValueService.removeConnectorValueListener(smartHomeValueListener);
             smartHomeValueService = null;
@@ -805,6 +827,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         FavoritePanelWindow value = favoriteWindows.remove(panelId);
         if (value == null) return;
         for (String itemId : value.itemIds) drawerSmartHomeBindings.remove(itemId);
+        for (String itemId : value.itemIds) drawerCarBindings.remove(itemId);
+        scheduleCarStateSubscriptionRefresh();
         value.window.remove();
         dezz.status.widget.diagnostics.ActionRecorder.recordOverlay(
                 "driver_favorites:" + panelId, "CLOSED", "dismiss");
@@ -820,6 +844,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         manuallyOpenFavorites.clear();
         manuallyClosedFavorites.clear();
         drawerSmartHomeBindings.clear();
+        drawerCarBindings.clear();
+        scheduleCarStateSubscriptionRefresh();
     }
 
     private void scheduleFavoriteOutsideDismiss(@NonNull String panelId) {
@@ -1191,6 +1217,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         content.addView(icon, new LinearLayout.LayoutParams(requested,
                 DriverPanelLayoutPolicy.shortcutIconHeight(requested, expandedClimate)));
 
+        @Nullable TextView titleLabel = null;
         if (shortcut.showTitle) {
             TextView label = new TextView(context);
             label.setText(shortcut.title);
@@ -1204,9 +1231,12 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                     ViewGroup.LayoutParams.WRAP_CONTENT);
             labelParams.setMargins(2, 2, 2, 0);
             content.addView(label, labelParams);
+            titleLabel = label;
         }
         @Nullable TextView stateLabel = null;
-        if (shortcut.kind == LauncherShortcutStore.Kind.RULE && shortcut.showState) {
+        if ((shortcut.kind == LauncherShortcutStore.Kind.RULE
+                || shortcut.kind == LauncherShortcutStore.Kind.CAR && !liveClimate)
+                && shortcut.showState) {
             stateLabel = new TextView(context);
             stateLabel.setText("…");
             stateLabel.setTextSize(10);
@@ -1247,9 +1277,15 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         } else {
             button.setClickable(false);
         }
-        if (shortcut.kind == LauncherShortcutStore.Kind.RULE && stateIcon != null) {
+        if (shortcut.kind == LauncherShortcutStore.Kind.CAR && stateIcon != null) {
+            CarStateBinding binding = new CarStateBinding(
+                    shortcut.copy(), button, stateIcon, titleLabel, stateLabel, actionEnabled);
+            (drawer ? drawerCarBindings : panelCarBindings).put(shortcut.id, binding);
+            applyCarState(binding, carControlStates.get(shortcut.target));
+            scheduleCarStateSubscriptionRefresh();
+        } else if (shortcut.kind == LauncherShortcutStore.Kind.RULE && stateIcon != null) {
             SmartHomeBinding binding = new SmartHomeBinding(
-                    shortcut.copy(), button, stateIcon, stateLabel, actionEnabled);
+                    shortcut.copy(), button, stateIcon, titleLabel, stateLabel, actionEnabled);
             (drawer ? drawerSmartHomeBindings : panelSmartHomeBindings)
                     .put(shortcut.id, binding);
             applySmartHomeState(binding);
@@ -1466,6 +1502,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         removeWindows(panelWindows);
         panelWindows.clear();
         panelSmartHomeBindings.clear();
+        panelCarBindings.clear();
+        scheduleCarStateSubscriptionRefresh();
     }
 
     private static void removeWindows(@NonNull List<AttachedWindow> windows) {
@@ -1527,17 +1565,78 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 Color.TRANSPARENT);
         binding.button.setBackground(rippleBackground(background, 14));
         String tint = active ? shortcut.activeIconColor : shortcut.iconColor;
+        String contentColor = SmartHomeTileColorPolicy.contentColor(
+                source, shortcut.textColor, tint);
         LauncherShortcutStore.Shortcut visual = shortcut.copy();
         visual.icon = state.iconKey;
         binding.icon.setImageDrawable(LauncherIconResolver.resolve(appContext, visual, tint));
+        if (binding.titleLabel != null) {
+            binding.titleLabel.setTextColor(safeColor(contentColor, Color.WHITE));
+        }
         float stateAlpha = !state.present ? .62f
                 : !state.available ? .42f : !state.fresh ? .68f : 1f;
         binding.button.setAlpha(binding.actionEnabled ? stateAlpha : .42f);
         if (binding.stateLabel != null) {
             binding.stateLabel.setText(state.valueLabel);
-            binding.stateLabel.setTextColor(safeColor(tint, Color.LTGRAY));
+            binding.stateLabel.setTextColor(safeColor(contentColor, Color.LTGRAY));
         }
         binding.button.setContentDescription(shortcut.title + ", " + state.valueLabel);
+    }
+
+    private void scheduleCarStateSubscriptionRefresh() {
+        mainHandler.removeCallbacks(refreshCarStateSubscription);
+        mainHandler.post(refreshCarStateSubscription);
+    }
+
+    private void resubscribeCarControls() {
+        LinkedHashSet<String> ids = new LinkedHashSet<>();
+        for (CarStateBinding binding : panelCarBindings.values()) {
+            ids.add(binding.shortcut.target);
+        }
+        for (CarStateBinding binding : drawerCarBindings.values()) {
+            ids.add(binding.shortcut.target);
+        }
+        if (ids.isEmpty()) carIntegration.unsubscribeControlStates(carStateListener);
+        else carIntegration.subscribeControlStates(ids, carStateListener);
+    }
+
+    private void applyCarControlState(@NonNull CarControlState state) {
+        carControlStates.put(state.controlId, state);
+        List<CarStateBinding> bindings = new ArrayList<>(panelCarBindings.values());
+        bindings.addAll(drawerCarBindings.values());
+        for (CarStateBinding binding : bindings) {
+            if (binding.shortcut.target.equals(state.controlId)) applyCarState(binding, state);
+        }
+    }
+
+    private void applyCarState(@NonNull CarStateBinding binding,
+                               @Nullable CarControlState state) {
+        LauncherShortcutStore.Shortcut shortcut = binding.shortcut;
+        boolean confirmed = state != null && state.available && state.known;
+        boolean active = confirmed && state.active;
+        if (confirmed && shortcut.command == CarControlCommand.Operation.SET) {
+            active = Math.abs(state.value - shortcut.commandValue) < .01d;
+        }
+        int background = safeColor(active
+                ? shortcut.activeBackgroundColor : shortcut.backgroundColor,
+                Color.TRANSPARENT);
+        binding.button.setBackground(rippleBackground(background, 14));
+        String tint = active ? shortcut.activeIconColor : shortcut.iconColor;
+        if (active && shortcut.useVehicleStateColor && state.suggestedColor != null) {
+            tint = state.suggestedColor;
+        }
+        binding.icon.setImageDrawable(LauncherIconResolver.resolve(appContext, shortcut, tint));
+        if (binding.titleLabel != null) {
+            binding.titleLabel.setTextColor(safeColor(tint, Color.WHITE));
+        }
+        binding.button.setAlpha(!binding.actionEnabled ? .42f
+                : state == null ? .62f : state.available ? 1f : .42f);
+        if (binding.stateLabel != null) {
+            binding.stateLabel.setText(state == null ? "…" : state.valueLabel);
+            binding.stateLabel.setTextColor(safeColor(tint, Color.LTGRAY));
+        }
+        binding.button.setContentDescription(shortcut.title + (state == null
+                ? ", состояние неизвестно" : ", " + state.valueLabel));
     }
 
     @NonNull
@@ -1777,15 +1876,39 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         @NonNull final LauncherShortcutStore.Shortcut shortcut;
         @NonNull final FrameLayout button;
         @NonNull final ImageView icon;
+        @Nullable final TextView titleLabel;
         @Nullable final TextView stateLabel;
         final boolean actionEnabled;
 
         SmartHomeBinding(@NonNull LauncherShortcutStore.Shortcut shortcut,
                          @NonNull FrameLayout button, @NonNull ImageView icon,
-                         @Nullable TextView stateLabel, boolean actionEnabled) {
+                         @Nullable TextView titleLabel, @Nullable TextView stateLabel,
+                         boolean actionEnabled) {
             this.shortcut = shortcut;
             this.button = button;
             this.icon = icon;
+            this.titleLabel = titleLabel;
+            this.stateLabel = stateLabel;
+            this.actionEnabled = actionEnabled;
+        }
+    }
+
+    private static final class CarStateBinding {
+        @NonNull final LauncherShortcutStore.Shortcut shortcut;
+        @NonNull final FrameLayout button;
+        @NonNull final ImageView icon;
+        @Nullable final TextView titleLabel;
+        @Nullable final TextView stateLabel;
+        final boolean actionEnabled;
+
+        CarStateBinding(@NonNull LauncherShortcutStore.Shortcut shortcut,
+                        @NonNull FrameLayout button, @NonNull ImageView icon,
+                        @Nullable TextView titleLabel, @Nullable TextView stateLabel,
+                        boolean actionEnabled) {
+            this.shortcut = shortcut;
+            this.button = button;
+            this.icon = icon;
+            this.titleLabel = titleLabel;
             this.stateLabel = stateLabel;
             this.actionEnabled = actionEnabled;
         }

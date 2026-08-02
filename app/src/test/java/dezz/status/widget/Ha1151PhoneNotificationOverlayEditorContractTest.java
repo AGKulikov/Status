@@ -63,11 +63,11 @@ public final class Ha1151PhoneNotificationOverlayEditorContractTest {
         assertTrue(editor.contains("previewIconBox.setClipToOutline"));
     }
 
-    @Test public void releaseIdentityIsMonotonicAndInstallableOverHa1150() throws Exception {
+    @Test public void releaseIdentityRemainsMonotonicAfterTheEditorRelease() throws Exception {
         String build = new String(Files.readAllBytes(projectFile("build.gradle")),
                 StandardCharsets.UTF_8);
-        assertTrue(build.contains("return 'v2.8.2-ha1151'"));
-        assertEquals(208021151, 208020000 + 1151);
+        assertTrue(build.contains("return 'v2.8.2-ha1152'"));
+        assertEquals(208021152, 208020000 + 1152);
     }
 
     private static String source(String relative) throws Exception {

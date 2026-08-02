@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One solid iPhone-style body. Charge is communicated by the whole-icon colour; there is no
-     second outline/fill layer, so the percentage remains clean and centred at every level. -->
+<!-- Complete iPhone-style silhouette used for measurement and optional outline generation.
+     OutlineImageView clips the rounded body to the live drawable level while keeping the terminal
+     visible, so this stays one frameless colour layer instead of an outline + inner-fill pair. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="32dp"
     android:height="20dp"

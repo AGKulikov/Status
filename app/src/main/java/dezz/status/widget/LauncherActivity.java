@@ -98,6 +98,7 @@ import dezz.status.widget.launcher.NavigationDataRepository;
 import dezz.status.widget.launcher.SingleFlightRefresh;
 import dezz.status.widget.launcher.SmartHomeShortcutStateBindingPolicy;
 import dezz.status.widget.launcher.SmartHomeShortcutStatePolicy;
+import dezz.status.widget.popup.SmartHomeTileColorPolicy;
 import dezz.status.widget.launcher.YandexWindowLauncher;
 import dezz.status.widget.launcher.apps.FavoriteAppConfig;
 import dezz.status.widget.launcher.apps.FavoriteAppsConfigStore;
@@ -3330,6 +3331,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 shortcut.iconSizePx * contentScale / 100)
                 : Math.max(LauncherShortcutStore.MIN_ICON_SIZE_PX, shortcut.iconSizePx);
         content.addView(icon, new LinearLayout.LayoutParams(iconSize, iconSize));
+        TextView titleLabel = null;
         if (shortcut.showTitle || addButton) {
             TextView label = text(12f * contentScale / 100f, Color.WHITE, true);
             try { label.setTextColor(Color.parseColor(shortcut.textColor)); }
@@ -3340,6 +3342,7 @@ public final class LauncherActivity extends AppCompatActivity {
             LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(matchWidth(), wrapContent());
             labelLp.topMargin = 0;
             content.addView(label, labelLp);
+            titleLabel = label;
         }
         TextView stateLabel = null;
         if (!addButton && (shortcut.kind == LauncherShortcutStore.Kind.CAR
@@ -3391,12 +3394,12 @@ public final class LauncherActivity extends AppCompatActivity {
             }
             if (shortcut.kind == LauncherShortcutStore.Kind.CAR) {
                 ShortcutTileBinding binding = new ShortcutTileBinding(shortcut.copy(), card,
-                        icon, stateLabel);
+                        icon, titleLabel, stateLabel);
                 carShortcutBindings.put(shortcut.id, binding);
                 applyCarState(binding, carControlStates.get(shortcut.target));
             } else if (shortcut.kind == LauncherShortcutStore.Kind.RULE) {
                 ShortcutTileBinding binding = new ShortcutTileBinding(shortcut.copy(), card,
-                        icon, stateLabel);
+                        icon, titleLabel, stateLabel);
                 smartHomeShortcutBindings.put(shortcut.id, binding);
                 applySmartHomeState(binding);
             }
@@ -3492,6 +3495,12 @@ public final class LauncherActivity extends AppCompatActivity {
             tint = state.suggestedColor;
         }
         binding.icon.setImageDrawable(LauncherIconResolver.resolve(this, shortcut, tint));
+        if (binding.titleLabel != null) {
+            try { binding.titleLabel.setTextColor(Color.parseColor(tint)); }
+            catch (IllegalArgumentException ignored) {
+                binding.titleLabel.setTextColor(Color.WHITE);
+            }
+        }
         binding.card.setAlpha(state == null ? .62f : state.available ? 1f : .42f);
         if (binding.stateLabel != null) {
             binding.stateLabel.setText(state == null ? "…" : state.valueLabel);
@@ -3546,14 +3555,22 @@ public final class LauncherActivity extends AppCompatActivity {
             binding.card.setCardBackgroundColor(Color.argb(180, 34, 39, 51));
         }
         String tint = active ? shortcut.activeIconColor : shortcut.iconColor;
+        String contentColor = SmartHomeTileColorPolicy.contentColor(
+                source, shortcut.textColor, tint);
         LauncherShortcutStore.Shortcut visual = shortcut.copy();
         visual.icon = state.iconKey;
         binding.icon.setImageDrawable(LauncherIconResolver.resolve(this, visual, tint));
+        if (binding.titleLabel != null) {
+            try { binding.titleLabel.setTextColor(Color.parseColor(contentColor)); }
+            catch (IllegalArgumentException ignored) {
+                binding.titleLabel.setTextColor(Color.WHITE);
+            }
+        }
         binding.card.setAlpha(!state.present ? .62f
                 : !state.available ? .42f : !state.fresh ? .68f : 1f);
         if (binding.stateLabel != null) {
             binding.stateLabel.setText(state.valueLabel);
-            try { binding.stateLabel.setTextColor(Color.parseColor(tint)); }
+            try { binding.stateLabel.setTextColor(Color.parseColor(contentColor)); }
             catch (IllegalArgumentException ignored) {
                 binding.stateLabel.setTextColor(Color.LTGRAY);
             }
@@ -4402,13 +4419,16 @@ public final class LauncherActivity extends AppCompatActivity {
         final LauncherShortcutStore.Shortcut shortcut;
         final MaterialCardView card;
         final ImageView icon;
+        @Nullable final TextView titleLabel;
         @Nullable final TextView stateLabel;
 
         ShortcutTileBinding(LauncherShortcutStore.Shortcut shortcut, MaterialCardView card,
-                            ImageView icon, @Nullable TextView stateLabel) {
+                            ImageView icon, @Nullable TextView titleLabel,
+                            @Nullable TextView stateLabel) {
             this.shortcut = shortcut;
             this.card = card;
             this.icon = icon;
+            this.titleLabel = titleLabel;
             this.stateLabel = stateLabel;
         }
     }

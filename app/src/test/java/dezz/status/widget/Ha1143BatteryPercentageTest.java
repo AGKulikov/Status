@@ -11,7 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-/** Updated regression contract for the solid optional iPhone battery percentage. */
+/** Regression contract for the level-aware frameless iPhone battery and optional percentage. */
 public final class Ha1143BatteryPercentageTest {
     @Test public void statusBarUsesOptionalLiveNumberWithoutPercentSign() throws Exception {
         String widget = source("WidgetService.java");
@@ -22,8 +22,8 @@ public final class Ha1143BatteryPercentageTest {
         assertTrue(preferences.contains("phoneBatteryShowPercentage\", true"));
         assertTrue(icon.contains("String text = String.valueOf(batteryPercent)"));
         assertTrue(icon.contains("contrastColor(batteryFillColor)"));
-        assertFalse(icon.contains("batteryPercent / 100f"));
-        assertFalse(icon.contains("canvas.clipRect(innerLeft"));
+        assertTrue(icon.contains("imageLevel / 10_000f"));
+        assertTrue(icon.contains("canvas.clipRect(bodyLeft"));
     }
 
     @Test public void driverAndLauncherTilesReuseTheSameLivePercentage() throws Exception {
@@ -38,14 +38,18 @@ public final class Ha1143BatteryPercentageTest {
         assertTrue(panel.contains("setBatteryPercent(null, Color.WHITE)"));
     }
 
-    @Test public void percentageScalesInsideOneSolidBatteryBody() throws Exception {
+    @Test public void percentageAndFillScaleInsideOneBatteryBody() throws Exception {
         String icon = source("OutlineImageView.java");
         String widget = source("WidgetService.java");
         String vector = resource("drawable/ic_status_iphone_battery.xml");
 
         assertTrue(icon.contains("14.5f / 32f"));
         assertTrue(icon.contains("Math.max(0, Math.min(100, percent))"));
-        assertTrue(widget.contains("batteryIcon.setImageLevel(10_000)"));
+        assertTrue(widget.contains(
+                "batteryIcon.setImageLevel(battery == null ? 0 : battery * 100)"));
+        assertTrue(widget.contains("iconLevel = battery == null ? 0 : battery * 100"));
+        assertTrue(icon.contains("drawBatteryLevel(canvas)"));
+        assertTrue(icon.contains("terminal communicates the battery orientation"));
         assertTrue(vector.contains("<vector"));
         assertFalse(vector.contains("<layer-list"));
         assertFalse(vector.contains("<clip"));

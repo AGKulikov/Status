@@ -77,6 +77,8 @@ public final class Ha1136RegressionContractTest {
         String layout = resource("layout/overlay_status_widget.xml");
         assertTrue(widget.contains("getMarqueeSourceText()"));
         assertTrue(widget.contains("MediaProgressWidthPolicy.width("));
+        assertTrue(widget.contains("MediaProgressWidthPolicy.leadingMargin("));
+        assertTrue(widget.contains("params.setMarginStart(leadingMargin)"));
         assertFalse(widget.contains("mediaTitleRow.getWidth()"));
         assertTrue(layout.contains("android:id=\"@+id/mediaProgressBar\""));
         assertTrue(layout.contains("android:layout_width=\"wrap_content\""));

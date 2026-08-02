@@ -2369,7 +2369,7 @@ public class WidgetService extends Service {
         Integer battery = phonePercent("battery.level");
         OutlineImageView batteryIcon = binding.phoneBatteryStatusIcon;
         batteryIcon.setImageResource(R.drawable.ic_status_iphone_battery);
-        batteryIcon.setImageLevel(10_000);
+        batteryIcon.setImageLevel(battery == null ? 0 : battery * 100);
         batteryIcon.setDrawIcon(true);
         int batteryColor = phoneBatteryColor(battery);
         ImageViewCompat.setImageTintList(batteryIcon, ColorStateList.valueOf(batteryColor));
@@ -2552,6 +2552,7 @@ public class WidgetService extends Service {
         // ever moves it vertically.
         applyMediaChildAlignment(binding.mediaSourceRow, prefs.media.sourceAlignment.get());
         applyMediaChildAlignment(binding.mediaTitleRow, prefs.media.alignment.get());
+        applyMediaChildAlignment(binding.mediaProgressBar, prefs.media.alignment.get());
     }
 
     /**
@@ -3860,9 +3861,13 @@ public class WidgetService extends Service {
                     binding.mediaTitleText.getCompoundPaddingLeft(),
                     binding.mediaTitleText.getCompoundPaddingRight(),
                     viewportWidth);
-            ViewGroup.LayoutParams params = binding.mediaProgressBar.getLayoutParams();
-            if (params.width != targetWidth) {
+            int leadingMargin = MediaProgressWidthPolicy.leadingMargin(
+                    binding.mediaTitleText.getLeft(), binding.mediaTitleRow.getPaddingLeft());
+            LinearLayout.LayoutParams params =
+                    (LinearLayout.LayoutParams) binding.mediaProgressBar.getLayoutParams();
+            if (params.width != targetWidth || params.getMarginStart() != leadingMargin) {
                 params.width = targetWidth;
+                params.setMarginStart(leadingMargin);
                 binding.mediaProgressBar.setLayoutParams(params);
             }
         });
@@ -5089,7 +5094,7 @@ public class WidgetService extends Service {
                 active = known;
                 text = known ? battery + "%" : "";
                 iconResource = R.drawable.ic_status_iphone_battery;
-                iconLevel = 10_000;
+                iconLevel = battery == null ? 0 : battery * 100;
                 iconPrefs = prefs.phoneBattery;
                 iconTint = phoneBatteryColor(battery);
                 batteryPercent = prefs.phoneBattery.showPercentage.get() ? battery : null;

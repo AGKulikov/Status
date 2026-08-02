@@ -19,4 +19,9 @@ public final class MediaProgressWidthPolicy {
                 ? Math.min(naturalWidth, titleViewportWidth)
                 : naturalWidth;
     }
+
+    /** Positions the timeline under the title when the play/pause glyph shares its row. */
+    public static int leadingMargin(int titleLeft, int titleRowPaddingLeft) {
+        return Math.max(0, titleLeft - Math.max(0, titleRowPaddingLeft));
+    }
 }

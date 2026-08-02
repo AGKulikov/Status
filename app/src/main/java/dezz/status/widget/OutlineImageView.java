@@ -60,8 +60,11 @@ public class OutlineImageView extends AppCompatImageView {
     private final Paint badgeTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint batteryPercentPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint batteryChargingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint batteryLevelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path batteryChargingPath = new Path();
     private final RectF batteryDrawableBounds = new RectF();
+    private int imageLevel = 10_000;
+    private boolean imageLevelApplied;
     private int filterColor = 0;
 
     private Bitmap cachedOutline;
@@ -165,6 +168,7 @@ public class OutlineImageView extends AppCompatImageView {
     public void setImageDrawable(@Nullable Drawable drawable) {
         currentImageResId = 0;
         super.setImageDrawable(drawable);
+        imageLevelApplied = false;
         invalidateOutlineCache();
     }
 
@@ -180,7 +184,18 @@ public class OutlineImageView extends AppCompatImageView {
         }
         currentImageResId = resId;
         super.setImageResource(resId);
+        imageLevelApplied = false;
         invalidateOutlineCache();
+    }
+
+    @Override
+    public void setImageLevel(int level) {
+        int bounded = Math.max(0, Math.min(10_000, level));
+        if (imageLevelApplied && imageLevel == bounded) return;
+        imageLevel = bounded;
+        imageLevelApplied = true;
+        super.setImageLevel(bounded);
+        invalidate();
     }
 
     private void invalidateOutlineCache() {
@@ -203,7 +218,9 @@ public class OutlineImageView extends AppCompatImageView {
                 canvas.drawBitmap(outline, 0, 0, outlinePaint);
             }
         }
-        if (drawIcon) {
+        if (drawIcon && currentImageResId == R.drawable.ic_status_iphone_battery) {
+            drawBatteryLevel(canvas);
+        } else if (drawIcon) {
             super.onDraw(canvas);
         }
         if (batteryPercent != null) {
@@ -225,6 +242,54 @@ public class OutlineImageView extends AppCompatImageView {
             badgeDrawable.setBounds(left, top, left + badgeSize, top + badgeSize);
             badgeDrawable.draw(canvas);
         }
+    }
+
+    /**
+     * Draws the one-piece iPhone battery body at the real helper-reported level.
+     *
+     * <p>The source vector remains a complete silhouette so Android can measure it and build the
+     * optional user-configured outer glow. Drawing that complete vector directly, however, made
+     * 1% and 100% look identical. Keep the terminal visible and clip only the rounded body to the
+     * drawable level; this preserves the requested frameless design while making its length an
+     * honest percentage indicator.</p>
+     */
+    private void drawBatteryLevel(@NonNull Canvas canvas) {
+        Drawable drawable = getDrawable();
+        if (drawable == null) return;
+        RectF displayed = batteryDrawableBounds;
+        displayed.set(drawable.getBounds());
+        if (displayed.isEmpty()) return;
+        getImageMatrix().mapRect(displayed);
+        displayed.offset(getPaddingLeft(), getPaddingTop());
+        if (displayed.isEmpty()) return;
+
+        float bodyLeft = displayed.left + displayed.width() * (0.5f / 32f);
+        float bodyRight = displayed.left + displayed.width() * (28.5f / 32f);
+        float bodyTop = displayed.top + displayed.height() * (2.5f / 20f);
+        float bodyBottom = displayed.top + displayed.height() * (17.5f / 20f);
+        float fraction = imageLevel / 10_000f;
+        batteryLevelPaint.setStyle(Paint.Style.FILL);
+        batteryLevelPaint.setColor(batteryFillColor);
+
+        if (fraction > 0f) {
+            int restore = canvas.save();
+            canvas.clipRect(bodyLeft, bodyTop,
+                    bodyLeft + (bodyRight - bodyLeft) * fraction, bodyBottom);
+            float radius = (bodyBottom - bodyTop) * 0.23f;
+            canvas.drawRoundRect(bodyLeft, bodyTop, bodyRight, bodyBottom,
+                    radius, radius, batteryLevelPaint);
+            canvas.restoreToCount(restore);
+        }
+
+        // The terminal communicates the battery orientation/capacity and must not disappear at
+        // low percentages as it would with a ClipDrawable around the complete resource.
+        float terminalLeft = displayed.left + displayed.width() * (30f / 32f);
+        float terminalRight = displayed.left + displayed.width() * (31.8f / 32f);
+        float terminalTop = displayed.top + displayed.height() * (7f / 20f);
+        float terminalBottom = displayed.top + displayed.height() * (13f / 20f);
+        float terminalRadius = (terminalBottom - terminalTop) * 0.5f;
+        canvas.drawRoundRect(terminalLeft, terminalTop, terminalRight, terminalBottom,
+                terminalRadius, terminalRadius, batteryLevelPaint);
     }
 
     private void drawBatteryPercent(@NonNull Canvas canvas) {
