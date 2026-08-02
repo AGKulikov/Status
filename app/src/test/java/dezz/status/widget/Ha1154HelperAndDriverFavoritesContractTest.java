@@ -19,7 +19,7 @@ public final class Ha1154HelperAndDriverFavoritesContractTest {
         assertTrue(transport.contains("PROPERTY_READ"));
         assertTrue(transport.contains("startHelperTelemetryRead"));
         assertTrue(transport.contains("scheduleHelperTelemetryRecovery"));
-        assertTrue(transport.contains("Helper TEL3 encrypted read accepted"));
+        assertTrue(transport.contains("Helper B4 atomic read accepted"));
     }
 
     @Test public void atomicSnapshotUpdatesPowerAndNetworkTogether() throws Exception {
@@ -51,7 +51,7 @@ public final class Ha1154HelperAndDriverFavoritesContractTest {
         assertTrue(vent.contains("android:scaleX=\"-1\""));
     }
 
-    @Test public void explicitDriverButtonSpacingUsesNaturalHeightAndBothMargins()
+    @Test public void explicitDriverButtonSpacingUsesNaturalHeightAndInternalInsets()
             throws Exception {
         String store = source("launcher/LauncherShortcutStore.java");
         String settings = source("DriverPanelSettingsActivity.java");
@@ -62,7 +62,8 @@ public final class Ha1154HelperAndDriverFavoritesContractTest {
         assertTrue(settings.contains("buttonGapSlider(body, shortcut, false)"));
         assertTrue(overlay.contains("boolean compactSpacing = false"));
         assertTrue(overlay.contains("ViewGroup.LayoutParams.WRAP_CONTENT"));
-        assertTrue(overlay.contains("itemGapBefore"));
+        assertTrue(overlay.contains("button.setPadding(button.getPaddingLeft(), internalTop"));
+        assertTrue(overlay.contains("itemParams.setMargins(4, 0, 4, 0)"));
     }
 
     private static String source(String relative) throws Exception {
