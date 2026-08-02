@@ -77,7 +77,9 @@ public final class LauncherShortcutStore {
         public int climateDetailsGapPx = 0;
         public int iconSizePx = 54;
         public int dividerThicknessPx = 2;
-        /** -1 inherits the panel-wide value; otherwise this button owns its following gap. */
+        /** -1 shares otherwise unused rail height; non-negative is exact internal top padding. */
+        public int gapBeforePx = -1;
+        /** -1 shares otherwise unused rail height; non-negative is exact internal bottom padding. */
         public int gapAfterPx = -1;
         public int columnSpan = 1;
         public int rowSpan = 1;
@@ -162,6 +164,7 @@ public final class LauncherShortcutStore {
             value.climateDetailsGapPx = climateDetailsGapPx;
             value.iconSizePx = iconSizePx;
             value.dividerThicknessPx = dividerThicknessPx;
+            value.gapBeforePx = gapBeforePx;
             value.gapAfterPx = gapAfterPx;
             value.columnSpan = columnSpan;
             value.rowSpan = rowSpan;
@@ -568,6 +571,7 @@ public final class LauncherShortcutStore {
         value.climateDetailsGapPx = Math.max(0,
                 Math.min(96, value.climateDetailsGapPx));
         value.dividerThicknessPx = Math.max(1, Math.min(20, value.dividerThicknessPx));
+        value.gapBeforePx = Math.max(-1, Math.min(80, value.gapBeforePx));
         value.gapAfterPx = Math.max(-1, Math.min(80, value.gapAfterPx));
         value.columnSpan = Math.max(1,
                 Math.min(LauncherActionsGridConfig.MAX_COLUMNS, value.columnSpan));
@@ -673,6 +677,7 @@ public final class LauncherShortcutStore {
                 .put("climateDetailsGapPx", value.climateDetailsGapPx)
                 .put("iconSizePx", value.iconSizePx)
                 .put("dividerThicknessPx", value.dividerThicknessPx)
+                .put("gapBeforePx", value.gapBeforePx)
                 .put("gapAfterPx", value.gapAfterPx)
                 .put("columnSpan", value.columnSpan)
                 .put("rowSpan", value.rowSpan).put("showTitle", value.showTitle)
@@ -782,6 +787,7 @@ public final class LauncherShortcutStore {
             value.climateDetailsGapPx = json.optInt("climateDetailsGapPx", 0);
             value.iconSizePx = json.optInt("iconSizePx", 54);
             value.dividerThicknessPx = json.optInt("dividerThicknessPx", 2);
+            value.gapBeforePx = json.optInt("gapBeforePx", -1);
             value.gapAfterPx = json.optInt("gapAfterPx", -1);
             value.columnSpan = json.optInt("columnSpan", 1);
             value.rowSpan = json.optInt("rowSpan", 1);

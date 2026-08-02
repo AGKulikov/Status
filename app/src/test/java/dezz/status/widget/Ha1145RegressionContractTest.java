@@ -26,8 +26,9 @@ public final class Ha1145RegressionContractTest {
         assertTrue(store.contains("public boolean informationGroupAncsOnly = false"));
         assertTrue(store.contains(".put(\"informationGroupAncsOnly\""));
         assertTrue(runtime.contains("shortcut.informationGroupAncsOnly && !ancsReady"));
-        assertTrue(runtime.contains("int internalGap = dp(context,"
-                + " rowStyle.informationGroupGapPx)"));
+        assertTrue(runtime.contains("int internalGap = rowStyle.informationGroupGapPx"));
+        assertTrue(runtime.contains("int availableTilesWidth"));
+        assertTrue(runtime.contains("informationTileWidth(context, member)"));
         assertTrue(service.contains("previousAncsReady != phoneAncsReady"));
         assertTrue(service.contains("DriverPanelService.apply(this)"));
     }
@@ -59,19 +60,16 @@ public final class Ha1145RegressionContractTest {
         assertFalse(scenarios.contains("Укажите ID ресурса"));
     }
 
-    @Test public void ancsEscalationAutomatesTheSuccessfulManualRadioRecovery()
+    @Test public void ancsRecoveryNeverCyclesTheSharedCarBluetoothAdapter()
             throws Exception {
         String controller = source("phone/PhoneConnectorController.java");
-        String policy = source("phone/AncsAdapterRecoveryPolicy.java");
         String transport = source("phone/transport/IphoneAncsTransport.java");
 
-        assertTrue(policy.contains("ESCALATION_DELAY_MS = 150_000L"));
-        assertTrue(policy.contains("RESET_COOLDOWN_MS = 5L * 60L * 1_000L"));
-        assertTrue(controller.contains("ancsWasReadyThisSession"));
-        assertTrue(controller.contains("adapter.disable()"));
-        assertTrue(controller.contains("adapter.enable()"));
-        assertTrue(controller.contains("handleAdapterRecoveryState(token, state)"));
-        assertTrue(transport.contains("refreshGattCache(previous)"));
+        assertFalse(controller.contains("adapter.disable()"));
+        assertFalse(controller.contains("adapter.enable()"));
+        assertFalse(controller.contains("startAdapterRecovery("));
+        assertTrue(transport.contains("awaitPersistentGattReconnect("));
+        assertTrue(transport.contains("restartDiscoveryOnPersistentOwner("));
     }
 
     @Test public void smartHomeNamesAndBluetoothFollowOneRenderedColour() throws Exception {

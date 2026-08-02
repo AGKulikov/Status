@@ -81,7 +81,6 @@ public final class PhoneConnectorController {
     private static final long GATT_DISCOVERY_TIMEOUT_MS = 15_000L;
     private static final long DEVICE_RESCAN_MS = 15_000L;
     private static final long ANCS_STABLE_READY_RESET_MS = 50_000L;
-    private static final long ADAPTER_RECOVERY_WATCHDOG_MS = 40_000L;
     private static final long APP_DISPLAY_NAME_WAIT_TIMEOUT_MS = 15_000L;
     /** Helper emits every 20 s; three missed heartbeats invalidate helper-only fields. */
     private static final long HELPER_TELEMETRY_TIMEOUT_MS = 65_000L;
@@ -169,9 +168,6 @@ public final class PhoneConnectorController {
     private static final String BLUETOOTH_SENDER_PERMISSION =
             "android.permission.BLUETOOTH_PRIVILEGED";
     private static final int SUMMARY_NOTIFICATION_ID = 0x50484f4e;
-    /** Process-wide cooldown survives controller reconfiguration inside the service process. */
-    private static volatile long lastAdapterRecoveryElapsedMs;
-
     /** Decouples Bluetooth presence from an optional Sprut.hub runtime. */
     public interface PresenceSink {
         void onPhoneConnectionChanged(boolean connected);
@@ -218,8 +214,6 @@ public final class PhoneConnectorController {
     private String smsStatus = "stopped";
     private String stockConnectionStatus = "stopped";
     private boolean ancsReady;
-    private boolean ancsWasReadyThisSession;
-    private boolean adapterRecoveryInProgress;
     private boolean smsAvailable;
     private boolean hfpBatteryKnown;
     private boolean basBatteryKnown;
@@ -283,8 +277,6 @@ public final class PhoneConnectorController {
     @Nullable private Runnable gattReconnectTask;
     @Nullable private Runnable ancsPublicationRetryTask;
     @Nullable private Runnable ancsStableReadyTask;
-    @Nullable private Runnable ancsAdapterEscalationTask;
-    @Nullable private Runnable adapterRecoveryWatchdog;
     @Nullable private Runnable stockConnectionTask;
     @Nullable private Runnable oemGattRefreshTask;
     private int ancsPublicationRetryCount;
@@ -494,8 +486,6 @@ public final class PhoneConnectorController {
         smsStatus = diagnostic;
         stockConnectionStatus = diagnostic;
         ancsReady = false;
-        ancsWasReadyThisSession = false;
-        adapterRecoveryInProgress = false;
         smsAvailable = false;
         hfpBatteryKnown = false;
         basBatteryKnown = false;
@@ -593,10 +583,6 @@ public final class PhoneConnectorController {
         if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
             int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
                     BluetoothAdapter.STATE_OFF);
-            if (adapterRecoveryInProgress) {
-                handleAdapterRecoveryState(token, state);
-                return;
-            }
             if (state == BluetoothAdapter.STATE_ON && selectedDevice == null) {
                 selectAndConnect(token);
             } else if (state != BluetoothAdapter.STATE_ON) {
@@ -1227,8 +1213,8 @@ public final class PhoneConnectorController {
         }
 
         @Override public void onCandidates(List<IphoneAncsTransport.Candidate> candidates) {
-            // Daily saved-peer operation never scans. Candidate callbacks belong only to the
-            // one-time Helper/bootstrap diagnostics and are intentionally not published here.
+            // Identity-resolution scans are transport-internal. The production controller keeps
+            // the selected phone fixed and never exposes nearby BLE candidates to the UI.
         }
 
         @Override public void onNotification(IphoneAncsTransport.NotificationItem item) {
@@ -1268,18 +1254,22 @@ public final class PhoneConnectorController {
     /** Applies only values delivered by the authenticated iPhone Helper channel. */
     private void applyHelperTelemetry(long token, @NonNull IphoneHelperTelemetry telemetry) {
         long now = SystemClock.elapsedRealtime();
-        if (telemetry.kind == IphoneHelperTelemetry.Kind.POWER) {
+        boolean hasPower = telemetry.kind == IphoneHelperTelemetry.Kind.POWER
+                || telemetry.kind == IphoneHelperTelemetry.Kind.SNAPSHOT;
+        boolean hasNetwork = telemetry.kind == IphoneHelperTelemetry.Kind.NETWORK
+                || telemetry.kind == IphoneHelperTelemetry.Kind.SNAPSHOT;
+        if (hasPower) {
             helperBatteryLevel = telemetry.batteryLevel;
             helperExternalPower = telemetry.externalPower;
             helperChargeState = telemetry.chargeState;
             helperPowerUpdatedAtElapsed = now;
             refreshBatteryValues();
-            markTelemetryUpdated(true, false);
-        } else {
+        }
+        if (hasNetwork) {
             helperNetworkType = telemetry.networkType;
             helperNetworkUpdatedAtElapsed = now;
-            markTelemetryUpdated(false, true);
         }
+        markTelemetryUpdated(hasPower, hasNetwork);
         scheduleHelperTelemetryExpiry(token);
         publishSnapshot(token);
     }
@@ -1349,8 +1339,6 @@ public final class PhoneConnectorController {
         if (state.contains("ANCS READY")) {
             gattConnected = true;
             ancsReady = true;
-            ancsWasReadyThisSession = true;
-            cancelAncsAdapterEscalation();
             ancsAuthorizedThisRun = true;
             ancsStatus = "ready";
             lastError = "";
@@ -1369,7 +1357,6 @@ public final class PhoneConnectorController {
             return;
         }
         if (state.contains("RECOVERING") || state.contains("IDENTITY SCAN")) {
-            scheduleAncsAdapterEscalation(token, state);
             cancelStableAncsReadyReset();
             gattConnected = false;
             ancsReady = false;
@@ -1439,7 +1426,6 @@ public final class PhoneConnectorController {
         synchronized (lifecycleLock) {
             if (isCurrentLocked(token)) ancsTransportStartPending = false;
         }
-        scheduleAncsAdapterEscalation(token, detail);
         scheduleGattReconnect(token, detail, "retrying");
     }
 
@@ -2024,8 +2010,6 @@ public final class PhoneConnectorController {
     private void maybeFinishAncsSetup(long token) {
         if (!ancsReady && ancsDataSubscribed && ancsNotificationSubscribed) {
             ancsReady = true;
-            ancsWasReadyThisSession = true;
-            cancelAncsAdapterEscalation();
             ancsAuthorizedThisRun = true;
             forceDirectGatt = false;
             reconnectAttempt = 0;
@@ -2602,12 +2586,10 @@ public final class PhoneConnectorController {
         if (selectedAddress.isEmpty()) return;
         PhoneTelemetryStore.Record previous = retainedTelemetry;
         long now = System.currentTimeMillis();
-        Integer savedBatteryLevel = batteryLiveSeenThisConnection
-                ? batteryLevel : previous == null ? null : previous.batteryLevel;
-        String savedBatteryLevelSource = batteryLiveSeenThisConnection
-                ? batteryLevelSource : previous == null ? "" : previous.batteryLevelSource;
-        // Helper-only fields are live session data and are never restored after a process/link
-        // restart. The next helper frame is required before the UI can show charger state.
+        // Every power field is Helper-only live session data. BAS/HFP/OEM readings remain useful
+        // in diagnostics, but are never persisted or substituted into the visible iPhone tile.
+        Integer savedBatteryLevel = null;
+        String savedBatteryLevelSource = "";
         Boolean savedCharging = null;
         Boolean savedChargingEstimated = null;
         String savedChargingSource = "";
@@ -2623,8 +2605,7 @@ public final class PhoneConnectorController {
         String savedNetworkOperator = networkLiveSeenThisConnection
                 ? networkOperator : previous == null ? "" : previous.networkOperator;
         String savedNetworkType = "";
-        long batteryUpdatedAt = batteryLiveSeenThisConnection
-                ? now : previous == null ? 0L : previous.batteryUpdatedAtWallMs;
+        long batteryUpdatedAt = 0L;
         long networkUpdatedAt = networkLiveSeenThisConnection
                 ? now : previous == null ? 0L : previous.networkUpdatedAtWallMs;
         PhoneTelemetryStore.Record next = new PhoneTelemetryStore.Record(
@@ -2656,22 +2637,14 @@ public final class PhoneConnectorController {
     }
 
     private void refreshBatteryValues() {
-        if (helperBatteryLevel != null) {
+        if (helperPowerUpdatedAtElapsed > 0L && helperBatteryLevel != null) {
             batteryLevel = helperBatteryLevel;
             batteryLevelSource = "iphone_helper";
-        } else if (basBatteryKnown && basBatteryUpdatedAt >= hfpBatteryUpdatedAt
-                && basBatteryUpdatedAt >= genericBatteryUpdatedAt) {
-            batteryLevel = basBatteryLevel;
-            batteryLevelSource = "ble_bas";
-        } else if (hfpBatteryKnown && hfpBatteryUpdatedAt >= genericBatteryUpdatedAt) {
-            batteryLevel = hfpBatteryLevel;
-            batteryLevelSource = "hfp_ecarx";
         } else {
-            batteryLevel = genericBatteryKnown ? genericBatteryLevel : null;
-            batteryLevelSource = genericBatteryKnown ? "android_broadcast" : "";
+            batteryLevel = null;
+            batteryLevelSource = "";
         }
-        // Charging is helper-only. BAS, HFP and OEM metadata may still improve the percentage,
-        // but they must never synthesize or retain the charger glyph.
+        // Charging and percentage share the exact same authenticated Helper heartbeat.
         if (helperPowerUpdatedAtElapsed > 0L) {
             batteryExternalPower = helperExternalPower;
             batteryChargeState = helperChargeState;
@@ -3010,7 +2983,6 @@ public final class PhoneConnectorController {
      */
     private void requestManagedAncsReconnect(long token, @NonNull String detail,
                                              boolean confirmedLeLoss) {
-        if (confirmedLeLoss) scheduleAncsAdapterEscalation(token, detail);
         IphoneAncsTransport current = ancsTransport;
         long transportSession = activeAncsTransportSession;
         if (current == null) {
@@ -3034,10 +3006,6 @@ public final class PhoneConnectorController {
     private void scheduleGattReconnect(long token, @NonNull String detail,
                                        @NonNull String visibleStatus) {
         if (!isCurrent(token)) return;
-        // Every controller-owned ANCS/GATT failure reaches this method. Arming here covers both
-        // the modern saved-peer transport and the legacy in-process GATT path without depending
-        // on one vendor-specific disconnect callback being delivered.
-        scheduleAncsAdapterEscalation(token, detail);
         cancelStableAncsReadyReset();
         lastError = bounded(detail, 512);
         ancsStatus = visibleStatus;
@@ -3159,149 +3127,6 @@ public final class PhoneConnectorController {
         cancelStableAncsReadyReset();
         cancelStockConnectionRequest();
         cancelOemGattRefresh();
-        cancelAncsAdapterEscalation();
-        cancelAdapterRecoveryWatchdog();
-    }
-
-    /**
-     * ECARX can leave its BLE controller wedged after an iPhone link loss: closing and reopening
-     * GATT clients then never restores ANCS, while a manual radio off/on does so immediately.
-     * Preserve the retained autoConnect owner and its complete fallback cycle first, then
-     * automate that proven final step only
-     * for a phone whose ANCS subscription was already healthy in this controller session.
-     */
-    private void scheduleAncsAdapterEscalation(long token, @NonNull String reason) {
-        if (!ancsWasReadyThisSession || ancsReady || adapterRecoveryInProgress
-                || ancsAdapterEscalationTask != null
-                || config == null || !config.transportNeeded()) return;
-        Handler handler = worker;
-        if (handler == null) return;
-        Runnable escalation = () -> runIfCurrent(token, () -> {
-            ancsAdapterEscalationTask = null;
-            long now = SystemClock.elapsedRealtime();
-            if (!AncsAdapterRecoveryPolicy.mayReset(
-                    ancsWasReadyThisSession, ancsReady, adapterRecoveryInProgress,
-                    now, lastAdapterRecoveryElapsedMs)) return;
-            startAdapterRecovery(token, reason);
-        });
-        ancsAdapterEscalationTask = escalation;
-        handler.postDelayed(escalation, AncsAdapterRecoveryPolicy.ESCALATION_DELAY_MS);
-        Log.w(TAG, "ANCS recovery watchdog armed: " + reason);
-    }
-
-    private void startAdapterRecovery(long token, @NonNull String reason) {
-        BluetoothAdapter adapter = bluetoothAdapter();
-        if (adapter == null || adapterRecoveryInProgress) return;
-        adapterRecoveryInProgress = true;
-        lastAdapterRecoveryElapsedMs = SystemClock.elapsedRealtime();
-        lastError = bounded("Automatic Bluetooth stack recovery after ANCS loss: "
-                + reason, 512);
-        ancsStatus = "bluetooth_stack_recovery";
-        closeAncsTransport();
-        cancelGattWatchdogs();
-        cancelGattReconnect();
-        cancelAncsPublicationRetry();
-        cancelDeviceRescan();
-        cancelStockConnectionRequest();
-        cancelOemGattRefresh();
-        BluetoothGatt previous = gatt;
-        gatt = null;
-        refreshGattCache(previous);
-        closeGatt(previous);
-        gattConnected = false;
-        resetAncsSession(token, "bluetooth_stack_recovery");
-        updateConnected(token);
-        Log.w(TAG, "ANCS did not recover; cycling the Android 9 Bluetooth adapter once");
-        boolean accepted;
-        try {
-            accepted = adapter.isEnabled() ? adapter.disable() : adapter.enable();
-        } catch (RuntimeException denied) {
-            accepted = false;
-            lastError = "Bluetooth stack recovery denied: " + safeMessage(denied);
-        }
-        if (!accepted) {
-            adapterRecoveryInProgress = false;
-            scheduleGattReconnect(token, lastError.isEmpty()
-                    ? "Bluetooth stack recovery was rejected" : lastError, "retrying");
-            return;
-        }
-        scheduleAdapterRecoveryWatchdog(token);
-    }
-
-    private void handleAdapterRecoveryState(long token, int state) {
-        BluetoothAdapter adapter = bluetoothAdapter();
-        if (state == BluetoothAdapter.STATE_OFF) {
-            invalidateSelectedPhone(token, "bluetooth_stack_recovery");
-            boolean accepted = false;
-            try {
-                accepted = adapter != null && adapter.enable();
-            } catch (RuntimeException denied) {
-                lastError = "Bluetooth restart denied: " + safeMessage(denied);
-            }
-            if (!accepted) {
-                adapterRecoveryInProgress = false;
-                scheduleDeviceRescan(token);
-            }
-            return;
-        }
-        if (state == BluetoothAdapter.STATE_ON) finishAdapterRecovery(token);
-    }
-
-    private void finishAdapterRecovery(long token) {
-        if (!adapterRecoveryInProgress) return;
-        adapterRecoveryInProgress = false;
-        cancelAdapterRecoveryWatchdog();
-        reconnectAttempt = 0;
-        ancsStatus = "connecting_after_bluetooth_recovery";
-        lastError = "";
-        selectedDevice = null;
-        selectedAddress = "";
-        selectedName = "";
-        selectAndConnect(token);
-        Log.i(TAG, "Bluetooth adapter restarted; selected iPhone reconnect resumed");
-    }
-
-    private void scheduleAdapterRecoveryWatchdog(long token) {
-        cancelAdapterRecoveryWatchdog();
-        Handler handler = worker;
-        if (handler == null) return;
-        Runnable watchdog = () -> runIfCurrent(token, () -> {
-            adapterRecoveryWatchdog = null;
-            if (!adapterRecoveryInProgress) return;
-            BluetoothAdapter adapter = bluetoothAdapter();
-            if (adapter != null && adapter.isEnabled()) {
-                finishAdapterRecovery(token);
-                return;
-            }
-            boolean accepted = false;
-            try {
-                accepted = adapter != null && adapter.enable();
-            } catch (RuntimeException denied) {
-                lastError = "Bluetooth recovery timeout: " + safeMessage(denied);
-            }
-            if (accepted) {
-                scheduleAdapterRecoveryWatchdog(token);
-            } else {
-                adapterRecoveryInProgress = false;
-                ancsStatus = "bluetooth_recovery_failed";
-                publishSnapshot(token);
-                scheduleDeviceRescan(token);
-            }
-        });
-        adapterRecoveryWatchdog = watchdog;
-        handler.postDelayed(watchdog, ADAPTER_RECOVERY_WATCHDOG_MS);
-    }
-
-    private void cancelAncsAdapterEscalation() {
-        Runnable task = ancsAdapterEscalationTask;
-        if (task != null && worker != null) worker.removeCallbacks(task);
-        ancsAdapterEscalationTask = null;
-    }
-
-    private void cancelAdapterRecoveryWatchdog() {
-        Runnable task = adapterRecoveryWatchdog;
-        if (task != null && worker != null) worker.removeCallbacks(task);
-        adapterRecoveryWatchdog = null;
     }
 
     private void cancelDeviceRescan() {
@@ -3617,15 +3442,12 @@ public final class PhoneConnectorController {
     private List<ConnectorValue> buildSnapshot(boolean active) {
         long now = System.currentTimeMillis();
         PhoneTelemetryStore.Record retained = retainedTelemetry;
-        boolean retainedBatteryAvailable = retainedBatteryFresh(now);
         boolean retainedNetworkAvailable = retainedNetworkFresh(now);
 
-        boolean retainedBatteryLevel = batteryLevel == null && retainedBatteryAvailable
-                && retained.batteryLevel != null;
-        Integer effectiveBatteryLevel = batteryLevel != null
-                ? batteryLevel : retainedBatteryLevel ? retained.batteryLevel : null;
-        String effectiveBatteryLevelSource = batteryLevel != null
-                ? batteryLevelSource : retainedBatteryLevel ? retained.batteryLevelSource : "";
+        Integer effectiveBatteryLevel = helperPowerUpdatedAtElapsed > 0L
+                ? batteryLevel : null;
+        String effectiveBatteryLevelSource = effectiveBatteryLevel == null
+                ? "" : "iphone_helper";
         // Never restore power state: only a fresh authenticated helper heartbeat is authoritative.
         Boolean effectiveCharging = batteryCharging;
         Boolean effectiveChargingEstimated = batteryChargingEstimated;
@@ -3657,8 +3479,7 @@ public final class PhoneConnectorController {
         // Radio generation is helper-only and is intentionally not resurrected from disk/HFP.
         String effectiveNetworkType = helperNetworkUpdatedAtElapsed > 0L
                 ? helperNetworkType : "";
-        boolean staleTelemetryUsed = retainedBatteryLevel
-                || retainedNetworkAvailability || retainedSignal || retainedRoaming
+        boolean staleTelemetryUsed = retainedNetworkAvailability || retainedSignal || retainedRoaming
                 || retainedOperator;
         telemetryStale = staleTelemetryUsed;
 

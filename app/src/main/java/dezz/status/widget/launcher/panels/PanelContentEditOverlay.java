@@ -59,6 +59,10 @@ public final class PanelContentEditOverlay extends View {
     }
 
     public interface Listener {
+        /** Brackets the complete pointer gesture so the host cannot rebuild its View tree. */
+        default void onGestureStateChanged(boolean active) {
+        }
+
         /** {@code finished} is true on ACTION_UP, suitable for a final persistence flush. */
         void onPlacementChanged(@NonNull String id, boolean finished);
 
@@ -167,6 +171,8 @@ public final class PanelContentEditOverlay extends View {
         if (!isEnabled() || current == null) return false;
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
+                Listener downListener = listener;
+                if (downListener != null) downListener.onGestureStateChanged(true);
                 Item hit = findHit(current, event.getX(), event.getY());
                 if (hit == null) {
                     selectedId = null;
@@ -241,6 +247,8 @@ public final class PanelContentEditOverlay extends View {
                 }
                 resizeCorner = PanelContentResizeMath.Corner.NONE;
                 performClick();
+                Listener upListener = listener;
+                if (upListener != null) upListener.onGestureStateChanged(false);
                 return true;
             default:
                 return true;

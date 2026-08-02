@@ -21,30 +21,42 @@ public final class AncsReconnectPolicyTest {
     @Test public void exactAddressDoesNotDependOnAdvertisementShape() {
         assertTrue(AncsReconnectPolicy.candidateMayBeSelected(
                 "AA:BB:CC:DD:EE:FF", "aa:bb:cc:dd:ee:ff",
-                false, false, false, false, false));
+                false, false, false, false, false, false, false));
     }
 
     @Test public void resolvedPrivateAddressNeedsAncsBondAndUniqueSupportingIdentity() {
         assertTrue(AncsReconnectPolicy.candidateMayBeSelected(
                 "AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66",
-                true, true, true, true, false));
+                true, true, true, true, false, false, false));
         assertFalse(AncsReconnectPolicy.candidateMayBeSelected(
                 "AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66",
-                true, true, false, true, false));
+                true, true, false, true, false, false, false));
         assertFalse(AncsReconnectPolicy.candidateMayBeSelected(
                 "AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66",
-                true, true, true, false, false));
+                true, true, true, false, false, false, false));
         assertFalse(AncsReconnectPolicy.candidateMayBeSelected(
                 "AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66",
-                true, false, true, true, false));
+                true, false, true, true, false, false, false));
     }
 
     @Test public void verifiedResolvedPeerReconnectsWithoutAnotherSolicitation() {
         assertTrue(AncsReconnectPolicy.candidateMayBeSelected(
                 "AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66",
-                true, false, false, false, true));
+                true, false, false, false, true, false, false));
         assertFalse(AncsReconnectPolicy.candidateMayBeSelected(
                 "AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66",
-                true, true, false, true, false));
+                true, true, false, true, false, false, false));
+    }
+
+    @Test public void privateHelperServiceResolvesSelectedLogicalPeripheralRpa() {
+        assertTrue(AncsReconnectPolicy.candidateMayBeSelected(
+                "AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66",
+                true, false, false, false, false, true, true));
+        assertFalse(AncsReconnectPolicy.candidateMayBeSelected(
+                "AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66",
+                true, false, false, false, false, true, false));
+        assertFalse(AncsReconnectPolicy.candidateMayBeSelected(
+                "AA:BB:CC:DD:EE:FF", "11:22:33:44:55:66",
+                true, false, false, false, false, false, true));
     }
 }

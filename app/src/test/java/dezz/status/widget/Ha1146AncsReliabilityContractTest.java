@@ -13,24 +13,25 @@ import java.nio.file.Paths;
 
 /** Regression barriers for the serialized, restart-safe ANCS transport introduced in HA1146. */
 public final class Ha1146AncsReliabilityContractTest {
-    @Test public void coldStartAndReconnectRetainExactlyOneBackgroundGattOwner()
+    @Test public void gpsStyleColdStartAndReconnectRetainExactlyOneGattOwner()
             throws Exception {
         String transport = source("phone/transport/IphoneAncsTransport.java");
-        String connect = between(transport, "private boolean startManagedBackgroundAttach",
-                "private void scheduleSavedPeerDirectFallback");
+        String connect = between(transport, "public boolean connectSavedIphone",
+                "public void requestSavedPeerReconnect");
         String callback = between(transport,
                 "private void handleIphonePeripheralConnectionState",
                 "private final BluetoothGattCallback gattCallback");
-        String autoWait = between(transport, "private void awaitBackgroundAutoReconnect",
+        String persistentWait = between(transport, "private void awaitPersistentGattReconnect",
                 "private boolean startSavedPeerScan");
 
-        assertTrue(connect.contains("connectGatt(context, true, gattCallback"));
-        assertTrue(connect.contains("gatt != null || clientConnectInFlight"));
-        assertTrue(callback.contains("activeClientAutoConnect && activeClientEstablished"));
-        assertTrue(callback.contains("awaitBackgroundAutoReconnect(callbackGatt"));
-        assertTrue(autoWait.contains("if (closing || gatt != expected"));
-        assertTrue(autoWait.contains("closeClientGatt(expected)"));
-        assertTrue(autoWait.contains("scheduleSavedPeerDirectFallback"));
+        assertTrue(connect.contains("return startSavedPeerScan(device)"));
+        assertFalse(connect.contains("connectGatt(context, true, gattCallback"));
+        assertTrue(callback.contains("boolean establishedOwner = activeClientEstablished"));
+        assertTrue(callback.contains("awaitPersistentGattReconnect(callbackGatt"));
+        assertTrue(persistentWait.contains("if (closing || gatt != expected"));
+        assertTrue(persistentWait.contains("rearmPersistentGattOwner"));
+        assertTrue(persistentWait.contains("expected.connect()"));
+        assertFalse(persistentWait.contains("closeClientGatt(expected)"));
     }
 
     @Test public void ambiguousAclLossProbesBeforeDestroyingAHealthyAncsLink()
@@ -44,6 +45,7 @@ public final class Ha1146AncsReliabilityContractTest {
         assertTrue(transport.contains("expected.readRemoteRssi()"));
         assertTrue(transport.contains("GATT liveness probe OK"));
         assertTrue(transport.contains("cancelAmbiguousAclProbe()"));
+        assertTrue(transport.contains("restartDiscoveryOnPersistentOwner"));
     }
 
     @Test public void mandatoryAncsQueueCannotBeKilledByOptionalBatteryOperations()
@@ -58,7 +60,7 @@ public final class Ha1146AncsReliabilityContractTest {
         assertFalse(controller.contains("state.contains(\"BAS OPERATION TIMEOUT\")"));
     }
 
-    @Test public void onlyNonSessionTelemetrySurvivesARecoveryWindow() throws Exception {
+    @Test public void onlyNonPowerTelemetrySurvivesARecoveryWindow() throws Exception {
         String controller = source("phone/PhoneConnectorController.java");
         String store = source("phone/PhoneTelemetryStore.java");
         String protocol = source("phone/transport/AncsProtocol.java");
@@ -68,7 +70,9 @@ public final class Ha1146AncsReliabilityContractTest {
         assertTrue(store.contains("network_updated_at"));
         assertTrue(controller.contains("persistCurrentTelemetry()"));
         assertTrue(controller.contains("telemetry.stale"));
-        assertTrue(controller.contains("retainedBatteryFresh(now)"));
+        assertFalse(controller.contains("retainedBatteryFresh(now)"));
+        assertTrue(controller.contains("Integer savedBatteryLevel = null"));
+        assertTrue(controller.contains("helperPowerUpdatedAtElapsed > 0L"));
         assertTrue(controller.contains("retainedNetworkFresh(now)"));
         assertFalse(store.contains("notification_uid"));
         assertTrue(protocol.contains("EVENT_FLAG_PRE_EXISTING"));

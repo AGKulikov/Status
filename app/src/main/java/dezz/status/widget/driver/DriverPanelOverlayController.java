@@ -948,10 +948,12 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             else controls.add(shortcut);
         }
         int availableHeight = Math.max(1, geometry.contentBottom - geometry.contentTop);
+        WindowManager.LayoutParams params = segmentParams(
+                type, screenHeight, screenWidth, profile);
         InformationSection topSection = buildInformationSection(
-                context, topInformation, gap);
+                context, topInformation, gap, params.width);
         InformationSection bottomSection = buildInformationSection(
-                context, bottomInformation, gap);
+                context, bottomInformation, gap, params.width);
         int desiredInformationHeight = topSection.desiredHeight
                 + bottomSection.desiredHeight;
         int informationBudget = desiredInformationHeight <= 0 ? 0
@@ -974,23 +976,56 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         }
         LinearLayout controlHost = new LinearLayout(context);
         controlHost.setOrientation(LinearLayout.VERTICAL);
-        controlHost.setGravity(Gravity.CENTER);
+        controlHost.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        List<View> controlViews = new ArrayList<>();
+        int[] naturalHeights = new int[controls.size()];
+        int[] requestedTop = new int[controls.size()];
+        int[] requestedBottom = new int[controls.size()];
+        int controlWidth = Math.max(1, params.width - 8);
+        int controlHeight = Math.max(1, availableHeight - topHeight - bottomHeight);
+        int controlIndex = 0;
         for (LauncherShortcutStore.Shortcut shortcut : controls) {
             View button = shortcutButton(context, shortcut, false);
             registerFavoriteAnchors(shortcut, button);
-            boolean expandedClimate = isExpandedClimate(shortcut);
-            int itemGap = shortcut.gapAfterPx < 0 ? gap : shortcut.gapAfterPx;
+            button.setMinimumHeight(0);
+            button.setMinimumWidth(0);
+            int naturalHeight;
+            if (shortcut.kind == LauncherShortcutStore.Kind.DIVIDER) {
+                naturalHeight = Math.max(1, shortcut.dividerThicknessPx);
+            } else {
+                button.measure(
+                        View.MeasureSpec.makeMeasureSpec(controlWidth, View.MeasureSpec.AT_MOST),
+                        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+                naturalHeight = Math.max(1, button.getMeasuredHeight());
+            }
+            controlViews.add(button);
+            naturalHeights[controlIndex] = naturalHeight;
+            requestedTop[controlIndex] = shortcut.gapBeforePx;
+            requestedBottom[controlIndex] = shortcut.gapAfterPx;
+            controlIndex++;
+        }
+        DriverControlSpacingPolicy.Layout spacing = DriverControlSpacingPolicy.resolve(
+                controlHeight, naturalHeights, requestedTop, requestedBottom);
+        for (int index = 0; index < controls.size(); index++) {
+            LauncherShortcutStore.Shortcut shortcut = controls.get(index);
+            View button = controlViews.get(index);
+            int internalTop = spacing.topPadding[index];
+            int internalBottom = spacing.bottomPadding[index];
             LinearLayout.LayoutParams itemParams;
             if (shortcut.kind == LauncherShortcutStore.Kind.DIVIDER) {
                 itemParams = new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
-                        shortcut.dividerThicknessPx + Math.max(4, itemGap));
+                        naturalHeights[index] + internalTop + internalBottom);
             } else {
+                button.setPadding(button.getPaddingLeft(), internalTop,
+                        button.getPaddingRight(), internalBottom);
                 itemParams = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, 0,
-                        DriverPanelLayoutPolicy.shortcutWeight(expandedClimate));
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT);
             }
-            itemParams.setMargins(4, 0, 4, Math.max(0, itemGap));
+            // Only the narrow rail edge inset remains external. Vertical spacing belongs to the
+            // button itself, so adjacent controls meet exactly when both values are zero.
+            itemParams.setMargins(4, 0, 4, 0);
             controlHost.addView(button, itemParams);
         }
         if (!controls.isEmpty()) {
@@ -1001,8 +1036,6 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             root.addView(bottomSection.view, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, bottomHeight));
         }
-        WindowManager.LayoutParams params = segmentParams(
-                type, screenHeight, screenWidth, profile);
         manager.addView(root, params);
         Log.d(TAG, "Attached " + profile.style.key + " driver panel type=" + type
                 + " screenWidth=" + screenWidth + " width=" + params.width
@@ -1014,7 +1047,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private InformationSection buildInformationSection(
             @NonNull Context context,
             @NonNull List<LauncherShortcutStore.Shortcut> information,
-            int panelGap) {
+            int panelGap,
+            int panelWidth) {
         if (information.isEmpty()) return new InformationSection(null, 0);
         LinkedHashMap<String, List<LauncherShortcutStore.Shortcut>> rows =
                 new LinkedHashMap<>();
@@ -1043,23 +1077,48 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             LinearLayout row = new LinearLayout(context);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(groupGravity(rowStyle));
-            int groupPaddingLeft = dp(context, rowStyle.informationGroupPaddingLeftPx);
-            int groupPaddingTop = dp(context, rowStyle.informationGroupPaddingTopPx);
-            int groupPaddingRight = dp(context, rowStyle.informationGroupPaddingRightPx);
-            int groupPaddingBottom = dp(context,
-                    rowStyle.informationGroupPaddingBottomPx);
+            // These settings are labelled and persisted as physical px for the fixed 1920×720
+            // display. Density conversion made a saved zero look non-zero and inflated every
+            // non-zero gap on the KX11 firmware.
+            int groupPaddingLeft = rowStyle.informationGroupPaddingLeftPx;
+            int groupPaddingTop = rowStyle.informationGroupPaddingTopPx;
+            int groupPaddingRight = rowStyle.informationGroupPaddingRightPx;
+            int groupPaddingBottom = rowStyle.informationGroupPaddingBottomPx;
             row.setPadding(groupPaddingLeft, groupPaddingTop,
                     groupPaddingRight, groupPaddingBottom);
             GradientDrawable groupBackground = new GradientDrawable();
             groupBackground.setColor(safeColor(
                     rowStyle.informationGroupBackgroundColor, Color.TRANSPARENT));
-            groupBackground.setCornerRadius(dp(context,
-                    rowStyle.informationGroupCornerRadiusPx));
+            groupBackground.setCornerRadius(rowStyle.informationGroupCornerRadiusPx);
             row.setBackground(groupBackground);
             int tileHeight = 0;
             int rowGap = 0;
             boolean namedGroup = !rowStyle.informationGroup.trim().isEmpty();
-            int internalGap = dp(context, rowStyle.informationGroupGapPx);
+            int internalGap = rowStyle.informationGroupGapPx;
+            int equalTileWidth = 1;
+            if (rowStyle.informationGroupDistribution == 0) {
+                for (LauncherShortcutStore.Shortcut member : rowItems) {
+                    equalTileWidth = Math.max(equalTileWidth,
+                            informationTileWidth(context, member));
+                }
+            }
+            int count = rowItems.size();
+            int availableTilesWidth = Math.max(count,
+                    panelWidth
+                            - rowStyle.informationGroupMarginLeftPx
+                            - rowStyle.informationGroupMarginRightPx
+                            - groupPaddingLeft - groupPaddingRight
+                            - Math.max(0, count - 1) * internalGap);
+            int[] requestedWidths = new int[count];
+            int requestedTotal = 0;
+            for (int index = 0; index < count; index++) {
+                int requested = rowStyle.informationGroupDistribution == 1
+                        ? informationTileWidth(context, rowItems.get(index)) : equalTileWidth;
+                requestedWidths[index] = Math.max(1, requested);
+                requestedTotal += requestedWidths[index];
+            }
+            float widthScale = requestedTotal <= availableTilesWidth ? 1f
+                    : availableTilesWidth / (float) requestedTotal;
             for (int itemIndex = 0; itemIndex < rowItems.size(); itemIndex++) {
                 LauncherShortcutStore.Shortcut shortcut = rowItems.get(itemIndex);
                 View tile = shortcutButton(context, shortcut, false);
@@ -1068,13 +1127,10 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                     rowGap = Math.max(rowGap, Math.max(0,
                             shortcut.gapAfterPx < 0 ? panelGap : shortcut.gapAfterPx));
                 }
-                LinearLayout.LayoutParams tileParams =
-                        rowStyle.informationGroupDistribution == 1
-                                ? new LinearLayout.LayoutParams(
-                                ViewGroup.LayoutParams.WRAP_CONTENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT)
-                                : new LinearLayout.LayoutParams(
-                                0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+                int tileWidth = Math.max(1,
+                        Math.round(requestedWidths[itemIndex] * widthScale));
+                LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(
+                        Math.max(1, tileWidth), ViewGroup.LayoutParams.MATCH_PARENT);
                 tileParams.rightMargin =
                         itemIndex + 1 < rowItems.size() ? internalGap : 0;
                 row.addView(tile, tileParams);
@@ -1083,11 +1139,10 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     Math.max(1, rowHeight));
-            rowParams.leftMargin = dp(context, rowStyle.informationGroupMarginLeftPx);
-            rowParams.topMargin = dp(context, rowStyle.informationGroupMarginTopPx);
-            rowParams.rightMargin = dp(context, rowStyle.informationGroupMarginRightPx);
-            rowParams.bottomMargin = dp(context,
-                    rowStyle.informationGroupMarginBottomPx) + rowGap;
+            rowParams.leftMargin = rowStyle.informationGroupMarginLeftPx;
+            rowParams.topMargin = rowStyle.informationGroupMarginTopPx;
+            rowParams.rightMargin = rowStyle.informationGroupMarginRightPx;
+            rowParams.bottomMargin = rowStyle.informationGroupMarginBottomPx + rowGap;
             host.addView(row, rowParams);
             contentHeight += rowHeight + rowParams.topMargin + rowParams.bottomMargin;
         }
@@ -1133,10 +1188,33 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 * (shortcut.informationShowValue ? 1 : 0)
                 + (shortcut.showTitle ? shortcut.informationLabelTextSizeSp : 0))
                 * scaledDensity * 1.18f);
-        int padding = dp(context, shortcut.informationPaddingTopPx
-                + shortcut.informationPaddingBottomPx);
-        int icon = dp(context, shortcut.informationIconSizePx) + padding;
+        int padding = shortcut.informationPaddingTopPx
+                + shortcut.informationPaddingBottomPx;
+        int icon = "none".equalsIgnoreCase(shortcut.icon)
+                ? padding : shortcut.informationIconSizePx + padding;
         return Math.max(1, Math.max(icon, text + padding));
+    }
+
+    /** Compact physical width; row gravity positions the cluster and the gap slider is exact. */
+    private static int informationTileWidth(
+            @NonNull Context context,
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        float scaledDensity = context.getResources().getDisplayMetrics().scaledDensity;
+        int width = shortcut.informationPaddingLeftPx + shortcut.informationPaddingRightPx;
+        if (!"none".equalsIgnoreCase(shortcut.icon)) width += shortcut.informationIconSizePx;
+        int textWidth = 0;
+        if (shortcut.showTitle) {
+            textWidth = Math.max(textWidth, Math.round(shortcut.title.length()
+                    * shortcut.informationLabelTextSizeSp * scaledDensity * .56f));
+        }
+        if (shortcut.informationShowValue) {
+            // Live values vary (for example operator names); reserve a useful compact baseline
+            // without forcing every cell to consume an equal fraction of the full rail.
+            textWidth = Math.max(textWidth,
+                    Math.round(shortcut.informationValueTextSizeSp * scaledDensity * 4.2f));
+        }
+        width += textWidth;
+        return Math.max(1, Math.min(240, width));
     }
 
     private static final class InformationSection {
@@ -1272,7 +1350,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 }
             });
             if (shortcut.hasLongAction) {
-                button.setOnLongClickListener(view -> actions.executeLong(shortcut, view));
+                button.setOnLongClickListener(view -> executeLongShortcut(shortcut, view));
             }
         } else {
             button.setClickable(false);
@@ -1295,12 +1373,28 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
     private void executeShortcut(@NonNull LauncherShortcutStore.Shortcut shortcut,
                                  @Nullable View anchor) {
+        // The All Apps drawer occupies the application area only, so driver-rail buttons stay
+        // clickable above it. Any different action owns that same area and must close the drawer
+        // first; the All Apps action itself remains a true second-tap toggle.
+        if (!isAllAppsAction(shortcut.kind, shortcut.target)) dismissAllApps();
         if (shortcut.kind == LauncherShortcutStore.Kind.BUILTIN
                 && LauncherShortcutStore.isDriverFavoritesTarget(shortcut.target)) {
             showFavorites(LauncherShortcutStore.driverFavoritesPanelId(shortcut.target), anchor);
             return;
         }
         actions.execute(shortcut, anchor);
+    }
+
+    private boolean executeLongShortcut(
+            @NonNull LauncherShortcutStore.Shortcut shortcut, @Nullable View anchor) {
+        if (!isAllAppsAction(shortcut.longKind, shortcut.longTarget)) dismissAllApps();
+        return actions.executeLong(shortcut, anchor);
+    }
+
+    private static boolean isAllAppsAction(
+            @NonNull LauncherShortcutStore.Kind kind, @Nullable String target) {
+        return kind == LauncherShortcutStore.Kind.BUILTIN
+                && LauncherShortcutStore.Builtin.ALL_APPS.key.equals(target);
     }
 
     private static boolean isPanelOverlayToggle(
@@ -1827,7 +1921,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 });
                 if (shortcut.hasLongAction) {
                     tile.setOnLongClickListener(view -> {
-                        boolean handled = actions.executeLong(shortcut, view);
+                        boolean handled = executeLongShortcut(shortcut, view);
                         if (handled && shortcut.closeFavoritePanelAfterAction) {
                             manuallyOpenFavorites.remove(panelId);
                             dismissFavoritePanel(panelId);

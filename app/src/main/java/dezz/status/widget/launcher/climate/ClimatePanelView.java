@@ -930,6 +930,12 @@ public final class ClimatePanelView extends FrameLayout {
     }
 
     private static int iconFor(@NonNull String id) {
+        if (id.equals(ClimatePanelConfig.SEAT_HEAT_PASSENGER)) {
+            return R.drawable.ic_car_seat_heat_passenger;
+        }
+        if (id.equals(ClimatePanelConfig.SEAT_VENT_PASSENGER)) {
+            return R.drawable.ic_car_seat_vent_passenger;
+        }
         if (id.contains("seat_heat")) return R.drawable.ic_car_seat_heat;
         if (id.contains("seat_vent")) return R.drawable.ic_car_seat_vent;
         if (id.equals(ClimatePanelConfig.WHEEL_HEAT)) return R.drawable.ic_car_wheel_heat;

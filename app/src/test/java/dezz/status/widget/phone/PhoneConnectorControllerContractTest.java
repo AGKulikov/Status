@@ -131,8 +131,7 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("mainHandler.post(() -> startAncsTransportOnMain("));
         assertTrue(savedPeer.contains("adapter.getRemoteDevice(address.trim())"));
         assertFalse(savedPeer.contains("startGeelyAncsAdvertising()"));
-        assertTrue(savedPeer.contains(
-                "return startManagedBackgroundAttach(device, \"initial selected-phone attach\")"));
+        assertTrue(savedPeer.contains("return startSavedPeerScan(device)"));
         assertTrue(savedPeer.contains("stopScan();"));
         assertTrue(savedPeer.contains("stopAdvertising();"));
         assertFalse(transport.contains(".setDeviceAddress(address)"));
@@ -143,9 +142,9 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(transport.contains("AncsReconnectPolicy.candidateMayBeSelected("));
         assertTrue(transport.contains("connectToSavedAdvertisingIphone("));
         assertTrue(transport.contains(
-                "connectToSavedAdvertisingIphone(result.getDevice(), solicitsAncs)"));
+                "connectToSavedAdvertisingIphone(result.getDevice(), solicitsAncs,"));
         assertTrue(transport.contains(
-                "matchesManagedSavedPeer(expected, device, solicitsAncs)"));
+                "matchesManagedSavedPeer(expected, device, solicitsAncs,"));
         assertTrue(transport.contains(
                 "connectIphonePeripheral(device, CONNECT_TIMEOUT_MS,"));
         assertTrue(transport.contains("CONNECT_TIMEOUT_MS = 35_000L"));
@@ -155,14 +154,13 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(clientConnect.contains("activeClientAutoConnect = false"));
         assertTrue(clientConnect.contains("main.postDelayed(connectTimeout, timeoutMs)"));
         assertFalse(clientConnect.contains("autoConnect=true"));
-        assertTrue(disconnect.contains("establishedAutoOwner"));
-        assertTrue(disconnect.contains("awaitBackgroundAutoReconnect(callbackGatt"));
+        assertTrue(disconnect.contains("establishedOwner"));
+        assertTrue(disconnect.contains("awaitPersistentGattReconnect(callbackGatt"));
         assertTrue(disconnect.contains("closeClientGatt(callbackGatt)"));
         assertTrue(disconnect.contains("state(\"GPS-STYLE · IPHONE DISCONNECTED\")"));
         assertFalse(source.contains("state.contains(\"AUTO · ЖДУ SAVED PEER\")"));
         assertTrue(source.contains("state.contains(\"IPHONE DISCONNECTED\")"));
         assertTrue(source.contains("scheduleGattReconnect(token,"));
-        assertTrue(source.contains("state.contains(\"AUTO · SERVICE CHANGED · RECONNECT\")"));
         assertTrue(transport.contains("scheduleManagedReconnect(value)"));
         assertTrue(transport.contains("managedReconnectTask != null"));
         assertTrue(transport.contains("LOCAL_LOGICAL_NAME = \"Geely_ANCS\""));
@@ -353,8 +351,10 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("value.put(\"text\", item.notification.message)"));
         assertTrue(source.contains("value.put(\"received_at\""));
         assertTrue(source.contains("\"diagnostics.last_app\""));
-        assertTrue(source.contains("basBatteryUpdatedAt >= hfpBatteryUpdatedAt"));
-        assertTrue(source.contains("genericBatteryUpdatedAt"));
+        assertTrue(source.contains("helperPowerUpdatedAtElapsed > 0L"));
+        assertTrue(source.contains("batteryLevelSource = \"iphone_helper\""));
+        assertTrue(source.contains(
+                "String effectiveNetworkType = helperNetworkUpdatedAtElapsed > 0L"));
         assertTrue(source.contains("SystemClock.elapsedRealtime()"));
         assertTrue(source.contains("clearGenericBatteryData()"));
     }

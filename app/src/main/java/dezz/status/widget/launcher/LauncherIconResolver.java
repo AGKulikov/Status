@@ -124,7 +124,9 @@ public final class LauncherIconResolver {
             ComponentName component = ComponentName.unflattenFromString(shortcut.target);
             if (component != null) source = HighResolutionAppIconLoader.load(context, component);
         }
-        if (source == null) source = ContextCompat.getDrawable(context, drawable(shortcut.icon));
+        if (source == null) {
+            source = ContextCompat.getDrawable(context, shortcutDrawable(shortcut));
+        }
         if (source == null) return null;
         source = DrawableCompat.wrap(source).mutate();
         String tint = colorOverride == null ? shortcut.iconColor : colorOverride;
@@ -228,5 +230,18 @@ public final class LauncherIconResolver {
             case "apps":
             default: return R.drawable.ic_launcher_apps;
         }
+    }
+
+    private static int shortcutDrawable(@NonNull LauncherShortcutStore.Shortcut shortcut) {
+        if (shortcut.kind == LauncherShortcutStore.Kind.CAR
+                && shortcut.target.endsWith("_passenger")) {
+            if ("seat_heat".equals(shortcut.icon)) {
+                return R.drawable.ic_car_seat_heat_passenger;
+            }
+            if ("seat_vent".equals(shortcut.icon)) {
+                return R.drawable.ic_car_seat_vent_passenger;
+            }
+        }
+        return drawable(shortcut.icon);
     }
 }

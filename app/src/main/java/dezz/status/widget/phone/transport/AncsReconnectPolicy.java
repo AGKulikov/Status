@@ -30,8 +30,11 @@ public final class AncsReconnectPolicy {
 
     /**
      * A broad software scan may accept the selected identity after Android resolves an iOS
-     * private address. ANCS solicitation is required unless the address already matches exactly
-     * or the same resolved peer completed this transport's strict identity gate earlier.
+     * private address. ANCS solicitation is required unless the address already matches exactly,
+     * the same resolved peer completed this transport's strict identity gate earlier, or the
+     * selected logical {@code iPhone_ANCS} peer is advertising the app-private Helper service.
+     * The last rule is what lets Android resolve iOS's rotating peripheral address before the
+     * encrypted ANCS service itself becomes visible.
      */
     public static boolean candidateMayBeSelected(
             @NonNull String selectedAddress,
@@ -40,11 +43,14 @@ public final class AncsReconnectPolicy {
             boolean observedBonded,
             boolean solicitsAncs,
             boolean uniqueBondedNameMatch,
-            boolean previouslyVerifiedResolvedPeer) {
+            boolean previouslyVerifiedResolvedPeer,
+            boolean advertisesHelperService,
+            boolean selectedHelperIdentity) {
         String selected = selectedAddress.trim();
         String observed = observedAddress.trim();
         if (!selected.isEmpty() && selected.equalsIgnoreCase(observed)) return true;
         if (previouslyVerifiedResolvedPeer) return true;
+        if (advertisesHelperService && selectedHelperIdentity) return true;
         return solicitsAncs && selectedBonded && observedBonded && uniqueBondedNameMatch;
     }
 }
