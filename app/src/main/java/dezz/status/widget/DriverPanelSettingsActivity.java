@@ -1352,12 +1352,34 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             int rowHeight = contentHeight
                     + Math.round((style.informationGroupPaddingTopPx
                     + style.informationGroupPaddingBottomPx) * .62f);
+            int count = items.size();
+            int availableTilesWidth = Math.max(count,
+                    railWidth
+                            - Math.round((style.informationGroupMarginLeftPx
+                            + style.informationGroupMarginRightPx
+                            + style.informationGroupPaddingLeftPx
+                            + style.informationGroupPaddingRightPx) * .62f)
+                            - Math.max(0, count - 1) * gap);
+            int equalWidth = 1;
+            if (style.informationGroupDistribution == 0) {
+                for (LauncherShortcutStore.Shortcut item : items) {
+                    equalWidth = Math.max(equalWidth,
+                            previewInformationTileWidth(item));
+                }
+            }
+            int[] requestedWidths = new int[count];
+            int requestedTotal = 0;
+            for (int index = 0; index < count; index++) {
+                requestedWidths[index] = style.informationGroupDistribution == 1
+                        ? previewInformationTileWidth(items.get(index)) : equalWidth;
+                requestedTotal += requestedWidths[index];
+            }
+            float widthScale = requestedTotal <= availableTilesWidth ? 1f
+                    : availableTilesWidth / (float) requestedTotal;
             for (int index = 0; index < items.size(); index++) {
                 FrameLayout cell = previewShortcutCell(items.get(index), railWidth);
-                LinearLayout.LayoutParams cellParams =
-                        style.informationGroupDistribution == 1
-                                ? new LinearLayout.LayoutParams(wrap(), match())
-                                : new LinearLayout.LayoutParams(0, match(), 1f);
+                LinearLayout.LayoutParams cellParams = new LinearLayout.LayoutParams(
+                        Math.max(1, Math.round(requestedWidths[index] * widthScale)), match());
                 cellParams.rightMargin = index + 1 < items.size() ? gap : 0;
                 row.addView(cell, cellParams);
             }
@@ -1416,6 +1438,26 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         int padding = Math.round((value.informationPaddingTopPx
                 + value.informationPaddingBottomPx) * .62f);
         return Math.max(1, Math.max(icon, text) + padding);
+    }
+
+    private int previewInformationTileWidth(
+            @NonNull LauncherShortcutStore.Shortcut value) {
+        int width = Math.round((value.informationPaddingLeftPx
+                + value.informationPaddingRightPx) * .62f);
+        if (!"none".equalsIgnoreCase(value.icon)) {
+            width += Math.round(value.informationIconSizePx * .62f);
+        }
+        float scaledDensity = getResources().getDisplayMetrics().scaledDensity;
+        int textWidth = 0;
+        if (value.showTitle) {
+            textWidth = Math.max(textWidth, Math.round(value.title.length()
+                    * value.informationLabelTextSizeSp * scaledDensity * .56f * .62f));
+        }
+        if (value.informationShowValue) {
+            textWidth = Math.max(textWidth, Math.round(value.informationValueTextSizeSp
+                    * scaledDensity * 4.2f * .62f));
+        }
+        return Math.max(1, Math.min(Math.round(240 * .62f), width + textWidth));
     }
 
     private static int previewGroupGravity(

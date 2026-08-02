@@ -26,8 +26,9 @@ public final class Ha1145RegressionContractTest {
         assertTrue(store.contains("public boolean informationGroupAncsOnly = false"));
         assertTrue(store.contains(".put(\"informationGroupAncsOnly\""));
         assertTrue(runtime.contains("shortcut.informationGroupAncsOnly && !ancsReady"));
-        assertTrue(runtime.contains("int internalGap = dp(context,"
-                + " rowStyle.informationGroupGapPx)"));
+        assertTrue(runtime.contains("int internalGap = rowStyle.informationGroupGapPx"));
+        assertTrue(runtime.contains("int availableTilesWidth"));
+        assertTrue(runtime.contains("informationTileWidth(context, member)"));
         assertTrue(service.contains("previousAncsReady != phoneAncsReady"));
         assertTrue(service.contains("DriverPanelService.apply(this)"));
     }

@@ -2602,12 +2602,10 @@ public final class PhoneConnectorController {
         if (selectedAddress.isEmpty()) return;
         PhoneTelemetryStore.Record previous = retainedTelemetry;
         long now = System.currentTimeMillis();
-        Integer savedBatteryLevel = batteryLiveSeenThisConnection
-                ? batteryLevel : previous == null ? null : previous.batteryLevel;
-        String savedBatteryLevelSource = batteryLiveSeenThisConnection
-                ? batteryLevelSource : previous == null ? "" : previous.batteryLevelSource;
-        // Helper-only fields are live session data and are never restored after a process/link
-        // restart. The next helper frame is required before the UI can show charger state.
+        // Every power field is Helper-only live session data. BAS/HFP/OEM readings remain useful
+        // in diagnostics, but are never persisted or substituted into the visible iPhone tile.
+        Integer savedBatteryLevel = null;
+        String savedBatteryLevelSource = "";
         Boolean savedCharging = null;
         Boolean savedChargingEstimated = null;
         String savedChargingSource = "";
@@ -2623,8 +2621,7 @@ public final class PhoneConnectorController {
         String savedNetworkOperator = networkLiveSeenThisConnection
                 ? networkOperator : previous == null ? "" : previous.networkOperator;
         String savedNetworkType = "";
-        long batteryUpdatedAt = batteryLiveSeenThisConnection
-                ? now : previous == null ? 0L : previous.batteryUpdatedAtWallMs;
+        long batteryUpdatedAt = 0L;
         long networkUpdatedAt = networkLiveSeenThisConnection
                 ? now : previous == null ? 0L : previous.networkUpdatedAtWallMs;
         PhoneTelemetryStore.Record next = new PhoneTelemetryStore.Record(
@@ -2656,22 +2653,14 @@ public final class PhoneConnectorController {
     }
 
     private void refreshBatteryValues() {
-        if (helperBatteryLevel != null) {
+        if (helperPowerUpdatedAtElapsed > 0L && helperBatteryLevel != null) {
             batteryLevel = helperBatteryLevel;
             batteryLevelSource = "iphone_helper";
-        } else if (basBatteryKnown && basBatteryUpdatedAt >= hfpBatteryUpdatedAt
-                && basBatteryUpdatedAt >= genericBatteryUpdatedAt) {
-            batteryLevel = basBatteryLevel;
-            batteryLevelSource = "ble_bas";
-        } else if (hfpBatteryKnown && hfpBatteryUpdatedAt >= genericBatteryUpdatedAt) {
-            batteryLevel = hfpBatteryLevel;
-            batteryLevelSource = "hfp_ecarx";
         } else {
-            batteryLevel = genericBatteryKnown ? genericBatteryLevel : null;
-            batteryLevelSource = genericBatteryKnown ? "android_broadcast" : "";
+            batteryLevel = null;
+            batteryLevelSource = "";
         }
-        // Charging is helper-only. BAS, HFP and OEM metadata may still improve the percentage,
-        // but they must never synthesize or retain the charger glyph.
+        // Charging and percentage share the exact same authenticated Helper heartbeat.
         if (helperPowerUpdatedAtElapsed > 0L) {
             batteryExternalPower = helperExternalPower;
             batteryChargeState = helperChargeState;
@@ -3617,15 +3606,12 @@ public final class PhoneConnectorController {
     private List<ConnectorValue> buildSnapshot(boolean active) {
         long now = System.currentTimeMillis();
         PhoneTelemetryStore.Record retained = retainedTelemetry;
-        boolean retainedBatteryAvailable = retainedBatteryFresh(now);
         boolean retainedNetworkAvailable = retainedNetworkFresh(now);
 
-        boolean retainedBatteryLevel = batteryLevel == null && retainedBatteryAvailable
-                && retained.batteryLevel != null;
-        Integer effectiveBatteryLevel = batteryLevel != null
-                ? batteryLevel : retainedBatteryLevel ? retained.batteryLevel : null;
-        String effectiveBatteryLevelSource = batteryLevel != null
-                ? batteryLevelSource : retainedBatteryLevel ? retained.batteryLevelSource : "";
+        Integer effectiveBatteryLevel = helperPowerUpdatedAtElapsed > 0L
+                ? batteryLevel : null;
+        String effectiveBatteryLevelSource = effectiveBatteryLevel == null
+                ? "" : "iphone_helper";
         // Never restore power state: only a fresh authenticated helper heartbeat is authoritative.
         Boolean effectiveCharging = batteryCharging;
         Boolean effectiveChargingEstimated = batteryChargingEstimated;
@@ -3657,8 +3643,7 @@ public final class PhoneConnectorController {
         // Radio generation is helper-only and is intentionally not resurrected from disk/HFP.
         String effectiveNetworkType = helperNetworkUpdatedAtElapsed > 0L
                 ? helperNetworkType : "";
-        boolean staleTelemetryUsed = retainedBatteryLevel
-                || retainedNetworkAvailability || retainedSignal || retainedRoaming
+        boolean staleTelemetryUsed = retainedNetworkAvailability || retainedSignal || retainedRoaming
                 || retainedOperator;
         telemetryStale = staleTelemetryUsed;
 

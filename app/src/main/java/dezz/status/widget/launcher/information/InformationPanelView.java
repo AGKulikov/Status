@@ -91,6 +91,8 @@ public final class InformationPanelView extends FrameLayout {
     private final Map<String, ConnectorValue> connectorValues = new HashMap<>();
     private final Map<String, ItemViews> itemViews = new LinkedHashMap<>();
     private boolean editorPreviewMode;
+    /** Driver-rail controls are specified in physical KX11 pixels, not density-independent dp. */
+    private boolean physicalPixelMetrics;
     private InformationPanelConfig config;
     @Nullable private Integer fixedCellBackgroundColor;
     private boolean started;
@@ -169,6 +171,17 @@ public final class InformationPanelView extends FrameLayout {
         if (editorPreviewMode == enabled) return;
         editorPreviewMode = enabled;
         updateValues();
+    }
+
+    /**
+     * Uses configuration values ending in {@code Px} as literal display pixels.  The launcher
+     * keeps its density-aware behavior, while the 1920×720 driver rail can make a true zero-pixel
+     * inset and an exact icon size selected in its editor.
+     */
+    public void setPhysicalPixelMetrics(boolean enabled) {
+        if (physicalPixelMetrics == enabled) return;
+        physicalPixelMetrics = enabled;
+        rebuild();
     }
 
     public void setConfig(@NonNull InformationPanelConfig source) {
@@ -373,7 +386,7 @@ public final class InformationPanelView extends FrameLayout {
         icon.setImageDrawable(LauncherIconResolver.resolvePreset(getContext(),
                 resolvedIconKey, item.iconColor));
         icon.setContentDescription(item.displayLabel());
-        int iconSize = scaledDp(item.iconSizePx, item.scalePercent);
+        int iconSize = Math.max(1, scaledDp(item.iconSizePx, item.scalePercent));
         LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(iconSize, iconSize);
         // No implicit icon/text inset: the owning free frame/group controls every gap.
         iconLp.rightMargin = 0;
@@ -774,7 +787,9 @@ public final class InformationPanelView extends FrameLayout {
     }
 
     private int scaledDp(int value, int scalePercent) {
-        return Math.max(1, dp(value) * scalePercent / 100);
+        int base = physicalPixelMetrics ? value : dp(value);
+        // Padding is allowed to be exactly zero; icon callers apply their own one-pixel floor.
+        return Math.max(0, base * scalePercent / 100);
     }
 
     private static float scaledSp(float value, int scalePercent) {

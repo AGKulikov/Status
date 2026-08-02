@@ -182,8 +182,13 @@ public class OutlineImageView extends AppCompatImageView {
         if (resId != 0 && resId == currentImageResId) {
             return;
         }
-        currentImageResId = resId;
+        // AppCompatImageView#setImageResource eventually invokes setImageDrawable(). Our
+        // override deliberately clears currentImageResId for callers that really supply an
+        // arbitrary Drawable, so assigning the resource id before super() loses the battery
+        // marker and makes onDraw() render the complete source vector (visually 100%) at every
+        // real charge level. Record the resource only after AppCompat has finished installing it.
         super.setImageResource(resId);
+        currentImageResId = resId;
         imageLevelApplied = false;
         invalidateOutlineCache();
     }

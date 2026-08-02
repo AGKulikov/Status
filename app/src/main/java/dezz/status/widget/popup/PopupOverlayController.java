@@ -119,6 +119,12 @@ public final class PopupOverlayController {
 
     private FrameLayout root;
     private WindowManager.LayoutParams params;
+    /**
+     * Android 9 on the KX11 can traverse an application-overlay ViewGroup after
+     * {@code removeAllViews()} has already nulled one of its child slots.  Keep the complete
+     * popup detached while its child tree is rebuilt, then attach the finished tree atomically.
+     */
+    private boolean rootAdded;
     private float touchX;
     private float touchY;
     private int startX;
@@ -230,9 +236,7 @@ public final class PopupOverlayController {
         renderedPlacements.clear();
         renderedTiles.clear();
         main.removeCallbacksAndMessages(null);
-        if (root != null) {
-            try { windowManager.removeView(root); } catch (Exception ignored) {}
-        }
+        detachRootImmediately();
         root = null;
         params = null;
     }
@@ -242,6 +246,10 @@ public final class PopupOverlayController {
         root = new FrameLayout(context);
         root.setClipChildren(false);
         root.setClipToPadding(false);
+        // The KX11 firmware has a broken inherited-RTL traversal for overlay windows.  Every
+        // generated popup is physically left-to-right, so make that contract explicit.
+        root.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+        root.setTextDirection(View.TEXT_DIRECTION_LTR);
         root.setOnTouchListener(this::dragOverlay);
         PopupOverlayConfig config = currentConfig;
         if (config == null) return;
@@ -256,14 +264,7 @@ public final class PopupOverlayController {
         params.x = config.x;
         params.y = config.y;
         params.windowAnimations = 0;
-        try {
-            windowManager.addView(root, params);
-        } catch (Exception e) {
-            root = null;
-            params = null;
-            Toast.makeText(context, "Не удалось создать всплывающий оверлей: "
-                    + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
+        rootAdded = false;
     }
 
     private void updateWindowGeometry() {
@@ -274,7 +275,9 @@ public final class PopupOverlayController {
         params.height = clamp(config.height, 100, 4000);
         params.x = config.x;
         params.y = config.y;
-        try { windowManager.updateViewLayout(root, params); } catch (Exception ignored) {}
+        if (rootAdded) {
+            try { windowManager.updateViewLayout(root, params); } catch (Exception ignored) {}
+        }
 
         GradientDrawable bg = new GradientDrawable();
         AutomationState overlayState = editorPreview ? AutomationState.missing()
@@ -295,7 +298,16 @@ public final class PopupOverlayController {
             refreshDeferred = true;
             return;
         }
-        root.removeAllViews();
+        // Never structurally mutate a ViewGroup that ViewRootImpl has ever measured. The KX11
+        // Android 9 build can retain a stale mChildrenCount after removeAllViews(), after which
+        // ViewGroup.resolveDrawables() dereferences a null child. Discard the whole detached root
+        // and build a fresh tree off-window instead.
+        detachRootImmediately();
+        root = null;
+        params = null;
+        ensureView();
+        updateWindowGeometry();
+        if (root == null || params == null) return;
         renderedPlacements.clear();
         renderedTiles.clear();
         PopupOverlayConfig config = currentConfig;
@@ -385,9 +397,21 @@ public final class PopupOverlayController {
         if (root == null) return;
         PanelContentEditOverlay grid = new PanelContentEditOverlay(context);
         grid.setModel(new EditorGridModel(), new PanelContentEditOverlay.Listener() {
+            @Override public void onGestureStateChanged(boolean active) {
+                touchInProgress = active;
+                if (!active && refreshDeferred && !destroyed) {
+                    refreshDeferred = false;
+                    // ACTION_UP/CANCEL must leave View.dispatchTouchEvent before WindowManager
+                    // swaps the complete overlay root.
+                    main.post(PopupOverlayController.this::applyPreferences);
+                }
+            }
+
             @Override public void onPlacementChanged(@NonNull String id, boolean finished) {
                 applyEditorPlacementsToViews();
-                if (finished) persistEditorPlacements();
+                if (finished) {
+                    persistEditorPlacements();
+                }
             }
 
             @Override public void onItemClicked(@NonNull String id) {
@@ -560,7 +584,9 @@ public final class PopupOverlayController {
     private void persistEditorPlacements() {
         try {
             configs.save(overlayId, currentItems);
-            applyPreferences();
+            // The editor already applied the final LayoutParams in-place. Rebuilding/removing the
+            // WindowManager root from inside PanelContentEditOverlay's ACTION_UP callback is both
+            // redundant and unsafe on the KX11 Android 9 ViewRoot implementation.
         } catch (JSONException | RuntimeException failure) {
             Toast.makeText(context, "Не удалось сохранить компоновку: "
                     + failure.getMessage(), Toast.LENGTH_LONG).show();
@@ -622,8 +648,7 @@ public final class PopupOverlayController {
         return Math.min(candidate, Math.min(horizontalLimit, verticalLimit));
     }
 
-    /** GONE alone is not reliable on every OEM WindowManager; NOT_TOUCHABLE guarantees that
-     * an empty fixed-size overlay cannot leave a 500×500 dead touch zone. */
+    /** Hidden overlays are removed from WindowManager, so they cannot leave a dead touch zone. */
     private void setOverlayVisible(boolean visible) {
         if (root == null || params == null) return;
         root.setVisibility(visible ? View.VISIBLE : View.GONE);
@@ -632,7 +657,37 @@ public final class PopupOverlayController {
                 : params.flags | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
         if (nextFlags != params.flags) {
             params.flags = nextFlags;
-            try { windowManager.updateViewLayout(root, params); } catch (Exception ignored) {}
+            if (rootAdded) {
+                try { windowManager.updateViewLayout(root, params); } catch (Exception ignored) {}
+            }
+        }
+        if (!visible) {
+            detachRootImmediately();
+            return;
+        }
+        if (rootAdded) return;
+        try {
+            windowManager.addView(root, params);
+            rootAdded = true;
+        } catch (RuntimeException failure) {
+            rootAdded = root.isAttachedToWindow();
+            if (!rootAdded) {
+                Toast.makeText(context, "Не удалось создать всплывающий оверлей: "
+                        + failure.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    /** Detaches synchronously before any child-array mutation on the KX11 Android 9 build. */
+    private void detachRootImmediately() {
+        FrameLayout current = root;
+        if (current == null || !rootAdded) return;
+        try {
+            windowManager.removeViewImmediate(current);
+        } catch (RuntimeException ignored) {
+            // A simultaneous service teardown may have removed it already.
+        } finally {
+            rootAdded = false;
         }
     }
 

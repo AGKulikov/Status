@@ -58,7 +58,7 @@ public final class Ha1146AncsReliabilityContractTest {
         assertFalse(controller.contains("state.contains(\"BAS OPERATION TIMEOUT\")"));
     }
 
-    @Test public void onlyNonSessionTelemetrySurvivesARecoveryWindow() throws Exception {
+    @Test public void onlyNonPowerTelemetrySurvivesARecoveryWindow() throws Exception {
         String controller = source("phone/PhoneConnectorController.java");
         String store = source("phone/PhoneTelemetryStore.java");
         String protocol = source("phone/transport/AncsProtocol.java");
@@ -68,7 +68,9 @@ public final class Ha1146AncsReliabilityContractTest {
         assertTrue(store.contains("network_updated_at"));
         assertTrue(controller.contains("persistCurrentTelemetry()"));
         assertTrue(controller.contains("telemetry.stale"));
-        assertTrue(controller.contains("retainedBatteryFresh(now)"));
+        assertFalse(controller.contains("retainedBatteryFresh(now)"));
+        assertTrue(controller.contains("Integer savedBatteryLevel = null"));
+        assertTrue(controller.contains("helperPowerUpdatedAtElapsed > 0L"));
         assertTrue(controller.contains("retainedNetworkFresh(now)"));
         assertFalse(store.contains("notification_uid"));
         assertTrue(protocol.contains("EVENT_FLAG_PRE_EXISTING"));

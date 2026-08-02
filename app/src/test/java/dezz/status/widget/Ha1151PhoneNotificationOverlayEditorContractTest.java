@@ -49,6 +49,15 @@ public final class Ha1151PhoneNotificationOverlayEditorContractTest {
         assertTrue(controller.contains("Переместить окно"));
         assertTrue(controller.contains("dragEditorWindow"));
         assertTrue(controller.contains("swaps them instead of refusing"));
+        String render = between(controller, "private void renderItems()",
+                "/**\n     * Adds launcher-style edit chrome");
+        assertTrue(render.contains("detachRootImmediately();"));
+        assertTrue(render.contains("root = null;"));
+        assertTrue(render.contains("ensureView();"));
+        assertFalse(render.contains("root.removeAllViews();"));
+        assertTrue(controller.contains("windowManager.removeViewImmediate(current)"));
+        assertTrue(controller.contains("root.setLayoutDirection(View.LAYOUT_DIRECTION_LTR)"));
+        assertTrue(controller.contains("onGestureStateChanged(boolean active)"));
     }
 
     @Test public void appIconRoundingUsesTheImageClipAndAnIosDefault() throws Exception {
@@ -66,8 +75,8 @@ public final class Ha1151PhoneNotificationOverlayEditorContractTest {
     @Test public void releaseIdentityRemainsMonotonicAfterTheEditorRelease() throws Exception {
         String build = new String(Files.readAllBytes(projectFile("build.gradle")),
                 StandardCharsets.UTF_8);
-        assertTrue(build.contains("return 'v2.8.2-ha1152'"));
-        assertEquals(208021152, 208020000 + 1152);
+        assertTrue(build.contains("return 'v2.8.2-ha1153'"));
+        assertEquals(208021153, 208020000 + 1153);
     }
 
     private static String source(String relative) throws Exception {
@@ -86,5 +95,13 @@ public final class Ha1151PhoneNotificationOverlayEditorContractTest {
         if (Files.isRegularFile(direct) && !Paths.get(".").toAbsolutePath().normalize()
                 .endsWith("app")) return direct;
         return Paths.get("..").resolve(relative).normalize();
+    }
+
+    private static String between(String source, String start, String end) {
+        int from = source.indexOf(start);
+        int to = source.indexOf(end, from + Math.max(1, start.length()));
+        assertTrue("Missing section start: " + start, from >= 0);
+        assertTrue("Missing section end: " + end, to > from);
+        return source.substring(from, to);
     }
 }
