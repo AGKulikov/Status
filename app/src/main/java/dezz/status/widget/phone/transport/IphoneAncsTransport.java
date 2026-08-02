@@ -107,10 +107,10 @@ public final class IphoneAncsTransport {
     private static final long BACKGROUND_ATTACH_TIMEOUT_MS = 30_000L;
     /**
      * A GATT client that has connected successfully with autoConnect=true is Android's durable
-     * background registration for the peer. Keep it substantially longer than a cold attach so
-     * an ordinary iPhone radio hand-off does not turn into scan/connect churn.
+     * background registration for the peer. The watchdog may re-arm that same owner, but must
+     * never close it merely because the iPhone stayed out of range for a fixed interval.
      */
-    private static final long ESTABLISHED_AUTO_RECONNECT_TIMEOUT_MS = 45_000L;
+    private static final long AUTO_RECONNECT_WATCHDOG_MS = 30_000L;
     /** ECARX often emits an ACL loss without saying whether Classic or LE was affected. */
     private static final long AMBIGUOUS_ACL_GRACE_MS = 1_200L;
     private static final long LINK_PROBE_TIMEOUT_MS = 2_500L;
@@ -374,6 +374,10 @@ public final class IphoneAncsTransport {
     private boolean iphoneHelperTelemetrySubscriptionAttempted;
     private boolean iphoneHelperTelemetrySubscribed;
     private boolean iphoneHelperTelemetryReadPending;
+    /** One deterministic B4 snapshot is read before any potentially encrypted ANCS CCCD. */
+    private boolean iphoneHelperInitialReadAttempted;
+    /** Service setup resumes only after that first snapshot read (or its bounded timeout). */
+    private boolean iphoneServiceSetupDeferredForHelperRead;
     private boolean iphonePostSecureDiscoveryScheduled;
     private boolean iphoneAncsSeen;
     private boolean closing;
@@ -822,23 +826,44 @@ public final class IphoneAncsTransport {
         if (!sessionState.move(expectedGeneration,
                 AncsSessionStateMachine.Phase.BACKGROUND_CONNECT)) return;
         state(REMOTE_LOGICAL_NAME + " · RECOVERING · AUTO WAIT");
+        rearmExistingAutoConnectOwner(expected, expectedGeneration, reason, true);
+    }
+
+    /**
+     * Reuses the already registered Android autoConnect owner indefinitely. Closing this object
+     * unregisters the background listener; on KX11/Android 9 a fresh scan then often cannot see
+     * the bonded iPhone until the user toggles Bluetooth. A watchdog therefore calls connect()
+     * on the same owner and re-schedules itself without creating a competing GATT client.
+     */
+    private void rearmExistingAutoConnectOwner(@NonNull BluetoothGatt expected,
+                                               long expectedGeneration,
+                                               @NonNull String reason,
+                                               boolean immediate) {
+        if (closing || gatt != expected || !clientConnectInFlight
+                || !sessionState.is(expectedGeneration,
+                AncsSessionStateMachine.Phase.BACKGROUND_CONNECT)) return;
+        if (immediate) {
+            boolean accepted;
+            try {
+                accepted = expected.connect();
+            } catch (RuntimeException failure) {
+                accepted = false;
+                log("Existing autoConnect owner connect() exception: " + failure);
+            }
+            log("Existing autoConnect owner re-armed=" + accepted + " · " + reason);
+        }
+        cancelConnectTimeout();
         connectTimeout = () -> {
+            connectTimeout = null;
             if (closing || gatt != expected || !clientConnectInFlight
                     || !sessionState.is(expectedGeneration,
                     AncsSessionStateMachine.Phase.BACKGROUND_CONNECT)) return;
-            clientConnectInFlight = false;
-            log("Existing autoConnect owner did not reattach in "
-                    + ESTABLISHED_AUTO_RECONNECT_TIMEOUT_MS
-                    + " ms; closing exactly once");
-            closeClientGatt(expected);
-            clearAncsRuntime();
-            scheduleSavedPeerDirectFallback(reason + "; autoConnect wait timeout",
-                    expectedGeneration);
+            log("iPhone ещё не вернулся за " + AUTO_RECONNECT_WATCHDOG_MS
+                    + " ms; сохраняю единственного autoConnect owner и повторяю connect()");
+            rearmExistingAutoConnectOwner(expected, expectedGeneration, reason, true);
         };
-        main.postDelayed(connectTimeout, ESTABLISHED_AUTO_RECONNECT_TIMEOUT_MS);
-        log("Сохраняю зарегистрированный autoConnect GATT ещё "
-                + ESTABLISHED_AUTO_RECONNECT_TIMEOUT_MS
-                + " ms для быстрого iPhone reconnect · " + reason);
+        main.postDelayed(connectTimeout, AUTO_RECONNECT_WATCHDOG_MS);
+        log("Фоновая GATT-регистрация сохранена без таймера закрытия · " + reason);
     }
 
     private boolean startSavedPeerScan(@NonNull BluetoothDevice device) {
@@ -1249,6 +1274,8 @@ public final class IphoneAncsTransport {
         iphoneHelperTelemetrySubscriptionAttempted = false;
         iphoneHelperTelemetrySubscribed = false;
         iphoneHelperTelemetryReadPending = false;
+        iphoneHelperInitialReadAttempted = false;
+        iphoneServiceSetupDeferredForHelperRead = false;
         iphonePostSecureDiscoveryScheduled = false;
         iphoneAncsSeen = false;
         ancsRetryAfterBond = false;
@@ -1863,6 +1890,22 @@ public final class IphoneAncsTransport {
             iphoneTelemetryCharacteristic = discoveredTelemetry;
             log("Helper telemetry endpoint="
                     + (iphoneTelemetryCharacteristic != null ? "TEL3/B4" : "legacy TEL2/B3"));
+
+            // Helper v9 deliberately makes B4 readable before ANCS authorization. Read one
+            // atomic snapshot before touching an encrypted ANCS CCCD: otherwise a pending
+            // pairing callback can occupy Android's serialized GATT queue for up to 90 seconds
+            // and make battery/network appear absent despite a healthy Helper service.
+            if (iphoneTelemetryCharacteristic != null
+                    && !iphoneHelperInitialReadAttempted && !gattReady) {
+                iphoneHelperInitialReadAttempted = true;
+                iphoneServiceSetupDeferredForHelperRead = true;
+                if (startHelperTelemetryRead(callbackGatt)) {
+                    log("Helper B4 initial snapshot started before ANCS subscriptions");
+                    return;
+                }
+                iphoneServiceSetupDeferredForHelperRead = false;
+                log("Helper B4 initial snapshot could not start; continuing ANCS setup");
+            }
         }
         // HA1122 exposed BAS even while iOS had not published ANCS yet. Prepare the optional
         // battery work immediately, then serialize it behind any Service Changed/ANCS CCCD.
@@ -2261,13 +2304,13 @@ public final class IphoneAncsTransport {
         prepareBatteryBootstrap(callbackGatt);
         log("Обе ANCS-подписки включены; Helper telemetry="
                 + (iphoneHelperTelemetrySubscribed ? "READY" : "UNAVAILABLE")
-                + "; encrypted TEL3 READ and BAS diagnostics use the serialized GATT queue");
+                + "; atomic B4 READ and BAS diagnostics use the serialized GATT queue");
         sendNextRequest();
     }
 
     /**
      * Keeps Helper telemetry alive independently of notification delivery. Notifications are the
-     * low-latency path; an encrypted B4 read is the deterministic snapshot/recovery path. If the
+     * low-latency path; a B4 read is the deterministic snapshot/recovery path. If the
      * Helper service was published after ANCS discovery, the same GATT owner periodically repeats
      * service discovery instead of opening a competing connection.
      */
@@ -2337,15 +2380,15 @@ public final class IphoneAncsTransport {
             started = callbackGatt.readCharacteristic(telemetry);
         } catch (RuntimeException failure) {
             started = false;
-            log("Helper TEL3 read exception: " + failure);
+            log("Helper B4 atomic read exception: " + failure);
         }
         if (!started) {
-            log("Helper TEL3 encrypted read did not start");
+            log("Helper B4 atomic read did not start");
             return false;
         }
         iphoneHelperTelemetryReadPending = true;
         scheduleHelperTelemetryReadTimeout(callbackGatt);
-        log("Helper TEL3 encrypted read started");
+        log("Helper B4 atomic read started");
         return true;
     }
 
@@ -2355,7 +2398,13 @@ public final class IphoneAncsTransport {
             helperTelemetryReadTimeout = null;
             if (expectedGatt != gatt || !iphoneHelperTelemetryReadPending) return;
             iphoneHelperTelemetryReadPending = false;
-            log("Helper TEL3 read callback timeout; ANCS remains active");
+            boolean resumeServiceSetup = iphoneServiceSetupDeferredForHelperRead;
+            iphoneServiceSetupDeferredForHelperRead = false;
+            log("Helper B4 read callback timeout; ANCS remains active");
+            if (resumeServiceSetup) {
+                handleServices(expectedGatt, GATT_SUCCESS);
+                return;
+            }
             scheduleHelperTelemetryRecovery(expectedGatt, HELPER_TELEMETRY_BUSY_RETRY_MS);
             sendNextRequest();
         };
@@ -2893,6 +2942,8 @@ public final class IphoneAncsTransport {
         iphoneHelperTelemetrySubscriptionAttempted = false;
         iphoneHelperTelemetrySubscribed = false;
         iphoneHelperTelemetryReadPending = false;
+        iphoneHelperInitialReadAttempted = false;
+        iphoneServiceSetupDeferredForHelperRead = false;
         descriptorStage = DescriptorStage.NONE;
         gattReady = false;
         discoveryPending = false;
@@ -3891,15 +3942,21 @@ public final class IphoneAncsTransport {
                         && iphoneHelperTelemetryReadPending) {
                     cancelHelperTelemetryReadTimeout();
                     iphoneHelperTelemetryReadPending = false;
+                    boolean resumeServiceSetup = iphoneServiceSetupDeferredForHelperRead;
+                    iphoneServiceSetupDeferredForHelperRead = false;
                     IphoneHelperTelemetry telemetry = status == GATT_SUCCESS
                             ? IphoneHelperTelemetry.parse(copy) : null;
                     if (telemetry != null) {
                         listener.onHelperTelemetry(telemetry);
-                        log("Helper TEL3 encrypted read accepted: kind=" + telemetry.kind
+                        log("Helper B4 atomic read accepted: kind=" + telemetry.kind
                                 + " seq=" + telemetry.sequence);
                     } else {
-                        log("Helper TEL3 encrypted read unavailable · status=" + status
+                        log("Helper B4 atomic read unavailable · status=" + status
                                 + " value=" + AdvertisementParser.hex(copy, 80));
+                    }
+                    if (resumeServiceSetup) {
+                        handleServices(callbackGatt, GATT_SUCCESS);
+                        return;
                     }
                     scheduleHelperTelemetryRecovery(callbackGatt, HELPER_TELEMETRY_POLL_MS);
                     sendNextRequest();
