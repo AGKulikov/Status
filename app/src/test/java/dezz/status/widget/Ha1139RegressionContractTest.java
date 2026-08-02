@@ -29,7 +29,7 @@ public final class Ha1139RegressionContractTest {
     @Test public void favoriteRailTapWinsOverTheSameOutsideTouch() throws Exception {
         String controller = source("driver/DriverPanelOverlayController.java");
 
-        assertTrue(controller.contains("FAVORITES_OUTSIDE_DISMISS_DELAY_MS = 120L"));
+        assertTrue(controller.contains("FAVORITES_OUTSIDE_DISMISS_DELAY_MS = 450L"));
         assertTrue(controller.contains("scheduleFavoriteOutsideDismiss(panelId)"));
         assertTrue(controller.contains("cancelPendingFavoriteOutsideDismiss(panelId);"));
         assertTrue(controller.contains(
@@ -38,7 +38,7 @@ public final class Ha1139RegressionContractTest {
 
     @Test public void driverAllAppsWindowNeverCoversTheRail() throws Exception {
         String controller = source("driver/DriverPanelOverlayController.java");
-        String method = between(controller, "public void showAllApps()",
+        String method = between(controller, "public void showAllApps(@Nullable View anchor)",
                 "public void showFavorites(");
 
         assertTrue(method.contains("metrics.widthPixels - physicalWidth"));
@@ -79,12 +79,16 @@ public final class Ha1139RegressionContractTest {
         assertTrue(full.contains("@color/iphone_signal_green"));
     }
 
-    @Test public void bluetoothFillRequiresTheCurrentlyReadableAncsFeed() throws Exception {
+    @Test public void bluetoothKeepsAncsAsDataButUsesOneMonochromeGlyph() throws Exception {
         String widget = source("WidgetService.java");
+        String policy = source("phone/PhoneBluetoothIndicatorPolicy.java");
         assertTrue(widget.contains("isPhoneNotificationPathAvailable()"));
         assertTrue(widget.contains("phoneStatusValues.get(\"notifications.items\")"));
         assertTrue(widget.contains("return phoneAncsReady && profileActive && feedActive"));
-        assertTrue(widget.contains("Math.min(1, Math.max(0, prefs.bluetooth.outlineWidth.get()))"));
+        assertTrue(policy.contains("PHONE_MONO"));
+        assertTrue(widget.contains("binding.bluetoothStatusIcon.setOutlineWidth(0)"));
+        assertFalse(widget.contains(
+                "Math.min(1, Math.max(0, prefs.bluetooth.outlineWidth.get()))"));
     }
 
     @Test public void mediaWidthSliderAllowsTheWholePhysicalRow() throws Exception {

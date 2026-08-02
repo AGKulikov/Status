@@ -115,9 +115,12 @@
     <string name="brick_title_indoor_temp">Cabin temperature</string>
     <string name="brick_title_outdoor_temp">Outside temperature</string>
     <string name="brick_title_phone_status">iPhone statuses</string>
-    <string name="brick_title_phone_cellular">iPhone cellular signal</string>
+    <string name="brick_title_phone_cellular">iPhone carrier and signal</string>
     <string name="brick_title_phone_battery">iPhone battery</string>
+    <string name="brick_title_phone_network_type">iPhone network type</string>
     <string name="show_bluetooth_device_count_badge">Show connected device count badge</string>
+    <string name="show_phone_cellular_network_type">Show network type in this block</string>
+    <string name="show_phone_battery_percentage">Show charge percentage inside battery</string>
     <string name="brick_font_size">Font size</string>
     <string name="brick_size">Size</string>
     <string name="brick_outline_alpha">Outline transparency</string>

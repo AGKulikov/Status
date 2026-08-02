@@ -375,6 +375,26 @@ public class Preferences {
         }
     }
 
+    /** iPhone battery brick adds the optional percentage rendered inside the solid body. */
+    public static final class PhoneBatteryBrickPrefs extends IconBrickPrefs {
+        public final Bool showPercentage;
+
+        public PhoneBatteryBrickPrefs(Preferences p) {
+            super(p, "phoneBattery");
+            showPercentage = new Bool(p, "phoneBatteryShowPercentage", true);
+        }
+    }
+
+    /** Combined cellular brick can independently include or hide its radio-generation label. */
+    public static final class PhoneCellularBrickPrefs extends IconBrickPrefs {
+        public final Bool showNetworkType;
+
+        public PhoneCellularBrickPrefs(Preferences p) {
+            super(p, "phoneCellular");
+            showNetworkType = new Bool(p, "phoneCellularShowNetworkType", true);
+        }
+    }
+
     /** Persisted generation marker retained only for one-time HA1084 migration. */
     public enum DriverPanelStyle {
         OLD("old"),
@@ -466,8 +486,10 @@ public class Preferences {
     public final IconBrickPrefs wifi = new IconBrickPrefs(this, "wifi");
     public final GpsBrickPrefs gps = new GpsBrickPrefs(this);
     public final BluetoothBrickPrefs bluetooth = new BluetoothBrickPrefs(this);
-    public final IconBrickPrefs phoneCellular = new IconBrickPrefs(this, "phoneCellular");
-    public final IconBrickPrefs phoneBattery = new IconBrickPrefs(this, "phoneBattery");
+    public final PhoneCellularBrickPrefs phoneCellular = new PhoneCellularBrickPrefs(this);
+    public final PhoneBatteryBrickPrefs phoneBattery = new PhoneBatteryBrickPrefs(this);
+    public final TextBrickPrefs phoneNetworkType =
+            new TextBrickPrefs(this, "phoneNetworkType", 36);
     // Car-specific temperature bricks (fed by the flavor's CarIntegration).
     public final TextBrickPrefs indoorTemp = new TextBrickPrefs(this, "indoorTemp", 40);
     public final TextBrickPrefs outdoorTemp = new TextBrickPrefs(this, "outdoorTemp", 40);
@@ -804,6 +826,8 @@ public class Preferences {
                 return homeAssistant;
             case PHONE_STATUS:
                 return phoneStatus;
+            case PHONE_NETWORK_TYPE:
+                return phoneNetworkType;
             default:
                 return null;
         }
@@ -1059,6 +1083,7 @@ public class Preferences {
             case PHONE_STATUS: return "phoneStatus";
             case PHONE_CELLULAR: return "phoneCellular";
             case PHONE_BATTERY: return "phoneBattery";
+            case PHONE_NETWORK_TYPE: return "phoneNetworkType";
             default: return null;
         }
     }

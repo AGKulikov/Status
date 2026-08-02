@@ -303,6 +303,8 @@ public class MainActivity extends AppCompatActivity {
                 return getString(R.string.brick_title_phone_cellular);
             case PHONE_BATTERY:
                 return getString(R.string.brick_title_phone_battery);
+            case PHONE_NETWORK_TYPE:
+                return getString(R.string.brick_title_phone_network_type);
             default:
                 return "";
         }

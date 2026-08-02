@@ -452,6 +452,7 @@ public final class InformationPanelView extends FrameLayout {
                     : ColorStateList.valueOf(status.iconTint));
             views.icon.setBatteryPercent(status.batteryPercent,
                     status.iconTint == 0 ? Color.WHITE : status.iconTint);
+            views.icon.setBatteryCharging(status.batteryCharging);
             views.icon.setOutlineColor(status.outlineColor);
             views.icon.setOutlineWidth(status.outlineWidth);
             views.icon.setBadgeText(status.badgeText,
@@ -466,6 +467,7 @@ public final class InformationPanelView extends FrameLayout {
         // regular preset selected by the driver.
         ImageViewCompat.setImageTintList(views.icon, null);
         views.icon.setBatteryPercent(null, Color.WHITE);
+        views.icon.setBatteryCharging(false);
         String iconKey = resolvedIconKey(item);
         if (!iconKey.equals(views.resolvedIconKey)) {
             views.icon.setImageDrawable(LauncherIconResolver.resolvePreset(

@@ -387,36 +387,47 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         });
         body.addView(size, new LinearLayout.LayoutParams(match(), dp(42)));
 
-        TextView gapValue = text(shortcut.gapAfterPx < 0
-                        ? "Отступ после кнопки: общий"
-                        : "Отступ после кнопки: " + shortcut.gapAfterPx + " px",
-                13, 0xFFC7C7CC);
-        body.addView(gapValue, topMargin(dp(6)));
-        SeekBar buttonGap = new SeekBar(this);
-        buttonGap.setMax(81);
-        buttonGap.setProgress(shortcut.gapAfterPx + 1);
-        buttonGap.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            int selected = shortcut.gapAfterPx;
+        if (shortcut.kind == LauncherShortcutStore.Kind.INFO
+                && !shortcut.informationGroup.trim().isEmpty()) {
+            // The previous card exposed gapAfterPx here even though a horizontal information
+            // row is rendered from informationGroupGapPx. That made the visible control a no-op
+            // for exactly the layout it claimed to edit.
+            spacingSlider(body, "Расстояние между информационными иконками", 120,
+                    shortcut.informationGroupGapPx, selected ->
+                            applyInformationGroupSetting(shortcut,
+                                    value -> value.informationGroupGapPx = selected));
+        } else {
+            TextView gapValue = text(shortcut.gapAfterPx < 0
+                            ? "Отступ после кнопки: общий"
+                            : "Отступ после кнопки: " + shortcut.gapAfterPx + " px",
+                    13, 0xFFC7C7CC);
+            body.addView(gapValue, topMargin(dp(6)));
+            SeekBar buttonGap = new SeekBar(this);
+            buttonGap.setMax(81);
+            buttonGap.setProgress(shortcut.gapAfterPx + 1);
+            buttonGap.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                int selected = shortcut.gapAfterPx;
 
-            @Override public void onProgressChanged(SeekBar seekBar, int progress,
-                                                    boolean fromUser) {
-                selected = progress - 1;
-                gapValue.setText(selected < 0
-                        ? "Отступ после кнопки: общий"
-                        : "Отступ после кнопки: " + selected + " px");
-            }
+                @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                                                        boolean fromUser) {
+                    selected = progress - 1;
+                    gapValue.setText(selected < 0
+                            ? "Отступ после кнопки: общий"
+                            : "Отступ после кнопки: " + selected + " px");
+                }
 
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {
-            }
+                @Override public void onStartTrackingTouch(SeekBar seekBar) {
+                }
 
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {
-                shortcut.gapAfterPx = selected;
-                store.upsert(shortcut);
-                refreshPreview();
-                applyPanel();
-            }
-        });
-        body.addView(buttonGap, new LinearLayout.LayoutParams(match(), dp(42)));
+                @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                    shortcut.gapAfterPx = selected;
+                    store.upsert(shortcut);
+                    refreshPreview();
+                    applyPanel();
+                }
+            });
+            body.addView(buttonGap, new LinearLayout.LayoutParams(match(), dp(42)));
+        }
 
         LinearLayout controls = new LinearLayout(this);
         controls.setOrientation(LinearLayout.HORIZONTAL);
@@ -861,10 +872,15 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 .show());
         form.addView(vertical, rowParams());
 
-        slider(form, "Расстояние между элементами", 0, 120,
-                shortcut.informationGroupGapPx, " px", selected ->
+        spacingSlider(form, "Расстояние между информационными иконками", 120,
+                shortcut.informationGroupGapPx, selected ->
                         applyInformationGroupSetting(shortcut,
                                 value -> value.informationGroupGapPx = selected));
+
+        addSwitch(form, "Показывать ряд только при подключении ANCS",
+                shortcut.informationGroupAncsOnly, checked ->
+                        applyInformationGroupSetting(shortcut,
+                                value -> value.informationGroupAncsOnly = checked));
 
         title(form, "Внешние отступы ряда");
         groupSlider(form, shortcut, "Слева",
@@ -937,7 +953,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                              @NonNull LauncherShortcutStore.Shortcut shortcut,
                              @NonNull String label, int current,
                              @NonNull GroupIntSetter setter) {
-        slider(form, label, 0, 120, current, " px", selected ->
+        spacingSlider(form, label, 120, current, selected ->
                 applyInformationGroupSetting(shortcut,
                         value -> setter.set(value, selected)));
     }
@@ -975,6 +991,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             @NonNull LauncherShortcutStore.Shortcut target) {
         target.informationPlacement = source.informationPlacement;
         target.informationGroupGapPx = source.informationGroupGapPx;
+        target.informationGroupAncsOnly = source.informationGroupAncsOnly;
         target.informationGroupMarginLeftPx = source.informationGroupMarginLeftPx;
         target.informationGroupMarginTopPx = source.informationGroupMarginTopPx;
         target.informationGroupMarginRightPx = source.informationGroupMarginRightPx;
@@ -1140,23 +1157,23 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         form.addView(vertical, rowParams());
 
         title(form, "Отступы содержимого");
-        slider(form, "Слева", 0, 96, shortcut.informationPaddingLeftPx,
-                " px", value -> {
+        spacingSlider(form, "Слева", 96, shortcut.informationPaddingLeftPx,
+                value -> {
                     shortcut.informationPaddingLeftPx = value;
                     persistInformationAppearance(shortcut);
                 });
-        slider(form, "Сверху", 0, 96, shortcut.informationPaddingTopPx,
-                " px", value -> {
+        spacingSlider(form, "Сверху", 96, shortcut.informationPaddingTopPx,
+                value -> {
                     shortcut.informationPaddingTopPx = value;
                     persistInformationAppearance(shortcut);
                 });
-        slider(form, "Справа", 0, 96, shortcut.informationPaddingRightPx,
-                " px", value -> {
+        spacingSlider(form, "Справа", 96, shortcut.informationPaddingRightPx,
+                value -> {
                     shortcut.informationPaddingRightPx = value;
                     persistInformationAppearance(shortcut);
                 });
-        slider(form, "Снизу", 0, 96, shortcut.informationPaddingBottomPx,
-                " px", value -> {
+        spacingSlider(form, "Снизу", 96, shortcut.informationPaddingBottomPx,
+                value -> {
                     shortcut.informationPaddingBottomPx = value;
                     persistInformationAppearance(shortcut);
                 });
@@ -1327,14 +1344,19 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                     style.informationGroupCornerRadiusPx * .62f));
             row.setBackground(surface);
             int gap = Math.round(style.informationGroupGapPx * .62f);
-            int rowHeight = dp(42)
+            int contentHeight = 1;
+            for (LauncherShortcutStore.Shortcut item : items) {
+                contentHeight = Math.max(contentHeight,
+                        previewInformationTileHeight(item));
+            }
+            int rowHeight = contentHeight
                     + Math.round((style.informationGroupPaddingTopPx
                     + style.informationGroupPaddingBottomPx) * .62f);
             for (int index = 0; index < items.size(); index++) {
                 FrameLayout cell = previewShortcutCell(items.get(index), railWidth);
                 LinearLayout.LayoutParams cellParams =
                         style.informationGroupDistribution == 1
-                                ? new LinearLayout.LayoutParams(dp(42), match())
+                                ? new LinearLayout.LayoutParams(wrap(), match())
                                 : new LinearLayout.LayoutParams(0, match(), 1f);
                 cellParams.rightMargin = index + 1 < items.size() ? gap : 0;
                 row.addView(cell, cellParams);
@@ -1367,13 +1389,33 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             if (drawable != null) image.setImageDrawable(drawable);
             icon = image;
         }
-        int iconSize = Math.max(dp(18), Math.min(railWidth - dp(8),
-                Math.round(value.iconSizePx * .62f)));
+        int requestedIconSize = value.kind == LauncherShortcutStore.Kind.INFO
+                ? value.informationIconSizePx : value.iconSizePx;
+        int iconSize = Math.max(1, Math.min(railWidth,
+                Math.round(requestedIconSize * .62f)));
         FrameLayout cell = new FrameLayout(this);
+        if (value.kind == LauncherShortcutStore.Kind.INFO) {
+            cell.setPadding(Math.round(value.informationPaddingLeftPx * .62f),
+                    Math.round(value.informationPaddingTopPx * .62f),
+                    Math.round(value.informationPaddingRightPx * .62f),
+                    Math.round(value.informationPaddingBottomPx * .62f));
+        }
         cell.addView(icon, new FrameLayout.LayoutParams(iconSize,
                 DriverPanelLayoutPolicy.shortcutIconHeight(iconSize, false),
                 Gravity.CENTER));
         return cell;
+    }
+
+    private static int previewInformationTileHeight(
+            @NonNull LauncherShortcutStore.Shortcut value) {
+        int icon = "none".equalsIgnoreCase(value.icon) ? 0
+                : Math.round(value.informationIconSizePx * .62f);
+        int label = value.showTitle ? value.informationLabelTextSizeSp : 0;
+        int state = value.informationShowValue ? value.informationValueTextSizeSp : 0;
+        int text = Math.round((label + state) * .62f * 1.18f);
+        int padding = Math.round((value.informationPaddingTopPx
+                + value.informationPaddingBottomPx) * .62f);
+        return Math.max(1, Math.max(icon, text) + padding);
     }
 
     private static int previewGroupGravity(
@@ -1501,6 +1543,41 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
+        block.addView(seek, new LinearLayout.LayoutParams(match(), dp(42)));
+        host.addView(block, rowParams());
+    }
+
+    /** Four-side spacing control with a dedicated zero action usable on a car touchscreen. */
+    private void spacingSlider(LinearLayout host, String label, int max, int current,
+                               IntSetter setter) {
+        LinearLayout block = new LinearLayout(this);
+        block.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = text(label + ": " + current + " px", 15, 0xFFC7C7CC);
+        header.addView(title, new LinearLayout.LayoutParams(0, wrap(), 1f));
+        MaterialButton zero = compactButton("0");
+        zero.setContentDescription(label + ": убрать отступ");
+        header.addView(zero, new LinearLayout.LayoutParams(dp(56), dp(40)));
+        block.addView(header);
+
+        SeekBar seek = new SeekBar(this);
+        seek.setMax(max);
+        seek.setProgress(Math.max(0, Math.min(max, current)));
+        zero.setEnabled(seek.getProgress() != 0);
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                                                    boolean fromUser) {
+                title.setText(label + ": " + progress + " px");
+                zero.setEnabled(progress != 0);
+                setter.set(progress);
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+        zero.setOnClickListener(view -> seek.setProgress(0));
         block.addView(seek, new LinearLayout.LayoutParams(match(), dp(42)));
         host.addView(block, rowParams());
     }

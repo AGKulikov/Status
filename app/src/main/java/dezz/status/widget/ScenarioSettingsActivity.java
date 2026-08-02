@@ -479,7 +479,14 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                         dialog.dismiss();
                         Toast.makeText(this, "Сценарий сохранён", Toast.LENGTH_SHORT).show();
                     } catch (Exception error) {
-                        showValidationError(error);
+                        if (!views.hasSelectedSource()) {
+                            Toast.makeText(this,
+                                    "Сначала выберите источник условия",
+                                    Toast.LENGTH_LONG).show();
+                            views.showSourcePicker();
+                        } else {
+                            showValidationError(error);
+                        }
                     }
                 }));
         dialog.show();
@@ -764,7 +771,7 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             String profile = DEFAULT_CONNECTOR_ID;
             String resource = text(resourceId);
             if (resource.isEmpty()) {
-                throw new IllegalArgumentException("Укажите ID ресурса");
+                throw new IllegalArgumentException("Выберите источник условия");
             }
             Operator selectedOperator = Operator.fromJsonName(
                     mappedValue(operator, OPERATOR_VALUES));
@@ -819,6 +826,10 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             }
             return Collections.singletonList(new LocalAction(targetScope, selectedTargetId,
                     field, value));
+        }
+
+        private boolean hasSelectedSource() {
+            return !text(resourceId).isEmpty();
         }
 
         private void updateValueControl() {

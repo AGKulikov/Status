@@ -42,7 +42,9 @@ public enum BrickType {
     /** iPhone cellular signal rendered as the familiar four ascending bars. */
     PHONE_CELLULAR,
     /** Exact paired-iPhone battery level rendered as an iPhone battery glyph. */
-    PHONE_BATTERY;
+    PHONE_BATTERY,
+    /** Helper-provided cellular radio generation rendered as an iPhone-style text label. */
+    PHONE_NETWORK_TYPE;
 
     /** Stable id used by Home Assistant/MQTT visibility commands. Never derive this from ordinal. */
     public String automationId() {
@@ -59,6 +61,7 @@ public enum BrickType {
             case PHONE_STATUS: return "builtin.phone_status";
             case PHONE_CELLULAR: return "builtin.phone_cellular";
             case PHONE_BATTERY: return "builtin.phone_battery";
+            case PHONE_NETWORK_TYPE: return "builtin.phone_network_type";
             default: throw new IllegalStateException("Unknown brick type " + this);
         }
     }

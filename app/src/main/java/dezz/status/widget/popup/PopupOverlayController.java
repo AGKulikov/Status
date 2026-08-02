@@ -399,16 +399,18 @@ public final class PopupOverlayController {
         int iconRes = PopupIconCatalog.resolve(iconId);
         Drawable appIcon = phoneAppIdentifier == null ? null
                 : PhoneAppIconStore.get(context).drawable(phoneAppIdentifier);
+        String renderedIconColor = SmartHomeTileColorPolicy.contentColor(
+                item.sourceBinding, item.iconColor, presentation.color);
         if (appIcon != null) {
             icon.setImageDrawable(appIcon);
             ImageViewCompat.setImageTintList(icon, appIcon instanceof BitmapDrawable
                     ? null
                     : ColorStateList.valueOf(
-                            AutomationState.parseColor(item.iconColor, 0xFFFFFFFF)));
+                            AutomationState.parseColor(renderedIconColor, 0xFFFFFFFF)));
         } else {
             if (iconRes != 0) icon.setImageResource(iconRes);
             ImageViewCompat.setImageTintList(icon, ColorStateList.valueOf(
-                    AutomationState.parseColor(item.iconColor, 0xFFFFFFFF)));
+                    AutomationState.parseColor(renderedIconColor, 0xFFFFFFFF)));
         }
         icon.setAlpha(item.iconAlpha / 255f);
         iconBox.addView(icon, new FrameLayout.LayoutParams(
@@ -433,7 +435,10 @@ public final class PopupOverlayController {
         title.setIncludeFontPadding(false);
         title.setText(item.title);
         title.setTextSize(TypedValue.COMPLEX_UNIT_PX, item.titleSize);
-        title.setTextColor(withAlpha(AutomationState.parseColor(item.titleColor, 0xCCFFFFFF),
+        String renderedTitleColor = SmartHomeTileColorPolicy.contentColor(
+                item.sourceBinding, item.titleColor, presentation.color);
+        title.setTextColor(withAlpha(AutomationState.parseColor(
+                renderedTitleColor, 0xCCFFFFFF),
                 item.titleAlpha));
         title.setTypeface(Fonts.resolve(context, item.titleFontFamily,
                 item.titleBold, item.titleItalic));

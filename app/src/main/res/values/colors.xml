@@ -32,7 +32,6 @@
     <color name="status_bluetooth">#0082FC</color>
     <!-- Fixed iPhone-style indicators. These intentionally have no night overrides. -->
     <color name="iphone_signal_green">#30D158</color>
-    <color name="iphone_battery_charging">#30D158</color>
     <color name="iphone_battery_low">#FFD60A</color>
     <color name="iphone_battery_critical">#FF453A</color>
     <!-- Fixed dark ink for text badges drawn on a colored pill (DR / anti-spoof). Intentionally

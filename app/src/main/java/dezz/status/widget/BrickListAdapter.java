@@ -159,6 +159,8 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
                 return R.string.brick_title_phone_cellular;
             case PHONE_BATTERY:
                 return R.string.brick_title_phone_battery;
+            case PHONE_NETWORK_TYPE:
+                return R.string.brick_title_phone_network_type;
             default:
                 return 0;
         }
@@ -232,6 +234,10 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
         final MaterialSwitch brickGpsShowSatelliteBadge;
         final LinearLayout brickBluetoothBlock;
         final MaterialSwitch brickBluetoothShowDeviceCountBadge;
+        final LinearLayout brickCellularBlock;
+        final MaterialSwitch brickCellularShowNetworkType;
+        final LinearLayout brickBatteryBlock;
+        final MaterialSwitch brickBatteryShowPercentage;
         // Containers in the generic brick area we GONE for media — media duplicates everything
         // text-related inside its own sectioned block.
         final LinearLayout brickSizeAdjustRow;
@@ -336,6 +342,10 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
             brickGpsShowSatelliteBadge = itemView.findViewById(R.id.brickGpsShowSatelliteBadge);
             brickBluetoothBlock = itemView.findViewById(R.id.brickBluetoothBlock);
             brickBluetoothShowDeviceCountBadge = itemView.findViewById(R.id.brickBluetoothShowDeviceCountBadge);
+            brickCellularBlock = itemView.findViewById(R.id.brickCellularBlock);
+            brickCellularShowNetworkType = itemView.findViewById(R.id.brickCellularShowNetworkType);
+            brickBatteryBlock = itemView.findViewById(R.id.brickBatteryBlock);
+            brickBatteryShowPercentage = itemView.findViewById(R.id.brickBatteryShowPercentage);
             brickSizeAdjustRow = itemView.findViewById(R.id.brickSizeAdjustRow);
             brickOutlineRow = itemView.findViewById(R.id.brickOutlineRow);
             brickContentAlphaRow = itemView.findViewById(R.id.brickContentAlphaRow);
@@ -426,6 +436,8 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
             brickDateOneLineLayout.setOnCheckedChangeListener(null);
             brickGpsShowSatelliteBadge.setOnCheckedChangeListener(null);
             brickBluetoothShowDeviceCountBadge.setOnCheckedChangeListener(null);
+            brickCellularShowNetworkType.setOnCheckedChangeListener(null);
+            brickBatteryShowPercentage.setOnCheckedChangeListener(null);
             brickMediaShowSource.setOnCheckedChangeListener(null);
             brickMediaTitleFirst.setOnCheckedChangeListener(null);
             brickMediaMarqueeEnabled.setOnCheckedChangeListener(null);
@@ -461,6 +473,8 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
             brickContentAlphaRow.setVisibility(View.VISIBLE);
             brickMarginRow.setVisibility(View.VISIBLE);
             brickFontBlockHeader.setVisibility(View.GONE);
+            showBatteryBlock(type == BrickType.PHONE_BATTERY);
+            showCellularBlock(type == BrickType.PHONE_CELLULAR);
 
             switch (type) {
                 case TIME:
@@ -538,6 +552,7 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
                     break;
                 case PHONE_CELLULAR:
                     bindIconBrick(prefs.phoneCellular);
+                    bindCellularBlock();
                     showDateBlock(false);
                     showGpsBlock(false);
                     showBluetoothBlock(false);
@@ -545,6 +560,14 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
                     break;
                 case PHONE_BATTERY:
                     bindIconBrick(prefs.phoneBattery);
+                    bindBatteryBlock();
+                    showDateBlock(false);
+                    showGpsBlock(false);
+                    showBluetoothBlock(false);
+                    showMediaBlock(false);
+                    break;
+                case PHONE_NETWORK_TYPE:
+                    bindTextBrick(prefs.phoneNetworkType);
                     showDateBlock(false);
                     showGpsBlock(false);
                     showBluetoothBlock(false);
@@ -755,6 +778,8 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
                     return activity.getString(R.string.brick_title_phone_cellular);
                 case PHONE_BATTERY:
                     return activity.getString(R.string.brick_title_phone_battery);
+                case PHONE_NETWORK_TYPE:
+                    return activity.getString(R.string.brick_title_phone_network_type);
                 default:
                     return "";
             }
@@ -982,6 +1007,23 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
             });
         }
 
+        private void bindBatteryBlock() {
+            brickBatteryShowPercentage.setChecked(prefs.phoneBattery.showPercentage.get());
+            brickBatteryShowPercentage.setOnCheckedChangeListener((v, c) -> {
+                prefs.phoneBattery.showPercentage.set(c);
+                notifyService();
+            });
+        }
+
+        private void bindCellularBlock() {
+            brickCellularShowNetworkType.setChecked(
+                    prefs.phoneCellular.showNetworkType.get());
+            brickCellularShowNetworkType.setOnCheckedChangeListener((v, c) -> {
+                prefs.phoneCellular.showNetworkType.set(c);
+                notifyService();
+            });
+        }
+
         private void bindMediaBlock() {
             // ============================ Общие ============================
             brickMediaShowSource.setChecked(prefs.media.showSource.get());
@@ -1088,6 +1130,14 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
 
         private void showBluetoothBlock(boolean show) {
             brickBluetoothBlock.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
+
+        private void showBatteryBlock(boolean show) {
+            brickBatteryBlock.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
+
+        private void showCellularBlock(boolean show) {
+            brickCellularBlock.setVisibility(show ? View.VISIBLE : View.GONE);
         }
 
         private void showMediaBlock(boolean show) {

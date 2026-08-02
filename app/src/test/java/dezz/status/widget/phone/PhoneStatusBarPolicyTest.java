@@ -34,7 +34,6 @@ public final class PhoneStatusBarPolicyTest {
                         "battery.level",
                         "battery.level_source",
                         "battery.charging",
-                        "battery.charging_estimated",
                         "battery.charging_source",
                         "battery.external_power",
                         "battery.charge_state",
@@ -168,6 +167,18 @@ public final class PhoneStatusBarPolicyTest {
                         false, true, true)));
         assertNull(PhoneStatusBarPolicy.booleanValue("battery.charging",
                 current("battery.external_power", true)));
+    }
+
+    @Test public void operatorTextIsExactCurrentPhoneDataWithoutDisplayPrefix() {
+        assertEquals("Orange RO 5G", PhoneStatusBarPolicy.textValue(
+                "network.operator", current("network.operator", " Orange\nRO\t5G ")));
+        assertNull(PhoneStatusBarPolicy.textValue("network.operator",
+                current("network.operator", Collections.singletonMap("x", "y"))));
+        assertNull(PhoneStatusBarPolicy.textValue("network.operator",
+                current("network.type", "LTE")));
+        assertNull(PhoneStatusBarPolicy.textValue("network.operator",
+                value(ConnectorType.PHONE, "network.operator", "Orange", false,
+                        true, true)));
     }
 
     @Test public void latestNotificationUsesStableKeyAndSelectedCanonicalFields() {

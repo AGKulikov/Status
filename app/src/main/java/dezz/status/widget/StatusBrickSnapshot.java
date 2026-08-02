@@ -17,6 +17,8 @@ public final class StatusBrickSnapshot {
     public final int iconLevel;
     /** Live number rendered inside the iPhone battery body; null for every other icon. */
     @Nullable public final Integer batteryPercent;
+    /** Fresh helper-reported external power; controls the lightning overlay. */
+    public final boolean batteryCharging;
     public final int outlineColor;
     public final int outlineWidth;
     @Nullable public final String badgeText;
@@ -31,6 +33,7 @@ public final class StatusBrickSnapshot {
                                int iconTint,
                                int iconLevel,
                                @Nullable Integer batteryPercent,
+                               boolean batteryCharging,
                                int outlineColor,
                                int outlineWidth,
                                @Nullable String badgeText,
@@ -44,6 +47,7 @@ public final class StatusBrickSnapshot {
         this.iconTint = iconTint;
         this.iconLevel = iconLevel;
         this.batteryPercent = batteryPercent;
+        this.batteryCharging = batteryCharging;
         this.outlineColor = outlineColor;
         this.outlineWidth = outlineWidth;
         this.badgeText = badgeText;

@@ -86,7 +86,8 @@ public final class PhoneSelectedIphoneIsolationContractTest {
         assertTrue(source.contains("created.connectSavedIphone(address)"));
         assertTrue(source.contains("new AncsTransportListener(token, transportSession)"));
         assertTrue(savedPeer.contains("adapter.getRemoteDevice(address.trim())"));
-        assertTrue(savedPeer.contains("return startSavedPeerScan(device)"));
+        assertTrue(savedPeer.contains(
+                "return startManagedBackgroundAttach(device, \"initial selected-phone attach\")"));
         assertFalse(savedPeer.contains("startGeelyAncsAdvertising()"));
         assertFalse(transport.contains(".setDeviceAddress(address)"));
         assertTrue(transport.contains("matchesManagedSavedPeer("));

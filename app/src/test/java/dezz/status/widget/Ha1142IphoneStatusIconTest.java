@@ -12,42 +12,43 @@ import java.nio.file.Paths;
 
 /** Regression contract for the iPhone-style status indicators added in HA1142. */
 public final class Ha1142IphoneStatusIconTest {
-    @Test public void chargingWinsOverLowBatteryColors() throws Exception {
+    @Test public void chargingBoltNeverOverridesPercentageThresholdColors() throws Exception {
         String widget = source("WidgetService.java");
         String policy = source("phone/PhoneStatusBarPolicy.java");
-        String colors = resource("values/colors.xml");
+        String icon = source("OutlineImageView.java");
 
-        int charging = widget.indexOf("return chargingNow");
-        int critical = widget.indexOf("battery != null && battery <= 10", charging);
-        assertTrue(charging >= 0 && critical > charging);
+        assertTrue(widget.contains("battery != null && battery <= 10"));
+        assertTrue(widget.contains("battery != null && battery <= 20"));
         assertTrue(count(widget, "phoneBatteryColor(battery)") >= 2);
         assertTrue(widget.contains("phoneBoolean(\"battery.charging\")"));
         assertTrue(widget.contains("phoneBoolean(\"battery.external_power\")"));
-        assertTrue(widget.contains("R.color.iphone_battery_charging"));
+        assertTrue(widget.contains("batteryIcon.setBatteryCharging(phoneChargingNow())"));
+        assertTrue(icon.contains("drawBatteryCharging"));
+        assertTrue(!widget.contains("R.color.iphone_battery_charging"));
         assertTrue(policy.contains("public static Boolean booleanValue"));
-        assertTrue(colors.contains("name=\"iphone_battery_charging\">#30D158"));
     }
 
     @Test public void gpsAndBluetoothUseOneIosVectorFamilyEverywhere() throws Exception {
         String widget = source("WidgetService.java");
         String resolver = source("launcher/LauncherIconResolver.java");
         String gps = resource("drawable/ic_status_iphone_gps_active.xml");
-        String bluetooth = resource("drawable/ic_status_iphone_bluetooth_outline.xml");
+        String bluetooth = resource("drawable/ic_status_iphone_bluetooth_solid.xml");
 
         assertTrue(count(widget, "R.drawable.ic_status_iphone_gps_active") >= 3);
-        assertTrue(count(widget, "R.drawable.ic_status_iphone_bluetooth_outline") >= 4);
+        assertTrue(count(widget, "R.drawable.ic_status_iphone_bluetooth_solid") >= 5);
         assertTrue(resolver.contains("R.drawable.ic_status_iphone_gps_active"));
         assertTrue(resolver.contains("R.drawable.ic_status_iphone_bluetooth_solid"));
         assertTrue(gps.contains("Location fill"));
-        assertTrue(bluetooth.contains("strokeWidth=\"1.35\""));
+        assertTrue(bluetooth.contains("fillColor=\"@android:color/white\""));
     }
 
-    @Test public void bluetoothFillStillDependsOnLiveNotificationPath() throws Exception {
+    @Test public void bluetoothUsesOneMonochromeGlyphForTheConnectedIphone() throws Exception {
         String widget = source("WidgetService.java");
-        assertTrue(widget.contains("isPhoneNotificationPathAvailable()"));
-        assertTrue(widget.contains("PhoneBluetoothIndicatorPolicy.Appearance.PHONE_SOLID"));
+        String policy = source("phone/PhoneBluetoothIndicatorPolicy.java");
+        assertTrue(policy.contains("Appearance.PHONE_MONO"));
         assertTrue(widget.contains("R.drawable.ic_status_iphone_bluetooth_solid"));
-        assertTrue(widget.contains("R.drawable.ic_status_iphone_bluetooth_outline"));
+        assertTrue(widget.contains("binding.bluetoothStatusIcon.setOutlineWidth(0)"));
+        assertTrue(!widget.contains("PhoneBluetoothIndicatorPolicy.Appearance.PHONE_SOLID"));
     }
 
     private static int count(String value, String needle) {

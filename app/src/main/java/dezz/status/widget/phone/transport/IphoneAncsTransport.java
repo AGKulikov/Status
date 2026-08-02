@@ -41,6 +41,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.nio.charset.StandardCharsets;
+import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -56,6 +57,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+
+import dezz.status.widget.phone.IphoneHelperTelemetry;
 
 /**
  * Production BLE/ANCS transport for one explicitly verified iPhone.
@@ -84,8 +87,6 @@ public final class IphoneAncsTransport {
             UUID.fromString("0000180f-0000-1000-8000-00805f9b34fb");
     private static final UUID BATTERY_LEVEL =
             UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb");
-    private static final UUID BATTERY_POWER_STATE =
-            UUID.fromString("00002a1a-0000-1000-8000-00805f9b34fb");
     private static final UUID BATTERY_LEVEL_STATUS =
             UUID.fromString("00002bed-0000-1000-8000-00805f9b34fb");
     private static final String LOG_TAG = "KX11ANCS";
@@ -97,8 +98,19 @@ public final class IphoneAncsTransport {
     /** Android/AOSP GATT_AUTH_FAIL (0x89): SMP/encryption could not be completed. */
     private static final int STATUS_GATT_AUTH_FAIL = 0x89;
     private static final long REQUEST_TIMEOUT_MS = 10_000L;
-    /** HWGPS keeps one direct GATT attempt alive for 35 seconds after a scan match. */
+    /** A direct attempt after a real advertisement may legitimately take longer on Android 9. */
     private static final long CONNECT_TIMEOUT_MS = 35_000L;
+    /** Give Android 9 time to restore the bonded identity before using scan/direct fallback. */
+    private static final long BACKGROUND_ATTACH_TIMEOUT_MS = 30_000L;
+    /**
+     * A GATT client that has connected successfully with autoConnect=true is Android's durable
+     * background registration for the peer. Keep it substantially longer than a cold attach so
+     * an ordinary iPhone radio hand-off does not turn into scan/connect churn.
+     */
+    private static final long ESTABLISHED_AUTO_RECONNECT_TIMEOUT_MS = 45_000L;
+    /** ECARX often emits an ACL loss without saying whether Classic or LE was affected. */
+    private static final long AMBIGUOUS_ACL_GRACE_MS = 1_200L;
+    private static final long LINK_PROBE_TIMEOUT_MS = 2_500L;
     private static final long GPS_CONNECT_TIMEOUT_MS = 15_000L;
     private static final long GPS_SCAN_TIMEOUT_MS = 30_000L;
     private static final long SAVED_PEER_SCAN_RESTART_MS = 30_000L;
@@ -107,6 +119,8 @@ public final class IphoneAncsTransport {
     private static final long GPS_POST_SECURE_DISCOVERY_DELAY_MS = 800L;
     private static final long DISCOVERY_TIMEOUT_MS = 15_000L;
     private static final long DESCRIPTOR_WRITE_TIMEOUT_MS = 15_000L;
+    /** The first encrypted ANCS CCCD may wait while the user accepts iPhone pairing. */
+    private static final long ANCS_DESCRIPTOR_WRITE_TIMEOUT_MS = 90_000L;
     private static final long BATTERY_OPERATION_TIMEOUT_MS = 5_000L;
     private static final long BOND_TIMEOUT_MS = 90_000L;
     private static final long ANCS_REQUEST_GAP_MS = 120L;
@@ -126,6 +140,8 @@ public final class IphoneAncsTransport {
         void onNotification(NotificationItem item);
         void onAppName(String appIdentifier, String displayName);
         void onBatteryCharacteristic(UUID characteristicUuid, byte[] value);
+        /** Authenticated v2 helper telemetry received on the encrypted application channel. */
+        default void onHelperTelemetry(IphoneHelperTelemetry telemetry) {}
     }
 
     public static final class Candidate {
@@ -208,18 +224,15 @@ public final class IphoneAncsTransport {
         DATA_SOURCE,
         NOTIFICATION_SOURCE,
         BATTERY_LEVEL,
-        BATTERY_POWER,
         BATTERY_LEVEL_STATUS
     }
 
     private enum BatteryStage {
         NOT_STARTED,
-        READ_LEVEL,
-        SUBSCRIBE_LEVEL,
-        READ_POWER,
-        SUBSCRIBE_POWER,
         READ_LEVEL_STATUS,
         SUBSCRIBE_LEVEL_STATUS,
+        READ_LEVEL,
+        SUBSCRIBE_LEVEL,
         COMPLETE
     }
 
@@ -318,6 +331,7 @@ public final class IphoneAncsTransport {
     private final Set<Long> dirtyNotificationUids = new HashSet<>();
     private final Set<String> queuedAppIdentifiers = new HashSet<>();
     private final RealtimeAdmission realtimeAdmission = new RealtimeAdmission();
+    private final AncsSessionStateMachine sessionState = new AncsSessionStateMachine();
 
     private BluetoothLeScanner scanner;
     private BluetoothLeAdvertiser advertiser;
@@ -326,6 +340,8 @@ public final class IphoneAncsTransport {
     private BluetoothDevice activeClientTarget;
     private BluetoothDevice savedPeerScanTarget;
     private BluetoothDevice managedSavedPeer;
+    /** Last BLE identity that already passed the selected-phone gate in this live session. */
+    private BluetoothDevice managedResolvedPeer;
     private final Object verifiedPeerLock = new Object();
     private BluetoothDevice verifiedPeer;
     private final LinkedHashMap<String, GattServerPeer> gattServerPeers =
@@ -337,6 +353,9 @@ public final class IphoneAncsTransport {
     private boolean directFallbackAttempted;
     private boolean secureAttConfirmed;
     private boolean gattClientConnected;
+    private boolean activeClientEstablished;
+    private long activeClientGeneration;
+    private long activeScanGeneration;
     private boolean iphonePeripheralMode;
     private boolean helperBootstrapMode;
     private boolean iphoneConnectStarted;
@@ -370,7 +389,6 @@ public final class IphoneAncsTransport {
     private BluetoothGattCharacteristic controlPoint;
     private BluetoothGattCharacteristic serviceChanged;
     private BluetoothGattCharacteristic batteryLevel;
-    private BluetoothGattCharacteristic batteryPower;
     private BluetoothGattCharacteristic batteryLevelStatus;
     private BluetoothGattCharacteristic iphoneSecureCharacteristic;
     private Request activeRequest;
@@ -388,6 +406,11 @@ public final class IphoneAncsTransport {
     private Runnable ancsBondRetry;
     private Runnable autoAncsWaitTimeout;
     private Runnable managedReconnectTask;
+    private Runnable savedPeerFallbackTask;
+    private Runnable ambiguousAclProbeTask;
+    private Runnable linkProbeTimeout;
+    private BluetoothGatt linkProbeGatt;
+    private long linkProbeGeneration;
     private int managedReconnectAttempt;
     private UUID batteryReadPendingUuid;
     private BatteryStage batteryStage = BatteryStage.NOT_STARTED;
@@ -524,13 +547,13 @@ public final class IphoneAncsTransport {
     }
 
     /**
-     * Daily path after a successful bootstrap. It scans only for the saved identity and starts
-     * the bounded direct GATT connection from the first real advertisement.
+     * Daily path for the selected bonded iPhone.
      *
-     * <p>This deliberately mirrors the stable HWGPS/GPSTether lifecycle: scan by the exact saved
-     * address, stop scanning on the first match, then call {@code connectGatt(false,
-     * TRANSPORT_LE)}. Connecting blindly to the cached address is what repeatedly produces
-     * Android status 133 on the KX11 controller.</p>
+     * <p>One background GATT registration is attempted first. It lets Android's bond/IRK owner
+     * reattach when iOS is no longer emitting an application-visible advertisement. If Android
+     * does not complete it quickly, that client is closed and the transport falls back to the
+     * proven identity-resolving scan followed by one direct GATT connection. Scan and connect
+     * are never active at the same time.</p>
      */
     public boolean connectSavedIphone(String address) {
         closing = false;
@@ -569,6 +592,7 @@ public final class IphoneAncsTransport {
         managedReconnectEnabled = true;
         managedReconnectAttempt = 0;
         managedSavedPeer = device;
+        managedResolvedPeer = null;
         iphonePeripheralMode = true;
         helperBootstrapMode = false;
         iphoneConnectStarted = false;
@@ -579,11 +603,228 @@ public final class IphoneAncsTransport {
             state("AUTO · SAVED PEER CONFLICT");
             return false;
         }
-        // Daily operation has exactly one BLE owner: scan as Android central, stop that scan on
-        // the selected identity, then create one connectGatt(false, TRANSPORT_LE). The diagnostic
-        // GATT server/advertiser is a manual Helper bootstrap only; running it here creates a
-        // competing peripheral-role link on ECARX and can leave the real ANCS client unencrypted.
-        return startSavedPeerScan(device);
+        // Daily operation has exactly one BLE owner. The diagnostic GATT server/advertiser stays
+        // a manual Helper bootstrap only; running it here would compete with ECARX's Bluetooth
+        // owner. A bounded background attach is followed by scan/direct fallback if necessary.
+        return startManagedBackgroundAttach(device, "initial selected-phone attach");
+    }
+
+    /**
+     * Explicit recovery hook for ECARX builds that report ACL loss but omit the GATT callback.
+     * Keeping the current transport alive preserves Android's resolved iOS BLE identity; closing
+     * and recreating it here is exactly what made recovery depend on toggling car Bluetooth.
+     */
+    public void requestSavedPeerReconnect(@NonNull String reason) {
+        requestSavedPeerReconnect(reason, true);
+    }
+
+    /**
+     * Recovers the managed link without trusting an ambiguous ECARX ACL broadcast.
+     *
+     * @param confirmedLeLoss true only when Android explicitly identified the lost transport as
+     *                        LE; false causes a non-destructive RSSI liveness probe first
+     */
+    public void requestSavedPeerReconnect(@NonNull String reason, boolean confirmedLeLoss) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            main.post(() -> requestSavedPeerReconnect(reason, confirmedLeLoss));
+            return;
+        }
+        if (closing || !managedReconnectEnabled || managedSavedPeer == null) return;
+        if (!confirmedLeLoss && isAncsReady()) {
+            scheduleAmbiguousAclProbe(reason.trim().isEmpty()
+                    ? "ambiguous selected-phone ACL loss" : reason);
+            return;
+        }
+        scheduleManagedReconnect(reason.trim().isEmpty()
+                ? "selected iPhone ACL link lost" : reason);
+        state(REMOTE_LOGICAL_NAME + " · RECOVERING");
+    }
+
+    private boolean startManagedBackgroundAttach(@NonNull BluetoothDevice selected,
+                                                 @NonNull String reason) {
+        if (closing || !managedReconnectEnabled || helperBootstrapMode) return false;
+        if (!ensureAdapter()) return false;
+        if (gatt != null || clientConnectInFlight || gattClientConnected || scanning) {
+            log("Background attach не запущен: другая BLE-операция уже активна");
+            return true;
+        }
+        BluetoothDevice target = managedResolvedPeer != null
+                ? managedResolvedPeer : selected;
+        if (!claimVerifiedPeer(target)) {
+            state("AUTO · SAVED PEER CONFLICT");
+            return false;
+        }
+
+        cancelAmbiguousAclProbe();
+        clearAncsRuntime();
+        clearIphonePeripheralRuntime(false);
+        iphonePeripheralMode = true;
+        helperBootstrapMode = false;
+        iphoneConnectStarted = true;
+        activeClientTarget = target;
+        activeClientAutoConnect = true;
+        activeClientEstablished = false;
+        clientConnectInFlight = true;
+        activeClientGeneration = sessionState.begin(
+                AncsSessionStateMachine.Phase.BACKGROUND_CONNECT);
+        long expectedGeneration = activeClientGeneration;
+        state(REMOTE_LOGICAL_NAME + " · BACKGROUND ATTACH");
+        log("connectGatt(autoConnect=true, TRANSPORT_LE) · target="
+                + safeAddress(target) + " · " + reason);
+        try {
+            BluetoothGatt created = target.connectGatt(context, true, gattCallback,
+                    BluetoothDevice.TRANSPORT_LE);
+            gatt = created;
+            if (created == null) {
+                clientConnectInFlight = false;
+                activeClientTarget = null;
+                scheduleSavedPeerDirectFallback("background connectGatt returned null",
+                        expectedGeneration);
+                return true;
+            }
+            connectTimeout = () -> {
+                if (gatt != created || !clientConnectInFlight
+                        || !sessionState.is(expectedGeneration,
+                        AncsSessionStateMachine.Phase.BACKGROUND_CONNECT)) return;
+                clientConnectInFlight = false;
+                log("Background attach не дал callback за "
+                        + BACKGROUND_ATTACH_TIMEOUT_MS + " ms; перехожу к scan/direct");
+                closeClientGatt(created);
+                clearAncsRuntime();
+                scheduleSavedPeerDirectFallback("background attach timeout",
+                        expectedGeneration);
+            };
+            main.postDelayed(connectTimeout, BACKGROUND_ATTACH_TIMEOUT_MS);
+            return true;
+        } catch (RuntimeException failure) {
+            clientConnectInFlight = false;
+            activeClientTarget = null;
+            gatt = null;
+            log("Background connectGatt exception: " + failure);
+            scheduleSavedPeerDirectFallback("background attach exception",
+                    expectedGeneration);
+            return true;
+        }
+    }
+
+    private void scheduleSavedPeerDirectFallback(@NonNull String reason,
+                                                  long failedGeneration) {
+        if (closing || !managedReconnectEnabled || managedSavedPeer == null
+                || savedPeerFallbackTask != null) return;
+        if (failedGeneration > 0L && !sessionState.isCurrent(failedGeneration)) return;
+        long waitGeneration = sessionState.begin(AncsSessionStateMachine.Phase.RETRY_WAIT);
+        state(REMOTE_LOGICAL_NAME + " · FALLBACK SCAN");
+        savedPeerFallbackTask = () -> {
+            savedPeerFallbackTask = null;
+            if (closing || !managedReconnectEnabled || managedSavedPeer == null
+                    || !sessionState.isCurrent(waitGeneration)) return;
+            iphoneConnectStarted = false;
+            if (!startSavedPeerScan(managedSavedPeer)) {
+                scheduleManagedReconnect("fallback identity scan could not start");
+            }
+        };
+        main.postDelayed(savedPeerFallbackTask, SAVED_PEER_SCAN_RESTART_DELAY_MS);
+        log("Scan/direct fallback через " + SAVED_PEER_SCAN_RESTART_DELAY_MS
+                + " ms · " + reason);
+    }
+
+    private void scheduleAmbiguousAclProbe(@NonNull String reason) {
+        if (ambiguousAclProbeTask != null || linkProbeTimeout != null) {
+            log("Неоднозначный ACL loss уже проверяется; дубль игнорирую");
+            return;
+        }
+        BluetoothGatt expected = gatt;
+        long expectedGeneration = activeClientGeneration;
+        if (expected == null || !isAncsReady()
+                || !sessionState.isCurrent(expectedGeneration)) {
+            scheduleManagedReconnect(reason + "; live ANCS owner absent");
+            state(REMOTE_LOGICAL_NAME + " · RECOVERING");
+            return;
+        }
+        ambiguousAclProbeTask = () -> {
+            ambiguousAclProbeTask = null;
+            if (closing || expected != gatt
+                    || !sessionState.isCurrent(expectedGeneration)) return;
+            if (!isAncsReady()) {
+                scheduleManagedReconnect(reason + "; ANCS lost during grace");
+                state(REMOTE_LOGICAL_NAME + " · RECOVERING");
+                return;
+            }
+            sessionState.move(expectedGeneration,
+                    AncsSessionStateMachine.Phase.VERIFYING_LINK);
+            boolean started;
+            try {
+                started = expected.readRemoteRssi();
+            } catch (RuntimeException failure) {
+                started = false;
+                log("readRemoteRssi liveness probe exception: " + failure);
+            }
+            if (!started) {
+                scheduleManagedReconnect(reason + "; liveness probe rejected");
+                state(REMOTE_LOGICAL_NAME + " · RECOVERING");
+                return;
+            }
+            linkProbeGatt = expected;
+            linkProbeGeneration = expectedGeneration;
+            linkProbeTimeout = () -> {
+                linkProbeTimeout = null;
+                linkProbeGatt = null;
+                if (closing || expected != gatt
+                        || !sessionState.isCurrent(expectedGeneration)) return;
+                log("GATT liveness probe не дал callback за "
+                        + LINK_PROBE_TIMEOUT_MS + " ms");
+                scheduleManagedReconnect(reason + "; liveness probe timeout");
+                state(REMOTE_LOGICAL_NAME + " · RECOVERING");
+            };
+            main.postDelayed(linkProbeTimeout, LINK_PROBE_TIMEOUT_MS);
+            log("Тип ACL transport не указан; проверяю живой ANCS GATT, "
+                    + "не закрывая его · " + reason);
+        };
+        main.postDelayed(ambiguousAclProbeTask, AMBIGUOUS_ACL_GRACE_MS);
+    }
+
+    private void cancelAmbiguousAclProbe() {
+        if (ambiguousAclProbeTask != null) main.removeCallbacks(ambiguousAclProbeTask);
+        if (linkProbeTimeout != null) main.removeCallbacks(linkProbeTimeout);
+        ambiguousAclProbeTask = null;
+        linkProbeTimeout = null;
+        linkProbeGatt = null;
+        linkProbeGeneration = 0L;
+    }
+
+    /**
+     * Keeps Android's successful autoConnect registration alive across a short radio loss.
+     * Closing it immediately would unregister the only background listener and make recovery
+     * depend on a fresh, application-visible iPhone advertisement.
+     */
+    private void awaitBackgroundAutoReconnect(@NonNull BluetoothGatt expected,
+                                              long expectedGeneration,
+                                              @NonNull String reason) {
+        cancelConnectTimeout();
+        cancelAmbiguousAclProbe();
+        clearAncsRuntime();
+        gattClientConnected = false;
+        clientConnectInFlight = true;
+        if (!sessionState.move(expectedGeneration,
+                AncsSessionStateMachine.Phase.BACKGROUND_CONNECT)) return;
+        state(REMOTE_LOGICAL_NAME + " · RECOVERING · AUTO WAIT");
+        connectTimeout = () -> {
+            if (closing || gatt != expected || !clientConnectInFlight
+                    || !sessionState.is(expectedGeneration,
+                    AncsSessionStateMachine.Phase.BACKGROUND_CONNECT)) return;
+            clientConnectInFlight = false;
+            log("Existing autoConnect owner did not reattach in "
+                    + ESTABLISHED_AUTO_RECONNECT_TIMEOUT_MS
+                    + " ms; closing exactly once");
+            closeClientGatt(expected);
+            clearAncsRuntime();
+            scheduleSavedPeerDirectFallback(reason + "; autoConnect wait timeout",
+                    expectedGeneration);
+        };
+        main.postDelayed(connectTimeout, ESTABLISHED_AUTO_RECONNECT_TIMEOUT_MS);
+        log("Сохраняю зарегистрированный autoConnect GATT ещё "
+                + ESTABLISHED_AUTO_RECONNECT_TIMEOUT_MS
+                + " ms для быстрого iPhone reconnect · " + reason);
     }
 
     private boolean startSavedPeerScan(@NonNull BluetoothDevice device) {
@@ -614,6 +855,8 @@ public final class IphoneAncsTransport {
                 .setReportDelay(0L)
                 .build();
         savedPeerScanTarget = device;
+        activeScanGeneration = sessionState.begin(AncsSessionStateMachine.Phase.SCANNING);
+        long expectedGeneration = activeScanGeneration;
         try {
             scanner.startScan(Collections.emptyList(), settings, scanCallback);
             scanning = true;
@@ -625,7 +868,9 @@ public final class IphoneAncsTransport {
             scanTimeout = () -> {
                 if (closing || helperBootstrapMode || iphoneConnectStarted
                         || !scanning || savedPeerScanTarget == null
-                        || !sameDevice(savedPeerScanTarget, expected)) return;
+                        || !sameDevice(savedPeerScanTarget, expected)
+                        || !sessionState.is(expectedGeneration,
+                        AncsSessionStateMachine.Phase.SCANNING)) return;
                 log("Saved-peer autoscan работает " + SAVED_PEER_SCAN_RESTART_MS
                         + " ms без match; безопасно перерегистрирую один scan");
                 stopScan();
@@ -779,7 +1024,9 @@ public final class IphoneAncsTransport {
                                                   boolean solicitsAncs) {
         BluetoothDevice expected = savedPeerScanTarget;
         if (!iphonePeripheralMode || helperBootstrapMode || iphoneConnectStarted
-                || expected == null) return;
+                || expected == null
+                || !sessionState.is(activeScanGeneration,
+                AncsSessionStateMachine.Phase.SCANNING)) return;
         // The scan callback already passed the selected-phone gate. Re-check it here because iOS
         // commonly rotates from the saved Classic/public address to a bonded BLE private address;
         // requiring sameDevice() a second time discarded the valid resolved peer just before
@@ -792,6 +1039,7 @@ public final class IphoneAncsTransport {
             state("AUTO · SAVED PEER CONFLICT");
             return;
         }
+        managedResolvedPeer = device;
         connectIphonePeripheral(device, CONNECT_TIMEOUT_MS,
                 "GPS-STYLE · SAVED PEER CONNECTING",
                 "selected identity resolved; one direct GATT after advertisement");
@@ -805,7 +1053,11 @@ public final class IphoneAncsTransport {
         iphoneConnectStarted = true;
         activeClientTarget = device;
         activeClientAutoConnect = false;
+        activeClientEstablished = false;
         clientConnectInFlight = true;
+        activeClientGeneration = sessionState.begin(
+                AncsSessionStateMachine.Phase.DIRECT_CONNECT);
+        long expectedGeneration = activeClientGeneration;
         state(connectingState);
         log("iPhone target: " + safeName(device) + " " + safeAddress(device)
                 + " type=" + typeLabel(safeType(device))
@@ -824,7 +1076,9 @@ public final class IphoneAncsTransport {
             }
             BluetoothGatt expected = gatt;
             connectTimeout = () -> {
-                if (gatt != expected || !clientConnectInFlight) return;
+                if (gatt != expected || !clientConnectInFlight
+                        || !sessionState.is(expectedGeneration,
+                        AncsSessionStateMachine.Phase.DIRECT_CONNECT)) return;
                 clientConnectInFlight = false;
                 state("GPS-STYLE · CONNECT TIMEOUT");
                 log("Нет callback подключения за " + timeoutMs
@@ -892,6 +1146,10 @@ public final class IphoneAncsTransport {
     public void disconnect() {
         iphonePeripheralMode = false;
         iphoneConnectStarted = false;
+        cancelAmbiguousAclProbe();
+        if (savedPeerFallbackTask != null) main.removeCallbacks(savedPeerFallbackTask);
+        savedPeerFallbackTask = null;
+        sessionState.begin(AncsSessionStateMachine.Phase.IDLE);
         clearIphonePeripheralRuntime(true);
         cancelClientAttemptCallbacks();
         clearAncsRuntime();
@@ -917,11 +1175,16 @@ public final class IphoneAncsTransport {
         closing = true;
         managedReconnectEnabled = false;
         managedSavedPeer = null;
+        managedResolvedPeer = null;
         if (managedReconnectTask != null) main.removeCallbacks(managedReconnectTask);
         managedReconnectTask = null;
+        cancelAmbiguousAclProbe();
+        if (savedPeerFallbackTask != null) main.removeCallbacks(savedPeerFallbackTask);
+        savedPeerFallbackTask = null;
         stopScan();
         stopAdvertising();
         disconnect();
+        sessionState.close();
         resetVerifiedPeerSession();
         main.removeCallbacks(candidatePublisher);
         try {
@@ -1138,7 +1401,12 @@ public final class IphoneAncsTransport {
         gattClientConnected = false;
         activeClientTarget = device;
         activeClientAutoConnect = autoConnect;
+        activeClientEstablished = false;
         clientConnectInFlight = true;
+        activeClientGeneration = sessionState.begin(autoConnect
+                ? AncsSessionStateMachine.Phase.BACKGROUND_CONNECT
+                : AncsSessionStateMachine.Phase.DIRECT_CONNECT);
+        long expectedGeneration = activeClientGeneration;
         String address = safeAddress(device);
         long linkAgeMs = Math.max(0L, android.os.SystemClock.elapsedRealtime()
                 - serverLink.connectedAtElapsedMs);
@@ -1169,7 +1437,8 @@ public final class IphoneAncsTransport {
                 BluetoothGatt expected = gatt;
                 boolean expectedAutoConnect = autoConnect;
                 connectTimeout = () -> {
-                    if (gatt != expected || !clientConnectInFlight) return;
+                    if (gatt != expected || !clientConnectInFlight
+                            || !sessionState.isCurrent(expectedGeneration)) return;
                     clientConnectInFlight = false;
                     state("CONNECT_TIMEOUT");
                     log("Нет callback успешного GATT-подключения за "
@@ -1393,6 +1662,8 @@ public final class IphoneAncsTransport {
 
     private void discoverServices(BluetoothGatt callbackGatt) {
         if (callbackGatt != gatt) return;
+        long expectedGeneration = activeClientGeneration;
+        if (!sessionState.isCurrent(expectedGeneration)) return;
         if (discoveryPending) {
             log("discoverServices уже выполняется");
             return;
@@ -1410,9 +1681,11 @@ public final class IphoneAncsTransport {
             state("DISCOVERY_START_FAILED");
             return;
         }
+        sessionState.move(expectedGeneration, AncsSessionStateMachine.Phase.DISCOVERING);
         BluetoothGatt expected = callbackGatt;
         discoveryTimeout = () -> {
-            if (gatt != expected || !discoveryPending) return;
+            if (gatt != expected || !discoveryPending
+                    || !sessionState.isCurrent(expectedGeneration)) return;
             discoveryPending = false;
             state("DISCOVERY_TIMEOUT");
             log("onServicesDiscovered не получен за "
@@ -1514,10 +1787,11 @@ public final class IphoneAncsTransport {
             if (helperBootstrapMode || expected != gatt || !gattClientConnected || gattReady) {
                 return;
             }
-            state("AUTO · ANCS WAIT TIMEOUT");
-            log("ANCS/Service Changed не появились за " + AUTO_ANCS_WAIT_TIMEOUT_MS
-                    + " ms; закрываю daily GATT перед reconnect backoff");
-            disconnect();
+            state("AUTO LINK OK · ANCS REDISCOVERY");
+            log("ANCS/Service Changed пока не опубликованы за "
+                    + AUTO_ANCS_WAIT_TIMEOUT_MS
+                    + " ms; сохраняю живой encrypted link и повторяю discovery");
+            discoverServices(expected);
         };
         main.postDelayed(autoAncsWaitTimeout, AUTO_ANCS_WAIT_TIMEOUT_MS);
         log("ANCS wait watchdog=" + AUTO_ANCS_WAIT_TIMEOUT_MS
@@ -1584,6 +1858,8 @@ public final class IphoneAncsTransport {
             log("ANCS найден. Подписываюсь Data Source → Notification Source; "
                     + "это настоящая защищённая операция ANCS");
             descriptorStage = DescriptorStage.DATA_SOURCE;
+            sessionState.move(activeClientGeneration,
+                    AncsSessionStateMachine.Phase.SUBSCRIBING);
             if (!subscribe(callbackGatt, dataSource, false)) {
                 descriptorStage = DescriptorStage.NONE;
             }
@@ -1641,13 +1917,18 @@ public final class IphoneAncsTransport {
     private boolean subscribe(BluetoothGatt callbackGatt,
                               BluetoothGattCharacteristic characteristic,
                               boolean indication) {
+        boolean optional = descriptorStage == DescriptorStage.SERVICE_CHANGED;
         boolean local;
         try {
             local = callbackGatt.setCharacteristicNotification(characteristic, true);
         } catch (RuntimeException failure) {
             descriptorStage = DescriptorStage.NONE;
-            state("SUBSCRIBE_EXCEPTION");
-            log("setCharacteristicNotification exception: " + failure);
+            if (optional) {
+                log("Optional Service Changed local subscription exception: " + failure);
+            } else {
+                state("SUBSCRIBE_EXCEPTION");
+                log("setCharacteristicNotification exception: " + failure);
+            }
             return false;
         }
         BluetoothGattDescriptor cccd =
@@ -1655,7 +1936,12 @@ public final class IphoneAncsTransport {
         log("setCharacteristicNotification " + shortUuid(characteristic.getUuid())
                 + "=" + local + "; CCCD=" + (cccd != null));
         if (!local || cccd == null) {
-            state("SUBSCRIBE_LOCAL_FAILED");
+            if (optional) {
+                descriptorStage = DescriptorStage.NONE;
+                log("Optional Service Changed unavailable locally; ANCS link remains alive");
+            } else {
+                state("SUBSCRIBE_LOCAL_FAILED");
+            }
             return false;
         }
         cccd.setValue(indication
@@ -1666,15 +1952,23 @@ public final class IphoneAncsTransport {
             started = callbackGatt.writeDescriptor(cccd);
         } catch (RuntimeException failure) {
             descriptorStage = DescriptorStage.NONE;
-            state("CCCD_WRITE_EXCEPTION");
-            log("writeDescriptor exception: " + failure);
+            if (optional) {
+                log("Optional Service Changed CCCD exception: " + failure);
+            } else {
+                state("CCCD_WRITE_EXCEPTION");
+                log("writeDescriptor exception: " + failure);
+            }
             return false;
         }
         log("writeDescriptor " + shortUuid(characteristic.getUuid())
                 + " started=" + started);
         if (!started) {
             descriptorStage = DescriptorStage.NONE;
-            state("CCCD_START_FAILED");
+            if (optional) {
+                log("Optional Service Changed CCCD was rejected; ANCS link remains alive");
+            } else {
+                state("CCCD_START_FAILED");
+            }
         } else {
             scheduleDescriptorWriteTimeout(callbackGatt, descriptorStage,
                     characteristic.getUuid());
@@ -1710,6 +2004,15 @@ public final class IphoneAncsTransport {
         if (status != GATT_SUCCESS) {
             DescriptorStage failedStage = descriptorStage;
             descriptorStage = DescriptorStage.NONE;
+            if (failedStage == DescriptorStage.SERVICE_CHANGED) {
+                log("Optional Service Changed CCCD skipped, status=" + status
+                        + "; mandatory ANCS path remains active");
+                state(iphonePeripheralMode && !helperBootstrapMode
+                        ? "AUTO LINK OK · ЖДУ ANCS"
+                        : "ЖДУ ANCS БЕЗ SERVICE CHANGED");
+                sendNextRequest();
+                return;
+            }
             if (isAuthorizationError(status)) {
                 ancsRetryAfterBond = true;
                 ancsAuthorizationFailureSeen = true;
@@ -1756,6 +2059,7 @@ public final class IphoneAncsTransport {
         } else if (descriptorStage == DescriptorStage.NOTIFICATION_SOURCE) {
             descriptorStage = DescriptorStage.NONE;
             gattReady = true;
+            sessionState.move(activeClientGeneration, AncsSessionStateMachine.Phase.READY);
             prepareBatteryBootstrap(callbackGatt);
             cancelAutoAncsWaitTimeout();
             state("ANCS READY · ОТПРАВЬТЕ УВЕДОМЛЕНИЕ");
@@ -1772,8 +2076,7 @@ public final class IphoneAncsTransport {
         UUID uuid = characteristic.getUuid();
         log("onCharacteristicChanged " + shortUuid(uuid)
                 + " bytes=" + AdvertisementParser.hex(value, 80));
-        if (BATTERY_LEVEL.equals(uuid) || BATTERY_POWER_STATE.equals(uuid)
-                || BATTERY_LEVEL_STATUS.equals(uuid)) {
+        if (BATTERY_LEVEL.equals(uuid) || BATTERY_LEVEL_STATUS.equals(uuid)) {
             if (gattClientConnected && value != null) {
                 listener.onBatteryCharacteristic(uuid, value.clone());
             }
@@ -1781,10 +2084,10 @@ public final class IphoneAncsTransport {
         }
         if (SERVICE_CHANGED.equals(uuid)) {
             if (iphonePeripheralMode && !helperBootstrapMode) {
-                log("Daily GATT получил Service Changed; на ECARX безопаснее закрыть "
-                        + "текущий client и выполнить новый saved-peer connect через backoff");
-                state("AUTO · SERVICE CHANGED · RECONNECT");
-                disconnect();
+                log("Daily GATT получил Service Changed; один managed owner "
+                        + "переоткроет services без внешнего дублирующего client");
+                scheduleManagedReconnect("SERVICE CHANGED indication");
+                state(REMOTE_LOGICAL_NAME + " · RECOVERING");
                 return;
             }
             log("Получен Service Changed; сбрасываю старые ANCS handles/очередь "
@@ -1817,8 +2120,6 @@ public final class IphoneAncsTransport {
                 return AncsProtocol.NOTIFICATION_SOURCE.equals(uuid);
             case BATTERY_LEVEL:
                 return BATTERY_LEVEL.equals(uuid);
-            case BATTERY_POWER:
-                return BATTERY_POWER_STATE.equals(uuid);
             case BATTERY_LEVEL_STATUS:
                 return BATTERY_LEVEL_STATUS.equals(uuid);
             case NONE:
@@ -1829,7 +2130,6 @@ public final class IphoneAncsTransport {
 
     private static boolean isBatteryDescriptorStage(DescriptorStage stage) {
         return stage == DescriptorStage.BATTERY_LEVEL
-                || stage == DescriptorStage.BATTERY_POWER
                 || stage == DescriptorStage.BATTERY_LEVEL_STATUS;
     }
 
@@ -1837,24 +2137,23 @@ public final class IphoneAncsTransport {
         if (callbackGatt != gatt || batteryStage != BatteryStage.NOT_STARTED) return;
         BluetoothGattService service = callbackGatt.getService(BATTERY_SERVICE);
         batteryLevel = service == null ? null : service.getCharacteristic(BATTERY_LEVEL);
-        batteryPower = service == null ? null : service.getCharacteristic(BATTERY_POWER_STATE);
         batteryLevelStatus =
                 service == null ? null : service.getCharacteristic(BATTERY_LEVEL_STATUS);
-        if (batteryLevel == null && batteryPower == null && batteryLevelStatus == null) {
+        if (batteryLevel == null && batteryLevelStatus == null) {
             batteryStage = BatteryStage.COMPLETE;
-            log("BAS 0x180F отсутствует; остаются HFP/OEM/broadcast источники заряда");
+            log("BAS 0x180F отсутствует; процент ожидается от Helper/HFP/broadcast");
             return;
         }
-        batteryStage = BatteryStage.READ_LEVEL;
-        log("BAS fallback найден: level=" + (batteryLevel != null)
-                + " power=" + (batteryPower != null)
+        // Battery Level Status is retained only as an optional percentage source. Its charging
+        // bits are ignored by the controller; TEL2 from iPhone Helper is authoritative.
+        batteryStage = BatteryStage.READ_LEVEL_STATUS;
+        log("BAS percentage probe: level=" + (batteryLevel != null)
                 + " levelStatus=" + (batteryLevelStatus != null));
     }
 
     private void resetBatteryBootstrap() {
         cancelBatteryReadTimeout();
         batteryLevel = null;
-        batteryPower = null;
         batteryLevelStatus = null;
         batteryReadPendingUuid = null;
         batteryStage = BatteryStage.NOT_STARTED;
@@ -1873,32 +2172,23 @@ public final class IphoneAncsTransport {
         }
         while (true) {
             switch (batteryStage) {
-                case READ_LEVEL:
-                    batteryStage = BatteryStage.SUBSCRIBE_LEVEL;
-                    if (startOptionalBatteryRead(callbackGatt, batteryLevel)) return;
-                    break;
-                case SUBSCRIBE_LEVEL:
-                    batteryStage = BatteryStage.READ_POWER;
-                    if (startOptionalBatterySubscription(callbackGatt, batteryLevel,
-                            DescriptorStage.BATTERY_LEVEL)) return;
-                    break;
-                case READ_POWER:
-                    batteryStage = BatteryStage.SUBSCRIBE_POWER;
-                    if (startOptionalBatteryRead(callbackGatt, batteryPower)) return;
-                    break;
-                case SUBSCRIBE_POWER:
-                    batteryStage = BatteryStage.READ_LEVEL_STATUS;
-                    if (startOptionalBatterySubscription(callbackGatt, batteryPower,
-                            DescriptorStage.BATTERY_POWER)) return;
-                    break;
                 case READ_LEVEL_STATUS:
                     batteryStage = BatteryStage.SUBSCRIBE_LEVEL_STATUS;
                     if (startOptionalBatteryRead(callbackGatt, batteryLevelStatus)) return;
                     break;
                 case SUBSCRIBE_LEVEL_STATUS:
-                    batteryStage = BatteryStage.COMPLETE;
+                    batteryStage = BatteryStage.READ_LEVEL;
                     if (startOptionalBatterySubscription(callbackGatt, batteryLevelStatus,
                             DescriptorStage.BATTERY_LEVEL_STATUS)) return;
+                    break;
+                case READ_LEVEL:
+                    batteryStage = BatteryStage.SUBSCRIBE_LEVEL;
+                    if (startOptionalBatteryRead(callbackGatt, batteryLevel)) return;
+                    break;
+                case SUBSCRIBE_LEVEL:
+                    batteryStage = BatteryStage.COMPLETE;
+                    if (startOptionalBatterySubscription(callbackGatt, batteryLevel,
+                            DescriptorStage.BATTERY_LEVEL)) return;
                     break;
                 case NOT_STARTED:
                 case COMPLETE:
@@ -2379,13 +2669,25 @@ public final class IphoneAncsTransport {
                 return;
             }
             descriptorStage = DescriptorStage.NONE;
+            if (expectedStage == DescriptorStage.SERVICE_CHANGED) {
+                log("Optional Service Changed CCCD callback timeout; "
+                        + "mandatory ANCS session is not reset");
+                state(iphonePeripheralMode && !helperBootstrapMode
+                        ? "AUTO LINK OK · ЖДУ ANCS"
+                        : "ЖДУ ANCS БЕЗ SERVICE CHANGED");
+                sendNextRequest();
+                return;
+            }
             gattReady = false;
-            log("onDescriptorWrite не получен за " + DESCRIPTOR_WRITE_TIMEOUT_MS
+            log("onDescriptorWrite не получен за "
+                    + ANCS_DESCRIPTOR_WRITE_TIMEOUT_MS
                     + " ms · stage=" + expectedStage
                     + " characteristic=" + shortUuid(expectedCharacteristic));
             state("CCCD_WRITE_TIMEOUT · " + expectedStage);
         };
-        main.postDelayed(descriptorWriteTimeout, DESCRIPTOR_WRITE_TIMEOUT_MS);
+        long timeout = expectedStage == DescriptorStage.SERVICE_CHANGED
+                ? DESCRIPTOR_WRITE_TIMEOUT_MS : ANCS_DESCRIPTOR_WRITE_TIMEOUT_MS;
+        main.postDelayed(descriptorWriteTimeout, timeout);
     }
 
     private void scheduleBatteryDescriptorTimeout(BluetoothGatt expectedGatt,
@@ -2400,10 +2702,10 @@ public final class IphoneAncsTransport {
                 return;
             }
             descriptorStage = DescriptorStage.NONE;
-            gattReady = false;
             log("BAS CCCD callback не получен за " + BATTERY_OPERATION_TIMEOUT_MS
-                    + " ms · " + expectedStage);
-            state("BAS OPERATION TIMEOUT · " + expectedStage);
+                    + " ms · " + expectedStage
+                    + "; optional operation skipped, ANCS stays READY");
+            sendNextRequest();
         };
         main.postDelayed(descriptorWriteTimeout, BATTERY_OPERATION_TIMEOUT_MS);
     }
@@ -2419,10 +2721,10 @@ public final class IphoneAncsTransport {
             batteryReadTimeout = null;
             if (gatt != expectedGatt || !expectedUuid.equals(batteryReadPendingUuid)) return;
             batteryReadPendingUuid = null;
-            gattReady = false;
             log("BAS read callback не получен за " + BATTERY_OPERATION_TIMEOUT_MS
-                    + " ms · " + shortUuid(expectedUuid));
-            state("BAS OPERATION TIMEOUT · READ " + shortUuid(expectedUuid));
+                    + " ms · " + shortUuid(expectedUuid)
+                    + "; optional operation skipped, ANCS stays READY");
+            sendNextRequest();
         };
         main.postDelayed(batteryReadTimeout, BATTERY_OPERATION_TIMEOUT_MS);
     }
@@ -2461,6 +2763,7 @@ public final class IphoneAncsTransport {
             clientConnectInFlight = false;
             activeClientTarget = null;
             activeClientAutoConnect = false;
+            activeClientEstablished = false;
         }
         try {
             callbackGatt.close();
@@ -2563,6 +2866,16 @@ public final class IphoneAncsTransport {
         if (closing || !managedReconnectEnabled || managedSavedPeer == null
                 || managedReconnectTask != null) return;
 
+        // Retain only an identity that was already selected and used by this managed GATT owner.
+        // Android commonly returns this resolved object without ANCS solicitation after a link
+        // drop; it remains safe to reuse inside the same in-memory session.
+        BluetoothDevice activeResolved = activeClientTarget != null
+                ? activeClientTarget : gatt == null ? null : gatt.getDevice();
+        if (activeResolved != null) managedResolvedPeer = activeResolved;
+
+        cancelAmbiguousAclProbe();
+        if (savedPeerFallbackTask != null) main.removeCallbacks(savedPeerFallbackTask);
+        savedPeerFallbackTask = null;
         stopScan();
         cancelClientAttemptCallbacks();
         clearAncsRuntime();
@@ -2576,6 +2889,12 @@ public final class IphoneAncsTransport {
         BluetoothGatt previous = gatt;
         gatt = null;
         if (previous != null) {
+            // Refresh only after a real Service Changed event. Doing it on every status 133 or
+            // brief radio loss discards Android's useful bonded-service cache and makes recovery
+            // depend on another Bluetooth power cycle.
+            if (reason.toUpperCase(Locale.US).contains("SERVICE CHANGED")) {
+                refreshGattCache(previous);
+            }
             try {
                 previous.disconnect();
             } catch (RuntimeException ignored) {
@@ -2589,19 +2908,34 @@ public final class IphoneAncsTransport {
         int attempt = managedReconnectAttempt++;
         long delay = AncsReconnectPolicy.retryDelayMillis(attempt);
         BluetoothDevice expected = managedSavedPeer;
+        long waitGeneration = sessionState.begin(AncsSessionStateMachine.Phase.RETRY_WAIT);
         managedReconnectTask = () -> {
             managedReconnectTask = null;
-            if (closing || !managedReconnectEnabled || expected != managedSavedPeer) return;
+            if (closing || !managedReconnectEnabled || expected != managedSavedPeer
+                    || !sessionState.isCurrent(waitGeneration)) return;
             iphonePeripheralMode = true;
             helperBootstrapMode = false;
             iphoneConnectStarted = false;
-            if (!startSavedPeerScan(expected)) {
-                scheduleManagedReconnect("identity scan could not start");
+            if (!startManagedBackgroundAttach(expected, "managed recovery #"
+                    + (attempt + 1))) {
+                scheduleManagedReconnect("background attach could not start");
             }
         };
         main.postDelayed(managedReconnectTask, delay);
         log("Одна recovery-сессия " + REMOTE_LOGICAL_NAME
                 + " #" + (attempt + 1) + " через " + delay + " ms · " + reason);
+    }
+
+    /** Clears Android 9's cached ANCS handles before registering the next saved-peer client. */
+    private static boolean refreshGattCache(@Nullable BluetoothGatt value) {
+        if (value == null) return false;
+        try {
+            Method refresh = value.getClass().getMethod("refresh");
+            Object result = refresh.invoke(value);
+            return !(result instanceof Boolean) || (Boolean) result;
+        } catch (Throwable unavailable) {
+            return false;
+        }
     }
 
     private static boolean requiresControllerRetry(@Nullable String value) {
@@ -2627,7 +2961,6 @@ public final class IphoneAncsTransport {
                 || value.contains("CCCD_WRITE_EXCEPTION")
                 || value.contains("CCCD_WRITE_TIMEOUT")
                 || value.contains("CCCD_FAILED_")
-                || value.contains("BAS OPERATION TIMEOUT")
                 || value.contains("ANCS DATA DESYNC")
                 || value.contains("ANCS WAIT TIMEOUT")
                 || value.contains("SECURE READ FAILED")
@@ -2731,7 +3064,8 @@ public final class IphoneAncsTransport {
                 safeAddress(selected), safeAddress(observed),
                 safeBondState(selected) == BluetoothDevice.BOND_BONDED,
                 safeBondState(observed) == BluetoothDevice.BOND_BONDED,
-                solicitsAncs, uniqueBondedNameMatch(selected, observed));
+                solicitsAncs, uniqueBondedNameMatch(selected, observed),
+                sameDevice(managedResolvedPeer, observed));
     }
 
     /**
@@ -3003,8 +3337,10 @@ public final class IphoneAncsTransport {
                         int offset, byte[] value) {
                     UUID uuid = characteristic == null ? null : characteristic.getUuid();
                     byte[] rawValue = value == null ? null : value.clone();
-                    main.post(() -> log("GATT SERVER WRITE raw: session="
-                            + sessionGeneration
+                    IphoneHelperTelemetry diagnosticTelemetry =
+                            IphoneHelperTelemetry.parse(rawValue);
+                    main.post(() -> log(diagnosticTelemetry == null
+                            ? "GATT SERVER WRITE raw: session=" + sessionGeneration
                             + " peer=" + safeAddress(device)
                             + " requestId=" + requestId
                             + " offset=" + offset
@@ -3015,7 +3351,10 @@ public final class IphoneAncsTransport {
                             + " hex=" + AdvertisementParser.hex(rawValue, 80)
                             + " ascii=`" + asciiCommand(rawValue) + "`"
                             + " type=" + typeLabel(safeType(device))
-                            + " bond=" + bondLabel(safeBondState(device))));
+                            + " bond=" + bondLabel(safeBondState(device))
+                            : "GATT SERVER WRITE TEL2: kind=" + diagnosticTelemetry.kind
+                            + " seq=" + diagnosticTelemetry.sequence
+                            + " peer=" + safeAddress(device)));
                     int status = BluetoothGatt.GATT_SUCCESS;
                     Runnable successAction = null;
 
@@ -3039,14 +3378,21 @@ public final class IphoneAncsTransport {
                         }
                     } else if (SECURE_CHARACTERISTIC.equals(uuid)) {
                         String command = asciiCommand(value);
+                        IphoneHelperTelemetry telemetry = IphoneHelperTelemetry.parse(value);
                         if (!isVerifiedPeer(device)) {
                             status = STATUS_INSUFFICIENT_AUTHORIZATION;
                             main.post(() -> log("SECURE WRITE отклонён: peer не verified · "
                                     + safeAddress(device)));
+                        } else if (telemetry != null) {
+                            successAction = () -> {
+                                listener.onHelperTelemetry(telemetry);
+                                log("Helper telemetry accepted: kind=" + telemetry.kind
+                                        + " seq=" + telemetry.sequence);
+                            };
                         } else if (!"ANCS".equals(command)) {
                             status = BluetoothGatt.GATT_FAILURE;
                             main.post(() -> log("SECURE command отклонена: `" + command
-                                    + "`; ожидается ASCII ANCS"));
+                                    + "`; ожидается ASCII ANCS или TEL2"));
                         } else {
                             successAction = () -> handleSecureAttSuccess(device, "WRITE");
                         }
@@ -3065,38 +3411,86 @@ public final class IphoneAncsTransport {
 
     private void handleIphonePeripheralConnectionState(BluetoothGatt callbackGatt,
                                                        int status, int newState) {
+        long callbackGeneration = activeClientGeneration;
+        if (!sessionState.isCurrent(callbackGeneration)) {
+            log("Игнорирую GATT callback устаревшей session generation");
+            closeClientGatt(callbackGatt);
+            return;
+        }
+        if (managedReconnectEnabled && callbackGatt.getDevice() != null) {
+            managedResolvedPeer = callbackGatt.getDevice();
+        }
+        boolean attachWasInFlight = clientConnectInFlight;
+        boolean establishedAutoOwner = activeClientAutoConnect && activeClientEstablished;
+        boolean failedBackgroundAttach = attachWasInFlight
+                && activeClientAutoConnect && !activeClientEstablished;
         if (status != GATT_SUCCESS) {
+            if (establishedAutoOwner) {
+                log("Established autoConnect callback status=" + status
+                        + "; сохраняю GATT-регистрацию и жду системный reconnect");
+                awaitBackgroundAutoReconnect(callbackGatt, callbackGeneration,
+                        "established autoConnect status=" + status);
+                return;
+            }
             cancelConnectTimeout();
             clientConnectInFlight = false;
             gattClientConnected = false;
-            if (status == 19 && ancsAuthorizationFailureSeen) {
+            closeClientGatt(callbackGatt);
+            clearAncsRuntime();
+            if (failedBackgroundAttach) {
+                log("Background attach status=" + status
+                        + "; без внешнего retry перехожу к scan/direct");
+                scheduleSavedPeerDirectFallback(
+                        "background attach status=" + status, callbackGeneration);
+            } else if (status == 19 && ancsAuthorizationFailureSeen) {
                 state("ANCS PAIRING FAILED · IPHONE CLOSED LINK");
                 log("iPhone закрыл BLE link (status=19/0x13) после неуспешной "
                         + "ANCS authorization/SMP");
             } else {
                 state("GPS-STYLE FAILED · status=" + status);
                 log("Прямое Android-central подключение завершилось ошибкой " + status);
+                if (managedReconnectEnabled) {
+                    scheduleManagedReconnect("direct GATT status=" + status);
+                }
             }
-            closeClientGatt(callbackGatt);
-            clearAncsRuntime();
             return;
         }
         if (newState == BluetoothProfile.STATE_CONNECTED) {
             cancelConnectTimeout();
+            cancelAmbiguousAclProbe();
             clientConnectInFlight = false;
             gattClientConnected = true;
-            state("IPHONE BLE CONNECTED · GPS-STYLE");
-            log("Android сам создал BLE link как central; начинаю GATT discovery");
+            activeClientEstablished = true;
+            state(activeClientAutoConnect
+                    ? "IPHONE BLE CONNECTED · BACKGROUND"
+                    : "IPHONE BLE CONNECTED · DIRECT");
+            log("Android создал единственный BLE link; начинаю GATT discovery");
             discoverServices(callbackGatt);
         } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
             cancelConnectTimeout();
+            cancelAmbiguousAclProbe();
             clientConnectInFlight = false;
             gattClientConnected = false;
+            if (establishedAutoOwner) {
+                log("Established autoConnect link disconnected normally; "
+                        + "не закрываю зарегистрированный GATT owner");
+                awaitBackgroundAutoReconnect(callbackGatt, callbackGeneration,
+                        "normal established autoConnect disconnect");
+                return;
+            }
             closeClientGatt(callbackGatt);
             clearAncsRuntime();
-            state("GPS-STYLE · IPHONE DISCONNECTED");
-            log("STATE_DISCONNECTED: старый BluetoothGatt закрыт; "
-                    + "следующую единственную direct-попытку создаст controller backoff");
+            if (failedBackgroundAttach) {
+                scheduleSavedPeerDirectFallback(
+                        "background attach disconnected", callbackGeneration);
+            } else {
+                state("GPS-STYLE · IPHONE DISCONNECTED");
+                log("STATE_DISCONNECTED: старый BluetoothGatt закрыт; "
+                        + "managed supervisor создаст одну новую recovery-сессию");
+                if (managedReconnectEnabled) {
+                    scheduleManagedReconnect("direct GATT disconnected");
+                }
+            }
         }
     }
 
@@ -3218,8 +3612,7 @@ public final class IphoneAncsTransport {
             main.post(() -> {
                 if (callbackGatt != gatt) return;
                 UUID uuid = characteristic.getUuid();
-                if ((BATTERY_LEVEL.equals(uuid) || BATTERY_POWER_STATE.equals(uuid)
-                        || BATTERY_LEVEL_STATUS.equals(uuid))
+                if ((BATTERY_LEVEL.equals(uuid) || BATTERY_LEVEL_STATUS.equals(uuid))
                         && uuid.equals(batteryReadPendingUuid)) {
                     cancelBatteryReadTimeout();
                     batteryReadPendingUuid = null;
@@ -3259,6 +3652,26 @@ public final class IphoneAncsTransport {
                     }
                 } else {
                     state("GPS-LINK · SECURE READ FAILED " + status);
+                }
+            });
+        }
+
+        @Override
+        public void onReadRemoteRssi(BluetoothGatt callbackGatt, int rssi, int status) {
+            main.post(() -> {
+                if (callbackGatt != gatt || callbackGatt != linkProbeGatt
+                        || !sessionState.isCurrent(linkProbeGeneration)) return;
+                long generation = linkProbeGeneration;
+                cancelAmbiguousAclProbe();
+                if (status == GATT_SUCCESS && gattClientConnected && gattReady) {
+                    sessionState.move(generation, AncsSessionStateMachine.Phase.READY);
+                    log("GATT liveness probe OK, RSSI=" + rssi
+                            + "; неоднозначный ACL loss не затронул ANCS");
+                } else {
+                    log("GATT liveness probe failed status=" + status);
+                    scheduleManagedReconnect("ambiguous ACL liveness probe failed status="
+                            + status);
+                    state(REMOTE_LOGICAL_NAME + " · RECOVERING");
                 }
             });
         }

@@ -79,7 +79,7 @@ public final class PhoneConnectorControllerContractTest {
                 "UUID.fromString(\"0000180f-0000-1000-8000-00805f9b34fb\")"));
         assertTrue(transport.contains(
                 "UUID.fromString(\"00002a19-0000-1000-8000-00805f9b34fb\")"));
-        assertTrue(transport.contains(
+        assertFalse(transport.contains(
                 "UUID.fromString(\"00002a1a-0000-1000-8000-00805f9b34fb\")"));
         assertTrue(transport.contains(
                 "UUID.fromString(\"00002bed-0000-1000-8000-00805f9b34fb\")"));
@@ -98,14 +98,15 @@ public final class PhoneConnectorControllerContractTest {
                 "listener.onBatteryCharacteristic(uuid, copy)"));
         assertTrue(transport.contains(
                 "listener.onBatteryCharacteristic(uuid, value.clone())"));
-        assertTrue(transport.contains("state(\"BAS OPERATION TIMEOUT"));
-        assertTrue(source.contains("state.contains(\"BAS OPERATION TIMEOUT\")"));
+        assertTrue(transport.contains("optional operation skipped, ANCS stays READY"));
+        assertFalse(transport.contains("state(\"BAS OPERATION TIMEOUT"));
+        assertFalse(source.contains("state.contains(\"BAS OPERATION TIMEOUT\")"));
         assertTrue(transportListener.contains("applyBatteryCharacteristic("));
 
         assertTrue(source.contains("ensureLegacyBatteryGatt(token)"));
         assertTrue(batteryOnly.contains("selectedDevice.connectGatt(context, autoConnect"));
         assertTrue(batteryOnly.contains("new SessionGattCallback(token)"));
-        assertTrue(batteryOnly.contains("config == null || config.ancsNeeded()"));
+        assertTrue(batteryOnly.contains("config == null || config.transportNeeded()"));
         assertTrue(source.contains("state.contains(\"IPHONE DISCONNECTED\")"));
         assertFalse(source.contains("state.contains(\"AUTO · ЖДУ SAVED PEER\")"));
     }
@@ -130,7 +131,8 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("mainHandler.post(() -> startAncsTransportOnMain("));
         assertTrue(savedPeer.contains("adapter.getRemoteDevice(address.trim())"));
         assertFalse(savedPeer.contains("startGeelyAncsAdvertising()"));
-        assertTrue(savedPeer.contains("return startSavedPeerScan(device)"));
+        assertTrue(savedPeer.contains(
+                "return startManagedBackgroundAttach(device, \"initial selected-phone attach\")"));
         assertTrue(savedPeer.contains("stopScan();"));
         assertTrue(savedPeer.contains("stopAdvertising();"));
         assertFalse(transport.contains(".setDeviceAddress(address)"));
@@ -153,9 +155,10 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(clientConnect.contains("activeClientAutoConnect = false"));
         assertTrue(clientConnect.contains("main.postDelayed(connectTimeout, timeoutMs)"));
         assertFalse(clientConnect.contains("autoConnect=true"));
+        assertTrue(disconnect.contains("establishedAutoOwner"));
+        assertTrue(disconnect.contains("awaitBackgroundAutoReconnect(callbackGatt"));
         assertTrue(disconnect.contains("closeClientGatt(callbackGatt)"));
         assertTrue(disconnect.contains("state(\"GPS-STYLE · IPHONE DISCONNECTED\")"));
-        assertFalse(disconnect.contains("if (activeClientAutoConnect)"));
         assertFalse(source.contains("state.contains(\"AUTO · ЖДУ SAVED PEER\")"));
         assertTrue(source.contains("state.contains(\"IPHONE DISCONNECTED\")"));
         assertTrue(source.contains("scheduleGattReconnect(token,"));
@@ -428,12 +431,17 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("PhoneConnectorPolicy.normalizeHfpBattery"));
         assertTrue(source.contains("BATTERY_LEVEL_STATUS"));
         assertTrue(source.contains("decodeBatteryLevelStatus"));
-        assertTrue(source.contains("inferChargingFromLevelTrend"));
-        assertTrue(source.contains("BATTERY_TREND_MAX_AGE_MS"));
-        assertTrue(source.contains("METADATA_MAIN_CHARGING = 19"));
-        assertTrue(source.contains("reflectedBluetoothMetadata("));
-        assertTrue(source.contains("decodeBluetoothChargingMetadata"));
-        assertTrue(source.contains("batteryChargingSource = \"android_metadata\""));
+        assertFalse(source.contains("inferChargingFromLevelTrend"));
+        assertFalse(source.contains("BATTERY_TREND_MAX_AGE_MS"));
+        assertFalse(source.contains("batteryChargingSource = batteryTrendSource"));
+        assertTrue(source.contains("batteryChargingEstimated = batteryCharging == null ? null : false"));
+        assertFalse(source.contains("selectBasChargingState"));
+        assertTrue(source.contains("the sole power-state authority"));
+        assertFalse(source.contains("METADATA_MAIN_CHARGING = 19"));
+        assertTrue(source.contains("HELPER_TELEMETRY_TIMEOUT_MS"));
+        assertFalse(source.contains("decodeBluetoothChargingMetadata"));
+        assertFalse(source.contains("batteryChargingSource = \"android_metadata\""));
+        assertTrue(source.contains("batteryChargingSource = \"iphone_helper\""));
         assertTrue(source.contains("NETWORK_SIGNAL_STRENGTH"));
         assertTrue(source.contains("networkOperator = \"\""));
         assertTrue(source.contains("ACTION_MAP_MESSAGE_RECEIVED"));
@@ -464,7 +472,8 @@ public final class PhoneConnectorControllerContractTest {
                 "call.audio_state", "call.audio_wideband",
                 "voice_assistant.active", "ringtone.in_band",
                 "network.available", "network.operator", "network.type",
-                "network.signal", "network.roaming", "notifications.count",
+                "network.signal", "network.roaming", "telemetry.stale",
+                "telemetry.updated_at", "notifications.count",
                 "notifications.latest", "notifications.items", "messages.unread",
                 "messages.latest", "diagnostics.device", "diagnostics.ancs",
                 "diagnostics.sms", "diagnostics.last_app", "diagnostics.last_error"
@@ -500,7 +509,7 @@ public final class PhoneConnectorControllerContractTest {
         String source = controller();
         assertTrue(source.contains("boolean ancsNeeded()"));
         assertTrue(source.contains("return notificationsEnabled || messagesEnabled"));
-        assertTrue(source.contains("if (!current.ancsNeeded())"));
+        assertTrue(source.contains("if (!current.transportNeeded())"));
         assertTrue(source.contains("ancsStatus = \"connecting\""));
         assertTrue(source.contains("created.connectSavedIphone(address)"));
         assertTrue(source.contains("if (config == null || !config.ancsNeeded())"));

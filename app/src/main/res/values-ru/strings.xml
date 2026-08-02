@@ -113,9 +113,12 @@
     <string name="brick_title_indoor_temp">Температура в салоне</string>
     <string name="brick_title_outdoor_temp">Температура за бортом</string>
     <string name="brick_title_phone_status">Статусы iPhone</string>
-    <string name="brick_title_phone_cellular">Сотовая сеть iPhone</string>
+    <string name="brick_title_phone_cellular">Оператор и сигнал iPhone</string>
     <string name="brick_title_phone_battery">Батарея iPhone</string>
+    <string name="brick_title_phone_network_type">Тип сети iPhone</string>
     <string name="show_bluetooth_device_count_badge">Показывать число подключённых устройств</string>
+    <string name="show_phone_cellular_network_type">Показывать тип сети в этом блоке</string>
+    <string name="show_phone_battery_percentage">Показывать процент внутри батареи</string>
     <string name="brick_font_size">Размер шрифта</string>
     <string name="brick_size">Размер</string>
     <string name="brick_outline_alpha">Интенсивность обводки</string>
