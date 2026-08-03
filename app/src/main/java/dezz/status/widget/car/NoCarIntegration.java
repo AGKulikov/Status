@@ -20,6 +20,8 @@ package dezz.status.widget.car;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.Set;
+
 import dezz.status.widget.BrickType;
 
 /**
@@ -40,6 +42,15 @@ public final class NoCarIntegration implements CarIntegration {
 
     @Override
     public void unsubscribe(@NonNull BrickType type) {
+    }
+
+    @Override
+    public void subscribeTelemetry(@NonNull Set<String> metricIds,
+                                   @NonNull TelemetryListener listener) {
+    }
+
+    @Override
+    public void unsubscribeTelemetry(@NonNull TelemetryListener listener) {
     }
 
     @Override
