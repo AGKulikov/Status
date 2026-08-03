@@ -1,0 +1,29 @@
+KX11 ANCS Helper v11
+====================
+
+Companion release: Status Widget v2.8.2-ha1161
+Bundle identifier: ru.natro.kx11ancshelper
+Marketing version: 11.0
+Build number: 11
+Minimum iOS version: 13.0
+
+Installation
+------------
+
+1. Open KX11ANCSHelper.xcodeproj in Xcode.
+2. Select the same Apple Development Team used for the installed Helper.
+3. Connect the iPhone and run the KX11ANCSHelper target on it.
+4. Open Helper once, leave the BLE service enabled and do not force-quit it.
+
+The bundle identifier and Core Bluetooth restoration identity are intentionally preserved, so
+v11 updates the existing Helper and resumes the same single peripheral/GATT service.
+
+Release verification
+--------------------
+
+- One BLE role only: iPhone peripheral, KX11 central.
+- No CBCentralManager, reverse scan or Geely_ANCS bridge.
+- B4 telemetry characteristic is READ + NOTIFY.
+- Battery, cable state and radio type are event driven, with a one-second recovery sampler.
+- Connection journal is bounded, persistent, clearable and exportable.
+- Background mode contains bluetooth-peripheral only.
