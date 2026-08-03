@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Apple-style Location outline while a fix is not yet available. -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="@android:color/white"
+        android:strokeWidth="1.55"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M2.95,10.35 L20.35,2.55 C21.03,2.24 21.76,2.97 21.45,3.65 L13.65,21.05 C13.36,21.70 12.42,21.62 12.24,20.93 L10.34,13.66 L3.07,11.76 C2.38,11.58 2.30,10.64 2.95,10.35 Z" />
+</vector>

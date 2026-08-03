@@ -22,8 +22,11 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
+import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 
@@ -37,6 +40,8 @@ public class OutlineImageView extends AppCompatImageView {
     private static final int DIAGONAL = 4;
     // Anti-aliasing band width (in distance units) for the outline edge.
     private static final int AA_BAND = STRAIGHT;
+    private static final Typeface BATTERY_PERCENT_TYPEFACE =
+            Typeface.create("sans-serif-condensed", Typeface.BOLD);
 
     private int outlineColor = Color.TRANSPARENT;
     private int outlineWidth = 0;
@@ -46,10 +51,20 @@ public class OutlineImageView extends AppCompatImageView {
     @Nullable private String badgeText;
     private int badgeTextBackgroundColor;
     private int badgeTextForegroundColor;
+    @Nullable private Integer batteryPercent;
+    private int batteryFillColor = Color.WHITE;
+    private boolean batteryCharging;
 
     private final Paint outlinePaint = new Paint(Paint.FILTER_BITMAP_FLAG);
     private final Paint badgeFillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint badgeTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint batteryPercentPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint batteryChargingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint batteryLevelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Path batteryChargingPath = new Path();
+    private final RectF batteryDrawableBounds = new RectF();
+    private int imageLevel = 10_000;
+    private boolean imageLevelApplied;
     private int filterColor = 0;
 
     private Bitmap cachedOutline;
@@ -130,10 +145,30 @@ public class OutlineImageView extends AppCompatImageView {
         }
     }
 
+    /** Draws the optional live number inside the solid iPhone-style battery body. */
+    public void setBatteryPercent(@Nullable Integer percent, int fillColor) {
+        Integer bounded = percent == null ? null : Math.max(0, Math.min(100, percent));
+        if (!java.util.Objects.equals(this.batteryPercent, bounded)
+                || this.batteryFillColor != fillColor) {
+            this.batteryPercent = bounded;
+            this.batteryFillColor = fillColor;
+            invalidate();
+        }
+    }
+
+    /** Draws a lightning bolt inside the battery body for fresh helper-reported external power. */
+    public void setBatteryCharging(boolean charging) {
+        if (batteryCharging != charging) {
+            batteryCharging = charging;
+            invalidate();
+        }
+    }
+
     @Override
     public void setImageDrawable(@Nullable Drawable drawable) {
         currentImageResId = 0;
         super.setImageDrawable(drawable);
+        imageLevelApplied = false;
         invalidateOutlineCache();
     }
 
@@ -147,9 +182,25 @@ public class OutlineImageView extends AppCompatImageView {
         if (resId != 0 && resId == currentImageResId) {
             return;
         }
-        currentImageResId = resId;
+        // AppCompatImageView#setImageResource eventually invokes setImageDrawable(). Our
+        // override deliberately clears currentImageResId for callers that really supply an
+        // arbitrary Drawable, so assigning the resource id before super() loses the battery
+        // marker and makes onDraw() render the complete source vector (visually 100%) at every
+        // real charge level. Record the resource only after AppCompat has finished installing it.
         super.setImageResource(resId);
+        currentImageResId = resId;
+        imageLevelApplied = false;
         invalidateOutlineCache();
+    }
+
+    @Override
+    public void setImageLevel(int level) {
+        int bounded = Math.max(0, Math.min(10_000, level));
+        if (imageLevelApplied && imageLevel == bounded) return;
+        imageLevel = bounded;
+        imageLevelApplied = true;
+        super.setImageLevel(bounded);
+        invalidate();
     }
 
     private void invalidateOutlineCache() {
@@ -172,8 +223,16 @@ public class OutlineImageView extends AppCompatImageView {
                 canvas.drawBitmap(outline, 0, 0, outlinePaint);
             }
         }
-        if (drawIcon) {
+        if (drawIcon && currentImageResId == R.drawable.ic_status_iphone_battery) {
+            drawBatteryLevel(canvas);
+        } else if (drawIcon) {
             super.onDraw(canvas);
+        }
+        if (batteryPercent != null) {
+            drawBatteryPercent(canvas);
+        }
+        if (batteryCharging) {
+            drawBatteryCharging(canvas);
         }
         if (badgeText != null) {
             drawTextBadge(canvas);
@@ -188,6 +247,141 @@ public class OutlineImageView extends AppCompatImageView {
             badgeDrawable.setBounds(left, top, left + badgeSize, top + badgeSize);
             badgeDrawable.draw(canvas);
         }
+    }
+
+    /**
+     * Draws the one-piece iPhone battery body at the real helper-reported level.
+     *
+     * <p>The source vector remains a complete silhouette so Android can measure it and build the
+     * optional user-configured outer glow. Drawing that complete vector directly, however, made
+     * 1% and 100% look identical. Keep the terminal visible and clip only the rounded body to the
+     * drawable level; this preserves the requested frameless design while making its length an
+     * honest percentage indicator.</p>
+     */
+    private void drawBatteryLevel(@NonNull Canvas canvas) {
+        Drawable drawable = getDrawable();
+        if (drawable == null) return;
+        RectF displayed = batteryDrawableBounds;
+        displayed.set(drawable.getBounds());
+        if (displayed.isEmpty()) return;
+        getImageMatrix().mapRect(displayed);
+        displayed.offset(getPaddingLeft(), getPaddingTop());
+        if (displayed.isEmpty()) return;
+
+        float bodyLeft = displayed.left + displayed.width() * (0.5f / 32f);
+        float bodyRight = displayed.left + displayed.width() * (28.5f / 32f);
+        float bodyTop = displayed.top + displayed.height() * (2.5f / 20f);
+        float bodyBottom = displayed.top + displayed.height() * (17.5f / 20f);
+        float fraction = imageLevel / 10_000f;
+        batteryLevelPaint.setStyle(Paint.Style.FILL);
+        batteryLevelPaint.setColor(batteryFillColor);
+
+        if (fraction > 0f) {
+            int restore = canvas.save();
+            canvas.clipRect(bodyLeft, bodyTop,
+                    bodyLeft + (bodyRight - bodyLeft) * fraction, bodyBottom);
+            float radius = (bodyBottom - bodyTop) * 0.23f;
+            canvas.drawRoundRect(bodyLeft, bodyTop, bodyRight, bodyBottom,
+                    radius, radius, batteryLevelPaint);
+            canvas.restoreToCount(restore);
+        }
+
+        // The terminal communicates the battery orientation/capacity and must not disappear at
+        // low percentages as it would with a ClipDrawable around the complete resource.
+        float terminalLeft = displayed.left + displayed.width() * (30f / 32f);
+        float terminalRight = displayed.left + displayed.width() * (31.8f / 32f);
+        float terminalTop = displayed.top + displayed.height() * (7f / 20f);
+        float terminalBottom = displayed.top + displayed.height() * (13f / 20f);
+        float terminalRadius = (terminalBottom - terminalTop) * 0.5f;
+        canvas.drawRoundRect(terminalLeft, terminalTop, terminalRight, terminalBottom,
+                terminalRadius, terminalRadius, batteryLevelPaint);
+    }
+
+    private void drawBatteryPercent(@NonNull Canvas canvas) {
+        Drawable drawable = getDrawable();
+        if (drawable == null || batteryPercent == null) return;
+
+        RectF displayed = batteryDrawableBounds;
+        displayed.set(drawable.getBounds());
+        if (displayed.isEmpty()) {
+            int width = drawable.getIntrinsicWidth();
+            int height = drawable.getIntrinsicHeight();
+            if (width <= 0 || height <= 0) return;
+            displayed.set(0f, 0f, width, height);
+        }
+        getImageMatrix().mapRect(displayed);
+        displayed.offset(getPaddingLeft(), getPaddingTop());
+        if (displayed.isEmpty()) return;
+
+        // The vector uses a 32x20 viewport. Keep the terminal outside the text geometry so the
+        // number is centred in the rounded body exactly like the iPhone status-bar icon.
+        float innerLeft = displayed.left + displayed.width() * (1.5f / 32f);
+        float innerRight = displayed.left + displayed.width() * (27.5f / 32f);
+        float innerTop = displayed.top + displayed.height() * (3.5f / 20f);
+        float innerBottom = displayed.top + displayed.height() * (16.5f / 20f);
+        float centerX = displayed.left + displayed.width()
+                * (batteryCharging ? 10.8f / 32f : 14.5f / 32f);
+
+        String text = String.valueOf(batteryPercent);
+        batteryPercentPaint.setStyle(Paint.Style.FILL);
+        batteryPercentPaint.setTextAlign(Paint.Align.CENTER);
+        batteryPercentPaint.setTypeface(BATTERY_PERCENT_TYPEFACE);
+        batteryPercentPaint.setTextSize((innerBottom - innerTop) * 0.78f);
+        float maxTextWidth = (innerRight - innerLeft) * (batteryCharging ? 0.55f : 0.88f);
+        float measured = batteryPercentPaint.measureText(text);
+        if (measured > maxTextWidth && measured > 0f) {
+            batteryPercentPaint.setTextSize(
+                    batteryPercentPaint.getTextSize() * maxTextWidth / measured);
+        }
+        Paint.FontMetrics metrics = batteryPercentPaint.getFontMetrics();
+        float centerY = (innerTop + innerBottom) / 2f
+                - (metrics.ascent + metrics.descent) / 2f;
+
+        batteryPercentPaint.setColor(contrastColor(batteryFillColor));
+        canvas.drawText(text, centerX, centerY, batteryPercentPaint);
+    }
+
+    private void drawBatteryCharging(@NonNull Canvas canvas) {
+        Drawable drawable = getDrawable();
+        if (drawable == null) return;
+        RectF displayed = batteryDrawableBounds;
+        displayed.set(drawable.getBounds());
+        if (displayed.isEmpty()) return;
+        getImageMatrix().mapRect(displayed);
+        displayed.offset(getPaddingLeft(), getPaddingTop());
+        float innerLeft = displayed.left + displayed.width() * (1.5f / 32f);
+        float innerRight = displayed.left + displayed.width() * (27.5f / 32f);
+        float innerTop = displayed.top + displayed.height() * (3.5f / 20f);
+        float innerBottom = displayed.top + displayed.height() * (16.5f / 20f);
+        float bodyWidth = innerRight - innerLeft;
+        float bodyHeight = innerBottom - innerTop;
+        float centerX = batteryPercent == null
+                ? (innerLeft + innerRight) / 2f
+                : innerLeft + bodyWidth * 0.76f;
+        float top = innerTop + bodyHeight * 0.08f;
+        float bottom = innerBottom - bodyHeight * 0.08f;
+        float height = bottom - top;
+        float width = height * 0.55f;
+        float left = centerX - width / 2f;
+
+        batteryChargingPath.reset();
+        batteryChargingPath.moveTo(left + width * 0.58f, top);
+        batteryChargingPath.lineTo(left + width * 0.15f, top + height * 0.53f);
+        batteryChargingPath.lineTo(left + width * 0.48f, top + height * 0.53f);
+        batteryChargingPath.lineTo(left + width * 0.34f, bottom);
+        batteryChargingPath.lineTo(left + width * 0.88f, top + height * 0.40f);
+        batteryChargingPath.lineTo(left + width * 0.56f, top + height * 0.40f);
+        batteryChargingPath.close();
+        batteryChargingPaint.setStyle(Paint.Style.FILL);
+        batteryChargingPaint.setColor(contrastColor(batteryFillColor));
+        canvas.drawPath(batteryChargingPath, batteryChargingPaint);
+    }
+
+    private static int contrastColor(int background) {
+        int brightness = (Color.red(background) * 299
+                + Color.green(background) * 587
+                + Color.blue(background) * 114) / 1000;
+        return brightness >= 145 ? Color.BLACK : Color.WHITE;
     }
 
     private void drawTextBadge(Canvas canvas) {
