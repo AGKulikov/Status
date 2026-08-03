@@ -352,7 +352,9 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("value.put(\"received_at\""));
         assertTrue(source.contains("\"diagnostics.last_app\""));
         assertTrue(source.contains("helperPowerUpdatedAtElapsed > 0L"));
-        assertTrue(source.contains("batteryLevelSource = \"iphone_helper\""));
+        assertTrue(source.contains("PhoneBatteryLevelPolicy.resolve("));
+        assertTrue(source.contains("batteryLevelSource = reading.source"));
+        assertFalse(source.contains("batteryLevelSource = \"iphone_helper\""));
         assertTrue(source.contains(
                 "String effectiveNetworkType = helperNetworkUpdatedAtElapsed > 0L"));
         assertTrue(source.contains("SystemClock.elapsedRealtime()"));
