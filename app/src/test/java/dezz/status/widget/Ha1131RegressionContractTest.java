@@ -65,7 +65,8 @@ public final class Ha1131RegressionContractTest {
         assertTrue(overlay.contains("boolean namedGroup"));
         assertTrue(overlay.contains("if (!namedGroup)"));
         assertTrue(overlay.contains("scroll.setPadding(0, 0, 0, 0)"));
-        assertTrue(overlay.contains("shortcut.informationShowValue ? 1 : 0"));
+        assertTrue(overlay.contains(
+                "DriverInformationTileLayoutPolicy.naturalHeight(context, shortcut, 1f)"));
         assertFalse(overlay.contains("text + padding + dp(context, 8)"));
         assertTrue(information.contains("iconLp.rightMargin = 0"));
     }

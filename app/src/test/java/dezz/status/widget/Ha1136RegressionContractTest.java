@@ -28,7 +28,8 @@ public final class Ha1136RegressionContractTest {
         assertTrue(source.contains("ViewGroup.LayoutParams.MATCH_PARENT, topHeight"));
         assertTrue(source.contains("ViewGroup.LayoutParams.MATCH_PARENT, bottomHeight"));
         assertTrue(source.contains("ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f"));
-        assertTrue(source.contains("shortcut.informationIconSizePx + padding"));
+        assertTrue(source.contains(
+                "DriverInformationTileLayoutPolicy.naturalHeight(context, shortcut, 1f)"));
         assertFalse(source.contains("dp(context, shortcut.informationIconSizePx) + padding"));
     }
 

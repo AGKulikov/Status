@@ -116,8 +116,9 @@ public final class DriverPanelHa1085ContractTest {
         assertTrue(overlay.contains("? bottomInformation : topInformation).add(shortcut)"));
         assertTrue(overlay.contains("new InformationShortcutView("));
         assertTrue(settings(widget).contains("Показывать значок слева"));
-        assertTrue(infoView.contains("value.setSingleLine(false)"));
-        assertTrue(infoView.contains("value.setMaxLines(Integer.MAX_VALUE)"));
+        assertTrue(infoView.contains("value.setSingleLine(phoneCellular)"));
+        assertTrue(infoView.contains(
+                "value.setMaxLines(phoneCellular ? 1 : Integer.MAX_VALUE)"));
         assertTrue(picker.contains("\"system.bluetooth\""));
         assertTrue(picker.contains("\"system.wifi\""));
         assertTrue(infoView.contains("private Value resolveBluetooth()"));

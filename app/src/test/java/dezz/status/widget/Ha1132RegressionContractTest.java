@@ -128,7 +128,8 @@ public final class Ha1132RegressionContractTest {
         assertTrue(driver.contains("InformationSection topSection = buildInformationSection("));
         assertTrue(driver.contains("ViewGroup.LayoutParams.MATCH_PARENT, topHeight"));
         assertTrue(driver.contains("ViewGroup.LayoutParams.MATCH_PARENT, bottomHeight"));
-        assertTrue(driver.contains("shortcut.informationShowValue ? 1 : 0"));
+        assertTrue(driver.contains(
+                "DriverInformationTileLayoutPolicy.naturalHeight(context, shortcut, 1f)"));
         assertTrue(driver.contains(
                 "AppUninstallLauncher.request(context, app, attachedType)"));
         assertTrue(uninstall.contains("window.setType(windowType)"));
