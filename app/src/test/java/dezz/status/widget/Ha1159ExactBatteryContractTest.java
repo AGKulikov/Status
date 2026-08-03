@@ -30,9 +30,9 @@ public final class Ha1159ExactBatteryContractTest {
         assertTrue(controller.contains("batteryLevelSource = reading.source"));
     }
 
-    @Test public void releaseIdentityIsHa1159() throws Exception {
+    @Test public void releaseIdentityIsHa1160() throws Exception {
         String build = project("build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1159'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1160'"));
     }
 
     private static String source(String relative) throws Exception {

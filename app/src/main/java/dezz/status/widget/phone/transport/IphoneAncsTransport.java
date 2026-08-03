@@ -116,6 +116,12 @@ public final class IphoneAncsTransport {
     private static final long GPS_SCAN_TIMEOUT_MS = 30_000L;
     private static final long SAVED_PEER_SCAN_RESTART_MS = 30_000L;
     private static final long SAVED_PEER_SCAN_RESTART_DELAY_MS = 400L;
+    /**
+     * Package replacement kills the app process and its Binder-owned GATT client while the
+     * system Bluetooth process and the iPhone's Classic profiles stay alive. Give Android 9 a
+     * short quiescence window before registering the replacement background GATT owner.
+     */
+    private static final long COLD_BACKGROUND_ATTACH_DELAY_MS = 2_500L;
     private static final long AUTO_ANCS_WAIT_TIMEOUT_MS = 60_000L;
     private static final long GPS_POST_SECURE_DISCOVERY_DELAY_MS = 800L;
     private static final long DISCOVERY_TIMEOUT_MS = 15_000L;
@@ -427,6 +433,7 @@ public final class IphoneAncsTransport {
     private Runnable scanTimeout;
     private Runnable ancsBondRetry;
     private Runnable autoAncsWaitTimeout;
+    private Runnable coldBackgroundAttachTask;
     private Runnable managedReconnectTask;
     private Runnable ambiguousAclProbeTask;
     private Runnable linkProbeTimeout;
@@ -570,10 +577,11 @@ public final class IphoneAncsTransport {
     /**
      * Daily path for the selected bonded iPhone.
      *
-     * <p>The cold path mirrors a stable Bluetooth-GPS client: continuously scan for the private
-     * Helper service, resolve the current iOS peripheral address, then create one direct GATT
-     * owner. After that owner has connected once it is retained and re-armed indefinitely across
-     * radio loss. Scan and connect are never active at the same time.</p>
+     * <p>The cold path registers one LE background GATT client against the selected system bond.
+     * This lets Android resolve iOS's rotating private address even when background advertising
+     * hides the Helper UUID from Android scanners. After that owner has connected once it is
+     * retained and re-armed indefinitely across radio loss. GPS-style scan/direct connect remains
+     * an unbonded/bootstrap fallback, and two GATT clients are never active at once.</p>
      */
     public boolean connectSavedIphone(String address) {
         closing = false;
@@ -592,13 +600,16 @@ public final class IphoneAncsTransport {
                 && (clientConnectInFlight || gattClientConnected);
         boolean matchingScan = scanning && savedPeerScanTarget != null
                 && sameDevice(savedPeerScanTarget, device);
+        boolean matchingScheduledAttach = coldBackgroundAttachTask != null
+                && managedSavedPeer != null && sameDevice(managedSavedPeer, device);
         if (iphonePeripheralMode && !helperBootstrapMode
-                && (matchingGatt || matchingScan)) {
+                && (matchingGatt || matchingScan || matchingScheduledAttach)) {
             log("Saved-peer GATT уже активен для "
                     + safeAddress(device) + "; дубликат connectGatt не создаю"
                     + " connected=" + gattClientConnected
                     + " inFlight=" + clientConnectInFlight
-                    + " scanning=" + matchingScan);
+                    + " scanning=" + matchingScan
+                    + " scheduled=" + matchingScheduledAttach);
             state(gattReady
                     ? "ANCS READY · ОТПРАВЬТЕ УВЕДОМЛЕНИЕ"
                     : "АВТО · SAVED PEER УЖЕ ЗАРЕГИСТРИРОВАН");
@@ -623,10 +634,117 @@ public final class IphoneAncsTransport {
             state("AUTO · SAVED PEER CONFLICT");
             return false;
         }
-        // Daily operation has exactly one BLE owner. Resolve the live iOS peripheral first, just
-        // as the known-good GPS path does; connectGatt(autoConnect=false) starts only after a real
-        // Helper advertisement and is never duplicated by another client.
+        // A bonded iPhone can hide the Helper UUID and local name while iOS is in the background.
+        // Register one durable LE background owner against Android's saved bond/IRK instead of
+        // waiting for an advertisement that Android is not allowed to see. The GPS-style scan is
+        // retained only for an unbonded/bootstrap peer where identity resolution is unavailable.
+        if (safeBondState(device) == BluetoothDevice.BOND_BONDED) {
+            return scheduleColdBackgroundAttach(device,
+                    "cold selected-phone attach after process start");
+        }
+        log("Saved iPhone peer не BOND_BONDED; background RPA resolution недоступен, "
+                + "перехожу к Helper scan");
         return startSavedPeerScan(device);
+    }
+
+    private boolean scheduleColdBackgroundAttach(@NonNull BluetoothDevice device,
+                                                  @NonNull String reason) {
+        if (closing || !managedReconnectEnabled || helperBootstrapMode) return false;
+        if (coldBackgroundAttachTask != null) {
+            log("Cold background attach уже запланирован; дубль пропущен");
+            return true;
+        }
+        if (gatt != null || clientConnectInFlight || gattClientConnected || scanning) {
+            log("Cold background attach не планируется: BLE owner/scan уже активен");
+            return true;
+        }
+        long waitGeneration = sessionState.begin(AncsSessionStateMachine.Phase.RETRY_WAIT);
+        state(REMOTE_LOGICAL_NAME + " · COLD START · STACK QUIESCENCE");
+        coldBackgroundAttachTask = () -> {
+            coldBackgroundAttachTask = null;
+            if (closing || !managedReconnectEnabled || helperBootstrapMode
+                    || managedSavedPeer == null
+                    || !sameDevice(managedSavedPeer, device)
+                    || !sessionState.isCurrent(waitGeneration)) return;
+            if (!startManagedBackgroundAttach(device, reason)) {
+                scheduleManagedReconnect("cold background attach could not start");
+            }
+        };
+        main.postDelayed(coldBackgroundAttachTask, COLD_BACKGROUND_ATTACH_DELAY_MS);
+        log("Один cold background GATT owner будет зарегистрирован через "
+                + COLD_BACKGROUND_ATTACH_DELAY_MS + " ms · " + reason);
+        return true;
+    }
+
+    /**
+     * Registers the sole long-lived GATT client for the selected bonded iPhone.
+     *
+     * <p>There is deliberately no connection timeout here. {@code autoConnect=true} is a pending
+     * background registration, not a direct attempt: iOS may remain silent for an arbitrary time
+     * and Android must keep resolving its RPA from the system bond. The owner is replaced only
+     * after an explicit terminal callback/exception, never merely because a timer elapsed.</p>
+     */
+    private boolean startManagedBackgroundAttach(@NonNull BluetoothDevice selected,
+                                                 @NonNull String reason) {
+        if (closing || !managedReconnectEnabled || helperBootstrapMode) return false;
+        if (!ensureAdapter()) return false;
+        if (gatt != null || clientConnectInFlight || gattClientConnected || scanning) {
+            log("Background attach не запущен: другая BLE-операция уже активна");
+            return true;
+        }
+        BluetoothDevice target = managedResolvedPeer != null
+                ? managedResolvedPeer : selected;
+        if (safeBondState(target) != BluetoothDevice.BOND_BONDED) {
+            log("Background attach отклонён: target не BOND_BONDED · "
+                    + safeAddress(target));
+            return startSavedPeerScan(selected);
+        }
+        if (!claimVerifiedPeer(target)) {
+            state("AUTO · SAVED PEER CONFLICT");
+            return false;
+        }
+
+        cancelAmbiguousAclProbe();
+        stopScan();
+        clearAncsRuntime();
+        clearIphonePeripheralRuntime(false);
+        iphonePeripheralMode = true;
+        helperBootstrapMode = false;
+        iphoneConnectStarted = true;
+        activeClientTarget = target;
+        activeClientAutoConnect = true;
+        activeClientEstablished = false;
+        clientConnectInFlight = true;
+        activeClientGeneration = sessionState.begin(
+                AncsSessionStateMachine.Phase.BACKGROUND_CONNECT);
+        state(REMOTE_LOGICAL_NAME + " · BACKGROUND ATTACH · PERSISTENT");
+        log("connectGatt(autoConnect=true, TRANSPORT_LE) · target="
+                + safeAddress(target) + " bond=" + bondLabel(safeBondState(target))
+                + " · one durable cold-start owner · " + reason);
+        try {
+            BluetoothGatt created = target.connectGatt(context, true, gattCallback,
+                    BluetoothDevice.TRANSPORT_LE);
+            gatt = created;
+            if (created == null) {
+                clientConnectInFlight = false;
+                activeClientTarget = null;
+                activeClientAutoConnect = false;
+                log("Background connectGatt вернул null");
+                scheduleManagedReconnect("background connectGatt returned null");
+            } else {
+                log("Background GATT зарегистрирован без закрывающего тайм-аута; "
+                        + "жду системное RPA/IRK reconnect-событие");
+            }
+            return true;
+        } catch (RuntimeException failure) {
+            clientConnectInFlight = false;
+            activeClientTarget = null;
+            activeClientAutoConnect = false;
+            gatt = null;
+            log("Background connectGatt exception: " + failure);
+            scheduleManagedReconnect("background attach exception");
+            return true;
+        }
     }
 
     /**
@@ -650,6 +768,20 @@ public final class IphoneAncsTransport {
             return;
         }
         if (closing || !managedReconnectEnabled || managedSavedPeer == null) return;
+        BluetoothGatt pendingOwner = gatt;
+        if (pendingOwner != null && activeClientAutoConnect && clientConnectInFlight
+                && !activeClientEstablished
+                && sessionState.is(activeClientGeneration,
+                AncsSessionStateMachine.Phase.BACKGROUND_CONNECT)) {
+            // The cold owner is already registered with Android and is waiting for the bonded
+            // iPhone to become connectable. ACL broadcasts (including explicit LE loss) describe
+            // exactly the absence this owner was created to survive; replacing it would discard
+            // the controller's pending RPA/IRK resolution and reintroduce reconnect churn.
+            state(REMOTE_LOGICAL_NAME + " · RECOVERING · BACKGROUND WAIT");
+            log("Сохраняю ожидающий background GATT owner; ACL event не создаёт новый client · "
+                    + reason);
+            return;
+        }
         if (!confirmedLeLoss && isAncsReady()) {
             scheduleAmbiguousAclProbe(reason.trim().isEmpty()
                     ? "ambiguous selected-phone ACL loss" : reason);
@@ -1141,6 +1273,7 @@ public final class IphoneAncsTransport {
     public void disconnect() {
         iphonePeripheralMode = false;
         iphoneConnectStarted = false;
+        cancelColdBackgroundAttach();
         cancelAmbiguousAclProbe();
         sessionState.begin(AncsSessionStateMachine.Phase.IDLE);
         clearIphonePeripheralRuntime(true);
@@ -1203,6 +1336,7 @@ public final class IphoneAncsTransport {
             verifiedPeer = null;
         }
         clearIphonePeripheralRuntime(true);
+        cancelColdBackgroundAttach();
         cancelClientAttemptCallbacks();
         sessionGeneration++;
         gattServerPeers.clear();
@@ -1484,6 +1618,13 @@ public final class IphoneAncsTransport {
         if (nextClientAttempt != null) main.removeCallbacks(nextClientAttempt);
         secureConnectStart = null;
         nextClientAttempt = null;
+    }
+
+    private void cancelColdBackgroundAttach() {
+        if (coldBackgroundAttachTask != null) {
+            main.removeCallbacks(coldBackgroundAttachTask);
+        }
+        coldBackgroundAttachTask = null;
     }
 
     private GattServerPeer findConnectedServerPeer(BluetoothDevice device) {
@@ -3150,7 +3291,7 @@ public final class IphoneAncsTransport {
      */
     private void scheduleManagedReconnect(@NonNull String reason) {
         if (closing || !managedReconnectEnabled || managedSavedPeer == null
-                || managedReconnectTask != null) return;
+                || managedReconnectTask != null || coldBackgroundAttachTask != null) return;
 
         BluetoothGatt establishedOwner = gatt;
         if (establishedOwner != null && activeClientEstablished
@@ -3164,9 +3305,9 @@ public final class IphoneAncsTransport {
             return;
         }
 
-        // A client that never established cannot resolve or retain iOS identity. Close only that
-        // failed attempt and return to the GPS-style Helper scan. Established owners take the
-        // early branch above and are never destroyed here.
+        // A client that never established cannot be retained. Close only that explicitly failed
+        // attempt, then register a fresh background owner against the same bonded identity.
+        // Established owners take the early branch above and are never destroyed here.
         BluetoothDevice activeResolved = activeClientTarget != null
                 ? activeClientTarget : gatt == null ? null : gatt.getDevice();
         if (activeResolved != null) managedResolvedPeer = activeResolved;
@@ -3206,12 +3347,16 @@ public final class IphoneAncsTransport {
             iphonePeripheralMode = true;
             helperBootstrapMode = false;
             iphoneConnectStarted = false;
-            if (!startSavedPeerScan(expected)) {
-                scheduleManagedReconnect("identity scan could not start");
+            boolean started = safeBondState(expected) == BluetoothDevice.BOND_BONDED
+                    ? startManagedBackgroundAttach(expected,
+                    "cold-owner retry #" + (attempt + 1) + " after " + reason)
+                    : startSavedPeerScan(expected);
+            if (!started) {
+                scheduleManagedReconnect("background attach/fallback scan could not start");
             }
         };
         main.postDelayed(managedReconnectTask, delay);
-        log("Одна GPS-style recovery scan-сессия " + REMOTE_LOGICAL_NAME
+        log("Одна serialized cold-owner recovery " + REMOTE_LOGICAL_NAME
                 + " #" + (attempt + 1) + " через " + delay + " ms · " + reason);
     }
 

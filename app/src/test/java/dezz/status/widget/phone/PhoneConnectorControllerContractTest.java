@@ -131,6 +131,7 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("mainHandler.post(() -> startAncsTransportOnMain("));
         assertTrue(savedPeer.contains("adapter.getRemoteDevice(address.trim())"));
         assertFalse(savedPeer.contains("startGeelyAncsAdvertising()"));
+        assertTrue(savedPeer.contains("return scheduleColdBackgroundAttach(device,"));
         assertTrue(savedPeer.contains("return startSavedPeerScan(device)"));
         assertTrue(savedPeer.contains("stopScan();"));
         assertTrue(savedPeer.contains("stopAdvertising();"));

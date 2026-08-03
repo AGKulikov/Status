@@ -24,8 +24,11 @@ public final class Ha1146AncsReliabilityContractTest {
         String persistentWait = between(transport, "private void awaitPersistentGattReconnect",
                 "private boolean startSavedPeerScan");
 
-        assertTrue(connect.contains("return startSavedPeerScan(device)"));
-        assertFalse(connect.contains("connectGatt(context, true, gattCallback"));
+        assertTrue(connect.contains("return scheduleColdBackgroundAttach(device,"));
+        assertTrue(connect.contains("startManagedBackgroundAttach"));
+        assertTrue(connect.contains("connectGatt(context, true, gattCallback"));
+        assertTrue(connect.contains("BluetoothDevice.TRANSPORT_LE"));
+        assertFalse(connect.contains("main.postDelayed(connectTimeout"));
         assertTrue(callback.contains("boolean establishedOwner = activeClientEstablished"));
         assertTrue(callback.contains("awaitPersistentGattReconnect(callbackGatt"));
         assertTrue(persistentWait.contains("if (closing || gatt != expected"));

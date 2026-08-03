@@ -23,6 +23,7 @@ public final class Ha1156ReleaseGateContractTest {
         String services = between(transport, "private void handleServices",
                 "private void subscribeServiceChangedIfAvailable");
 
+        assertTrue(transport.contains("return scheduleColdBackgroundAttach(device,"));
         assertTrue(transport.contains("return startSavedPeerScan(device)"));
         assertTrue(scan.contains("advertisesService(record, DIAGNOSTIC_SERVICE)"));
         assertTrue(scan.contains("connectToSavedAdvertisingIphone(result.getDevice(),"));
