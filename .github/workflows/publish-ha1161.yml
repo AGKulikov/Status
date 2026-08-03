@@ -1,0 +1,110 @@
+name: Publish preverified HA1161
+
+on:
+  push:
+    branches: ['automation/publish-ha1161']
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  SOURCE_SHA: 11842e31f660bce0c925104660ebf050266a6d7a
+  SOURCE_RUN_ID: '30852779619'
+  TAG: v2.8.2-ha1161
+  UNSIGNED_SHA256: a33a0227509b0210e3a1f4cf0e002084aaa76080f1098c574954975fce63df43
+  PATCH_SHA256: 83368e7fcfbd9c17e3798ca2be92a4ef51bd5daab345f289dcd9c5e1755dc2ec
+  SIGNED_SHA256: 2bca9c302de28ee871f4b674f1a6afa015f19d3cf01b14d07faf66b21dab747a
+  SIGNER_SHA256: 6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout publisher inputs
+        uses: actions/checkout@v4
+
+      - name: Download exact CI handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p handoff
+          gh run download "$SOURCE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "status-widget-ha-${TAG}-unsigned" \
+            --dir handoff
+          UNSIGNED="handoff/status-widget-ha-${TAG}-unsigned.apk"
+          test -f "$UNSIGNED"
+          echo "$UNSIGNED_SHA256  $UNSIGNED" | sha256sum -c -
+          jq -e \
+            --arg sourceSha "$SOURCE_SHA" \
+            --arg unsignedSha256 "$UNSIGNED_SHA256" \
+            --arg tag "$TAG" \
+            '.sourceSha == $sourceSha and .unsignedSha256 == $unsignedSha256 and .tag == $tag' \
+            handoff/manifest.json >/dev/null
+
+      - name: Reconstruct offline-signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v zstd >/dev/null || {
+            sudo apt-get update
+            sudo apt-get install -y zstd
+          }
+          PATCH='.github/release-assets/ha1161-from-ci-unsigned.zstpatch'
+          echo "$PATCH_SHA256  $PATCH" | sha256sum -c -
+          mkdir -p release-out
+          UNSIGNED="handoff/status-widget-ha-${TAG}-unsigned.apk"
+          APK="release-out/Status-Widget-${TAG}.apk"
+          zstd -d --patch-from="$UNSIGNED" "$PATCH" -o "$APK"
+          echo "$SIGNED_SHA256  $APK" | sha256sum -c -
+          (cd release-out && sha256sum "Status-Widget-${TAG}.apk" \
+            > "Status-Widget-${TAG}.apk.sha256")
+
+      - name: Set up Android verifier
+        uses: android-actions/setup-android@v2
+
+      - name: Verify identity, resources, alignment and signer
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +o pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
+          set -o pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'build-tools;36.0.0' >/dev/null
+          APK="release-out/Status-Widget-${TAG}.apk"
+          unzip -t "$APK" >/dev/null
+          unzip -Z1 "$APK" | grep -Fx 'resources.arsc'
+          test "$(unzip -Z1 "$APK" | grep -c '^res/')" -gt 500
+          BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
+          echo "$BADGING" | grep -F \
+            "package: name='ru.natro.statuswidget' versionCode='208021161' versionName='${TAG}'"
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$APK" >/dev/null
+          CERTS=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" \
+            verify --verbose --print-certs "$APK")
+          echo "$CERTS"
+          echo "$CERTS" | grep -qi "$SIGNER_SHA256"
+          echo "$CERTS" | grep -Fq \
+            'Verified using v3 scheme (APK Signature Scheme v3): true'
+
+      - name: Create release and upload verified assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="release-out/Status-Widget-${TAG}.apk"
+          CHECKSUM="${APK}.sha256"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" "$CHECKSUM" \
+              --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" "$APK" "$CHECKSUM" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$SOURCE_SHA" \
+              --title "Status Widget HA1161" \
+              --notes-file release-manifests/HA1161.md
+          fi
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --json tagName,targetCommitish,url,assets
