@@ -38,7 +38,8 @@ public final class Ha1150HelperTelemetryContractTest {
         assertTrue(layout.contains("@+id/phoneNetworkTypeText"));
         assertTrue(prefs.contains("phoneCellularShowNetworkType"));
         assertTrue(widget.contains("PhoneNetworkTypePolicy.display(phoneText(\"network.type\"))"));
-        assertTrue(widget.contains("batteryIcon.setBatteryCharging(phoneChargingNow())"));
+        assertTrue(widget.contains("boolean charging = phoneChargingNow()"));
+        assertTrue(widget.contains("batteryIcon.setBatteryCharging(charging)"));
         assertTrue(icon.contains("drawBatteryCharging"));
     }
 

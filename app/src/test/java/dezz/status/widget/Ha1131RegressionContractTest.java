@@ -68,7 +68,8 @@ public final class Ha1131RegressionContractTest {
         assertTrue(overlay.contains(
                 "DriverInformationTileLayoutPolicy.naturalHeight(context, shortcut, 1f)"));
         assertFalse(overlay.contains("text + padding + dp(context, 8)"));
-        assertTrue(information.contains("iconLp.rightMargin = 0"));
+        assertTrue(information.contains(
+                "PhoneIndicatorVisualPolicy.cellularIconTextGapPx(iconSize)"));
     }
 
     @Test public void favoritesSecondTapClosesAndAutoDoesNotImmediatelyReopen()

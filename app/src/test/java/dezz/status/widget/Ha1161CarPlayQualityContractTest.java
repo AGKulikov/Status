@@ -86,7 +86,8 @@ public final class Ha1161CarPlayQualityContractTest {
 
     private static String project(String relative) throws Exception {
         Path direct = Paths.get(relative);
-        Path file = Files.isRegularFile(direct) ? direct : Paths.get("..").resolve(relative);
+        Path parent = Paths.get("..").resolve(relative);
+        Path file = Files.isRegularFile(parent) ? parent : direct;
         return new String(Files.readAllBytes(file.normalize()), StandardCharsets.UTF_8);
     }
 }

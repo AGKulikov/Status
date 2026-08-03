@@ -105,7 +105,7 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("device.get(\"ancs_setup\")"));
         assertTrue(source.contains("\"diagnostics.last_app\".equals(value.resourceId)"));
         assertTrue(source.contains("\"diagnostics.last_error\".equals(value.resourceId)"));
-        assertTrue(source.contains("diagnosticsHandler.postDelayed(diagnosticsPoll, 1_000L)"));
+        assertTrue(source.contains("diagnosticsHandler.postDelayed(diagnosticsPoll, 500L)"));
         assertTrue(source.contains("diagnosticsHandler.removeCallbacks(diagnosticsPoll)"));
         assertTrue(source.contains("this::testAncsConnection"));
         assertTrue(source.contains("!service.reconnectPhoneForDiagnostics()"));

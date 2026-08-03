@@ -62,8 +62,9 @@ public final class Ha1156ReleaseGateContractTest {
         assertTrue(settings.contains("DriverControlSpacingPolicy.resolve("));
         assertFalse(overlay.contains("boolean compactSpacing"));
         assertFalse(settings.contains("boolean compactSpacing"));
-        assertTrue(overlay.contains("requestedTop[controlIndex] = shortcut.gapBeforePx"));
-        assertTrue(overlay.contains("requestedBottom[controlIndex] = shortcut.gapAfterPx"));
+        assertTrue(overlay.contains("requestedTop[controlIndex] = DriverButtonHeightPolicy.spacingRequest("));
+        assertTrue(overlay.contains("requestedBottom[controlIndex] = DriverButtonHeightPolicy.spacingRequest("));
+        assertTrue(settings.contains("DriverButtonHeightPolicy.internalPadding("));
     }
 
     private static String source(String relative) throws Exception {
