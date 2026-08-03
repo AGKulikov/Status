@@ -2,10 +2,16 @@ import CoreBluetooth
 import CoreTelephony
 import UIKit
 
-/// Helper v9 has exactly one BLE role: iPhone is the peripheral/GATT server and KX11 is the
+/// Helper v10 has exactly one BLE role: iPhone is the peripheral/GATT server and KX11 is the
 /// central/GATT client. ANCS and Helper telemetry therefore travel through one Android-owned
 /// connection and can never race each other by opening two competing links.
 final class ViewController: UIViewController {
+    private struct TelemetrySnapshot: Equatable {
+        let batteryLevel: UInt8
+        let powerFlags: UInt8
+        let networkCode: UInt8
+    }
+
     private let serviceUUID = CBUUID(string: "D2D9E4B0-47F1-4E44-A8BB-A932FD5A2F01")
     private let infoUUID = CBUUID(string: "D2D9E4B1-47F1-4E44-A8BB-A932FD5A2F01")
     private let controlUUID = CBUUID(string: "D2D9E4B2-47F1-4E44-A8BB-A932FD5A2F01")
@@ -14,7 +20,9 @@ final class ViewController: UIViewController {
 
     private let logicalName = "iPhone_ANCS"
     private let runPreference = "KX11ANCSHelper.runRequested"
-    private let restoreIdentifier = "ru.natro.kx11ancshelper.peripheral.v9.single-link"
+    private let restoreIdentifier = "ru.natro.kx11ancshelper.peripheral.v10.single-link"
+    private let telemetrySampleInterval: TimeInterval = 1
+    private let telemetryHeartbeatInterval: TimeInterval = 30
 
     private let statusLabel = UILabel()
     private let telemetryLabel = UILabel()
@@ -32,11 +40,16 @@ final class ViewController: UIViewController {
     private var secureCharacteristic: CBMutableCharacteristic?
     private var telemetryCharacteristic: CBMutableCharacteristic?
     private var telemetrySubscribers: Set<UUID> = []
-    private var pendingTelemetryFrame: Data?
-    private var latestTelemetryFrame = Data()
+    /// Core Bluetooth can temporarily apply backpressure to notifications. Keep every changed
+    /// state in order so a one-percent battery transition is never replaced by a newer frame.
+    private var pendingTelemetryFrames: [Data] = []
+    private var lastPublishedSnapshot: TelemetrySnapshot?
+    private var lastTelemetryPublishAt = Date.distantPast
     private var telemetrySequence: UInt16 = 0
     private var telemetryTimer: Timer?
+    private var settledTelemetryRefresh: DispatchWorkItem?
     private var lastAndroidReadAt: Date?
+    private var lastAndroidReadLogAt = Date.distantPast
     private let telephonyInfo = CTTelephonyNetworkInfo()
 
     override func viewDidLoad() {
@@ -50,9 +63,9 @@ final class ViewController: UIViewController {
         runRequested = defaults.bool(forKey: runPreference)
         updateButtons()
 
-        append("v9: единый маршрут KX11 central → iPhone peripheral")
+        append("v10: мгновенная телеметрия по единому маршруту KX11 central → iPhone peripheral")
         append("ANCS и B4 используют один Android-owned GATT; обратного BLE-моста нет")
-        append("Заряд и радиосеть передаются только из публичных iOS API")
+        append("Батарея, питание и радиосеть: события iOS + контроль каждую секунду")
 
         startTelemetryMonitoring()
         peripheralManager = CBPeripheralManager(
@@ -67,7 +80,9 @@ final class ViewController: UIViewController {
 
     deinit {
         telemetryTimer?.invalidate()
+        settledTelemetryRefresh?.cancel()
         NotificationCenter.default.removeObserver(self)
+        telephonyInfo.delegate = nil
         UIDevice.current.isBatteryMonitoringEnabled = false
     }
 
@@ -75,7 +90,7 @@ final class ViewController: UIViewController {
         view.backgroundColor = UIColor(red: 0.05, green: 0.08, blue: 0.12, alpha: 1)
 
         let titleLabel = UILabel()
-        titleLabel.text = "KX11 ANCS HELPER v9"
+        titleLabel.text = "KX11 ANCS HELPER v10"
         titleLabel.font = .boldSystemFont(ofSize: 24)
         titleLabel.textColor = .white
 
@@ -224,7 +239,7 @@ final class ViewController: UIViewController {
         secureCharacteristic = nil
         telemetryCharacteristic = nil
         telemetrySubscribers.removeAll()
-        pendingTelemetryFrame = nil
+        pendingTelemetryFrames.removeAll()
     }
 
     private func startAdvertising() {
@@ -250,11 +265,14 @@ final class ViewController: UIViewController {
     private func responseData(for characteristic: CBCharacteristic) -> Data? {
         switch characteristic.uuid {
         case infoUUID:
-            return Data("\(logicalName)/9/single-link".utf8)
+            return Data("\(logicalName)/10/realtime-single-link".utf8)
         case secureUUID:
             return Data("SECURE IPHONE OK".utf8)
         case telemetryUUID:
-            return makeTelemetryFrame(incrementSequence: true)
+            let snapshot = captureTelemetrySnapshot()
+            lastPublishedSnapshot = snapshot
+            lastTelemetryPublishAt = Date()
+            return makeTelemetryFrame(for: snapshot, incrementSequence: true)
         default:
             return nil
         }
@@ -264,50 +282,92 @@ final class ViewController: UIViewController {
 
     private func startTelemetryMonitoring() {
         UIDevice.current.isBatteryMonitoringEnabled = true
+        telephonyInfo.delegate = self
         let center = NotificationCenter.default
-        center.addObserver(self, selector: #selector(telemetryDidChange),
+        center.addObserver(self, selector: #selector(batteryLevelDidChange),
                            name: UIDevice.batteryLevelDidChangeNotification, object: nil)
-        center.addObserver(self, selector: #selector(telemetryDidChange),
+        center.addObserver(self, selector: #selector(batteryStateDidChange),
                            name: UIDevice.batteryStateDidChangeNotification, object: nil)
-        center.addObserver(self, selector: #selector(telemetryDidChange),
+        center.addObserver(self, selector: #selector(radioTechnologyDidChange),
                            name: .CTServiceRadioAccessTechnologyDidChange, object: nil)
         center.addObserver(self, selector: #selector(applicationBecameActive),
                            name: UIApplication.didBecomeActiveNotification, object: nil)
-        telemetryTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) {
-            [weak self] _ in self?.publishTelemetry(reason: "heartbeat")
+        let timer = Timer(timeInterval: telemetrySampleInterval, repeats: true) {
+            [weak self] _ in self?.publishTelemetry(reason: "1s control")
         }
-        if let timer = telemetryTimer {
-            RunLoop.main.add(timer, forMode: .common)
-        }
-        latestTelemetryFrame = makeTelemetryFrame(incrementSequence: true)
-        updateTelemetryLabel()
+        timer.tolerance = 0.1
+        telemetryTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+        publishTelemetry(reason: "startup", force: true)
     }
 
     @objc private func applicationBecameActive() {
         publishServiceIfPossible()
-        publishTelemetry(reason: "foreground refresh")
+        publishTelemetry(reason: "foreground refresh", force: true)
+        scheduleSettledTelemetryRefresh(reason: "foreground settled")
     }
 
-    @objc private func telemetryDidChange() {
+    @objc private func batteryLevelDidChange() {
+        publishTelemetryOnMain(reason: "battery level changed")
+    }
+
+    @objc private func batteryStateDidChange() {
+        publishTelemetryOnMain(reason: "power state changed")
+    }
+
+    @objc private func radioTechnologyDidChange(_ notification: Notification) {
+        let service = (notification.object as? String) ?? "unknown service"
+        publishTelemetryOnMain(reason: "radio changed \(service)")
+    }
+
+    private func publishTelemetryOnMain(reason: String) {
         if Thread.isMainThread {
-            publishTelemetry(reason: "iOS change")
+            publishTelemetry(reason: reason, force: true)
+            scheduleSettledTelemetryRefresh(reason: "\(reason) settled")
         } else {
             DispatchQueue.main.async { [weak self] in
-                self?.publishTelemetry(reason: "iOS change")
+                self?.publishTelemetry(reason: reason, force: true)
+                self?.scheduleSettledTelemetryRefresh(reason: "\(reason) settled")
             }
         }
     }
 
-    private func publishTelemetry(reason: String) {
+    /// Some iOS notifications arrive in the same run-loop turn in which the underlying public
+    /// property changes. Send immediately, then re-read once after 250 ms to catch that edge
+    /// without waiting for the one-second safety sampler.
+    private func scheduleSettledTelemetryRefresh(reason: String) {
+        settledTelemetryRefresh?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            self?.publishTelemetry(reason: reason)
+        }
+        settledTelemetryRefresh = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: item)
+    }
+
+    private func publishTelemetry(reason: String, force: Bool = false) {
         guard runRequested else { return }
-        latestTelemetryFrame = makeTelemetryFrame(incrementSequence: true)
+        let snapshot = captureTelemetrySnapshot()
+        let changed = snapshot != lastPublishedSnapshot
+        let heartbeatDue = Date().timeIntervalSince(lastTelemetryPublishAt)
+            >= telemetryHeartbeatInterval
         updateTelemetryLabel()
+        guard force || changed || heartbeatDue else { return }
+        let frame = makeTelemetryFrame(for: snapshot, incrementSequence: true)
+        lastPublishedSnapshot = snapshot
+        lastTelemetryPublishAt = Date()
         guard servicePublished, telemetryCharacteristic != nil,
               !telemetrySubscribers.isEmpty else { return }
-        pendingTelemetryFrame = latestTelemetryFrame
+        // A periodic heartbeat may be coalesced while the BLE transmit queue is blocked, but a
+        // changed battery/power/network snapshot is always appended and kept in order.
+        if changed || force || pendingTelemetryFrames.isEmpty {
+            pendingTelemetryFrames.append(frame)
+        } else {
+            pendingTelemetryFrames[pendingTelemetryFrames.count - 1] = frame
+        }
         drainTelemetryNotification()
-        if reason != "heartbeat" {
-            append("B4 snapshot · \(reason) · subscribers=\(telemetrySubscribers.count)")
+        if changed || force {
+            append("B4 realtime · \(reason) · queue=\(pendingTelemetryFrames.count)"
+                + " · subscribers=\(telemetrySubscribers.count)")
         }
     }
 
@@ -315,21 +375,36 @@ final class ViewController: UIViewController {
         guard runRequested, peripheralManager != nil,
               peripheralManager.state == .poweredOn,
               let characteristic = telemetryCharacteristic,
-              let frame = pendingTelemetryFrame,
               !telemetrySubscribers.isEmpty else { return }
-        if peripheralManager.updateValue(frame, for: characteristic,
-                                         onSubscribedCentrals: nil) {
-            pendingTelemetryFrame = nil
+        while let frame = pendingTelemetryFrames.first {
+            guard peripheralManager.updateValue(frame, for: characteristic,
+                                                onSubscribedCentrals: nil) else { return }
+            pendingTelemetryFrames.removeFirst()
         }
     }
 
     /// Fixed frame: A5, version, level, flags, network, sequence LE, CRC-8/ATM.
-    private func makeTelemetryFrame(incrementSequence: Bool) -> Data {
+    private func makeTelemetryFrame(for snapshot: TelemetrySnapshot,
+                                    incrementSequence: Bool) -> Data {
         if incrementSequence { telemetrySequence &+= 1 }
+        var bytes: [UInt8] = [
+            0xA5, 0x01, snapshot.batteryLevel, snapshot.powerFlags,
+            snapshot.networkCode,
+            UInt8(truncatingIfNeeded: telemetrySequence),
+            UInt8(truncatingIfNeeded: telemetrySequence >> 8)
+        ]
+        bytes.append(crc8(bytes))
+        return Data(bytes)
+    }
+
+    private func captureTelemetrySnapshot() -> TelemetrySnapshot {
         let device = UIDevice.current
         let level: UInt8
         if device.batteryLevel >= 0 {
-            let percent = max(0, min(100, Int((device.batteryLevel * 100).rounded())))
+            // Convert the public UIKit value once at the source. Android receives this exact
+            // integer and never estimates, smooths or quantizes it.
+            let percent = max(0, min(100,
+                Int((Double(device.batteryLevel) * 100.0).rounded())))
             level = UInt8(percent)
         } else {
             level = 0xFF
@@ -349,13 +424,11 @@ final class ViewController: UIViewController {
             flags = 0
         }
 
-        var bytes: [UInt8] = [
-            0xA5, 0x01, level, flags, currentNetworkCode(),
-            UInt8(truncatingIfNeeded: telemetrySequence),
-            UInt8(truncatingIfNeeded: telemetrySequence >> 8)
-        ]
-        bytes.append(crc8(bytes))
-        return Data(bytes)
+        return TelemetrySnapshot(
+            batteryLevel: level,
+            powerFlags: flags,
+            networkCode: currentNetworkCode()
+        )
     }
 
     private func crc8(_ bytes: [UInt8]) -> UInt8 {
@@ -434,7 +507,7 @@ final class ViewController: UIViewController {
 
     private func batteryDescription() -> String {
         let level = UIDevice.current.batteryLevel >= 0
-            ? "\(Int((UIDevice.current.batteryLevel * 100).rounded()))%" : "—%"
+            ? "\(Int((Double(UIDevice.current.batteryLevel) * 100.0).rounded()))%" : "—%"
         switch UIDevice.current.batteryState {
         case .charging: return "\(level), питание подключено, зарядка"
         case .full: return "\(level), питание подключено, полный"
@@ -480,6 +553,15 @@ final class ViewController: UIViewController {
     }
 }
 
+extension ViewController: CTTelephonyNetworkInfoDelegate {
+    /// Radio technology and the SIM currently carrying mobile data are separate CoreTelephony
+    /// events. Listening to both prevents a stale EDGE/3G label after iOS moves data to LTE/5G
+    /// on another line.
+    func dataServiceIdentifierDidChange(_ identifier: String) {
+        publishTelemetryOnMain(reason: "data service changed \(identifier)")
+    }
+}
+
 extension ViewController: CBPeripheralManagerDelegate {
     func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
         append("CBPeripheralManager state=\(peripheral.state.rawValue)")
@@ -521,7 +603,7 @@ extension ViewController: CBPeripheralManagerDelegate {
             guard let self = self, self.runRequested else { return }
             if self.servicePublished { self.startAdvertising() }
             else { self.publishServiceIfPossible() }
-            self.publishTelemetry(reason: "state restoration")
+            self.publishTelemetry(reason: "state restoration", force: true)
         }
     }
 
@@ -555,7 +637,7 @@ extension ViewController: CBPeripheralManagerDelegate {
         telemetrySubscribers.insert(central.identifier)
         append("KX11 subscribed B4 · \(central.identifier.uuidString)")
         updateConnectionStatus()
-        publishTelemetry(reason: "B4 subscribed")
+        publishTelemetry(reason: "B4 subscribed", force: true)
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral,
@@ -584,10 +666,15 @@ extension ViewController: CBPeripheralManagerDelegate {
         request.value = fullValue.subdata(in: request.offset..<fullValue.count)
         peripheral.respond(to: request, withResult: .success)
         if request.characteristic.uuid == telemetryUUID {
-            latestTelemetryFrame = fullValue
-            lastAndroidReadAt = Date()
+            let now = Date()
+            lastAndroidReadAt = now
             updateTelemetryLabel()
-            append("KX11 READ B4 OK · 8 bytes · \(request.central.identifier.uuidString)")
+            // The label shows every one-second read. Keep the on-screen journal bounded enough
+            // for long drives by writing a proof line only once per 30 seconds.
+            if now.timeIntervalSince(lastAndroidReadLogAt) >= 30 {
+                lastAndroidReadLogAt = now
+                append("KX11 READ B4 LIVE · 8 bytes · \(request.central.identifier.uuidString)")
+            }
             updateConnectionStatus()
         }
     }
