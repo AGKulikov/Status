@@ -14,7 +14,7 @@ import java.util.Locale;
  * One atomic telemetry frame read from KX11 iPhone Helper on the selected-phone GATT session.
  * The Android transport binds it to the same verified peer and GATT owner used by ANCS.
  *
- * <p>Helper v9 uses one fixed eight-byte binary frame. It cannot be split by a 23-byte ATT MTU
+ * <p>Helper v9+ uses one fixed eight-byte binary frame. It cannot be split by a 23-byte ATT MTU
  * and carries a CRC-8, so a truncated/stale callback is rejected instead of silently clearing
  * the visible values:</p>
  * <pre>

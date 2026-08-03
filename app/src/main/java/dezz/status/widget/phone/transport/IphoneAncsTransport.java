@@ -54,6 +54,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -123,7 +124,11 @@ public final class IphoneAncsTransport {
     private static final long ANCS_DESCRIPTOR_WRITE_TIMEOUT_MS = 90_000L;
     private static final long BATTERY_OPERATION_TIMEOUT_MS = 5_000L;
     private static final long HELPER_TELEMETRY_READ_TIMEOUT_MS = 5_000L;
-    private static final long HELPER_TELEMETRY_POLL_MS = 15_000L;
+    /**
+     * Notifications are the zero-delay path. A one-second read is the deterministic fallback
+     * when iOS coalesces a public battery/CoreTelephony callback while the Helper is backgrounded.
+     */
+    private static final long HELPER_TELEMETRY_POLL_MS = 1_000L;
     private static final long HELPER_TELEMETRY_BUSY_RETRY_MS = 1_000L;
     private static final long HELPER_SERVICE_REDISCOVERY_MS = 30_000L;
     private static final long BOND_TIMEOUT_MS = 90_000L;
@@ -414,6 +419,8 @@ public final class IphoneAncsTransport {
     private Runnable batteryReadTimeout;
     private Runnable helperTelemetryReadTimeout;
     private Runnable helperTelemetryPoll;
+    private long lastHelperTelemetrySuccessLogAt;
+    @NonNull private String lastLoggedHelperTelemetry = "";
     private Runnable bondTimeout;
     private Runnable secureConnectStart;
     private Runnable nextClientAttempt;
@@ -540,7 +547,7 @@ public final class IphoneAncsTransport {
             scanner.startScan(Collections.singletonList(filter), settings, scanCallback);
             scanning = true;
             state("FALLBACK · ОТКРОЙТЕ IPHONE HELPER V4");
-            log("v9 bootstrap: Android работает BLE central, как HWGPS/GPSTether");
+            log("v10 bootstrap: Android работает BLE central, как HWGPS/GPSTether");
             log("Фильтр scan: service " + DIAGNOSTIC_SERVICE
                     + "; этот scan нужен только для bootstrap/аварийного восстановления");
             scanTimeout = () -> {
@@ -1836,7 +1843,7 @@ public final class IphoneAncsTransport {
             log("Helper telemetry endpoint="
                     + (iphoneTelemetryCharacteristic != null ? "TEL3/B4" : "legacy TEL2/B3"));
 
-            // Helper v9 deliberately makes B4 readable before ANCS authorization. Read one
+            // Helper v9+ deliberately makes B4 readable before ANCS authorization. Read one
             // atomic snapshot before touching an encrypted ANCS CCCD: otherwise a pending
             // pairing callback can occupy Android's serialized GATT queue for up to 90 seconds
             // and make battery/network appear absent despite a healthy Helper service.
@@ -1850,6 +1857,19 @@ public final class IphoneAncsTransport {
                 }
                 iphoneServiceSetupDeferredForHelperRead = false;
                 log("Helper B4 initial snapshot could not start; continuing ANCS setup");
+            }
+
+            // Enable the unencrypted B4 notification before any encrypted ANCS CCCD can occupy
+            // Android 9's serialized GATT queue. Battery percentage, cable state and radio type
+            // therefore stay live even while the first ANCS authorization is still pending.
+            if (iphoneTelemetryCharacteristic != null
+                    && !iphoneHelperTelemetrySubscribed
+                    && !iphoneHelperTelemetrySubscriptionAttempted
+                    && descriptorStage == DescriptorStage.NONE && !gattReady) {
+                if (startOptionalHelperTelemetrySubscription(callbackGatt)) {
+                    log("Helper B4 realtime subscription started before ANCS subscriptions");
+                    return;
+                }
             }
         }
         // HA1122 exposed BAS even while iOS had not published ANCS yet. Prepare the optional
@@ -2332,7 +2352,17 @@ public final class IphoneAncsTransport {
         }
         iphoneHelperTelemetryReadPending = true;
         scheduleHelperTelemetryReadTimeout(callbackGatt);
-        log("Helper B4 atomic read started");
+        return true;
+    }
+
+    private boolean shouldLogHelperTelemetry(@NonNull IphoneHelperTelemetry telemetry) {
+        String fingerprint = telemetry.batteryLevel + "|" + telemetry.externalPower + "|"
+                + telemetry.chargeState + "|" + telemetry.networkType;
+        long now = SystemClock.elapsedRealtime();
+        boolean changed = !Objects.equals(lastLoggedHelperTelemetry, fingerprint);
+        if (!changed && now - lastHelperTelemetrySuccessLogAt < 30_000L) return false;
+        lastLoggedHelperTelemetry = fingerprint;
+        lastHelperTelemetrySuccessLogAt = now;
         return true;
     }
 
@@ -3875,13 +3905,15 @@ public final class IphoneAncsTransport {
                             ? IphoneHelperTelemetry.parse(copy) : null;
                     if (telemetry != null) {
                         listener.onHelperTelemetry(telemetry);
-                        log("Helper B4 atomic read accepted: kind=" + telemetry.kind
-                                + " battery=" + telemetry.batteryLevel
-                                + " externalPower=" + telemetry.externalPower
-                                + " chargeState=" + telemetry.chargeState
-                                + " network=" + (telemetry.networkType.isEmpty()
-                                ? "unknown" : telemetry.networkType)
-                                + " seq=" + telemetry.sequence);
+                        if (shouldLogHelperTelemetry(telemetry)) {
+                            log("Helper B4 atomic read accepted: kind=" + telemetry.kind
+                                    + " battery=" + telemetry.batteryLevel
+                                    + " externalPower=" + telemetry.externalPower
+                                    + " chargeState=" + telemetry.chargeState
+                                    + " network=" + (telemetry.networkType.isEmpty()
+                                    ? "unknown" : telemetry.networkType)
+                                    + " seq=" + telemetry.sequence);
+                        }
                     } else {
                         log("Helper B4 atomic read unavailable · status=" + status
                                 + " value=" + AdvertisementParser.hex(copy, 80));

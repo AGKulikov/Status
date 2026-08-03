@@ -82,7 +82,7 @@ public final class PhoneConnectorController {
     private static final long DEVICE_RESCAN_MS = 15_000L;
     private static final long ANCS_STABLE_READY_RESET_MS = 50_000L;
     private static final long APP_DISPLAY_NAME_WAIT_TIMEOUT_MS = 15_000L;
-    /** Helper emits every 20 s; three missed heartbeats invalidate helper-only fields. */
+    /** Helper heartbeats remain 30 s; live notifications and one-second reads refresh sooner. */
     private static final long HELPER_TELEMETRY_TIMEOUT_MS = 65_000L;
     private static final int DESIRED_GATT_MTU = 512;
     private static final int GATT_INSUFFICIENT_AUTHENTICATION = 5;
@@ -1258,6 +1258,12 @@ public final class PhoneConnectorController {
                 || telemetry.kind == IphoneHelperTelemetry.Kind.SNAPSHOT;
         boolean hasNetwork = telemetry.kind == IphoneHelperTelemetry.Kind.NETWORK
                 || telemetry.kind == IphoneHelperTelemetry.Kind.SNAPSHOT;
+        boolean powerChanged = hasPower && (helperPowerUpdatedAtElapsed <= 0L
+                || !Objects.equals(helperBatteryLevel, telemetry.batteryLevel)
+                || !Objects.equals(helperExternalPower, telemetry.externalPower)
+                || !Objects.equals(helperChargeState, telemetry.chargeState));
+        boolean networkChanged = hasNetwork && (helperNetworkUpdatedAtElapsed <= 0L
+                || !Objects.equals(helperNetworkType, telemetry.networkType));
         if (hasPower) {
             helperBatteryLevel = telemetry.batteryLevel;
             helperExternalPower = telemetry.externalPower;
@@ -1269,9 +1275,18 @@ public final class PhoneConnectorController {
             helperNetworkType = telemetry.networkType;
             helperNetworkUpdatedAtElapsed = now;
         }
-        markTelemetryUpdated(hasPower, hasNetwork);
+        if (powerChanged || networkChanged) {
+            markTelemetryUpdated(hasPower, hasNetwork);
+        } else {
+            // A one-second identical control read only refreshes liveness. Do not rewrite
+            // SharedPreferences or replace the UI snapshot every second: that would waste I/O
+            // and could make overlay views flicker despite no visible value changing.
+            if (hasPower) batteryLiveSeenThisConnection = true;
+            if (hasNetwork) networkLiveSeenThisConnection = true;
+            telemetryStale = false;
+        }
         scheduleHelperTelemetryExpiry(token);
-        publishSnapshot(token);
+        if (powerChanged || networkChanged) publishSnapshot(token);
     }
 
     private void scheduleHelperTelemetryExpiry(long token) {
