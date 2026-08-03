@@ -62,8 +62,16 @@ public final class Ha1158RealtimeIphoneTelemetryContractTest {
 
     private static String project(String relative) throws Exception {
         Path direct = Paths.get(relative);
+        Path parent = Paths.get("..").resolve(relative).normalize();
+        // Gradle executes Android unit tests with app/ as the working directory,
+        // where app/build.gradle also exists. Prefer the parent only when it is
+        // demonstrably the project root; keep direct paths for repository-root runs.
+        if (Files.isRegularFile(Paths.get("..", "settings.gradle"))
+                && Files.isRegularFile(parent)) {
+            return text(parent);
+        }
         if (Files.isRegularFile(direct)) return text(direct);
-        return text(Paths.get("..").resolve(relative).normalize());
+        return text(parent);
     }
 
     private static String read(Path root, Path app) throws Exception {
