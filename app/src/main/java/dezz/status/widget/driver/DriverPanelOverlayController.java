@@ -1180,41 +1180,17 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private static int informationTileHeight(
             @NonNull Context context,
             @NonNull LauncherShortcutStore.Shortcut shortcut) {
-        float scaledDensity = context.getResources().getDisplayMetrics().scaledDensity;
         // This is both the ScrollView budget and the minimum concrete row height. Supplying that
         // height is essential: MATCH_PARENT information tiles otherwise reserve space in the
         // panel while their parent row still measures to zero.
-        int text = Math.round((shortcut.informationValueTextSizeSp
-                * (shortcut.informationShowValue ? 1 : 0)
-                + (shortcut.showTitle ? shortcut.informationLabelTextSizeSp : 0))
-                * scaledDensity * 1.18f);
-        int padding = shortcut.informationPaddingTopPx
-                + shortcut.informationPaddingBottomPx;
-        int icon = "none".equalsIgnoreCase(shortcut.icon)
-                ? padding : shortcut.informationIconSizePx + padding;
-        return Math.max(1, Math.max(icon, text + padding));
+        return DriverInformationTileLayoutPolicy.naturalHeight(context, shortcut, 1f);
     }
 
     /** Compact physical width; row gravity positions the cluster and the gap slider is exact. */
     private static int informationTileWidth(
             @NonNull Context context,
             @NonNull LauncherShortcutStore.Shortcut shortcut) {
-        float scaledDensity = context.getResources().getDisplayMetrics().scaledDensity;
-        int width = shortcut.informationPaddingLeftPx + shortcut.informationPaddingRightPx;
-        if (!"none".equalsIgnoreCase(shortcut.icon)) width += shortcut.informationIconSizePx;
-        int textWidth = 0;
-        if (shortcut.showTitle) {
-            textWidth = Math.max(textWidth, Math.round(shortcut.title.length()
-                    * shortcut.informationLabelTextSizeSp * scaledDensity * .56f));
-        }
-        if (shortcut.informationShowValue) {
-            // Live values vary (for example operator names); reserve a useful compact baseline
-            // without forcing every cell to consume an equal fraction of the full rail.
-            textWidth = Math.max(textWidth,
-                    Math.round(shortcut.informationValueTextSizeSp * scaledDensity * 4.2f));
-        }
-        width += textWidth;
-        return Math.max(1, Math.min(240, width));
+        return DriverInformationTileLayoutPolicy.naturalWidth(context, shortcut, 1f);
     }
 
     private static final class InformationSection {

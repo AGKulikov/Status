@@ -127,6 +127,10 @@ public final class LauncherShortcutStore {
         public int informationIconOutlineWidth = 0;
         /** Status-bar sources can reuse their live icon family, semantic colour and badges. */
         public boolean informationUseStatusIconStyle = false;
+        /** PHONE_CELLULAR information tile: independent live component visibility. */
+        public boolean informationPhoneCellularShowSignal = true;
+        public boolean informationPhoneCellularShowOperator = true;
+        public boolean informationPhoneCellularShowNetworkType = true;
         /** Driver Favorites only: dismiss the owning compact panel after either action. */
         public boolean closeFavoritePanelAfterAction = false;
         public boolean enabled = true;
@@ -203,6 +207,12 @@ public final class LauncherShortcutStore {
             value.informationIconOutlineAlpha = informationIconOutlineAlpha;
             value.informationIconOutlineWidth = informationIconOutlineWidth;
             value.informationUseStatusIconStyle = informationUseStatusIconStyle;
+            value.informationPhoneCellularShowSignal =
+                    informationPhoneCellularShowSignal;
+            value.informationPhoneCellularShowOperator =
+                    informationPhoneCellularShowOperator;
+            value.informationPhoneCellularShowNetworkType =
+                    informationPhoneCellularShowNetworkType;
             value.closeFavoritePanelAfterAction = closeFavoritePanelAfterAction;
             value.enabled = enabled;
             return value;
@@ -734,6 +744,12 @@ public final class LauncherShortcutStore {
                         value.informationIconOutlineWidth)
                 .put("informationUseStatusIconStyle",
                         value.informationUseStatusIconStyle)
+                .put("informationPhoneCellularShowSignal",
+                        value.informationPhoneCellularShowSignal)
+                .put("informationPhoneCellularShowOperator",
+                        value.informationPhoneCellularShowOperator)
+                .put("informationPhoneCellularShowNetworkType",
+                        value.informationPhoneCellularShowNetworkType)
                 .put("closeFavoritePanelAfterAction",
                         value.closeFavoritePanelAfterAction)
                 .put("enabled", value.enabled);
@@ -874,6 +890,25 @@ public final class LauncherShortcutStore {
                     json.optInt("informationIconOutlineWidth", 0);
             value.informationUseStatusIconStyle =
                     json.optBoolean("informationUseStatusIconStyle", false);
+            boolean hasCellularParts = json.has("informationPhoneCellularShowSignal")
+                    || json.has("informationPhoneCellularShowOperator")
+                    || json.has("informationPhoneCellularShowNetworkType");
+            if (!hasCellularParts && PHONE_CELLULAR_INFO_TARGET.equals(value.target)) {
+                // Preserve the old combined switch exactly on first upgrade: a signal-only tile
+                // must not suddenly regain operator/type text merely because the new independent
+                // fields did not exist in its stored JSON yet.
+                value.informationPhoneCellularShowSignal =
+                        !"none".equalsIgnoreCase(value.icon);
+                value.informationPhoneCellularShowOperator = value.informationShowValue;
+                value.informationPhoneCellularShowNetworkType = value.informationShowValue;
+            } else {
+                value.informationPhoneCellularShowSignal =
+                        json.optBoolean("informationPhoneCellularShowSignal", true);
+                value.informationPhoneCellularShowOperator =
+                        json.optBoolean("informationPhoneCellularShowOperator", true);
+                value.informationPhoneCellularShowNetworkType =
+                        json.optBoolean("informationPhoneCellularShowNetworkType", true);
+            }
             value.closeFavoritePanelAfterAction =
                     json.optBoolean("closeFavoritePanelAfterAction", false);
             value.enabled = json.optBoolean("enabled", true);

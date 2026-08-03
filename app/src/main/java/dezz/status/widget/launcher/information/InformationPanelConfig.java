@@ -69,6 +69,10 @@ public final class InformationPanelConfig {
         public boolean showValue;
         /** Reuse the live status-bar icon family, semantic tint, outline and badge. */
         public boolean useStatusIconStyle;
+        /** PHONE_CELLULAR only: every visible component is independently selectable. */
+        public boolean phoneCellularShowSignal;
+        public boolean phoneCellularShowOperator;
+        public boolean phoneCellularShowNetworkType;
         public int iconSizePx;
         public int iconAlpha;
         public int iconOutlineAlpha;
@@ -115,6 +119,9 @@ public final class InformationPanelConfig {
             showLabel = true;
             showValue = true;
             useStatusIconStyle = false;
+            phoneCellularShowSignal = true;
+            phoneCellularShowOperator = true;
+            phoneCellularShowNetworkType = true;
             iconSizePx = 32;
             iconAlpha = 255;
             iconOutlineAlpha = 0;
@@ -181,6 +188,9 @@ public final class InformationPanelConfig {
             value.showLabel = showLabel;
             value.showValue = showValue;
             value.useStatusIconStyle = useStatusIconStyle;
+            value.phoneCellularShowSignal = phoneCellularShowSignal;
+            value.phoneCellularShowOperator = phoneCellularShowOperator;
+            value.phoneCellularShowNetworkType = phoneCellularShowNetworkType;
             value.iconSizePx = iconSizePx;
             value.iconAlpha = iconAlpha;
             value.iconOutlineAlpha = iconOutlineAlpha;

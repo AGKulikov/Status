@@ -33,6 +33,15 @@ public final class InformationShortcutDefaults {
             shortcut.informationIconAlpha = icon.contentAlpha.get();
             shortcut.informationIconOutlineAlpha = icon.outlineAlpha.get();
             shortcut.informationIconOutlineWidth = icon.outlineWidth.get();
+            if (type == BrickType.PHONE_CELLULAR) {
+                shortcut.informationPhoneCellularShowSignal = true;
+                shortcut.informationPhoneCellularShowOperator = true;
+                shortcut.informationPhoneCellularShowNetworkType =
+                        preferences.phoneCellular.showNetworkType.get();
+                shortcut.informationShowValue = true;
+                shortcut.informationHorizontalAlignment = 1;
+                shortcut.informationVerticalAlignment = 1;
+            }
             return;
         }
 

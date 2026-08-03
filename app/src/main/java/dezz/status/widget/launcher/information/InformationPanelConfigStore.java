@@ -102,6 +102,12 @@ public final class InformationPanelConfigStore {
                     item.showValue = encoded.optBoolean("showValue", true);
                     item.useStatusIconStyle =
                             encoded.optBoolean("useStatusIconStyle", false);
+                    item.phoneCellularShowSignal =
+                            encoded.optBoolean("phoneCellularShowSignal", true);
+                    item.phoneCellularShowOperator =
+                            encoded.optBoolean("phoneCellularShowOperator", true);
+                    item.phoneCellularShowNetworkType =
+                            encoded.optBoolean("phoneCellularShowNetworkType", true);
                     item.iconSizePx = encoded.optInt("iconSizePx", 32);
                     item.iconAlpha = encoded.optInt("iconAlpha", 255);
                     item.iconOutlineAlpha = encoded.optInt("iconOutlineAlpha", 0);
@@ -171,6 +177,9 @@ public final class InformationPanelConfigStore {
             encoded.put("showLabel", item.showLabel);
             encoded.put("showValue", item.showValue);
             encoded.put("useStatusIconStyle", item.useStatusIconStyle);
+            encoded.put("phoneCellularShowSignal", item.phoneCellularShowSignal);
+            encoded.put("phoneCellularShowOperator", item.phoneCellularShowOperator);
+            encoded.put("phoneCellularShowNetworkType", item.phoneCellularShowNetworkType);
             encoded.put("iconSizePx", item.iconSizePx);
             encoded.put("iconAlpha", item.iconAlpha);
             encoded.put("iconOutlineAlpha", item.iconOutlineAlpha);

@@ -40,11 +40,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import dezz.status.widget.driver.DriverControlSpacingPolicy;
+import dezz.status.widget.driver.DriverInformationTileLayoutPolicy;
 import dezz.status.widget.driver.DriverPanelLayoutPolicy;
 import dezz.status.widget.driver.DriverPanelService;
 import dezz.status.widget.driver.DriverClimateShortcutView;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.launcher.HighResolutionAppIconLoader;
+import dezz.status.widget.launcher.InformationShortcutView;
 import dezz.status.widget.launcher.InstalledAppCatalog;
 import dezz.status.widget.launcher.LauncherIconResolver;
 import dezz.status.widget.launcher.LauncherShortcutStore;
@@ -1027,11 +1029,36 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 .show());
         form.addView(placement, rowParams());
 
-        addSwitch(form, "Показывать значение",
-                shortcut.informationShowValue, checked -> {
-                    shortcut.informationShowValue = checked;
-                    persistInformationAppearance(shortcut);
-                });
+        boolean phoneCellular = StatusBarInformationCatalog.typeForTarget(shortcut.target)
+                == BrickType.PHONE_CELLULAR;
+        if (phoneCellular) {
+            title(form, "Состав блока оператора и сигнала");
+            addSwitch(form, "Показывать шкалу сигнала",
+                    shortcut.informationPhoneCellularShowSignal, checked -> {
+                        shortcut.informationPhoneCellularShowSignal = checked;
+                        persistInformationAppearance(shortcut);
+                    });
+            addSwitch(form, "Показывать название оператора",
+                    shortcut.informationPhoneCellularShowOperator, checked -> {
+                        shortcut.informationPhoneCellularShowOperator = checked;
+                        shortcut.informationShowValue = checked
+                                || shortcut.informationPhoneCellularShowNetworkType;
+                        persistInformationAppearance(shortcut);
+                    });
+            addSwitch(form, "Показывать тип сети (LTE/3G/5G)",
+                    shortcut.informationPhoneCellularShowNetworkType, checked -> {
+                        shortcut.informationPhoneCellularShowNetworkType = checked;
+                        shortcut.informationShowValue = checked
+                                || shortcut.informationPhoneCellularShowOperator;
+                        persistInformationAppearance(shortcut);
+                    });
+        } else {
+            addSwitch(form, "Показывать значение",
+                    shortcut.informationShowValue, checked -> {
+                        shortcut.informationShowValue = checked;
+                        persistInformationAppearance(shortcut);
+                    });
+        }
 
         if (StatusBarInformationCatalog.typeForTarget(shortcut.target) != null) {
             addSwitch(form, "Иконка, цвет, обводка и бейдж как в статусной строке",
@@ -1404,6 +1431,33 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
     @NonNull
     private FrameLayout previewShortcutCell(
             @NonNull LauncherShortcutStore.Shortcut value, int railWidth) {
+        if (value.kind == LauncherShortcutStore.Kind.INFO) {
+            LauncherShortcutStore.Shortcut scaled = value.copy();
+            scaled.informationIconSizePx = Math.max(1,
+                    Math.round(value.informationIconSizePx * .62f));
+            scaled.informationIconOutlineWidth = Math.max(0,
+                    Math.round(value.informationIconOutlineWidth * .62f));
+            scaled.informationLabelTextSizeSp = Math.max(1,
+                    Math.round(value.informationLabelTextSizeSp * .62f));
+            scaled.informationValueTextSizeSp = Math.max(1,
+                    Math.round(value.informationValueTextSizeSp * .62f));
+            scaled.informationPaddingLeftPx = Math.round(
+                    value.informationPaddingLeftPx * .62f);
+            scaled.informationPaddingTopPx = Math.round(
+                    value.informationPaddingTopPx * .62f);
+            scaled.informationPaddingRightPx = Math.round(
+                    value.informationPaddingRightPx * .62f);
+            scaled.informationPaddingBottomPx = Math.round(
+                    value.informationPaddingBottomPx * .62f);
+            FrameLayout cell = new FrameLayout(this);
+            cell.setClipChildren(false);
+            cell.setClipToPadding(false);
+            InformationShortcutView information = new InformationShortcutView(
+                    this, preferences, scaled);
+            cell.addView(information, new FrameLayout.LayoutParams(match(), match()));
+            return cell;
+        }
+
         View icon;
         if (isLiveClimate(value)) {
             DriverClimateShortcutView climate = new DriverClimateShortcutView(
@@ -1418,53 +1472,24 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             if (drawable != null) image.setImageDrawable(drawable);
             icon = image;
         }
-        int requestedIconSize = value.kind == LauncherShortcutStore.Kind.INFO
-                ? value.informationIconSizePx : value.iconSizePx;
+        int requestedIconSize = value.iconSizePx;
         int iconSize = Math.max(1, Math.min(railWidth,
                 Math.round(requestedIconSize * .62f)));
         FrameLayout cell = new FrameLayout(this);
-        if (value.kind == LauncherShortcutStore.Kind.INFO) {
-            cell.setPadding(Math.round(value.informationPaddingLeftPx * .62f),
-                    Math.round(value.informationPaddingTopPx * .62f),
-                    Math.round(value.informationPaddingRightPx * .62f),
-                    Math.round(value.informationPaddingBottomPx * .62f));
-        }
         cell.addView(icon, new FrameLayout.LayoutParams(iconSize,
                 DriverPanelLayoutPolicy.shortcutIconHeight(iconSize, false),
                 Gravity.CENTER));
         return cell;
     }
 
-    private static int previewInformationTileHeight(
+    private int previewInformationTileHeight(
             @NonNull LauncherShortcutStore.Shortcut value) {
-        int icon = "none".equalsIgnoreCase(value.icon) ? 0
-                : Math.round(value.informationIconSizePx * .62f);
-        int label = value.showTitle ? value.informationLabelTextSizeSp : 0;
-        int state = value.informationShowValue ? value.informationValueTextSizeSp : 0;
-        int text = Math.round((label + state) * .62f * 1.18f);
-        int padding = Math.round((value.informationPaddingTopPx
-                + value.informationPaddingBottomPx) * .62f);
-        return Math.max(1, Math.max(icon, text) + padding);
+        return DriverInformationTileLayoutPolicy.naturalHeight(this, value, .62f);
     }
 
     private int previewInformationTileWidth(
             @NonNull LauncherShortcutStore.Shortcut value) {
-        int width = Math.round((value.informationPaddingLeftPx
-                + value.informationPaddingRightPx) * .62f);
-        if (!"none".equalsIgnoreCase(value.icon)) {
-            width += Math.round(value.informationIconSizePx * .62f);
-        }
-        float scaledDensity = getResources().getDisplayMetrics().scaledDensity;
-        int textWidth = 0;
-        if (value.showTitle) {
-            textWidth = Math.max(textWidth, Math.round(value.title.length()
-                    * value.informationLabelTextSizeSp * scaledDensity * .56f * .62f));
-        }
-        if (value.informationShowValue) {
-            textWidth = Math.max(textWidth, Math.round(value.informationValueTextSizeSp
-                    * scaledDensity * 4.2f * .62f));
-        }
-        return Math.max(1, Math.min(Math.round(240 * .62f), width + textWidth));
+        return DriverInformationTileLayoutPolicy.naturalWidth(this, value, .62f);
     }
 
     private static int previewGroupGravity(

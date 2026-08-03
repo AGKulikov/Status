@@ -4996,6 +4996,9 @@ public class WidgetService extends Service {
         int iconLevel = 10000;
         Integer batteryPercent = null;
         boolean batteryCharging = false;
+        Integer cellularSignalPercent = null;
+        String cellularOperator = "";
+        String cellularNetworkType = "";
         int outlineColor = ContextCompat.getColor(
                 themedContext != null ? themedContext : this, R.color.text_outline);
         int outlineWidth = 0;
@@ -5074,8 +5077,12 @@ public class WidgetService extends Service {
             case PHONE_CELLULAR:
                 Integer signal = phonePercent("network.signal");
                 String operator = phoneText("network.operator");
+                String rawCellularType = phoneNetworkType();
                 String cellularType = prefs.phoneCellular.showNetworkType.get()
-                        ? phoneNetworkType() : "";
+                        ? rawCellularType : "";
+                cellularSignalPercent = signal;
+                cellularOperator = operator;
+                cellularNetworkType = rawCellularType;
                 known = signal != null || !operator.isEmpty() || !cellularType.isEmpty();
                 active = !operator.isEmpty() || !cellularType.isEmpty()
                         || signal != null && signal > 0;
@@ -5181,7 +5188,7 @@ public class WidgetService extends Service {
             }
         }
         return new StatusBrickSnapshot(text, iconResource, iconTint, iconLevel, batteryPercent,
-                batteryCharging,
+                batteryCharging, cellularSignalPercent, cellularOperator, cellularNetworkType,
                 outlineColor, outlineWidth, badgeText, badgeBackground, badgeForeground,
                 badgeDrawableResource, known, active);
     }

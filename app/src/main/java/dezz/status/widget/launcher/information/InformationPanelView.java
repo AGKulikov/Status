@@ -361,11 +361,9 @@ public final class InformationPanelView extends FrameLayout {
 
     @NonNull
     private View buildItem(@NonNull InformationPanelConfig.Item item) {
-        LinearLayout tile = new LinearLayout(getContext());
+        FrameLayout tile = new FrameLayout(getContext());
         LauncherGlobalElementTag.attach(tile, LauncherLayoutStore.INFORMATION,
                 item.id, item.displayLabel());
-        tile.setOrientation(LinearLayout.HORIZONTAL);
-        tile.setGravity(itemGravity(item.horizontalAlignment, item.verticalAlignment));
         tile.setPadding(scaledDp(item.paddingLeftPx, item.scalePercent),
                 scaledDp(item.paddingTopPx, item.scalePercent),
                 scaledDp(item.paddingRightPx, item.scalePercent),
@@ -380,6 +378,16 @@ public final class InformationPanelView extends FrameLayout {
         background.setCornerRadius(Math.max(4f, config.cornerRadiusPx * .48f));
         tile.setBackground(background);
 
+        // The icon and its selected values form one compact unit. Centering a weighted text
+        // column used to centre only the text in the space left after the icon, which made the
+        // cellular value look shifted and let the right edge clip. The complete unit now owns
+        // WRAP_CONTENT geometry and is positioned as a whole inside the configured tile.
+        LinearLayout content = new LinearLayout(getContext());
+        content.setOrientation(LinearLayout.HORIZONTAL);
+        content.setGravity(Gravity.CENTER_VERTICAL);
+        content.setClipChildren(false);
+        content.setClipToPadding(false);
+
         OutlineImageView icon = new OutlineImageView(getContext());
         icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         String resolvedIconKey = resolvedIconKey(item);
@@ -390,7 +398,7 @@ public final class InformationPanelView extends FrameLayout {
         LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(iconSize, iconSize);
         // No implicit icon/text inset: the owning free frame/group controls every gap.
         iconLp.rightMargin = 0;
-        tile.addView(icon, iconLp);
+        content.addView(icon, iconLp);
         icon.setVisibility(item.showIcon ? View.VISIBLE : View.GONE);
 
         LinearLayout texts = new LinearLayout(getContext());
@@ -406,15 +414,20 @@ public final class InformationPanelView extends FrameLayout {
         TextView value = text("—", scaledSp(item.valueTextSizeSp, item.scalePercent),
                 color(item.valueColor, Color.WHITE), item);
         value.setGravity(itemGravity(item.horizontalAlignment, item.verticalAlignment));
-        // Smart-device states can carry a mode, value and availability explanation. Never cut
-        // that status down to one line on HOME, the driver rail or Driver Favorites.
-        value.setSingleLine(false);
-        value.setMaxLines(Integer.MAX_VALUE);
+        boolean phoneCellular = StatusBarInformationCatalog.type(item)
+                == BrickType.PHONE_CELLULAR;
+        // Cellular metadata is one measured line. Other smart-device states can carry a mode,
+        // value and availability explanation and therefore remain unrestricted multi-line text.
+        value.setSingleLine(phoneCellular);
+        value.setMaxLines(phoneCellular ? 1 : Integer.MAX_VALUE);
         value.setEllipsize(null);
         value.setVisibility(item.showValue ? View.VISIBLE : View.GONE);
         texts.addView(label, new LinearLayout.LayoutParams(match(), wrap()));
         texts.addView(value, new LinearLayout.LayoutParams(match(), wrap()));
-        tile.addView(texts, new LinearLayout.LayoutParams(0, wrap(), 1f));
+        content.addView(texts, new LinearLayout.LayoutParams(wrap(), wrap()));
+        FrameLayout.LayoutParams contentLp = new FrameLayout.LayoutParams(wrap(), wrap(),
+                itemGravity(item.horizontalAlignment, item.verticalAlignment));
+        tile.addView(content, contentLp);
 
         itemViews.put(item.id, new ItemViews(tile, icon, label, value, background,
                 resolvedIconKey));
@@ -561,6 +574,18 @@ public final class InformationPanelView extends FrameLayout {
     private Value resolveSystem(@NonNull InformationPanelConfig.Item item) {
         StatusBrickSnapshot status = statusSnapshot(item);
         if (status != null) {
+            if (StatusBarInformationCatalog.type(item) == BrickType.PHONE_CELLULAR) {
+                PhoneCellularDisplayPolicy.Presentation selected =
+                        PhoneCellularDisplayPolicy.resolve(
+                                status.cellularSignalPercent,
+                                status.cellularOperator,
+                                status.cellularNetworkType,
+                                item.phoneCellularShowSignal,
+                                item.phoneCellularShowOperator,
+                                item.phoneCellularShowNetworkType);
+                return new Value(selected.known, selected.active,
+                        selected.text.isEmpty() ? "—" : selected.text);
+            }
             return new Value(status.known, status.active,
                     status.text.isEmpty() ? "—" : status.text);
         }

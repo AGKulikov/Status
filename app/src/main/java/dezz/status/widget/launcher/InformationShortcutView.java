@@ -15,11 +15,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import dezz.status.widget.Preferences;
+import dezz.status.widget.BrickType;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.launcher.information.InformationPanelConfig;
 import dezz.status.widget.launcher.information.InformationPanelConfigStore;
 import dezz.status.widget.launcher.information.InformationPanelView;
+import dezz.status.widget.launcher.information.StatusBarInformationCatalog;
 
 /** One universal, read-only information shortcut reused by HOME, driver rail and Favorites. */
 public final class InformationShortcutView extends FrameLayout {
@@ -90,14 +92,25 @@ public final class InformationShortcutView extends FrameLayout {
         item.iconColor = shortcut.iconColor;
         item.valueColor = shortcut.textColor;
         item.labelColor = shortcut.textColor;
-        item.showIcon = !"none".equalsIgnoreCase(shortcut.icon);
+        boolean phoneCellular = StatusBarInformationCatalog.type(item)
+                == BrickType.PHONE_CELLULAR;
+        item.showIcon = phoneCellular
+                ? shortcut.informationPhoneCellularShowSignal
+                : !"none".equalsIgnoreCase(shortcut.icon);
         item.showLabel = shortcut.showTitle;
-        item.showValue = shortcut.informationShowValue;
+        item.showValue = phoneCellular
+                ? shortcut.informationPhoneCellularShowOperator
+                || shortcut.informationPhoneCellularShowNetworkType
+                : shortcut.informationShowValue;
         item.iconSizePx = shortcut.informationIconSizePx;
         item.iconAlpha = shortcut.informationIconAlpha;
         item.iconOutlineAlpha = shortcut.informationIconOutlineAlpha;
         item.iconOutlineWidth = shortcut.informationIconOutlineWidth;
         item.useStatusIconStyle = shortcut.informationUseStatusIconStyle;
+        item.phoneCellularShowSignal = shortcut.informationPhoneCellularShowSignal;
+        item.phoneCellularShowOperator = shortcut.informationPhoneCellularShowOperator;
+        item.phoneCellularShowNetworkType =
+                shortcut.informationPhoneCellularShowNetworkType;
         item.labelTextSizeSp = shortcut.informationLabelTextSizeSp;
         item.valueTextSizeSp = shortcut.informationValueTextSizeSp;
         item.fontFamily = shortcut.informationFontFamily;

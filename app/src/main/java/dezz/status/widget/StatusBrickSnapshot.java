@@ -19,6 +19,10 @@ public final class StatusBrickSnapshot {
     @Nullable public final Integer batteryPercent;
     /** Fresh helper-reported external power; controls the lightning overlay. */
     public final boolean batteryCharging;
+    /** Raw iPhone cellular fields retained for independently configurable secondary surfaces. */
+    @Nullable public final Integer cellularSignalPercent;
+    @NonNull public final String cellularOperator;
+    @NonNull public final String cellularNetworkType;
     public final int outlineColor;
     public final int outlineWidth;
     @Nullable public final String badgeText;
@@ -34,6 +38,9 @@ public final class StatusBrickSnapshot {
                                int iconLevel,
                                @Nullable Integer batteryPercent,
                                boolean batteryCharging,
+                               @Nullable Integer cellularSignalPercent,
+                               @NonNull String cellularOperator,
+                               @NonNull String cellularNetworkType,
                                int outlineColor,
                                int outlineWidth,
                                @Nullable String badgeText,
@@ -48,6 +55,9 @@ public final class StatusBrickSnapshot {
         this.iconLevel = iconLevel;
         this.batteryPercent = batteryPercent;
         this.batteryCharging = batteryCharging;
+        this.cellularSignalPercent = cellularSignalPercent;
+        this.cellularOperator = cellularOperator;
+        this.cellularNetworkType = cellularNetworkType;
         this.outlineColor = outlineColor;
         this.outlineWidth = outlineWidth;
         this.badgeText = badgeText;
