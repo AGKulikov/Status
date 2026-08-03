@@ -18,6 +18,7 @@ import dezz.status.widget.WidgetService;
 import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.launcher.information.PhoneCellularDisplayPolicy;
 import dezz.status.widget.launcher.information.StatusBarInformationCatalog;
+import dezz.status.widget.phone.PhoneIndicatorVisualPolicy;
 
 /** One geometry contract shared by the live driver rail and its settings preview. */
 public final class DriverInformationTileLayoutPolicy {
@@ -58,6 +59,10 @@ public final class DriverInformationTileLayoutPolicy {
                 + shortcut.informationPaddingRightPx) * safeScale);
         if (showsIcon(shortcut)) {
             width += Math.round(shortcut.informationIconSizePx * safeScale);
+            if (showsValue(shortcut) && isPhoneCellular(shortcut)) {
+                width += PhoneIndicatorVisualPolicy.cellularIconTextGapPx(
+                        Math.round(shortcut.informationIconSizePx * safeScale));
+            }
         }
 
         int textWidth = 0;

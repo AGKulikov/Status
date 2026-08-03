@@ -11,7 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-/** Regression contract for the level-aware frameless iPhone battery and optional percentage. */
+/** Regression contract for the level-aware CarPlay battery and optional percentage. */
 public final class Ha1143BatteryPercentageTest {
     @Test public void statusBarUsesOptionalLiveNumberWithoutPercentSign() throws Exception {
         String widget = source("WidgetService.java");
@@ -23,7 +23,7 @@ public final class Ha1143BatteryPercentageTest {
         assertTrue(icon.contains("String text = String.valueOf(batteryPercent)"));
         assertTrue(icon.contains("contrastColor(batteryFillColor)"));
         assertTrue(icon.contains("imageLevel / 10_000f"));
-        assertTrue(icon.contains("canvas.clipRect(bodyLeft"));
+        assertTrue(icon.contains("canvas.clipRect(innerLeft"));
     }
 
     @Test public void driverAndLauncherTilesReuseTheSameLivePercentage() throws Exception {
@@ -43,13 +43,13 @@ public final class Ha1143BatteryPercentageTest {
         String widget = source("WidgetService.java");
         String vector = resource("drawable/ic_status_iphone_battery.xml");
 
-        assertTrue(icon.contains("14.5f / 32f"));
+        assertTrue(icon.contains("drawRoundRect(bodyLeft + stroke / 2f"));
         assertTrue(icon.contains("Math.max(0, Math.min(100, percent))"));
         assertTrue(widget.contains(
                 "batteryIcon.setImageLevel(battery == null ? 0 : battery * 100)"));
         assertTrue(widget.contains("iconLevel = battery == null ? 0 : battery * 100"));
         assertTrue(icon.contains("drawBatteryLevel(canvas)"));
-        assertTrue(icon.contains("terminal communicates the battery orientation"));
+        assertTrue(icon.contains("CarPlay outline"));
         assertTrue(vector.contains("<vector"));
         assertFalse(vector.contains("<layer-list"));
         assertFalse(vector.contains("<clip"));

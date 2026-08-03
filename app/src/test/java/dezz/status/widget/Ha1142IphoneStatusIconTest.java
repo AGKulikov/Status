@@ -19,12 +19,13 @@ public final class Ha1142IphoneStatusIconTest {
 
         assertTrue(widget.contains("battery != null && battery <= 10"));
         assertTrue(widget.contains("battery != null && battery <= 20"));
-        assertTrue(count(widget, "phoneBatteryColor(battery)") >= 2);
+        assertTrue(count(widget, "phoneBatteryColor(battery, batteryCharging)") >= 1);
+        assertTrue(widget.contains("phoneBatteryColor(battery, charging)"));
         assertTrue(widget.contains("phoneBoolean(\"battery.charging\")"));
         assertTrue(widget.contains("phoneBoolean(\"battery.external_power\")"));
-        assertTrue(widget.contains("batteryIcon.setBatteryCharging(phoneChargingNow())"));
+        assertTrue(widget.contains("batteryIcon.setBatteryCharging(charging)"));
         assertTrue(icon.contains("drawBatteryCharging"));
-        assertTrue(!widget.contains("R.color.iphone_battery_charging"));
+        assertTrue(widget.contains("R.color.iphone_battery_charging"));
         assertTrue(policy.contains("public static Boolean booleanValue"));
     }
 

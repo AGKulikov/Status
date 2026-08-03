@@ -113,8 +113,13 @@ public final class PhoneNotificationAutomation {
         List<PopupOverlayConfig> overlays = new ArrayList<>(overlayStore.load());
         PopupOverlayConfig plain = ensureOverlay(
                 overlays, OVERLAY_ID, "Уведомления телефона · без иконки");
-        ensureOverlay(overlays, OVERLAY_WITH_ICON_ID,
+        PopupOverlayConfig withIcon = ensureOverlay(overlays, OVERLAY_WITH_ICON_ID,
                 "Уведомления телефона · с иконкой");
+
+        PhoneNotificationLayoutConfigStore layoutStore =
+                new PhoneNotificationLayoutConfigStore(prefs);
+        layoutStore.save(layoutStore.load(plain.id));
+        layoutStore.save(layoutStore.load(withIcon.id));
 
         PopupItemConfigStore itemStore = new PopupItemConfigStore(prefs);
         List<PopupItemConfig> items = new ArrayList<>(itemStore.load());
@@ -183,12 +188,12 @@ public final class PhoneNotificationAutomation {
         }
         if (overlay == null) {
             overlay = PopupOverlayConfig.create(id, name, overlays.size());
-            overlay.width = 900;
-            overlay.height = 300;
-            overlay.rows = 3;
-            overlay.columns = 1;
+            overlay.width = 1000;
+            overlay.height = 170;
+            overlay.rows = PhoneNotificationLayoutConfig.GRID_ROWS;
+            overlay.columns = PhoneNotificationLayoutConfig.GRID_COLUMNS;
             overlay.x = 420;
-            overlay.y = 180;
+            overlay.y = 520;
             overlay.paddingLeft = 0;
             overlay.paddingTop = 0;
             overlay.paddingRight = 0;
@@ -198,6 +203,16 @@ public final class PhoneNotificationAutomation {
             overlay.backgroundAlpha = 0;
             overlay.cornerRadius = 0;
             overlays.add(overlay);
+        } else if (overlay.width == 900 && overlay.height == 300
+                && overlay.rows == 3 && overlay.columns == 1
+                && overlay.paddingLeft == 0 && overlay.paddingTop == 0
+                && overlay.paddingRight == 0 && overlay.paddingBottom == 0) {
+            // One-time migration from the old three independent rows to one CarPlay pill.
+            overlay.width = 1000;
+            overlay.height = 170;
+            overlay.rows = PhoneNotificationLayoutConfig.GRID_ROWS;
+            overlay.columns = PhoneNotificationLayoutConfig.GRID_COLUMNS;
+            overlay.y = 520;
         }
         overlay.enabled = true;
         overlay.defaultVisible = false;

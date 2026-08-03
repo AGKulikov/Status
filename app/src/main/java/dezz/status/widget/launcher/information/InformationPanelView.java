@@ -63,6 +63,7 @@ import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.launcher.LauncherGlobalElementTag;
+import dezz.status.widget.phone.PhoneIndicatorVisualPolicy;
 import dezz.status.widget.launcher.LauncherIconResolver;
 import dezz.status.widget.launcher.LauncherLayoutStore;
 
@@ -396,8 +397,13 @@ public final class InformationPanelView extends FrameLayout {
         icon.setContentDescription(item.displayLabel());
         int iconSize = Math.max(1, scaledDp(item.iconSizePx, item.scalePercent));
         LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(iconSize, iconSize);
-        // No implicit icon/text inset: the owning free frame/group controls every gap.
-        iconLp.rightMargin = 0;
+        // CarPlay keeps a deliberate optical pause between the bars and LTE/3G text. This is
+        // part of the cellular glyph itself, not a tile padding, so zero tile padding remains
+        // genuinely zero while the signal and its value never collide.
+        boolean phoneCellular = StatusBarInformationCatalog.type(item)
+                == BrickType.PHONE_CELLULAR;
+        iconLp.rightMargin = phoneCellular && item.showIcon && item.showValue
+                ? PhoneIndicatorVisualPolicy.cellularIconTextGapPx(iconSize) : 0;
         content.addView(icon, iconLp);
         icon.setVisibility(item.showIcon ? View.VISIBLE : View.GONE);
 
@@ -414,8 +420,6 @@ public final class InformationPanelView extends FrameLayout {
         TextView value = text("—", scaledSp(item.valueTextSizeSp, item.scalePercent),
                 color(item.valueColor, Color.WHITE), item);
         value.setGravity(itemGravity(item.horizontalAlignment, item.verticalAlignment));
-        boolean phoneCellular = StatusBarInformationCatalog.type(item)
-                == BrickType.PHONE_CELLULAR;
         // Cellular metadata is one measured line. Other smart-device states can carry a mode,
         // value and availability explanation and therefore remain unrestricted multi-line text.
         value.setSingleLine(phoneCellular);

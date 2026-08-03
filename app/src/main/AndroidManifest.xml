@@ -224,6 +224,11 @@
             android:screenOrientation="landscape" />
 
         <activity
+            android:name=".PhoneNotificationLayoutEditorActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".VisualBrickEditorActivity"
             android:exported="false" />
 

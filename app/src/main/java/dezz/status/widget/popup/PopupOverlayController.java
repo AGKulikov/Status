@@ -11,6 +11,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -53,6 +54,9 @@ import dezz.status.widget.integration.ActionBinding;
 import dezz.status.widget.integration.ActionDispatcher;
 import dezz.status.widget.phone.PhoneAppIconStore;
 import dezz.status.widget.phone.PhoneNotificationAutomation;
+import dezz.status.widget.phone.PhoneNotificationCardView;
+import dezz.status.widget.phone.PhoneNotificationLayoutConfig;
+import dezz.status.widget.phone.PhoneNotificationLayoutConfigStore;
 import dezz.status.widget.phone.PhoneNotificationPreviewIconFactory;
 import dezz.status.widget.launcher.panels.PanelContentEditOverlay;
 
@@ -60,6 +64,7 @@ import dezz.status.widget.launcher.panels.PanelContentEditOverlay;
 public final class PopupOverlayController {
     private static final long ACTION_DEBOUNCE_MS = 750L;
     private static final long STATE_REFRESH_DEBOUNCE_MS = 50L;
+    private static final long EMPTY_GENERATION_GRACE_MS = 220L;
 
     public interface BuiltinProvider {
         @Nullable BuiltinValue getBuiltinValue(@NonNull String automationId);
@@ -83,6 +88,7 @@ public final class PopupOverlayController {
     private final AutomationStateStore states;
     private final PopupItemConfigStore configs;
     private final PopupOverlayConfigStore overlayConfigs;
+    private final PhoneNotificationLayoutConfigStore phoneNotificationLayouts;
     private final String overlayId;
     private final ActionDispatcher actionDispatcher;
     private final BuiltinProvider builtinProvider;
@@ -100,6 +106,13 @@ public final class PopupOverlayController {
     /** Prevent connector updates from replacing the touched View between DOWN and UP. */
     private boolean touchInProgress;
     private boolean refreshDeferred;
+    private long emptyGenerationSinceElapsed;
+    private long lastVisualSignature = Long.MIN_VALUE;
+    private long lastPhoneNotificationSignature = Long.MIN_VALUE;
+    @Nullable private FrameLayout styledRoot;
+    private int styledBackground;
+    private int styledCornerRadius = -1;
+    @Nullable private PhoneNotificationCardView phoneNotificationCard;
     private List<PopupItemConfig> currentItems = Collections.emptyList();
     /** Actual auto-placement resolved during the last render, used by the direct grid editor. */
     private final Map<String, int[]> renderedPlacements = new HashMap<>();
@@ -162,6 +175,7 @@ public final class PopupOverlayController {
         this.states = states;
         this.configs = new PopupItemConfigStore(prefs);
         this.overlayConfigs = overlayConfigs;
+        this.phoneNotificationLayouts = new PhoneNotificationLayoutConfigStore(prefs);
         this.overlayId = AutomationContract.requireSafeId(overlayId);
         this.actionDispatcher = actionDispatcher;
         this.builtinProvider = builtinProvider;
@@ -186,6 +200,7 @@ public final class PopupOverlayController {
         if (currentConfig == null || (!currentConfig.enabled && !editorPreview)
                 || editorPreviewSuppressed) {
             currentItems = Collections.emptyList();
+            lastVisualSignature = Long.MIN_VALUE;
             setOverlayVisible(false);
             return;
         }
@@ -211,6 +226,7 @@ public final class PopupOverlayController {
             return;
         }
         if ((!config.enabled && !editorPreview) || editorPreviewSuppressed) {
+            lastVisualSignature = Long.MIN_VALUE;
             setOverlayVisible(false);
             return;
         }
@@ -239,6 +255,12 @@ public final class PopupOverlayController {
         currentItems = Collections.emptyList();
         renderedPlacements.clear();
         renderedTiles.clear();
+        phoneNotificationCard = null;
+        emptyGenerationSinceElapsed = 0L;
+        lastVisualSignature = Long.MIN_VALUE;
+        lastPhoneNotificationSignature = Long.MIN_VALUE;
+        styledRoot = null;
+        styledCornerRadius = -1;
         main.removeCallbacksAndMessages(null);
         detachAllRootsImmediately();
         root = null;
@@ -275,11 +297,17 @@ public final class PopupOverlayController {
         if (root == null || params == null) return;
         PopupOverlayConfig config = currentConfig;
         if (config == null) return;
-        params.width = clamp(config.width, 100, 4000);
-        params.height = clamp(config.height, 100, 4000);
-        params.x = config.x;
-        params.y = config.y;
-        if (rootAdded) {
+        int nextWidth = clamp(config.width, 100, 4000);
+        int nextHeight = clamp(config.height, 100, 4000);
+        int nextX = config.x;
+        int nextY = config.y;
+        boolean geometryChanged = params.width != nextWidth || params.height != nextHeight
+                || params.x != nextX || params.y != nextY;
+        params.width = nextWidth;
+        params.height = nextHeight;
+        params.x = nextX;
+        params.y = nextY;
+        if (rootAdded && geometryChanged) {
             try { windowManager.updateViewLayout(root, params); } catch (Exception ignored) {}
         }
 
@@ -291,15 +319,34 @@ public final class PopupOverlayController {
         int base = AutomationState.parseColor(configuredBackground, 0xFF000000);
         int alpha = overlayState.backgroundColor == null
                 ? clamp(config.backgroundAlpha, 0, 255) : (base >>> 24);
-        bg.setColor((base & 0x00FFFFFF) | (alpha << 24));
-        bg.setCornerRadius(config.cornerRadius);
-        root.setBackground(bg);
+        int background = (base & 0x00FFFFFF) | (alpha << 24);
+        if (styledRoot != root || styledBackground != background
+                || styledCornerRadius != config.cornerRadius) {
+            bg.setColor(background);
+            bg.setCornerRadius(config.cornerRadius);
+            root.setBackground(bg);
+            styledRoot = root;
+            styledBackground = background;
+            styledCornerRadius = config.cornerRadius;
+        }
     }
 
     private void renderItems() {
         if (root == null || params == null) return;
         if (touchInProgress) {
             refreshDeferred = true;
+            return;
+        }
+        if (PhoneNotificationAutomation.isNotificationOverlayId(overlayId)) {
+            renderPhoneNotificationCard();
+            return;
+        }
+        long visualSignature = visualSignature();
+        if (!editorPreview && rootAdded && visualSignature != Long.MIN_VALUE
+                && visualSignature == lastVisualSignature) {
+            // Connector registries can publish the same retained snapshot several times in one
+            // second. Do not create a second WindowManager generation when no rendered property
+            // changed; even frame-safe double buffering is visible as a flash on some KX11 GPUs.
             return;
         }
         // Never structurally mutate a ViewGroup that ViewRootImpl has ever measured. Build the
@@ -321,6 +368,11 @@ public final class PopupOverlayController {
         if (config == null || editorPreviewSuppressed
                 || (!editorPreview && !states.effectiveVisibility(
                 AutomationContract.SCOPE_OVERLAY, overlayId, config.defaultVisible))) {
+            if (!editorPreviewSuppressed && previousAdded
+                    && holdLastGenerationDuringEmptyTransition()) {
+                restorePreviousRoot(previousRoot, previousParams);
+                return;
+            }
             setOverlayVisible(false);
             return;
         }
@@ -394,8 +446,17 @@ public final class PopupOverlayController {
         }
         if (editorPreview) attachEditorChrome(left, top, right, bottom);
         boolean visible = visibleCount > 0 || editorPreview;
-        setOverlayVisible(visible);
-        if (!visible) return;
+        if (!visible) {
+            if (previousAdded && holdLastGenerationDuringEmptyTransition()) {
+                restorePreviousRoot(previousRoot, previousParams);
+                return;
+            }
+            setOverlayVisible(false);
+            return;
+        }
+        emptyGenerationSinceElapsed = 0L;
+        lastVisualSignature = visualSignature;
+        setOverlayVisible(true);
         if (rootAdded && root != null) {
             retireOlderRootsAfterFirstDraw(root);
         } else if (previousAdded && previousRoot != null && previousParams != null) {
@@ -407,6 +468,170 @@ public final class PopupOverlayController {
                     || previousRoot.isAttachedToWindow();
             if (rootAdded) attachedRoots.add(previousRoot);
         }
+    }
+
+    /**
+     * Phone notifications are one semantic card, not three generic grid tiles. Updating its
+     * existing child Views in place avoids the WindowManager generation swap visible as a flash
+     * in the user's KX11 video while still retaining the exact field-level conditions.
+     */
+    private void renderPhoneNotificationCard() {
+        PopupOverlayConfig overlay = currentConfig;
+        if (root == null || params == null || overlay == null) return;
+        if (editorPreviewSuppressed) {
+            setOverlayVisible(false);
+            return;
+        }
+        boolean overlayVisible = !editorPreviewSuppressed
+                && (editorPreview || states.effectiveVisibility(
+                AutomationContract.SCOPE_OVERLAY, overlayId, overlay.defaultVisible));
+        long now = System.currentTimeMillis();
+        AutomationState app = states.get(AutomationContract.SCOPE_POPUP,
+                PhoneNotificationAutomation.APPLICATION_AUTOMATION_ID);
+        AutomationState topic = states.get(AutomationContract.SCOPE_POPUP,
+                PhoneNotificationAutomation.TOPIC_AUTOMATION_ID);
+        AutomationState message = states.get(AutomationContract.SCOPE_POPUP,
+                PhoneNotificationAutomation.TEXT_AUTOMATION_ID);
+        boolean hasApplication = notificationFieldAvailable(app, now);
+        boolean hasTopic = notificationFieldAvailable(topic, now);
+        boolean hasMessage = notificationFieldAvailable(message, now);
+        boolean visible = overlayVisible && (editorPreview
+                || hasApplication || hasTopic || hasMessage);
+        if (!visible) {
+            if (rootAdded && holdLastGenerationDuringEmptyTransition()) return;
+            setOverlayVisible(false);
+            return;
+        }
+        emptyGenerationSinceElapsed = 0L;
+        PhoneNotificationCardView.Model model = editorPreview
+                ? PhoneNotificationCardView.Model.preview()
+                : new PhoneNotificationCardView.Model(
+                hasApplication ? app.text : "Уведомление",
+                hasTopic ? topic.text : "Новое уведомление",
+                hasMessage ? message.text : "",
+                hasApplication ? app.icon : null);
+        if (phoneNotificationCard == null) {
+            phoneNotificationCard = new PhoneNotificationCardView(context);
+            root.addView(phoneNotificationCard, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        }
+        PhoneNotificationLayoutConfig layout = phoneNotificationLayouts.load(overlayId);
+        long presentationSignature = phoneNotificationSignature(layout, model);
+        if (!editorPreview && rootAdded && phoneNotificationCard != null
+                && presentationSignature == lastPhoneNotificationSignature) {
+            setOverlayVisible(true);
+            return;
+        }
+        phoneNotificationCard.setPresentation(layout, model);
+        lastPhoneNotificationSignature = presentationSignature;
+        setOverlayVisible(true);
+    }
+
+    private long phoneNotificationSignature(@NonNull PhoneNotificationLayoutConfig layout,
+                                            @NonNull PhoneNotificationCardView.Model model) {
+        long value = mix(0xcbf29ce484222325L, model.application);
+        value = mix(value, model.title);
+        value = mix(value, model.message);
+        value = mix(value, model.appIconIdentifier);
+        if (model.appIconIdentifier != null
+                && PhoneAppIconStore.get(context).hasIcon(model.appIconIdentifier)) {
+            value = (value ^ 1L) * 0x100000001b3L;
+        }
+        try {
+            return mix(value, layout.toJson().toString());
+        } catch (JSONException ignored) {
+            return Long.MIN_VALUE;
+        }
+    }
+
+    private static boolean notificationFieldAvailable(@NonNull AutomationState state, long now) {
+        return state.visible && state.fresh && state.text != null && !state.text.trim().isEmpty()
+                && (state.expiresAt <= 0L || now < state.expiresAt);
+    }
+
+    /** Keeps the last valid generation through short multi-field connector transactions. */
+    private boolean holdLastGenerationDuringEmptyTransition() {
+        long now = SystemClock.elapsedRealtime();
+        if (emptyGenerationSinceElapsed <= 0L) {
+            emptyGenerationSinceElapsed = now;
+            main.removeCallbacks(stateRefresh);
+            main.postDelayed(stateRefresh, EMPTY_GENERATION_GRACE_MS);
+            return true;
+        }
+        long elapsed = now - emptyGenerationSinceElapsed;
+        if (elapsed < EMPTY_GENERATION_GRACE_MS) {
+            main.removeCallbacks(stateRefresh);
+            main.postDelayed(stateRefresh, EMPTY_GENERATION_GRACE_MS - elapsed);
+            return true;
+        }
+        emptyGenerationSinceElapsed = 0L;
+        return false;
+    }
+
+    private void restorePreviousRoot(@NonNull FrameLayout previousRoot,
+                                     @NonNull WindowManager.LayoutParams previousParams) {
+        root = previousRoot;
+        params = previousParams;
+        rootAdded = attachedRoots.contains(previousRoot) || previousRoot.isAttachedToWindow();
+        if (rootAdded) attachedRoots.add(previousRoot);
+    }
+
+    /** Complete presentation signature used only to eliminate genuinely redundant generations. */
+    private long visualSignature() {
+        PopupOverlayConfig overlay = currentConfig;
+        if (overlay == null) return Long.MIN_VALUE;
+        try {
+            long now = System.currentTimeMillis();
+            long value = mix(0xcbf29ce484222325L, overlay.toJson().toString());
+            AutomationState overlayState = states.get(
+                    AutomationContract.SCOPE_OVERLAY, overlayId);
+            value = mixState(value, overlayState, 0L, now);
+            for (PopupItemConfig item : currentItems) {
+                value = mix(value, item.toJson().toString());
+                String stateScope = PopupItemConfig.TYPE_BUILTIN.equals(item.type)
+                        ? AutomationContract.SCOPE_BUILTIN : AutomationContract.SCOPE_POPUP;
+                String stateId = PopupItemConfig.TYPE_BUILTIN.equals(item.type)
+                        && !item.builtinId.isEmpty() ? item.builtinId : item.automationId;
+                value = mixState(value, states.get(stateScope, stateId),
+                        Math.max(0L, item.staleAfterSeconds) * 1_000L, now);
+                if (PopupItemConfig.TYPE_BUILTIN.equals(item.type)) {
+                    BuiltinValue builtin = builtinProvider.getBuiltinValue(item.builtinId);
+                    if (builtin != null) {
+                        value = mix(value, builtin.text);
+                        value = mix(value, builtin.color);
+                        value = mix(value, builtin.iconId);
+                        value = (value ^ (builtin.visible ? 1L : 0L)) * 0x100000001b3L;
+                    }
+                }
+            }
+            return value;
+        } catch (JSONException | RuntimeException invalidConfiguration) {
+            // Rendering remains available even if an imported config cannot be fingerprinted.
+            return Long.MIN_VALUE;
+        }
+    }
+
+    private static long mix(long value, @Nullable String text) {
+        String safe = text == null ? "" : text;
+        for (int index = 0; index < safe.length(); index++) {
+            value = (value ^ safe.charAt(index)) * 0x100000001b3L;
+        }
+        return value;
+    }
+
+    private static long mixState(long value, @NonNull AutomationState state,
+                                 long staleAfterMs, long now) {
+        value = mix(value, state.text);
+        value = mix(value, state.color);
+        value = mix(value, state.icon);
+        value = mix(value, state.backgroundColor);
+        value = (value ^ (state.present ? 1L : 0L)) * 0x100000001b3L;
+        value = (value ^ (state.visible ? 2L : 0L)) * 0x100000001b3L;
+        value = (value ^ (state.fresh ? 4L : 0L)) * 0x100000001b3L;
+        value = (value ^ (state.actionEnabled ? 8L : 0L)) * 0x100000001b3L;
+        value = (value ^ (state.isStale(now, staleAfterMs) ? 16L : 0L))
+                * 0x100000001b3L;
+        return value;
     }
 
     /**

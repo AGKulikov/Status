@@ -135,6 +135,7 @@ import dezz.status.widget.phone.PhoneLowBatteryAlertPolicy;
 import dezz.status.widget.phone.PhoneNotificationAutomation;
 import dezz.status.widget.phone.PhoneNetworkTypePolicy;
 import dezz.status.widget.phone.PhoneStatusBarPolicy;
+import dezz.status.widget.phone.PhoneIndicatorVisualPolicy;
 import dezz.status.widget.phone.PhoneSprutPresenceExporter;
 import dezz.status.widget.popup.PopupOverlayController;
 import dezz.status.widget.popup.PopupOverlayManager;
@@ -2364,6 +2365,7 @@ public class WidgetService extends Service {
         binding.phoneCellularNetworkTypeText.setVisibility(
                 prefs.phoneCellular.showNetworkType.get() && !networkType.isEmpty()
                         ? View.VISIBLE : View.GONE);
+        applyPhoneCellularInternalSpacing();
         binding.phoneNetworkTypeText.setText(networkType);
 
         Integer battery = phonePercent("battery.level");
@@ -2371,11 +2373,12 @@ public class WidgetService extends Service {
         batteryIcon.setImageResource(R.drawable.ic_status_iphone_battery);
         batteryIcon.setImageLevel(battery == null ? 0 : battery * 100);
         batteryIcon.setDrawIcon(true);
-        int batteryColor = phoneBatteryColor(battery);
+        boolean charging = phoneChargingNow();
+        int batteryColor = phoneBatteryColor(battery, charging);
         ImageViewCompat.setImageTintList(batteryIcon, ColorStateList.valueOf(batteryColor));
         batteryIcon.setBatteryPercent(
                 prefs.phoneBattery.showPercentage.get() ? battery : null, batteryColor);
-        batteryIcon.setBatteryCharging(phoneChargingNow());
+        batteryIcon.setBatteryCharging(charging);
         applyConfiguredIconOutline(batteryIcon, prefs.phoneBattery);
         batteryIcon.setBadgeText(null, 0, 0);
         batteryIcon.setBadgeDrawable(null);
@@ -2398,13 +2401,37 @@ public class WidgetService extends Service {
         return value == null ? "" : value;
     }
 
-    private int phoneBatteryColor(@Nullable Integer battery) {
+    private int phoneBatteryColor(@Nullable Integer battery, boolean charging) {
         Context context = themedContext != null ? themedContext : this;
         return battery != null && battery <= 10
                 ? ContextCompat.getColor(context, R.color.iphone_battery_critical)
                 : battery != null && battery <= 20
                 ? ContextCompat.getColor(context, R.color.iphone_battery_low)
+                : charging
+                ? ContextCompat.getColor(context, R.color.iphone_battery_charging)
                 : ContextCompat.getColor(context, android.R.color.white);
+    }
+
+    private void applyPhoneCellularInternalSpacing() {
+        if (binding == null || prefs == null) return;
+        int iconSize = Math.max(1, prefs.phoneCellular.size.get());
+        boolean typeVisible = binding.phoneCellularNetworkTypeText.getVisibility()
+                == View.VISIBLE;
+        boolean operatorVisible = binding.phoneCellularOperatorText.getVisibility()
+                == View.VISIBLE;
+        ViewGroup.MarginLayoutParams typeParams =
+                (ViewGroup.MarginLayoutParams) binding.phoneCellularNetworkTypeText
+                        .getLayoutParams();
+        typeParams.setMarginStart(typeVisible
+                ? PhoneIndicatorVisualPolicy.cellularIconTextGapPx(iconSize) : 0);
+        binding.phoneCellularNetworkTypeText.setLayoutParams(typeParams);
+        ViewGroup.MarginLayoutParams operatorParams =
+                (ViewGroup.MarginLayoutParams) binding.phoneCellularOperatorText
+                        .getLayoutParams();
+        operatorParams.setMarginStart(!operatorVisible ? 0
+                : typeVisible ? PhoneIndicatorVisualPolicy.cellularTextGapPx(iconSize)
+                : PhoneIndicatorVisualPolicy.cellularIconTextGapPx(iconSize));
+        binding.phoneCellularOperatorText.setLayoutParams(operatorParams);
     }
 
     private boolean phoneChargingNow() {
@@ -2695,6 +2722,7 @@ public class WidgetService extends Service {
                 textOutlineColor(prefs.phoneCellular.outlineAlpha.get()));
         binding.phoneCellularNetworkTypeText.setOutlineWidth(
                 prefs.phoneCellular.outlineWidth.get());
+        applyPhoneCellularInternalSpacing();
         applyHorizontalMargins(binding.phoneCellularContainer,
                 prefs.phoneCellular.marginStart.get(), prefs.phoneCellular.marginEnd.get());
         binding.phoneCellularContainer.setTranslationY(prefs.phoneCellular.adjustY.get());
@@ -5103,9 +5131,9 @@ public class WidgetService extends Service {
                 iconResource = R.drawable.ic_status_iphone_battery;
                 iconLevel = battery == null ? 0 : battery * 100;
                 iconPrefs = prefs.phoneBattery;
-                iconTint = phoneBatteryColor(battery);
-                batteryPercent = prefs.phoneBattery.showPercentage.get() ? battery : null;
                 batteryCharging = phoneChargingNow();
+                iconTint = phoneBatteryColor(battery, batteryCharging);
+                batteryPercent = prefs.phoneBattery.showPercentage.get() ? battery : null;
                 break;
             case PHONE_NETWORK_TYPE:
                 text = phoneNetworkType();

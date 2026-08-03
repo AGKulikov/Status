@@ -29,6 +29,8 @@ public final class LauncherShortcutStore {
     public static final int SCHEMA_VERSION = 1;
     public static final int MIN_ICON_SIZE_PX = 24;
     public static final int MAX_ICON_SIZE_PX = 320;
+    public static final int MIN_DRIVER_BUTTON_HEIGHT_PX = 16;
+    public static final int MAX_DRIVER_BUTTON_HEIGHT_PX = 480;
     public static final int MAX_DRIVER_PANEL_SHORTCUTS = 10;
 
     public enum Kind { APP, BUILTIN, RULE, INTENT, CAR, INFO, DIVIDER }
@@ -77,6 +79,8 @@ public final class LauncherShortcutStore {
         public int climateDetailsGapPx = 0;
         public int iconSizePx = 54;
         public int dividerThicknessPx = 2;
+        /** Driver rail only: 0 = auto; positive values are the exact physical button height. */
+        public int buttonHeightPx = 0;
         /** -1 shares otherwise unused rail height; non-negative is exact internal top padding. */
         public int gapBeforePx = -1;
         /** -1 shares otherwise unused rail height; non-negative is exact internal bottom padding. */
@@ -168,6 +172,7 @@ public final class LauncherShortcutStore {
             value.climateDetailsGapPx = climateDetailsGapPx;
             value.iconSizePx = iconSizePx;
             value.dividerThicknessPx = dividerThicknessPx;
+            value.buttonHeightPx = buttonHeightPx;
             value.gapBeforePx = gapBeforePx;
             value.gapAfterPx = gapAfterPx;
             value.columnSpan = columnSpan;
@@ -581,6 +586,9 @@ public final class LauncherShortcutStore {
         value.climateDetailsGapPx = Math.max(0,
                 Math.min(96, value.climateDetailsGapPx));
         value.dividerThicknessPx = Math.max(1, Math.min(20, value.dividerThicknessPx));
+        value.buttonHeightPx = value.buttonHeightPx <= 0 ? 0
+                : Math.max(MIN_DRIVER_BUTTON_HEIGHT_PX,
+                Math.min(MAX_DRIVER_BUTTON_HEIGHT_PX, value.buttonHeightPx));
         value.gapBeforePx = Math.max(-1, Math.min(80, value.gapBeforePx));
         value.gapAfterPx = Math.max(-1, Math.min(80, value.gapAfterPx));
         value.columnSpan = Math.max(1,
@@ -687,6 +695,7 @@ public final class LauncherShortcutStore {
                 .put("climateDetailsGapPx", value.climateDetailsGapPx)
                 .put("iconSizePx", value.iconSizePx)
                 .put("dividerThicknessPx", value.dividerThicknessPx)
+                .put("buttonHeightPx", value.buttonHeightPx)
                 .put("gapBeforePx", value.gapBeforePx)
                 .put("gapAfterPx", value.gapAfterPx)
                 .put("columnSpan", value.columnSpan)
@@ -803,6 +812,7 @@ public final class LauncherShortcutStore {
             value.climateDetailsGapPx = json.optInt("climateDetailsGapPx", 0);
             value.iconSizePx = json.optInt("iconSizePx", 54);
             value.dividerThicknessPx = json.optInt("dividerThicknessPx", 2);
+            value.buttonHeightPx = json.optInt("buttonHeightPx", 0);
             value.gapBeforePx = json.optInt("gapBeforePx", -1);
             value.gapAfterPx = json.optInt("gapAfterPx", -1);
             value.columnSpan = json.optInt("columnSpan", 1);

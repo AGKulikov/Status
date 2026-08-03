@@ -24,6 +24,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -54,6 +55,7 @@ import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.phone.PhoneAppCatalog;
 import dezz.status.widget.phone.PhoneAppIconStore;
+import dezz.status.widget.phone.PhoneConnectionJournal;
 import dezz.status.widget.phone.PhoneLowBatteryAlertPolicy;
 import dezz.status.widget.phone.PhoneNotificationFilter;
 import dezz.status.widget.phone.PhoneStatusBarPolicy;
@@ -99,13 +101,15 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     private MaterialButton lowBatteryColorButton;
     private TextView selectedSprutPathValue;
     private TextView diagnostics;
+    private TextView connectionJournal;
+    private ScrollView connectionJournalScroll;
     private final Handler diagnosticsHandler = new Handler(Looper.getMainLooper());
     private boolean diagnosticsPolling;
     private final Runnable diagnosticsPoll = new Runnable() {
         @Override public void run() {
             if (!diagnosticsPolling) return;
             refreshDiagnostics();
-            diagnosticsHandler.postDelayed(this, 1_000L);
+            diagnosticsHandler.postDelayed(this, 500L);
         }
     };
     @NonNull private String selectedDeviceAddress = "";
@@ -125,6 +129,7 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         preferences = new Preferences(this);
+        PhoneConnectionJournal.initialize(this);
         selectedDeviceAddress = clean(preferences.phoneDeviceAddress.get());
         selectedSprutPath = clean(preferences.phoneSprutPresencePath.get());
         selectedStatusItems.addAll(PhoneStatusBarPolicy.parseIds(
@@ -167,7 +172,7 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         refreshDiagnostics();
         diagnosticsPolling = true;
         diagnosticsHandler.removeCallbacks(diagnosticsPoll);
-        diagnosticsHandler.postDelayed(diagnosticsPoll, 1_000L);
+        diagnosticsHandler.postDelayed(diagnosticsPoll, 500L);
     }
 
     @Override
@@ -341,6 +346,28 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 this::testAncsConnection), topMargin(10));
         page.addView(actionButton(getString(R.string.phone_notification_settings),
                 this::openPhoneNotificationSettings), topMargin(8));
+
+        page.addView(sectionTitle("Журнал подключения к телефону"), topMargin(24));
+        connectionJournal = secondary("", 12);
+        connectionJournal.setTypeface(Typeface.MONOSPACE);
+        connectionJournal.setTextIsSelectable(true);
+        connectionJournal.setPadding(dp(14), dp(12), dp(14), dp(12));
+        LinearLayout journalContent = column();
+        connectionJournalScroll = new ScrollView(this);
+        connectionJournalScroll.setFillViewport(true);
+        connectionJournalScroll.addView(connectionJournal, matchWrap());
+        journalContent.addView(connectionJournalScroll,
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dp(260)));
+        page.addView(card(journalContent), topMargin(7));
+        LinearLayout journalActions = row();
+        journalActions.addView(actionButton("Обновить", this::refreshConnectionJournal),
+                weighted());
+        journalActions.addView(actionButton("Очистить", this::clearConnectionJournal),
+                weighted());
+        journalActions.addView(actionButton("Экспорт", this::exportConnectionJournal),
+                weighted());
+        page.addView(journalActions, topMargin(8));
 
         TextView privacy = secondary(getString(R.string.phone_privacy_hint), 13);
         privacy.setPadding(dp(8), 0, dp(8), 0);
@@ -1070,6 +1097,48 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                     getString(R.string.phone_diag_last_error), lastError));
         }
         diagnostics.setText(result);
+        refreshConnectionJournal();
+    }
+
+    private void refreshConnectionJournal() {
+        if (connectionJournal == null) return;
+        boolean followLatest = connectionJournalScroll == null
+                || connectionJournalScroll.getChildCount() == 0
+                || connectionJournalScroll.getScrollY()
+                + connectionJournalScroll.getHeight()
+                >= connectionJournalScroll.getChildAt(0).getHeight() - dp(24);
+        String text = PhoneConnectionJournal.tailText(240);
+        connectionJournal.setText(text.isEmpty()
+                ? "Журнал пока пуст — события появятся при следующем подключении."
+                : text);
+        if (followLatest && connectionJournalScroll != null) {
+            connectionJournalScroll.post(() ->
+                    connectionJournalScroll.fullScroll(View.FOCUS_DOWN));
+        }
+    }
+
+    private void clearConnectionJournal() {
+        PhoneConnectionJournal.clear();
+        refreshConnectionJournal();
+        Toast.makeText(this, "Журнал подключения очищен", Toast.LENGTH_SHORT).show();
+    }
+
+    private void exportConnectionJournal() {
+        String text = PhoneConnectionJournal.tailText(600);
+        if (text.isEmpty()) {
+            Toast.makeText(this, "Журнал подключения пуст", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Intent share = new Intent(Intent.ACTION_SEND)
+                .setType("text/plain")
+                .putExtra(Intent.EXTRA_SUBJECT, "Status Widget — подключение iPhone")
+                .putExtra(Intent.EXTRA_TEXT, text);
+        try {
+            startActivity(Intent.createChooser(share, "Экспортировать журнал"));
+        } catch (RuntimeException error) {
+            Toast.makeText(this, "Не найдено приложение для экспорта",
+                    Toast.LENGTH_LONG).show();
+        }
     }
 
     @NonNull

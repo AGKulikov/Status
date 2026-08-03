@@ -337,6 +337,8 @@ public final class PhoneConnectorController {
         this.presenceSink = presenceSink == null ? NO_PRESENCE_SINK : presenceSink;
         this.mainHandler = new Handler(Looper.getMainLooper());
         this.telemetryStore = new PhoneTelemetryStore(this.context);
+        PhoneConnectionJournal.initialize(this.context);
+        PhoneConnectionJournal.append("controller", "контроллер создан; foreground owner готов");
     }
 
     /**
@@ -345,6 +347,10 @@ public final class PhoneConnectorController {
      */
     public void reconfigure() {
         Config next = Config.from(prefs);
+        PhoneConnectionJournal.append("controller", "применение настроек: enabled="
+                + next.enabled + ", BLE/ANCS=" + next.transportNeeded()
+                + ", iPhone=" + (next.deviceAddress.isEmpty()
+                ? "не выбран" : maskedAddress(next.deviceAddress)));
         synchronized (lifecycleLock) {
             if (running && signature.equals(next.signature())) {
                 Handler current = worker;
@@ -370,6 +376,7 @@ public final class PhoneConnectorController {
 
     /** Fully releases receiver, observer, GATT and worker resources; safe to call repeatedly. */
     public void stop() {
+        PhoneConnectionJournal.append("controller", "остановка контроллера запрошена");
         synchronized (lifecycleLock) {
             signature = "";
             stopLocked("stopped");
@@ -389,6 +396,8 @@ public final class PhoneConnectorController {
             long token = generation;
             if (currentWorker == null) return false;
             currentWorker.post(() -> runIfCurrent(token, () -> {
+                PhoneConnectionJournal.append("controller",
+                        "ручное чистое переподключение без сброса пары");
                 String configuredAddress = config == null ? "" : config.deviceAddress;
                 closeAncsTransport();
                 BluetoothGatt previous = gatt;
@@ -459,6 +468,7 @@ public final class PhoneConnectorController {
 
     private void startSession(long token, @NonNull Config next) {
         if (!isCurrent(token)) return;
+        PhoneConnectionJournal.append("controller", "запуск сессии generation=" + token);
         clearRuntimeState("starting");
         config = next;
         ancsStatus = next.transportNeeded() ? "starting" : "disabled";
@@ -1221,11 +1231,15 @@ public final class PhoneConnectorController {
         }
 
         @Override public void onState(String state) {
+            PhoneConnectionJournal.append("transport-state",
+                    redactedDiagnostic(state == null ? "" : state));
             dispatchAncsTransport(token, transportSession,
                     () -> handleAncsTransportState(token, state));
         }
 
         @Override public void onRetryRequired(String reason) {
+            PhoneConnectionJournal.append("transport-retry",
+                    redactedDiagnostic(reason == null ? "без причины" : reason));
             dispatchAncsTransport(token, transportSession,
                     () -> handleAncsTransportFailure(token,
                             reason == null || reason.trim().isEmpty()
@@ -1234,7 +1248,9 @@ public final class PhoneConnectorController {
 
         @Override public void onLog(String line) {
             if (line != null && !line.trim().isEmpty()) {
-                Log.d(TAG, "ANCS: " + redactedDiagnostic(line));
+                String safe = redactedDiagnostic(line);
+                Log.d(TAG, "ANCS: " + safe);
+                PhoneConnectionJournal.append("transport", safe);
             }
         }
 
@@ -1302,6 +1318,11 @@ public final class PhoneConnectorController {
             helperNetworkUpdatedAtElapsed = now;
         }
         if (powerChanged || networkChanged) {
+            PhoneConnectionJournal.append("helper-telemetry",
+                    "kind=" + telemetry.kind + ", battery=" + telemetry.batteryLevel
+                            + ", externalPower=" + telemetry.externalPower
+                            + ", chargeState=" + telemetry.chargeState
+                            + ", network=" + telemetry.networkType);
             markTelemetryUpdated(hasPower, hasNetwork);
         } else {
             // A one-second identical control read only refreshes liveness. Do not rewrite
@@ -2937,6 +2958,10 @@ public final class PhoneConnectorController {
             return;
         }
         connected = next;
+        PhoneConnectionJournal.append("connection", next
+                ? "iPhone подключён; acl=" + aclConnected + ", hfp=" + hfpConnected
+                + ", map=" + mapConnected + ", gatt=" + gattConnected
+                : "iPhone отключён; очищаю только live-состояние");
         synchronized (lifecycleLock) {
             if (isCurrentLocked(token)) updatePresenceLocked(next);
         }
@@ -3079,6 +3104,8 @@ public final class PhoneConnectorController {
         resetAncsSession(token, visibleStatus);
         updateConnected(token);
         long delay = PhoneConnectorPolicy.reconnectDelayMillis(reconnectAttempt++);
+        PhoneConnectionJournal.append("reconnect", "попытка #" + reconnectAttempt
+                + " через " + delay + " ms; " + redactedDiagnostic(detail));
         Handler handler = worker;
         if (handler == null) return;
         Runnable retry = () -> runIfCurrent(token, () -> {

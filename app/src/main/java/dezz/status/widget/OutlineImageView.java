@@ -61,6 +61,7 @@ public class OutlineImageView extends AppCompatImageView {
     private final Paint batteryPercentPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint batteryChargingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint batteryLevelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint batteryOutlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path batteryChargingPath = new Path();
     private final RectF batteryDrawableBounds = new RectF();
     private int imageLevel = 10_000;
@@ -145,7 +146,7 @@ public class OutlineImageView extends AppCompatImageView {
         }
     }
 
-    /** Draws the optional live number inside the solid iPhone-style battery body. */
+    /** Draws the optional live number inside the CarPlay-style outlined battery body. */
     public void setBatteryPercent(@Nullable Integer percent, int fillColor) {
         Integer bounded = percent == null ? null : Math.max(0, Math.min(100, percent));
         if (!java.util.Objects.equals(this.batteryPercent, bounded)
@@ -249,15 +250,7 @@ public class OutlineImageView extends AppCompatImageView {
         }
     }
 
-    /**
-     * Draws the one-piece iPhone battery body at the real helper-reported level.
-     *
-     * <p>The source vector remains a complete silhouette so Android can measure it and build the
-     * optional user-configured outer glow. Drawing that complete vector directly, however, made
-     * 1% and 100% look identical. Keep the terminal visible and clip only the rounded body to the
-     * drawable level; this preserves the requested frameless design while making its length an
-     * honest percentage indicator.</p>
-     */
+    /** Draws a persistent CarPlay outline and an honest, proportional inner level. */
     private void drawBatteryLevel(@NonNull Canvas canvas) {
         Drawable drawable = getDrawable();
         if (drawable == null) return;
@@ -268,33 +261,48 @@ public class OutlineImageView extends AppCompatImageView {
         displayed.offset(getPaddingLeft(), getPaddingTop());
         if (displayed.isEmpty()) return;
 
-        float bodyLeft = displayed.left + displayed.width() * (0.5f / 32f);
-        float bodyRight = displayed.left + displayed.width() * (28.5f / 32f);
-        float bodyTop = displayed.top + displayed.height() * (2.5f / 20f);
-        float bodyBottom = displayed.top + displayed.height() * (17.5f / 20f);
+        float bodyLeft = displayed.left + displayed.width() * (0.8f / 32f);
+        float bodyRight = displayed.left + displayed.width() * (28.2f / 32f);
+        float bodyTop = displayed.top + displayed.height() * (2.8f / 20f);
+        float bodyBottom = displayed.top + displayed.height() * (17.2f / 20f);
+        float bodyHeight = bodyBottom - bodyTop;
+        float stroke = Math.max(1f, displayed.height() * (1.15f / 20f));
+        float radius = bodyHeight * .24f;
+
+        // The case never disappears at 0% and never changes width with the level. This is the
+        // essential visual distinction between the CarPlay battery and the old clipped capsule.
+        batteryOutlinePaint.setStyle(Paint.Style.STROKE);
+        batteryOutlinePaint.setStrokeWidth(stroke);
+        batteryOutlinePaint.setColor(Color.WHITE);
+        canvas.drawRoundRect(bodyLeft + stroke / 2f, bodyTop + stroke / 2f,
+                bodyRight - stroke / 2f, bodyBottom - stroke / 2f,
+                radius, radius, batteryOutlinePaint);
+
+        float innerLeft = bodyLeft + stroke * 1.45f;
+        float innerRight = bodyRight - stroke * 1.45f;
+        float innerTop = bodyTop + stroke * 1.45f;
+        float innerBottom = bodyBottom - stroke * 1.45f;
         float fraction = imageLevel / 10_000f;
         batteryLevelPaint.setStyle(Paint.Style.FILL);
         batteryLevelPaint.setColor(batteryFillColor);
 
         if (fraction > 0f) {
-            int restore = canvas.save();
-            canvas.clipRect(bodyLeft, bodyTop,
-                    bodyLeft + (bodyRight - bodyLeft) * fraction, bodyBottom);
-            float radius = (bodyBottom - bodyTop) * 0.23f;
-            canvas.drawRoundRect(bodyLeft, bodyTop, bodyRight, bodyBottom,
-                    radius, radius, batteryLevelPaint);
-            canvas.restoreToCount(restore);
+            float fillRight = innerLeft + (innerRight - innerLeft) * fraction;
+            float fillRadius = Math.min((innerBottom - innerTop) * .22f,
+                    Math.max(0f, (fillRight - innerLeft) / 2f));
+            canvas.drawRoundRect(innerLeft, innerTop, fillRight, innerBottom,
+                    fillRadius, fillRadius, batteryLevelPaint);
         }
 
-        // The terminal communicates the battery orientation/capacity and must not disappear at
-        // low percentages as it would with a ClipDrawable around the complete resource.
-        float terminalLeft = displayed.left + displayed.width() * (30f / 32f);
-        float terminalRight = displayed.left + displayed.width() * (31.8f / 32f);
-        float terminalTop = displayed.top + displayed.height() * (7f / 20f);
-        float terminalBottom = displayed.top + displayed.height() * (13f / 20f);
+        float terminalLeft = displayed.left + displayed.width() * (29.45f / 32f);
+        float terminalRight = displayed.left + displayed.width() * (31.2f / 32f);
+        float terminalTop = displayed.top + displayed.height() * (7.1f / 20f);
+        float terminalBottom = displayed.top + displayed.height() * (12.9f / 20f);
         float terminalRadius = (terminalBottom - terminalTop) * 0.5f;
+        batteryOutlinePaint.setStyle(Paint.Style.FILL);
+        batteryOutlinePaint.setColor(Color.WHITE);
         canvas.drawRoundRect(terminalLeft, terminalTop, terminalRight, terminalBottom,
-                terminalRadius, terminalRadius, batteryLevelPaint);
+                terminalRadius, terminalRadius, batteryOutlinePaint);
     }
 
     private void drawBatteryPercent(@NonNull Canvas canvas) {
@@ -337,8 +345,16 @@ public class OutlineImageView extends AppCompatImageView {
         float centerY = (innerTop + innerBottom) / 2f
                 - (metrics.ascent + metrics.descent) / 2f;
 
+        // White remains readable in the empty part. Repaint the part over the coloured fill with
+        // its contrast colour, so a changing level can never make half the number disappear.
+        batteryPercentPaint.setColor(Color.WHITE);
+        canvas.drawText(text, centerX, centerY, batteryPercentPaint);
+        float fillRight = innerLeft + (innerRight - innerLeft) * imageLevel / 10_000f;
+        int restore = canvas.save();
+        canvas.clipRect(innerLeft, innerTop, fillRight, innerBottom);
         batteryPercentPaint.setColor(contrastColor(batteryFillColor));
         canvas.drawText(text, centerX, centerY, batteryPercentPaint);
+        canvas.restoreToCount(restore);
     }
 
     private void drawBatteryCharging(@NonNull Canvas canvas) {
@@ -373,8 +389,11 @@ public class OutlineImageView extends AppCompatImageView {
         batteryChargingPath.lineTo(left + width * 0.56f, top + height * 0.40f);
         batteryChargingPath.close();
         batteryChargingPaint.setStyle(Paint.Style.FILL);
-        batteryChargingPaint.setColor(contrastColor(batteryFillColor));
+        batteryChargingPaint.setColor(Color.WHITE);
+        batteryChargingPaint.setShadowLayer(Math.max(1f, displayed.height() * .035f),
+                0f, 0f, Color.argb(170, 0, 0, 0));
         canvas.drawPath(batteryChargingPath, batteryChargingPaint);
+        batteryChargingPaint.clearShadowLayer();
     }
 
     private static int contrastColor(int background) {

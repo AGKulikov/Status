@@ -40,6 +40,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import dezz.status.widget.driver.DriverControlSpacingPolicy;
+import dezz.status.widget.driver.DriverButtonHeightPolicy;
 import dezz.status.widget.driver.DriverInformationTileLayoutPolicy;
 import dezz.status.widget.driver.DriverPanelLayoutPolicy;
 import dezz.status.widget.driver.DriverPanelService;
@@ -389,6 +390,11 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
             }
         });
         body.addView(size, new LinearLayout.LayoutParams(match(), dp(42)));
+
+        if (shortcut.kind != LauncherShortcutStore.Kind.INFO
+                && shortcut.kind != LauncherShortcutStore.Kind.DIVIDER) {
+            driverButtonHeightSlider(body, shortcut);
+        }
 
         if (shortcut.kind == LauncherShortcutStore.Kind.INFO
                 && !shortcut.informationGroup.trim().isEmpty()) {
@@ -1312,6 +1318,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         int[] naturalHeights = new int[controls.size()];
         int[] requestedTop = new int[controls.size()];
         int[] requestedBottom = new int[controls.size()];
+        int[] configuredHeights = new int[controls.size()];
         for (int index = 0; index < controls.size(); index++) {
             LauncherShortcutStore.Shortcut value = controls.get(index);
             FrameLayout cell = previewShortcutCell(value, width);
@@ -1320,11 +1327,19 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                     View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.AT_MOST),
                     View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
             cells.add(cell);
-            naturalHeights[index] = Math.max(1, cell.getMeasuredHeight());
-            requestedTop[index] = value.gapBeforePx < 0 ? -1
+            int configuredHeight = value.kind == LauncherShortcutStore.Kind.DIVIDER
+                    ? 0 : value.buttonHeightPx;
+            configuredHeights[index] = configuredHeight;
+            naturalHeights[index] = DriverButtonHeightPolicy.resolvedHeight(
+                    Math.max(1, cell.getMeasuredHeight()), configuredHeight, .62f);
+            int top = value.gapBeforePx < 0 ? -1
                     : Math.round(value.gapBeforePx * .62f);
-            requestedBottom[index] = value.gapAfterPx < 0 ? -1
+            int bottom = value.gapAfterPx < 0 ? -1
                     : Math.round(value.gapAfterPx * .62f);
+            requestedTop[index] = DriverButtonHeightPolicy.spacingRequest(
+                    configuredHeight, top);
+            requestedBottom[index] = DriverButtonHeightPolicy.spacingRequest(
+                    configuredHeight, bottom);
             controlHost.addView(cell, new LinearLayout.LayoutParams(match(), wrap()));
         }
         if (!controls.isEmpty()) {
@@ -1339,8 +1354,21 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                                 naturalHeights, requestedTop, requestedBottom);
                 for (int index = 0; index < cells.size(); index++) {
                     FrameLayout cell = cells.get(index);
-                    cell.setPadding(cell.getPaddingLeft(), spacing.topPadding[index],
-                            cell.getPaddingRight(), spacing.bottomPadding[index]);
+                    LauncherShortcutStore.Shortcut value = controls.get(index);
+                    int height = naturalHeights[index];
+                    int top = DriverButtonHeightPolicy.internalPadding(
+                            configuredHeights[index], value.gapBeforePx,
+                            spacing.topPadding[index], .62f, height);
+                    int bottom = DriverButtonHeightPolicy.internalPadding(
+                            configuredHeights[index], value.gapAfterPx,
+                            spacing.bottomPadding[index], .62f, height);
+                    cell.setPadding(cell.getPaddingLeft(), top,
+                            cell.getPaddingRight(), bottom);
+                    if (DriverButtonHeightPolicy.isExplicit(configuredHeights[index])) {
+                        ViewGroup.LayoutParams params = cell.getLayoutParams();
+                        params.height = height;
+                        cell.setLayoutParams(params);
+                    }
                 }
             });
         }
@@ -1619,6 +1647,44 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         });
         block.addView(seek, new LinearLayout.LayoutParams(match(), dp(42)));
         host.addView(block, rowParams());
+    }
+
+    /** Exact physical control height; zero delegates the remaining-height calculation to rail. */
+    private void driverButtonHeightSlider(@NonNull LinearLayout host,
+                                          @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        TextView value = text(shortcut.buttonHeightPx <= 0
+                        ? "Высота кнопки: авто"
+                        : "Высота кнопки: " + shortcut.buttonHeightPx + " px",
+                13, 0xFFC7C7CC);
+        host.addView(value, topMargin(dp(6)));
+        SeekBar seek = new SeekBar(this);
+        int selectable = LauncherShortcutStore.MAX_DRIVER_BUTTON_HEIGHT_PX
+                - LauncherShortcutStore.MIN_DRIVER_BUTTON_HEIGHT_PX + 1;
+        seek.setMax(selectable);
+        seek.setProgress(shortcut.buttonHeightPx <= 0 ? 0
+                : shortcut.buttonHeightPx
+                - LauncherShortcutStore.MIN_DRIVER_BUTTON_HEIGHT_PX + 1);
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            int selected = shortcut.buttonHeightPx;
+
+            @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                                                    boolean fromUser) {
+                selected = progress == 0 ? 0
+                        : LauncherShortcutStore.MIN_DRIVER_BUTTON_HEIGHT_PX + progress - 1;
+                value.setText(selected <= 0 ? "Высота кнопки: авто"
+                        : "Высота кнопки: " + selected + " px");
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                shortcut.buttonHeightPx = selected;
+                store.upsert(shortcut);
+                refreshPreview();
+                applyPanel();
+            }
+        });
+        host.addView(seek, new LinearLayout.LayoutParams(match(), dp(42)));
     }
 
     /** Per-control internal padding. -1 keeps the legacy evenly distributed panel layout. */

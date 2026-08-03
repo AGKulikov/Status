@@ -102,6 +102,14 @@ public final class MediaPanelView extends FrameLayout {
     private long renderedArtworkFingerprint;
     private boolean renderedArtworkOwned;
     private boolean artworkRenderInitialized;
+    private boolean artworkTrackChanged;
+    @NonNull private String artworkTrackKey = "";
+    @NonNull private String artworkTrackApplication = "";
+    @NonNull private String artworkTrackTitle = "";
+    @NonNull private String artworkTrackArtist = "";
+    @NonNull private String artworkTrackAlbum = "";
+    @NonNull private String previousArtworkTrackAlbum = "";
+    private long rejectedArtworkFingerprint;
     private boolean playPauseRenderInitialized;
     private boolean renderedPlaying;
     private int renderedPlayPauseTint;
@@ -173,6 +181,17 @@ public final class MediaPanelView extends FrameLayout {
 
     /** Existing Android MediaSession state remains owned by LauncherMediaController. */
     public void setSnapshot(@NonNull LauncherMediaController.Snapshot state) {
+        boolean sameTrack = MediaArtworkBindingPolicy.sameTrack(
+                artworkTrackApplication, artworkTrackTitle, artworkTrackArtist,
+                artworkTrackAlbum, state.application, state.title, state.artist, state.album);
+        artworkTrackChanged = !artworkTrackKey.isEmpty() && !sameTrack;
+        previousArtworkTrackAlbum = artworkTrackAlbum;
+        artworkTrackApplication = state.application;
+        artworkTrackTitle = state.title;
+        artworkTrackArtist = state.artist;
+        artworkTrackAlbum = state.album;
+        artworkTrackKey = MediaArtworkBindingPolicy.rejectionKey(
+                state.application, state.title, state.artist, state.album);
         titleValue = state.title;
         artistValue = state.artist;
         albumValue = state.album;
@@ -221,6 +240,11 @@ public final class MediaPanelView extends FrameLayout {
         renderedArtworkFingerprint = 0L;
         renderedArtworkOwned = false;
         artworkRenderInitialized = false;
+        artworkTrackChanged = false;
+        // Keep a rejected previous-track fingerprint across a settings/layout rebuild. The
+        // MediaSession may keep publishing that same stale bitmap for minutes; rebuilding the
+        // panel must not admit it as the new track's cover on the next one-second snapshot.
+        // A genuinely different fingerprint clears the rejection in applyArtwork().
         playPauseRenderInitialized = false;
         renderedPlayPauseTint = 0;
         applySurface();
@@ -547,6 +571,24 @@ public final class MediaPanelView extends FrameLayout {
             observedArtworkBitmap = artworkBitmap;
             observedArtworkFingerprint = fingerprint;
         }
+        boolean staleAcrossBoundary = MediaArtworkBindingPolicy.staleAcrossTrackBoundary(
+                artworkTrackChanged, previousArtworkTrackAlbum, artworkTrackAlbum,
+                renderedArtworkFingerprint, fingerprint);
+        if (staleAcrossBoundary) {
+            rejectedArtworkFingerprint = fingerprint;
+        }
+        boolean previouslyRejected = fingerprint != 0L
+                && fingerprint == rejectedArtworkFingerprint;
+        if (staleAcrossBoundary || previouslyRejected) {
+            // New metadata arrived with the old track's pixels: keep that fingerprint hidden.
+            // The same rejected fingerprint stays blocked across one-second polls until genuinely
+            // new pixels arrive; a same-album shared cover is still valid.
+            artworkBitmap = null;
+            fingerprint = 0L;
+        } else if (fingerprint != 0L && fingerprint != rejectedArtworkFingerprint) {
+            rejectedArtworkFingerprint = 0L;
+        }
+        artworkTrackChanged = false;
         boolean same = artworkRenderInitialized
                 && sameArtwork(artworkBitmap, fingerprint,
                 renderedArtworkBitmap, renderedArtworkFingerprint);

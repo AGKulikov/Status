@@ -505,6 +505,9 @@ public class Preferences {
     /** Independent floating overlay windows. Empty means the legacy popup settings still need
      * to be projected into the default `popup` overlay by PopupOverlayConfigStore. */
     public final Str popupOverlaysJson = new Str(this, "popupOverlaysJson", "");
+    /** Dedicated CarPlay-style notification-card composition for the two phone overlays. */
+    public final Str phoneNotificationLayoutsJson = new Str(
+            this, "phoneNotificationLayoutsJson", "[]");
     /** Ordered connector-neutral local scenarios. Conditions and UI targets are independent. */
     public final Str localScenariosJson = new Str(this, "localScenariosJson", "[]");
     /** One-shot, exact Android Intent actions mapped to stored connector commands. */

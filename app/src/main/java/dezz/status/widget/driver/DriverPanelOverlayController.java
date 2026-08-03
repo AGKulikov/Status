@@ -999,9 +999,14 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 naturalHeight = Math.max(1, button.getMeasuredHeight());
             }
             controlViews.add(button);
-            naturalHeights[controlIndex] = naturalHeight;
-            requestedTop[controlIndex] = shortcut.gapBeforePx;
-            requestedBottom[controlIndex] = shortcut.gapAfterPx;
+            int configuredHeight = shortcut.kind == LauncherShortcutStore.Kind.DIVIDER
+                    ? 0 : shortcut.buttonHeightPx;
+            naturalHeights[controlIndex] = DriverButtonHeightPolicy.resolvedHeight(
+                    naturalHeight, configuredHeight, 1f);
+            requestedTop[controlIndex] = DriverButtonHeightPolicy.spacingRequest(
+                    configuredHeight, shortcut.gapBeforePx);
+            requestedBottom[controlIndex] = DriverButtonHeightPolicy.spacingRequest(
+                    configuredHeight, shortcut.gapAfterPx);
             controlIndex++;
         }
         DriverControlSpacingPolicy.Layout spacing = DriverControlSpacingPolicy.resolve(
@@ -1009,8 +1014,14 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         for (int index = 0; index < controls.size(); index++) {
             LauncherShortcutStore.Shortcut shortcut = controls.get(index);
             View button = controlViews.get(index);
-            int internalTop = spacing.topPadding[index];
-            int internalBottom = spacing.bottomPadding[index];
+            int configuredHeight = shortcut.kind == LauncherShortcutStore.Kind.DIVIDER
+                    ? 0 : shortcut.buttonHeightPx;
+            int internalTop = DriverButtonHeightPolicy.internalPadding(configuredHeight,
+                    shortcut.gapBeforePx, spacing.topPadding[index], 1f,
+                    naturalHeights[index]);
+            int internalBottom = DriverButtonHeightPolicy.internalPadding(configuredHeight,
+                    shortcut.gapAfterPx, spacing.bottomPadding[index], 1f,
+                    naturalHeights[index]);
             LinearLayout.LayoutParams itemParams;
             if (shortcut.kind == LauncherShortcutStore.Kind.DIVIDER) {
                 itemParams = new LinearLayout.LayoutParams(
@@ -1021,7 +1032,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                         button.getPaddingRight(), internalBottom);
                 itemParams = new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT);
+                        DriverButtonHeightPolicy.isExplicit(configuredHeight)
+                                ? naturalHeights[index] : ViewGroup.LayoutParams.WRAP_CONTENT);
             }
             // Only the narrow rail edge inset remains external. Vertical spacing belongs to the
             // button itself, so adjacent controls meet exactly when both values are zero.

@@ -1,0 +1,204 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+package dezz.status.widget.phone;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.util.Arrays;
+import java.util.List;
+
+/** Free, cell-based composition of one CarPlay-style iPhone notification card. */
+public final class PhoneNotificationLayoutConfig {
+    public static final int SCHEMA_VERSION = 2;
+    /** Fine horizontal grid: at the default 1000 px width one cell is about 21 px. */
+    public static final int GRID_COLUMNS = 48;
+    public static final int GRID_ROWS = 12;
+
+    public static final String AVATAR = "avatar";
+    public static final String BADGE = "badge";
+    public static final String TITLE = "title";
+    public static final String TIME = "time";
+    public static final String APPLICATION = "application";
+    public static final String MESSAGE = "message";
+    public static final String CHEVRON = "chevron";
+
+    public static final class Element {
+        @NonNull public final String id;
+        @NonNull public final String label;
+        public int column;
+        public int row;
+        public int columnSpan;
+        public int rowSpan;
+        public boolean visible;
+        public int textSizePx;
+        @NonNull public String color;
+        public boolean bold;
+
+        private Element(@NonNull String id, @NonNull String label) {
+            this.id = id;
+            this.label = label;
+        }
+
+        @NonNull JSONObject toJson() throws JSONException {
+            return new JSONObject().put("id", id).put("column", column).put("row", row)
+                    .put("columnSpan", columnSpan).put("rowSpan", rowSpan)
+                    .put("visible", visible).put("textSizePx", textSizePx)
+                    .put("color", color).put("bold", bold);
+        }
+
+        void read(@Nullable JSONObject source) {
+            if (source == null) return;
+            column = source.optInt("column", column);
+            row = source.optInt("row", row);
+            columnSpan = source.optInt("columnSpan", columnSpan);
+            rowSpan = source.optInt("rowSpan", rowSpan);
+            visible = source.optBoolean("visible", visible);
+            textSizePx = source.optInt("textSizePx", textSizePx);
+            color = safeColor(source.optString("color", color), color);
+            bold = source.optBoolean("bold", bold);
+            normalize();
+        }
+
+        void normalize() {
+            columnSpan = clamp(columnSpan, 1, GRID_COLUMNS);
+            rowSpan = clamp(rowSpan, 1, GRID_ROWS);
+            column = clamp(column, 0, GRID_COLUMNS - columnSpan);
+            row = clamp(row, 0, GRID_ROWS - rowSpan);
+            textSizePx = clamp(textSizePx, 8, 160);
+            color = safeColor(color, "#FFFFFFFF");
+        }
+    }
+
+    @NonNull public final String overlayId;
+    @NonNull public String backgroundColor = "#FF29292D";
+    public int backgroundAlpha = 244;
+    public int cornerRadiusPx = 38;
+    /** Contact avatar stays circular independently from the small application badge. */
+    public int avatarCornerRadiusPx = 120;
+    /** iPhone-like rounded-square application icon. */
+    public int iconCornerRadiusPx = 12;
+    @NonNull public String avatarColor = "#FF5AC466";
+    public final Element avatar = element(AVATAR, "Аватар", 1, 1, 5, 7,
+            true, 42, "#FFFFFFFF", true);
+    public final Element badge = element(BADGE, "Значок приложения", 5, 7, 2, 3,
+            true, 20, "#FFFFFFFF", false);
+    public final Element title = element(TITLE, "Отправитель", 8, 2, 14, 3,
+            true, 30, "#FFFFFFFF", true);
+    public final Element time = element(TIME, "Время", 23, 2, 7, 3,
+            true, 23, "#FFD1D1D6", false);
+    public final Element application = element(APPLICATION, "Приложение", 8, 5, 27, 3,
+            true, 25, "#FFFFFFFF", true);
+    public final Element message = element(MESSAGE, "Текст", 8, 8, 34, 3,
+            false, 22, "#FFD1D1D6", false);
+    public final Element chevron = element(CHEVRON, "Стрелка", 45, 3, 2, 6,
+            true, 46, "#FFFFFFFF", true);
+
+    private PhoneNotificationLayoutConfig(@NonNull String overlayId) {
+        this.overlayId = overlayId;
+    }
+
+    @NonNull
+    public static PhoneNotificationLayoutConfig carPlay(@NonNull String overlayId) {
+        PhoneNotificationLayoutConfig value = new PhoneNotificationLayoutConfig(overlayId);
+        if (!PhoneNotificationAutomation.isIconOverlayId(overlayId)) {
+            value.avatar.visible = false;
+            value.badge.visible = false;
+            value.title.column = 2;
+            value.title.columnSpan = 20;
+            value.application.column = 2;
+            value.application.columnSpan = 33;
+            value.message.column = 2;
+            value.message.columnSpan = 40;
+        }
+        value.normalize();
+        return value;
+    }
+
+    @NonNull
+    public static PhoneNotificationLayoutConfig fromJson(
+            @NonNull String overlayId, @Nullable JSONObject source) {
+        PhoneNotificationLayoutConfig value = carPlay(overlayId);
+        if (source == null || source.optInt("schemaVersion", SCHEMA_VERSION) != SCHEMA_VERSION) {
+            return value;
+        }
+        value.backgroundColor = safeColor(source.optString(
+                "backgroundColor", value.backgroundColor), value.backgroundColor);
+        value.backgroundAlpha = source.optInt("backgroundAlpha", value.backgroundAlpha);
+        value.cornerRadiusPx = source.optInt("cornerRadiusPx", value.cornerRadiusPx);
+        value.avatarCornerRadiusPx = source.optInt(
+                "avatarCornerRadiusPx", value.avatarCornerRadiusPx);
+        value.iconCornerRadiusPx = source.optInt(
+                "iconCornerRadiusPx", value.iconCornerRadiusPx);
+        value.avatarColor = safeColor(source.optString(
+                "avatarColor", value.avatarColor), value.avatarColor);
+        JSONObject elements = source.optJSONObject("elements");
+        for (Element element : value.elements()) {
+            element.read(elements == null ? null : elements.optJSONObject(element.id));
+        }
+        value.normalize();
+        return value;
+    }
+
+    @NonNull
+    public JSONObject toJson() throws JSONException {
+        normalize();
+        JSONObject elements = new JSONObject();
+        for (Element element : elements()) elements.put(element.id, element.toJson());
+        return new JSONObject().put("schemaVersion", SCHEMA_VERSION)
+                .put("overlayId", overlayId).put("backgroundColor", backgroundColor)
+                .put("backgroundAlpha", backgroundAlpha)
+                .put("cornerRadiusPx", cornerRadiusPx)
+                .put("avatarCornerRadiusPx", avatarCornerRadiusPx)
+                .put("iconCornerRadiusPx", iconCornerRadiusPx)
+                .put("avatarColor", avatarColor).put("elements", elements);
+    }
+
+    @NonNull
+    public List<Element> elements() {
+        return Arrays.asList(avatar, badge, title, time, application, message, chevron);
+    }
+
+    @Nullable
+    public Element element(@NonNull String id) {
+        for (Element element : elements()) if (element.id.equals(id)) return element;
+        return null;
+    }
+
+    public void normalize() {
+        backgroundColor = safeColor(backgroundColor, "#FF29292D");
+        avatarColor = safeColor(avatarColor, "#FF5AC466");
+        backgroundAlpha = clamp(backgroundAlpha, 0, 255);
+        cornerRadiusPx = clamp(cornerRadiusPx, 0, 240);
+        avatarCornerRadiusPx = clamp(avatarCornerRadiusPx, 0, 240);
+        iconCornerRadiusPx = clamp(iconCornerRadiusPx, 0, 240);
+        for (Element element : elements()) element.normalize();
+    }
+
+    @NonNull
+    private static Element element(String id, String label, int column, int row,
+                                   int columnSpan, int rowSpan, boolean visible,
+                                   int textSizePx, String color, boolean bold) {
+        Element value = new Element(id, label);
+        value.column = column;
+        value.row = row;
+        value.columnSpan = columnSpan;
+        value.rowSpan = rowSpan;
+        value.visible = visible;
+        value.textSizePx = textSizePx;
+        value.color = color;
+        value.bold = bold;
+        return value;
+    }
+
+    private static String safeColor(@Nullable String raw, @NonNull String fallback) {
+        String value = raw == null ? "" : raw.trim();
+        return value.matches("#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?") ? value : fallback;
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+}

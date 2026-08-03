@@ -30,6 +30,10 @@ final class ViewController: UIViewController {
     private let startButton = UIButton(type: .system)
     private let stopButton = UIButton(type: .system)
     private let resetButton = UIButton(type: .system)
+    private let clearLogButton = UIButton(type: .system)
+    private let shareLogButton = UIButton(type: .system)
+    private var logLines: [String] = []
+    private let maximumLogLines = 600
 
     private var peripheralManager: CBPeripheralManager!
     private var runRequested = true
@@ -45,6 +49,7 @@ final class ViewController: UIViewController {
     private var pendingTelemetryFrames: [Data] = []
     private var lastPublishedSnapshot: TelemetrySnapshot?
     private var lastTelemetryPublishAt = Date.distantPast
+    private var lastTelemetryBackpressureLogAt = Date.distantPast
     private var telemetrySequence: UInt16 = 0
     private var telemetryTimer: Timer?
     private var settledTelemetryRefresh: DispatchWorkItem?
@@ -115,10 +120,18 @@ final class ViewController: UIViewController {
                         action: #selector(stopTapped))
         configureButton(resetButton, title: "Перепубликовать GATT без сброса пары",
                         action: #selector(resetTapped))
+        configureButton(clearLogButton, title: "Очистить журнал",
+                        action: #selector(clearLogTapped), compact: true)
+        configureButton(shareLogButton, title: "Поделиться журналом",
+                        action: #selector(shareLogTapped), compact: true)
 
         let buttons = UIStackView(arrangedSubviews: [startButton, stopButton, resetButton])
         buttons.axis = .vertical
         buttons.spacing = 8
+        let logActions = UIStackView(arrangedSubviews: [clearLogButton, shareLogButton])
+        logActions.axis = .horizontal
+        logActions.spacing = 8
+        logActions.distribution = .fillEqually
 
         logView.backgroundColor = UIColor(white: 0.97, alpha: 1)
         logView.textColor = UIColor(white: 0.08, alpha: 1)
@@ -128,7 +141,7 @@ final class ViewController: UIViewController {
         logView.textContainerInset = UIEdgeInsets(top: 10, left: 8, bottom: 10, right: 8)
 
         let stack = UIStackView(arrangedSubviews: [
-            titleLabel, statusLabel, telemetryLabel, buttons, logView
+            titleLabel, statusLabel, telemetryLabel, buttons, logActions, logView
         ])
         stack.axis = .vertical
         stack.spacing = 12
@@ -144,14 +157,16 @@ final class ViewController: UIViewController {
             stack.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor,
                                           constant: -16)
         ])
+        loadJournal()
     }
 
-    private func configureButton(_ button: UIButton, title: String, action: Selector) {
+    private func configureButton(_ button: UIButton, title: String, action: Selector,
+                                 compact: Bool = false) {
         button.setTitle(title, for: .normal)
         button.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
         button.backgroundColor = UIColor(white: 0.93, alpha: 1)
         button.layer.cornerRadius = 8
-        button.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        button.heightAnchor.constraint(equalToConstant: compact ? 36 : 44).isActive = true
         button.addTarget(self, action: action, for: .touchUpInside)
     }
 
@@ -178,6 +193,25 @@ final class ViewController: UIViewController {
         peripheralManager.removeAllServices()
         clearPublishedService()
         publishServiceIfPossible()
+    }
+
+    @objc private func clearLogTapped() {
+        logLines.removeAll()
+        logView.text = ""
+        persistJournal()
+        append("Журнал подключения очищен")
+    }
+
+    @objc private func shareLogTapped() {
+        let text = logLines.joined(separator: "\n")
+        guard !text.isEmpty else { return }
+        let controller = UIActivityViewController(activityItems: [text],
+                                                  applicationActivities: nil)
+        if let popover = controller.popoverPresentationController {
+            popover.sourceView = shareLogButton
+            popover.sourceRect = shareLogButton.bounds
+        }
+        present(controller, animated: true)
     }
 
     private func updateButtons() {
@@ -355,6 +389,13 @@ final class ViewController: UIViewController {
         let frame = makeTelemetryFrame(for: snapshot, incrementSequence: true)
         lastPublishedSnapshot = snapshot
         lastTelemetryPublishAt = Date()
+        if changed || force {
+            let power = String(snapshot.powerFlags, radix: 16, uppercase: true)
+            append("B4 snapshot · \(reason) · battery=\(snapshot.batteryLevel)"
+                + " · powerFlags=0x\(power) · network=\(currentNetworkType())"
+                + " · seq=\(telemetrySequence) · service=\(servicePublished)"
+                + " · subscribers=\(telemetrySubscribers.count)")
+        }
         guard servicePublished, telemetryCharacteristic != nil,
               !telemetrySubscribers.isEmpty else { return }
         // A periodic heartbeat may be coalesced while the BLE transmit queue is blocked, but a
@@ -365,10 +406,6 @@ final class ViewController: UIViewController {
             pendingTelemetryFrames[pendingTelemetryFrames.count - 1] = frame
         }
         drainTelemetryNotification()
-        if changed || force {
-            append("B4 realtime · \(reason) · queue=\(pendingTelemetryFrames.count)"
-                + " · subscribers=\(telemetrySubscribers.count)")
-        }
     }
 
     private func drainTelemetryNotification() {
@@ -378,7 +415,15 @@ final class ViewController: UIViewController {
               !telemetrySubscribers.isEmpty else { return }
         while let frame = pendingTelemetryFrames.first {
             guard peripheralManager.updateValue(frame, for: characteristic,
-                                                onSubscribedCentrals: nil) else { return }
+                                                onSubscribedCentrals: nil) else {
+                let now = Date()
+                if now.timeIntervalSince(lastTelemetryBackpressureLogAt) >= 1 {
+                    lastTelemetryBackpressureLogAt = now
+                    append("B4 notify backpressure · queue=\(pendingTelemetryFrames.count)"
+                        + " · subscribers=\(telemetrySubscribers.count)")
+                }
+                return
+            }
             pendingTelemetryFrames.removeFirst()
         }
     }
@@ -543,13 +588,36 @@ final class ViewController: UIViewController {
 
     private func append(_ message: String) {
         let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss.SSS"
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
         let line = "\(formatter.string(from: Date()))  \(message)"
-        if logView.text.isEmpty { logView.text = line }
-        else { logView.text.append("\n\(line)") }
+        logLines.append(line)
+        if logLines.count > maximumLogLines {
+            logLines.removeFirst(logLines.count - maximumLogLines)
+        }
+        logView.text = logLines.joined(separator: "\n")
+        persistJournal()
         guard !logView.text.isEmpty else { return }
         let end = NSRange(location: max(0, logView.text.utf16.count - 1), length: 1)
         logView.scrollRangeToVisible(end)
+    }
+
+    private var journalURL: URL? {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("KX11-phone-connection.log")
+    }
+
+    private func loadJournal() {
+        guard let url = journalURL,
+              let text = try? String(contentsOf: url, encoding: .utf8) else { return }
+        logLines = text.split(separator: "\n", omittingEmptySubsequences: true)
+            .suffix(maximumLogLines).map(String.init)
+        logView.text = logLines.joined(separator: "\n")
+    }
+
+    private func persistJournal() {
+        guard let url = journalURL else { return }
+        try? logLines.joined(separator: "\n").write(
+            to: url, atomically: true, encoding: .utf8)
     }
 }
 

@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Complete iPhone-style silhouette used for measurement and optional outline generation.
-     OutlineImageView clips the rounded body to the live drawable level while keeping the terminal
-     visible, so this stays one frameless colour layer instead of an outline + inner-fill pair. -->
+<!-- Complete silhouette used only for measurement and optional user glow generation.
+     OutlineImageView draws the visible CarPlay case, proportional fill and charging bolt. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="32dp"
     android:height="20dp"

@@ -17,12 +17,12 @@ import dezz.status.widget.phone.PhoneNotificationAutomation;
 public final class Ha1151PhoneNotificationOverlayEditorContractTest {
     @Test public void bothNotificationLayoutsOpenTheLivePreviewEditor() throws Exception {
         String settings = source("PhoneNotificationAutomationSettingsActivity.java");
-        String popup = source("PopupSettingsActivity.java");
-        assertTrue(settings.contains("editPhoneNotificationIntent"));
-        assertTrue(popup.contains("EXTRA_PHONE_NOTIFICATION_PREVIEW_ID"));
-        assertTrue(popup.contains("previewSession.onResume()"));
-        assertTrue(popup.contains("previewSession.onPause()"));
-        assertTrue(popup.contains("Перетаскивайте плитки по сетке"));
+        String editor = source("PhoneNotificationLayoutEditorActivity.java");
+        assertTrue(settings.contains("PhoneNotificationLayoutEditorActivity.intent"));
+        assertTrue(editor.contains("previewSession.onResume()"));
+        assertTrue(editor.contains("previewSession.onPause()"));
+        assertTrue(editor.contains("Уведомление в стиле CarPlay"));
+        assertTrue(editor.contains("PanelContentEditOverlay"));
     }
 
     @Test public void previewIsEphemeralAndHandsOffBetweenNestedEditors() throws Exception {
@@ -41,16 +41,15 @@ public final class Ha1151PhoneNotificationOverlayEditorContractTest {
 
     @Test public void realOverlayUsesSampleFieldsAndLauncherStyleGridEditing() throws Exception {
         String controller = source("popup/PopupOverlayController.java");
-        assertTrue(controller.contains("PhoneNotificationAutomation.editorPreviewText"));
-        assertTrue(controller.contains("PanelContentEditOverlay"));
-        assertTrue(controller.contains("applyEditorPlacementsToViews"));
-        assertTrue(controller.contains("safeGridGap"));
-        assertTrue(controller.contains("persistEditorPlacements"));
-        assertTrue(controller.contains("Переместить окно"));
-        assertTrue(controller.contains("dragEditorWindow"));
-        assertTrue(controller.contains("swaps them instead of refusing"));
+        String editor = source("PhoneNotificationLayoutEditorActivity.java");
+        String card = source("phone/PhoneNotificationCardView.java");
+        assertTrue(controller.contains("renderPhoneNotificationCard()"));
+        assertTrue(controller.contains("phoneNotificationCard.setPresentation"));
+        assertTrue(editor.contains("class LayoutModel implements PanelContentEditOverlay.Model"));
+        assertTrue(editor.contains("overlaps are valid CarPlay compositions"));
+        assertTrue(card.contains("single-piece CarPlay notification card"));
         String render = between(controller, "private void renderItems()",
-                "/**\n     * Adds launcher-style edit chrome");
+                "/**\n     * Phone notifications are one semantic card");
         assertTrue(render.contains("retireOlderRootsAfterFirstDraw(root)"));
         assertTrue(render.contains("root = null;"));
         assertTrue(render.contains("ensureView();"));
@@ -58,26 +57,27 @@ public final class Ha1151PhoneNotificationOverlayEditorContractTest {
         assertTrue(controller.contains("windowManager.removeViewImmediate(current)"));
         assertTrue(controller.contains("addOnPreDrawListener"));
         assertTrue(controller.contains("root.setLayoutDirection(View.LAYOUT_DIRECTION_LTR)"));
-        assertTrue(controller.contains("onGestureStateChanged(boolean active)"));
+        assertTrue(controller.contains("EMPTY_GENERATION_GRACE_MS"));
     }
 
     @Test public void appIconRoundingUsesTheImageClipAndAnIosDefault() throws Exception {
         String automation = source("phone/PhoneNotificationAutomation.java");
-        String controller = source("popup/PopupOverlayController.java");
-        String editor = source("VisualBrickEditorActivity.java");
+        String card = source("phone/PhoneNotificationCardView.java");
+        String editor = source("PhoneNotificationLayoutEditorActivity.java");
         assertEquals(16, PhoneNotificationAutomation.defaultAppIconCornerRadius(72));
         assertEquals(22, PhoneNotificationAutomation.defaultAppIconCornerRadius(100));
         assertTrue(automation.contains("IOS_APP_ICON_CORNER_RATIO = 0.2237f"));
-        assertTrue(controller.contains("iconBox.setClipToOutline(item.iconCornerRadius > 0)"));
-        assertTrue(editor.contains("Скругление краёв иконки"));
-        assertTrue(editor.contains("previewIconBox.setClipToOutline"));
+        assertTrue(card.contains("badge.setClipToOutline(value.iconCornerRadiusPx > 0)"));
+        assertTrue(editor.contains("Скругление иконки приложения"));
+        assertTrue(editor.contains("Скругление аватара"));
+        assertTrue(editor.contains("Жирное начертание"));
     }
 
     @Test public void releaseIdentityRemainsMonotonicAfterTheEditorRelease() throws Exception {
         String build = new String(Files.readAllBytes(projectFile("build.gradle")),
                 StandardCharsets.UTF_8);
-        assertTrue(build.contains("return 'v2.8.2-ha1160'"));
-        assertEquals(208021160, 208020000 + 1160);
+        assertTrue(build.contains("return 'v2.8.2-ha1161'"));
+        assertEquals(208021161, 208020000 + 1161);
     }
 
     private static String source(String relative) throws Exception {
