@@ -216,6 +216,7 @@ public final class PhoneConnectorController {
     private boolean ancsReady;
     private boolean smsAvailable;
     private boolean hfpBatteryKnown;
+    private boolean hfpBatteryPercentScale;
     private boolean basBatteryKnown;
     private boolean genericBatteryKnown;
     @Nullable private Integer hfpBatteryLevel;
@@ -488,6 +489,7 @@ public final class PhoneConnectorController {
         ancsReady = false;
         smsAvailable = false;
         hfpBatteryKnown = false;
+        hfpBatteryPercentScale = false;
         basBatteryKnown = false;
         genericBatteryKnown = false;
         hfpBatteryLevel = null;
@@ -750,12 +752,35 @@ public final class PhoneConnectorController {
         selectedAddress = safeAddress(selected);
         selectedName = safeName(selected);
         restoreRetainedTelemetry(selectedAddress);
+        readInitialDeviceBattery(selected);
         startOemPowerObservation(token, selectedAddress);
         updateConnected(token);
         queryInitialProfileState(token, adapter, BluetoothProfile.A2DP);
         queryInitialProfileState(token, adapter, PROFILE_HEADSET_CLIENT);
         queryInitialProfileState(token, adapter, PROFILE_MAP_CLIENT);
         beginStockConnectionRequest(token, selectedAddress);
+    }
+
+    /**
+     * Reads Android's cached remote-device percentage before the first change broadcast arrives.
+     * The API exists as a privileged SystemApi on Android 9, so reflection is intentionally
+     * best-effort: KX11 firmware that blocks it still receives the event broadcast and BAS read.
+     */
+    private void readInitialDeviceBattery(@NonNull BluetoothDevice device) {
+        try {
+            Method method = BluetoothDevice.class.getMethod("getBatteryLevel");
+            method.setAccessible(true);
+            Object value = method.invoke(device);
+            if (!(value instanceof Number)) return;
+            int level = ((Number) value).intValue();
+            if (level < 0 || level > 100) return;
+            genericBatteryKnown = true;
+            genericBatteryLevel = level;
+            genericBatteryUpdatedAt = SystemClock.elapsedRealtime();
+            refreshBatteryValues();
+        } catch (Throwable ignored) {
+            // Direct BAS and ACTION_DEVICE_BATTERY_LEVEL_CHANGED remain the platform event paths.
+        }
     }
 
     /**
@@ -797,6 +822,7 @@ public final class PhoneConnectorController {
         Integer normalized = PhoneConnectorPolicy.normalizeHfpBattery(rawPower);
         if (normalized == null) return;
         hfpBatteryKnown = true;
+        hfpBatteryPercentScale = rawPower > 5;
         hfpBatteryLevel = normalized;
         hfpBatteryUpdatedAt = SystemClock.elapsedRealtime();
         refreshBatteryValues();
@@ -2405,8 +2431,8 @@ public final class PhoneConnectorController {
             basBatteryUpdatedAt = SystemClock.elapsedRealtime();
             percentageUpdated = true;
         }
-        // BAS/HFP remain optional percentage fallbacks only. Their charging bits are deliberately
-        // ignored: the encrypted iPhone Helper frame is the sole power-state authority.
+        // BAS is a primary direct 0..100 percentage source. Its charging bits are deliberately
+        // ignored: the encrypted iPhone Helper frame remains the sole power-state authority.
         if (!percentageUpdated) return;
         refreshBatteryValues();
         markTelemetryUpdated(true, false);
@@ -2422,6 +2448,7 @@ public final class PhoneConnectorController {
             Integer normalized = PhoneConnectorPolicy.normalizeHfpBattery(rawBattery);
             if (normalized != null) {
                 hfpBatteryKnown = true;
+                hfpBatteryPercentScale = rawBattery > 5;
                 hfpBatteryLevel = normalized;
                 hfpBatteryUpdatedAt = SystemClock.elapsedRealtime();
                 batteryUpdated = true;
@@ -2601,8 +2628,9 @@ public final class PhoneConnectorController {
         if (selectedAddress.isEmpty()) return;
         PhoneTelemetryStore.Record previous = retainedTelemetry;
         long now = System.currentTimeMillis();
-        // Every power field is Helper-only live session data. BAS/HFP/OEM readings remain useful
-        // in diagnostics, but are never persisted or substituted into the visible iPhone tile.
+        // Power-state fields are Helper-only. Percentage may be direct Android/BAS data, but it
+        // is intentionally not persisted: after reconnect the current cached value/read/event
+        // must win instead of showing an old exact-looking number from disk.
         Integer savedBatteryLevel = null;
         String savedBatteryLevelSource = "";
         Boolean savedCharging = null;
@@ -2652,14 +2680,21 @@ public final class PhoneConnectorController {
     }
 
     private void refreshBatteryValues() {
-        if (helperPowerUpdatedAtElapsed > 0L && helperBatteryLevel != null) {
-            batteryLevel = helperBatteryLevel;
-            batteryLevelSource = "iphone_helper";
-        } else {
+        PhoneBatteryLevelPolicy.Reading reading = PhoneBatteryLevelPolicy.resolve(
+                basBatteryKnown, basBatteryLevel, basBatteryUpdatedAt,
+                genericBatteryKnown, genericBatteryLevel, genericBatteryUpdatedAt,
+                helperPowerUpdatedAtElapsed > 0L ? helperBatteryLevel : null,
+                hfpBatteryKnown, hfpBatteryLevel, hfpBatteryPercentScale);
+        if (reading == null) {
             batteryLevel = null;
             batteryLevelSource = "";
+        } else {
+            batteryLevel = reading.level;
+            batteryLevelSource = reading.source;
         }
-        // Charging and percentage share the exact same authenticated Helper heartbeat.
+        // Cable/charging state remains Helper-only. The percentage is deliberately independent:
+        // Android/BAS direct 0..100 readings must never be overwritten by iOS's coarse public
+        // UIDevice value from the same Helper heartbeat.
         if (helperPowerUpdatedAtElapsed > 0L) {
             batteryExternalPower = helperExternalPower;
             batteryChargeState = helperChargeState;
@@ -2695,6 +2730,7 @@ public final class PhoneConnectorController {
 
     private void clearHfpData() {
         hfpBatteryKnown = false;
+        hfpBatteryPercentScale = false;
         hfpBatteryLevel = null;
         hfpBatteryUpdatedAt = 0L;
         networkAvailable = null;
@@ -3459,10 +3495,9 @@ public final class PhoneConnectorController {
         PhoneTelemetryStore.Record retained = retainedTelemetry;
         boolean retainedNetworkAvailable = retainedNetworkFresh(now);
 
-        Integer effectiveBatteryLevel = helperPowerUpdatedAtElapsed > 0L
-                ? batteryLevel : null;
+        Integer effectiveBatteryLevel = batteryLevel;
         String effectiveBatteryLevelSource = effectiveBatteryLevel == null
-                ? "" : "iphone_helper";
+                ? "" : batteryLevelSource;
         // Never restore power state: only a fresh authenticated helper heartbeat is authoritative.
         Boolean effectiveCharging = batteryCharging;
         Boolean effectiveChargingEstimated = batteryChargingEstimated;

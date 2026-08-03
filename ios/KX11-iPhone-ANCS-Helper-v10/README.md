@@ -9,7 +9,9 @@ event-driven with a one-second recovery sampler:
 - there is no reverse scan/connect to `Geely_ANCS`, so two Core Bluetooth roles cannot race;
 - Core Bluetooth peripheral state restoration and `bluetooth-peripheral` background mode remain
   enabled.
-- every public `UIDevice.batteryLevel` change is sent as its own B4 notification;
+- every public `UIDevice.batteryLevel` change is sent as its own B4 notification, but on recent
+  iOS versions this value can be quantized; Status Widget therefore uses Android's direct remote
+  battery broadcast / BLE Battery Service as the primary displayed percentage;
 - cable/charging changes come directly from `UIDevice.batteryState` and are sent immediately;
 - radio changes and active-data-SIM changes come directly from CoreTelephony;
 - a one-second B4 read on KX11 is the deterministic fallback if iOS coalesces an app callback.
@@ -23,7 +25,8 @@ before an ANCS authorization operation. It returns one fixed eight-byte snapshot
 A5 01 LL FF NN SS SS CC
 ```
 
-- `LL`: exact `UIDevice.batteryLevel` percentage (`FF` means unavailable);
+- `LL`: public `UIDevice.batteryLevel` fallback (`FF` means unavailable; it may be quantized by
+  iOS and is not allowed to overwrite a direct Android/BAS percentage);
 - `FF`: validity, external-power, charging and full flags from `UIDevice.batteryState`;
 - `NN`: current public CoreTelephony radio generation (`5G`, `LTE`, `4G`, `3G`, `E`, `G`,
   `1X`, `SOS`, `SAT` or unavailable);
@@ -61,5 +64,6 @@ app switcher: iOS does not relaunch a user-force-quit Bluetooth app until it is 
 4. After ANCS subscribes, Helper shows `KX11 ПОДКЛЮЧЁН · ЕДИНЫЙ GATT`.
 5. Walk out of BLE range and return without toggling Bluetooth. Status Widget keeps the same
    Android `autoConnect` owner and reattaches instead of replacing it after a timeout.
-6. Change the battery by one percent, attach/detach power, and move between LTE/3G/EDGE. The
-   matching B4 notification/read must appear no later than the next one-second control read.
+6. Change the battery by one percent: Status Widget must update from `android_broadcast` or
+   `ble_bas`, even when B4 remains on the previous five-percent step. Attach/detach power and move
+   between LTE/3G/EDGE; those Helper fields must update no later than the next one-second read.

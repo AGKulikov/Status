@@ -23,16 +23,17 @@ public final class Ha1153Kx11RegressionContractTest {
         assertTrue(transport.contains("listener.onHelperTelemetry(telemetry)"));
     }
 
-    @Test public void visibleBatteryAndChargeStateAreFreshHelperValuesOnly()
+    @Test public void directPercentageWinsWhileChargeStateRemainsHelperOnly()
             throws Exception {
         String controller = source("phone/PhoneConnectorController.java");
         String refresh = between(controller, "private void refreshBatteryValues()",
                 "private void clearBasData()");
-        assertTrue(refresh.contains("helperPowerUpdatedAtElapsed > 0L"));
-        assertTrue(refresh.contains("batteryLevelSource = \"iphone_helper\""));
-        assertFalse(refresh.contains("batteryLevelSource = \"ble_bas\""));
-        assertFalse(refresh.contains("batteryLevelSource = \"hfp_ecarx\""));
-        assertFalse(refresh.contains("batteryLevelSource = \"android_broadcast\""));
+        assertTrue(refresh.contains("PhoneBatteryLevelPolicy.resolve("));
+        assertTrue(refresh.contains("genericBatteryKnown, genericBatteryLevel"));
+        assertTrue(refresh.contains("basBatteryKnown, basBatteryLevel"));
+        assertTrue(refresh.contains("helperPowerUpdatedAtElapsed > 0L ? helperBatteryLevel"));
+        assertTrue(refresh.contains("batteryChargingSource = \"iphone_helper\""));
+        assertTrue(controller.contains("Integer effectiveBatteryLevel = batteryLevel;"));
         assertTrue(controller.contains("Integer savedBatteryLevel = null"));
     }
 

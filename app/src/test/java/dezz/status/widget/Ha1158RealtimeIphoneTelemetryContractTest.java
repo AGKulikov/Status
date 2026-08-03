@@ -11,7 +11,7 @@ import java.nio.file.Paths;
 
 import org.junit.Test;
 
-/** Release barriers for one-percent, power-edge and radio-edge Helper telemetry. */
+/** Release barriers for power/radio Helper telemetry and its coarse battery fallback. */
 public final class Ha1158RealtimeIphoneTelemetryContractTest {
     @Test public void helperObservesEveryPublicIosSourceAndKeepsChangedFrames() throws Exception {
         String helper = project("ios/KX11-iPhone-ANCS-Helper-v10/"
@@ -52,7 +52,7 @@ public final class Ha1158RealtimeIphoneTelemetryContractTest {
 
     @Test public void releaseIdentityMovesForward() throws Exception {
         String build = project("build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1158'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1159'"));
     }
 
     private static String source(String relative) throws Exception {
