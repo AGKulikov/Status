@@ -127,7 +127,8 @@ public final class PhoneConnectorControllerContractTest {
                 "@Override\n        public void onServicesDiscovered");
 
         assertTrue(source.contains("created.connectSavedIphone(address)"));
-        assertTrue(source.contains("final String address = current.ancsDeviceAddress"));
+        assertTrue(source.contains("final String address = PhoneBleRole.isIphoneCentral(current.bleRole)"));
+        assertTrue(source.contains("? current.ancsDeviceAddress : current.deviceAddress"));
         assertTrue(source.contains("mainHandler.post(() -> startAncsTransportOnMain("));
         assertTrue(savedPeer.contains("adapter.getRemoteDevice(address.trim())"));
         assertFalse(savedPeer.contains("startGeelyAncsAdvertising()"));

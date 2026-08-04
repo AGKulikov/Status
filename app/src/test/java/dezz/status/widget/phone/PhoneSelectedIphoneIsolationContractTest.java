@@ -82,7 +82,8 @@ public final class PhoneSelectedIphoneIsolationContractTest {
         String savedPeer = method(transport, "public boolean connectSavedIphone",
                 "public boolean acceptIphoneCentral");
 
-        assertTrue(source.contains("final String address = current.ancsDeviceAddress"));
+        assertTrue(source.contains("final String address = PhoneBleRole.isIphoneCentral(current.bleRole)"));
+        assertTrue(source.contains("? current.ancsDeviceAddress : current.deviceAddress"));
         assertTrue(source.contains("created.connectSavedIphone(address)"));
         assertTrue(source.contains("new AncsTransportListener(token, transportSession)"));
         assertTrue(savedPeer.contains("adapter.getRemoteDevice(address.trim())"));
