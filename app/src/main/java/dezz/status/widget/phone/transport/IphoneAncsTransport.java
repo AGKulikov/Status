@@ -157,6 +157,8 @@ public final class IphoneAncsTransport {
         void onBatteryCharacteristic(UUID characteristicUuid, byte[] value);
         /** Authenticated Helper telemetry received on the encrypted application channel. */
         default void onHelperTelemetry(IphoneHelperTelemetry telemetry) {}
+        /** Stable BLE identity proved by PAIR plus an encrypted SECURE ATT operation. */
+        default void onVerifiedPeerAddress(String address) {}
     }
 
     public static final class Candidate {
@@ -391,6 +393,8 @@ public final class IphoneAncsTransport {
     private boolean closing;
     private boolean retrySignalled;
     private boolean managedReconnectEnabled;
+    /** True only for the opt-in route where iPhone initiates a link to Geely_ANCS. */
+    private boolean managedIncomingMode;
     private boolean ancsRetryAfterBond;
     private boolean ancsAuthorizationFailureSeen;
     private boolean leBondAttemptObserved;
@@ -586,6 +590,7 @@ public final class IphoneAncsTransport {
     public boolean connectSavedIphone(String address) {
         closing = false;
         retrySignalled = false;
+        managedIncomingMode = false;
         if (!ensureAdapter()) return false;
         if (address == null || address.trim().isEmpty()) return false;
         final BluetoothDevice device;
@@ -645,6 +650,54 @@ public final class IphoneAncsTransport {
         log("Saved iPhone peer не BOND_BONDED; background RPA resolution недоступен, "
                 + "перехожу к Helper scan");
         return startSavedPeerScan(device);
+    }
+
+    /**
+     * Opt-in reverse route: KX11 is the link-layer peripheral/GATT server and iPhone Helper is
+     * the central that initiates the connection with the ANCS-required Core Bluetooth option.
+     * Android subsequently registers its ANCS GATT client against the exact incoming peer; this
+     * is a second GATT role on the same physical BLE link, not a second radio connection.
+     */
+    public boolean acceptIphoneCentral(String address) {
+        return acceptIphoneCentral(address, address);
+    }
+
+    public boolean acceptIphoneCentral(String address, String classicAddress) {
+        closing = false;
+        retrySignalled = false;
+        if (!ensureAdapter()) return false;
+        if (address == null || address.trim().isEmpty()) return false;
+        final BluetoothDevice selected;
+        try {
+            selected = adapter.getRemoteDevice(address.trim());
+        } catch (IllegalArgumentException invalidAddress) {
+            log("Saved peer address invalid: `" + address + "`");
+            return false;
+        }
+
+        stopScan();
+        stopAdvertising();
+        disconnect();
+        resetVerifiedPeerSession();
+        managedReconnectEnabled = true;
+        managedIncomingMode = true;
+        managedReconnectAttempt = 0;
+        managedSavedPeer = selected;
+        boolean dedicatedIdentity = classicAddress != null
+                && !address.trim().equalsIgnoreCase(classicAddress.trim());
+        managedResolvedPeer = dedicatedIdentity ? selected : null;
+        if (managedResolvedPeer != null) {
+            claimVerifiedPeer(managedResolvedPeer);
+            log("Reverse route восстановил ранее подтверждённую BLE identity "
+                    + safeAddress(managedResolvedPeer));
+        }
+        iphonePeripheralMode = false;
+        helperBootstrapMode = false;
+        iphoneConnectStarted = false;
+        state(LOCAL_LOGICAL_NAME + " · IPHONE CENTRAL MODE");
+        log("Выбран обратный маршрут: KX11 peripheral/GATT server, "
+                + "iPhone Helper central; Classic Bluetooth не изменяется");
+        return startGeelyAncsAdvertising();
     }
 
     private boolean scheduleColdBackgroundAttach(@NonNull BluetoothDevice device,
@@ -768,6 +821,17 @@ public final class IphoneAncsTransport {
             return;
         }
         if (closing || !managedReconnectEnabled || managedSavedPeer == null) return;
+        if (managedIncomingMode) {
+            if (!confirmedLeLoss) {
+                log("Неоднозначный/Classic ACL loss не управляет reverse BLE link · "
+                        + reason);
+                return;
+            }
+            scheduleManagedIncomingRestart(reason.trim().isEmpty()
+                    ? "incoming iPhone link lost" : reason);
+            state(REMOTE_LOGICAL_NAME + " · RECOVERING · WAITING FOR IPHONE CENTRAL");
+            return;
+        }
         BluetoothGatt pendingOwner = gatt;
         if (pendingOwner != null && activeClientAutoConnect && clientConnectInFlight
                 && !activeClientEstablished
@@ -1300,6 +1364,7 @@ public final class IphoneAncsTransport {
     public void close() {
         closing = true;
         managedReconnectEnabled = false;
+        managedIncomingMode = false;
         managedSavedPeer = null;
         managedResolvedPeer = null;
         if (managedReconnectTask != null) main.removeCallbacks(managedReconnectTask);
@@ -1462,6 +1527,10 @@ public final class IphoneAncsTransport {
         }
         boolean first = !secureAttConfirmed;
         secureAttConfirmed = true;
+        if (managedIncomingMode) {
+            managedResolvedPeer = device;
+            listener.onVerifiedPeerAddress(safeAddress(device));
+        }
         state("SECURE ATT OK · SAME-PEER ATTACH");
         log("SECURE ATT OK · " + operation + " · peer=" + safeAddress(device)
                 + (first ? " · encrypted characteristic confirmed" : " · повтор"));
@@ -3293,6 +3362,11 @@ public final class IphoneAncsTransport {
         if (closing || !managedReconnectEnabled || managedSavedPeer == null
                 || managedReconnectTask != null || coldBackgroundAttachTask != null) return;
 
+        if (managedIncomingMode) {
+            scheduleManagedIncomingRestart(reason);
+            return;
+        }
+
         BluetoothGatt establishedOwner = gatt;
         if (establishedOwner != null && activeClientEstablished
                 && sessionState.isCurrent(activeClientGeneration)) {
@@ -3360,6 +3434,58 @@ public final class IphoneAncsTransport {
                 + " #" + (attempt + 1) + " через " + delay + " ms · " + reason);
     }
 
+    /** Re-publishes Geely_ANCS after a failed/lost incoming route without touching Classic. */
+    private void scheduleManagedIncomingRestart(@NonNull String reason) {
+        if (closing || !managedReconnectEnabled || !managedIncomingMode
+                || managedSavedPeer == null || managedReconnectTask != null) return;
+
+        cancelAmbiguousAclProbe();
+        stopScan();
+        cancelClientAttemptCallbacks();
+        clearAncsRuntime();
+        gattClientConnected = false;
+        clientConnectInFlight = false;
+        activeClientTarget = null;
+        BluetoothGatt previous = gatt;
+        gatt = null;
+        if (previous != null) {
+            try {
+                previous.disconnect();
+            } catch (RuntimeException ignored) {
+            }
+            try {
+                previous.close();
+            } catch (RuntimeException ignored) {
+            }
+        }
+        BluetoothDevice resolvedPeer = managedResolvedPeer;
+        stopAdvertising();
+        resetVerifiedPeerSession();
+        managedIncomingMode = true;
+        if (resolvedPeer != null) claimVerifiedPeer(resolvedPeer);
+        iphonePeripheralMode = false;
+        helperBootstrapMode = false;
+
+        int attempt = managedReconnectAttempt++;
+        long delay = AncsReconnectPolicy.retryDelayMillis(attempt);
+        BluetoothDevice expected = managedSavedPeer;
+        long waitGeneration = sessionState.begin(AncsSessionStateMachine.Phase.RETRY_WAIT);
+        managedReconnectTask = () -> {
+            managedReconnectTask = null;
+            if (closing || !managedReconnectEnabled || !managedIncomingMode
+                    || expected != managedSavedPeer
+                    || !sessionState.isCurrent(waitGeneration)) return;
+            iphonePeripheralMode = false;
+            helperBootstrapMode = false;
+            if (!startGeelyAncsAdvertising()) {
+                scheduleManagedIncomingRestart("Geely_ANCS advertising could not restart");
+            }
+        };
+        main.postDelayed(managedReconnectTask, delay);
+        log("Одна serialized Geely_ANCS recovery #" + (attempt + 1)
+                + " через " + delay + " ms · " + reason);
+    }
+
     private static boolean requiresControllerRetry(@Nullable String value) {
         if (value == null) return false;
         return value.contains("CONNECT RETURNED NULL")
@@ -3391,6 +3517,12 @@ public final class IphoneAncsTransport {
                 || value.contains("LE BOND FAILED")
                 || value.contains("ATTEMPTS EXHAUSTED")
                 || value.contains("PAIRING FAILED")
+                || value.contains("ADVERTISE_FAILED_")
+                || value.contains("ADVERTISE_EXCEPTION")
+                || value.contains("GATT_SERVER_UNAVAILABLE")
+                || value.contains("GATT_SERVICE_ADD_FAILED_")
+                || value.contains("GATT_SERVICE_ADD_START_FAILED")
+                || value.contains("GATT_CHARACTERISTIC_ADD_FAILED")
                 || value.contains("AUTH FAILED ПОСЛЕ BOND");
     }
 
@@ -3947,9 +4079,16 @@ public final class IphoneAncsTransport {
                     cancelConnectTimeout();
                     clientConnectInFlight = false;
                     gattClientConnected = false;
-                    state("GATT CONNECTION FAILED · status=" + status);
                     closeClientGatt(callbackGatt);
                     clearAncsRuntime();
+                    if (managedIncomingMode) {
+                        scheduleManagedIncomingRestart(
+                                "same-peer GATT status=" + status);
+                        state(REMOTE_LOGICAL_NAME
+                                + " · RECOVERING · WAITING FOR IPHONE CENTRAL");
+                        return;
+                    }
+                    state("GATT CONNECTION FAILED · status=" + status);
                     if (failedBackgroundAttach) {
                         scheduleDirectFallback("background attach status=" + status);
                     } else if (attachWasInFlight) {
@@ -3959,6 +4098,7 @@ public final class IphoneAncsTransport {
                     cancelConnectTimeout();
                     clientConnectInFlight = false;
                     gattClientConnected = true;
+                    activeClientEstablished = true;
                     state("SAME-PEER GATT CONNECTED");
                     log("GATT client зарегистрирован на exact verified peer; "
                             + "discoverServices сразу, без requestMtu");
@@ -3970,9 +4110,15 @@ public final class IphoneAncsTransport {
                     cancelConnectTimeout();
                     clientConnectInFlight = false;
                     gattClientConnected = false;
-                    state("GATT DISCONNECTED · status=" + status);
                     closeClientGatt(callbackGatt);
                     clearAncsRuntime();
+                    if (managedIncomingMode) {
+                        scheduleManagedIncomingRestart("same-peer GATT disconnected");
+                        state(REMOTE_LOGICAL_NAME
+                                + " · RECOVERING · WAITING FOR IPHONE CENTRAL");
+                        return;
+                    }
+                    state("GATT DISCONNECTED · status=" + status);
                     if (failedBackgroundAttach) {
                         scheduleDirectFallback("background attach disconnected");
                     } else if (attachWasInFlight) {

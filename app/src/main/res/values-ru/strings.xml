@@ -273,6 +273,9 @@
     <string name="phone_section_connection">Подключение</string>
     <string name="phone_enable_title">Подключение iPhone</string>
     <string name="phone_enable_subtitle">Отслеживается только выбранное сопряжённое устройство, а не любой телефон рядом</string>
+    <string name="phone_ble_role_title">Роль iPhone в BLE: Peripheral / Central</string>
+    <string name="phone_ble_role_peripheral">Peripheral — текущая схема; KX11 подключается к iPhone_ANCS</string>
+    <string name="phone_ble_role_central">Central — Helper подключается к Geely_ANCS</string>
     <string name="phone_device_title">Выбранный iPhone</string>
     <string name="phone_choose_device">Выбрать сопряжённый iPhone</string>
     <string name="phone_open_bluetooth">Настройки Bluetooth</string>
@@ -358,6 +361,7 @@
     <string name="phone_diag_disabled">выключен</string>
     <string name="phone_diag_not_supported">недоступен</string>
     <string name="phone_diag_device">Конкретный сопряжённый iPhone</string>
+    <string name="phone_diag_ble_role">Роль BLE</string>
     <string name="phone_diag_ancs_transport">Отдельный транспорт BLE/ANCS</string>
     <string name="phone_diag_ancs_transport_names">%1$s ↔ %2$s; имя и сопряжение Classic Bluetooth не меняются</string>
     <string name="phone_diag_ancs_dedicated_route">Отдельный BLE-сервис приложения и восстановление ANCS с разрешением личности iPhone</string>

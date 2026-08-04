@@ -55,6 +55,7 @@ import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.phone.PhoneAppCatalog;
 import dezz.status.widget.phone.PhoneAppIconStore;
+import dezz.status.widget.phone.PhoneBleRole;
 import dezz.status.widget.phone.PhoneConnectionJournal;
 import dezz.status.widget.phone.PhoneLowBatteryAlertPolicy;
 import dezz.status.widget.phone.PhoneNotificationFilter;
@@ -84,6 +85,8 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
 
     private Preferences preferences;
     private MaterialSwitch connectorEnabled;
+    private MaterialSwitch iphoneCentralRole;
+    private TextView iphoneBleRoleSubtitle;
     private MaterialSwitch notificationsEnabled;
     private MaterialSwitch messagesEnabled;
     private MaterialSwitch includeNotificationText;
@@ -204,6 +207,15 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         connectorEnabled.setChecked(preferences.phoneConnectorEnabled.get());
         addSwitchRow(connectionRows, connectorEnabled,
                 R.string.phone_enable_title, R.string.phone_enable_subtitle, false);
+
+        iphoneCentralRole = new MaterialSwitch(this);
+        iphoneCentralRole.setChecked(PhoneBleRole.isIphoneCentral(
+                preferences.phoneBleRole.get()));
+        addPhoneBleRoleRow(connectionRows);
+        iphoneCentralRole.setOnCheckedChangeListener((button, checked) -> {
+            refreshPhoneBleRoleSummary();
+            refreshDiagnostics();
+        });
 
         LinearLayout deviceRow = clickableRow(this::chooseBondedDevice);
         LinearLayout deviceLabels = column();
@@ -396,6 +408,35 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         row.addView(toggle, wrapWrap());
         row.setOnClickListener(view -> toggle.setChecked(!toggle.isChecked()));
         parent.addView(row, matchWrap());
+    }
+
+    /** A two-state switch whose label names the iPhone role, not the Android GATT role. */
+    private void addPhoneBleRoleRow(@NonNull LinearLayout parent) {
+        parent.addView(separator(), separatorParams());
+        LinearLayout roleRow = row();
+        roleRow.setGravity(Gravity.CENTER_VERTICAL);
+        roleRow.setPadding(dp(16), dp(11), dp(12), dp(11));
+        roleRow.setMinimumHeight(dp(76));
+        LinearLayout labels = column();
+        labels.addView(text(getString(R.string.phone_ble_role_title),
+                17, Typeface.NORMAL), matchWrap());
+        iphoneBleRoleSubtitle = secondary("", 13);
+        labels.addView(iphoneBleRoleSubtitle, topMargin(2));
+        roleRow.addView(labels, weighted());
+        iphoneCentralRole.setContentDescription(
+                getString(R.string.phone_ble_role_title));
+        roleRow.addView(iphoneCentralRole, wrapWrap());
+        roleRow.setOnClickListener(view ->
+                iphoneCentralRole.setChecked(!iphoneCentralRole.isChecked()));
+        parent.addView(roleRow, matchWrap());
+        refreshPhoneBleRoleSummary();
+    }
+
+    private void refreshPhoneBleRoleSummary() {
+        if (iphoneBleRoleSubtitle == null) return;
+        iphoneBleRoleSubtitle.setText(getString(checked(iphoneCentralRole, false)
+                ? R.string.phone_ble_role_central
+                : R.string.phone_ble_role_peripheral));
     }
 
     @NonNull
@@ -1018,6 +1059,13 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                         : selectedDeviceAddress.isEmpty()
                         ? getString(R.string.phone_no_device)
                         : getString(R.string.phone_diag_not_bonded)));
+        boolean iphoneCentral = checked(iphoneCentralRole,
+                PhoneBleRole.isIphoneCentral(preferences.phoneBleRole.get()));
+        result.append('\n').append(line(true,
+                getString(R.string.phone_diag_ble_role),
+                getString(iphoneCentral
+                        ? R.string.phone_ble_role_central
+                        : R.string.phone_ble_role_peripheral)));
         result.append('\n').append(line(ancsRequested,
                 getString(R.string.phone_diag_ancs_transport),
                 getString(R.string.phone_diag_ancs_transport_names,
@@ -1568,11 +1616,19 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 || preferences.phoneLowBatteryAlertThreshold.get()
                         != savedLowBatteryThreshold;
 
+        String previouslySelectedDevice = clean(preferences.phoneDeviceAddress.get());
+        String rememberedAncsAddress = clean(preferences.phoneAncsDeviceAddress.get());
         preferences.phoneConnectorEnabled.set(connectorRequested);
         preferences.phoneDeviceAddress.set(selectedDeviceAddress);
         // Classic and ANCS start with the same physical iPhone, but the BLE transport owns a
         // separate identity key and never mutates the stock Classic pairing/name.
-        preferences.phoneAncsDeviceAddress.set(selectedDeviceAddress);
+        if (rememberedAncsAddress.isEmpty()
+                || !selectedDeviceAddress.equalsIgnoreCase(previouslySelectedDevice)) {
+            preferences.phoneAncsDeviceAddress.set(selectedDeviceAddress);
+        }
+        preferences.phoneBleRole.set(checked(iphoneCentralRole,
+                PhoneBleRole.isIphoneCentral(preferences.phoneBleRole.get()))
+                ? PhoneBleRole.IPHONE_CENTRAL : PhoneBleRole.IPHONE_PERIPHERAL);
         preferences.phoneNotificationsEnabled.set(notificationsRequested);
         preferences.phoneMessagesEnabled.set(messagesRequested);
         preferences.phoneIncludeNotificationText.set(includeTextRequested);

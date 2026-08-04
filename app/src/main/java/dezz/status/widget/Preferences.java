@@ -743,6 +743,12 @@ public class Preferences {
      */
     public final Str phoneAncsDeviceAddress = new Str(this,
             "phoneAncsDeviceAddress", "");
+    /**
+     * BLE role of the iPhone. Zero preserves the HA1161 route (iPhone peripheral/KX11 central);
+     * one enables the opt-in reverse route (iPhone central/KX11 peripheral). Classic profiles
+     * never read this preference.
+     */
+    public final Int phoneBleRole = new Int(this, "phoneBleRole", 0);
     public final Bool phoneNotificationsEnabled = new Bool(this,
             "phoneNotificationsEnabled", true);
     public final Bool phoneMessagesEnabled = new Bool(this,

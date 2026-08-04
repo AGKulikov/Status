@@ -349,6 +349,7 @@ public final class PhoneConnectorController {
         Config next = Config.from(prefs);
         PhoneConnectionJournal.append("controller", "применение настроек: enabled="
                 + next.enabled + ", BLE/ANCS=" + next.transportNeeded()
+                + ", role=" + PhoneBleRole.diagnosticName(next.bleRole)
                 + ", iPhone=" + (next.deviceAddress.isEmpty()
                 ? "не выбран" : maskedAddress(next.deviceAddress)));
         synchronized (lifecycleLock) {
@@ -1135,8 +1136,10 @@ public final class PhoneConnectorController {
 
         final long transportSession = activeAncsTransportSession;
         final String address = current.ancsDeviceAddress;
+        final String classicAddress = current.deviceAddress;
+        final int bleRole = current.bleRole;
         mainHandler.post(() -> startAncsTransportOnMain(
-                token, transportSession, address));
+                token, transportSession, address, classicAddress, bleRole));
     }
 
     /**
@@ -1177,7 +1180,8 @@ public final class PhoneConnectorController {
      * unchanged.
      */
     private void startAncsTransportOnMain(long token, long transportSession,
-                                          @NonNull String address) {
+                                          @NonNull String address,
+                                          @NonNull String classicAddress, int bleRole) {
         if (!isCurrent(token)
                 || transportSession != activeAncsTransportSession) return;
 
@@ -1209,10 +1213,13 @@ public final class PhoneConnectorController {
 
         try {
             created.publishCapabilities();
-            if (!created.connectSavedIphone(address)) {
+            boolean started = PhoneBleRole.isIphoneCentral(bleRole)
+                    ? created.acceptIphoneCentral(address, classicAddress)
+                    : created.connectSavedIphone(address);
+            if (!started) {
                 dispatchAncsTransport(token, transportSession, () ->
                         handleAncsTransportFailure(token,
-                                "connectSavedIphone rejected " + maskedAddress(address)));
+                                "BLE role start rejected " + maskedAddress(address)));
             }
         } catch (Throwable error) {
             dispatchAncsTransport(token, transportSession, () ->
@@ -1280,6 +1287,23 @@ public final class PhoneConnectorController {
             dispatchAncsTransport(token, transportSession,
                     () -> applyHelperTelemetry(token, telemetry));
         }
+
+        @Override public void onVerifiedPeerAddress(String address) {
+            dispatchAncsTransport(token, transportSession,
+                    () -> rememberVerifiedAncsAddress(address));
+        }
+    }
+
+    /** Keeps the reverse route's bonded LE identity separate from the stock Classic address. */
+    private void rememberVerifiedAncsAddress(@Nullable String address) {
+        String normalized = address == null ? "" : address.trim();
+        if (config == null || !PhoneBleRole.isIphoneCentral(config.bleRole)
+                || !BluetoothAdapter.checkBluetoothAddress(normalized)) return;
+        String previous = prefs.phoneAncsDeviceAddress.get();
+        if (normalized.equalsIgnoreCase(previous == null ? "" : previous.trim())) return;
+        prefs.phoneAncsDeviceAddress.set(normalized);
+        PhoneConnectionJournal.append("transport-identity",
+                "сохранена подтверждённая BLE identity " + maskedAddress(normalized));
     }
 
     private void dispatchAncsTransport(long token, long transportSession,
@@ -1411,7 +1435,10 @@ public final class PhoneConnectorController {
             updateConnected(token);
             return;
         }
-        if (state.contains("IPHONE BLE CONNECTED")) {
+        if (state.contains("IPHONE BLE CONNECTED")
+                || state.contains("INCOMING LINK")
+                || state.contains("SAME-PEER GATT CONNECTED")
+                || state.contains("SAME-PEER ATTACH")) {
             gattConnected = true;
             ancsReady = false;
             ancsStatus = "negotiating";
@@ -3664,6 +3691,9 @@ public final class PhoneConnectorController {
         device.put("classic_name", selectedName);
         device.put("ancs_local_name", IphoneAncsTransport.LOCAL_LOGICAL_NAME);
         device.put("ancs_remote_name", IphoneAncsTransport.REMOTE_LOGICAL_NAME);
+        device.put("ancs_ble_role", config == null
+                ? PhoneBleRole.diagnosticName(PhoneBleRole.IPHONE_PERIPHERAL)
+                : PhoneBleRole.diagnosticName(config.bleRole));
         device.put("stock_connection", stockConnectionStatus);
         device.put("ancs_setup", config != null && config.transportNeeded()
                 ? "dedicated_ble_v1" : "disabled");
@@ -4164,6 +4194,7 @@ public final class PhoneConnectorController {
         final boolean enabled;
         @NonNull final String deviceAddress;
         @NonNull final String ancsDeviceAddress;
+        final int bleRole;
         final boolean notificationsEnabled;
         final boolean messagesEnabled;
         final boolean includeNotificationText;
@@ -4172,7 +4203,7 @@ public final class PhoneConnectorController {
         @NonNull final Set<String> notificationAppFilterKeys;
 
         Config(boolean enabled, @NonNull String deviceAddress,
-               @NonNull String ancsDeviceAddress, boolean notificationsEnabled,
+               @NonNull String ancsDeviceAddress, int bleRole, boolean notificationsEnabled,
                boolean messagesEnabled, boolean includeNotificationText,
                @NonNull Set<Integer> notificationCategoryIds,
                int notificationAppFilterMode,
@@ -4180,6 +4211,7 @@ public final class PhoneConnectorController {
             this.enabled = enabled;
             this.deviceAddress = deviceAddress;
             this.ancsDeviceAddress = ancsDeviceAddress;
+            this.bleRole = PhoneBleRole.normalize(bleRole);
             this.notificationsEnabled = notificationsEnabled;
             this.messagesEnabled = messagesEnabled;
             this.includeNotificationText = includeNotificationText;
@@ -4195,7 +4227,7 @@ public final class PhoneConnectorController {
             String ancsAddress = bounded(prefs.phoneAncsDeviceAddress.get(), 64);
             if (ancsAddress.trim().isEmpty()) ancsAddress = classicAddress;
             return new Config(prefs.phoneConnectorEnabled.get(),
-                    classicAddress, ancsAddress,
+                    classicAddress, ancsAddress, prefs.phoneBleRole.get(),
                     prefs.phoneNotificationsEnabled.get(),
                     prefs.phoneMessagesEnabled.get(),
                     prefs.phoneIncludeNotificationText.get(),
@@ -4209,7 +4241,7 @@ public final class PhoneConnectorController {
         @NonNull
         String signature() {
             return enabled + "|" + deviceAddress + "|" + ancsDeviceAddress
-                    + "|" + notificationsEnabled + "|"
+                    + "|" + bleRole + "|" + notificationsEnabled + "|"
                     + messagesEnabled + "|" + includeNotificationText + "|"
                     + PhoneNotificationFilter.serializeCategoryIds(
                     notificationCategoryIds) + "|" + notificationAppFilterMode + "|"
