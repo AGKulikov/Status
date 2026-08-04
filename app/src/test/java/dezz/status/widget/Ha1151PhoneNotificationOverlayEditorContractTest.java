@@ -68,7 +68,8 @@ public final class Ha1151PhoneNotificationOverlayEditorContractTest {
         assertEquals(22, PhoneNotificationAutomation.defaultAppIconCornerRadius(100));
         assertTrue(automation.contains("IOS_APP_ICON_CORNER_RATIO = 0.2237f"));
         assertTrue(card.contains("badge.setCornerRadiusPx(value.iconCornerRadiusPx)"));
-        assertTrue(card.contains("PorterDuff.Mode.DST_IN"));
+        assertTrue(card.contains("new BitmapShader"));
+        assertTrue(card.contains("canvas.drawRoundRect(maskBounds, radius, radius"));
         assertTrue(editor.contains("Скругление иконки приложения"));
         assertTrue(editor.contains("Скругление аватара"));
         assertTrue(editor.contains("Жирное начертание"));

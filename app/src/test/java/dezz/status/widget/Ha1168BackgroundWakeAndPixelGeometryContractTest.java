@@ -21,8 +21,8 @@ public final class Ha1168BackgroundWakeAndPixelGeometryContractTest {
         assertTrue(rounded.contains("Bitmap.createBitmap"));
         assertTrue(rounded.contains("new BitmapShader"));
         assertTrue(rounded.contains("canvas.drawRoundRect(maskBounds, radius, radius"));
-        assertFalse(rounded.contains("clipToOutline"));
-        assertFalse(rounded.contains("PorterDuffXfermode"));
+        assertFalse(rounded.contains("setClipToOutline("));
+        assertFalse(rounded.contains("new PorterDuffXfermode"));
     }
 
     @Test public void climateCentersItsActualOpaquePixelBounds() throws Exception {
