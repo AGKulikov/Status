@@ -116,7 +116,7 @@ public final class PhoneConnectorControllerContractTest {
         String source = controller();
         String transport = transport();
         String savedPeer = between(transport, "public boolean connectSavedIphone",
-                "public void stopScan");
+                "public boolean acceptIphoneCentral");
         String clientConnect = between(transport, "private void connectIphonePeripheral",
                 "public void connect(Candidate candidate)");
         String disconnect = between(transport,

@@ -17,4 +17,6 @@ Release verification
 - Role changes stop the previous Core Bluetooth route before starting the next one.
 - B4 telemetry is READ/NOTIFY in Peripheral mode and encrypted WRITE in Central mode.
 - Background modes contain bluetooth-central and bluetooth-peripheral.
+- The modern disconnect callback remains visible to the iOS 13 deployment target, as required by
+  current Xcode SDK protocol-conformance checks.
 - Classic Bluetooth profiles and names are untouched.

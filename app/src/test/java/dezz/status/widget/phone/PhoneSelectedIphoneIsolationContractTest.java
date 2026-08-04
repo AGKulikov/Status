@@ -80,7 +80,7 @@ public final class PhoneSelectedIphoneIsolationContractTest {
         String batteryOnly = method(source, "private void ensureLegacyBatteryGatt",
                 "private void startAncsTransportOnMain");
         String savedPeer = method(transport, "public boolean connectSavedIphone",
-                "public void stopScan");
+                "public boolean acceptIphoneCentral");
 
         assertTrue(source.contains("final String address = current.ancsDeviceAddress"));
         assertTrue(source.contains("created.connectSavedIphone(address)"));
