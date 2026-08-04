@@ -3,6 +3,9 @@ package dezz.status.widget.driver;
 
 /** Keeps explicit driver-button heights identical in the live rail and scaled preview. */
 public final class DriverButtonHeightPolicy {
+    /** Fixed-height side whose spacing is still untouched/automatic. */
+    static final int FIXED_AUTO_SPACING_REQUEST = -2;
+
     private DriverButtonHeightPolicy() {
     }
 
@@ -16,9 +19,18 @@ public final class DriverButtonHeightPolicy {
                 : Math.max(1, measuredHeightPx);
     }
 
-    /** A fixed button must not absorb free rail height through an untouched auto side. */
+    /**
+     * A fixed button must not absorb free rail height through an untouched auto side. Keep that
+     * side distinct from an explicit zero, however, so it does not suppress the neighbouring
+     * automatic side and pull the neighbour's content away from centre.
+     */
     public static int spacingRequest(int configuredHeightPx, int requestedPaddingPx) {
-        return isExplicit(configuredHeightPx) ? 0 : requestedPaddingPx;
+        if (!isExplicit(configuredHeightPx)) return requestedPaddingPx;
+        return requestedPaddingPx < 0 ? FIXED_AUTO_SPACING_REQUEST : 0;
+    }
+
+    static boolean isFixedAutoSpacingRequest(int value) {
+        return value == FIXED_AUTO_SPACING_REQUEST;
     }
 
     /** Explicit top/bottom values stay inside a fixed-height button instead of enlarging it. */

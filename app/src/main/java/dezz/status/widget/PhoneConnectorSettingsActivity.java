@@ -20,11 +20,11 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.text.InputType;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -105,7 +105,8 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     private TextView selectedSprutPathValue;
     private TextView diagnostics;
     private TextView connectionJournal;
-    private ScrollView connectionJournalScroll;
+    private NestedScrollView connectionJournalScroll;
+    private float connectionJournalLastTouchY;
     private final Handler diagnosticsHandler = new Handler(Looper.getMainLooper());
     private boolean diagnosticsPolling;
     private final Runnable diagnosticsPoll = new Runnable() {
@@ -365,8 +366,10 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         connectionJournal.setTextIsSelectable(true);
         connectionJournal.setPadding(dp(14), dp(12), dp(14), dp(12));
         LinearLayout journalContent = column();
-        connectionJournalScroll = new ScrollView(this);
+        connectionJournalScroll = new NestedScrollView(this);
         connectionJournalScroll.setFillViewport(true);
+        connectionJournalScroll.setNestedScrollingEnabled(true);
+        installConnectionJournalTouchRouting();
         connectionJournalScroll.addView(connectionJournal, matchWrap());
         journalContent.addView(connectionJournalScroll,
                 new LinearLayout.LayoutParams(
@@ -1156,13 +1159,64 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 + connectionJournalScroll.getHeight()
                 >= connectionJournalScroll.getChildAt(0).getHeight() - dp(24);
         String text = PhoneConnectionJournal.tailText(240);
-        connectionJournal.setText(text.isEmpty()
+        String rendered = text.isEmpty()
                 ? "Журнал пока пуст — события появятся при следующем подключении."
-                : text);
+                : text;
+        if (rendered.contentEquals(connectionJournal.getText())) return;
+        connectionJournal.setText(rendered);
         if (followLatest && connectionJournalScroll != null) {
-            connectionJournalScroll.post(() ->
-                    connectionJournalScroll.fullScroll(View.FOCUS_DOWN));
+            // fullScroll(FOCUS_DOWN) requests focus for a descendant. On the ECARX Android 9
+            // build that focus request also makes the outer settings NestedScrollView reveal the
+            // journal every 500 ms. Move only this viewport instead; the page keeps its position.
+            connectionJournalScroll.post(this::scrollConnectionJournalToBottomWithoutFocus);
         }
+    }
+
+    /**
+     * Lets the fixed-height journal consume vertical drags while it can move, then hands a drag
+     * back to the outer settings page at either edge. ECARX Android 9 does not reliably negotiate
+     * the gesture when a plain ScrollView is nested inside the page, so keep this explicit edge
+     * routing in addition to NestedScrollView's standard nested-scrolling contract.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private void installConnectionJournalTouchRouting() {
+        if (connectionJournalScroll == null) return;
+        connectionJournalScroll.setOnTouchListener((view, event) -> {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    connectionJournalLastTouchY = event.getY();
+                    view.getParent().requestDisallowInterceptTouchEvent(true);
+                    break;
+                case MotionEvent.ACTION_MOVE:
+                    float delta = connectionJournalLastTouchY - event.getY();
+                    connectionJournalLastTouchY = event.getY();
+                    if (Math.abs(delta) >= 1f) {
+                        int direction = delta > 0f ? 1 : -1;
+                        view.getParent().requestDisallowInterceptTouchEvent(
+                                view.canScrollVertically(direction));
+                    }
+                    break;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    view.getParent().requestDisallowInterceptTouchEvent(false);
+                    break;
+                default:
+                    break;
+            }
+            return false;
+        });
+    }
+
+    /** Scrolls the journal content without assigning focus to it or moving the outer page. */
+    private void scrollConnectionJournalToBottomWithoutFocus() {
+        if (connectionJournalScroll == null
+                || connectionJournalScroll.getChildCount() == 0) return;
+        View content = connectionJournalScroll.getChildAt(0);
+        int viewport = connectionJournalScroll.getHeight()
+                - connectionJournalScroll.getPaddingTop()
+                - connectionJournalScroll.getPaddingBottom();
+        int bottom = Math.max(0, content.getHeight() - Math.max(0, viewport));
+        connectionJournalScroll.scrollTo(connectionJournalScroll.getScrollX(), bottom);
     }
 
     private void clearConnectionJournal() {

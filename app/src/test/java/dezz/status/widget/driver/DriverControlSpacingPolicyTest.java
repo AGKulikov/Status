@@ -29,6 +29,26 @@ public final class DriverControlSpacingPolicyTest {
         assertArrayEquals(new int[]{0, 0}, layout.bottomPadding);
     }
 
+    @Test public void fixedBackHeightDoesNotUncentreUntouchedHomeButton() {
+        int fixedAuto = DriverButtonHeightPolicy.spacingRequest(30, -1);
+        DriverControlSpacingPolicy.Layout layout = DriverControlSpacingPolicy.resolve(
+                300,
+                new int[]{50, 50, 30},
+                new int[]{-1, -1, fixedAuto},
+                new int[]{-1, -1, fixedAuto});
+
+        assertEquals(layout.topPadding[1], layout.bottomPadding[1]);
+        assertEquals(0, layout.topPadding[2]);
+        assertEquals(0, layout.bottomPadding[2]);
+        int occupied = 0;
+        int[] natural = {50, 50, 30};
+        for (int index = 0; index < natural.length; index++) {
+            occupied += natural[index]
+                    + layout.topPadding[index] + layout.bottomPadding[index];
+        }
+        assertEquals(300, occupied);
+    }
+
     @Test public void untouchedControlsStillFillTheAvailableRailEvenly() {
         DriverControlSpacingPolicy.Layout layout = DriverControlSpacingPolicy.resolve(
                 300,

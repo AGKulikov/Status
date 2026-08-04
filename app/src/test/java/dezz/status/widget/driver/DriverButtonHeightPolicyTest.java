@@ -11,7 +11,8 @@ public final class DriverButtonHeightPolicyTest {
     @Test public void explicitHeightIsExactAndDoesNotConsumeAutomaticSpacing() {
         assertTrue(DriverButtonHeightPolicy.isExplicit(33));
         assertEquals(33, DriverButtonHeightPolicy.resolvedHeight(120, 33, 1f));
-        assertEquals(0, DriverButtonHeightPolicy.spacingRequest(33, -1));
+        assertTrue(DriverButtonHeightPolicy.isFixedAutoSpacingRequest(
+                DriverButtonHeightPolicy.spacingRequest(33, -1)));
         assertEquals(0, DriverButtonHeightPolicy.spacingRequest(33, 24));
     }
 

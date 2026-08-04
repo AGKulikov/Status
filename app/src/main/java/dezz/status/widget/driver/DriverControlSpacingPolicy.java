@@ -40,13 +40,13 @@ public final class DriverControlSpacingPolicy {
         int[] top = new int[count];
         int[] bottom = new int[count];
         for (int index = 0; index < count; index++) {
-            top[index] = requestedTop[index] < 0 ? AUTO : requestedTop[index];
-            bottom[index] = requestedBottom[index] < 0 ? AUTO : requestedBottom[index];
+            top[index] = normalizedRequest(requestedTop[index]);
+            bottom[index] = normalizedRequest(requestedBottom[index]);
         }
 
         for (int index = 1; index < count; index++) {
-            if (top[index] != AUTO && bottom[index - 1] == AUTO) bottom[index - 1] = 0;
-            if (bottom[index - 1] != AUTO && top[index] == AUTO) top[index] = 0;
+            if (top[index] >= 0 && bottom[index - 1] == AUTO) bottom[index - 1] = 0;
+            if (bottom[index - 1] >= 0 && top[index] == AUTO) top[index] = 0;
         }
 
         long fixed = 0L;
@@ -54,9 +54,13 @@ public final class DriverControlSpacingPolicy {
         for (int index = 0; index < count; index++) {
             fixed += Math.max(0, naturalHeights[index]);
             if (top[index] == AUTO) autoSides++;
-            else fixed += top[index];
+            else if (!DriverButtonHeightPolicy.isFixedAutoSpacingRequest(top[index])) {
+                fixed += top[index];
+            }
             if (bottom[index] == AUTO) autoSides++;
-            else fixed += bottom[index];
+            else if (!DriverButtonHeightPolicy.isFixedAutoSpacingRequest(bottom[index])) {
+                fixed += bottom[index];
+            }
         }
         int remaining = (int) Math.max(0L, Math.min(Integer.MAX_VALUE,
                 (long) Math.max(0, availableHeight) - fixed));
@@ -77,7 +81,18 @@ public final class DriverControlSpacingPolicy {
                     remainder--;
                 }
             }
+            if (DriverButtonHeightPolicy.isFixedAutoSpacingRequest(top[index])) {
+                top[index] = 0;
+            }
+            if (DriverButtonHeightPolicy.isFixedAutoSpacingRequest(bottom[index])) {
+                bottom[index] = 0;
+            }
         }
         return new Layout(top, bottom);
+    }
+
+    private static int normalizedRequest(int requested) {
+        if (DriverButtonHeightPolicy.isFixedAutoSpacingRequest(requested)) return requested;
+        return requested < 0 ? AUTO : requested;
     }
 }
