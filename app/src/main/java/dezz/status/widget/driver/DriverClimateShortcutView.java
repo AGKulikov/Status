@@ -62,7 +62,12 @@ public final class DriverClimateShortcutView extends View {
     private final Paint shapePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint artworkPaint = new Paint(Paint.ANTI_ALIAS_FLAG
             | Paint.FILTER_BITMAP_FLAG);
+    private final Paint compositePaint = new Paint(Paint.ANTI_ALIAS_FLAG
+            | Paint.FILTER_BITMAP_FLAG);
     private final RectF shape = new RectF();
+    private final Rect paintedContentBounds = new Rect();
+    @Nullable private Bitmap climateLayer;
+    @Nullable private int[] climatePixels;
     @Nullable private final Drawable airflowFace;
     @Nullable private final Drawable airflowLegs;
     @Nullable private final Drawable airflowFaceLegs;
@@ -178,6 +183,10 @@ public final class DriverClimateShortcutView extends View {
             integration.unsubscribeTelemetry(ignitionListener);
         }
         removeCallbacks(expiry);
+        Bitmap current = climateLayer;
+        climateLayer = null;
+        climatePixels = null;
+        if (current != null) current.recycle();
         super.onDetachedFromWindow();
     }
 
@@ -257,6 +266,26 @@ public final class DriverClimateShortcutView extends View {
         float width = getWidth();
         float height = getHeight();
         if (width <= 0 || height <= 0) return;
+        ensureClimateLayer(getWidth(), getHeight());
+        Bitmap layer = climateLayer;
+        if (layer == null) return;
+        layer.eraseColor(Color.TRANSPARENT);
+        drawClimateContent(new Canvas(layer), width, height);
+        if (!findPaintedContent(layer)) return;
+
+        // Centre what is actually painted, rather than merely centring the larger climate canvas.
+        // The detailed canvas is twice the icon height and its text/font metrics are asymmetric;
+        // centring only that rectangle left the visible temperature/fan/AUTO cluster high on a
+        // user-sized button.  An alpha-bounds pass keeps both preview and overlay exact for every
+        // climate state, font and icon height.
+        float contentCenterX = (paintedContentBounds.left + paintedContentBounds.right) / 2f;
+        float contentCenterY = (paintedContentBounds.top + paintedContentBounds.bottom) / 2f;
+        float dx = Math.round(width / 2f - contentCenterX);
+        float dy = Math.round(height / 2f - contentCenterY);
+        canvas.drawBitmap(layer, dx, dy, compositePaint);
+    }
+
+    private void drawClimateContent(@NonNull Canvas canvas, float width, float height) {
         float unit = Math.min(width, height);
         // Extended climate fits the ordinary rail slot and adds only AUTO/airflow. In particular,
         // there is no decorative fan blade competing with the level scale.
@@ -317,6 +346,52 @@ public final class DriverClimateShortcutView extends View {
                     DriverClimatePresentation.airflowTargets(airflowLabel),
                     false, color);
         }
+    }
+
+    private void ensureClimateLayer(int width, int height) {
+        Bitmap current = climateLayer;
+        if (current != null && current.getWidth() == width && current.getHeight() == height) {
+            int required = width * height;
+            if (climatePixels == null || climatePixels.length < required) {
+                climatePixels = new int[required];
+            }
+            return;
+        }
+        if (current != null) current.recycle();
+        climateLayer = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        climatePixels = new int[width * height];
+    }
+
+    private boolean findPaintedContent(@NonNull Bitmap layer) {
+        int width = layer.getWidth();
+        int height = layer.getHeight();
+        int required = width * height;
+        int[] pixels = climatePixels;
+        if (pixels == null || pixels.length < required) {
+            pixels = new int[required];
+            climatePixels = pixels;
+        }
+        layer.getPixels(pixels, 0, width, 0, 0, width, height);
+        int left = width;
+        int top = height;
+        int right = -1;
+        int bottom = -1;
+        for (int y = 0; y < height; y++) {
+            int row = y * width;
+            for (int x = 0; x < width; x++) {
+                if ((pixels[row + x] >>> 24) == 0) continue;
+                if (x < left) left = x;
+                if (x > right) right = x;
+                if (y < top) top = y;
+                if (y > bottom) bottom = y;
+            }
+        }
+        if (right < left || bottom < top) {
+            paintedContentBounds.setEmpty();
+            return false;
+        }
+        paintedContentBounds.set(left, top, right + 1, bottom + 1);
+        return true;
     }
 
     private void drawTemperature(@NonNull Canvas canvas, @NonNull String value,

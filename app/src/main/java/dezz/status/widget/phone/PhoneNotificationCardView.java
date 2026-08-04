@@ -2,13 +2,14 @@
 package dezz.status.widget.phone;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.PorterDuff;
-import android.graphics.PorterDuffXfermode;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -378,15 +379,13 @@ public final class PhoneNotificationCardView extends FrameLayout {
     /** Deterministic rounded-square clipping for bitmap and vector application icons. */
     private static final class RoundedIconView extends ImageView {
         private final RectF maskBounds = new RectF();
-        private final Paint maskPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint roundedPaint = new Paint(Paint.ANTI_ALIAS_FLAG
+                | Paint.FILTER_BITMAP_FLAG);
+        @Nullable private Bitmap iconLayer;
         private int cornerRadiusPx;
 
         RoundedIconView(@NonNull Context context) {
             super(context);
-            // KX11's Android 9 hardware compositor ignores clipPath for this child in an overlay.
-            // A software saveLayer plus DST_IN is a real alpha mask for bitmap and vector icons.
-            setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-            maskPaint.setColor(Color.BLACK);
         }
 
         void setCornerRadiusPx(int radius) {
@@ -397,19 +396,45 @@ public final class PhoneNotificationCardView extends FrameLayout {
         }
 
         @Override protected void onDraw(@NonNull Canvas canvas) {
-            if (cornerRadiusPx <= 0 || getWidth() <= 0 || getHeight() <= 0) {
-                super.onDraw(canvas);
-                return;
-            }
+            if (getWidth() <= 0 || getHeight() <= 0 || getDrawable() == null) return;
+            ensureIconLayer();
+            Bitmap layer = iconLayer;
+            if (layer == null) return;
+
+            // Draw ImageView's matrix into an ordinary ARGB bitmap first.  The final operation is
+            // a rounded primitive filled by a BitmapShader, so neither clipToOutline, clipPath nor
+            // an OEM-dependent PorterDuff layer participates in the visible result.
+            layer.eraseColor(Color.TRANSPARENT);
+            Canvas iconCanvas = new Canvas(layer);
+            int iconCheckpoint = iconCanvas.save();
+            iconCanvas.translate(getPaddingLeft(), getPaddingTop());
+            iconCanvas.concat(getImageMatrix());
+            getDrawable().draw(iconCanvas);
+            iconCanvas.restoreToCount(iconCheckpoint);
+
             float radius = Math.min(cornerRadiusPx,
                     Math.min(getWidth(), getHeight()) / 2f);
             maskBounds.set(0f, 0f, getWidth(), getHeight());
-            int checkpoint = canvas.saveLayer(maskBounds, null);
-            super.onDraw(canvas);
-            maskPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
-            canvas.drawRoundRect(maskBounds, radius, radius, maskPaint);
-            maskPaint.setXfermode(null);
-            canvas.restoreToCount(checkpoint);
+            BitmapShader shader = new BitmapShader(layer,
+                    Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+            roundedPaint.setShader(shader);
+            canvas.drawRoundRect(maskBounds, radius, radius, roundedPaint);
+            roundedPaint.setShader(null);
+        }
+
+        private void ensureIconLayer() {
+            Bitmap current = iconLayer;
+            if (current != null && current.getWidth() == getWidth()
+                    && current.getHeight() == getHeight()) return;
+            if (current != null) current.recycle();
+            iconLayer = Bitmap.createBitmap(getWidth(), getHeight(), Bitmap.Config.ARGB_8888);
+        }
+
+        @Override protected void onDetachedFromWindow() {
+            Bitmap current = iconLayer;
+            iconLayer = null;
+            if (current != null) current.recycle();
+            super.onDetachedFromWindow();
         }
     }
 
