@@ -1,0 +1,30 @@
+KX11 ANCS Helper v15
+====================
+
+Companion release: Status Widget v2.8.2-ha1167
+Bundle identifier: ru.natro.kx11ancshelper
+Marketing version: 15.0
+Build number: 15
+Minimum iOS version: 13.0
+
+Release verification
+--------------------
+
+- Default role is Peripheral and keeps the v11 iPhone_ANCS route.
+- Central role scans only for Geely_ANCS, connects with RequiresANCS and uses system
+  auto-reconnect on iOS 17+.
+- PAIR plus the per-connection B3 challenge fixes the peer before KX11 performs same-peer ANCS
+  attach; the Android 9 Classic-BONDED/LE-key-size deadlock is not used as the proof anymore.
+- The first B3 authentication challenge is retried on the same physical connection; persistent
+  errors are bounded and cause a fresh-advertisement reconnect.
+- B4 telemetry is READ/NOTIFY in Peripheral mode and WRITE-with-response in Central mode.
+- Role changes stop the previous Core Bluetooth route before starting the next one.
+- Background modes contain bluetooth-central and bluetooth-peripheral.
+- The modern disconnect callback remains visible to the iOS 13 deployment target, as required by
+  current Xcode SDK protocol-conformance checks.
+- Classic Bluetooth profiles, pairing and names are untouched.
+- A missing/invalidated D2D9 service or stale ATT handle forces a real disconnect and waits for a
+  fresh advertisement instead of rediscovering cached handles once per second.
+- D2D9 characteristics are discovered unfiltered and accepted only from the current CBService
+  instance, avoiding the uuidNotAllowed loop from a stale filtered Core Bluetooth cache.
+- Repeated Central failures back off through 1/2/5/10/20/30 seconds and log NSError domain/code.
