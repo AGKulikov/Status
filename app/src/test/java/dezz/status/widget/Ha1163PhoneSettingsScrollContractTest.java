@@ -33,12 +33,12 @@ public final class Ha1163PhoneSettingsScrollContractTest {
         assertTrue(settings.contains("requestDisallowInterceptTouchEvent("));
     }
 
-    @Test public void releaseIdentityIsHa1163() throws Exception {
+    @Test public void releaseIdentityIsHa1164() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) {
             build = project("../build.gradle");
         }
-        assertTrue(build.contains("return 'v2.8.2-ha1163'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1164'"));
     }
 
     private static String source(String relative) throws Exception {

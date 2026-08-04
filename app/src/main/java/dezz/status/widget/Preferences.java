@@ -738,8 +738,10 @@ public class Preferences {
             "phoneConnectorEnabled", false);
     public final Str phoneDeviceAddress = new Str(this, "phoneDeviceAddress", "");
     /**
-     * Dedicated BLE/ANCS identity. It is initially copied from the selected Classic phone but is
-     * kept under a separate key so ANCS recovery never renames, re-pairs, or rewrites Classic.
+     * Verified incoming LE identity for the opt-in iPhone-central route. It is initially copied
+     * from the selected Classic phone, then updated only after PAIR plus encrypted SECURE. The
+     * original iPhone-peripheral route always starts from {@link #phoneDeviceAddress}, so a
+     * private address learned here can never redirect or break that route.
      */
     public final Str phoneAncsDeviceAddress = new Str(this,
             "phoneAncsDeviceAddress", "");

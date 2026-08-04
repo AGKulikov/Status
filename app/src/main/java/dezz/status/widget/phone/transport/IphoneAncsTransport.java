@@ -143,6 +143,8 @@ public final class IphoneAncsTransport {
     private static final int MAX_PENDING_ANCS_REQUESTS = 24;
     private static final long SECURE_TO_CLIENT_CONNECT_DELAY_MS = 400L;
     private static final long DIRECT_FALLBACK_DELAY_MS = 500L;
+    private static final int INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS = 3;
+    private static final long INCOMING_CLIENT_ATTACH_RETRY_MS = 1_500L;
     private static final long CANDIDATE_UI_INTERVAL_MS = 500L;
     private static final int MAX_CANDIDATES = 150;
 
@@ -369,6 +371,8 @@ public final class IphoneAncsTransport {
     private boolean activeClientAutoConnect;
     private boolean backgroundAttachAttempted;
     private boolean directFallbackAttempted;
+    /** Direct GATT-client registrations tried while the verified incoming server link stays up. */
+    private int incomingClientAttachAttempt;
     private boolean secureAttConfirmed;
     private boolean gattClientConnected;
     private boolean activeClientEstablished;
@@ -1297,6 +1301,17 @@ public final class IphoneAncsTransport {
             discoverServices(current);
             return;
         }
+        if (managedIncomingMode) {
+            if (nextClientAttempt != null || clientConnectInFlight) {
+                log("Direct same-peer attach уже выполняется или запланирован");
+                return;
+            }
+            // A manual diagnostic retry starts a fresh bounded group but keeps the verified
+            // incoming link and the published Geely_ANCS service intact.
+            incomingClientAttachAttempt = 0;
+            startSamePeerAttach(false, "ручной direct same-peer retry");
+            return;
+        }
         if (!backgroundAttachAttempted) {
             startSamePeerAttach(true, "ручной запуск");
         } else if (nextClientAttempt != null) {
@@ -1409,6 +1424,7 @@ public final class IphoneAncsTransport {
         activeClientAutoConnect = false;
         backgroundAttachAttempted = false;
         directFallbackAttempted = false;
+        incomingClientAttachAttempt = 0;
         clientConnectInFlight = false;
         secureAttConfirmed = false;
         gattClientConnected = false;
@@ -1550,7 +1566,10 @@ public final class IphoneAncsTransport {
         if (secureConnectStart != null || clientConnectInFlight || gattClientConnected) return;
         secureConnectStart = () -> {
             secureConnectStart = null;
-            startSamePeerAttach(true, "первый SECURE ATT OK + "
+            // The iPhone already owns the physical link. Register Android's GATT-client role
+            // directly against that exact peer; autoConnect=true is a background/reconnect
+            // request and made the ECARX Android 9 stack reject the dual-role attach.
+            startSamePeerAttach(false, "первый SECURE ATT OK + "
                     + SECURE_TO_CLIENT_CONNECT_DELAY_MS + " ms");
         };
         main.postDelayed(secureConnectStart, SECURE_TO_CLIENT_CONNECT_DELAY_MS);
@@ -1581,7 +1600,19 @@ public final class IphoneAncsTransport {
                     + safeAddress(device) + " не активен");
             return;
         }
-        if (autoConnect) {
+        if (managedIncomingMode) {
+            if (autoConnect) {
+                log("Reverse route запрещает autoConnect=true на уже активном incoming link");
+                return;
+            }
+            if (incomingClientAttachAttempt >= INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS) {
+                state("SAME-PEER ATTACH · LINK KEPT · RETRIES EXHAUSTED");
+                log("Лимит direct same-peer attach исчерпан; Geely_ANCS и incoming link "
+                        + "сохранены без перепубликации");
+                return;
+            }
+            incomingClientAttachAttempt++;
+        } else if (autoConnect) {
             if (backgroundAttachAttempted) {
                 log("Повтор autoConnect=true заблокирован");
                 return;
@@ -1611,7 +1642,9 @@ public final class IphoneAncsTransport {
         String address = safeAddress(device);
         long linkAgeMs = Math.max(0L, android.os.SystemClock.elapsedRealtime()
                 - serverLink.connectedAtElapsedMs);
-        state(autoConnect
+        state(managedIncomingMode
+                ? "SAME-PEER ATTACH · DIRECT #" + incomingClientAttachAttempt
+                : autoConnect
                 ? "SAME-PEER ATTACH · BACKGROUND"
                 : "SAME-PEER ATTACH · DIRECT FALLBACK");
         log("connectGatt(autoConnect=" + autoConnect + ", TRANSPORT_LE): "
@@ -1629,7 +1662,9 @@ public final class IphoneAncsTransport {
                 activeClientTarget = null;
                 state("CONNECT_GATT_RETURNED_NULL");
                 log("connectGatt вернул null");
-                if (autoConnect) {
+                if (managedIncomingMode) {
+                    scheduleIncomingClientAttachRetry("connectGatt returned null");
+                } else if (autoConnect) {
                     scheduleDirectFallback("connectGatt(autoConnect=true) returned null");
                 } else {
                     state("V6 ATTEMPTS EXHAUSTED");
@@ -1649,7 +1684,9 @@ public final class IphoneAncsTransport {
                             + " transport=TRANSPORT_LE");
                     closeClientGatt(expected);
                     clearAncsRuntime();
-                    if (expectedAutoConnect) {
+                    if (managedIncomingMode) {
+                        scheduleIncomingClientAttachRetry("direct attach timeout");
+                    } else if (expectedAutoConnect) {
                         scheduleDirectFallback("background attach timeout");
                     } else {
                         state("V6 ATTEMPTS EXHAUSTED");
@@ -1662,7 +1699,9 @@ public final class IphoneAncsTransport {
             activeClientTarget = null;
             state("CONNECT_EXCEPTION");
             log("connectGatt exception: " + failure);
-            if (autoConnect) {
+            if (managedIncomingMode) {
+                scheduleIncomingClientAttachRetry("direct attach exception");
+            } else if (autoConnect) {
                 scheduleDirectFallback("background attach exception");
             } else {
                 state("V6 ATTEMPTS EXHAUSTED");
@@ -1680,6 +1719,82 @@ public final class IphoneAncsTransport {
         main.postDelayed(nextClientAttempt, DIRECT_FALLBACK_DELAY_MS);
         log("Единственный direct fallback autoConnect=false через "
                 + DIRECT_FALLBACK_DELAY_MS + " ms · " + reason);
+    }
+
+    /**
+     * A failed Android GATT-client registration is not proof that the incoming BLE link was
+     * lost. Keep the GATT server and its service published while the exact verified server peer
+     * is still connected; otherwise Core Bluetooth receives a false Service Changed event and
+     * tears down the only working half of the reverse route.
+     */
+    private void scheduleIncomingClientAttachRetry(@NonNull String reason) {
+        if (closing || !managedReconnectEnabled || !managedIncomingMode
+                || nextClientAttempt != null) return;
+        BluetoothDevice device = getVerifiedPeer();
+        if (device == null || findConnectedServerPeer(device) == null) {
+            state(REMOTE_LOGICAL_NAME + " · INCOMING LINK LOST");
+            log("Direct same-peer attach не повторяется: verified GATT-server link уже потерян");
+            scheduleManagedIncomingRestart("verified incoming link lost after " + reason);
+            return;
+        }
+        if (incomingClientAttachAttempt >= INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS) {
+            state("SAME-PEER ATTACH · LINK KEPT · RETRIES EXHAUSTED");
+            log("Direct same-peer attach не удался после " + incomingClientAttachAttempt
+                    + " попыток; Geely_ANCS server/link остаются активны · " + reason);
+            return;
+        }
+        int nextAttempt = incomingClientAttachAttempt + 1;
+        long delay = INCOMING_CLIENT_ATTACH_RETRY_MS * incomingClientAttachAttempt;
+        nextClientAttempt = () -> {
+            nextClientAttempt = null;
+            if (closing || !managedIncomingMode || !secureAttConfirmed) return;
+            BluetoothDevice current = getVerifiedPeer();
+            if (current == null || findConnectedServerPeer(current) == null) {
+                scheduleManagedIncomingRestart(
+                        "verified incoming link lost before direct retry");
+                return;
+            }
+            startSamePeerAttach(false, "same incoming link retry #" + nextAttempt
+                    + " after " + reason);
+        };
+        state("SAME-PEER ATTACH · RETRY #" + nextAttempt + " · LINK KEPT");
+        main.postDelayed(nextClientAttempt, delay);
+        log("Direct same-peer attach retry #" + nextAttempt + " через " + delay
+                + " ms; GATT server не закрывается · " + reason);
+    }
+
+    /**
+     * Restarts only Android's client registration. Calling disconnect() or closing the GATT
+     * server here would remove Geely_ANCS from the still-connected iPhone and invalidate every
+     * Core Bluetooth handle. BluetoothGatt.close() merely unregisters this failed client owner;
+     * the independently verified GATT-server link remains the physical connection owner.
+     */
+    private void recoverIncomingClientRole(@NonNull String reason) {
+        if (closing || !managedIncomingMode) return;
+        BluetoothDevice device = getVerifiedPeer();
+        if (device == null || findConnectedServerPeer(device) == null) {
+            scheduleManagedIncomingRestart("incoming link lost during " + reason);
+            return;
+        }
+        cancelConnectTimeout();
+        cancelClientAttemptCallbacks();
+        clearAncsRuntime();
+        BluetoothGatt failedClient = gatt;
+        gatt = null;
+        gattClientConnected = false;
+        clientConnectInFlight = false;
+        activeClientTarget = null;
+        activeClientAutoConnect = false;
+        activeClientEstablished = false;
+        if (failedClient != null) {
+            try {
+                failedClient.close();
+            } catch (RuntimeException ignored) {
+            }
+        }
+        log("Перезапускаю только Android GATT-client; Geely_ANCS server/link сохранены · "
+                + reason);
+        scheduleIncomingClientAttachRetry(reason);
     }
 
     private void cancelClientAttemptCallbacks() {
@@ -3332,6 +3447,7 @@ public final class IphoneAncsTransport {
     private void state(String value) {
         if (value != null && value.contains("ANCS READY")) {
             managedReconnectAttempt = 0;
+            incomingClientAttachAttempt = 0;
             if (managedReconnectTask != null) main.removeCallbacks(managedReconnectTask);
             managedReconnectTask = null;
         }
@@ -3363,7 +3479,12 @@ public final class IphoneAncsTransport {
                 || managedReconnectTask != null || coldBackgroundAttachTask != null) return;
 
         if (managedIncomingMode) {
-            scheduleManagedIncomingRestart(reason);
+            BluetoothDevice verified = getVerifiedPeer();
+            if (verified != null && findConnectedServerPeer(verified) != null) {
+                recoverIncomingClientRole(reason);
+            } else {
+                scheduleManagedIncomingRestart(reason);
+            }
             return;
         }
 
@@ -4082,10 +4203,8 @@ public final class IphoneAncsTransport {
                     closeClientGatt(callbackGatt);
                     clearAncsRuntime();
                     if (managedIncomingMode) {
-                        scheduleManagedIncomingRestart(
+                        scheduleIncomingClientAttachRetry(
                                 "same-peer GATT status=" + status);
-                        state(REMOTE_LOGICAL_NAME
-                                + " · RECOVERING · WAITING FOR IPHONE CENTRAL");
                         return;
                     }
                     state("GATT CONNECTION FAILED · status=" + status);
@@ -4113,9 +4232,7 @@ public final class IphoneAncsTransport {
                     closeClientGatt(callbackGatt);
                     clearAncsRuntime();
                     if (managedIncomingMode) {
-                        scheduleManagedIncomingRestart("same-peer GATT disconnected");
-                        state(REMOTE_LOGICAL_NAME
-                                + " · RECOVERING · WAITING FOR IPHONE CENTRAL");
+                        scheduleIncomingClientAttachRetry("same-peer GATT disconnected");
                         return;
                     }
                     state("GATT DISCONNECTED · status=" + status);
@@ -4391,7 +4508,8 @@ public final class IphoneAncsTransport {
                 return "application registration failed";
             case ScanCallback.SCAN_FAILED_INTERNAL_ERROR: return "internal error";
             case ScanCallback.SCAN_FAILED_FEATURE_UNSUPPORTED: return "feature unsupported";
-            case ScanCallback.SCAN_FAILED_OUT_OF_HARDWARE_RESOURCES:
+            // Added to the public SDK after Android 9; the platform callback value is stable.
+            case 5:
                 return "out of hardware resources";
             default: return "unknown";
         }

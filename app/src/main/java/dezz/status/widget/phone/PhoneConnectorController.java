@@ -1135,7 +1135,13 @@ public final class PhoneConnectorController {
         publishSnapshot(token);
 
         final long transportSession = activeAncsTransportSession;
-        final String address = current.ancsDeviceAddress;
+        // HA1162 stored the reverse route's verified incoming LE identity in
+        // phoneAncsDeviceAddress. Reusing that identity after switching back made the original
+        // Android-central route target the wrong BluetoothDevice. The established Peripheral
+        // route must always start from the selected Classic/bond identity; only the opt-in
+        // iPhone-central route consumes the separately learned incoming LE identity.
+        final String address = PhoneBleRole.isIphoneCentral(current.bleRole)
+                ? current.ancsDeviceAddress : current.deviceAddress;
         final String classicAddress = current.deviceAddress;
         final int bleRole = current.bleRole;
         mainHandler.post(() -> startAncsTransportOnMain(

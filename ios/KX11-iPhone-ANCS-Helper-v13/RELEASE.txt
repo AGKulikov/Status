@@ -1,0 +1,26 @@
+KX11 ANCS Helper v13
+====================
+
+Companion release: Status Widget v2.8.2-ha1164
+Bundle identifier: ru.natro.kx11ancshelper
+Marketing version: 13.0
+Build number: 13
+Minimum iOS version: 13.0
+
+Release verification
+--------------------
+
+- Default role is Peripheral and keeps the v11 iPhone_ANCS route.
+- Central role scans only for Geely_ANCS, connects with RequiresANCS and uses system
+  auto-reconnect on iOS 17+.
+- PAIR plus encrypted SECURE fixes the peer before KX11 performs same-peer ANCS attach.
+- Role changes stop the previous Core Bluetooth route before starting the next one.
+- B4 telemetry is READ/NOTIFY in Peripheral mode and encrypted WRITE in Central mode.
+- Background modes contain bluetooth-central and bluetooth-peripheral.
+- The modern disconnect callback remains visible to the iOS 13 deployment target, as required by
+  current Xcode SDK protocol-conformance checks.
+- Classic Bluetooth profiles and names are untouched.
+- A missing/invalidated D2D9 service or stale ATT handle now forces a real disconnect and waits
+  for a fresh advertisement instead of rediscovering cached handles once per second.
+- Loss of LE encryption after an already-secure session performs a bounded retry and full link
+  reset; telemetry no longer loops for 90 seconds on an unencrypted connection.

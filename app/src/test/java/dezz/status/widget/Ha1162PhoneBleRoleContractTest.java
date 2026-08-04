@@ -66,12 +66,12 @@ public final class Ha1162PhoneBleRoleContractTest {
         assertFalse(helper11.contains("Geely_ANCS"));
     }
 
-    @Test public void currentReleaseIdentityIsHa1163() throws Exception {
+    @Test public void currentReleaseIdentityIsHa1164() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) {
             build = project("../build.gradle");
         }
-        assertTrue(build.contains("return 'v2.8.2-ha1163'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1164'"));
     }
 
     private static String source(String relative) throws Exception {
