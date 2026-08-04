@@ -164,14 +164,33 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
             rebuild();
         });
         page.addView(preset, top(10));
+        if (!PhoneNotificationAutomation.isIconOverlayId(config.overlayId)) {
+            Button copyStyle = button("Копировать стиль из уведомления со значком");
+            copyStyle.setOnClickListener(view -> {
+                PhoneNotificationLayoutConfig source = layoutStore.load(
+                        PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID);
+                config.copyStyleFrom(source);
+                persistLayout();
+                Toast.makeText(this, "Стиль скопирован; компоновка без значка сохранена",
+                        Toast.LENGTH_SHORT).show();
+                rebuild();
+            });
+            page.addView(copyStyle, top(8));
+        }
 
         page.addView(text("Окно", 20, Color.WHITE), top(20));
         slider(page, "Ширина", 400, 1600, overlay.width, value -> overlay.width = value);
         slider(page, "Высота", 110, 500, overlay.height, value -> overlay.height = value);
         slider(page, "Положение X", -200, 1800, overlay.x, value -> overlay.x = value);
         slider(page, "Положение Y", -100, 700, overlay.y, value -> overlay.y = value);
+        page.addView(checkBox("По центру экрана по горизонтали", overlay.centerHorizontally,
+                checked -> overlay.centerHorizontally = checked), top(4));
+        page.addView(checkBox("По центру экрана по вертикали", overlay.centerVertically,
+                checked -> overlay.centerVertically = checked), top(2));
         slider(page, "Скругление карточки", 0, 160, config.cornerRadiusPx,
                 value -> config.cornerRadiusPx = value);
+        slider(page, "Толщина обводки", 0, 40, config.borderWidthPx,
+                value -> config.borderWidthPx = value);
         slider(page, "Прозрачность фона", 0, 255, config.backgroundAlpha,
                 value -> config.backgroundAlpha = value);
         slider(page, "Скругление аватара", 0, 120, config.avatarCornerRadiusPx,
@@ -180,6 +199,8 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
                 value -> config.iconCornerRadiusPx = value);
         colorButton(page, "Цвет карточки", () -> config.backgroundColor,
                 value -> config.backgroundColor = value);
+        colorButton(page, "Цвет обводки", () -> config.borderColor,
+                value -> config.borderColor = value);
         colorButton(page, "Цвет аватара", () -> config.avatarColor,
                 value -> config.avatarColor = value);
 
@@ -229,6 +250,20 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
         if (!PhoneNotificationLayoutConfig.BADGE.equals(element.id)) {
             slider(card, "Размер", 8, 160, element.textSizePx,
                     value -> element.textSizePx = value);
+        } else {
+            card.addView(checkBox("Сохранять пропорции иконки",
+                    config.iconPreserveAspectRatio,
+                    checked -> config.iconPreserveAspectRatio = checked));
+        }
+        if (PhoneNotificationLayoutConfig.isTextElement(element.id)) {
+            slider(card, "Максимум строк", 1, 8, element.maxLines, " стр.",
+                    value -> element.maxLines = value);
+            card.addView(checkBox("Автопрокрутка при переполнении (выкл. = …)",
+                    PhoneNotificationLayoutConfig.OVERFLOW_SCROLL.equals(
+                            element.overflowMode),
+                    checked -> element.overflowMode = checked
+                            ? PhoneNotificationLayoutConfig.OVERFLOW_SCROLL
+                            : PhoneNotificationLayoutConfig.OVERFLOW_ELLIPSIS));
         }
         colorButton(card, "Цвет", () -> element.color, value -> element.color = value);
         return card;
@@ -236,8 +271,14 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
 
     private void slider(@NonNull LinearLayout host, @NonNull String label,
                         int min, int max, int current, @NonNull IntConsumer setter) {
+        slider(host, label, min, max, current, " px", setter);
+    }
+
+    private void slider(@NonNull LinearLayout host, @NonNull String label,
+                        int min, int max, int current, @NonNull String suffix,
+                        @NonNull IntConsumer setter) {
         LinearLayout block = column();
-        TextView value = text(label + ": " + current + " px", 13, 0xFFC7C7CC);
+        TextView value = text(label + ": " + current + suffix, 13, 0xFFC7C7CC);
         block.addView(value);
         SeekBar seek = new SeekBar(this);
         seek.setMax(max - min);
@@ -247,7 +288,7 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
                                                     boolean fromUser) {
                 int selected = min + progress;
                 setter.accept(selected);
-                value.setText(label + ": " + selected + " px");
+                value.setText(label + ": " + selected + suffix);
                 updatePreviewAndPersist();
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
@@ -283,6 +324,7 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
         if (previewCard != null) {
             previewCard.setPresentation(config, PhoneNotificationCardView.Model.preview());
         }
+        if (editOverlay != null) editOverlay.invalidate();
         persistLayout();
     }
 
@@ -305,6 +347,9 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
         if (config == null || overlay == null) return;
         try {
             layoutStore.save(config);
+            // Position has its own atomic write path. Save it first so the catalog's stale-editor
+            // protection preserves this slider value instead of restoring the previous one.
+            overlayStore.savePosition(overlay.id, overlay.x, overlay.y);
             List<PopupOverlayConfig> overlays = new ArrayList<>(overlayStore.load());
             for (int index = 0; index < overlays.size(); index++) {
                 if (overlays.get(index).id.equals(overlay.id)) {
@@ -313,7 +358,6 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
                 }
             }
             overlayStore.save(overlays);
-            overlayStore.savePosition(overlay.id, overlay.x, overlay.y);
             WidgetService service = WidgetService.getInstance();
             if (service != null) service.applyPopupPreferences();
         } catch (Exception failure) {
@@ -328,6 +372,7 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
         @NonNull @Override public List<PanelContentEditOverlay.Item> items() {
             List<PanelContentEditOverlay.Item> result = new ArrayList<>();
             for (PhoneNotificationLayoutConfig.Element element : config.elements()) {
+                if (!element.visible) continue;
                 result.add(new PanelContentEditOverlay.Item(element.id, element.label,
                         element.column, element.row, element.columnSpan, element.rowSpan));
             }
@@ -364,6 +409,18 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
     @NonNull private Button button(String label) {
         MaterialButton value = new MaterialButton(this);
         value.setText(label);
+        return value;
+    }
+    @NonNull private CheckBox checkBox(@NonNull String label, boolean checked,
+                                       @NonNull java.util.function.Consumer<Boolean> setter) {
+        CheckBox value = new CheckBox(this);
+        value.setText(label);
+        value.setTextColor(0xFFC7C7CC);
+        value.setChecked(checked);
+        value.setOnCheckedChangeListener((button, selected) -> {
+            setter.accept(selected);
+            updatePreviewAndPersist();
+        });
         return value;
     }
     @NonNull private TextView text(String value, float size, int color) {

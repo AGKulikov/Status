@@ -4,6 +4,7 @@ package dezz.status.widget.popup;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.PixelFormat;
+import android.graphics.Point;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
@@ -299,8 +300,11 @@ public final class PopupOverlayController {
         if (config == null) return;
         int nextWidth = clamp(config.width, 100, 4000);
         int nextHeight = clamp(config.height, 100, 4000);
-        int nextX = config.x;
-        int nextY = config.y;
+        Point display = physicalDisplaySize();
+        int nextX = config.centerHorizontally
+                ? (display.x - nextWidth) / 2 : config.x;
+        int nextY = config.centerVertically
+                ? (display.y - nextHeight) / 2 : config.y;
         boolean geometryChanged = params.width != nextWidth || params.height != nextHeight
                 || params.x != nextX || params.y != nextY;
         params.width = nextWidth;
@@ -320,15 +324,37 @@ public final class PopupOverlayController {
         int alpha = overlayState.backgroundColor == null
                 ? clamp(config.backgroundAlpha, 0, 255) : (base >>> 24);
         int background = (base & 0x00FFFFFF) | (alpha << 24);
+        int rootCornerRadius = config.cornerRadius;
+        if (PhoneNotificationAutomation.isNotificationOverlayId(overlayId)) {
+            // The semantic notification card owns its rounded translucent surface and stroke.
+            // Leaving the generic popup's opaque rectangle underneath made the corners look
+            // rounded only because they were masked with black.
+            background = 0x00000000;
+            rootCornerRadius = 0;
+        }
         if (styledRoot != root || styledBackground != background
-                || styledCornerRadius != config.cornerRadius) {
+                || styledCornerRadius != rootCornerRadius) {
             bg.setColor(background);
-            bg.setCornerRadius(config.cornerRadius);
+            bg.setCornerRadius(rootCornerRadius);
             root.setBackground(bg);
             styledRoot = root;
             styledBackground = background;
-            styledCornerRadius = config.cornerRadius;
+            styledCornerRadius = rootCornerRadius;
         }
+    }
+
+    @NonNull
+    private Point physicalDisplaySize() {
+        Point result = new Point();
+        try {
+            windowManager.getDefaultDisplay().getRealSize(result);
+        } catch (RuntimeException ignored) {
+        }
+        if (result.x <= 0 || result.y <= 0) {
+            android.util.DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+            result.set(Math.max(1, metrics.widthPixels), Math.max(1, metrics.heightPixels));
+        }
+        return result;
     }
 
     private void renderItems() {
@@ -857,8 +883,8 @@ public final class PopupOverlayController {
                     rootDragging = true;
                 }
                 if (rootDragging) {
-                    params.x = startX + Math.round(dx);
-                    params.y = startY + Math.round(dy);
+                    params.x = isCenteredHorizontally() ? startX : startX + Math.round(dx);
+                    params.y = isCenteredVertically() ? startY : startY + Math.round(dy);
                     try { windowManager.updateViewLayout(root, params); }
                     catch (Exception ignored) {}
                 }
@@ -1208,8 +1234,10 @@ public final class PopupOverlayController {
                     }
                     if (dragging[0]) {
                         view.setPressed(false);
-                        params.x = origin[0] + Math.round(dx);
-                        params.y = origin[1] + Math.round(dy);
+                        params.x = isCenteredHorizontally()
+                                ? origin[0] : origin[0] + Math.round(dx);
+                        params.y = isCenteredVertically()
+                                ? origin[1] : origin[1] + Math.round(dy);
                         try { windowManager.updateViewLayout(root, params); }
                         catch (Exception ignored) {}
                     } else {
@@ -1344,8 +1372,8 @@ public final class PopupOverlayController {
                     rootDragging = true;
                 }
                 if (rootDragging) {
-                    params.x = startX + Math.round(dx);
-                    params.y = startY + Math.round(dy);
+                    params.x = isCenteredHorizontally() ? startX : startX + Math.round(dx);
+                    params.y = isCenteredVertically() ? startY : startY + Math.round(dy);
                     try { windowManager.updateViewLayout(root, params); }
                     catch (Exception ignored) {}
                 }
@@ -1380,6 +1408,14 @@ public final class PopupOverlayController {
 
     private boolean isPositionLocked() {
         return currentConfig != null && currentConfig.positionLocked;
+    }
+
+    private boolean isCenteredHorizontally() {
+        return currentConfig != null && currentConfig.centerHorizontally;
+    }
+
+    private boolean isCenteredVertically() {
+        return currentConfig != null && currentConfig.centerVertically;
     }
 
     private void saveCurrentPosition() {

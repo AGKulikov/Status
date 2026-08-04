@@ -1315,8 +1315,13 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT));
         }
+        // Fill the physical button and centre the content inside that complete rectangle. A
+        // WRAP_CONTENT child happened to stay near its old measured top on the ECARX Android 9
+        // FrameLayout after only buttonHeightPx changed, which was most visible on the tall live
+        // climate tile. MATCH_PARENT also makes asymmetric explicit top/bottom padding shift the
+        // content predictably while untouched auto padding remains genuinely centred.
         button.addView(content, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
                 Gravity.CENTER));
         WidgetService widgetService = WidgetService.getInstance();
         boolean actionEnabled = widgetService == null

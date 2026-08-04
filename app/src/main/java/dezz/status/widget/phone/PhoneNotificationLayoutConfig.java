@@ -12,7 +12,8 @@ import java.util.List;
 
 /** Free, cell-based composition of one CarPlay-style iPhone notification card. */
 public final class PhoneNotificationLayoutConfig {
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 3;
+    private static final int FIRST_READABLE_SCHEMA_VERSION = 2;
     /** Fine horizontal grid: at the default 1000 px width one cell is about 21 px. */
     public static final int GRID_COLUMNS = 48;
     public static final int GRID_ROWS = 12;
@@ -24,6 +25,8 @@ public final class PhoneNotificationLayoutConfig {
     public static final String APPLICATION = "application";
     public static final String MESSAGE = "message";
     public static final String CHEVRON = "chevron";
+    public static final String OVERFLOW_ELLIPSIS = "ellipsis";
+    public static final String OVERFLOW_SCROLL = "scroll";
 
     public static final class Element {
         @NonNull public final String id;
@@ -36,6 +39,10 @@ public final class PhoneNotificationLayoutConfig {
         public int textSizePx;
         @NonNull public String color;
         public boolean bold;
+        /** Maximum number of simultaneously visible lines inside this element's rectangle. */
+        public int maxLines;
+        /** Either {@link #OVERFLOW_ELLIPSIS} or {@link #OVERFLOW_SCROLL}. */
+        @NonNull public String overflowMode;
 
         private Element(@NonNull String id, @NonNull String label) {
             this.id = id;
@@ -46,7 +53,8 @@ public final class PhoneNotificationLayoutConfig {
             return new JSONObject().put("id", id).put("column", column).put("row", row)
                     .put("columnSpan", columnSpan).put("rowSpan", rowSpan)
                     .put("visible", visible).put("textSizePx", textSizePx)
-                    .put("color", color).put("bold", bold);
+                    .put("color", color).put("bold", bold)
+                    .put("maxLines", maxLines).put("overflowMode", overflowMode);
         }
 
         void read(@Nullable JSONObject source) {
@@ -59,6 +67,8 @@ public final class PhoneNotificationLayoutConfig {
             textSizePx = source.optInt("textSizePx", textSizePx);
             color = safeColor(source.optString("color", color), color);
             bold = source.optBoolean("bold", bold);
+            maxLines = source.optInt("maxLines", maxLines);
+            overflowMode = safeOverflowMode(source.optString("overflowMode", overflowMode));
             normalize();
         }
 
@@ -68,7 +78,9 @@ public final class PhoneNotificationLayoutConfig {
             column = clamp(column, 0, GRID_COLUMNS - columnSpan);
             row = clamp(row, 0, GRID_ROWS - rowSpan);
             textSizePx = clamp(textSizePx, 8, 160);
+            maxLines = clamp(maxLines, 1, 8);
             color = safeColor(color, "#FFFFFFFF");
+            overflowMode = safeOverflowMode(overflowMode);
         }
     }
 
@@ -76,10 +88,14 @@ public final class PhoneNotificationLayoutConfig {
     @NonNull public String backgroundColor = "#FF29292D";
     public int backgroundAlpha = 244;
     public int cornerRadiusPx = 38;
+    public int borderWidthPx = 0;
+    @NonNull public String borderColor = "#FFFFFFFF";
     /** Contact avatar stays circular independently from the small application badge. */
     public int avatarCornerRadiusPx = 120;
     /** iPhone-like rounded-square application icon. */
     public int iconCornerRadiusPx = 12;
+    /** Re-applied on every render so reopening the editor cannot fall back to CENTER_CROP. */
+    public boolean iconPreserveAspectRatio = true;
     @NonNull public String avatarColor = "#FF5AC466";
     public final Element avatar = element(AVATAR, "Аватар", 1, 1, 5, 7,
             true, 42, "#FFFFFFFF", true);
@@ -121,17 +137,25 @@ public final class PhoneNotificationLayoutConfig {
     public static PhoneNotificationLayoutConfig fromJson(
             @NonNull String overlayId, @Nullable JSONObject source) {
         PhoneNotificationLayoutConfig value = carPlay(overlayId);
-        if (source == null || source.optInt("schemaVersion", SCHEMA_VERSION) != SCHEMA_VERSION) {
+        int schema = source == null ? SCHEMA_VERSION
+                : source.optInt("schemaVersion", SCHEMA_VERSION);
+        if (source == null || schema < FIRST_READABLE_SCHEMA_VERSION
+                || schema > SCHEMA_VERSION) {
             return value;
         }
         value.backgroundColor = safeColor(source.optString(
                 "backgroundColor", value.backgroundColor), value.backgroundColor);
         value.backgroundAlpha = source.optInt("backgroundAlpha", value.backgroundAlpha);
         value.cornerRadiusPx = source.optInt("cornerRadiusPx", value.cornerRadiusPx);
+        value.borderWidthPx = source.optInt("borderWidthPx", value.borderWidthPx);
+        value.borderColor = safeColor(source.optString(
+                "borderColor", value.borderColor), value.borderColor);
         value.avatarCornerRadiusPx = source.optInt(
                 "avatarCornerRadiusPx", value.avatarCornerRadiusPx);
         value.iconCornerRadiusPx = source.optInt(
                 "iconCornerRadiusPx", value.iconCornerRadiusPx);
+        value.iconPreserveAspectRatio = source.optBoolean(
+                "iconPreserveAspectRatio", value.iconPreserveAspectRatio);
         value.avatarColor = safeColor(source.optString(
                 "avatarColor", value.avatarColor), value.avatarColor);
         JSONObject elements = source.optJSONObject("elements");
@@ -151,9 +175,35 @@ public final class PhoneNotificationLayoutConfig {
                 .put("overlayId", overlayId).put("backgroundColor", backgroundColor)
                 .put("backgroundAlpha", backgroundAlpha)
                 .put("cornerRadiusPx", cornerRadiusPx)
+                .put("borderWidthPx", borderWidthPx)
+                .put("borderColor", borderColor)
                 .put("avatarCornerRadiusPx", avatarCornerRadiusPx)
                 .put("iconCornerRadiusPx", iconCornerRadiusPx)
+                .put("iconPreserveAspectRatio", iconPreserveAspectRatio)
                 .put("avatarColor", avatarColor).put("elements", elements);
+    }
+
+    /** Copies appearance and typography while retaining the target layout and visibility. */
+    public void copyStyleFrom(@NonNull PhoneNotificationLayoutConfig source) {
+        backgroundColor = source.backgroundColor;
+        backgroundAlpha = source.backgroundAlpha;
+        cornerRadiusPx = source.cornerRadiusPx;
+        borderWidthPx = source.borderWidthPx;
+        borderColor = source.borderColor;
+        avatarCornerRadiusPx = source.avatarCornerRadiusPx;
+        iconCornerRadiusPx = source.iconCornerRadiusPx;
+        iconPreserveAspectRatio = source.iconPreserveAspectRatio;
+        avatarColor = source.avatarColor;
+        for (Element target : elements()) {
+            Element origin = source.element(target.id);
+            if (origin == null) continue;
+            target.textSizePx = origin.textSizePx;
+            target.color = origin.color;
+            target.bold = origin.bold;
+            target.maxLines = origin.maxLines;
+            target.overflowMode = origin.overflowMode;
+        }
+        normalize();
     }
 
     @NonNull
@@ -169,9 +219,11 @@ public final class PhoneNotificationLayoutConfig {
 
     public void normalize() {
         backgroundColor = safeColor(backgroundColor, "#FF29292D");
+        borderColor = safeColor(borderColor, "#FFFFFFFF");
         avatarColor = safeColor(avatarColor, "#FF5AC466");
         backgroundAlpha = clamp(backgroundAlpha, 0, 255);
         cornerRadiusPx = clamp(cornerRadiusPx, 0, 240);
+        borderWidthPx = clamp(borderWidthPx, 0, 40);
         avatarCornerRadiusPx = clamp(avatarCornerRadiusPx, 0, 240);
         iconCornerRadiusPx = clamp(iconCornerRadiusPx, 0, 240);
         for (Element element : elements()) element.normalize();
@@ -190,7 +242,19 @@ public final class PhoneNotificationLayoutConfig {
         value.textSizePx = textSizePx;
         value.color = color;
         value.bold = bold;
+        value.maxLines = MESSAGE.equals(id) ? 2 : 1;
+        value.overflowMode = OVERFLOW_ELLIPSIS;
         return value;
+    }
+
+    public static boolean isTextElement(@NonNull String id) {
+        return TITLE.equals(id) || TIME.equals(id)
+                || APPLICATION.equals(id) || MESSAGE.equals(id);
+    }
+
+    @NonNull
+    private static String safeOverflowMode(@Nullable String raw) {
+        return OVERFLOW_SCROLL.equals(raw) ? OVERFLOW_SCROLL : OVERFLOW_ELLIPSIS;
     }
 
     private static String safeColor(@Nullable String raw, @NonNull String fallback) {

@@ -21,6 +21,8 @@ public final class PopupOverlayConfigTest {
         source.columns = 3;
         source.x = -42;
         source.y = 515;
+        source.centerHorizontally = true;
+        source.centerVertically = true;
         source.positionLocked = true;
         source.backgroundColor = "transparent";
 
@@ -35,6 +37,8 @@ public final class PopupOverlayConfigTest {
         assertEquals(3, restored.columns);
         assertEquals(-42, restored.x);
         assertEquals(515, restored.y);
+        assertTrue(restored.centerHorizontally);
+        assertTrue(restored.centerVertically);
         assertTrue(restored.positionLocked);
         assertEquals("transparent", restored.backgroundColor);
     }
