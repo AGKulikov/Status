@@ -42,6 +42,8 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("\"phoneLowBatteryAlertLatched\""));
         assertTrue(source.contains("\"phoneSprutPresenceEnabled\", false"));
         assertTrue(source.contains("\"phoneSprutPresencePath\", \"\""));
+        assertTrue(source.contains("\"phoneSprutAncsPresenceEnabled\", false"));
+        assertTrue(source.contains("\"phoneSprutAncsPresencePath\", \"\""));
         assertTrue(source.substring(source.indexOf("SECRET_PREFERENCE_KEYS"),
                 source.indexOf("public static abstract class Preference"))
                 .contains("\"phoneDeviceAddress\""));
@@ -142,6 +144,7 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("chooseSprutAccessory()"));
         assertTrue(source.contains("chooseSprutService("));
         assertTrue(source.contains("chooseSprutCharacteristic("));
+        assertTrue(source.contains("chooseAncsSprutAccessory()"));
         assertTrue(source.contains("characteristic.writable()"));
         assertTrue(source.contains("SprutActionValue.isBooleanLike(characteristic)"));
         assertTrue(source.contains("value.path().stableId()"));
@@ -176,6 +179,8 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("preferences.phoneLowBatteryAlertThreshold.set("));
         assertTrue(source.contains("preferences.phoneLowBatteryAlertColor.set("));
         assertTrue(source.contains("preferences.phoneLowBatteryAlertLatched.set(false)"));
+        assertTrue(source.contains("preferences.phoneSprutAncsPresenceEnabled.set("));
+        assertTrue(source.contains("preferences.phoneSprutAncsPresencePath.set("));
         assertFalse(source.contains("statusBarNotificationsEnabled.isChecked()"));
         assertFalse(source.contains("private MaterialSwitch statusBarNotificationsEnabled"));
     }
@@ -202,12 +207,15 @@ public final class PhoneConnectorSettingsContractTest {
                 "checked(lowBatteryAlertEnabled,\n                preferences.phoneLowBatteryAlertEnabled.get())"));
         assertTrue(persist.contains(
                 "checked(sprutPresenceEnabled,\n                preferences.phoneSprutPresenceEnabled.get())"));
+        assertTrue(persist.contains(
+                "checked(sprutAncsPresenceEnabled,\n                preferences.phoneSprutAncsPresenceEnabled.get())"));
         assertFalse(persist.contains("connectorEnabled.isChecked()"));
         assertFalse(persist.contains("notificationsEnabled.isChecked()"));
         assertFalse(persist.contains("messagesEnabled.isChecked()"));
         assertFalse(persist.contains("includeNotificationText.isChecked()"));
         assertFalse(persist.contains("lowBatteryAlertEnabled.isChecked()"));
         assertFalse(persist.contains("sprutPresenceEnabled.isChecked()"));
+        assertFalse(persist.contains("sprutAncsPresenceEnabled.isChecked()"));
     }
 
     @Test
@@ -245,6 +253,8 @@ public final class PhoneConnectorSettingsContractTest {
             assertTrue(source.contains("name=\"phone_choose_required\""));
             assertTrue(source.contains("name=\"phone_diag_ancs_iphone\""));
             assertTrue(source.contains("name=\"phone_sprut_target_title\""));
+            assertTrue(source.contains("name=\"phone_sprut_ancs_enable_title\""));
+            assertTrue(source.contains("name=\"phone_sprut_ancs_target_title\""));
             assertTrue(source.contains("name=\"phone_privacy_hint\""));
             assertTrue(source.contains("name=\"phone_diag_map_ready\""));
             assertTrue(source.contains("name=\"phone_diag_map_waiting\""));

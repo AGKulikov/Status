@@ -93,6 +93,16 @@ public class PhoneSprutPresenceExporterTest {
         assertEquals("", PhoneSprutPresenceExporter.normalizeAddress(null));
     }
 
+    @Test
+    public void ancsSignalUsesIndependentPreferencesAndRejectsSharedTarget() throws Exception {
+        String source = readSource();
+        assertTrue(source.contains("public enum Signal"));
+        assertTrue(source.contains("prefs.phoneSprutAncsPresencePath.get()"));
+        assertTrue(source.contains("prefs.phoneSprutAncsPresenceEnabled.get()"));
+        assertTrue(source.contains("signal == Signal.ANCS && !hasPhoneState"));
+        assertTrue(source.contains("samePath(parsed, parsePath("));
+    }
+
     private static String readSource() throws Exception {
         Path file = Paths.get("src/main/java/dezz/status/widget/phone/"
                 + "PhoneSprutPresenceExporter.java");

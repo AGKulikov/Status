@@ -22,9 +22,13 @@ public class PhoneWidgetServiceIntegrationContractTest {
         assertTrue(source.contains("private PhoneConnectorController phoneController;"));
         assertTrue(source.contains(
                 "private PhoneSprutPresenceExporter phonePresenceExporter;"));
+        assertTrue(source.contains(
+                "private PhoneSprutPresenceExporter phoneAncsPresenceExporter;"));
         assertTrue(source.contains("new PhoneConnectorController(this, prefs, connectorValues,"));
         assertTrue(source.contains(
                 "exporter.onPhoneConnectionChanged(connected)"));
+        assertTrue(source.contains("PhoneSprutPresenceExporter.Signal.ANCS"));
+        assertTrue(source.contains("onAncsConnectionChanged(boolean connected)"));
     }
 
     @Test
@@ -35,6 +39,11 @@ public class PhoneWidgetServiceIntegrationContractTest {
         assertTrue(source.contains("phonePresenceExporter.onSprutCatalogChanged()"));
         assertTrue(source.contains(
                 "phonePresenceExporter.onSprutCharacteristicChanged(path)"));
+        assertTrue(source.contains(
+                "phoneAncsPresenceExporter.onSprutConnectionChanged(state)"));
+        assertTrue(source.contains("phoneAncsPresenceExporter.onSprutCatalogChanged()"));
+        assertTrue(source.contains(
+                "phoneAncsPresenceExporter.onSprutCharacteristicChanged(path)"));
     }
 
     @Test
@@ -43,9 +52,11 @@ public class PhoneWidgetServiceIntegrationContractTest {
         int method = source.indexOf("private void reconfigureIntegrationControllers()");
         int presence = source.indexOf("phonePresenceExporter.reconfigure()", method);
         int phone = source.indexOf("phoneController.reconfigure()", method);
+        int ancsPresence = source.indexOf("phoneAncsPresenceExporter.reconfigure()", method);
         assertTrue(method >= 0);
         assertTrue(presence > method);
-        assertTrue(phone > presence);
+        assertTrue(ancsPresence > presence);
+        assertTrue(phone > ancsPresence);
     }
 
     @Test
@@ -62,11 +73,13 @@ public class PhoneWidgetServiceIntegrationContractTest {
         int destroy = source.indexOf("public void onDestroy()");
         int phone = source.indexOf("phoneController::stop", destroy);
         int presence = source.indexOf("phonePresenceExporter::stop", destroy);
+        int ancsPresence = source.indexOf("phoneAncsPresenceExporter::stop", destroy);
         int sprut = source.indexOf("sprutController::stop", destroy);
         assertTrue(destroy >= 0);
         assertTrue(phone > destroy);
         assertTrue(presence > phone);
-        assertTrue(sprut > presence);
+        assertTrue(ancsPresence > presence);
+        assertTrue(sprut > ancsPresence);
     }
 
     @Test

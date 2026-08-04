@@ -171,6 +171,9 @@ public final class PhoneConnectorController {
     /** Decouples Bluetooth presence from an optional Sprut.hub runtime. */
     public interface PresenceSink {
         void onPhoneConnectionChanged(boolean connected);
+
+        /** Confirmed ANCS readiness is independent from Classic/ACL phone presence. */
+        default void onAncsConnectionChanged(boolean connected) { }
     }
 
     private static final PresenceSink NO_PRESENCE_SINK = connected -> { };
@@ -186,6 +189,7 @@ public final class PhoneConnectorController {
     private long generation;
     private boolean running;
     private boolean lastPresence;
+    private boolean lastAncsPresence;
     private String signature = "";
     @Nullable private HandlerThread workerThread;
     @Nullable private volatile Handler worker;
@@ -463,6 +467,7 @@ public final class PhoneConnectorController {
         cancelAllMirroredNotifications();
         clearRuntimeState(reason);
         updatePresenceLocked(false);
+        updateAncsPresenceLocked(false);
         publishOfflineSnapshotLocked(reason);
         if (oldThread != null) oldThread.quitSafely();
     }
@@ -3486,6 +3491,7 @@ public final class PhoneConnectorController {
     private void publishSnapshot(long token) {
         synchronized (lifecycleLock) {
             if (!isCurrentLocked(token)) return;
+            updateAncsPresenceLocked(ancsReady);
             values.replaceSnapshot(ConnectorType.PHONE, CONNECTOR_ID, buildSnapshot(true));
         }
     }
@@ -3790,6 +3796,7 @@ public final class PhoneConnectorController {
                 lastError = bounded("Phone callback: " + safeMessage(error), 512);
                 Log.w(TAG, lastError, error);
                 try {
+                    updateAncsPresenceLocked(ancsReady);
                     values.replaceSnapshot(ConnectorType.PHONE, CONNECTOR_ID,
                             buildSnapshot(true));
                 } catch (RuntimeException publishError) {
@@ -3806,6 +3813,16 @@ public final class PhoneConnectorController {
             presenceSink.onPhoneConnectionChanged(value);
         } catch (RuntimeException error) {
             Log.w(TAG, "Phone presence sink failed", error);
+        }
+    }
+
+    private void updateAncsPresenceLocked(boolean value) {
+        if (lastAncsPresence == value) return;
+        lastAncsPresence = value;
+        try {
+            presenceSink.onAncsConnectionChanged(value);
+        } catch (RuntimeException error) {
+            Log.w(TAG, "ANCS presence sink failed", error);
         }
     }
 
@@ -4204,6 +4221,7 @@ public final class PhoneConnectorController {
         final boolean notificationsEnabled;
         final boolean messagesEnabled;
         final boolean includeNotificationText;
+        final boolean ancsPresenceEnabled;
         @NonNull final Set<Integer> notificationCategoryIds;
         final int notificationAppFilterMode;
         @NonNull final Set<String> notificationAppFilterKeys;
@@ -4211,6 +4229,7 @@ public final class PhoneConnectorController {
         Config(boolean enabled, @NonNull String deviceAddress,
                @NonNull String ancsDeviceAddress, int bleRole, boolean notificationsEnabled,
                boolean messagesEnabled, boolean includeNotificationText,
+               boolean ancsPresenceEnabled,
                @NonNull Set<Integer> notificationCategoryIds,
                int notificationAppFilterMode,
                @NonNull Set<String> notificationAppFilterKeys) {
@@ -4221,6 +4240,7 @@ public final class PhoneConnectorController {
             this.notificationsEnabled = notificationsEnabled;
             this.messagesEnabled = messagesEnabled;
             this.includeNotificationText = includeNotificationText;
+            this.ancsPresenceEnabled = ancsPresenceEnabled;
             this.notificationCategoryIds = notificationCategoryIds;
             this.notificationAppFilterMode =
                     PhoneNotificationFilter.normalizeMode(notificationAppFilterMode);
@@ -4237,6 +4257,7 @@ public final class PhoneConnectorController {
                     prefs.phoneNotificationsEnabled.get(),
                     prefs.phoneMessagesEnabled.get(),
                     prefs.phoneIncludeNotificationText.get(),
+                    prefs.phoneSprutAncsPresenceEnabled.get(),
                     PhoneNotificationFilter.parseCategoryIds(
                             prefs.phoneNotificationCategoryIds.get()),
                     prefs.phoneNotificationAppFilterMode.get(),
@@ -4249,13 +4270,14 @@ public final class PhoneConnectorController {
             return enabled + "|" + deviceAddress + "|" + ancsDeviceAddress
                     + "|" + bleRole + "|" + notificationsEnabled + "|"
                     + messagesEnabled + "|" + includeNotificationText + "|"
+                    + ancsPresenceEnabled + "|"
                     + PhoneNotificationFilter.serializeCategoryIds(
                     notificationCategoryIds) + "|" + notificationAppFilterMode + "|"
                     + PhoneNotificationFilter.serializeAppKeys(notificationAppFilterKeys);
         }
 
         boolean ancsNeeded() {
-            return notificationsEnabled || messagesEnabled;
+            return notificationsEnabled || messagesEnabled || ancsPresenceEnabled;
         }
 
         /** The authenticated helper channel is required for power/network telemetry itself. */

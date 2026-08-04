@@ -353,6 +353,12 @@
     <string name="phone_sprut_characteristic_title">Характеристика «вкл/выкл»</string>
     <string name="phone_sprut_choose_required">Выберите переключатель Sprut.hub или отключите передачу присутствия.</string>
     <string name="phone_sprut_invalid_saved">Путь Sprut.hub некорректен. Выберите переключатель заново.</string>
+    <string name="phone_sprut_ancs_enable_title">Передавать готовность ANCS</string>
+    <string name="phone_sprut_ancs_enable_subtitle">Включать отдельный переключатель только после подтверждённой подписки ANCS и выключать сразу при её потере</string>
+    <string name="phone_sprut_ancs_target_title">Переключатель состояния ANCS</string>
+    <string name="phone_sprut_ancs_choose">Выбрать ANCS-переключатель</string>
+    <string name="phone_sprut_ancs_choose_required">Выберите переключатель для состояния ANCS или отключите эту связку.</string>
+    <string name="phone_sprut_targets_must_differ">Для Bluetooth и ANCS выбран один переключатель. Выберите разные переключатели, иначе их состояния будут конфликтовать.</string>
     <string name="phone_back">Назад</string>
 
     <string name="phone_section_diagnostics">Диагностика</string>

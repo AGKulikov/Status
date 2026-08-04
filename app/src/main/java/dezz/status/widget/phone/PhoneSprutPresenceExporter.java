@@ -37,9 +37,16 @@ import dezz.status.widget.sprut.SprutPath;
 public final class PhoneSprutPresenceExporter {
     private static final String TAG = "PhoneSprutPresence";
 
+    /** Selects one independent smart-home projection without changing the legacy binding. */
+    public enum Signal {
+        BLUETOOTH,
+        ANCS
+    }
+
     private final Preferences prefs;
     private final SprutHubController sprut;
     private final Handler main;
+    private final Signal signal;
 
     @Nullable private SprutPath targetPath;
     @Nullable private Runnable scheduledRetry;
@@ -62,9 +69,17 @@ public final class PhoneSprutPresenceExporter {
     public PhoneSprutPresenceExporter(@NonNull Preferences prefs,
                                       @NonNull SprutHubController sprut,
                                       @NonNull Handler main) {
+        this(prefs, sprut, main, Signal.BLUETOOTH);
+    }
+
+    public PhoneSprutPresenceExporter(@NonNull Preferences prefs,
+                                      @NonNull SprutHubController sprut,
+                                      @NonNull Handler main,
+                                      @NonNull Signal signal) {
         this.prefs = Objects.requireNonNull(prefs, "prefs");
         this.sprut = Objects.requireNonNull(sprut, "sprut");
         this.main = Objects.requireNonNull(main, "main");
+        this.signal = Objects.requireNonNull(signal, "signal");
     }
 
     /** Reloads the selected switch without trusting a cached Sprut catalog. */
@@ -136,14 +151,31 @@ public final class PhoneSprutPresenceExporter {
 
         SprutPath oldTarget = targetPath;
         boolean oldConfigured = configured;
-        SprutPath parsed = parsePath(prefs.phoneSprutPresencePath.get());
+        SprutPath parsed = parsePath(signal == Signal.ANCS
+                ? prefs.phoneSprutAncsPresencePath.get()
+                : prefs.phoneSprutPresencePath.get());
         String nextPhoneAddress = normalizeAddress(prefs.phoneDeviceAddress.get());
         boolean phoneChanged = !selectedPhoneAddress.equals(nextPhoneAddress);
         boolean phoneConnectorEnabled = prefs.phoneConnectorEnabled.get();
         boolean nextConfigured = phoneConnectorEnabled
-                && prefs.phoneSprutPresenceEnabled.get() && parsed != null
+                && (signal == Signal.ANCS
+                ? prefs.phoneSprutAncsPresenceEnabled.get()
+                : prefs.phoneSprutPresenceEnabled.get()) && parsed != null
                 && !nextPhoneAddress.isEmpty();
+        if (nextConfigured && signal == Signal.ANCS
+                && prefs.phoneSprutPresenceEnabled.get()
+                && samePath(parsed, parsePath(prefs.phoneSprutPresencePath.get()))) {
+            // Imported/legacy preferences can bypass the settings-screen validation. Never let
+            // two latest-state exporters fight forever over one writable characteristic.
+            nextConfigured = false;
+            reportError("Bluetooth и ANCS не могут управлять одним переключателем");
+        }
         if (!phoneConnectorEnabled) {
+            hasPhoneState = true;
+            desiredConnected = false;
+        } else if (signal == Signal.ANCS && !hasPhoneState) {
+            // A stale ON value must never survive a process restart while ANCS is still being
+            // negotiated. The controller will explicitly publish true after both CCCDs succeed.
             hasPhoneState = true;
             desiredConnected = false;
         }
@@ -377,6 +409,10 @@ public final class PhoneSprutPresenceExporter {
             Log.w(TAG, "Ignored invalid Sprut presence path", invalid);
             return null;
         }
+    }
+
+    private static boolean samePath(@Nullable SprutPath left, @Nullable SprutPath right) {
+        return left != null && left.equals(right);
     }
 
     @NonNull

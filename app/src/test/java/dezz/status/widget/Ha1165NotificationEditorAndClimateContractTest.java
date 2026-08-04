@@ -10,7 +10,7 @@ import java.nio.file.Paths;
 
 import org.junit.Test;
 
-/** Release barrier for the visual-editor and fixed-height climate regressions in HA1165. */
+/** Release barrier for the visual-editor, climate and ANCS-presence fixes in HA1165. */
 public final class Ha1165NotificationEditorAndClimateContractTest {
     @Test public void notificationWindowUsesARealTransparentRoundedSurfaceAndStroke()
             throws Exception {
@@ -61,6 +61,24 @@ public final class Ha1165NotificationEditorAndClimateContractTest {
 
     @Test public void releaseIdentityIsHa1165() throws Exception {
         assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1165'"));
+    }
+
+    @Test public void ancsSmartHomeBindingUsesConfirmedSubscriptionStateOnly()
+            throws Exception {
+        String controller = source("phone/PhoneConnectorController.java");
+        String service = source("WidgetService.java");
+        String settings = source("PhoneConnectorSettingsActivity.java");
+        String exporter = source("phone/PhoneSprutPresenceExporter.java");
+
+        assertTrue(controller.contains("updateAncsPresenceLocked(ancsReady)"));
+        assertTrue(controller.contains("presenceSink.onAncsConnectionChanged(value)"));
+        assertTrue(controller.contains(
+                "return notificationsEnabled || messagesEnabled || ancsPresenceEnabled"));
+        assertTrue(service.contains("PhoneSprutPresenceExporter.Signal.ANCS"));
+        assertTrue(service.contains("onAncsConnectionChanged(boolean connected)"));
+        assertTrue(settings.contains("phoneSprutAncsPresenceEnabled"));
+        assertTrue(settings.contains("selectedSprutPath.equals(selectedSprutAncsPath)"));
+        assertTrue(exporter.contains("signal == Signal.ANCS"));
     }
 
     private static String source(String relative) throws Exception {

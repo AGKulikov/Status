@@ -358,6 +358,12 @@
     <string name="phone_sprut_characteristic_title">On/off characteristic</string>
     <string name="phone_sprut_choose_required">Choose a Sprut.hub switch or turn presence export off.</string>
     <string name="phone_sprut_invalid_saved">The saved Sprut.hub path is invalid. Choose the switch again.</string>
+    <string name="phone_sprut_ancs_enable_title">Export ANCS readiness</string>
+    <string name="phone_sprut_ancs_enable_subtitle">Turn on a separate switch only after ANCS subscriptions are confirmed, and turn it off immediately when they are lost</string>
+    <string name="phone_sprut_ancs_target_title">ANCS state switch</string>
+    <string name="phone_sprut_ancs_choose">Choose ANCS switch</string>
+    <string name="phone_sprut_ancs_choose_required">Choose an ANCS state switch or turn this binding off.</string>
+    <string name="phone_sprut_targets_must_differ">Bluetooth and ANCS use the same switch. Choose different switches so their states cannot conflict.</string>
     <string name="phone_back">Back</string>
 
     <string name="phone_section_diagnostics">Diagnostics</string>

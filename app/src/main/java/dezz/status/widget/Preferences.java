@@ -799,6 +799,11 @@ public class Preferences {
             "phoneSprutPresenceEnabled", false);
     public final Str phoneSprutPresencePath = new Str(this,
             "phoneSprutPresencePath", "");
+    /** Optional independent Sprut.hub switch reflecting confirmed ANCS subscriptions. */
+    public final Bool phoneSprutAncsPresenceEnabled = new Bool(this,
+            "phoneSprutAncsPresenceEnabled", false);
+    public final Str phoneSprutAncsPresencePath = new Str(this,
+            "phoneSprutAncsPresencePath", "");
 
     // Direct Sprut.hub connector. The token is intentionally kept only in the live connector;
     // reconnect performs a fresh challenge using the Keystore-protected password.

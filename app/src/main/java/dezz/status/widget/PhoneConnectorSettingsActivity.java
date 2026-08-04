@@ -92,6 +92,7 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     private MaterialSwitch includeNotificationText;
     private MaterialSwitch lowBatteryAlertEnabled;
     private MaterialSwitch sprutPresenceEnabled;
+    private MaterialSwitch sprutAncsPresenceEnabled;
     private TextView selectedDeviceValue;
     private TextView selectedNotificationCategoriesValue;
     private TextView notificationAppFilterModeValue;
@@ -103,6 +104,7 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     private MaterialButton notificationColorButton;
     private MaterialButton lowBatteryColorButton;
     private TextView selectedSprutPathValue;
+    private TextView selectedSprutAncsPathValue;
     private TextView diagnostics;
     private TextView connectionJournal;
     private NestedScrollView connectionJournalScroll;
@@ -118,6 +120,7 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     };
     @NonNull private String selectedDeviceAddress = "";
     @NonNull private String selectedSprutPath = "";
+    @NonNull private String selectedSprutAncsPath = "";
     @NonNull private final Set<String> selectedStatusItems = new LinkedHashSet<>();
     @NonNull private final Set<String> selectedNotificationFields = new LinkedHashSet<>();
     @NonNull private final Set<Integer> selectedNotificationCategories = new LinkedHashSet<>();
@@ -136,6 +139,7 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         PhoneConnectionJournal.initialize(this);
         selectedDeviceAddress = clean(preferences.phoneDeviceAddress.get());
         selectedSprutPath = clean(preferences.phoneSprutPresencePath.get());
+        selectedSprutAncsPath = clean(preferences.phoneSprutAncsPresencePath.get());
         selectedStatusItems.addAll(PhoneStatusBarPolicy.parseIds(
                 preferences.phoneStatusBarItems.get(),
                 PhoneStatusBarPolicy.statusIds()));
@@ -347,6 +351,38 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         sprutActions.addView(actionButton(getString(R.string.phone_sprut_clear),
                 this::clearSprutTarget), weighted());
         page.addView(sprutActions, topMargin(10));
+
+        LinearLayout sprutAncsRows = column();
+        sprutAncsPresenceEnabled = new MaterialSwitch(this);
+        sprutAncsPresenceEnabled.setChecked(
+                preferences.phoneSprutAncsPresenceEnabled.get());
+        addSwitchRow(sprutAncsRows, sprutAncsPresenceEnabled,
+                R.string.phone_sprut_ancs_enable_title,
+                R.string.phone_sprut_ancs_enable_subtitle, false);
+        sprutAncsPresenceEnabled.setOnCheckedChangeListener((button, checked) -> {
+            if (checked && connectorEnabled != null) connectorEnabled.setChecked(true);
+        });
+        LinearLayout ancsPathRow = clickableRow(this::chooseAncsSprutAccessory);
+        LinearLayout ancsPathLabels = column();
+        ancsPathLabels.addView(text(getString(R.string.phone_sprut_ancs_target_title),
+                17, Typeface.NORMAL), matchWrap());
+        selectedSprutAncsPathValue = secondary("", 14);
+        ancsPathLabels.addView(selectedSprutAncsPathValue, topMargin(3));
+        ancsPathRow.addView(ancsPathLabels, weighted());
+        TextView ancsPathDisclosure = text("›", 30, Typeface.NORMAL);
+        ancsPathDisclosure.setTextColor(color(R.color.settings_tertiary_text));
+        ancsPathRow.addView(ancsPathDisclosure, wrapWrap());
+        sprutAncsRows.addView(separator(), separatorParams());
+        sprutAncsRows.addView(ancsPathRow, matchWrap());
+        page.addView(card(sprutAncsRows), topMargin(12));
+
+        LinearLayout sprutAncsActions = row();
+        sprutAncsActions.addView(actionButton(
+                getString(R.string.phone_sprut_ancs_choose),
+                this::chooseAncsSprutAccessory), weighted());
+        sprutAncsActions.addView(actionButton(getString(R.string.phone_sprut_clear),
+                this::clearAncsSprutTarget), weighted());
+        page.addView(sprutAncsActions, topMargin(10));
 
         page.addView(sectionTitle(getString(R.string.phone_section_diagnostics)),
                 topMargin(24));
@@ -1046,7 +1082,9 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 preferences.phoneNotificationsEnabled.get());
         boolean messagesRequested = checked(messagesEnabled,
                 preferences.phoneMessagesEnabled.get());
-        boolean ancsRequested = notificationsRequested || messagesRequested;
+        boolean ancsRequested = notificationsRequested || messagesRequested
+                || checked(sprutAncsPresenceEnabled,
+                preferences.phoneSprutAncsPresenceEnabled.get());
         boolean notificationDelivery = notificationDeliveryEnabled();
         StringBuilder result = new StringBuilder();
         result.append(line(bluetooth.supported, getString(R.string.phone_diag_adapter),
@@ -1402,6 +1440,14 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     }
 
     private void chooseSprutAccessory() {
+        chooseSprutAccessory(false);
+    }
+
+    private void chooseAncsSprutAccessory() {
+        chooseSprutAccessory(true);
+    }
+
+    private void chooseSprutAccessory(boolean ancsTarget) {
         reloadSprutCatalog();
         List<SprutCatalog.Accessory> accessories = new ArrayList<>();
         for (SprutCatalog.Accessory accessory : sprutCatalog.accessories()) {
@@ -1436,12 +1482,13 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.phone_sprut_accessory_title)
                 .setItems(labels, (dialog, which) ->
-                        chooseSprutService(accessories.get(which)))
+                        chooseSprutService(accessories.get(which), ancsTarget))
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
     }
 
-    private void chooseSprutService(@NonNull SprutCatalog.Accessory accessory) {
+    private void chooseSprutService(@NonNull SprutCatalog.Accessory accessory,
+                                    boolean ancsTarget) {
         List<SprutCatalog.Service> services = new ArrayList<>();
         for (SprutCatalog.Service service : accessory.services()) {
             if (hasWritableBooleanTarget(service)) services.add(service);
@@ -1458,14 +1505,16 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.phone_sprut_service_title)
                 .setItems(labels, (dialog, which) ->
-                        chooseSprutCharacteristic(accessory, services.get(which)))
+                        chooseSprutCharacteristic(
+                                accessory, services.get(which), ancsTarget))
                 .setNegativeButton(R.string.phone_back,
-                        (dialog, which) -> chooseSprutAccessory())
+                        (dialog, which) -> chooseSprutAccessory(ancsTarget))
                 .show();
     }
 
     private void chooseSprutCharacteristic(@NonNull SprutCatalog.Accessory accessory,
-                                           @NonNull SprutCatalog.Service service) {
+                                           @NonNull SprutCatalog.Service service,
+                                           boolean ancsTarget) {
         List<SprutCatalog.Characteristic> values = new ArrayList<>();
         for (SprutCatalog.Characteristic characteristic : service.characteristics()) {
             if (isWritableBooleanTarget(characteristic)) values.add(characteristic);
@@ -1480,12 +1529,18 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.phone_sprut_characteristic_title)
                 .setItems(labels, (dialog, which) -> {
-                    selectedSprutPath = values.get(which).path().stableId();
-                    sprutPresenceEnabled.setChecked(true);
+                    String path = values.get(which).path().stableId();
+                    if (ancsTarget) {
+                        selectedSprutAncsPath = path;
+                        sprutAncsPresenceEnabled.setChecked(true);
+                    } else {
+                        selectedSprutPath = path;
+                        sprutPresenceEnabled.setChecked(true);
+                    }
                     refreshSprutSummary();
                 })
                 .setNegativeButton(R.string.phone_back,
-                        (dialog, which) -> chooseSprutService(accessory))
+                        (dialog, which) -> chooseSprutService(accessory, ancsTarget))
                 .show();
     }
 
@@ -1495,26 +1550,38 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         refreshSprutSummary();
     }
 
+    private void clearAncsSprutTarget() {
+        selectedSprutAncsPath = "";
+        sprutAncsPresenceEnabled.setChecked(false);
+        refreshSprutSummary();
+    }
+
     private void refreshSprutSummary() {
-        if (selectedSprutPathValue == null) return;
-        if (selectedSprutPath.isEmpty()) {
-            selectedSprutPathValue.setText(R.string.phone_sprut_not_selected);
+        refreshSprutPathSummary(selectedSprutPathValue, selectedSprutPath);
+        refreshSprutPathSummary(selectedSprutAncsPathValue, selectedSprutAncsPath);
+    }
+
+    private void refreshSprutPathSummary(@Nullable TextView target,
+                                         @NonNull String selectedPath) {
+        if (target == null) return;
+        if (selectedPath.isEmpty()) {
+            target.setText(R.string.phone_sprut_not_selected);
             return;
         }
-        String description = selectedSprutPath;
+        String description = selectedPath;
         try {
-            SprutPath path = SprutPath.parse(selectedSprutPath);
+            SprutPath path = SprutPath.parse(selectedPath);
             SprutCatalog.Characteristic characteristic = sprutCatalog.find(path);
             if (characteristic != null) {
                 description = first(characteristic.name(), characteristic.type(),
-                        selectedSprutPath) + "\npath: " + selectedSprutPath;
+                        selectedPath) + "\npath: " + selectedPath;
             } else {
-                description = getString(R.string.phone_sprut_saved_path, selectedSprutPath);
+                description = getString(R.string.phone_sprut_saved_path, selectedPath);
             }
         } catch (IllegalArgumentException ignored) {
-            description = getString(R.string.phone_sprut_invalid_path, selectedSprutPath);
+            description = getString(R.string.phone_sprut_invalid_path, selectedPath);
         }
-        selectedSprutPathValue.setText(description);
+        target.setText(description);
     }
 
     private static boolean hasWritableBooleanTarget(
@@ -1556,7 +1623,8 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
             return;
         }
         if (!preferences.phoneNotificationsEnabled.get()
-                && !preferences.phoneMessagesEnabled.get()) {
+                && !preferences.phoneMessagesEnabled.get()
+                && !preferences.phoneSprutAncsPresenceEnabled.get()) {
             Toast.makeText(this, R.string.phone_test_choose_source, Toast.LENGTH_LONG).show();
             return;
         }
@@ -1624,7 +1692,13 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 preferences.phoneLowBatteryAlertEnabled.get());
         boolean sprutPresenceRequested = checked(sprutPresenceEnabled,
                 preferences.phoneSprutPresenceEnabled.get());
+        boolean sprutAncsPresenceRequested = checked(sprutAncsPresenceEnabled,
+                preferences.phoneSprutAncsPresenceEnabled.get());
         if (lowBatteryAlertRequested) {
+            connectorRequested = true;
+            if (connectorEnabled != null) connectorEnabled.setChecked(true);
+        }
+        if (sprutAncsPresenceRequested) {
             connectorRequested = true;
             if (connectorEnabled != null) connectorEnabled.setChecked(true);
         }
@@ -1660,6 +1734,26 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                         Toast.LENGTH_LONG).show();
                 return false;
             }
+        }
+        if (sprutAncsPresenceRequested) {
+            if (selectedSprutAncsPath.isEmpty()) {
+                Toast.makeText(this, R.string.phone_sprut_ancs_choose_required,
+                        Toast.LENGTH_LONG).show();
+                return false;
+            }
+            try {
+                SprutPath.parse(selectedSprutAncsPath);
+            } catch (IllegalArgumentException invalid) {
+                Toast.makeText(this, R.string.phone_sprut_invalid_saved,
+                        Toast.LENGTH_LONG).show();
+                return false;
+            }
+        }
+        if (sprutPresenceRequested && sprutAncsPresenceRequested
+                && selectedSprutPath.equals(selectedSprutAncsPath)) {
+            Toast.makeText(this, R.string.phone_sprut_targets_must_differ,
+                    Toast.LENGTH_LONG).show();
+            return false;
         }
 
         int savedLowBatteryThreshold =
@@ -1709,6 +1803,8 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         }
         preferences.phoneSprutPresenceEnabled.set(sprutPresenceRequested);
         preferences.phoneSprutPresencePath.set(selectedSprutPath);
+        preferences.phoneSprutAncsPresenceEnabled.set(sprutAncsPresenceRequested);
+        preferences.phoneSprutAncsPresencePath.set(selectedSprutAncsPath);
 
         WidgetService service = WidgetService.getInstance();
         if (service != null) {

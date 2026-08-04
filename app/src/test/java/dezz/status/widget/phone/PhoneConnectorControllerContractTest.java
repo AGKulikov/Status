@@ -36,6 +36,9 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(source.contains("if (isSelected(device))"));
         assertTrue(source.contains("PresenceSink"));
         assertTrue(source.contains("updatePresenceLocked(false)"));
+        assertTrue(source.contains("updateAncsPresenceLocked(false)"));
+        assertTrue(source.contains("updateAncsPresenceLocked(ancsReady)"));
+        assertTrue(source.contains("onAncsConnectionChanged(boolean connected)"));
         assertTrue(source.contains("hfpConnected = false"));
         assertTrue(source.contains("if (mapConnected) endMapSession(\"disconnected\")"));
     }

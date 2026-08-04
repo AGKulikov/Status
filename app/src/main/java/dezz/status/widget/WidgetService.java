@@ -276,6 +276,7 @@ public class WidgetService extends Service {
     private SprutHubController sprutController;
     private PhoneConnectorController phoneController;
     private PhoneSprutPresenceExporter phonePresenceExporter;
+    private PhoneSprutPresenceExporter phoneAncsPresenceExporter;
     private CarTelemetryExporter carTelemetryExporter;
     private PopupOverlayManager popupOverlay;
     /** Parsed only when settings change; connector packets must never reparse the JSON document. */
@@ -824,6 +825,9 @@ public class WidgetService extends Service {
                         if (phonePresenceExporter != null) {
                             phonePresenceExporter.onSprutConnectionChanged(state);
                         }
+                        if (phoneAncsPresenceExporter != null) {
+                            phoneAncsPresenceExporter.onSprutConnectionChanged(state);
+                        }
                     }
 
                     @Override public void onCatalogChanged(@NonNull SprutCatalog catalog) {
@@ -836,6 +840,9 @@ public class WidgetService extends Service {
                         if (phonePresenceExporter != null) {
                             phonePresenceExporter.onSprutCatalogChanged();
                         }
+                        if (phoneAncsPresenceExporter != null) {
+                            phoneAncsPresenceExporter.onSprutCatalogChanged();
+                        }
                     }
 
                     @Override public void onCharacteristicChanged(
@@ -846,14 +853,27 @@ public class WidgetService extends Service {
                         if (phonePresenceExporter != null) {
                             phonePresenceExporter.onSprutCharacteristicChanged(path);
                         }
+                        if (phoneAncsPresenceExporter != null) {
+                            phoneAncsPresenceExporter.onSprutCharacteristicChanged(path);
+                        }
                     }
                 });
         phonePresenceExporter = new PhoneSprutPresenceExporter(
                 prefs, sprutController, mainHandler);
+        phoneAncsPresenceExporter = new PhoneSprutPresenceExporter(
+                prefs, sprutController, mainHandler,
+                PhoneSprutPresenceExporter.Signal.ANCS);
         phoneController = new PhoneConnectorController(this, prefs, connectorValues,
-                connected -> {
-                    PhoneSprutPresenceExporter exporter = phonePresenceExporter;
-                    if (exporter != null) exporter.onPhoneConnectionChanged(connected);
+                new PhoneConnectorController.PresenceSink() {
+                    @Override public void onPhoneConnectionChanged(boolean connected) {
+                        PhoneSprutPresenceExporter exporter = phonePresenceExporter;
+                        if (exporter != null) exporter.onPhoneConnectionChanged(connected);
+                    }
+
+                    @Override public void onAncsConnectionChanged(boolean connected) {
+                        PhoneSprutPresenceExporter exporter = phoneAncsPresenceExporter;
+                        if (exporter != null) exporter.onPhoneConnectionChanged(connected);
+                    }
                 });
         carTelemetryExporter = new CarTelemetryExporter(prefs, CarIntegrations.get(this),
                 sprutController, mainHandler);
@@ -1005,6 +1025,7 @@ public class WidgetService extends Service {
         // current state. A device change therefore clears the old Sprut switch first.
         runIntegrationStep("phone presence", () -> {
             if (phonePresenceExporter != null) phonePresenceExporter.reconfigure();
+            if (phoneAncsPresenceExporter != null) phoneAncsPresenceExporter.reconfigure();
         });
         runIntegrationStep("phone", () -> {
             if (phoneController != null) phoneController.reconfigure();
@@ -4930,6 +4951,10 @@ public class WidgetService extends Service {
             runCleanupStep("phone presence", phonePresenceExporter::stop);
         }
         phonePresenceExporter = null;
+        if (phoneAncsPresenceExporter != null) {
+            runCleanupStep("phone ANCS presence", phoneAncsPresenceExporter::stop);
+        }
+        phoneAncsPresenceExporter = null;
         if (carTelemetryExporter != null) {
             runCleanupStep("car telemetry", carTelemetryExporter::stop);
         }
