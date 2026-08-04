@@ -49,7 +49,7 @@ public final class Ha1166BleIdentityAndVisualCenteringContractTest {
         String writes = between(transport, "public void onCharacteristicWriteRequest",
                 "private void handleIphonePeripheralConnectionState");
 
-        assertTrue(incoming.contains("current incoming peer будет подтверждён заново"));
+        assertTrue(incoming.contains("текущий incoming peer будет подтверждён заново"));
         assertFalse(incoming.contains("claimVerifiedPeer(managedResolvedPeer)"));
         assertFalse(restart.contains("claimVerifiedPeer(resolvedPeer)"));
         assertTrue(writes.contains("claimVerifiedPeer(device)"));
