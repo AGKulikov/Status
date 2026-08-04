@@ -18,11 +18,11 @@ public final class Ha1167CurrentLinkAndRenderingContractTest {
         String rounded = between(card, "private static final class RoundedIconView",
                 "private Drawable phoneAppIcon");
 
-        assertTrue(rounded.contains("setLayerType(View.LAYER_TYPE_SOFTWARE, null)"));
-        assertTrue(rounded.contains("canvas.saveLayer(maskBounds, null)"));
-        assertTrue(rounded.contains("PorterDuff.Mode.DST_IN"));
+        assertTrue(rounded.contains("BitmapShader"));
+        assertTrue(rounded.contains("ensureIconLayer()"));
         assertTrue(rounded.contains("canvas.drawRoundRect(maskBounds, radius, radius"));
         assertFalse(rounded.contains("canvas.clipPath"));
+        assertFalse(rounded.contains("PorterDuff.Mode.DST_IN"));
     }
 
     @Test public void climateIsRecenteredFromTheCurrentPhysicalButtonBounds()
@@ -36,6 +36,8 @@ public final class Ha1167CurrentLinkAndRenderingContractTest {
         assertTrue(exact.contains("child.layout(childLeft, childTop"));
         assertTrue(runtime.contains("button.addExactlyCentered(icon, requested"));
         assertTrue(settings.contains("cell.addExactlyCentered(icon, iconSize"));
+        assertTrue(source("driver/DriverClimateShortcutView.java")
+                .contains("findPaintedContent(layer)"));
     }
 
     @Test public void reverseRouteChallengesSecurityInsideTheCurrentGattCallback()
@@ -73,7 +75,7 @@ public final class Ha1167CurrentLinkAndRenderingContractTest {
     @Test public void releaseIdentityIsHa1167() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1167'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1168'"));
     }
 
     private static String source(String relative) throws Exception {

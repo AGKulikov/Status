@@ -19,9 +19,9 @@ public final class Ha1166BleIdentityAndVisualCenteringContractTest {
 
         assertTrue(card.contains("private static final class RoundedIconView"));
         assertTrue(card.contains("badge.setCornerRadiusPx(value.iconCornerRadiusPx)"));
-        assertTrue(card.contains("canvas.saveLayer(maskBounds, null)"));
-        assertTrue(card.contains("PorterDuff.Mode.DST_IN"));
-        assertTrue(card.contains("setLayerType(View.LAYER_TYPE_SOFTWARE, null)"));
+        assertTrue(card.contains("new BitmapShader"));
+        assertTrue(card.contains("canvas.drawRoundRect(maskBounds, radius, radius"));
+        assertFalse(card.contains("new PorterDuffXfermode"));
         assertTrue(card.contains("layoutElementsExactly(right - left, bottom - top)"));
         assertTrue(card.contains("placeExactly(badge, value.badge, width, height)"));
         assertTrue(card.contains("view.layout(childLeft, childTop"));
@@ -74,7 +74,7 @@ public final class Ha1166BleIdentityAndVisualCenteringContractTest {
     @Test public void releaseIdentityIsHa1166() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1167'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1168'"));
     }
 
     private static String source(String relative) throws Exception {

@@ -44,6 +44,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -82,6 +83,8 @@ public final class IphoneAncsTransport {
     /** Dedicated Helper telemetry endpoint on the current verified GATT-server connection. */
     private static final UUID TELEMETRY_CHARACTERISTIC =
             UUID.fromString("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f01");
+    private static final UUID CLIENT_CHARACTERISTIC_CONFIGURATION =
+            UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
     private static final UUID GENERIC_ATTRIBUTE_SERVICE =
             UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
     private static final UUID SERVICE_CHANGED =
@@ -136,6 +139,12 @@ public final class IphoneAncsTransport {
      */
     private static final long HELPER_TELEMETRY_POLL_MS = 1_000L;
     private static final long HELPER_TELEMETRY_BUSY_RETRY_MS = 1_000L;
+    /**
+     * In the iPhone-Central route an ordinary iOS Timer is suspended in the background.  A B4
+     * notification is a Core Bluetooth event, so it wakes the subscribed Helper and lets it write
+     * a fresh atomic battery/power/network frame without an unrelated background-mode workaround.
+     */
+    private static final long HELPER_CENTRAL_BACKGROUND_POLL_MS = 5_000L;
     private static final long HELPER_SERVICE_REDISCOVERY_MS = 30_000L;
     private static final long BOND_TIMEOUT_MS = 90_000L;
     private static final long ANCS_REQUEST_GAP_MS = 120L;
@@ -331,6 +340,7 @@ public final class IphoneAncsTransport {
         long connectedAtElapsedMs;
         boolean connected;
         boolean linkSecurityChallengeIssued;
+        boolean telemetryNotificationsEnabled;
 
         GattServerPeer(long sessionGeneration, BluetoothDevice device) {
             this.sessionGeneration = sessionGeneration;
@@ -424,6 +434,7 @@ public final class IphoneAncsTransport {
     private BluetoothGattCharacteristic batteryLevelStatus;
     private BluetoothGattCharacteristic iphoneSecureCharacteristic;
     private BluetoothGattCharacteristic iphoneTelemetryCharacteristic;
+    private BluetoothGattCharacteristic serverTelemetryCharacteristic;
     private Request activeRequest;
     private AncsProtocol.NotificationAccumulator notificationAccumulator;
     private AncsProtocol.AppNameAccumulator appNameAccumulator;
@@ -434,6 +445,9 @@ public final class IphoneAncsTransport {
     private Runnable batteryReadTimeout;
     private Runnable helperTelemetryReadTimeout;
     private Runnable helperTelemetryPoll;
+    private Runnable helperCentralBackgroundPoll;
+    private int helperCentralBackgroundPollSequence;
+    private long lastHelperCentralBackgroundPollLogAt;
     private long lastHelperTelemetrySuccessLogAt;
     @NonNull private String lastLoggedHelperTelemetry = "";
     private Runnable bondTimeout;
@@ -1417,6 +1431,7 @@ public final class IphoneAncsTransport {
     }
 
     private void resetVerifiedPeerSession() {
+        cancelHelperCentralBackgroundPolling();
         synchronized (verifiedPeerLock) {
             verifiedPeer = null;
         }
@@ -1557,6 +1572,7 @@ public final class IphoneAncsTransport {
         state("CURRENT LINK OK · SAME-PEER ATTACH");
         log("SECURE ATT OK · " + operation + " · peer=" + safeAddress(device)
                 + (first ? " · current-link challenge confirmed" : " · повтор"));
+        scheduleHelperCentralBackgroundPolling(0L);
         if (!first) {
             log("Повторный SECURE ATT OK не создаёт новую connectGatt-попытку");
             return;
@@ -1868,13 +1884,102 @@ public final class IphoneAncsTransport {
                 if (!peer.connected) {
                     peer.connectedAtElapsedMs = now;
                     peer.linkSecurityChallengeIssued = false;
+                    peer.telemetryNotificationsEnabled = false;
                 }
                 peer.connected = true;
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 peer.connected = false;
                 peer.linkSecurityChallengeIssued = false;
+                peer.telemetryNotificationsEnabled = false;
             }
         }
+    }
+
+    private boolean setServerTelemetrySubscription(BluetoothDevice device, boolean enabled) {
+        synchronized (gattServerPeers) {
+            for (GattServerPeer peer : gattServerPeers.values()) {
+                if (peer.sessionGeneration != sessionGeneration
+                        || !peer.connected || !sameDevice(peer.device, device)) continue;
+                peer.telemetryNotificationsEnabled = enabled;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isServerTelemetrySubscribed(BluetoothDevice device) {
+        synchronized (gattServerPeers) {
+            for (GattServerPeer peer : gattServerPeers.values()) {
+                if (peer.sessionGeneration == sessionGeneration
+                        && peer.connected && peer.telemetryNotificationsEnabled
+                        && sameDevice(peer.device, device)) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isTelemetryCccd(@Nullable BluetoothGattDescriptor descriptor) {
+        if (descriptor == null
+                || !CLIENT_CHARACTERISTIC_CONFIGURATION.equals(descriptor.getUuid())) {
+            return false;
+        }
+        BluetoothGattCharacteristic characteristic = descriptor.getCharacteristic();
+        return characteristic != null
+                && TELEMETRY_CHARACTERISTIC.equals(characteristic.getUuid());
+    }
+
+    private void cancelHelperCentralBackgroundPolling() {
+        if (helperCentralBackgroundPoll != null) {
+            main.removeCallbacks(helperCentralBackgroundPoll);
+        }
+        helperCentralBackgroundPoll = null;
+        helperCentralBackgroundPollSequence = 0;
+        lastHelperCentralBackgroundPollLogAt = 0L;
+    }
+
+    private void scheduleHelperCentralBackgroundPolling(long delayMs) {
+        if (helperCentralBackgroundPoll != null || closing || !managedIncomingMode
+                || !secureAttConfirmed) return;
+        BluetoothDevice device = getVerifiedPeer();
+        if (device == null || !isServerTelemetrySubscribed(device)) return;
+        helperCentralBackgroundPoll = () -> {
+            helperCentralBackgroundPoll = null;
+            sendHelperCentralBackgroundPoll();
+        };
+        main.postDelayed(helperCentralBackgroundPoll, Math.max(0L, delayMs));
+    }
+
+    private void sendHelperCentralBackgroundPoll() {
+        if (closing || !managedIncomingMode || !secureAttConfirmed) return;
+        BluetoothGattServer server = gattServer;
+        BluetoothGattCharacteristic characteristic = serverTelemetryCharacteristic;
+        BluetoothDevice device = getVerifiedPeer();
+        if (server == null || characteristic == null || device == null
+                || findConnectedServerPeer(device) == null
+                || !isServerTelemetrySubscribed(device)) return;
+        helperCentralBackgroundPollSequence = (helperCentralBackgroundPollSequence + 1) & 0xFFFF;
+        characteristic.setValue(new byte[] {
+                0x4B, 0x58, 0x50, 0x01,
+                (byte) helperCentralBackgroundPollSequence,
+                (byte) (helperCentralBackgroundPollSequence >> 8)
+        });
+        boolean accepted;
+        try {
+            accepted = server.notifyCharacteristicChanged(device, characteristic, false);
+        } catch (RuntimeException failure) {
+            accepted = false;
+            log("B4 background poll notify exception: " + failure);
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (!accepted || lastHelperCentralBackgroundPollLogAt == 0L
+                || now - lastHelperCentralBackgroundPollLogAt >= 60_000L) {
+            lastHelperCentralBackgroundPollLogAt = now;
+            log("B4 background poll → iPhone Central · accepted=" + accepted
+                    + " · seq=" + helperCentralBackgroundPollSequence);
+        }
+        scheduleHelperCentralBackgroundPolling(
+                accepted ? HELPER_CENTRAL_BACKGROUND_POLL_MS
+                        : HELPER_TELEMETRY_BUSY_RETRY_MS);
     }
 
     private void handleVerifiedServerLinkDisconnected(BluetoothDevice device) {
@@ -1957,10 +2062,17 @@ public final class IphoneAncsTransport {
         BluetoothGattCharacteristic telemetry = new BluetoothGattCharacteristic(
                 TELEMETRY_CHARACTERISTIC,
                 BluetoothGattCharacteristic.PROPERTY_READ
-                        | BluetoothGattCharacteristic.PROPERTY_WRITE,
+                        | BluetoothGattCharacteristic.PROPERTY_WRITE
+                        | BluetoothGattCharacteristic.PROPERTY_NOTIFY,
                 BluetoothGattCharacteristic.PERMISSION_READ
                         | BluetoothGattCharacteristic.PERMISSION_WRITE);
         telemetry.setValue("TEL3;-;-;X;-;0".getBytes(StandardCharsets.UTF_8));
+        BluetoothGattDescriptor telemetryCccd = new BluetoothGattDescriptor(
+                CLIENT_CHARACTERISTIC_CONFIGURATION,
+                BluetoothGattDescriptor.PERMISSION_READ
+                        | BluetoothGattDescriptor.PERMISSION_WRITE);
+        telemetryCccd.setValue(BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE);
+        boolean telemetryDescriptorAdded = telemetry.addDescriptor(telemetryCccd);
 
         boolean informationAdded = service.addCharacteristic(information);
         boolean controlAdded = service.addCharacteristic(control);
@@ -1968,8 +2080,10 @@ public final class IphoneAncsTransport {
         boolean telemetryAdded = service.addCharacteristic(telemetry);
         log("Diagnostic characteristics: INFO=" + informationAdded
                 + " CONTROL=" + controlAdded + " SECURE=" + secureAdded
-                + " TELEMETRY=" + telemetryAdded);
-        if (!informationAdded || !controlAdded || !secureAdded || !telemetryAdded) {
+                + " TELEMETRY=" + telemetryAdded
+                + " B4_CCCD=" + telemetryDescriptorAdded);
+        if (!informationAdded || !controlAdded || !secureAdded || !telemetryAdded
+                || !telemetryDescriptorAdded) {
             state("GATT_CHARACTERISTIC_ADD_FAILED");
             advertisingDesired = false;
             clearPreparedAdvertising();
@@ -1984,6 +2098,7 @@ public final class IphoneAncsTransport {
             clearPreparedAdvertising();
             closeGattServer();
         } else {
+            serverTelemetryCharacteristic = telemetry;
             state("ЖДУ ДОБАВЛЕНИЯ GATT SERVICE");
         }
     }
@@ -2020,6 +2135,8 @@ public final class IphoneAncsTransport {
     }
 
     private void closeGattServer() {
+        cancelHelperCentralBackgroundPolling();
+        serverTelemetryCharacteristic = null;
         BluetoothGattServer old = gattServer;
         gattServer = null;
         if (old != null) {
@@ -4016,6 +4133,69 @@ public final class IphoneAncsTransport {
                 }
 
                 @Override
+                public void onDescriptorReadRequest(BluetoothDevice device, int requestId,
+                                                    int offset,
+                                                    BluetoothGattDescriptor descriptor) {
+                    if (!isTelemetryCccd(descriptor)) {
+                        sendGattServerResponse(device, requestId,
+                                BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, 0, null);
+                        return;
+                    }
+                    byte[] value = isServerTelemetrySubscribed(device)
+                            ? BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                            : BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE;
+                    sendGattReadResponse(device, requestId, offset, value);
+                }
+
+                @Override
+                public void onDescriptorWriteRequest(BluetoothDevice device, int requestId,
+                                                     BluetoothGattDescriptor descriptor,
+                                                     boolean preparedWrite,
+                                                     boolean responseNeeded,
+                                                     int offset, byte[] value) {
+                    int status = BluetoothGatt.GATT_SUCCESS;
+                    boolean enabled = false;
+                    if (!isTelemetryCccd(descriptor)) {
+                        status = BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED;
+                    } else if (preparedWrite) {
+                        status = BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED;
+                    } else if (offset != 0) {
+                        status = BluetoothGatt.GATT_INVALID_OFFSET;
+                    } else if (!isVerifiedPeer(device)) {
+                        status = STATUS_INSUFFICIENT_AUTHORIZATION;
+                    } else if (Arrays.equals(value,
+                            BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)) {
+                        enabled = true;
+                        if (!setServerTelemetrySubscription(device, true)) {
+                            status = BluetoothGatt.GATT_FAILURE;
+                        }
+                    } else if (Arrays.equals(value,
+                            BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE)) {
+                        if (!setServerTelemetrySubscription(device, false)) {
+                            status = BluetoothGatt.GATT_FAILURE;
+                        }
+                    } else {
+                        status = BluetoothGatt.GATT_FAILURE;
+                    }
+                    if (responseNeeded) {
+                        sendGattServerResponse(device, requestId, status, 0, null);
+                    }
+                    final int completedStatus = status;
+                    final boolean notificationsEnabled = enabled;
+                    main.post(() -> {
+                        log("B4 CCCD · status=" + completedStatus
+                                + " · notifications=" + notificationsEnabled
+                                + " · peer=" + safeAddress(device));
+                        if (completedStatus != BluetoothGatt.GATT_SUCCESS) return;
+                        if (notificationsEnabled) {
+                            scheduleHelperCentralBackgroundPolling(0L);
+                        } else {
+                            cancelHelperCentralBackgroundPolling();
+                        }
+                    });
+                }
+
+                @Override
                 public void onCharacteristicReadRequest(BluetoothDevice device,
                                                         int requestId, int offset,
                                                         BluetoothGattCharacteristic characteristic) {
@@ -4078,8 +4258,9 @@ public final class IphoneAncsTransport {
                     byte[] rawValue = value == null ? null : value.clone();
                     IphoneHelperTelemetry diagnosticTelemetry =
                             IphoneHelperTelemetry.parse(rawValue);
-                    main.post(() -> log(diagnosticTelemetry == null
-                            ? "GATT SERVER WRITE raw: session=" + sessionGeneration
+                    if (diagnosticTelemetry == null) {
+                        main.post(() -> log("GATT SERVER WRITE raw: session="
+                            + sessionGeneration
                             + " peer=" + safeAddress(device)
                             + " requestId=" + requestId
                             + " offset=" + offset
@@ -4090,10 +4271,8 @@ public final class IphoneAncsTransport {
                             + " hex=" + AdvertisementParser.hex(rawValue, 80)
                             + " ascii=`" + asciiCommand(rawValue) + "`"
                             + " type=" + typeLabel(safeType(device))
-                            + " bond=" + bondLabel(safeBondState(device))
-                            : "GATT SERVER WRITE TELEMETRY: kind=" + diagnosticTelemetry.kind
-                            + " seq=" + diagnosticTelemetry.sequence
-                            + " peer=" + safeAddress(device)));
+                            + " bond=" + bondLabel(safeBondState(device))));
+                    }
                     int status = BluetoothGatt.GATT_SUCCESS;
                     Runnable successAction = null;
 
@@ -4126,8 +4305,13 @@ public final class IphoneAncsTransport {
                         } else if (telemetry != null) {
                             successAction = () -> {
                                 listener.onHelperTelemetry(telemetry);
-                                log("Helper telemetry accepted: kind=" + telemetry.kind
-                                        + " seq=" + telemetry.sequence);
+                                if (shouldLogHelperTelemetry(telemetry)) {
+                                    log("Helper telemetry accepted: kind=" + telemetry.kind
+                                            + " battery=" + telemetry.batteryLevel
+                                            + " externalPower=" + telemetry.externalPower
+                                            + " network=" + telemetry.networkType
+                                            + " seq=" + telemetry.sequence);
+                                }
                             };
                         } else if (TELEMETRY_CHARACTERISTIC.equals(uuid)) {
                             status = BluetoothGatt.GATT_FAILURE;

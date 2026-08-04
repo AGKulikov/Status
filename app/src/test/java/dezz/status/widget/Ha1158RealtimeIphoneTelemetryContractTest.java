@@ -52,7 +52,7 @@ public final class Ha1158RealtimeIphoneTelemetryContractTest {
 
     @Test public void releaseIdentityMovesForward() throws Exception {
         String build = project("build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1167'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1168'"));
     }
 
     private static String source(String relative) throws Exception {
