@@ -57,7 +57,7 @@ public final class PhoneNotificationCardView extends FrameLayout {
     private PhoneNotificationLayoutConfig config;
     private Model model = Model.preview();
     private final TextView avatar;
-    private final ImageView badge;
+    private final RoundedIconView badge;
     private final OverflowTextView title;
     private final OverflowTextView time;
     private final OverflowTextView application;
@@ -75,7 +75,7 @@ public final class PhoneNotificationCardView extends FrameLayout {
         setClipToPadding(true);
 
         avatar = text(Gravity.CENTER, 1);
-        badge = new ImageView(context);
+        badge = new RoundedIconView(context);
         title = overflowText(Gravity.START | Gravity.CENTER_VERTICAL);
         time = overflowText(Gravity.START | Gravity.CENTER_VERTICAL);
         application = overflowText(Gravity.START | Gravity.CENTER_VERTICAL);
@@ -123,9 +123,11 @@ public final class PhoneNotificationCardView extends FrameLayout {
         avatar.setBackground(round(value.avatarColor, value.avatarCornerRadiusPx));
         avatar.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
         avatar.setClipToOutline(value.avatarCornerRadiusPx > 0);
-        badge.setBackground(round("#00000000", value.iconCornerRadiusPx));
-        badge.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
-        badge.setClipToOutline(value.iconCornerRadiusPx > 0);
+        // ViewOutlineProvider.BACKGROUND does not reliably clip a fully transparent
+        // GradientDrawable on the KX11 Android 9 compositor.  Clip the icon's complete draw pass
+        // with the configured path so the slider changes both the editor and the real overlay.
+        badge.setBackgroundColor(Color.TRANSPARENT);
+        badge.setCornerRadiusPx(value.iconCornerRadiusPx);
         badge.setScaleType(value.iconPreserveAspectRatio
                 ? ImageView.ScaleType.FIT_CENTER : ImageView.ScaleType.CENTER_CROP);
         Drawable icon = phoneAppIcon(model.appIconIdentifier);
@@ -187,6 +189,18 @@ public final class PhoneNotificationCardView extends FrameLayout {
         layoutElements(width, height);
     }
 
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
+        // The KX11 Android 9 FrameLayout can keep an ImageView at the position produced by its
+        // temporary MATCH_PARENT parameters when this editor is opened again.  The edit overlay
+        // already draws from the persisted grid, so that stale child position makes the bitmap
+        // appear in the middle while its blue frame stays at the saved cell.  Re-apply the exact
+        // grid bounds after every parent layout (not only after a size change) so the rendered
+        // child and editor outline always share one coordinate source.
+        layoutElementsExactly(right - left, bottom - top);
+    }
+
     private void layoutElements(int width, int height) {
         PhoneNotificationLayoutConfig value = config;
         if (value == null || width <= 0 || height <= 0) return;
@@ -199,21 +213,69 @@ public final class PhoneNotificationCardView extends FrameLayout {
         place(chevron, value.chevron, width, height);
     }
 
+    private void layoutElementsExactly(int width, int height) {
+        PhoneNotificationLayoutConfig value = config;
+        if (value == null || width <= 0 || height <= 0) return;
+        placeExactly(avatar, value.avatar, width, height);
+        placeExactly(badge, value.badge, width, height);
+        placeExactly(title, value.title, width, height);
+        placeExactly(time, value.time, width, height);
+        placeExactly(application, value.application, width, height);
+        placeExactly(message, value.message, width, height);
+        placeExactly(chevron, value.chevron, width, height);
+    }
+
     private static void place(@NonNull View view,
                               @NonNull PhoneNotificationLayoutConfig.Element element,
                               int width, int height) {
-        int cellWidth = Math.max(1, width / PhoneNotificationLayoutConfig.GRID_COLUMNS);
-        int cellHeight = Math.max(1, height / PhoneNotificationLayoutConfig.GRID_ROWS);
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                Math.max(1, element.columnSpan * cellWidth),
-                Math.max(1, element.rowSpan * cellHeight));
+        int childLeft = gridCoordinate(element.column, width,
+                PhoneNotificationLayoutConfig.GRID_COLUMNS);
+        int childRight = gridCoordinate(element.column + element.columnSpan, width,
+                PhoneNotificationLayoutConfig.GRID_COLUMNS);
+        int childTop = gridCoordinate(element.row, height,
+                PhoneNotificationLayoutConfig.GRID_ROWS);
+        int childBottom = gridCoordinate(element.row + element.rowSpan, height,
+                PhoneNotificationLayoutConfig.GRID_ROWS);
         if (view instanceof OverflowTextView) {
-            params.height = Math.min(params.height,
-                    ((OverflowTextView) view).preferredVisibleHeight());
+            childBottom = Math.min(childBottom, childTop
+                    + ((OverflowTextView) view).preferredVisibleHeight());
         }
-        params.leftMargin = element.column * cellWidth;
-        params.topMargin = element.row * cellHeight;
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                Math.max(1, childRight - childLeft), Math.max(1, childBottom - childTop));
+        params.leftMargin = childLeft;
+        params.topMargin = childTop;
         view.setLayoutParams(params);
+    }
+
+    private static void placeExactly(@NonNull View view,
+                                     @NonNull PhoneNotificationLayoutConfig.Element element,
+                                     int width, int height) {
+        if (view.getVisibility() == GONE) return;
+        int childLeft = gridCoordinate(element.column, width,
+                PhoneNotificationLayoutConfig.GRID_COLUMNS);
+        int childRight = gridCoordinate(element.column + element.columnSpan, width,
+                PhoneNotificationLayoutConfig.GRID_COLUMNS);
+        int childTop = gridCoordinate(element.row, height,
+                PhoneNotificationLayoutConfig.GRID_ROWS);
+        int childBottom = gridCoordinate(element.row + element.rowSpan, height,
+                PhoneNotificationLayoutConfig.GRID_ROWS);
+        if (view instanceof OverflowTextView) {
+            childBottom = Math.min(childBottom, childTop
+                    + ((OverflowTextView) view).preferredVisibleHeight());
+        }
+        int childWidth = Math.max(1, childRight - childLeft);
+        int childHeight = Math.max(1, childBottom - childTop);
+        if (view.getMeasuredWidth() != childWidth || view.getMeasuredHeight() != childHeight) {
+            view.measure(MeasureSpec.makeMeasureSpec(childWidth, MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(childHeight, MeasureSpec.EXACTLY));
+        }
+        view.setTranslationX(0f);
+        view.setTranslationY(0f);
+        view.layout(childLeft, childTop, childLeft + childWidth, childTop + childHeight);
+    }
+
+    private static int gridCoordinate(int index, int extent, int cellCount) {
+        return Math.round(index * (Math.max(1, extent) / (float) Math.max(1, cellCount)));
     }
 
     @NonNull
@@ -307,6 +369,40 @@ public final class PhoneNotificationCardView extends FrameLayout {
         @Override protected void onDetachedFromWindow() {
             removeCallbacks(scrollFrame);
             super.onDetachedFromWindow();
+        }
+    }
+
+    /** Deterministic rounded-square clipping for bitmap and vector application icons. */
+    private static final class RoundedIconView extends ImageView {
+        private final Path clipPath = new Path();
+        private final RectF clipBounds = new RectF();
+        private int cornerRadiusPx;
+
+        RoundedIconView(@NonNull Context context) {
+            super(context);
+        }
+
+        void setCornerRadiusPx(int radius) {
+            int safe = Math.max(0, radius);
+            if (cornerRadiusPx == safe) return;
+            cornerRadiusPx = safe;
+            invalidate();
+        }
+
+        @Override public void draw(@NonNull Canvas canvas) {
+            if (cornerRadiusPx <= 0 || getWidth() <= 0 || getHeight() <= 0) {
+                super.draw(canvas);
+                return;
+            }
+            float radius = Math.min(cornerRadiusPx,
+                    Math.min(getWidth(), getHeight()) / 2f);
+            clipBounds.set(0f, 0f, getWidth(), getHeight());
+            clipPath.reset();
+            clipPath.addRoundRect(clipBounds, radius, radius, Path.Direction.CW);
+            int checkpoint = canvas.save();
+            canvas.clipPath(clipPath);
+            super.draw(canvas);
+            canvas.restoreToCount(checkpoint);
         }
     }
 

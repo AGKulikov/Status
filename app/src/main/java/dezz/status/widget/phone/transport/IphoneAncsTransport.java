@@ -691,9 +691,13 @@ public final class IphoneAncsTransport {
                 && !address.trim().equalsIgnoreCase(classicAddress.trim());
         managedResolvedPeer = dedicatedIdentity ? selected : null;
         if (managedResolvedPeer != null) {
-            claimVerifiedPeer(managedResolvedPeer);
-            log("Reverse route восстановил ранее подтверждённую BLE identity "
-                    + safeAddress(managedResolvedPeer));
+            // The saved value can be yesterday's resolvable private address.  It is only a hint
+            // for diagnostics until this GATT-server generation receives PAIR from the actual
+            // incoming link.  Pre-claiming it made every rotated iOS RPA look like a foreign
+            // callback and returned ATT status 8 (insufficient authorization) forever.
+            log("Reverse route сохранил прежнюю BLE identity только как hint "
+                    + safeAddress(managedResolvedPeer)
+                    + "; текущий incoming peer будет подтверждён заново через PAIR + SECURE");
         }
         iphonePeripheralMode = false;
         helperBootstrapMode = false;
@@ -3583,7 +3587,11 @@ public final class IphoneAncsTransport {
         stopAdvertising();
         resetVerifiedPeerSession();
         managedIncomingMode = true;
-        if (resolvedPeer != null) claimVerifiedPeer(resolvedPeer);
+        managedResolvedPeer = resolvedPeer;
+        if (resolvedPeer != null) {
+            log("Новая Geely_ANCS session не pre-claim'ит старый RPA "
+                    + safeAddress(resolvedPeer) + "; жду PAIR от текущего incoming callback");
+        }
         iphonePeripheralMode = false;
         helperBootstrapMode = false;
 

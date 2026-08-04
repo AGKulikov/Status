@@ -76,6 +76,28 @@ public final class PhoneNotificationLayoutConfigTest {
         assertTrue(restored.iconPreserveAspectRatio);
     }
 
+    @Test public void reopeningKeepsTheApplicationIconCellAndAppearanceTogether()
+            throws Exception {
+        PhoneNotificationLayoutConfig value = PhoneNotificationLayoutConfig.carPlay(
+                PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID);
+        value.badge.column = 3;
+        value.badge.row = 2;
+        value.badge.columnSpan = 8;
+        value.badge.rowSpan = 7;
+        value.iconCornerRadiusPx = 29;
+        value.iconPreserveAspectRatio = false;
+
+        PhoneNotificationLayoutConfig restored = PhoneNotificationLayoutConfig.fromJson(
+                value.overlayId, value.toJson());
+
+        assertEquals(3, restored.badge.column);
+        assertEquals(2, restored.badge.row);
+        assertEquals(8, restored.badge.columnSpan);
+        assertEquals(7, restored.badge.rowSpan);
+        assertEquals(29, restored.iconCornerRadiusPx);
+        assertFalse(restored.iconPreserveAspectRatio);
+    }
+
     @Test public void copyStyleKeepsNoIconGeometryAndVisibility() {
         PhoneNotificationLayoutConfig source = PhoneNotificationLayoutConfig.carPlay(
                 PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID);

@@ -1280,8 +1280,15 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             content.setSoundEffectsEnabled(false);
             icon.setSoundEffectsEnabled(false);
         }
-        content.addView(icon, new LinearLayout.LayoutParams(requested,
-                DriverPanelLayoutPolicy.shortcutIconHeight(requested, expandedClimate)));
+        // A live climate tile without a caption is the complete visual content.  Add it directly
+        // to the physical FrameLayout with CENTER gravity: the ECARX Android 9 LinearLayout path
+        // retained the child's old top after buttonHeightPx changed, even when its wrapper filled
+        // the button.  Other shortcuts and captioned climate tiles keep their normal column.
+        boolean directlyCenteredClimate = liveClimate && !shortcut.showTitle;
+        if (!directlyCenteredClimate) {
+            content.addView(icon, new LinearLayout.LayoutParams(requested,
+                    DriverPanelLayoutPolicy.shortcutIconHeight(requested, expandedClimate)));
+        }
 
         @Nullable TextView titleLabel = null;
         if (shortcut.showTitle) {
@@ -1320,9 +1327,15 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         // FrameLayout after only buttonHeightPx changed, which was most visible on the tall live
         // climate tile. MATCH_PARENT also makes asymmetric explicit top/bottom padding shift the
         // content predictably while untouched auto padding remains genuinely centred.
-        button.addView(content, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
-                Gravity.CENTER));
+        if (directlyCenteredClimate) {
+            button.addView(icon, new FrameLayout.LayoutParams(requested,
+                    DriverPanelLayoutPolicy.shortcutIconHeight(requested, expandedClimate),
+                    Gravity.CENTER));
+        } else {
+            button.addView(content, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
+                    Gravity.CENTER));
+        }
         WidgetService widgetService = WidgetService.getInstance();
         boolean actionEnabled = widgetService == null
                 || widgetService.driverShortcutActionEnabled(shortcut.id, true);
