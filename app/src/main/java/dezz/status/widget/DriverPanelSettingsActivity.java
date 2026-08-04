@@ -45,6 +45,7 @@ import dezz.status.widget.driver.DriverInformationTileLayoutPolicy;
 import dezz.status.widget.driver.DriverPanelLayoutPolicy;
 import dezz.status.widget.driver.DriverPanelService;
 import dezz.status.widget.driver.DriverClimateShortcutView;
+import dezz.status.widget.driver.DriverExactCenterFrameLayout;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.launcher.HighResolutionAppIconLoader;
 import dezz.status.widget.launcher.InformationShortcutView;
@@ -1503,10 +1504,9 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         int requestedIconSize = value.iconSizePx;
         int iconSize = Math.max(1, Math.min(railWidth,
                 Math.round(requestedIconSize * .62f)));
-        FrameLayout cell = new FrameLayout(this);
-        cell.addView(icon, new FrameLayout.LayoutParams(iconSize,
-                DriverPanelLayoutPolicy.shortcutIconHeight(iconSize, false),
-                Gravity.CENTER));
+        DriverExactCenterFrameLayout cell = new DriverExactCenterFrameLayout(this);
+        cell.addExactlyCentered(icon, iconSize,
+                DriverPanelLayoutPolicy.shortcutIconHeight(iconSize, false));
         return cell;
     }
 

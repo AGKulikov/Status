@@ -4,7 +4,10 @@ package dezz.status.widget.phone;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
@@ -374,12 +377,16 @@ public final class PhoneNotificationCardView extends FrameLayout {
 
     /** Deterministic rounded-square clipping for bitmap and vector application icons. */
     private static final class RoundedIconView extends ImageView {
-        private final Path clipPath = new Path();
-        private final RectF clipBounds = new RectF();
+        private final RectF maskBounds = new RectF();
+        private final Paint maskPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private int cornerRadiusPx;
 
         RoundedIconView(@NonNull Context context) {
             super(context);
+            // KX11's Android 9 hardware compositor ignores clipPath for this child in an overlay.
+            // A software saveLayer plus DST_IN is a real alpha mask for bitmap and vector icons.
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+            maskPaint.setColor(Color.BLACK);
         }
 
         void setCornerRadiusPx(int radius) {
@@ -389,19 +396,19 @@ public final class PhoneNotificationCardView extends FrameLayout {
             invalidate();
         }
 
-        @Override public void draw(@NonNull Canvas canvas) {
+        @Override protected void onDraw(@NonNull Canvas canvas) {
             if (cornerRadiusPx <= 0 || getWidth() <= 0 || getHeight() <= 0) {
-                super.draw(canvas);
+                super.onDraw(canvas);
                 return;
             }
             float radius = Math.min(cornerRadiusPx,
                     Math.min(getWidth(), getHeight()) / 2f);
-            clipBounds.set(0f, 0f, getWidth(), getHeight());
-            clipPath.reset();
-            clipPath.addRoundRect(clipBounds, radius, radius, Path.Direction.CW);
-            int checkpoint = canvas.save();
-            canvas.clipPath(clipPath);
-            super.draw(canvas);
+            maskBounds.set(0f, 0f, getWidth(), getHeight());
+            int checkpoint = canvas.saveLayer(maskBounds, null);
+            super.onDraw(canvas);
+            maskPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
+            canvas.drawRoundRect(maskBounds, radius, radius, maskPaint);
+            maskPaint.setXfermode(null);
             canvas.restoreToCount(checkpoint);
         }
     }

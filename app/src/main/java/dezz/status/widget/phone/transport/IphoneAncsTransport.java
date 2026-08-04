@@ -79,7 +79,7 @@ public final class IphoneAncsTransport {
             UUID.fromString("d2d9e4b2-47f1-4e44-a8bb-a932fd5a2f01");
     private static final UUID SECURE_CHARACTERISTIC =
             UUID.fromString("d2d9e4b3-47f1-4e44-a8bb-a932fd5a2f01");
-    /** Dedicated Helper v8 telemetry endpoint; B3 remains the encrypted handshake. */
+    /** Dedicated Helper telemetry endpoint on the current verified GATT-server connection. */
     private static final UUID TELEMETRY_CHARACTERISTIC =
             UUID.fromString("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f01");
     private static final UUID GENERIC_ATTRIBUTE_SERVICE =
@@ -157,9 +157,9 @@ public final class IphoneAncsTransport {
         void onNotification(NotificationItem item);
         void onAppName(String appIdentifier, String displayName);
         void onBatteryCharacteristic(UUID characteristicUuid, byte[] value);
-        /** Authenticated Helper telemetry received on the encrypted application channel. */
+        /** Helper telemetry received from the peer verified on the current application channel. */
         default void onHelperTelemetry(IphoneHelperTelemetry telemetry) {}
-        /** Stable BLE identity proved by PAIR plus an encrypted SECURE ATT operation. */
+        /** Stable BLE identity proved by PAIR plus a second operation on the same live ATT link. */
         default void onVerifiedPeerAddress(String address) {}
     }
 
@@ -330,6 +330,7 @@ public final class IphoneAncsTransport {
         BluetoothDevice device;
         long connectedAtElapsedMs;
         boolean connected;
+        boolean linkSecurityChallengeIssued;
 
         GattServerPeer(long sessionGeneration, BluetoothDevice device) {
             this.sessionGeneration = sessionGeneration;
@@ -1423,7 +1424,9 @@ public final class IphoneAncsTransport {
         cancelColdBackgroundAttach();
         cancelClientAttemptCallbacks();
         sessionGeneration++;
-        gattServerPeers.clear();
+        synchronized (gattServerPeers) {
+            gattServerPeers.clear();
+        }
         activeClientTarget = null;
         activeClientAutoConnect = false;
         backgroundAttachAttempted = false;
@@ -1525,18 +1528,18 @@ public final class IphoneAncsTransport {
             log("PAIR callback проигнорирован: peer не совпадает с verified peer");
             return;
         }
-        state("VERIFIED PEER · ЗАПРОС LE BOND");
+        state("VERIFIED PEER · CURRENT LINK CHALLENGE");
         log("PAIR принят. VERIFIED PEER: " + safeName(device)
                 + " " + safeAddress(device)
                 + " objectId=" + System.identityHashCode(device)
                 + " type=" + typeLabel(safeType(device))
                 + " bond=" + bondLabel(safeBondState(device)));
         if (safeBondState(device) == BluetoothDevice.BOND_BONDED) {
-            log("PAIR: verified peer уже BOND_BONDED; ждём SECURE ATT OK. "
-                    + "Ранний reverse connect запрещён");
+            log("PAIR: общий Classic/LE peer уже BOND_BONDED; первая B3 READ запросит "
+                    + "security именно текущего LE link. Ранний reverse connect запрещён");
         } else {
             requestBond(device);
-            log("connectGatt отложен до SECURE ATT OK");
+            log("connectGatt отложен до подтверждения текущего ATT link");
         }
     }
 
@@ -1551,9 +1554,9 @@ public final class IphoneAncsTransport {
             managedResolvedPeer = device;
             listener.onVerifiedPeerAddress(safeAddress(device));
         }
-        state("SECURE ATT OK · SAME-PEER ATTACH");
+        state("CURRENT LINK OK · SAME-PEER ATTACH");
         log("SECURE ATT OK · " + operation + " · peer=" + safeAddress(device)
-                + (first ? " · encrypted characteristic confirmed" : " · повтор"));
+                + (first ? " · current-link challenge confirmed" : " · повтор"));
         if (!first) {
             log("Повторный SECURE ATT OK не создаёт новую connectGatt-попытку");
             return;
@@ -1816,36 +1819,66 @@ public final class IphoneAncsTransport {
     }
 
     private GattServerPeer findConnectedServerPeer(BluetoothDevice device) {
-        for (GattServerPeer peer : gattServerPeers.values()) {
-            if (peer.sessionGeneration == sessionGeneration
-                    && peer.connected
-                    && sameDevice(peer.device, device)) {
-                return peer;
+        synchronized (gattServerPeers) {
+            for (GattServerPeer peer : gattServerPeers.values()) {
+                if (peer.sessionGeneration == sessionGeneration
+                        && peer.connected
+                        && sameDevice(peer.device, device)) {
+                    return peer;
+                }
             }
         }
         return null;
+    }
+
+    /**
+     * Returns true exactly once for each physical incoming GATT link.  The first B3 read receives
+     * ATT insufficient-authentication so Core Bluetooth can restore/start LE security even when
+     * Android 9 incorrectly reports the shared Classic device as already BOND_BONDED.  B3 itself
+     * deliberately has plain framework permissions: otherwise Fluoride rejects the request with
+     * code 12 before this callback and the application can never break that stale-key loop.
+     */
+    private boolean issueCurrentLinkSecurityChallenge(BluetoothDevice device) {
+        synchronized (gattServerPeers) {
+            for (GattServerPeer peer : gattServerPeers.values()) {
+                if (peer.sessionGeneration != sessionGeneration
+                        || !peer.connected || !sameDevice(peer.device, device)) continue;
+                if (peer.linkSecurityChallengeIssued) return false;
+                peer.linkSecurityChallengeIssued = true;
+                return true;
+            }
+        }
+        // A read should follow the connection callback, but challenge an unexpectedly early Binder
+        // request rather than accepting a link that has not reached the current session registry.
+        return true;
     }
 
     private void recordGattServerPeer(BluetoothDevice device, int status, int newState) {
         if (device == null) return;
         long now = android.os.SystemClock.elapsedRealtime();
         String key = deviceKey(device);
-        GattServerPeer peer = gattServerPeers.get(key);
-        if (peer == null || peer.sessionGeneration != sessionGeneration) {
-            peer = new GattServerPeer(sessionGeneration, device);
-            gattServerPeers.put(key, peer);
-        }
-        peer.device = device;
-        if (status == GATT_SUCCESS && newState == BluetoothProfile.STATE_CONNECTED) {
-            if (!peer.connected) peer.connectedAtElapsedMs = now;
-            peer.connected = true;
-        } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-            peer.connected = false;
+        synchronized (gattServerPeers) {
+            GattServerPeer peer = gattServerPeers.get(key);
+            if (peer == null || peer.sessionGeneration != sessionGeneration) {
+                peer = new GattServerPeer(sessionGeneration, device);
+                gattServerPeers.put(key, peer);
+            }
+            peer.device = device;
+            if (status == GATT_SUCCESS && newState == BluetoothProfile.STATE_CONNECTED) {
+                if (!peer.connected) {
+                    peer.connectedAtElapsedMs = now;
+                    peer.linkSecurityChallengeIssued = false;
+                }
+                peer.connected = true;
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                peer.connected = false;
+                peer.linkSecurityChallengeIssued = false;
+            }
         }
     }
 
     private void handleVerifiedServerLinkDisconnected(BluetoothDevice device) {
-        boolean encryptedHandshakeIncomplete = !secureAttConfirmed || !iphoneAncsSeen;
+        boolean linkHandshakeIncomplete = !secureAttConfirmed || !iphoneAncsSeen;
         cancelClientAttemptCallbacks();
         log("VERIFIED GATT SERVER LINK disconnected: " + safeAddress(device)
                 + "; pending same-peer client attach остановлен");
@@ -1868,8 +1901,8 @@ public final class IphoneAncsTransport {
             }
         }
         if (managedReconnectEnabled) {
-            if (encryptedHandshakeIncomplete) {
-                log("Encrypted handshake не завершён; пересоздаю GATT server/advertiser "
+            if (linkHandshakeIncomplete) {
+                log("Current-link handshake не завершён; пересоздаю GATT server/advertiser "
                         + "без сброса Classic pairing");
                 stopAdvertising();
                 resetVerifiedPeerSession();
@@ -1917,16 +1950,16 @@ public final class IphoneAncsTransport {
                 SECURE_CHARACTERISTIC,
                 BluetoothGattCharacteristic.PROPERTY_READ
                         | BluetoothGattCharacteristic.PROPERTY_WRITE,
-                BluetoothGattCharacteristic.PERMISSION_READ_ENCRYPTED
-                        | BluetoothGattCharacteristic.PERMISSION_WRITE_ENCRYPTED);
+                BluetoothGattCharacteristic.PERMISSION_READ
+                        | BluetoothGattCharacteristic.PERMISSION_WRITE);
         secure.setValue("SECURE ATT OK".getBytes(StandardCharsets.UTF_8));
 
         BluetoothGattCharacteristic telemetry = new BluetoothGattCharacteristic(
                 TELEMETRY_CHARACTERISTIC,
                 BluetoothGattCharacteristic.PROPERTY_READ
                         | BluetoothGattCharacteristic.PROPERTY_WRITE,
-                BluetoothGattCharacteristic.PERMISSION_READ_ENCRYPTED
-                        | BluetoothGattCharacteristic.PERMISSION_WRITE_ENCRYPTED);
+                BluetoothGattCharacteristic.PERMISSION_READ
+                        | BluetoothGattCharacteristic.PERMISSION_WRITE);
         telemetry.setValue("TEL3;-;-;X;-;0".getBytes(StandardCharsets.UTF_8));
 
         boolean informationAdded = service.addCharacteristic(information);
@@ -4007,6 +4040,13 @@ public final class IphoneAncsTransport {
                                     STATUS_INSUFFICIENT_AUTHORIZATION, 0, null);
                             main.post(() -> log("SECURE READ отклонён: peer не verified · "
                                     + safeAddress(device)));
+                            return;
+                        }
+                        if (issueCurrentLinkSecurityChallenge(device)) {
+                            sendGattServerResponse(device, requestId,
+                                    STATUS_INSUFFICIENT_AUTHENTICATION, 0, null);
+                            main.post(() -> log("CURRENT LINK SECURITY CHALLENGE · первая B3 READ "
+                                    + "получила ATT status=5 · peer=" + safeAddress(device)));
                             return;
                         }
                         sendGattReadResponse(device, requestId, offset,

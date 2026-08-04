@@ -19,7 +19,9 @@ public final class Ha1166BleIdentityAndVisualCenteringContractTest {
 
         assertTrue(card.contains("private static final class RoundedIconView"));
         assertTrue(card.contains("badge.setCornerRadiusPx(value.iconCornerRadiusPx)"));
-        assertTrue(card.contains("canvas.clipPath(clipPath)"));
+        assertTrue(card.contains("canvas.saveLayer(maskBounds, null)"));
+        assertTrue(card.contains("PorterDuff.Mode.DST_IN"));
+        assertTrue(card.contains("setLayerType(View.LAYER_TYPE_SOFTWARE, null)"));
         assertTrue(card.contains("layoutElementsExactly(right - left, bottom - top)"));
         assertTrue(card.contains("placeExactly(badge, value.badge, width, height)"));
         assertTrue(card.contains("view.layout(childLeft, childTop"));
@@ -35,8 +37,7 @@ public final class Ha1166BleIdentityAndVisualCenteringContractTest {
                 "WidgetService widgetService");
 
         assertTrue(placement.contains("if (directlyCenteredClimate)"));
-        assertTrue(placement.contains("button.addView(icon, new FrameLayout.LayoutParams"));
-        assertTrue(placement.contains("Gravity.CENTER"));
+        assertTrue(placement.contains("button.addExactlyCentered(icon, requested"));
     }
 
     @Test public void reverseRouteNeverPreclaimsAStoredPrivateAddress()
@@ -73,7 +74,7 @@ public final class Ha1166BleIdentityAndVisualCenteringContractTest {
     @Test public void releaseIdentityIsHa1166() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1166'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1167'"));
     }
 
     private static String source(String relative) throws Exception {

@@ -1232,7 +1232,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             holder.setClickable(false);
             return holder;
         }
-        FrameLayout button = new FrameLayout(context);
+        DriverExactCenterFrameLayout button = new DriverExactCenterFrameLayout(context);
         button.setClickable(true);
         button.setFocusable(false);
         button.setClipChildren(false);
@@ -1328,9 +1328,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         // climate tile. MATCH_PARENT also makes asymmetric explicit top/bottom padding shift the
         // content predictably while untouched auto padding remains genuinely centred.
         if (directlyCenteredClimate) {
-            button.addView(icon, new FrameLayout.LayoutParams(requested,
-                    DriverPanelLayoutPolicy.shortcutIconHeight(requested, expandedClimate),
-                    Gravity.CENTER));
+            button.addExactlyCentered(icon, requested,
+                    DriverPanelLayoutPolicy.shortcutIconHeight(requested, expandedClimate));
         } else {
             button.addView(content, new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
