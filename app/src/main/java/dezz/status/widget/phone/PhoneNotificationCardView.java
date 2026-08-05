@@ -423,9 +423,9 @@ public final class PhoneNotificationCardView extends FrameLayout {
 
         /**
          * Render ImageView's final scale matrix to a software bitmap, then draw that bitmap through
-         * a round-rect shader into a second ARGB bitmap. The stored result contains transparent
-         * corner pixels before the overlay compositor sees it, so the card's own clip cannot
-         * cancel or flatten the icon radius.
+         * a round-rect shader into a second ARGB bitmap. The stored result contains real
+         * transparent corner pixels before the overlay compositor sees it, so the card's own clip
+         * cannot cancel or flatten the icon radius.
          */
         private void ensureRoundedBitmap() {
             int width = getWidth();

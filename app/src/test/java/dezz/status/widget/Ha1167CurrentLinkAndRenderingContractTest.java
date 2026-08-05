@@ -32,7 +32,8 @@ public final class Ha1167CurrentLinkAndRenderingContractTest {
         String settings = source("DriverPanelSettingsActivity.java");
 
         assertTrue(exact.contains("protected void onLayout"));
-        assertTrue(exact.contains("childTop = contentTop"));
+        assertTrue(exact.contains("physicalHeight = Math.max(0, bottom - top)"));
+        assertTrue(exact.contains("childTop = (physicalHeight - centeredHeightPx) / 2"));
         assertTrue(exact.contains("child.layout(childLeft, childTop"));
         assertTrue(runtime.contains("button.addExactlyCentered(icon, requested"));
         assertTrue(settings.contains("cell.addExactlyCentered(icon, iconSize"));
