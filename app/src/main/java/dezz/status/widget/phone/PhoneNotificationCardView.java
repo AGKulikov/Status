@@ -9,8 +9,6 @@ import android.graphics.ColorFilter;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
-import android.graphics.PorterDuff;
-import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Typeface;
@@ -128,16 +126,15 @@ public final class PhoneNotificationCardView extends FrameLayout {
         avatar.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
         avatar.setClipToOutline(value.avatarCornerRadiusPx > 0);
         // The card and icon share the same normalized Apple path. The card draws that path
-        // directly; the icon bakes it into an exact-size software bitmap. KX11's Android 9
-        // compositor therefore never has to preserve nested clipPath/saveLayer state.
+        // directly; the icon publishes a different exact-size Bitmap whose corner pixels already
+        // have zero alpha. KX11 therefore never receives the original square drawable.
         badge.setBackgroundColor(Color.TRANSPARENT);
         badge.setContinuousCornerRadiusPx(value.iconCornerRadiusPx);
-        badge.setScaleType(value.iconPreserveAspectRatio
-                ? ImageView.ScaleType.FIT_CENTER : ImageView.ScaleType.CENTER_CROP);
+        badge.setPreserveAspectRatio(value.iconPreserveAspectRatio);
         Drawable icon = phoneAppIcon(model.appIconIdentifier);
         if (icon == null) icon = PhoneNotificationPreviewIconFactory.create(
                 getContext(), Math.max(24, value.badge.columnSpan * 24));
-        badge.setImageDrawable(icon);
+        badge.setSourceDrawable(icon);
         title.setText(model.title);
         time.setText("сейчас");
         application.setText(model.application);
@@ -497,120 +494,149 @@ public final class PhoneNotificationCardView extends FrameLayout {
         }
     }
 
-    /** Exact-size Apple continuous mask baked into real transparent bitmap pixels. */
+    /**
+     * Publishes an exact-size bitmap whose corner pixels are physically transparent.
+     *
+     * <p>Do not apply the mask from an {@code onDraw()} override. The Android 9 KX11 compositor can
+     * keep the ImageView display list for the original square drawable even when a mutable bitmap
+     * is painted over it during the same draw. Instead this view rasterises the source only when
+     * its source, size or style changes, multiplies every source alpha byte by a software mask,
+     * and gives that finished bitmap to the ordinary ImageView renderer.</p>
+     */
     private static final class AppleContinuousIconView extends ImageView {
         private final RectF outputBounds = new RectF();
         private final Path outputPath = new Path();
-        private final Paint bitmapPaint = new Paint(Paint.ANTI_ALIAS_FLAG
-                | Paint.FILTER_BITMAP_FLAG);
         private final Paint maskPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint alphaMaskPaint = new Paint(Paint.ANTI_ALIAS_FLAG
-                | Paint.FILTER_BITMAP_FLAG);
         private int continuousCornerRadiusPx;
-        private int pathWidth = -1;
-        private int pathHeight = -1;
-        private int pathRadius = -1;
-        @Nullable private Bitmap renderBuffer;
-        @Nullable private Canvas renderCanvas;
-        @Nullable private Bitmap maskBuffer;
-        @Nullable private Canvas maskCanvas;
-        @Nullable private Bitmap maskedBuffer;
-        @Nullable private Canvas maskedCanvas;
+        private boolean preserveAspectRatio = true;
+        @Nullable private Drawable sourceDrawable;
+        @Nullable private Bitmap publishedBitmap;
+        private int publishedWidth = -1;
+        private int publishedHeight = -1;
+        private int publishedRadius = -1;
+        private boolean publishedPreserveAspectRatio;
+        @Nullable private Drawable publishedSource;
 
         AppleContinuousIconView(@NonNull Context context) {
             super(context);
             maskPaint.setColor(Color.WHITE);
             maskPaint.setStyle(Paint.Style.FILL);
-            alphaMaskPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
+            // Scaling is performed while rasterising the source. The published bitmap already has
+            // the view's exact physical dimensions, so ImageView must not reinterpret its bounds.
+            super.setScaleType(ScaleType.FIT_XY);
         }
 
         void setContinuousCornerRadiusPx(int radius) {
             int safe = Math.max(0, radius);
             if (continuousCornerRadiusPx == safe) return;
             continuousCornerRadiusPx = safe;
-            pathRadius = -1;
-            invalidate();
+            invalidatePublishedBitmap();
+            publishIfReady();
         }
 
-        @Override protected void onDraw(@NonNull Canvas canvas) {
-            if (continuousCornerRadiusPx <= 0 || getWidth() <= 0 || getHeight() <= 0) {
-                super.onDraw(canvas);
-                return;
+        void setPreserveAspectRatio(boolean preserve) {
+            if (preserveAspectRatio == preserve) return;
+            preserveAspectRatio = preserve;
+            invalidatePublishedBitmap();
+            publishIfReady();
+        }
+
+        void setSourceDrawable(@Nullable Drawable source) {
+            sourceDrawable = source;
+            invalidatePublishedBitmap();
+            if (source == null) super.setImageDrawable(null);
+            publishIfReady();
+        }
+
+        private void publishIfReady() {
+            Drawable source = sourceDrawable;
+            int width = getWidth();
+            int height = getHeight();
+            if (source == null || width <= 0 || height <= 0) return;
+            if (publishedBitmap != null && publishedWidth == width
+                    && publishedHeight == height && publishedRadius == continuousCornerRadiusPx
+                    && publishedPreserveAspectRatio == preserveAspectRatio
+                    && publishedSource == source) return;
+
+            Bitmap sourceBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            sourceBitmap.setDensity(getResources().getDisplayMetrics().densityDpi);
+            drawSource(source, new Canvas(sourceBitmap), width, height);
+
+            Bitmap output = sourceBitmap;
+            if (continuousCornerRadiusPx > 0) {
+                Bitmap mask = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                mask.setDensity(getResources().getDisplayMetrics().densityDpi);
+                outputBounds.set(0f, 0f, width, height);
+                AppleContinuousCornerPath.set(
+                        outputPath, outputBounds, continuousCornerRadiusPx);
+                new Canvas(mask).drawPath(outputPath, maskPaint);
+
+                int pixelCount = width * height;
+                int[] pixels = new int[pixelCount];
+                int[] alphaMask = new int[pixelCount];
+                sourceBitmap.getPixels(pixels, 0, width, 0, 0, width, height);
+                mask.getPixels(alphaMask, 0, width, 0, 0, width, height);
+                IconAlphaMask.apply(pixels, alphaMask);
+
+                output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                output.setDensity(getResources().getDisplayMetrics().densityDpi);
+                output.setPixels(pixels, 0, width, 0, 0, width, height);
+                output.setHasAlpha(true);
             }
-            ensureRenderBuffer(getWidth(), getHeight());
-            Bitmap source = renderBuffer;
-            Canvas sourceCanvas = renderCanvas;
-            Bitmap mask = maskBuffer;
-            Canvas currentMaskCanvas = maskCanvas;
-            Bitmap masked = maskedBuffer;
-            Canvas currentMaskedCanvas = maskedCanvas;
-            if (source == null || sourceCanvas == null || mask == null
-                    || currentMaskCanvas == null || masked == null
-                    || currentMaskedCanvas == null) return;
-
-            // Render ImageView's final FIT_CENTER/CENTER_CROP result on a software bitmap first.
-            // The mask is then applied to every pixel (including transparent pixels outside the
-            // path) with DST_IN. The window compositor receives one ordinary bitmap whose corners
-            // are already transparent; it never has to understand clipPath, saveLayer or a
-            // mutable bitmap shader.
-            source.eraseColor(Color.TRANSPARENT);
-            super.onDraw(sourceCanvas);
-            updateOutputPath(getWidth(), getHeight());
-
-            mask.eraseColor(Color.TRANSPARENT);
-            currentMaskCanvas.drawPath(outputPath, maskPaint);
-            masked.eraseColor(Color.TRANSPARENT);
-            currentMaskedCanvas.drawBitmap(source, 0f, 0f, bitmapPaint);
-            currentMaskedCanvas.drawBitmap(mask, 0f, 0f, alphaMaskPaint);
-
-            // Plain drawBitmap is the only hardware-composited operation for the icon.
-            canvas.drawBitmap(masked, 0f, 0f, bitmapPaint);
+            output.prepareToDraw();
+            publishedBitmap = output;
+            publishedWidth = width;
+            publishedHeight = height;
+            publishedRadius = continuousCornerRadiusPx;
+            publishedPreserveAspectRatio = preserveAspectRatio;
+            publishedSource = source;
+            // This is the decisive difference from HA1173: the ImageView itself now owns only
+            // the completed transparent-corner bitmap, never the original square drawable.
+            super.setImageBitmap(output);
         }
 
-        private void updateOutputPath(int width, int height) {
-            if (pathWidth == width && pathHeight == height
-                    && pathRadius == continuousCornerRadiusPx) return;
-            pathWidth = width;
-            pathHeight = height;
-            pathRadius = continuousCornerRadiusPx;
-            outputBounds.set(0f, 0f, width, height);
-            AppleContinuousCornerPath.set(outputPath, outputBounds, continuousCornerRadiusPx);
+        private void drawSource(@NonNull Drawable source, @NonNull Canvas canvas,
+                                int width, int height) {
+            int sourceWidth = source.getIntrinsicWidth();
+            int sourceHeight = source.getIntrinsicHeight();
+            if (sourceWidth <= 0) sourceWidth = width;
+            if (sourceHeight <= 0) sourceHeight = height;
+            float widthScale = width / (float) Math.max(1, sourceWidth);
+            float heightScale = height / (float) Math.max(1, sourceHeight);
+            float scale = preserveAspectRatio
+                    ? Math.min(widthScale, heightScale) : Math.max(widthScale, heightScale);
+            int drawWidth = Math.max(1, Math.round(sourceWidth * scale));
+            int drawHeight = Math.max(1, Math.round(sourceHeight * scale));
+            int left = (width - drawWidth) / 2;
+            int top = (height - drawHeight) / 2;
+            Rect previousBounds = source.copyBounds();
+            int checkpoint = canvas.save();
+            canvas.clipRect(0, 0, width, height);
+            source.setBounds(left, top, left + drawWidth, top + drawHeight);
+            source.draw(canvas);
+            source.setBounds(previousBounds);
+            canvas.restoreToCount(checkpoint);
         }
 
-        private void ensureRenderBuffer(int width, int height) {
-            if (renderBuffer != null && renderBuffer.getWidth() == width
-                    && renderBuffer.getHeight() == height) return;
-            // Do not recycle prior buffers: Android 9 may still have their final bitmap queued.
-            renderBuffer = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            renderCanvas = new Canvas(renderBuffer);
-            maskBuffer = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            maskCanvas = new Canvas(maskBuffer);
-            maskedBuffer = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            maskedCanvas = new Canvas(maskedBuffer);
+        private void invalidatePublishedBitmap() {
+            publishedBitmap = null;
+            publishedWidth = -1;
+            publishedHeight = -1;
+            publishedRadius = -1;
+            publishedSource = null;
         }
 
         @Override protected void onSizeChanged(int width, int height,
                                                int oldWidth, int oldHeight) {
             super.onSizeChanged(width, height, oldWidth, oldHeight);
-            renderBuffer = null;
-            renderCanvas = null;
-            maskBuffer = null;
-            maskCanvas = null;
-            maskedBuffer = null;
-            maskedCanvas = null;
-            pathWidth = -1;
-            pathHeight = -1;
-            pathRadius = -1;
+            invalidatePublishedBitmap();
+            publishIfReady();
         }
 
-        @Override protected void onDetachedFromWindow() {
-            renderBuffer = null;
-            renderCanvas = null;
-            maskBuffer = null;
-            maskCanvas = null;
-            maskedBuffer = null;
-            maskedCanvas = null;
-            super.onDetachedFromWindow();
+        @Override protected void onLayout(boolean changed, int left, int top,
+                                          int right, int bottom) {
+            super.onLayout(changed, left, top, right, bottom);
+            publishIfReady();
         }
     }
 

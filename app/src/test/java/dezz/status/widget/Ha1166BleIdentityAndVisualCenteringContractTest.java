@@ -20,10 +20,10 @@ public final class Ha1166BleIdentityAndVisualCenteringContractTest {
         assertTrue(card.contains("private static final class AppleContinuousIconView"));
         assertTrue(card.contains("badge.setContinuousCornerRadiusPx(value.iconCornerRadiusPx)"));
         assertTrue(card.contains("Bitmap.Config.ARGB_8888"));
-        assertTrue(card.contains("new PorterDuffXfermode(PorterDuff.Mode.DST_IN)"));
-        assertTrue(card.contains("currentMaskCanvas.drawPath(outputPath, maskPaint)"));
-        assertTrue(card.contains("canvas.drawBitmap(masked, 0f, 0f, bitmapPaint)"));
-        assertTrue(card.contains("source.eraseColor(Color.TRANSPARENT)"));
+        assertTrue(card.contains("new Canvas(mask).drawPath(outputPath, maskPaint)"));
+        assertTrue(card.contains("IconAlphaMask.apply(pixels, alphaMask)"));
+        assertTrue(card.contains("super.setImageBitmap(output)"));
+        assertFalse(card.contains("PorterDuffXfermode"));
         assertTrue(card.contains("layoutElementsExactly(right - left, bottom - top)"));
         assertTrue(card.contains("placeExactly(badge, value.badge, width, height)"));
         assertTrue(card.contains("view.layout(childLeft, childTop"));
@@ -82,7 +82,7 @@ public final class Ha1166BleIdentityAndVisualCenteringContractTest {
     @Test public void releaseIdentityIsHa1166() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1173'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1174'"));
     }
 
     private static String source(String relative) throws Exception {

@@ -68,10 +68,11 @@ public final class Ha1151PhoneNotificationOverlayEditorContractTest {
         assertEquals(22, PhoneNotificationAutomation.defaultAppIconCornerRadius(100));
         assertTrue(automation.contains("IOS_APP_ICON_CORNER_RATIO = 0.2237f"));
         assertTrue(card.contains("badge.setContinuousCornerRadiusPx(value.iconCornerRadiusPx)"));
-        assertTrue(card.contains("new PorterDuffXfermode(PorterDuff.Mode.DST_IN)"));
-        assertTrue(card.contains("canvas.drawBitmap(masked, 0f, 0f, bitmapPaint)"));
+        assertTrue(card.contains("IconAlphaMask.apply(pixels, alphaMask)"));
+        assertTrue(card.contains("super.setImageBitmap(output)"));
         assertTrue(card.contains("AppleContinuousCornerPath.set(outputPath"));
         assertFalse(card.contains("BitmapShader"));
+        assertFalse(card.contains("PorterDuffXfermode"));
         assertTrue(editor.contains("Радиус иконки Apple"));
         assertTrue(editor.contains("Скругление аватара"));
         assertTrue(editor.contains("Жирное начертание"));
@@ -80,7 +81,7 @@ public final class Ha1151PhoneNotificationOverlayEditorContractTest {
     @Test public void releaseIdentityRemainsMonotonicAfterTheEditorRelease() throws Exception {
         String build = new String(Files.readAllBytes(projectFile("build.gradle")),
                 StandardCharsets.UTF_8);
-        assertTrue(build.contains("return 'v2.8.2-ha1173'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1174'"));
         assertEquals(208021165, 208020000 + 1165);
     }
 

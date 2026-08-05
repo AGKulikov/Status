@@ -21,7 +21,8 @@ public final class Ha1165NotificationEditorAndClimateContractTest {
         assertTrue(card.contains("canvas.drawPath(fillPath, fillPaint)"));
         assertTrue(card.contains("canvas.drawPath(borderPath, borderPaint)"));
         assertTrue(card.contains("iconPreserveAspectRatio"));
-        assertTrue(card.contains("ImageView.ScaleType.FIT_CENTER"));
+        assertTrue(card.contains("badge.setPreserveAspectRatio"));
+        assertTrue(card.contains("Math.min(widthScale, heightScale)"));
         assertTrue(controller.contains("background = 0x00000000"));
         assertTrue(controller.contains("The semantic notification card owns its rounded"));
     }
@@ -63,7 +64,7 @@ public final class Ha1165NotificationEditorAndClimateContractTest {
     @Test public void releaseIdentityIsHa1165() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1173'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1174'"));
     }
 
     @Test public void ancsSmartHomeBindingUsesConfirmedSubscriptionStateOnly()

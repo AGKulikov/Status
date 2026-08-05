@@ -19,11 +19,11 @@ public final class Ha1169GattGenerationAndBackgroundWakeContractTest {
                 "private Drawable phoneAppIcon");
 
         assertTrue(rounded.contains("Bitmap.Config.ARGB_8888"));
-        assertTrue(rounded.contains("new PorterDuffXfermode(PorterDuff.Mode.DST_IN)"));
-        assertTrue(rounded.contains("currentMaskedCanvas.drawBitmap(mask, 0f, 0f, alphaMaskPaint)"));
-        assertTrue(rounded.contains("canvas.drawBitmap(masked, 0f, 0f, bitmapPaint)"));
-        assertTrue(rounded.contains("AppleContinuousCornerPath.set(outputPath"));
-        assertTrue(rounded.contains("source.eraseColor(Color.TRANSPARENT)"));
+        assertTrue(rounded.contains("new Canvas(mask).drawPath(outputPath, maskPaint)"));
+        assertTrue(rounded.contains("IconAlphaMask.apply(pixels, alphaMask)"));
+        assertTrue(rounded.contains("super.setImageBitmap(output)"));
+        assertTrue(rounded.contains("AppleContinuousCornerPath.set("));
+        assertTrue(rounded.contains("output.setHasAlpha(true)"));
     }
 
     @Test public void multilineTextVerticalPlacementIsPersistedAndRendered() throws Exception {
@@ -76,7 +76,7 @@ public final class Ha1169GattGenerationAndBackgroundWakeContractTest {
     @Test public void releaseIdentityIsHa1169() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1173'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1174'"));
     }
 
     private static String source(String relative) throws Exception {

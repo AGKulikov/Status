@@ -13,21 +13,22 @@ import org.junit.Test;
 
 /** Release barriers retained from the HA1171 exact-size notification-icon rendering fix. */
 public final class Ha1171IconRoundingContractTest {
-    @Test public void iconMaskUsesTheCurrentFinalViewBoundsOnEveryDraw() throws Exception {
+    @Test public void iconMaskPublishesPhysicalAlphaAtTheFinalViewSize() throws Exception {
         String card = source("phone/PhoneNotificationCardView.java");
         String rounded = between(card, "private static final class AppleContinuousIconView",
                 "private Drawable phoneAppIcon");
 
-        assertTrue(rounded.contains("ensureRenderBuffer(getWidth(), getHeight())"));
-        assertTrue(rounded.contains("source.eraseColor(Color.TRANSPARENT)"));
-        assertTrue(rounded.contains("super.onDraw(sourceCanvas)"));
+        assertTrue(rounded.contains("int width = getWidth()"));
+        assertTrue(rounded.contains("int height = getHeight()"));
         assertTrue(rounded.contains("outputBounds.set(0f, 0f, width, height)"));
-        assertTrue(rounded.contains("AppleContinuousCornerPath.set(outputPath"));
-        assertTrue(rounded.contains("currentMaskCanvas.drawPath(outputPath, maskPaint)"));
-        assertTrue(rounded.contains("canvas.drawBitmap(masked, 0f, 0f, bitmapPaint)"));
+        assertTrue(rounded.contains("AppleContinuousCornerPath.set("));
+        assertTrue(rounded.contains("IconAlphaMask.apply(pixels, alphaMask)"));
+        assertTrue(rounded.contains("super.setImageBitmap(output)"));
+        assertTrue(rounded.contains("protected void onLayout"));
         assertFalse(rounded.contains("roundedBitmap"));
         assertFalse(rounded.contains(".recycle()"));
         assertFalse(rounded.contains("BitmapShader"));
+        assertFalse(rounded.contains("PorterDuffXfermode"));
     }
 
     @Test public void notificationEditorDoesNotPaintSquaresIntoTransparentCorners()
@@ -43,7 +44,7 @@ public final class Ha1171IconRoundingContractTest {
     @Test public void releaseIdentityIsHa1171() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1173'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1174'"));
     }
 
     private static String source(String relative) throws Exception {

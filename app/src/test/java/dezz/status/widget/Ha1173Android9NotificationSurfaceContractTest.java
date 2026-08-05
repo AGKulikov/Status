@@ -30,22 +30,19 @@ public final class Ha1173Android9NotificationSurfaceContractTest {
         assertFalse(card.contains("setBackground(null)"));
     }
 
-    @Test public void iconCornersAreBakedBeforeOnePlainHardwareBitmapDraw() throws Exception {
+    @Test public void iconCornersArePublishedAsTheOnlyImageViewDrawable() throws Exception {
         String card = source("phone/PhoneNotificationCardView.java");
         String icon = between(card, "private static final class AppleContinuousIconView",
                 "private Drawable phoneAppIcon");
 
-        assertTrue(icon.contains("renderBuffer = Bitmap.createBitmap"));
-        assertTrue(icon.contains("maskBuffer = Bitmap.createBitmap"));
-        assertTrue(icon.contains("maskedBuffer = Bitmap.createBitmap"));
-        assertTrue(icon.contains("new PorterDuffXfermode(PorterDuff.Mode.DST_IN)"));
-        assertTrue(icon.contains("currentMaskCanvas.drawPath(outputPath, maskPaint)"));
-        assertTrue(icon.contains(
-                "currentMaskedCanvas.drawBitmap(mask, 0f, 0f, alphaMaskPaint)"));
-        assertTrue(icon.contains("canvas.drawBitmap(masked, 0f, 0f, bitmapPaint)"));
+        assertTrue(icon.contains("sourceBitmap = Bitmap.createBitmap"));
+        assertTrue(icon.contains("Bitmap mask = Bitmap.createBitmap"));
+        assertTrue(icon.contains("IconAlphaMask.apply(pixels, alphaMask)"));
+        assertTrue(icon.contains("output.setPixels(pixels"));
+        assertTrue(icon.contains("super.setImageBitmap(output)"));
         assertFalse(icon.contains("BitmapShader"));
-        assertFalse(icon.contains("canvas.drawPath(outputPath"));
         assertFalse(icon.contains("canvas.clipPath"));
+        assertFalse(icon.contains("PorterDuffXfermode"));
     }
 
     @Test public void existingStyleKeysAndUpdateIdentityArePreserved() throws Exception {
@@ -59,7 +56,7 @@ public final class Ha1173Android9NotificationSurfaceContractTest {
         assertTrue(config.contains("borderWidthPx"));
         assertTrue(config.contains("borderColor"));
         assertTrue(config.contains("iconCornerRadiusPx"));
-        assertTrue(build.contains("return 'v2.8.2-ha1173'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1174'"));
     }
 
     private static String source(String relative) throws Exception {
