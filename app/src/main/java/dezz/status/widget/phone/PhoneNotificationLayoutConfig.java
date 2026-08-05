@@ -95,12 +95,13 @@ public final class PhoneNotificationLayoutConfig {
     @NonNull public final String overlayId;
     @NonNull public String backgroundColor = "#FF29292D";
     public int backgroundAlpha = 244;
+    /** Radius used by the Apple continuous-card path (persisted key kept compatible). */
     public int cornerRadiusPx = 38;
     public int borderWidthPx = 0;
     @NonNull public String borderColor = "#FFFFFFFF";
     /** Contact avatar stays circular independently from the small application badge. */
     public int avatarCornerRadiusPx = 120;
-    /** iPhone-like rounded-square application icon. */
+    /** Radius used by the iOS app-icon continuous mask. */
     public int iconCornerRadiusPx = 12;
     /** Re-applied on every render so reopening the editor cannot fall back to CENTER_CROP. */
     public boolean iconPreserveAspectRatio = true;

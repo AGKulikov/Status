@@ -11,18 +11,19 @@ import java.nio.file.Paths;
 
 import org.junit.Test;
 
-/** Release barriers for the HA1171 four-corner notification-icon rendering fix. */
+/** Release barriers retained from the HA1171 exact-size notification-icon rendering fix. */
 public final class Ha1171IconRoundingContractTest {
     @Test public void iconMaskUsesTheCurrentFinalViewBoundsOnEveryDraw() throws Exception {
         String card = source("phone/PhoneNotificationCardView.java");
-        String rounded = between(card, "private static final class RoundedIconView",
+        String rounded = between(card, "private static final class AppleContinuousIconView",
                 "private Drawable phoneAppIcon");
 
         assertTrue(rounded.contains("ensureRenderBuffer(getWidth(), getHeight())"));
         assertTrue(rounded.contains("buffer.eraseColor(Color.TRANSPARENT)"));
         assertTrue(rounded.contains("super.onDraw(bufferCanvas)"));
-        assertTrue(rounded.contains("Math.min(cornerRadiusPx, Math.min(getWidth(), getHeight()) / 2f)"));
-        assertTrue(rounded.contains("canvas.drawRoundRect(outputBounds, radius, radius"));
+        assertTrue(rounded.contains("outputBounds.set(0f, 0f, width, height)"));
+        assertTrue(rounded.contains("AppleContinuousCornerPath.set(outputPath"));
+        assertTrue(rounded.contains("canvas.drawPath(outputPath, outputPaint)"));
         assertFalse(rounded.contains("roundedBitmap"));
         assertFalse(rounded.contains(".recycle()"));
     }
@@ -40,7 +41,7 @@ public final class Ha1171IconRoundingContractTest {
     @Test public void releaseIdentityIsHa1171() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1171'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1172'"));
     }
 
     private static String source(String relative) throws Exception {

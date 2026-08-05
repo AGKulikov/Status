@@ -187,7 +187,7 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
                 checked -> overlay.centerHorizontally = checked), top(4));
         page.addView(checkBox("По центру экрана по вертикали", overlay.centerVertically,
                 checked -> overlay.centerVertically = checked), top(2));
-        slider(page, "Скругление карточки", 0, 160, config.cornerRadiusPx,
+        slider(page, "Радиус карточки Apple", 0, 160, config.cornerRadiusPx,
                 value -> config.cornerRadiusPx = value);
         slider(page, "Толщина обводки", 0, 40, config.borderWidthPx,
                 value -> config.borderWidthPx = value);
@@ -195,7 +195,7 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
                 value -> config.backgroundAlpha = value);
         slider(page, "Скругление аватара", 0, 120, config.avatarCornerRadiusPx,
                 value -> config.avatarCornerRadiusPx = value);
-        slider(page, "Скругление иконки приложения", 0, 120, config.iconCornerRadiusPx,
+        slider(page, "Радиус иконки Apple", 0, 120, config.iconCornerRadiusPx,
                 value -> config.iconCornerRadiusPx = value);
         colorButton(page, "Цвет карточки", () -> config.backgroundColor,
                 value -> config.backgroundColor = value);

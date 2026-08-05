@@ -61,15 +61,30 @@ public final class PhoneNotificationCardView extends FrameLayout {
     private PhoneNotificationLayoutConfig config;
     private Model model = Model.preview();
     private final TextView avatar;
-    private final RoundedIconView badge;
+    private final AppleContinuousIconView badge;
     private final OverflowTextView title;
     private final OverflowTextView time;
     private final OverflowTextView application;
     private final OverflowTextView message;
     private final TextView chevron;
-    private final Path surfaceClip = new Path();
+    private final Path surfacePath = new Path();
+    private final Path surfaceBorderPath = new Path();
     private final RectF surfaceBounds = new RectF();
+    private final RectF surfaceBorderBounds = new RectF();
+    private final Paint surfaceOutputPaint = new Paint(Paint.ANTI_ALIAS_FLAG
+            | Paint.FILTER_BITMAP_FLAG);
+    private final Paint surfaceBorderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private int surfaceColor = Color.TRANSPARENT;
     private int surfaceCornerRadiusPx;
+    private int surfaceBorderWidthPx;
+    private int surfaceBorderColor = Color.TRANSPARENT;
+    private int surfacePathWidth = -1;
+    private int surfacePathHeight = -1;
+    private int surfacePathRadius = -1;
+    private int surfacePathBorderWidth = -1;
+    @Nullable private Bitmap surfaceBuffer;
+    @Nullable private Canvas surfaceBufferCanvas;
+    @Nullable private BitmapShader surfaceBufferShader;
 
     public PhoneNotificationCardView(@NonNull Context context) {
         super(context);
@@ -77,9 +92,11 @@ public final class PhoneNotificationCardView extends FrameLayout {
         setTextDirection(View.TEXT_DIRECTION_LTR);
         setClipChildren(true);
         setClipToPadding(true);
+        surfaceBorderPaint.setStrokeJoin(Paint.Join.ROUND);
+        surfaceBorderPaint.setStrokeCap(Paint.Cap.ROUND);
 
         avatar = text(Gravity.CENTER, 1);
-        badge = new RoundedIconView(context);
+        badge = new AppleContinuousIconView(context);
         title = overflowText(Gravity.START | Gravity.CENTER_VERTICAL);
         time = overflowText(Gravity.START | Gravity.CENTER_VERTICAL);
         application = overflowText(Gravity.START | Gravity.CENTER_VERTICAL);
@@ -109,17 +126,17 @@ public final class PhoneNotificationCardView extends FrameLayout {
         PhoneNotificationLayoutConfig value = config;
         if (value == null) return;
         value.normalize();
-        GradientDrawable surface = new GradientDrawable();
         int base = color(value.backgroundColor, 0xFF29292D);
-        surface.setColor((base & 0x00FFFFFF) | (value.backgroundAlpha << 24));
-        surface.setCornerRadius(value.cornerRadiusPx);
-        if (value.borderWidthPx > 0) {
-            surface.setStroke(value.borderWidthPx, color(value.borderColor, Color.WHITE));
-        }
-        setBackground(surface);
+        surfaceColor = (base & 0x00FFFFFF) | (value.backgroundAlpha << 24);
         surfaceCornerRadiusPx = value.cornerRadiusPx;
-        setOutlineProvider(ViewOutlineProvider.BACKGROUND);
-        setClipToOutline(value.cornerRadiusPx > 0);
+        surfaceBorderWidthPx = value.borderWidthPx;
+        surfaceBorderColor = color(value.borderColor, Color.WHITE);
+        // The final card is composited through the same Apple continuous path as its icon. An
+        // Android GradientDrawable would reintroduce circular quarter-arcs underneath that mask.
+        setBackground(null);
+        setOutlineProvider(ViewOutlineProvider.BOUNDS);
+        setClipToOutline(false);
+        invalidateSurfacePaths();
 
         String initial = model.title.isEmpty() ? "•"
                 : model.title.substring(0, 1).toUpperCase(java.util.Locale.getDefault());
@@ -127,11 +144,11 @@ public final class PhoneNotificationCardView extends FrameLayout {
         avatar.setBackground(round(value.avatarColor, value.avatarCornerRadiusPx));
         avatar.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
         avatar.setClipToOutline(value.avatarCornerRadiusPx > 0);
-        // The card itself is clipped in draw(). Never reuse that parent clip/layer for the icon:
-        // the KX11 Android 9 compositor flattens nested overlay layers and drops the child mask.
-        // RoundedIconView renders the final ImageView pixels through its own exact-size shader.
+        // The card and icon share the same normalized Apple path, but each owns an exact-size
+        // render buffer. KX11's Android 9 compositor therefore never has to preserve nested
+        // clipPath/saveLayer state across the translucent WindowManager overlay.
         badge.setBackgroundColor(Color.TRANSPARENT);
-        badge.setCornerRadiusPx(value.iconCornerRadiusPx);
+        badge.setContinuousCornerRadiusPx(value.iconCornerRadiusPx);
         badge.setScaleType(value.iconPreserveAspectRatio
                 ? ImageView.ScaleType.FIT_CENTER : ImageView.ScaleType.CENTER_CROP);
         Drawable icon = phoneAppIcon(model.appIconIdentifier);
@@ -174,29 +191,85 @@ public final class PhoneNotificationCardView extends FrameLayout {
         }
     }
 
-    /**
-     * Clips the complete card, including children, to the same path as its drawable. This is an
-     * actual translucent-window cut-out; no black parent rectangle is used to fake the corners.
-     */
+    /** Composites the complete card through one real Apple-continuous alpha silhouette. */
     @Override
     public void draw(@NonNull Canvas canvas) {
-        if (surfaceCornerRadiusPx <= 0 || getWidth() <= 0 || getHeight() <= 0) {
+        int width = getWidth();
+        int height = getHeight();
+        if (width <= 0 || height <= 0) {
             super.draw(canvas);
             return;
         }
-        surfaceBounds.set(0f, 0f, getWidth(), getHeight());
-        surfaceClip.reset();
-        surfaceClip.addRoundRect(surfaceBounds, surfaceCornerRadiusPx, surfaceCornerRadiusPx,
-                Path.Direction.CW);
-        int checkpoint = canvas.save();
-        canvas.clipPath(surfaceClip);
-        super.draw(canvas);
-        canvas.restoreToCount(checkpoint);
+        ensureSurfaceBuffer(width, height);
+        Bitmap buffer = surfaceBuffer;
+        Canvas bufferCanvas = surfaceBufferCanvas;
+        BitmapShader shader = surfaceBufferShader;
+        if (buffer == null || bufferCanvas == null || shader == null) return;
+
+        // Render the opaque/translucent background and every child first, then cut final pixels
+        // by drawing only inside the continuous path. This is not a black corner cover and does
+        // not depend on Android 9 outline or hardware clip support.
+        buffer.eraseColor(surfaceColor);
+        super.draw(bufferCanvas);
+        updateSurfacePaths(width, height);
+        surfaceOutputPaint.setShader(shader);
+        canvas.drawPath(surfacePath, surfaceOutputPaint);
+        surfaceOutputPaint.setShader(null);
+
+        if (surfaceBorderWidthPx > 0 && !surfaceBorderPath.isEmpty()) {
+            surfaceBorderPaint.setStyle(Paint.Style.STROKE);
+            surfaceBorderPaint.setStrokeWidth(surfaceBorderWidthPx);
+            surfaceBorderPaint.setColor(surfaceBorderColor);
+            canvas.drawPath(surfaceBorderPath, surfaceBorderPaint);
+        }
+    }
+
+    private void ensureSurfaceBuffer(int width, int height) {
+        if (surfaceBuffer != null && surfaceBuffer.getWidth() == width
+                && surfaceBuffer.getHeight() == height) return;
+        Bitmap source = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        surfaceBuffer = source;
+        surfaceBufferCanvas = new Canvas(source);
+        surfaceBufferShader = new BitmapShader(source,
+                Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+    }
+
+    private void updateSurfacePaths(int width, int height) {
+        if (surfacePathWidth == width && surfacePathHeight == height
+                && surfacePathRadius == surfaceCornerRadiusPx
+                && surfacePathBorderWidth == surfaceBorderWidthPx) return;
+        surfacePathWidth = width;
+        surfacePathHeight = height;
+        surfacePathRadius = surfaceCornerRadiusPx;
+        surfacePathBorderWidth = surfaceBorderWidthPx;
+        surfaceBounds.set(0f, 0f, width, height);
+        AppleContinuousCornerPath.set(surfacePath, surfaceBounds, surfaceCornerRadiusPx);
+
+        surfaceBorderPath.reset();
+        if (surfaceBorderWidthPx <= 0) return;
+        float halfStroke = Math.min(surfaceBorderWidthPx,
+                Math.min(width, height)) / 2f;
+        surfaceBorderBounds.set(halfStroke, halfStroke,
+                width - halfStroke, height - halfStroke);
+        AppleContinuousCornerPath.set(surfaceBorderPath, surfaceBorderBounds,
+                Math.max(0f, surfaceCornerRadiusPx
+                        - halfStroke / AppleContinuousCornerPath.CONTINUOUS_EXTENT_MULTIPLIER));
+    }
+
+    private void invalidateSurfacePaths() {
+        surfacePathWidth = -1;
+        surfacePathHeight = -1;
+        surfacePathRadius = -1;
+        surfacePathBorderWidth = -1;
     }
 
     @Override
     protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
         super.onSizeChanged(width, height, oldWidth, oldHeight);
+        surfaceBuffer = null;
+        surfaceBufferCanvas = null;
+        surfaceBufferShader = null;
+        invalidateSurfacePaths();
         layoutElements(width, height);
     }
 
@@ -395,29 +468,34 @@ public final class PhoneNotificationCardView extends FrameLayout {
         }
     }
 
-    /** Deterministic four-corner mask for bitmap and vector application icons. */
-    private static final class RoundedIconView extends ImageView {
+    /** Exact-size Apple continuous mask for bitmap and vector application icons. */
+    private static final class AppleContinuousIconView extends ImageView {
         private final RectF outputBounds = new RectF();
+        private final Path outputPath = new Path();
         private final Paint outputPaint = new Paint(Paint.ANTI_ALIAS_FLAG
                 | Paint.FILTER_BITMAP_FLAG);
-        private int cornerRadiusPx;
+        private int continuousCornerRadiusPx;
+        private int pathWidth = -1;
+        private int pathHeight = -1;
+        private int pathRadius = -1;
         @Nullable private Bitmap renderBuffer;
         @Nullable private Canvas renderCanvas;
         @Nullable private BitmapShader renderShader;
 
-        RoundedIconView(@NonNull Context context) {
+        AppleContinuousIconView(@NonNull Context context) {
             super(context);
         }
 
-        void setCornerRadiusPx(int radius) {
+        void setContinuousCornerRadiusPx(int radius) {
             int safe = Math.max(0, radius);
-            if (cornerRadiusPx == safe) return;
-            cornerRadiusPx = safe;
+            if (continuousCornerRadiusPx == safe) return;
+            continuousCornerRadiusPx = safe;
+            pathRadius = -1;
             invalidate();
         }
 
         @Override protected void onDraw(@NonNull Canvas canvas) {
-            if (cornerRadiusPx <= 0 || getWidth() <= 0 || getHeight() <= 0) {
+            if (continuousCornerRadiusPx <= 0 || getWidth() <= 0 || getHeight() <= 0) {
                 super.onDraw(canvas);
                 return;
             }
@@ -427,18 +505,25 @@ public final class PhoneNotificationCardView extends FrameLayout {
             BitmapShader shader = renderShader;
             if (buffer == null || bufferCanvas == null || shader == null) return;
 
-            // Draw ImageView's already-scaled result into a buffer whose coordinates are exactly
-            // the current child bounds. The round rect is then drawn directly to the destination
-            // canvas, so no cached output bitmap can later be stretched, cropped or reused after
-            // a grid resize. All four corners therefore use the same final geometry.
+            // Draw ImageView's already-scaled result into exact child coordinates. Drawing that
+            // bitmap shader only through the Apple path bakes transparent continuous corners into
+            // the final icon pixels without clipPath, a pseudo black cover or a circular arc.
             buffer.eraseColor(Color.TRANSPARENT);
             super.onDraw(bufferCanvas);
-            float radius = Math.max(0f,
-                    Math.min(cornerRadiusPx, Math.min(getWidth(), getHeight()) / 2f));
-            outputBounds.set(0f, 0f, getWidth(), getHeight());
+            updateOutputPath(getWidth(), getHeight());
             outputPaint.setShader(shader);
-            canvas.drawRoundRect(outputBounds, radius, radius, outputPaint);
+            canvas.drawPath(outputPath, outputPaint);
             outputPaint.setShader(null);
+        }
+
+        private void updateOutputPath(int width, int height) {
+            if (pathWidth == width && pathHeight == height
+                    && pathRadius == continuousCornerRadiusPx) return;
+            pathWidth = width;
+            pathHeight = height;
+            pathRadius = continuousCornerRadiusPx;
+            outputBounds.set(0f, 0f, width, height);
+            AppleContinuousCornerPath.set(outputPath, outputBounds, continuousCornerRadiusPx);
         }
 
         private void ensureRenderBuffer(int width, int height) {
@@ -460,6 +545,9 @@ public final class PhoneNotificationCardView extends FrameLayout {
             renderBuffer = null;
             renderCanvas = null;
             renderShader = null;
+            pathWidth = -1;
+            pathHeight = -1;
+            pathRadius = -1;
         }
 
         @Override protected void onDetachedFromWindow() {
@@ -468,6 +556,13 @@ public final class PhoneNotificationCardView extends FrameLayout {
             renderShader = null;
             super.onDetachedFromWindow();
         }
+    }
+
+    @Override protected void onDetachedFromWindow() {
+        surfaceBuffer = null;
+        surfaceBufferCanvas = null;
+        surfaceBufferShader = null;
+        super.onDetachedFromWindow();
     }
 
     @Nullable

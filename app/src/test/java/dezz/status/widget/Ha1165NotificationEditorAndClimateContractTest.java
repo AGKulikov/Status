@@ -12,13 +12,14 @@ import org.junit.Test;
 
 /** Release barrier for the visual-editor, climate and ANCS-presence fixes in HA1165. */
 public final class Ha1165NotificationEditorAndClimateContractTest {
-    @Test public void notificationWindowUsesARealTransparentRoundedSurfaceAndStroke()
+    @Test public void notificationWindowUsesARealTransparentContinuousSurfaceAndStroke()
             throws Exception {
         String card = source("phone/PhoneNotificationCardView.java");
         String controller = source("popup/PopupOverlayController.java");
 
-        assertTrue(card.contains("canvas.clipPath(surfaceClip)"));
-        assertTrue(card.contains("surface.setStroke(value.borderWidthPx"));
+        assertTrue(card.contains("AppleContinuousCornerPath.set(surfacePath"));
+        assertTrue(card.contains("canvas.drawPath(surfacePath, surfaceOutputPaint)"));
+        assertTrue(card.contains("canvas.drawPath(surfaceBorderPath, surfaceBorderPaint)"));
         assertTrue(card.contains("iconPreserveAspectRatio"));
         assertTrue(card.contains("ImageView.ScaleType.FIT_CENTER"));
         assertTrue(controller.contains("background = 0x00000000"));
@@ -62,7 +63,7 @@ public final class Ha1165NotificationEditorAndClimateContractTest {
     @Test public void releaseIdentityIsHa1165() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1171'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1172'"));
     }
 
     @Test public void ancsSmartHomeBindingUsesConfirmedSubscriptionStateOnly()

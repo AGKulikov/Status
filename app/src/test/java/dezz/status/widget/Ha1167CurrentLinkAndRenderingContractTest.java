@@ -15,12 +15,13 @@ import org.junit.Test;
 public final class Ha1167CurrentLinkAndRenderingContractTest {
     @Test public void notificationIconUsesARealAndroid9AlphaBitmap() throws Exception {
         String card = source("phone/PhoneNotificationCardView.java");
-        String rounded = between(card, "private static final class RoundedIconView",
+        String rounded = between(card, "private static final class AppleContinuousIconView",
                 "private Drawable phoneAppIcon");
 
         assertTrue(rounded.contains("Bitmap.Config.ARGB_8888"));
         assertTrue(rounded.contains("new BitmapShader(source"));
-        assertTrue(rounded.contains("canvas.drawRoundRect(outputBounds"));
+        assertTrue(rounded.contains("canvas.drawPath(outputPath, outputPaint)"));
+        assertTrue(rounded.contains("AppleContinuousCornerPath.set(outputPath"));
         assertTrue(rounded.contains("buffer.eraseColor(Color.TRANSPARENT)"));
         assertFalse(rounded.contains("roundedBitmap"));
         assertFalse(rounded.contains("canvas.saveLayer"));
@@ -75,7 +76,7 @@ public final class Ha1167CurrentLinkAndRenderingContractTest {
     @Test public void releaseIdentityIsHa1167() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1171'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1172'"));
     }
 
     private static String source(String relative) throws Exception {

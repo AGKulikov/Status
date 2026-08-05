@@ -12,15 +12,16 @@ import org.junit.Test;
 
 /** Release barriers for the HA1169 fresh-GATT generation and background telemetry wake path. */
 public final class Ha1169GattGenerationAndBackgroundWakeContractTest {
-    @Test public void iconRadiusIsBakedBeforeTheCardOverlayIsComposited() throws Exception {
+    @Test public void iconContinuousMaskIsBakedBeforeTheCardOverlayIsComposited()
+            throws Exception {
         String card = source("phone/PhoneNotificationCardView.java");
-        String rounded = between(card, "private static final class RoundedIconView",
+        String rounded = between(card, "private static final class AppleContinuousIconView",
                 "private Drawable phoneAppIcon");
 
         assertTrue(rounded.contains("Bitmap.Config.ARGB_8888"));
         assertTrue(rounded.contains("new BitmapShader(source"));
-        assertTrue(rounded.contains("canvas.drawRoundRect(outputBounds"));
-        assertTrue(rounded.contains("All four corners therefore use the same final geometry"));
+        assertTrue(rounded.contains("canvas.drawPath(outputPath, outputPaint)"));
+        assertTrue(rounded.contains("AppleContinuousCornerPath.set(outputPath"));
         assertTrue(rounded.contains("buffer.eraseColor(Color.TRANSPARENT)"));
     }
 
@@ -74,7 +75,7 @@ public final class Ha1169GattGenerationAndBackgroundWakeContractTest {
     @Test public void releaseIdentityIsHa1169() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1171'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1172'"));
     }
 
     private static String source(String relative) throws Exception {
