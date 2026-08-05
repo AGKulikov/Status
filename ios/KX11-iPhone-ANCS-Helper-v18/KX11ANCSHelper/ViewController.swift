@@ -1266,7 +1266,7 @@ extension ViewController: CBCentralManagerDelegate {
         if isReconnecting {
             // Handles a restored connection originally created by an older Helper. New v18
             // connections never request Core Bluetooth auto-reconnect.
-            central.cancelPeripheralConnection(peripheral)
+            centralManager.cancelPeripheralConnection(peripheral)
         }
         let reason = hardReset.map { "fresh advertisement after \($0)" }
             ?? "fresh advertisement after link disconnected"
