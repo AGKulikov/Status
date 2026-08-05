@@ -15,7 +15,7 @@ import org.junit.Test;
 public final class Ha1154HelperAndDriverFavoritesContractTest {
     @Test public void helperTelemetryHasDedicatedNotifyAndReadRecovery() throws Exception {
         String transport = source("phone/transport/IphoneAncsTransport.java");
-        assertTrue(transport.contains("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f01"));
+        assertTrue(transport.contains("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f02"));
         assertTrue(transport.contains("PROPERTY_NOTIFY"));
         assertTrue(transport.contains("PROPERTY_READ"));
         assertTrue(transport.contains("startHelperTelemetryRead"));

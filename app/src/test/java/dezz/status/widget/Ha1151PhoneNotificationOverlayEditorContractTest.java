@@ -77,7 +77,7 @@ public final class Ha1151PhoneNotificationOverlayEditorContractTest {
     @Test public void releaseIdentityRemainsMonotonicAfterTheEditorRelease() throws Exception {
         String build = new String(Files.readAllBytes(projectFile("build.gradle")),
                 StandardCharsets.UTF_8);
-        assertTrue(build.contains("return 'v2.8.2-ha1167'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1169'"));
         assertEquals(208021165, 208020000 + 1165);
     }
 

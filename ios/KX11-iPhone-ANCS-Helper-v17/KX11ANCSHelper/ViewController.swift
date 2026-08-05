@@ -1342,6 +1342,7 @@ extension ViewController: CBPeripheralDelegate {
                                                source: "fresh characteristic callback") else {
             append("Geely_ANCS incomplete: CONTROL/SECURE/TELEMETRY required")
             resetCentralLink(reason: "Geely_ANCS characteristics incomplete")
+            return
         }
     }
 
