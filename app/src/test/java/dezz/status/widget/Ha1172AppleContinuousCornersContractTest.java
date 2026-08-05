@@ -25,31 +25,34 @@ public final class Ha1172AppleContinuousCornersContractTest {
         assertTrue(helper.contains("target.close()"));
         assertFalse(helper.contains("addRoundRect"));
 
-        assertTrue(card.contains("AppleContinuousCornerPath.set(surfacePath"));
-        assertTrue(card.contains("AppleContinuousCornerPath.set(surfaceBorderPath"));
+        assertTrue(card.contains("AppleContinuousCornerPath.set(fillPath"));
+        assertTrue(card.contains("AppleContinuousCornerPath.set(borderPath"));
         assertTrue(card.contains("AppleContinuousCornerPath.set(outputPath"));
-        assertTrue(card.contains("canvas.drawPath(surfacePath, surfaceOutputPaint)"));
-        assertTrue(card.contains("canvas.drawPath(surfaceBorderPath, surfaceBorderPaint)"));
-        assertTrue(card.contains("canvas.drawPath(outputPath, outputPaint)"));
+        assertTrue(card.contains("canvas.drawPath(fillPath, fillPaint)"));
+        assertTrue(card.contains("canvas.drawPath(borderPath, borderPaint)"));
+        assertTrue(card.contains("currentMaskCanvas.drawPath(outputPath, maskPaint)"));
     }
 
     @Test public void finalPixelsAreMaskedWithoutRoundRectOutlineOrBlackCornerCovers()
             throws Exception {
         String card = source("phone/PhoneNotificationCardView.java");
-        String surface = between(card, "public void draw(@NonNull Canvas canvas)",
-                "private void ensureSurfaceBuffer");
+        String surface = between(card, "private static final class AppleContinuousSurfaceDrawable",
+                "private static final class AppleContinuousIconView");
         String icon = between(card, "private static final class AppleContinuousIconView",
                 "private Drawable phoneAppIcon");
 
-        assertTrue(surface.contains("buffer.eraseColor(surfaceColor)"));
-        assertTrue(surface.contains("super.draw(bufferCanvas)"));
-        assertTrue(surface.contains("surfaceOutputPaint.setShader(shader)"));
+        assertTrue(surface.contains("canvas.drawPath(fillPath, fillPaint)"));
+        assertTrue(surface.contains("canvas.drawPath(borderPath, borderPaint)"));
         assertFalse(surface.contains("clipPath"));
         assertFalse(surface.contains("drawRoundRect"));
-        assertTrue(icon.contains("buffer.eraseColor(Color.TRANSPARENT)"));
-        assertTrue(icon.contains("super.onDraw(bufferCanvas)"));
+        assertTrue(icon.contains("source.eraseColor(Color.TRANSPARENT)"));
+        assertTrue(icon.contains("super.onDraw(sourceCanvas)"));
+        assertTrue(icon.contains("PorterDuff.Mode.DST_IN"));
+        assertTrue(icon.contains("canvas.drawBitmap(masked, 0f, 0f, bitmapPaint)"));
         assertFalse(icon.contains("canvas.clipPath"));
         assertFalse(icon.contains("drawRoundRect"));
+        assertFalse(card.contains("BitmapShader"));
+        assertFalse(card.contains("setBackground(null)"));
         assertFalse(card.contains("GradientDrawable surface ="));
     }
 
@@ -61,7 +64,7 @@ public final class Ha1172AppleContinuousCornersContractTest {
 
         assertTrue(editor.contains("Радиус карточки Apple"));
         assertTrue(editor.contains("Радиус иконки Apple"));
-        assertTrue(build.contains("return 'v2.8.2-ha1172'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1173'"));
     }
 
     private static String source(String relative) throws Exception {

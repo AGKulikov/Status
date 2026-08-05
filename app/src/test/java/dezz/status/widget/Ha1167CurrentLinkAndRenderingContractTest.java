@@ -19,12 +19,14 @@ public final class Ha1167CurrentLinkAndRenderingContractTest {
                 "private Drawable phoneAppIcon");
 
         assertTrue(rounded.contains("Bitmap.Config.ARGB_8888"));
-        assertTrue(rounded.contains("new BitmapShader(source"));
-        assertTrue(rounded.contains("canvas.drawPath(outputPath, outputPaint)"));
+        assertTrue(rounded.contains("new PorterDuffXfermode(PorterDuff.Mode.DST_IN)"));
+        assertTrue(rounded.contains("currentMaskCanvas.drawPath(outputPath, maskPaint)"));
+        assertTrue(rounded.contains("canvas.drawBitmap(masked, 0f, 0f, bitmapPaint)"));
         assertTrue(rounded.contains("AppleContinuousCornerPath.set(outputPath"));
-        assertTrue(rounded.contains("buffer.eraseColor(Color.TRANSPARENT)"));
+        assertTrue(rounded.contains("masked.eraseColor(Color.TRANSPARENT)"));
         assertFalse(rounded.contains("roundedBitmap"));
         assertFalse(rounded.contains("canvas.saveLayer"));
+        assertFalse(rounded.contains("BitmapShader"));
     }
 
     @Test public void climateIsRecenteredFromTheCurrentPhysicalButtonBounds()
@@ -76,7 +78,7 @@ public final class Ha1167CurrentLinkAndRenderingContractTest {
     @Test public void releaseIdentityIsHa1167() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1172'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1173'"));
     }
 
     private static String source(String relative) throws Exception {

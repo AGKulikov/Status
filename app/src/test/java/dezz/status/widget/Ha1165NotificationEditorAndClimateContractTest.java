@@ -17,9 +17,9 @@ public final class Ha1165NotificationEditorAndClimateContractTest {
         String card = source("phone/PhoneNotificationCardView.java");
         String controller = source("popup/PopupOverlayController.java");
 
-        assertTrue(card.contains("AppleContinuousCornerPath.set(surfacePath"));
-        assertTrue(card.contains("canvas.drawPath(surfacePath, surfaceOutputPaint)"));
-        assertTrue(card.contains("canvas.drawPath(surfaceBorderPath, surfaceBorderPaint)"));
+        assertTrue(card.contains("AppleContinuousCornerPath.set(fillPath"));
+        assertTrue(card.contains("canvas.drawPath(fillPath, fillPaint)"));
+        assertTrue(card.contains("canvas.drawPath(borderPath, borderPaint)"));
         assertTrue(card.contains("iconPreserveAspectRatio"));
         assertTrue(card.contains("ImageView.ScaleType.FIT_CENTER"));
         assertTrue(controller.contains("background = 0x00000000"));
@@ -63,7 +63,7 @@ public final class Ha1165NotificationEditorAndClimateContractTest {
     @Test public void releaseIdentityIsHa1165() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1172'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1173'"));
     }
 
     @Test public void ancsSmartHomeBindingUsesConfirmedSubscriptionStateOnly()
