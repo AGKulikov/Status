@@ -571,22 +571,23 @@ public final class MediaPanelView extends FrameLayout {
             observedArtworkBitmap = artworkBitmap;
             observedArtworkFingerprint = fingerprint;
         }
-        boolean staleAcrossBoundary = MediaArtworkBindingPolicy.staleAcrossTrackBoundary(
-                artworkTrackChanged, previousArtworkTrackAlbum, artworkTrackAlbum,
-                renderedArtworkFingerprint, fingerprint);
-        if (staleAcrossBoundary) {
-            rejectedArtworkFingerprint = fingerprint;
+        if (artworkTrackChanged) {
+            // Capture the previous track's rendered pixels even when the first snapshot for the
+            // new track already contains its correct new cover.  A vendor session can emit the
+            // previous bitmap again after that correct frame; the rejection must survive it.
+            rejectedArtworkFingerprint =
+                    MediaArtworkBindingPolicy.previousTrackFingerprintToReject(
+                            true, previousArtworkTrackAlbum, artworkTrackAlbum,
+                            renderedArtworkFingerprint);
         }
-        boolean previouslyRejected = fingerprint != 0L
-                && fingerprint == rejectedArtworkFingerprint;
-        if (staleAcrossBoundary || previouslyRejected) {
+        boolean previouslyRejected = MediaArtworkBindingPolicy.isRejectedForCurrentTrack(
+                rejectedArtworkFingerprint, fingerprint);
+        if (previouslyRejected) {
             // New metadata arrived with the old track's pixels: keep that fingerprint hidden.
-            // The same rejected fingerprint stays blocked across one-second polls until genuinely
-            // new pixels arrive; a same-album shared cover is still valid.
+            // It stays blocked for this entire track, including after the correct new cover has
+            // already appeared, so a late old MediaSession/cache packet cannot flash on screen.
             artworkBitmap = null;
             fingerprint = 0L;
-        } else if (fingerprint != 0L && fingerprint != rejectedArtworkFingerprint) {
-            rejectedArtworkFingerprint = 0L;
         }
         artworkTrackChanged = false;
         boolean same = artworkRenderInitialized

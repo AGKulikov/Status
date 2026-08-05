@@ -259,7 +259,7 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
             slider(card, "Максимум строк", 1, 8, element.maxLines, " стр.",
                     value -> element.maxLines = value);
             card.addView(checkBox(
-                    "По центру по вертикали при 2+ строках (выкл. = сверху)",
+                    "Текст по центру поля по вертикали (выкл. = у верхнего края)",
                     PhoneNotificationLayoutConfig.TEXT_VERTICAL_CENTER.equals(
                             element.verticalAlignment),
                     checked -> element.verticalAlignment = checked

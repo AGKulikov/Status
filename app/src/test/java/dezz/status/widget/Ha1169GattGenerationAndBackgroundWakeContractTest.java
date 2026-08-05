@@ -33,8 +33,9 @@ public final class Ha1169GattGenerationAndBackgroundWakeContractTest {
         assertTrue(config.contains("TEXT_VERTICAL_TOP = \"top\""));
         assertTrue(config.contains(".put(\"verticalAlignment\", verticalAlignment)"));
         assertTrue(config.contains("target.verticalAlignment = origin.verticalAlignment"));
-        assertTrue(editor.contains("По центру по вертикали при 2+ строках"));
+        assertTrue(editor.contains("Текст по центру поля по вертикали"));
         assertTrue(card.contains("element.verticalAlignment"));
+        assertTrue(card.contains("? Gravity.TOP : Gravity.CENTER_VERTICAL"));
         assertTrue(card.contains("slotBottom - childTop - visibleHeight"));
     }
 
@@ -73,7 +74,7 @@ public final class Ha1169GattGenerationAndBackgroundWakeContractTest {
     @Test public void releaseIdentityIsHa1169() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1169'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1170'"));
     }
 
     private static String source(String relative) throws Exception {

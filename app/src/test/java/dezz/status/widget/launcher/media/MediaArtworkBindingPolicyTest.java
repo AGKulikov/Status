@@ -31,4 +31,20 @@ public final class MediaArtworkBindingPolicyTest {
                 MediaArtworkBindingPolicy.rejectionKey("p", "First", "a", "x"),
                 MediaArtworkBindingPolicy.rejectionKey("p", "Second", "a", "x"));
     }
+
+    @Test public void previousPixelsRemainBlockedAfterTheNewCoverWasAlreadyShown() {
+        long rejected = MediaArtworkBindingPolicy.previousTrackFingerprintToReject(
+                true, "First album", "Second album", 42L);
+        assertTrue(MediaArtworkBindingPolicy.isRejectedForCurrentTrack(rejected, 42L));
+        assertFalse(MediaArtworkBindingPolicy.isRejectedForCurrentTrack(rejected, 43L));
+        // Showing fingerprint 43 must not erase the remembered fingerprint 42. A late 42 is
+        // still the old track and remains rejected until the next track boundary.
+        assertTrue(MediaArtworkBindingPolicy.isRejectedForCurrentTrack(rejected, 42L));
+    }
+
+    @Test public void explicitSharedAlbumArtworkIsNotRejected() {
+        long rejected = MediaArtworkBindingPolicy.previousTrackFingerprintToReject(
+                true, "Shared album", "Shared album", 42L);
+        assertFalse(MediaArtworkBindingPolicy.isRejectedForCurrentTrack(rejected, 42L));
+    }
 }

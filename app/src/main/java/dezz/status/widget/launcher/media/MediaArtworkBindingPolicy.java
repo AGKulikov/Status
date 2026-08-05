@@ -42,6 +42,28 @@ final class MediaArtworkBindingPolicy {
                 || !previousAlbum.equals(nextAlbum);
     }
 
+    /**
+     * Remembers the previous track's pixels for the whole lifetime of the next track.
+     *
+     * <p>Some players publish A(old) -> B(new) -> A(old) -> B(new) during one hand-off.  Merely
+     * rejecting A until B first appears is not enough: the second A produces the visible flash
+     * reported on the head unit.  Keep A blocked until another real track boundary.  Explicitly
+     * shared album artwork remains valid for adjacent songs from the same album.</p>
+     */
+    static long previousTrackFingerprintToReject(boolean trackChanged,
+                                                 @NonNull String previousAlbum,
+                                                 @NonNull String nextAlbum,
+                                                 long renderedFingerprint) {
+        if (!trackChanged || renderedFingerprint == 0L) return 0L;
+        if (!previousAlbum.isEmpty() && previousAlbum.equals(nextAlbum)) return 0L;
+        return renderedFingerprint;
+    }
+
+    static boolean isRejectedForCurrentTrack(long rejectedFingerprint,
+                                             long incomingFingerprint) {
+        return rejectedFingerprint != 0L && rejectedFingerprint == incomingFingerprint;
+    }
+
     @NonNull
     static String rejectionKey(@NonNull String application, @NonNull String title,
                                @NonNull String artist, @NonNull String album) {

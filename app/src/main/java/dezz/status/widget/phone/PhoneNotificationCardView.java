@@ -163,6 +163,13 @@ public final class PhoneNotificationCardView extends FrameLayout {
             text.setTypeface(Typeface.create("sans-serif",
                     element.bold ? Typeface.BOLD : Typeface.NORMAL));
             if (text instanceof OverflowTextView) {
+                // Alignment belongs to the actual one/two-line text inside the configured field,
+                // not merely to the maximum-lines viewport.  A one-line value in a three-line
+                // element therefore really touches the top when TOP is selected and remains
+                // vertically centred when CENTER is selected.
+                text.setGravity(Gravity.START
+                        | (PhoneNotificationLayoutConfig.TEXT_VERTICAL_TOP.equals(
+                        element.verticalAlignment) ? Gravity.TOP : Gravity.CENTER_VERTICAL));
                 ((OverflowTextView) text).configure(element.maxLines, element.overflowMode);
             }
         }
@@ -245,8 +252,7 @@ public final class PhoneNotificationCardView extends FrameLayout {
             int slotBottom = childBottom;
             int visibleHeight = Math.min(Math.max(1, slotBottom - childTop),
                     ((OverflowTextView) view).preferredVisibleHeight());
-            if (element.maxLines <= 1
-                    || PhoneNotificationLayoutConfig.TEXT_VERTICAL_CENTER.equals(
+            if (PhoneNotificationLayoutConfig.TEXT_VERTICAL_CENTER.equals(
                     element.verticalAlignment)) {
                 childTop += Math.max(0, slotBottom - childTop - visibleHeight) / 2;
             }
@@ -275,8 +281,7 @@ public final class PhoneNotificationCardView extends FrameLayout {
             int slotBottom = childBottom;
             int visibleHeight = Math.min(Math.max(1, slotBottom - childTop),
                     ((OverflowTextView) view).preferredVisibleHeight());
-            if (element.maxLines <= 1
-                    || PhoneNotificationLayoutConfig.TEXT_VERTICAL_CENTER.equals(
+            if (PhoneNotificationLayoutConfig.TEXT_VERTICAL_CENTER.equals(
                     element.verticalAlignment)) {
                 childTop += Math.max(0, slotBottom - childTop - visibleHeight) / 2;
             }
