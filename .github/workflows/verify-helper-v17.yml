@@ -1,0 +1,74 @@
+name: Verify iPhone Helper v17
+
+on:
+  push:
+    branches:
+      - 'release/kx11-ancs-helper-v17'
+      - 'release/v*'
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v17/**'
+      - '.github/workflows/verify-helper-v17.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-helper:
+    name: Compile Helper v17 without signing
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Validate project settings
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v17/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            CODE_SIGNING_ALLOWED=NO \
+            -showBuildSettings >"$RUNNER_TEMP/helper-v17-build-settings.txt"
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper' \
+            "$RUNNER_TEMP/helper-v17-build-settings.txt"
+          grep -q 'MARKETING_VERSION = 17.0' \
+            "$RUNNER_TEMP/helper-v17-build-settings.txt"
+          grep -q 'CURRENT_PROJECT_VERSION = 17' \
+            "$RUNNER_TEMP/helper-v17-build-settings.txt"
+
+      - name: Compile Helper v17
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v17/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            SYMROOT="$RUNNER_TEMP/KX11ANCSHelperProducts" \
+            OBJROOT="$RUNNER_TEMP/KX11ANCSHelperIntermediates" \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Verify generation, cache and background-wake contracts
+        run: |
+          set -euo pipefail
+          source=ios/KX11-iPhone-ANCS-Helper-v17/KX11ANCSHelper/ViewController.swift
+          plist=ios/KX11-iPhone-ANCS-Helper-v17/KX11ANCSHelper/Info.plist
+          grep -q 'KX11 ANCS HELPER v17' "$source"
+          grep -q 'D2D9E4B0-47F1-4E44-A8BB-A932FD5A2F02' "$source"
+          grep -q 'CBConnectPeripheralOptionRequiresANCS: true' "$source"
+          grep -q 'armCentralConnectTimeout' "$source"
+          grep -q 'discover missing characteristics' "$source"
+          grep -q 'cache fallback after uuidNotAllowed' "$source"
+          grep -q 'peripheral.setNotifyValue(true, for: telemetry)' "$source"
+          grep -q 'KX11 background wake poll' "$source"
+          grep -q 'Data("PAIR".utf8)' "$source"
+          grep -q 'READ CURRENT LINK B3' "$source"
+          grep -q '<string>bluetooth-central</string>' "$plist"
+          grep -q '<string>bluetooth-peripheral</string>' "$plist"

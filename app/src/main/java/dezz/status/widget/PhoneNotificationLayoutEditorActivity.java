@@ -258,6 +258,13 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
         if (PhoneNotificationLayoutConfig.isTextElement(element.id)) {
             slider(card, "Максимум строк", 1, 8, element.maxLines, " стр.",
                     value -> element.maxLines = value);
+            card.addView(checkBox(
+                    "По центру по вертикали при 2+ строках (выкл. = сверху)",
+                    PhoneNotificationLayoutConfig.TEXT_VERTICAL_CENTER.equals(
+                            element.verticalAlignment),
+                    checked -> element.verticalAlignment = checked
+                            ? PhoneNotificationLayoutConfig.TEXT_VERTICAL_CENTER
+                            : PhoneNotificationLayoutConfig.TEXT_VERTICAL_TOP));
             card.addView(checkBox("Автопрокрутка при переполнении (выкл. = …)",
                     PhoneNotificationLayoutConfig.OVERFLOW_SCROLL.equals(
                             element.overflowMode),

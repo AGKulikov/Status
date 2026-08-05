@@ -12,7 +12,7 @@ import java.util.List;
 
 /** Free, cell-based composition of one CarPlay-style iPhone notification card. */
 public final class PhoneNotificationLayoutConfig {
-    public static final int SCHEMA_VERSION = 3;
+    public static final int SCHEMA_VERSION = 4;
     private static final int FIRST_READABLE_SCHEMA_VERSION = 2;
     /** Fine horizontal grid: at the default 1000 px width one cell is about 21 px. */
     public static final int GRID_COLUMNS = 48;
@@ -27,6 +27,8 @@ public final class PhoneNotificationLayoutConfig {
     public static final String CHEVRON = "chevron";
     public static final String OVERFLOW_ELLIPSIS = "ellipsis";
     public static final String OVERFLOW_SCROLL = "scroll";
+    public static final String TEXT_VERTICAL_TOP = "top";
+    public static final String TEXT_VERTICAL_CENTER = "center";
 
     public static final class Element {
         @NonNull public final String id;
@@ -43,6 +45,8 @@ public final class PhoneNotificationLayoutConfig {
         public int maxLines;
         /** Either {@link #OVERFLOW_ELLIPSIS} or {@link #OVERFLOW_SCROLL}. */
         @NonNull public String overflowMode;
+        /** Vertical placement of the visible text block inside its persisted grid rectangle. */
+        @NonNull public String verticalAlignment;
 
         private Element(@NonNull String id, @NonNull String label) {
             this.id = id;
@@ -54,7 +58,8 @@ public final class PhoneNotificationLayoutConfig {
                     .put("columnSpan", columnSpan).put("rowSpan", rowSpan)
                     .put("visible", visible).put("textSizePx", textSizePx)
                     .put("color", color).put("bold", bold)
-                    .put("maxLines", maxLines).put("overflowMode", overflowMode);
+                    .put("maxLines", maxLines).put("overflowMode", overflowMode)
+                    .put("verticalAlignment", verticalAlignment);
         }
 
         void read(@Nullable JSONObject source) {
@@ -69,6 +74,8 @@ public final class PhoneNotificationLayoutConfig {
             bold = source.optBoolean("bold", bold);
             maxLines = source.optInt("maxLines", maxLines);
             overflowMode = safeOverflowMode(source.optString("overflowMode", overflowMode));
+            verticalAlignment = safeVerticalAlignment(source.optString(
+                    "verticalAlignment", verticalAlignment));
             normalize();
         }
 
@@ -81,6 +88,7 @@ public final class PhoneNotificationLayoutConfig {
             maxLines = clamp(maxLines, 1, 8);
             color = safeColor(color, "#FFFFFFFF");
             overflowMode = safeOverflowMode(overflowMode);
+            verticalAlignment = safeVerticalAlignment(verticalAlignment);
         }
     }
 
@@ -202,6 +210,7 @@ public final class PhoneNotificationLayoutConfig {
             target.bold = origin.bold;
             target.maxLines = origin.maxLines;
             target.overflowMode = origin.overflowMode;
+            target.verticalAlignment = origin.verticalAlignment;
         }
         normalize();
     }
@@ -244,6 +253,7 @@ public final class PhoneNotificationLayoutConfig {
         value.bold = bold;
         value.maxLines = MESSAGE.equals(id) ? 2 : 1;
         value.overflowMode = OVERFLOW_ELLIPSIS;
+        value.verticalAlignment = TEXT_VERTICAL_CENTER;
         return value;
     }
 
@@ -255,6 +265,11 @@ public final class PhoneNotificationLayoutConfig {
     @NonNull
     private static String safeOverflowMode(@Nullable String raw) {
         return OVERFLOW_SCROLL.equals(raw) ? OVERFLOW_SCROLL : OVERFLOW_ELLIPSIS;
+    }
+
+    @NonNull
+    private static String safeVerticalAlignment(@Nullable String raw) {
+        return TEXT_VERTICAL_TOP.equals(raw) ? TEXT_VERTICAL_TOP : TEXT_VERTICAL_CENTER;
     }
 
     private static String safeColor(@Nullable String raw, @NonNull String fallback) {

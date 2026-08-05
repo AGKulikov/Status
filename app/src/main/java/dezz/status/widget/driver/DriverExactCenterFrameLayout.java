@@ -13,7 +13,8 @@ import androidx.annotation.NonNull;
  * <p>The ECARX Android 9 FrameLayout occasionally retains the child's previous top after only the
  * parent height changes. Gravity.CENTER is therefore insufficient for an adjustable-height driver
  * button. This host measures and lays out the climate canvas from the current physical rectangle
- * every time, while still respecting deliberately asymmetric button padding.</p>
+ * every time. Deliberately asymmetric rail spacing is stored as button padding, but it must not
+ * move the climate artwork away from the centre of the visible button background.</p>
  */
 public final class DriverExactCenterFrameLayout extends FrameLayout {
     private View exactlyCenteredChild;
@@ -43,12 +44,13 @@ public final class DriverExactCenterFrameLayout extends FrameLayout {
         View child = exactlyCenteredChild;
         if (child == null || child.getVisibility() == GONE) return;
         measureExactlyCenteredChild();
-        int contentLeft = getPaddingLeft();
-        int contentTop = getPaddingTop();
-        int contentRight = Math.max(contentLeft, right - left - getPaddingRight());
-        int contentBottom = Math.max(contentTop, bottom - top - getPaddingBottom());
-        int childLeft = contentLeft + (contentRight - contentLeft - centeredWidthPx) / 2;
-        int childTop = contentTop + (contentBottom - contentTop - centeredHeightPx) / 2;
+        // Centre against the complete painted button, not its padded content rectangle. The rail
+        // spacing solver may assign unequal top/bottom padding to a button; using that padding here
+        // was the reason a 153 px climate button visibly kept its icon above the physical centre.
+        int physicalWidth = Math.max(0, right - left);
+        int physicalHeight = Math.max(0, bottom - top);
+        int childLeft = (physicalWidth - centeredWidthPx) / 2;
+        int childTop = (physicalHeight - centeredHeightPx) / 2;
         child.setTranslationX(0f);
         child.setTranslationY(0f);
         child.layout(childLeft, childTop,

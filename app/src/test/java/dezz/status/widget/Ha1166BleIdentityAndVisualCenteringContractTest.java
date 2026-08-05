@@ -19,9 +19,10 @@ public final class Ha1166BleIdentityAndVisualCenteringContractTest {
 
         assertTrue(card.contains("private static final class RoundedIconView"));
         assertTrue(card.contains("badge.setCornerRadiusPx(value.iconCornerRadiusPx)"));
-        assertTrue(card.contains("canvas.saveLayer(maskBounds, null)"));
-        assertTrue(card.contains("PorterDuff.Mode.DST_IN"));
-        assertTrue(card.contains("setLayerType(View.LAYER_TYPE_SOFTWARE, null)"));
+        assertTrue(card.contains("Bitmap.Config.ARGB_8888"));
+        assertTrue(card.contains("new BitmapShader(source"));
+        assertTrue(card.contains("outputCanvas.drawRoundRect"));
+        assertTrue(card.contains("canvas.drawBitmap(roundedBitmap"));
         assertTrue(card.contains("layoutElementsExactly(right - left, bottom - top)"));
         assertTrue(card.contains("placeExactly(badge, value.badge, width, height)"));
         assertTrue(card.contains("view.layout(childLeft, childTop"));
@@ -32,12 +33,18 @@ public final class Ha1166BleIdentityAndVisualCenteringContractTest {
     @Test public void captionlessClimateCanvasIsARealCenteredFrameChild()
             throws Exception {
         String driver = source("driver/DriverPanelOverlayController.java");
+        String host = source("driver/DriverExactCenterFrameLayout.java");
         String placement = between(driver,
                 "boolean directlyCenteredClimate = liveClimate && !shortcut.showTitle",
                 "WidgetService widgetService");
 
         assertTrue(placement.contains("if (directlyCenteredClimate)"));
         assertTrue(placement.contains("button.addExactlyCentered(icon, requested"));
+        assertTrue(host.contains("int physicalWidth = Math.max(0, right - left)"));
+        assertTrue(host.contains("int physicalHeight = Math.max(0, bottom - top)"));
+        assertTrue(host.contains("int childLeft = (physicalWidth - centeredWidthPx) / 2"));
+        assertTrue(host.contains("int childTop = (physicalHeight - centeredHeightPx) / 2"));
+        assertFalse(host.contains("int contentTop = getPaddingTop()"));
     }
 
     @Test public void reverseRouteNeverPreclaimsAStoredPrivateAddress()
@@ -74,7 +81,7 @@ public final class Ha1166BleIdentityAndVisualCenteringContractTest {
     @Test public void releaseIdentityIsHa1166() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1167'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1169'"));
     }
 
     private static String source(String relative) throws Exception {

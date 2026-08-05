@@ -13,16 +13,16 @@ import org.junit.Test;
 
 /** Release barriers for the HA1167 OEM rendering and current-link reconnect fixes. */
 public final class Ha1167CurrentLinkAndRenderingContractTest {
-    @Test public void notificationIconUsesARealAndroid9AlphaMask() throws Exception {
+    @Test public void notificationIconUsesARealAndroid9AlphaBitmap() throws Exception {
         String card = source("phone/PhoneNotificationCardView.java");
         String rounded = between(card, "private static final class RoundedIconView",
                 "private Drawable phoneAppIcon");
 
-        assertTrue(rounded.contains("setLayerType(View.LAYER_TYPE_SOFTWARE, null)"));
-        assertTrue(rounded.contains("canvas.saveLayer(maskBounds, null)"));
-        assertTrue(rounded.contains("PorterDuff.Mode.DST_IN"));
-        assertTrue(rounded.contains("canvas.drawRoundRect(maskBounds, radius, radius"));
-        assertFalse(rounded.contains("canvas.clipPath"));
+        assertTrue(rounded.contains("Bitmap.Config.ARGB_8888"));
+        assertTrue(rounded.contains("new BitmapShader(source"));
+        assertTrue(rounded.contains("outputCanvas.drawRoundRect"));
+        assertTrue(rounded.contains("canvas.drawBitmap(roundedBitmap"));
+        assertFalse(rounded.contains("canvas.saveLayer"));
     }
 
     @Test public void climateIsRecenteredFromTheCurrentPhysicalButtonBounds()
@@ -73,7 +73,7 @@ public final class Ha1167CurrentLinkAndRenderingContractTest {
     @Test public void releaseIdentityIsHa1167() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1167'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1169'"));
     }
 
     private static String source(String relative) throws Exception {

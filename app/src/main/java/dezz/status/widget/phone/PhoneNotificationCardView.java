@@ -2,13 +2,15 @@
 package dezz.status.widget.phone;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PorterDuff;
-import android.graphics.PorterDuffXfermode;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -126,9 +128,9 @@ public final class PhoneNotificationCardView extends FrameLayout {
         avatar.setBackground(round(value.avatarColor, value.avatarCornerRadiusPx));
         avatar.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
         avatar.setClipToOutline(value.avatarCornerRadiusPx > 0);
-        // ViewOutlineProvider.BACKGROUND does not reliably clip a fully transparent
-        // GradientDrawable on the KX11 Android 9 compositor.  Clip the icon's complete draw pass
-        // with the configured path so the slider changes both the editor and the real overlay.
+        // The card itself is clipped in draw(). Never reuse that parent clip/layer for the icon:
+        // the KX11 Android 9 compositor flattens nested overlay layers and drops the child mask.
+        // RoundedIconView below bakes real transparent pixels into its own cached bitmap instead.
         badge.setBackgroundColor(Color.TRANSPARENT);
         badge.setCornerRadiusPx(value.iconCornerRadiusPx);
         badge.setScaleType(value.iconPreserveAspectRatio
@@ -240,8 +242,15 @@ public final class PhoneNotificationCardView extends FrameLayout {
         int childBottom = gridCoordinate(element.row + element.rowSpan, height,
                 PhoneNotificationLayoutConfig.GRID_ROWS);
         if (view instanceof OverflowTextView) {
-            childBottom = Math.min(childBottom, childTop
-                    + ((OverflowTextView) view).preferredVisibleHeight());
+            int slotBottom = childBottom;
+            int visibleHeight = Math.min(Math.max(1, slotBottom - childTop),
+                    ((OverflowTextView) view).preferredVisibleHeight());
+            if (element.maxLines <= 1
+                    || PhoneNotificationLayoutConfig.TEXT_VERTICAL_CENTER.equals(
+                    element.verticalAlignment)) {
+                childTop += Math.max(0, slotBottom - childTop - visibleHeight) / 2;
+            }
+            childBottom = childTop + visibleHeight;
         }
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                 Math.max(1, childRight - childLeft), Math.max(1, childBottom - childTop));
@@ -263,8 +272,15 @@ public final class PhoneNotificationCardView extends FrameLayout {
         int childBottom = gridCoordinate(element.row + element.rowSpan, height,
                 PhoneNotificationLayoutConfig.GRID_ROWS);
         if (view instanceof OverflowTextView) {
-            childBottom = Math.min(childBottom, childTop
-                    + ((OverflowTextView) view).preferredVisibleHeight());
+            int slotBottom = childBottom;
+            int visibleHeight = Math.min(Math.max(1, slotBottom - childTop),
+                    ((OverflowTextView) view).preferredVisibleHeight());
+            if (element.maxLines <= 1
+                    || PhoneNotificationLayoutConfig.TEXT_VERTICAL_CENTER.equals(
+                    element.verticalAlignment)) {
+                childTop += Math.max(0, slotBottom - childTop - visibleHeight) / 2;
+            }
+            childBottom = childTop + visibleHeight;
         }
         int childWidth = Math.max(1, childRight - childLeft);
         int childHeight = Math.max(1, childBottom - childTop);
@@ -375,24 +391,24 @@ public final class PhoneNotificationCardView extends FrameLayout {
         }
     }
 
-    /** Deterministic rounded-square clipping for bitmap and vector application icons. */
+    /** Deterministic rounded-square alpha bitmap for bitmap and vector application icons. */
     private static final class RoundedIconView extends ImageView {
-        private final RectF maskBounds = new RectF();
-        private final Paint maskPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF outputBounds = new RectF();
+        private final Paint outputPaint = new Paint(Paint.ANTI_ALIAS_FLAG
+                | Paint.FILTER_BITMAP_FLAG);
         private int cornerRadiusPx;
+        @Nullable private Bitmap roundedBitmap;
+        private boolean roundedBitmapDirty = true;
 
         RoundedIconView(@NonNull Context context) {
             super(context);
-            // KX11's Android 9 hardware compositor ignores clipPath for this child in an overlay.
-            // A software saveLayer plus DST_IN is a real alpha mask for bitmap and vector icons.
-            setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-            maskPaint.setColor(Color.BLACK);
         }
 
         void setCornerRadiusPx(int radius) {
             int safe = Math.max(0, radius);
             if (cornerRadiusPx == safe) return;
             cornerRadiusPx = safe;
+            roundedBitmapDirty = true;
             invalidate();
         }
 
@@ -401,15 +417,62 @@ public final class PhoneNotificationCardView extends FrameLayout {
                 super.onDraw(canvas);
                 return;
             }
-            float radius = Math.min(cornerRadiusPx,
-                    Math.min(getWidth(), getHeight()) / 2f);
-            maskBounds.set(0f, 0f, getWidth(), getHeight());
-            int checkpoint = canvas.saveLayer(maskBounds, null);
-            super.onDraw(canvas);
-            maskPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
-            canvas.drawRoundRect(maskBounds, radius, radius, maskPaint);
-            maskPaint.setXfermode(null);
-            canvas.restoreToCount(checkpoint);
+            ensureRoundedBitmap();
+            if (roundedBitmap != null) canvas.drawBitmap(roundedBitmap, 0f, 0f, null);
+        }
+
+        /**
+         * Render ImageView's final scale matrix to a software bitmap, then draw that bitmap through
+         * a round-rect shader into a second ARGB bitmap. The stored result contains transparent
+         * corner pixels before the overlay compositor sees it, so the card's own clip cannot
+         * cancel or flatten the icon radius.
+         */
+        private void ensureRoundedBitmap() {
+            int width = getWidth();
+            int height = getHeight();
+            if (!roundedBitmapDirty && roundedBitmap != null
+                    && roundedBitmap.getWidth() == width
+                    && roundedBitmap.getHeight() == height) return;
+            recycleRoundedBitmap();
+            Bitmap source = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            Canvas sourceCanvas = new Canvas(source);
+            sourceCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
+            super.onDraw(sourceCanvas);
+
+            Bitmap output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            Canvas outputCanvas = new Canvas(output);
+            outputCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
+            float radius = Math.min(cornerRadiusPx, Math.min(width, height) / 2f);
+            outputBounds.set(0f, 0f, width, height);
+            outputPaint.setShader(new BitmapShader(source,
+                    Shader.TileMode.CLAMP, Shader.TileMode.CLAMP));
+            outputCanvas.drawRoundRect(outputBounds, radius, radius, outputPaint);
+            outputPaint.setShader(null);
+            source.recycle();
+            roundedBitmap = output;
+            roundedBitmapDirty = false;
+        }
+
+        @Override public void invalidate() {
+            roundedBitmapDirty = true;
+            super.invalidate();
+        }
+
+        @Override protected void onSizeChanged(int width, int height,
+                                               int oldWidth, int oldHeight) {
+            super.onSizeChanged(width, height, oldWidth, oldHeight);
+            roundedBitmapDirty = true;
+            recycleRoundedBitmap();
+        }
+
+        @Override protected void onDetachedFromWindow() {
+            recycleRoundedBitmap();
+            super.onDetachedFromWindow();
+        }
+
+        private void recycleRoundedBitmap() {
+            if (roundedBitmap != null) roundedBitmap.recycle();
+            roundedBitmap = null;
         }
     }
 
