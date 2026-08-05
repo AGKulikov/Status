@@ -70,7 +70,8 @@ public final class Ha1151PhoneNotificationOverlayEditorContractTest {
         assertTrue(card.contains("badge.setContinuousCornerRadiusPx(value.iconCornerRadiusPx)"));
         assertTrue(card.contains("IconAlphaMask.apply(pixels, alphaMask)"));
         assertTrue(card.contains("super.setImageBitmap(output)"));
-        assertTrue(card.contains("AppleContinuousCornerPath.set(outputPath"));
+        assertTrue(card.contains("AppleContinuousCornerPath.set("));
+        assertTrue(card.contains("outputPath, outputBounds, continuousCornerRadiusPx"));
         assertFalse(card.contains("BitmapShader"));
         assertFalse(card.contains("PorterDuffXfermode"));
         assertTrue(editor.contains("Радиус иконки Apple"));
