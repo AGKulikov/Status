@@ -560,15 +560,19 @@ public final class PhoneNotificationCardView extends FrameLayout {
 
             Bitmap sourceBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
             sourceBitmap.setDensity(getResources().getDisplayMetrics().densityDpi);
-            drawSource(source, new Canvas(sourceBitmap), width, height);
+            float iconSide = Math.min(width, height);
+            float iconLeft = (width - iconSide) / 2f;
+            float iconTop = (height - iconSide) / 2f;
+            outputBounds.set(iconLeft, iconTop, iconLeft + iconSide, iconTop + iconSide);
+            drawSource(source, new Canvas(sourceBitmap), outputBounds);
 
             Bitmap output = sourceBitmap;
             if (continuousCornerRadiusPx > 0) {
                 Bitmap mask = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
                 mask.setDensity(getResources().getDisplayMetrics().densityDpi);
-                outputBounds.set(0f, 0f, width, height);
-                AppleContinuousCornerPath.set(
-                        outputPath, outputBounds, continuousCornerRadiusPx);
+                AppleContinuousCornerPath.setIconMask(
+                        outputPath, outputBounds, continuousCornerRadiusPx,
+                        PhoneNotificationLayoutConfig.ICON_CORNER_RADIUS_MAX_PX);
                 new Canvas(mask).drawPath(outputPath, maskPaint);
 
                 int pixelCount = width * height;
@@ -596,22 +600,24 @@ public final class PhoneNotificationCardView extends FrameLayout {
         }
 
         private void drawSource(@NonNull Drawable source, @NonNull Canvas canvas,
-                                int width, int height) {
+                                @NonNull RectF iconBounds) {
             int sourceWidth = source.getIntrinsicWidth();
             int sourceHeight = source.getIntrinsicHeight();
-            if (sourceWidth <= 0) sourceWidth = width;
-            if (sourceHeight <= 0) sourceHeight = height;
-            float widthScale = width / (float) Math.max(1, sourceWidth);
-            float heightScale = height / (float) Math.max(1, sourceHeight);
+            int boxWidth = Math.max(1, Math.round(iconBounds.width()));
+            int boxHeight = Math.max(1, Math.round(iconBounds.height()));
+            if (sourceWidth <= 0) sourceWidth = boxWidth;
+            if (sourceHeight <= 0) sourceHeight = boxHeight;
+            float widthScale = boxWidth / (float) Math.max(1, sourceWidth);
+            float heightScale = boxHeight / (float) Math.max(1, sourceHeight);
             float scale = preserveAspectRatio
                     ? Math.min(widthScale, heightScale) : Math.max(widthScale, heightScale);
             int drawWidth = Math.max(1, Math.round(sourceWidth * scale));
             int drawHeight = Math.max(1, Math.round(sourceHeight * scale));
-            int left = (width - drawWidth) / 2;
-            int top = (height - drawHeight) / 2;
+            int left = Math.round(iconBounds.centerX() - drawWidth / 2f);
+            int top = Math.round(iconBounds.centerY() - drawHeight / 2f);
             Rect previousBounds = source.copyBounds();
             int checkpoint = canvas.save();
-            canvas.clipRect(0, 0, width, height);
+            canvas.clipRect(iconBounds);
             source.setBounds(left, top, left + drawWidth, top + drawHeight);
             source.draw(canvas);
             source.setBounds(previousBounds);

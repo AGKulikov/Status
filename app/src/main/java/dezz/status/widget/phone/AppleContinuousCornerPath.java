@@ -13,7 +13,8 @@ import androidx.annotation.NonNull;
  * corners keep changing curvature through the whole corner, producing the familiar app-icon
  * squircle without a visible straight-to-arc join. Android 9 has no public equivalent, so this
  * class traces a local exponent-five superellipse into the caller's exact bounds. The same path
- * is used as the final alpha mask and as the border centreline.</p>
+ * is used as the final alpha mask and as the border centreline. Application icons additionally
+ * morph from that Apple-like default into a mathematical circle at the slider maximum.</p>
  */
 final class AppleContinuousCornerPath {
     /** Exponent five closely matches the continuous iOS app-icon/notification silhouette. */
@@ -33,6 +34,45 @@ final class AppleContinuousCornerPath {
 
     /** Replaces {@code target} with one clockwise, closed continuous-corner contour. */
     static void set(@NonNull Path target, @NonNull RectF bounds, float requestedRadius) {
+        setSuperellipse(target, bounds, requestedRadius, EXPONENT);
+    }
+
+    /**
+     * Icon-only control curve. The top slider stop is deliberately an exact oval, not an
+     * exponent-five squircle: once the icon is placed in square bounds this guarantees a circle
+     * on every source aspect ratio and avoids the "barrel" silhouette produced by a saturated
+     * superellipse. Between saturation and the maximum, the exponent eases continuously toward
+     * two so the final step does not jump visually.
+     */
+    static void setIconMask(@NonNull Path target, @NonNull RectF squareBounds,
+                            float requestedRadius, float maximumControlRadius) {
+        target.reset();
+        if (squareBounds.width() <= 0f || squareBounds.height() <= 0f) return;
+
+        float safeMaximum = Math.max(1f, maximumControlRadius);
+        float safeRadius = Math.max(0f, requestedRadius);
+        if (safeRadius >= safeMaximum) {
+            target.addOval(squareBounds, Path.Direction.CW);
+            return;
+        }
+
+        float halfSide = Math.max(0f,
+                Math.min(squareBounds.width(), squareBounds.height()) / 2f);
+        float saturationRadius = halfSide / CONTINUOUS_EXTENT_MULTIPLIER;
+        float progress = Math.max(0f, Math.min(1f, safeRadius / safeMaximum));
+        float saturationProgress = Math.max(0f,
+                Math.min(1f, saturationRadius / safeMaximum));
+        double exponent = EXPONENT;
+        if (progress > saturationProgress && saturationProgress < 1f) {
+            float unit = (progress - saturationProgress) / (1f - saturationProgress);
+            float smooth = unit * unit * (3f - 2f * unit);
+            exponent = EXPONENT + (2.0d - EXPONENT) * smooth;
+        }
+        setSuperellipse(target, squareBounds, safeRadius, exponent);
+    }
+
+    private static void setSuperellipse(@NonNull Path target, @NonNull RectF bounds,
+                                        float requestedRadius, double exponent) {
         target.reset();
         if (bounds.width() <= 0f || bounds.height() <= 0f) return;
 
@@ -52,7 +92,7 @@ final class AppleContinuousCornerPath {
         // Top-right: top edge -> right edge.
         for (int index = 1; index <= SAMPLES_PER_CORNER; index++) {
             float axis = axis(index);
-            float partner = partner(axis);
+            float partner = partner(axis, exponent);
             target.lineTo(
                     right - extent + extent * axis,
                     top + extent * partner);
@@ -62,7 +102,7 @@ final class AppleContinuousCornerPath {
         // Bottom-right: right edge -> bottom edge.
         for (int index = 1; index <= SAMPLES_PER_CORNER; index++) {
             float axis = axis(index);
-            float partner = partner(axis);
+            float partner = partner(axis, exponent);
             target.lineTo(
                     right - extent * partner,
                     bottom - extent + extent * axis);
@@ -72,7 +112,7 @@ final class AppleContinuousCornerPath {
         // Bottom-left: bottom edge -> left edge.
         for (int index = 1; index <= SAMPLES_PER_CORNER; index++) {
             float axis = axis(index);
-            float partner = partner(axis);
+            float partner = partner(axis, exponent);
             target.lineTo(
                     left + extent - extent * axis,
                     bottom - extent * partner);
@@ -82,7 +122,7 @@ final class AppleContinuousCornerPath {
         // Top-left: left edge -> top edge.
         for (int index = 1; index <= SAMPLES_PER_CORNER; index++) {
             float axis = axis(index);
-            float partner = partner(axis);
+            float partner = partner(axis, exponent);
             target.lineTo(
                     left + extent * partner,
                     top + extent - extent * axis);
@@ -99,8 +139,10 @@ final class AppleContinuousCornerPath {
     }
 
     /** Paired axis of x^n + y^n = 1, expressed as distance from the outer edge. */
-    private static float partner(float axis) {
-        double powered = Math.pow(Math.max(0d, Math.min(1d, axis)), EXPONENT);
-        return (float) (1d - Math.pow(Math.max(0d, 1d - powered), 1d / EXPONENT));
+    private static float partner(float axis, double exponent) {
+        double safeExponent = Math.max(2.0d, exponent);
+        double powered = Math.pow(Math.max(0d, Math.min(1d, axis)), safeExponent);
+        return (float) (1d - Math.pow(Math.max(0d, 1d - powered),
+                1d / safeExponent));
     }
 }

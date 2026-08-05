@@ -20,8 +20,9 @@ public final class Ha1171IconRoundingContractTest {
 
         assertTrue(rounded.contains("int width = getWidth()"));
         assertTrue(rounded.contains("int height = getHeight()"));
-        assertTrue(rounded.contains("outputBounds.set(0f, 0f, width, height)"));
-        assertTrue(rounded.contains("AppleContinuousCornerPath.set("));
+        assertTrue(rounded.contains("float iconSide = Math.min(width, height)"));
+        assertTrue(rounded.contains("outputBounds.set(iconLeft, iconTop"));
+        assertTrue(rounded.contains("AppleContinuousCornerPath.setIconMask("));
         assertTrue(rounded.contains("IconAlphaMask.apply(pixels, alphaMask)"));
         assertTrue(rounded.contains("super.setImageBitmap(output)"));
         assertTrue(rounded.contains("protected void onLayout"));
@@ -44,7 +45,7 @@ public final class Ha1171IconRoundingContractTest {
     @Test public void releaseIdentityIsHa1171() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1174'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1175'"));
     }
 
     private static String source(String relative) throws Exception {

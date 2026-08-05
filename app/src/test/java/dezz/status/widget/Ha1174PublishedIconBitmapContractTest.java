@@ -38,13 +38,13 @@ public final class Ha1174PublishedIconBitmapContractTest {
         assertTrue(icon.contains("int height = getHeight()"));
         assertTrue(icon.contains("protected void onSizeChanged"));
         assertTrue(icon.contains("protected void onLayout"));
-        assertTrue(icon.contains("AppleContinuousCornerPath.set("));
+        assertTrue(icon.contains("AppleContinuousCornerPath.setIconMask("));
     }
 
     @Test public void releaseIdentityIsHa1174() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1174'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1175'"));
     }
 
     private static String source(String relative) throws Exception {

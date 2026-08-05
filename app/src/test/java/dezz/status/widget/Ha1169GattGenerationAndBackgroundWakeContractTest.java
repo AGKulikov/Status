@@ -22,7 +22,7 @@ public final class Ha1169GattGenerationAndBackgroundWakeContractTest {
         assertTrue(rounded.contains("new Canvas(mask).drawPath(outputPath, maskPaint)"));
         assertTrue(rounded.contains("IconAlphaMask.apply(pixels, alphaMask)"));
         assertTrue(rounded.contains("super.setImageBitmap(output)"));
-        assertTrue(rounded.contains("AppleContinuousCornerPath.set("));
+        assertTrue(rounded.contains("AppleContinuousCornerPath.setIconMask("));
         assertTrue(rounded.contains("output.setHasAlpha(true)"));
     }
 
@@ -76,7 +76,7 @@ public final class Ha1169GattGenerationAndBackgroundWakeContractTest {
     @Test public void releaseIdentityIsHa1169() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1174'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1175'"));
     }
 
     private static String source(String relative) throws Exception {

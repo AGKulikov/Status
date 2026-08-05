@@ -17,6 +17,8 @@ public final class PhoneNotificationLayoutConfig {
     /** Fine horizontal grid: at the default 1000 px width one cell is about 21 px. */
     public static final int GRID_COLUMNS = 48;
     public static final int GRID_ROWS = 12;
+    /** Last icon-radius slider stop; it maps to an exact circle in the renderer. */
+    public static final int ICON_CORNER_RADIUS_MAX_PX = 120;
 
     public static final String AVATAR = "avatar";
     public static final String BADGE = "badge";
@@ -235,7 +237,7 @@ public final class PhoneNotificationLayoutConfig {
         cornerRadiusPx = clamp(cornerRadiusPx, 0, 240);
         borderWidthPx = clamp(borderWidthPx, 0, 40);
         avatarCornerRadiusPx = clamp(avatarCornerRadiusPx, 0, 240);
-        iconCornerRadiusPx = clamp(iconCornerRadiusPx, 0, 240);
+        iconCornerRadiusPx = clamp(iconCornerRadiusPx, 0, ICON_CORNER_RADIUS_MAX_PX);
         for (Element element : elements()) element.normalize();
     }
 

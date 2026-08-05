@@ -2001,8 +2001,30 @@ public final class IphoneAncsTransport {
     }
 
     private void handleVerifiedServerLinkDisconnected(BluetoothDevice device) {
+        boolean samePeerClientHandoff = managedIncomingMode
+                && secureAttConfirmed
+                && activeClientTarget != null
+                && sameDevice(activeClientTarget, device)
+                && gatt != null
+                && (clientConnectInFlight || gattClientConnected || activeClientEstablished);
+        if (samePeerClientHandoff) {
+            state("SAME-PEER HANDOFF · ANCS CLIENT PRESERVED");
+            log("VERIFIED GATT SERVER callback released during same-peer handoff: "
+                    + safeAddress(device)
+                    + "; Android ANCS client remains owner"
+                    + " connected=" + gattClientConnected
+                    + " inFlight=" + clientConnectInFlight);
+            // Registering Android's GATT-client role on the exact incoming ATT peer can make the
+            // Android 9 server API report STATE_DISCONNECTED even though the client callback is
+            // already connected (or queued). Closing that client here created the v17 loop.
+            // Its own bounded callback/timeout now owns success or recovery.
+            return;
+        }
         boolean linkHandshakeIncomplete = !secureAttConfirmed || !iphoneAncsSeen;
         cancelClientAttemptCallbacks();
+        state(managedReconnectEnabled
+                ? REMOTE_LOGICAL_NAME + " · INCOMING LINK LOST"
+                : "VERIFIED SERVER LINK DISCONNECTED");
         log("VERIFIED GATT SERVER LINK disconnected: " + safeAddress(device)
                 + "; pending same-peer client attach остановлен");
         if (activeClientTarget != null && sameDevice(activeClientTarget, device)) {
@@ -2381,7 +2403,7 @@ public final class IphoneAncsTransport {
         BluetoothGattService ancs = callbackGatt.getService(AncsProtocol.SERVICE);
         if (ancs != null) {
             cancelAutoAncsWaitTimeout();
-            iphoneAncsSeen = iphonePeripheralMode;
+            iphoneAncsSeen = true;
             if (gattReady) {
                 log("ANCS уже READY; проверяю появившийся Helper TEL3 без перезапуска ANCS");
                 if (!startOptionalHelperTelemetrySubscription(callbackGatt)) {
@@ -4147,9 +4169,6 @@ public final class IphoneAncsTransport {
                                     + CONTROL_CHARACTERISTIC);
                         } else if (newState == BluetoothProfile.STATE_DISCONNECTED
                                 && isVerifiedPeer(device)) {
-                            state(managedReconnectEnabled
-                                    ? REMOTE_LOGICAL_NAME + " · INCOMING LINK LOST"
-                                    : "VERIFIED SERVER LINK DISCONNECTED");
                             handleVerifiedServerLinkDisconnected(device);
                         }
                     });

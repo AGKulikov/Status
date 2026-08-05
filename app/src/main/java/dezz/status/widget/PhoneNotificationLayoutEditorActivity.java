@@ -195,7 +195,9 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
                 value -> config.backgroundAlpha = value);
         slider(page, "Скругление аватара", 0, 120, config.avatarCornerRadiusPx,
                 value -> config.avatarCornerRadiusPx = value);
-        slider(page, "Радиус иконки Apple", 0, 120, config.iconCornerRadiusPx,
+        slider(page, "Радиус иконки Apple", 0,
+                PhoneNotificationLayoutConfig.ICON_CORNER_RADIUS_MAX_PX,
+                config.iconCornerRadiusPx,
                 value -> config.iconCornerRadiusPx = value);
         colorButton(page, "Цвет карточки", () -> config.backgroundColor,
                 value -> config.backgroundColor = value);
