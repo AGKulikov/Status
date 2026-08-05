@@ -21,8 +21,8 @@ public final class Ha1166BleIdentityAndVisualCenteringContractTest {
         assertTrue(card.contains("badge.setCornerRadiusPx(value.iconCornerRadiusPx)"));
         assertTrue(card.contains("Bitmap.Config.ARGB_8888"));
         assertTrue(card.contains("new BitmapShader(source"));
-        assertTrue(card.contains("outputCanvas.drawRoundRect"));
-        assertTrue(card.contains("canvas.drawBitmap(roundedBitmap"));
+        assertTrue(card.contains("canvas.drawRoundRect(outputBounds"));
+        assertTrue(card.contains("buffer.eraseColor(Color.TRANSPARENT)"));
         assertTrue(card.contains("layoutElementsExactly(right - left, bottom - top)"));
         assertTrue(card.contains("placeExactly(badge, value.badge, width, height)"));
         assertTrue(card.contains("view.layout(childLeft, childTop"));
@@ -81,7 +81,7 @@ public final class Ha1166BleIdentityAndVisualCenteringContractTest {
     @Test public void releaseIdentityIsHa1166() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1170'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1171'"));
     }
 
     private static String source(String relative) throws Exception {

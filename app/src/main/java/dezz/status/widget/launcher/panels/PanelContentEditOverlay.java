@@ -53,6 +53,10 @@ public final class PanelContentEditOverlay extends View {
         default int cellGapPx() {
             return 0;
         }
+        /** Whether the editor should tint item interiors or leave rendered content unobscured. */
+        default boolean drawItemFill() {
+            return true;
+        }
         @NonNull List<Item> items();
         boolean setPlacement(@NonNull String id, int column, int row,
                              int columnSpan, int rowSpan);
@@ -151,7 +155,7 @@ public final class PanelContentEditOverlay extends View {
         }
         for (Item item : safeItems(current)) {
             itemRect(item, current, scratch);
-            canvas.drawRect(scratch, fillPaint);
+            if (current.drawItemFill()) canvas.drawRect(scratch, fillPaint);
             canvas.drawRect(scratch, item.id.equals(selectedId) ? selectedPaint : outlinePaint);
             float labelX = scratch.left + dp(6);
             float labelY = Math.min(scratch.bottom - dp(5), scratch.top + dp(16));

@@ -20,8 +20,9 @@ public final class Ha1167CurrentLinkAndRenderingContractTest {
 
         assertTrue(rounded.contains("Bitmap.Config.ARGB_8888"));
         assertTrue(rounded.contains("new BitmapShader(source"));
-        assertTrue(rounded.contains("outputCanvas.drawRoundRect"));
-        assertTrue(rounded.contains("canvas.drawBitmap(roundedBitmap"));
+        assertTrue(rounded.contains("canvas.drawRoundRect(outputBounds"));
+        assertTrue(rounded.contains("buffer.eraseColor(Color.TRANSPARENT)"));
+        assertFalse(rounded.contains("roundedBitmap"));
         assertFalse(rounded.contains("canvas.saveLayer"));
     }
 
@@ -74,7 +75,7 @@ public final class Ha1167CurrentLinkAndRenderingContractTest {
     @Test public void releaseIdentityIsHa1167() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1170'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1171'"));
     }
 
     private static String source(String relative) throws Exception {

@@ -8,7 +8,6 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.PorterDuff;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
@@ -130,7 +129,7 @@ public final class PhoneNotificationCardView extends FrameLayout {
         avatar.setClipToOutline(value.avatarCornerRadiusPx > 0);
         // The card itself is clipped in draw(). Never reuse that parent clip/layer for the icon:
         // the KX11 Android 9 compositor flattens nested overlay layers and drops the child mask.
-        // RoundedIconView below bakes real transparent pixels into its own cached bitmap instead.
+        // RoundedIconView renders the final ImageView pixels through its own exact-size shader.
         badge.setBackgroundColor(Color.TRANSPARENT);
         badge.setCornerRadiusPx(value.iconCornerRadiusPx);
         badge.setScaleType(value.iconPreserveAspectRatio
@@ -396,14 +395,15 @@ public final class PhoneNotificationCardView extends FrameLayout {
         }
     }
 
-    /** Deterministic rounded-square alpha bitmap for bitmap and vector application icons. */
+    /** Deterministic four-corner mask for bitmap and vector application icons. */
     private static final class RoundedIconView extends ImageView {
         private final RectF outputBounds = new RectF();
         private final Paint outputPaint = new Paint(Paint.ANTI_ALIAS_FLAG
                 | Paint.FILTER_BITMAP_FLAG);
         private int cornerRadiusPx;
-        @Nullable private Bitmap roundedBitmap;
-        private boolean roundedBitmapDirty = true;
+        @Nullable private Bitmap renderBuffer;
+        @Nullable private Canvas renderCanvas;
+        @Nullable private BitmapShader renderShader;
 
         RoundedIconView(@NonNull Context context) {
             super(context);
@@ -413,7 +413,6 @@ public final class PhoneNotificationCardView extends FrameLayout {
             int safe = Math.max(0, radius);
             if (cornerRadiusPx == safe) return;
             cornerRadiusPx = safe;
-            roundedBitmapDirty = true;
             invalidate();
         }
 
@@ -422,62 +421,52 @@ public final class PhoneNotificationCardView extends FrameLayout {
                 super.onDraw(canvas);
                 return;
             }
-            ensureRoundedBitmap();
-            if (roundedBitmap != null) canvas.drawBitmap(roundedBitmap, 0f, 0f, null);
-        }
+            ensureRenderBuffer(getWidth(), getHeight());
+            Bitmap buffer = renderBuffer;
+            Canvas bufferCanvas = renderCanvas;
+            BitmapShader shader = renderShader;
+            if (buffer == null || bufferCanvas == null || shader == null) return;
 
-        /**
-         * Render ImageView's final scale matrix to a software bitmap, then draw that bitmap through
-         * a round-rect shader into a second ARGB bitmap. The stored result contains real
-         * transparent corner pixels before the overlay compositor sees it, so the card's own clip
-         * cannot cancel or flatten the icon radius.
-         */
-        private void ensureRoundedBitmap() {
-            int width = getWidth();
-            int height = getHeight();
-            if (!roundedBitmapDirty && roundedBitmap != null
-                    && roundedBitmap.getWidth() == width
-                    && roundedBitmap.getHeight() == height) return;
-            recycleRoundedBitmap();
-            Bitmap source = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            Canvas sourceCanvas = new Canvas(source);
-            sourceCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
-            super.onDraw(sourceCanvas);
-
-            Bitmap output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            Canvas outputCanvas = new Canvas(output);
-            outputCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
-            float radius = Math.min(cornerRadiusPx, Math.min(width, height) / 2f);
-            outputBounds.set(0f, 0f, width, height);
-            outputPaint.setShader(new BitmapShader(source,
-                    Shader.TileMode.CLAMP, Shader.TileMode.CLAMP));
-            outputCanvas.drawRoundRect(outputBounds, radius, radius, outputPaint);
+            // Draw ImageView's already-scaled result into a buffer whose coordinates are exactly
+            // the current child bounds. The round rect is then drawn directly to the destination
+            // canvas, so no cached output bitmap can later be stretched, cropped or reused after
+            // a grid resize. All four corners therefore use the same final geometry.
+            buffer.eraseColor(Color.TRANSPARENT);
+            super.onDraw(bufferCanvas);
+            float radius = Math.max(0f,
+                    Math.min(cornerRadiusPx, Math.min(getWidth(), getHeight()) / 2f));
+            outputBounds.set(0f, 0f, getWidth(), getHeight());
+            outputPaint.setShader(shader);
+            canvas.drawRoundRect(outputBounds, radius, radius, outputPaint);
             outputPaint.setShader(null);
-            source.recycle();
-            roundedBitmap = output;
-            roundedBitmapDirty = false;
         }
 
-        @Override public void invalidate() {
-            roundedBitmapDirty = true;
-            super.invalidate();
+        private void ensureRenderBuffer(int width, int height) {
+            if (renderBuffer != null && renderBuffer.getWidth() == width
+                    && renderBuffer.getHeight() == height) return;
+            // Do not explicitly recycle the previous bitmap. A hardware canvas may still have its
+            // texture queued on Android 9; recycling it here caused partially updated masks after
+            // reopening or resizing the editor.
+            Bitmap source = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            renderBuffer = source;
+            renderCanvas = new Canvas(source);
+            renderShader = new BitmapShader(source,
+                    Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
         }
 
         @Override protected void onSizeChanged(int width, int height,
                                                int oldWidth, int oldHeight) {
             super.onSizeChanged(width, height, oldWidth, oldHeight);
-            roundedBitmapDirty = true;
-            recycleRoundedBitmap();
+            renderBuffer = null;
+            renderCanvas = null;
+            renderShader = null;
         }
 
         @Override protected void onDetachedFromWindow() {
-            recycleRoundedBitmap();
+            renderBuffer = null;
+            renderCanvas = null;
+            renderShader = null;
             super.onDetachedFromWindow();
-        }
-
-        private void recycleRoundedBitmap() {
-            if (roundedBitmap != null) roundedBitmap.recycle();
-            roundedBitmap = null;
         }
     }
 

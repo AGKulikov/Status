@@ -69,7 +69,7 @@ public final class Ha1151PhoneNotificationOverlayEditorContractTest {
         assertTrue(automation.contains("IOS_APP_ICON_CORNER_RATIO = 0.2237f"));
         assertTrue(card.contains("badge.setCornerRadiusPx(value.iconCornerRadiusPx)"));
         assertTrue(card.contains("new BitmapShader(source"));
-        assertTrue(card.contains("outputCanvas.drawRoundRect"));
+        assertTrue(card.contains("canvas.drawRoundRect(outputBounds"));
         assertTrue(editor.contains("Скругление иконки приложения"));
         assertTrue(editor.contains("Скругление аватара"));
         assertTrue(editor.contains("Жирное начертание"));
@@ -78,7 +78,7 @@ public final class Ha1151PhoneNotificationOverlayEditorContractTest {
     @Test public void releaseIdentityRemainsMonotonicAfterTheEditorRelease() throws Exception {
         String build = new String(Files.readAllBytes(projectFile("build.gradle")),
                 StandardCharsets.UTF_8);
-        assertTrue(build.contains("return 'v2.8.2-ha1170'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1171'"));
         assertEquals(208021165, 208020000 + 1165);
     }
 

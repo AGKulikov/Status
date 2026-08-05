@@ -376,6 +376,10 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
     private final class LayoutModel implements PanelContentEditOverlay.Model {
         @Override public int columns() { return PhoneNotificationLayoutConfig.GRID_COLUMNS; }
         @Override public int rows() { return PhoneNotificationLayoutConfig.GRID_ROWS; }
+        // The generic blue item fill is useful for empty launcher cells, but over a notification
+        // icon it paints a square back into the real transparent corners and visually turns a
+        // correct four-corner mask into the flat-top shape seen on the head unit.
+        @Override public boolean drawItemFill() { return false; }
         @NonNull @Override public List<PanelContentEditOverlay.Item> items() {
             List<PanelContentEditOverlay.Item> result = new ArrayList<>();
             for (PhoneNotificationLayoutConfig.Element element : config.elements()) {
