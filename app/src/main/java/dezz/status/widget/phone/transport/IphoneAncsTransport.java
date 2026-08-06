@@ -83,6 +83,15 @@ public final class IphoneAncsTransport {
     /** Dedicated Helper telemetry endpoint on the current verified GATT-server connection. */
     private static final UUID TELEMETRY_CHARACTERISTIC =
             UUID.fromString("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f02");
+    /**
+     * iPhone-owned telemetry relay discovered by Android on the already-working ANCS owner.
+     * Generation 3 is intentionally separate from Android's generation-2 bootstrap database:
+     * Android 9 and Core Bluetooth otherwise reuse the opposite GATT role's stale B4 handle.
+     */
+    private static final UUID TELEMETRY_RELAY_SERVICE =
+            UUID.fromString("d2d9e4b0-47f1-4e44-a8bb-a932fd5a2f03");
+    private static final UUID TELEMETRY_RELAY_CHARACTERISTIC =
+            UUID.fromString("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f03");
     private static final UUID GENERIC_ATTRIBUTE_SERVICE =
             UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
     private static final UUID SERVICE_CHANGED =
@@ -2353,19 +2362,30 @@ public final class IphoneAncsTransport {
                         + " props=0x" + Integer.toHexString(characteristic.getProperties()));
             }
         }
-        if (iphonePeripheralMode) {
+        if (helperTelemetryClientEnabled()) {
+            BluetoothGattService relay = callbackGatt.getService(TELEMETRY_RELAY_SERVICE);
             BluetoothGattService helper = callbackGatt.getService(DIAGNOSTIC_SERVICE);
-            iphoneSecureCharacteristic = helper == null ? null
-                    : helper.getCharacteristic(SECURE_CHARACTERISTIC);
-            BluetoothGattCharacteristic discoveredTelemetry = helper == null ? null
-                    : helper.getCharacteristic(TELEMETRY_CHARACTERISTIC);
-            if ((iphoneTelemetryCharacteristic == null) != (discoveredTelemetry == null)) {
+            iphoneSecureCharacteristic = iphonePeripheralMode && helper != null
+                    ? helper.getCharacteristic(SECURE_CHARACTERISTIC) : null;
+            BluetoothGattCharacteristic discoveredTelemetry = relay == null ? null
+                    : relay.getCharacteristic(TELEMETRY_RELAY_CHARACTERISTIC);
+            if (discoveredTelemetry == null && helper != null) {
+                discoveredTelemetry = helper.getCharacteristic(TELEMETRY_CHARACTERISTIC);
+            }
+            UUID previousTelemetryUuid = iphoneTelemetryCharacteristic == null ? null
+                    : iphoneTelemetryCharacteristic.getUuid();
+            UUID discoveredTelemetryUuid = discoveredTelemetry == null ? null
+                    : discoveredTelemetry.getUuid();
+            if (!Objects.equals(previousTelemetryUuid, discoveredTelemetryUuid)) {
                 iphoneHelperTelemetrySubscriptionAttempted = false;
                 iphoneHelperTelemetrySubscribed = false;
             }
             iphoneTelemetryCharacteristic = discoveredTelemetry;
             log("Helper telemetry endpoint="
-                    + (iphoneTelemetryCharacteristic != null ? "TEL3/B4" : "legacy TEL2/B3"));
+                    + (TELEMETRY_RELAY_CHARACTERISTIC.equals(discoveredTelemetryUuid)
+                    ? "B4 relay generation 3 on ANCS owner"
+                    : iphoneTelemetryCharacteristic != null
+                    ? "bootstrap B4 generation 2" : "legacy TEL2/B3"));
 
             // Helper v9+ deliberately makes B4 readable before ANCS authorization. Read one
             // atomic snapshot before touching an encrypted ANCS CCCD: otherwise a pending
@@ -2387,6 +2407,7 @@ public final class IphoneAncsTransport {
             // Android 9's serialized GATT queue. Battery percentage, cable state and radio type
             // therefore stay live even while the first ANCS authorization is still pending.
             if (iphoneTelemetryCharacteristic != null
+                    && iphonePeripheralMode
                     && !iphoneHelperTelemetrySubscribed
                     && !iphoneHelperTelemetrySubscriptionAttempted
                     && descriptorStage == DescriptorStage.NONE && !gattReady) {
@@ -2680,8 +2701,10 @@ public final class IphoneAncsTransport {
             }
             return;
         }
-        if ((TELEMETRY_CHARACTERISTIC.equals(uuid) || SECURE_CHARACTERISTIC.equals(uuid))
-                && iphonePeripheralMode) {
+        if ((TELEMETRY_CHARACTERISTIC.equals(uuid)
+                || TELEMETRY_RELAY_CHARACTERISTIC.equals(uuid)
+                || SECURE_CHARACTERISTIC.equals(uuid))
+                && helperTelemetryClientEnabled()) {
             IphoneHelperTelemetry telemetry = IphoneHelperTelemetry.parse(value);
             if (telemetry != null) {
                 listener.onHelperTelemetry(telemetry);
@@ -2694,8 +2717,9 @@ public final class IphoneAncsTransport {
             return;
         }
         if (SERVICE_CHANGED.equals(uuid)) {
-            if (iphonePeripheralMode && !helperBootstrapMode) {
-                log("Daily GATT получил Service Changed; переоткрываю services на том же owner");
+            if (helperTelemetryClientEnabled() && !helperBootstrapMode) {
+                log("Рабочий ANCS GATT получил Service Changed; "
+                        + "переоткрываю services на том же owner");
                 restartDiscoveryOnPersistentOwner(callbackGatt, activeClientGeneration,
                         "SERVICE CHANGED indication");
                 return;
@@ -2726,6 +2750,7 @@ public final class IphoneAncsTransport {
                 return SERVICE_CHANGED.equals(uuid);
             case HELPER_TELEMETRY:
                 return TELEMETRY_CHARACTERISTIC.equals(uuid)
+                        || TELEMETRY_RELAY_CHARACTERISTIC.equals(uuid)
                         || SECURE_CHARACTERISTIC.equals(uuid);
             case DATA_SOURCE:
                 return AncsProtocol.DATA_SOURCE.equals(uuid);
@@ -2753,7 +2778,7 @@ public final class IphoneAncsTransport {
      */
     private boolean startOptionalHelperTelemetrySubscription(BluetoothGatt callbackGatt) {
         BluetoothGattCharacteristic telemetry = helperTelemetryEndpoint();
-        if (!iphonePeripheralMode || callbackGatt != gatt || telemetry == null
+        if (!helperTelemetryClientEnabled() || callbackGatt != gatt || telemetry == null
                 || iphoneHelperTelemetrySubscribed
                 || iphoneHelperTelemetrySubscriptionAttempted
                 || descriptorStage != DescriptorStage.NONE) return false;
@@ -2782,10 +2807,22 @@ public final class IphoneAncsTransport {
                 ? iphoneTelemetryCharacteristic : iphoneSecureCharacteristic;
     }
 
+    /** Both client routes terminate on an iPhone-owned GATT database. */
+    private boolean helperTelemetryClientEnabled() {
+        return iphonePeripheralMode || managedIncomingMode;
+    }
+
     private void continueAfterHelperTelemetrySubscription(BluetoothGatt callbackGatt) {
         scheduleHelperTelemetryRecovery(callbackGatt, 200L);
         if (gattReady) finishAncsReadySetup(callbackGatt);
-        else scheduleIphonePostSecureDiscovery(callbackGatt);
+        else if (managedIncomingMode) {
+            // In the reverse route there is no Helper B3 phase on this client owner. Resume the
+            // same discovery result immediately so ANCS subscriptions follow the optional B4
+            // relay CCCD instead of waiting for the direct-route post-secure scheduler.
+            handleServices(callbackGatt, GATT_SUCCESS);
+        } else {
+            scheduleIphonePostSecureDiscovery(callbackGatt);
+        }
     }
 
     private void finishAncsReadySetup(BluetoothGatt callbackGatt) {
@@ -2803,12 +2840,13 @@ public final class IphoneAncsTransport {
      * service discovery instead of opening a competing connection.
      */
     private void scheduleHelperTelemetryRecovery(BluetoothGatt expectedGatt, long delayMs) {
-        if (!iphonePeripheralMode || expectedGatt == null || expectedGatt != gatt
+        if (!helperTelemetryClientEnabled() || expectedGatt == null || expectedGatt != gatt
                 || !gattClientConnected) return;
         if (helperTelemetryPoll != null) main.removeCallbacks(helperTelemetryPoll);
         helperTelemetryPoll = () -> {
             helperTelemetryPoll = null;
-            if (!iphonePeripheralMode || expectedGatt != gatt || !gattClientConnected) return;
+            if (!helperTelemetryClientEnabled()
+                    || expectedGatt != gatt || !gattClientConnected) return;
 
             BluetoothGattCharacteristic endpoint = helperTelemetryEndpoint();
             boolean busy = discoveryPending || descriptorStage != DescriptorStage.NONE
@@ -4587,7 +4625,8 @@ public final class IphoneAncsTransport {
             main.post(() -> {
                 if (callbackGatt != gatt) return;
                 UUID uuid = characteristic.getUuid();
-                if (TELEMETRY_CHARACTERISTIC.equals(uuid)
+                if ((TELEMETRY_CHARACTERISTIC.equals(uuid)
+                        || TELEMETRY_RELAY_CHARACTERISTIC.equals(uuid))
                         && iphoneHelperTelemetryReadPending) {
                     cancelHelperTelemetryReadTimeout();
                     iphoneHelperTelemetryReadPending = false;
