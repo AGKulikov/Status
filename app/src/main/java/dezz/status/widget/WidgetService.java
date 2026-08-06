@@ -88,6 +88,7 @@ import org.json.JSONObject;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -242,6 +243,9 @@ public class WidgetService extends Service {
     private static final long MEDIA_PROGRESS_TICK_MS = 1_000L;
     /** More than the connector cache, so removing the newest item can never replay an older one. */
     private static final int MAX_OBSERVED_PHONE_NOTIFICATIONS = 128;
+    /** Burst deliveries are intentionally readable and deterministic, one card per second. */
+    private static final long PHONE_NOTIFICATION_QUEUE_SLOT_MS = 1_000L;
+    private static final int MAX_QUEUED_PHONE_NOTIFICATIONS = 128;
     /** Gap between the play/pause indicator and the text it precedes, as a fraction of that
      *  text's size — same rationale as the icon's own size: it must track the font sliders. */
     private static final float STATE_ICON_GAP_RATIO = 0.25f;
@@ -344,6 +348,9 @@ public class WidgetService extends Service {
     private String activePhoneBatteryAlertText;
     private boolean phoneLowBatteryAlertLatched;
     private final Set<String> observedPhoneNotificationKeys = new LinkedHashSet<>();
+    private final ArrayDeque<QueuedPhoneNotification> queuedPhoneNotifications =
+            new ArrayDeque<>();
+    private boolean phoneNotificationBurstActive;
     private long activePhoneNotificationExpiresAt;
     private long activePhonePopupNotificationExpiresAt;
     private boolean phoneNotificationPopupConfigured;
@@ -378,6 +385,26 @@ public class WidgetService extends Service {
                 return;
             }
             clearPhonePopupNotification();
+        }
+    };
+    private final Runnable phoneNotificationQueueAdvance = new Runnable() {
+        @Override public void run() {
+            if (destroyed || !phoneNotificationBurstActive) return;
+            QueuedPhoneNotification next = queuedPhoneNotifications.pollFirst();
+            if (next == null) {
+                finishPhoneNotificationBurst();
+                return;
+            }
+            boolean presented = presentPhoneNotification(next);
+            if (!presented) {
+                if (queuedPhoneNotifications.isEmpty()) finishPhoneNotificationBurst();
+                else mainHandler.post(this);
+                return;
+            }
+            long nextSlot = SystemClock.elapsedRealtime()
+                    + PHONE_NOTIFICATION_QUEUE_SLOT_MS;
+            holdPhoneNotificationDestinationsUntil(nextSlot);
+            mainHandler.postDelayed(this, PHONE_NOTIFICATION_QUEUE_SLOT_MS);
         }
     };
     private final Runnable crossSourceRuleRefresh = () -> {
@@ -1497,6 +1524,10 @@ public class WidgetService extends Service {
         if (reconfigureIntegrations && !popupAppliedByStartup && integrationsStarted) {
             applyPopupPreferencesSafely();
         }
+        if (!prefs.phoneStatusBarNotificationsEnabled.get()
+                && !prefs.phonePopupNotificationsEnabled.get()) {
+            cancelPhoneNotificationQueue();
+        }
         if (!prefs.phonePopupNotificationsEnabled.get()) {
             clearPhonePopupNotification();
         } else if (integrationsStarted) {
@@ -2223,6 +2254,7 @@ public class WidgetService extends Service {
         if (sessionEnded) {
             phoneAncsReady = false;
             observedPhoneNotificationKeys.clear();
+            cancelPhoneNotificationQueue();
             clearPhonePopupNotification();
             if (activePhoneBatteryAlertText != null) {
                 clearPhoneStatusNotification(true);
@@ -2247,19 +2279,7 @@ public class WidgetService extends Service {
                     PhoneStatusBarPolicy.NotificationPresentation presentation =
                             PhoneStatusBarPolicy.notification(latestNotification, selected);
                     if (presentation != null) {
-                        updatePhoneNotificationFieldStates(presentation, selected);
-                        boolean presentedInStatusRow = false;
-                        boolean presentedInPopup = false;
-                        if (prefs.phoneStatusBarNotificationsEnabled.get()) {
-                            presentedInStatusRow =
-                                    showPhoneStatusNotification(presentation, selected);
-                        }
-                        if (prefs.phonePopupNotificationsEnabled.get()) {
-                            presentedInPopup = showPhonePopupNotification(presentation);
-                        }
-                        if (!presentedInStatusRow && !presentedInPopup) {
-                            clearPhoneNotificationFieldsIfInactive();
-                        }
+                        enqueuePhoneNotification(presentation, selected);
                     }
                 }
             }
@@ -2297,6 +2317,116 @@ public class WidgetService extends Service {
             if (!oldest.hasNext()) break;
             oldest.next();
             oldest.remove();
+        }
+    }
+
+    /**
+     * Keeps the visible card stable. The first newcomer waits one second; every later delivery is
+     * retained in arrival order and receives its own one-second slot.
+     */
+    private void enqueuePhoneNotification(
+            @NonNull PhoneStatusBarPolicy.NotificationPresentation presentation,
+            @NonNull Set<String> selectedFields) {
+        QueuedPhoneNotification delivery = new QueuedPhoneNotification(
+                presentation, selectedFields);
+        if (phoneNotificationBurstActive) {
+            appendQueuedPhoneNotification(delivery);
+            return;
+        }
+        if (hasActiveRoutinePhoneNotificationDestination()) {
+            appendQueuedPhoneNotification(delivery);
+            phoneNotificationBurstActive = true;
+            long nextSlot = SystemClock.elapsedRealtime()
+                    + PHONE_NOTIFICATION_QUEUE_SLOT_MS;
+            holdPhoneNotificationDestinationsUntil(nextSlot);
+            mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
+            mainHandler.postDelayed(phoneNotificationQueueAdvance,
+                    PHONE_NOTIFICATION_QUEUE_SLOT_MS);
+            return;
+        }
+        presentPhoneNotification(delivery);
+    }
+
+    private void appendQueuedPhoneNotification(@NonNull QueuedPhoneNotification delivery) {
+        if (queuedPhoneNotifications.size() >= MAX_QUEUED_PHONE_NOTIFICATIONS) {
+            // Preserve the already promised order. This is only a pathological safety bound;
+            // normal ANCS bursts (including ten simultaneous notifications) are never reduced.
+            return;
+        }
+        queuedPhoneNotifications.addLast(delivery);
+    }
+
+    private boolean presentPhoneNotification(@NonNull QueuedPhoneNotification delivery) {
+        if (prefs == null) return false;
+        updatePhoneNotificationFieldStates(delivery.presentation, delivery.selectedFields);
+        boolean presentedInStatusRow = prefs.phoneStatusBarNotificationsEnabled.get()
+                && showPhoneStatusNotification(
+                delivery.presentation, delivery.selectedFields);
+        boolean presentedInPopup = prefs.phonePopupNotificationsEnabled.get()
+                && showPhonePopupNotification(delivery.presentation);
+        if (!presentedInStatusRow && !presentedInPopup) {
+            clearPhoneNotificationFieldsIfInactive();
+        }
+        if (binding != null) {
+            updateMediaInfo();
+            applyBrickVisibility(currentBrickSet());
+        }
+        schedulePopupRefresh();
+        return presentedInStatusRow || presentedInPopup;
+    }
+
+    private boolean hasActiveRoutinePhoneNotificationDestination() {
+        long now = SystemClock.elapsedRealtime();
+        boolean statusActive = activePhoneNotification != null
+                && activePhoneNotificationExpiresAt > now;
+        boolean popupActive = activePhonePopupNotificationExpiresAt > now;
+        return statusActive || popupActive;
+    }
+
+    /** Normal configured expiry is suspended while the one-second burst clock owns the card. */
+    private void holdPhoneNotificationDestinationsUntil(long elapsedDeadline) {
+        long guardedDeadline = elapsedDeadline + 100L;
+        if (activePhoneNotification != null) {
+            activePhoneNotificationExpiresAt = Math.max(
+                    activePhoneNotificationExpiresAt, guardedDeadline);
+            mainHandler.removeCallbacks(phoneNotificationExpiry);
+        }
+        if (activePhonePopupNotificationExpiresAt > 0L) {
+            activePhonePopupNotificationExpiresAt = Math.max(
+                    activePhonePopupNotificationExpiresAt, guardedDeadline);
+            mainHandler.removeCallbacks(phonePopupNotificationExpiry);
+        }
+    }
+
+    private void finishPhoneNotificationBurst() {
+        mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
+        queuedPhoneNotifications.clear();
+        phoneNotificationBurstActive = false;
+        if (activePhoneNotification != null) clearPhoneStatusNotification(true);
+        if (activePhonePopupNotificationExpiresAt > 0L) clearPhonePopupNotification();
+        if (binding != null) {
+            updateMediaInfo();
+            applyBrickVisibility(currentBrickSet());
+        }
+        schedulePopupRefresh();
+    }
+
+    private void cancelPhoneNotificationQueue() {
+        mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
+        queuedPhoneNotifications.clear();
+        phoneNotificationBurstActive = false;
+    }
+
+    private static final class QueuedPhoneNotification {
+        @NonNull final PhoneStatusBarPolicy.NotificationPresentation presentation;
+        @NonNull final Set<String> selectedFields;
+
+        QueuedPhoneNotification(
+                @NonNull PhoneStatusBarPolicy.NotificationPresentation presentation,
+                @NonNull Set<String> selectedFields) {
+            this.presentation = presentation;
+            this.selectedFields = Collections.unmodifiableSet(
+                    new LinkedHashSet<>(selectedFields));
         }
     }
 
@@ -4918,6 +5048,8 @@ public class WidgetService extends Service {
         }
         phoneStatusValues.clear();
         observedPhoneNotificationKeys.clear();
+        queuedPhoneNotifications.clear();
+        phoneNotificationBurstActive = false;
         phoneAncsReady = false;
         activePhoneNotification = null;
         activePhoneNotificationFields = Collections.emptySet();

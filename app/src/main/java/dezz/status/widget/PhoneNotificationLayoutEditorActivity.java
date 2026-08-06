@@ -187,6 +187,11 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
                 checked -> overlay.centerHorizontally = checked), top(4));
         page.addView(checkBox("По центру экрана по вертикали", overlay.centerVertically,
                 checked -> overlay.centerVertically = checked), top(2));
+        page.addView(checkBox("Заблокировать положение всплывающего уведомления",
+                overlay.positionLocked,
+                checked -> overlay.positionLocked = checked), top(2));
+        page.addView(text("После блокировки карточка сохраняет X/Y и больше не двигается "
+                + "жестом; элементы внутри остаются доступными.", 13, 0xFFC7C7CC), top(2));
         slider(page, "Радиус карточки Apple", 0, 160, config.cornerRadiusPx,
                 value -> config.cornerRadiusPx = value);
         slider(page, "Толщина обводки", 0, 40, config.borderWidthPx,

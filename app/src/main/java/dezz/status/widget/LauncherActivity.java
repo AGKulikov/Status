@@ -2796,6 +2796,9 @@ public final class LauncherActivity extends AppCompatActivity {
                     @Override public void next() {
                         if (mediaController != null) mediaController.next();
                     }
+                    @Override public void seekTo(long positionMs) {
+                        if (mediaController != null) mediaController.seekTo(positionMs);
+                    }
                     @Override public boolean openPlayer() {
                         return mediaController != null && mediaController.openTargetPlayer();
                     }

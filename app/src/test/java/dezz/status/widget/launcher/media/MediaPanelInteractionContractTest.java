@@ -62,6 +62,26 @@ public final class MediaPanelInteractionContractTest {
         assertFalse(source.contains("root.setBackground(glassBackground("));
     }
 
+    @Test public void progressIsAnInteractiveExactSessionSeekBarWithoutAThumb()
+            throws IOException {
+        String panel = source("dezz/status/widget/launcher/media/MediaPanelView.java");
+        String controller = source("dezz/status/widget/launcher/LauncherMediaController.java");
+        String command = source("dezz/status/widget/launcher/MediaResumeCommand.java");
+        int progressStart = panel.indexOf("class ResponsiveProgressBar extends View");
+        int progressEnd = panel.indexOf("/** Touch-capable volume track", progressStart);
+        String progress = panel.substring(progressStart, progressEnd);
+
+        assertTrue(progress.contains("onTouchEvent(@NonNull MotionEvent event)"));
+        assertTrue(progress.contains("updateFromTouch(event.getX())"));
+        assertFalse(progress.contains("drawCircle"));
+        assertFalse(progress.contains("drawOval"));
+        assertTrue(panel.contains("controls.seekTo(positionMs)"));
+        assertTrue(panel.contains("progress == null || !progress.isPressed()"));
+        assertTrue(controller.contains("public void seekTo(long positionMs)"));
+        assertTrue(command.contains("controller.getTransportControls().seekTo("));
+        assertTrue(command.contains("A timeline position has no safe media-button fallback"));
+    }
+
     @Test public void everySnapshotReappliesTrackArtworkAndPlayback() throws IOException {
         String source = source("dezz/status/widget/launcher/media/MediaPanelView.java");
         int start = source.indexOf("public void setSnapshot(");
@@ -201,7 +221,7 @@ public final class MediaPanelInteractionContractTest {
         assertTrue(source.contains(
                 "if (view.getVisibility() != visibility) view.setVisibility(visibility)"));
         assertTrue(source.contains(
-                "if (progress.getProgress() != nextProgress) progress.setProgress(nextProgress)"));
+                "if (!progress.isPressed() && progress.getProgress() != nextProgress)"));
         assertTrue(source.contains(
                 "volume.getProgress() != volumePercent"));
     }

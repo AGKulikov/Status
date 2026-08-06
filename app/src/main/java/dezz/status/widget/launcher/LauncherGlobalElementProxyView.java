@@ -41,13 +41,15 @@ import java.util.Map;
 import dezz.status.widget.Fonts;
 import dezz.status.widget.MarqueeOutlineTextView;
 import dezz.status.widget.OutlineTextView;
+import dezz.status.widget.launcher.media.MediaPanelConfig;
 
 /**
  * Draws one live launcher widget in screen coordinates without changing its native proportions.
  *
  * <p>The hidden panel hierarchy remains the data/action source. This view supplies a separate
  * viewport, padding, typography and action policy for each atomic widget. FIT is deliberately the
- * default; STRETCH exists only as an explicit compatibility choice.</p>
+ * default for bitmap-like content; the media progress and volume controls are responsive and
+ * always consume the complete independently resized frame.</p>
  */
 public final class LauncherGlobalElementProxyView extends View {
     public interface Source {
@@ -131,7 +133,8 @@ public final class LauncherGlobalElementProxyView extends View {
                 canvas.translate(transform.offsetX, transform.offsetY);
                 canvas.scale(transform.scaleX, transform.scaleY);
                 canvas.translate(-transform.sourceLeft, -transform.sourceTop);
-                drawWithoutAutomaticSurface(value, canvas, transform.scaleY);
+                drawWithoutAutomaticSurface(value, canvas,
+                        transform.scaleX, transform.scaleY);
             }
         }
         canvas.restoreToCount(checkpoint);
@@ -224,7 +227,11 @@ public final class LauncherGlobalElementProxyView extends View {
         float sourceBottom = content.bottom;
         float sourceWidth = Math.max(1f, sourceRight - sourceLeft);
         float sourceHeight = Math.max(1f, sourceBottom - sourceTop);
-        if (appearance.scaleMode == LauncherGlobalElementLayoutStore.ScaleMode.STRETCH) {
+        // Progress and volume are responsive controls rather than a bitmap-like panel cell.
+        // Their outer frame may grow independently on either axis; the controls themselves keep
+        // circles, glyphs and rounded ends proportional while using all of the new space.
+        if (isResponsiveMediaControl(source)
+                || appearance.scaleMode == LauncherGlobalElementLayoutStore.ScaleMode.STRETCH) {
             return new DrawTransform(left, top,
                     viewportWidth / sourceWidth, viewportHeight / sourceHeight,
                     sourceLeft, sourceTop, sourceRight, sourceBottom);
@@ -247,6 +254,14 @@ public final class LauncherGlobalElementProxyView extends View {
         if (alignment == 0) return start;
         if (alignment == 2) return start + available - used;
         return start + (available - used) / 2f;
+    }
+
+    private static boolean isResponsiveMediaControl(@NonNull View source) {
+        LauncherGlobalElementTag tag = LauncherGlobalElementTag.from(source);
+        if (tag == null) return false;
+        String progress = LauncherLayoutStore.MEDIA + "/" + MediaPanelConfig.PROGRESS;
+        String volume = LauncherLayoutStore.MEDIA + "/" + MediaPanelConfig.VOLUME;
+        return progress.equals(tag.id) || volume.equals(tag.id);
     }
 
     private static boolean isPlainText(@NonNull View value) {
@@ -519,18 +534,22 @@ public final class LauncherGlobalElementProxyView extends View {
     private void drawWithoutAutomaticSurface(
             @NonNull View source,
             @NonNull Canvas canvas,
+            float sourceToScreenScaleX,
             float sourceToScreenScaleY) {
         drawViewTree(source, canvas,
+                Math.max(.01f, Math.abs(sourceToScreenScaleX)),
                 Math.max(.01f, Math.abs(sourceToScreenScaleY)));
     }
 
     private void drawViewTree(
             @NonNull View value,
             @NonNull Canvas canvas,
+            float sourceToScreenScaleX,
             float sourceToScreenScaleY) {
         if (value.getVisibility() != View.VISIBLE) return;
         if (value instanceof TextView && isPlainText(value)) {
-            drawNestedText(canvas, (TextView) value, sourceToScreenScaleY);
+            drawNestedText(canvas, (TextView) value,
+                    sourceToScreenScaleX, sourceToScreenScaleY);
             return;
         }
         if (value instanceof ViewGroup) {
@@ -545,7 +564,8 @@ public final class LauncherGlobalElementProxyView extends View {
                 int checkpoint = canvas.save();
                 canvas.translate(child.getLeft() - group.getScrollX(),
                         child.getTop() - group.getScrollY());
-                drawViewTree(child, canvas, sourceToScreenScaleY);
+                drawViewTree(child, canvas,
+                        sourceToScreenScaleX, sourceToScreenScaleY);
                 canvas.restoreToCount(checkpoint);
             }
             canvas.restoreToCount(groupCheckpoint);
@@ -556,7 +576,8 @@ public final class LauncherGlobalElementProxyView extends View {
         // normal rendering. Automatic surfaces live on container/text/image nodes and were
         // already skipped above, so no attached source property has to be toggled here.
         if (value instanceof ImageView) {
-            drawImageContent(canvas, (ImageView) value);
+            drawImageContent(canvas, (ImageView) value,
+                    sourceToScreenScaleX, sourceToScreenScaleY);
             return;
         }
         value.draw(canvas);
@@ -565,6 +586,7 @@ public final class LauncherGlobalElementProxyView extends View {
     private void drawNestedText(
             @NonNull Canvas canvas,
             @NonNull TextView source,
+            float sourceToScreenScaleX,
             float sourceToScreenScaleY) {
         int viewportWidth = Math.max(0, source.getWidth());
         int viewportHeight = Math.max(0, source.getHeight());
@@ -583,6 +605,10 @@ public final class LauncherGlobalElementProxyView extends View {
                 ? configuredPx
                 : original == null ? source.getTextSize() : original.textSizePx;
         paint.setTextSize(desiredScreenPx / sourceToScreenScaleY);
+        // A responsive control can have different X/Y frame scales. Counter the outer X scale
+        // in the glyph metrics so labels stay typographically proportional.
+        paint.setTextScaleX(paint.getTextScaleX()
+                * sourceToScreenScaleY / sourceToScreenScaleX);
         paint.setColor(source.getCurrentTextColor());
         paint.setAlpha(Math.max(0, Math.min(255,
                 Math.round(Color.alpha(source.getCurrentTextColor()) * source.getAlpha()))));
@@ -631,10 +657,17 @@ public final class LauncherGlobalElementProxyView extends View {
     }
 
     private static void drawImageContent(
-            @NonNull Canvas canvas, @NonNull ImageView image) {
+            @NonNull Canvas canvas, @NonNull ImageView image,
+            float sourceToScreenScaleX, float sourceToScreenScaleY) {
         Drawable drawable = image.getDrawable();
         if (drawable == null) return;
         int checkpoint = canvas.save();
+        float uniformScale = Math.min(
+                Math.max(.01f, Math.abs(sourceToScreenScaleX)),
+                Math.max(.01f, Math.abs(sourceToScreenScaleY)));
+        canvas.scale(uniformScale / Math.max(.01f, Math.abs(sourceToScreenScaleX)),
+                uniformScale / Math.max(.01f, Math.abs(sourceToScreenScaleY)),
+                image.getWidth() / 2f, image.getHeight() / 2f);
         canvas.clipRect(image.getPaddingLeft(), image.getPaddingTop(),
                 Math.max(image.getPaddingLeft(),
                         image.getWidth() - image.getPaddingRight()),

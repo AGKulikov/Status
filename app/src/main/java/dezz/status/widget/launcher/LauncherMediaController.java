@@ -351,6 +351,16 @@ public final class LauncherMediaController {
         scheduleCommandReconcile();
     }
 
+    /** Seeks only the exact active player represented on HOME; there is no global fallback. */
+    public void seekTo(long positionMs) {
+        String target = commandTargetPackage();
+        if (target.isEmpty()) return;
+        if (MediaResumeCommand.seekTo(context, target, Math.max(0L, positionMs))
+                == MediaResumeCommand.Result.SESSION_COMMAND) {
+            scheduleCommandReconcile();
+        }
+    }
+
     /** Opens the same player that owns HOME transport commands. */
     public boolean openTargetPlayer() {
         String target = commandTargetPackage();

@@ -57,6 +57,30 @@ final class MediaResumeCommand {
         return send(context, targetPackage, Command.NEXT);
     }
 
+    /** A timeline position has no safe media-button fallback, so require the exact session. */
+    @NonNull
+    static Result seekTo(@NonNull Context context, @NonNull String targetPackage,
+                         long positionMs) {
+        String target = targetPackage.trim();
+        if (target.isEmpty()) return Result.NO_TARGET;
+        MediaSessionManager sessions = context.getSystemService(MediaSessionManager.class);
+        if (sessions == null) return Result.NO_TARGET;
+        try {
+            ComponentName listener = new ComponentName(context,
+                    MediaNotificationListener.class);
+            List<MediaController> controllers = sessions.getActiveSessions(listener);
+            if (controllers == null) controllers = Collections.emptyList();
+            for (MediaController controller : controllers) {
+                if (!target.equals(controller.getPackageName())) continue;
+                controller.getTransportControls().seekTo(Math.max(0L, positionMs));
+                return Result.SESSION_COMMAND;
+            }
+        } catch (RuntimeException ignored) {
+            // Seeking a different/global session would be worse than leaving the position alone.
+        }
+        return Result.NO_TARGET;
+    }
+
     private enum Command {
         PLAY,
         PLAY_PAUSE,

@@ -214,7 +214,9 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         input.setSelectAllOnFocus(true);
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Длительность показа")
-                .setMessage("От 1 до 120 секунд. Новое уведомление начинает этот интервал заново.")
+                .setMessage("От 1 до 120 секунд для одиночного уведомления. "
+                        + "В серии каждое следующее уведомление показывается по очереди "
+                        + "в течение 1 секунды.")
                 .setView(input)
                 .setNegativeButton("Отмена", null)
                 .setPositiveButton("Сохранить", null)

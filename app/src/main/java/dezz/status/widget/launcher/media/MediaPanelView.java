@@ -54,6 +54,7 @@ public final class MediaPanelView extends FrameLayout {
         void previous();
         void playPause();
         void next();
+        void seekTo(long positionMs);
         boolean openPlayer();
     }
 
@@ -63,7 +64,7 @@ public final class MediaPanelView extends FrameLayout {
                              boolean finished);
     }
 
-    private interface VolumeChangeListener {
+    private interface BarChangeListener {
         void onProgressChanged(int value, boolean fromUser);
     }
 
@@ -198,7 +199,9 @@ public final class MediaPanelView extends FrameLayout {
         applicationValue = state.application;
         artworkBitmap = state.artwork;
         durationMs = state.durationMs;
-        positionMs = state.positionMs;
+        // A one-second controller tick can arrive while the user is dragging. Keep the finger's
+        // selected position authoritative until UP/CANCEL instead of snapping the bar backwards.
+        if (progress == null || !progress.isPressed()) positionMs = state.positionMs;
         volumePercent = state.volumePercent;
         playing = state.playing;
         applySnapshot();
@@ -350,6 +353,17 @@ public final class MediaPanelView extends FrameLayout {
                 color(config.controlColor, Color.WHITE),
                 withAlpha(color(config.secondaryColor, Color.LTGRAY), 95));
         progress.setMax(1_000);
+        progress.setEnabled(controls != null && layoutEditor == null);
+        progress.setOnProgressChanged((value, fromUser) -> {
+            if (!fromUser || controls == null || layoutEditor != null || durationMs <= 0L) return;
+            long selected = Math.round(durationMs * value / 1_000d);
+            positionMs = MediaTimeline.clampPosition(selected, durationMs);
+            if (timeline != null) {
+                setTextIfChanged(timeline, MediaTimeline.format(positionMs) + " / "
+                        + MediaTimeline.format(durationMs));
+            }
+            controls.seekTo(positionMs);
+        });
         progress.setMinimumHeight(dp(Math.max(2, Math.min(40, progressBarHeightDp))));
         root.addView(progress, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
@@ -536,7 +550,9 @@ public final class MediaPanelView extends FrameLayout {
         }
         if (progress != null) {
             int nextProgress = MediaTimeline.progress(positionMs, durationMs, 1_000);
-            if (progress.getProgress() != nextProgress) progress.setProgress(nextProgress);
+            if (!progress.isPressed() && progress.getProgress() != nextProgress) {
+                progress.setProgress(nextProgress);
+            }
             View progressRoot = elementViews.get(MediaPanelConfig.PROGRESS);
             if (progressRoot != null) {
                 setVisibilityIfChanged(progressRoot,
@@ -873,59 +889,12 @@ public final class MediaPanelView extends FrameLayout {
         private final Paint backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint progressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF bounds = new RectF();
+        private final float[] canvasMatrix = new float[9];
         private int maximum = 100;
         private int value;
+        @Nullable private BarChangeListener listener;
 
         ResponsiveProgressBar(@NonNull Context context, int progressColor, int backgroundColor) {
-            super(context);
-            progressPaint.setColor(progressColor);
-            backgroundPaint.setColor(backgroundColor);
-        }
-
-        void setMax(int maximum) {
-            this.maximum = Math.max(1, maximum);
-            setProgress(value);
-        }
-
-        void setProgress(int progress) {
-            int next = Math.max(0, Math.min(maximum, progress));
-            if (value == next) return;
-            value = next;
-            invalidate();
-        }
-
-        int getProgress() {
-            return value;
-        }
-
-        @Override protected void onDraw(@NonNull Canvas canvas) {
-            super.onDraw(canvas);
-            float width = getWidth();
-            float height = getHeight();
-            if (width <= 0f || height <= 0f) return;
-            float radius = height / 2f;
-            bounds.set(0f, 0f, width, height);
-            canvas.drawRoundRect(bounds, radius, radius, backgroundPaint);
-            float progressWidth = width * value / Math.max(1f, maximum);
-            if (progressWidth <= 0f) return;
-            bounds.set(0f, 0f, Math.max(Math.min(width, progressWidth), height), height);
-            canvas.save();
-            canvas.clipRect(0f, 0f, progressWidth, height);
-            canvas.drawRoundRect(bounds, radius, radius, progressPaint);
-            canvas.restore();
-        }
-    }
-
-    /** Touch-capable volume track whose visual height follows its free frame. */
-    private final class ResponsiveVolumeBar extends View {
-        private final Paint backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint progressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final RectF bounds = new RectF();
-        private int maximum = 100;
-        private int value;
-        @Nullable private VolumeChangeListener listener;
-
-        ResponsiveVolumeBar(@NonNull Context context, int progressColor, int backgroundColor) {
             super(context);
             progressPaint.setColor(progressColor);
             backgroundPaint.setColor(backgroundColor);
@@ -939,14 +908,17 @@ public final class MediaPanelView extends FrameLayout {
         }
 
         void setProgress(int progress) {
-            setProgress(progress, false);
+            int next = Math.max(0, Math.min(maximum, progress));
+            if (value == next) return;
+            value = next;
+            invalidate();
         }
 
         int getProgress() {
             return value;
         }
 
-        void setOnProgressChanged(@Nullable VolumeChangeListener listener) {
+        void setOnProgressChanged(@Nullable BarChangeListener listener) {
             this.listener = listener;
         }
 
@@ -955,7 +927,7 @@ public final class MediaPanelView extends FrameLayout {
             if (value == next) return;
             value = next;
             invalidate();
-            VolumeChangeListener callback = listener;
+            BarChangeListener callback = listener;
             if (callback != null) callback.onProgressChanged(value, fromUser);
         }
 
@@ -964,21 +936,21 @@ public final class MediaPanelView extends FrameLayout {
             float width = getWidth();
             float height = getHeight();
             if (width <= 0f || height <= 0f) return;
-            float thumbRadius = Math.max(dp(4), height * .34f);
-            thumbRadius = Math.min(thumbRadius, Math.min(height / 2f, width / 2f));
-            float left = thumbRadius;
-            float right = Math.max(left, width - thumbRadius);
-            float centerY = height / 2f;
-            float trackHeight = Math.max(dp(3), height * .28f);
-            trackHeight = Math.min(trackHeight, height);
-            float trackRadius = trackHeight / 2f;
-            bounds.set(left, centerY - trackHeight / 2f,
-                    right, centerY + trackHeight / 2f);
-            canvas.drawRoundRect(bounds, trackRadius, trackRadius, backgroundPaint);
-            float x = left + (right - left) * value / Math.max(1f, maximum);
-            bounds.right = x;
-            canvas.drawRoundRect(bounds, trackRadius, trackRadius, progressPaint);
-            canvas.drawCircle(x, centerY, thumbRadius, progressPaint);
+            canvas.getMatrix().getValues(canvasMatrix);
+            float scaleX = matrixScaleX(canvasMatrix);
+            float scaleY = matrixScaleY(canvasMatrix);
+            float radiusY = height / 2f;
+            float radiusX = radiusY * scaleY / scaleX;
+            bounds.set(0f, 0f, width, height);
+            canvas.drawRoundRect(bounds, radiusX, radiusY, backgroundPaint);
+            float progressWidth = width * value / Math.max(1f, maximum);
+            if (progressWidth <= 0f) return;
+            bounds.set(0f, 0f,
+                    Math.max(Math.min(width, progressWidth), radiusX * 2f), height);
+            canvas.save();
+            canvas.clipRect(0f, 0f, progressWidth, height);
+            canvas.drawRoundRect(bounds, radiusX, radiusY, progressPaint);
+            canvas.restore();
         }
 
         @Override public boolean onTouchEvent(@NonNull MotionEvent event) {
@@ -1008,9 +980,123 @@ public final class MediaPanelView extends FrameLayout {
         }
 
         private void updateFromTouch(float x) {
-            float thumbRadius = Math.max(dp(4), getHeight() * .34f);
-            thumbRadius = Math.min(thumbRadius,
-                    Math.min(getHeight() / 2f, getWidth() / 2f));
+            float fraction = Math.max(0f, Math.min(1f, x / Math.max(1f, getWidth())));
+            setProgress(Math.round(fraction * maximum), true);
+        }
+
+        @Override public boolean performClick() {
+            super.performClick();
+            return true;
+        }
+    }
+
+    /** Touch-capable volume track whose visual height follows its free frame. */
+    private final class ResponsiveVolumeBar extends View {
+        private final Paint backgroundPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint progressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF bounds = new RectF();
+        private final float[] canvasMatrix = new float[9];
+        private int maximum = 100;
+        private int value;
+        private float renderedThumbRadiusX;
+        @Nullable private BarChangeListener listener;
+
+        ResponsiveVolumeBar(@NonNull Context context, int progressColor, int backgroundColor) {
+            super(context);
+            progressPaint.setColor(progressColor);
+            backgroundPaint.setColor(backgroundColor);
+            setClickable(true);
+            setFocusable(true);
+        }
+
+        void setMax(int maximum) {
+            this.maximum = Math.max(1, maximum);
+            setProgress(value);
+        }
+
+        void setProgress(int progress) {
+            setProgress(progress, false);
+        }
+
+        int getProgress() {
+            return value;
+        }
+
+        void setOnProgressChanged(@Nullable BarChangeListener listener) {
+            this.listener = listener;
+        }
+
+        private void setProgress(int progress, boolean fromUser) {
+            int next = Math.max(0, Math.min(maximum, progress));
+            if (value == next) return;
+            value = next;
+            invalidate();
+            BarChangeListener callback = listener;
+            if (callback != null) callback.onProgressChanged(value, fromUser);
+        }
+
+        @Override protected void onDraw(@NonNull Canvas canvas) {
+            super.onDraw(canvas);
+            float width = getWidth();
+            float height = getHeight();
+            if (width <= 0f || height <= 0f) return;
+            canvas.getMatrix().getValues(canvasMatrix);
+            float scaleX = matrixScaleX(canvasMatrix);
+            float scaleY = matrixScaleY(canvasMatrix);
+            float thumbRadiusY = Math.max(dp(4), height * .34f);
+            thumbRadiusY = Math.min(thumbRadiusY, height / 2f);
+            float thumbRadiusX = Math.min(width / 2f,
+                    thumbRadiusY * scaleY / scaleX);
+            renderedThumbRadiusX = thumbRadiusX;
+            float left = thumbRadiusX;
+            float right = Math.max(left, width - thumbRadiusX);
+            float centerY = height / 2f;
+            float trackHeight = Math.max(dp(3), height * .28f);
+            trackHeight = Math.min(trackHeight, height);
+            float trackRadiusY = trackHeight / 2f;
+            float trackRadiusX = trackRadiusY * scaleY / scaleX;
+            bounds.set(left, centerY - trackHeight / 2f,
+                    right, centerY + trackHeight / 2f);
+            canvas.drawRoundRect(bounds, trackRadiusX, trackRadiusY, backgroundPaint);
+            float x = left + (right - left) * value / Math.max(1f, maximum);
+            bounds.right = x;
+            canvas.drawRoundRect(bounds, trackRadiusX, trackRadiusY, progressPaint);
+            bounds.set(x - thumbRadiusX, centerY - thumbRadiusY,
+                    x + thumbRadiusX, centerY + thumbRadiusY);
+            canvas.drawOval(bounds, progressPaint);
+        }
+
+        @Override public boolean onTouchEvent(@NonNull MotionEvent event) {
+            if (!isEnabled()) return false;
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    setPressed(true);
+                    if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
+                    updateFromTouch(event.getX());
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    updateFromTouch(event.getX());
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    updateFromTouch(event.getX());
+                    setPressed(false);
+                    if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(false);
+                    performClick();
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    setPressed(false);
+                    if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(false);
+                    return true;
+                default:
+                    return super.onTouchEvent(event);
+            }
+        }
+
+        private void updateFromTouch(float x) {
+            float thumbRadius = renderedThumbRadiusX > 0f
+                    ? renderedThumbRadiusX
+                    : Math.min(getWidth() / 2f,
+                    Math.max(dp(4), getHeight() * .34f));
             float available = Math.max(1f, getWidth() - thumbRadius * 2f);
             float fraction = Math.max(0f, Math.min(1f, (x - thumbRadius) / available));
             setProgress(Math.round(fraction * maximum), true);
@@ -1020,6 +1106,18 @@ public final class MediaPanelView extends FrameLayout {
             super.performClick();
             return true;
         }
+    }
+
+    private static float matrixScaleX(@NonNull float[] matrix) {
+        return Math.max(.01f, (float) Math.hypot(
+                matrix[android.graphics.Matrix.MSCALE_X],
+                matrix[android.graphics.Matrix.MSKEW_Y]));
+    }
+
+    private static float matrixScaleY(@NonNull float[] matrix) {
+        return Math.max(.01f, (float) Math.hypot(
+                matrix[android.graphics.Matrix.MSKEW_X],
+                matrix[android.graphics.Matrix.MSCALE_Y]));
     }
 
     private static int color(String value, int fallback) {
