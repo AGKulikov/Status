@@ -19,7 +19,8 @@ import dezz.status.widget.Preferences;
 
 /** Versioned persistence for the visual media-panel editor. */
 public final class MediaPanelConfigStore {
-    public static final int SCHEMA_VERSION = 6;
+    public static final int SCHEMA_VERSION = 7;
+    private static final int EDGE_TO_EDGE_SURFACE_SCHEMA_VERSION = 6;
     private static final int LEGACY_SURFACE_SCHEMA_VERSION = 5;
     private static final int ELEMENT_GRID_SCHEMA_VERSION = 4;
     private static final int LEGACY_FLOW_SCHEMA_VERSION = 1;
@@ -43,11 +44,7 @@ public final class MediaPanelConfigStore {
         try {
             JSONObject root = new JSONObject(raw);
             int version = root.optInt("version", 0);
-            if (version != SCHEMA_VERSION && version != LEGACY_SURFACE_SCHEMA_VERSION
-                    && version != ELEMENT_GRID_SCHEMA_VERSION
-                    && version != VARIABLE_GRID_SCHEMA_VERSION
-                    && version != FIXED_GRID_SCHEMA_VERSION
-                    && version != LEGACY_FLOW_SCHEMA_VERSION) return value;
+            if (version < LEGACY_FLOW_SCHEMA_VERSION || version > SCHEMA_VERSION) return value;
             if (version >= VARIABLE_GRID_SCHEMA_VERSION) {
                 value.gridColumns = root.optInt("gridColumns", value.gridColumns);
                 value.gridRows = root.optInt("gridRows", value.gridRows);
@@ -67,7 +64,7 @@ public final class MediaPanelConfigStore {
             value.outlineColor = root.optString("outlineColor", value.outlineColor);
             value.outlineAlpha = root.optInt("outlineAlpha", value.outlineAlpha);
             value.outlineWidthPx = root.optInt("outlineWidthPx", value.outlineWidthPx);
-            if (version < SCHEMA_VERSION) {
+            if (version < EDGE_TO_EDGE_SURFACE_SCHEMA_VERSION) {
                 // HA1132 removes every implicit media/widget surface. Keep colours and geometry,
                 // but migrate the old panel/glass insets to an edge-to-edge transparent frame.
                 value.backgroundAlpha = 0;
@@ -94,6 +91,14 @@ public final class MediaPanelConfigStore {
                     if (MediaPanelConfig.PROGRESS.equals(id)) {
                         value.setProgressBarHeightDp(item.optInt("progressBarHeightDp",
                                 element.progressBarHeightDp));
+                        value.setProgressTimeGapDp(item.optInt("progressTimeGapDp",
+                                element.progressTimeGapDp));
+                    }
+                    if (MediaPanelConfig.VOLUME.equals(id)) {
+                        value.setVolumeThumbVisible(item.optBoolean("volumeThumbVisible",
+                                element.volumeThumbVisible));
+                        value.setVolumeThumbSizePercent(item.optInt("volumeThumbSizePercent",
+                                element.volumeThumbSizePercent));
                     }
                     // Applying moves in array order also makes hand-edited/imported JSON robust
                     // against duplicate or sparse order numbers.
@@ -157,6 +162,11 @@ public final class MediaPanelConfigStore {
                 item.put("marqueeEnabled", element.marqueeEnabled);
                 if (MediaPanelConfig.PROGRESS.equals(element.id)) {
                     item.put("progressBarHeightDp", element.progressBarHeightDp);
+                    item.put("progressTimeGapDp", element.progressTimeGapDp);
+                }
+                if (MediaPanelConfig.VOLUME.equals(element.id)) {
+                    item.put("volumeThumbVisible", element.volumeThumbVisible);
+                    item.put("volumeThumbSizePercent", element.volumeThumbSizePercent);
                 }
                 item.put("column", element.column);
                 item.put("row", element.row);

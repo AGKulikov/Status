@@ -62,6 +62,12 @@ public final class MediaPanelConfig {
         public boolean marqueeEnabled;
         /** Progress widget's independently adjustable bar thickness. */
         public int progressBarHeightDp;
+        /** Vertical breathing room between elapsed/duration text and the progress track. */
+        public int progressTimeGapDp;
+        /** Volume widget may render only the track when the user disables its thumb. */
+        public boolean volumeThumbVisible;
+        /** Independent proportional size of the volume thumb. */
+        public int volumeThumbSizePercent;
         public int column;
         public int row;
         public int columnSpan;
@@ -76,6 +82,9 @@ public final class MediaPanelConfig {
             this.scalePercent = scalePercent;
             this.marqueeEnabled = marqueeEnabled;
             this.progressBarHeightDp = PROGRESS.equals(id) ? 7 : 0;
+            this.progressTimeGapDp = PROGRESS.equals(id) ? 8 : 0;
+            this.volumeThumbVisible = VOLUME.equals(id);
+            this.volumeThumbSizePercent = VOLUME.equals(id) ? 100 : 0;
             this.column = column;
             this.row = row;
             this.columnSpan = columnSpan;
@@ -86,6 +95,9 @@ public final class MediaPanelConfig {
             Element value = new Element(id, enabled, order, scalePercent, marqueeEnabled,
                     column, row, columnSpan, rowSpan);
             value.progressBarHeightDp = progressBarHeightDp;
+            value.progressTimeGapDp = progressTimeGapDp;
+            value.volumeThumbVisible = volumeThumbVisible;
+            value.volumeThumbSizePercent = volumeThumbSizePercent;
             return value;
         }
     }
@@ -184,6 +196,21 @@ public final class MediaPanelConfig {
     public void setProgressBarHeightDp(int heightDp) {
         Element value = elements.get(PROGRESS);
         if (value != null) value.progressBarHeightDp = heightDp;
+    }
+
+    public void setProgressTimeGapDp(int gapDp) {
+        Element value = elements.get(PROGRESS);
+        if (value != null) value.progressTimeGapDp = gapDp;
+    }
+
+    public void setVolumeThumbVisible(boolean visible) {
+        Element value = elements.get(VOLUME);
+        if (value != null) value.volumeThumbVisible = visible;
+    }
+
+    public void setVolumeThumbSizePercent(int sizePercent) {
+        Element value = elements.get(VOLUME);
+        if (value != null) value.volumeThumbSizePercent = sizePercent;
     }
 
     public boolean setPosition(@NonNull String id, int column, int row) {
@@ -326,8 +353,17 @@ public final class MediaPanelConfig {
                 if (!supportsMarquee(element.id)) element.marqueeEnabled = false;
                 if (PROGRESS.equals(element.id)) {
                     element.progressBarHeightDp = clamp(element.progressBarHeightDp, 2, 40);
+                    element.progressTimeGapDp = clamp(element.progressTimeGapDp, 0, 48);
                 } else {
                     element.progressBarHeightDp = 0;
+                    element.progressTimeGapDp = 0;
+                }
+                if (VOLUME.equals(element.id)) {
+                    element.volumeThumbSizePercent = clamp(
+                            element.volumeThumbSizePercent, 25, 220);
+                } else {
+                    element.volumeThumbVisible = false;
+                    element.volumeThumbSizePercent = 0;
                 }
                 normalizePlacement(element);
             }

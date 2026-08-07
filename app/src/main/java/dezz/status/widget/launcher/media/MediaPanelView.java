@@ -68,6 +68,10 @@ public final class MediaPanelView extends FrameLayout {
         void onProgressChanged(int value, boolean fromUser);
     }
 
+    private interface BarCommitListener {
+        void onProgressCommitted(int value);
+    }
+
     private final MediaPanelConfigStore store;
     @Nullable private final Controls controls;
     private final Map<String, View> elementViews = new LinkedHashMap<>();
@@ -313,7 +317,8 @@ public final class MediaPanelView extends FrameLayout {
                 application.setContentDescription("Музыкальное приложение");
                 return application;
             case MediaPanelConfig.PROGRESS:
-                return progressElement(element.scalePercent, element.progressBarHeightDp);
+                return progressElement(element.scalePercent, element.progressBarHeightDp,
+                        element.progressTimeGapDp);
             case MediaPanelConfig.PREVIOUS:
                 return button(R.drawable.ic_media_previous, "Предыдущий трек",
                         controls == null || layoutEditor != null
@@ -328,7 +333,8 @@ public final class MediaPanelView extends FrameLayout {
                         controls == null || layoutEditor != null
                                 ? null : v -> controls.next(), element.scalePercent);
             case MediaPanelConfig.VOLUME:
-                return volumeElement(element.scalePercent);
+                return volumeElement(element.scalePercent, element.volumeThumbVisible,
+                        element.volumeThumbSizePercent);
             default:
                 TextView fallback = text(14, Color.WHITE, false);
                 fallback.setText(spec.label);
@@ -337,7 +343,8 @@ public final class MediaPanelView extends FrameLayout {
     }
 
     @NonNull
-    private View progressElement(int scalePercent, int progressBarHeightDp) {
+    private View progressElement(int scalePercent, int progressBarHeightDp,
+                                 int progressTimeGapDp) {
         LinearLayout root = new LinearLayout(getContext());
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER_VERTICAL);
@@ -347,31 +354,47 @@ public final class MediaPanelView extends FrameLayout {
                 false);
         timeline.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.CENTER_VERTICAL);
         timeline.setContentDescription("Позиция и длительность трека");
-        root.addView(timeline, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        LinearLayout.LayoutParams timelineParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        timelineParams.bottomMargin = dp(Math.max(0, Math.min(48, progressTimeGapDp)));
+        root.addView(timeline, timelineParams);
         progress = new ResponsiveProgressBar(getContext(),
                 color(config.controlColor, Color.WHITE),
                 withAlpha(color(config.secondaryColor, Color.LTGRAY), 95));
         progress.setMax(1_000);
         progress.setEnabled(controls != null && layoutEditor == null);
         progress.setOnProgressChanged((value, fromUser) -> {
-            if (!fromUser || controls == null || layoutEditor != null || durationMs <= 0L) return;
+            if (!fromUser || layoutEditor != null || durationMs <= 0L) return;
             long selected = Math.round(durationMs * value / 1_000d);
             positionMs = MediaTimeline.clampPosition(selected, durationMs);
             if (timeline != null) {
                 setTextIfChanged(timeline, MediaTimeline.format(positionMs) + " / "
                         + MediaTimeline.format(durationMs));
             }
+        });
+        progress.setOnProgressCommitted(value -> {
+            if (controls == null || layoutEditor != null || durationMs <= 0L) return;
+            long selected = Math.round(durationMs * value / 1_000d);
+            positionMs = MediaTimeline.clampPosition(selected, durationMs);
             controls.seekTo(positionMs);
         });
         progress.setMinimumHeight(dp(Math.max(2, Math.min(40, progressBarHeightDp))));
         root.addView(progress, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        if (controls != null && layoutEditor == null) {
+            // The complete widget frame is a scrub surface. This keeps a tall resized element
+            // easy to operate even when its visual track or timeline text occupies only part of
+            // the frame; the progress track itself remains thumb-free.
+            root.setOnTouchListener((view, event) -> progress != null
+                    && progress.handleUserTouch(event.getActionMasked(), event.getX(),
+                    Math.max(1f, view.getWidth())));
+        }
         return root;
     }
 
     @NonNull
-    private View volumeElement(int scalePercent) {
+    private View volumeElement(int scalePercent, boolean volumeThumbVisible,
+                               int volumeThumbSizePercent) {
         LinearLayout root = new LinearLayout(getContext());
         root.setGravity(Gravity.CENTER_VERTICAL);
         root.setContentDescription("Громкость музыки");
@@ -386,6 +409,7 @@ public final class MediaPanelView extends FrameLayout {
         volume = new ResponsiveVolumeBar(getContext(),
                 color(config.controlColor, Color.WHITE),
                 withAlpha(color(config.secondaryColor, Color.LTGRAY), 95));
+        volume.setThumbStyle(volumeThumbVisible, volumeThumbSizePercent);
         volume.setMax(100);
         volume.setEnabled(controls != null && layoutEditor == null);
         volume.setOnProgressChanged((value, fromUser) -> {
@@ -893,6 +917,7 @@ public final class MediaPanelView extends FrameLayout {
         private int maximum = 100;
         private int value;
         @Nullable private BarChangeListener listener;
+        @Nullable private BarCommitListener commitListener;
 
         ResponsiveProgressBar(@NonNull Context context, int progressColor, int backgroundColor) {
             super(context);
@@ -920,6 +945,10 @@ public final class MediaPanelView extends FrameLayout {
 
         void setOnProgressChanged(@Nullable BarChangeListener listener) {
             this.listener = listener;
+        }
+
+        void setOnProgressCommitted(@Nullable BarCommitListener listener) {
+            this.commitListener = listener;
         }
 
         private void setProgress(int progress, boolean fromUser) {
@@ -954,18 +983,25 @@ public final class MediaPanelView extends FrameLayout {
         }
 
         @Override public boolean onTouchEvent(@NonNull MotionEvent event) {
+            return handleUserTouch(event.getActionMasked(), event.getX(),
+                    Math.max(1f, getWidth()));
+        }
+
+        boolean handleUserTouch(int action, float x, float coordinateWidth) {
             if (!isEnabled()) return false;
-            switch (event.getActionMasked()) {
+            switch (action) {
                 case MotionEvent.ACTION_DOWN:
                     setPressed(true);
                     if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(true);
-                    updateFromTouch(event.getX());
+                    updateFromTouch(x, coordinateWidth);
                     return true;
                 case MotionEvent.ACTION_MOVE:
-                    updateFromTouch(event.getX());
+                    updateFromTouch(x, coordinateWidth);
                     return true;
                 case MotionEvent.ACTION_UP:
-                    updateFromTouch(event.getX());
+                    updateFromTouch(x, coordinateWidth);
+                    BarCommitListener callback = commitListener;
+                    if (callback != null) callback.onProgressCommitted(value);
                     setPressed(false);
                     if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(false);
                     performClick();
@@ -975,12 +1011,13 @@ public final class MediaPanelView extends FrameLayout {
                     if (getParent() != null) getParent().requestDisallowInterceptTouchEvent(false);
                     return true;
                 default:
-                    return super.onTouchEvent(event);
+                    return false;
             }
         }
 
-        private void updateFromTouch(float x) {
-            float fraction = Math.max(0f, Math.min(1f, x / Math.max(1f, getWidth())));
+        private void updateFromTouch(float x, float coordinateWidth) {
+            float fraction = Math.max(0f, Math.min(1f,
+                    x / Math.max(1f, coordinateWidth)));
             setProgress(Math.round(fraction * maximum), true);
         }
 
@@ -999,6 +1036,8 @@ public final class MediaPanelView extends FrameLayout {
         private int maximum = 100;
         private int value;
         private float renderedThumbRadiusX;
+        private boolean thumbVisible = true;
+        private float thumbScale = 1f;
         @Nullable private BarChangeListener listener;
 
         ResponsiveVolumeBar(@NonNull Context context, int progressColor, int backgroundColor) {
@@ -1026,6 +1065,12 @@ public final class MediaPanelView extends FrameLayout {
             this.listener = listener;
         }
 
+        void setThumbStyle(boolean visible, int sizePercent) {
+            thumbVisible = visible;
+            thumbScale = Math.max(.25f, Math.min(2.2f, sizePercent / 100f));
+            invalidate();
+        }
+
         private void setProgress(int progress, boolean fromUser) {
             int next = Math.max(0, Math.min(maximum, progress));
             if (value == next) return;
@@ -1043,7 +1088,8 @@ public final class MediaPanelView extends FrameLayout {
             canvas.getMatrix().getValues(canvasMatrix);
             float scaleX = matrixScaleX(canvasMatrix);
             float scaleY = matrixScaleY(canvasMatrix);
-            float thumbRadiusY = Math.max(dp(4), height * .34f);
+            float thumbRadiusY = thumbVisible
+                    ? Math.max(dp(1), height * .22f * thumbScale) : 0f;
             thumbRadiusY = Math.min(thumbRadiusY, height / 2f);
             float thumbRadiusX = Math.min(width / 2f,
                     thumbRadiusY * scaleY / scaleX);
@@ -1061,9 +1107,11 @@ public final class MediaPanelView extends FrameLayout {
             float x = left + (right - left) * value / Math.max(1f, maximum);
             bounds.right = x;
             canvas.drawRoundRect(bounds, trackRadiusX, trackRadiusY, progressPaint);
-            bounds.set(x - thumbRadiusX, centerY - thumbRadiusY,
-                    x + thumbRadiusX, centerY + thumbRadiusY);
-            canvas.drawOval(bounds, progressPaint);
+            if (thumbVisible) {
+                bounds.set(x - thumbRadiusX, centerY - thumbRadiusY,
+                        x + thumbRadiusX, centerY + thumbRadiusY);
+                canvas.drawOval(bounds, progressPaint);
+            }
         }
 
         @Override public boolean onTouchEvent(@NonNull MotionEvent event) {
@@ -1095,8 +1143,8 @@ public final class MediaPanelView extends FrameLayout {
         private void updateFromTouch(float x) {
             float thumbRadius = renderedThumbRadiusX > 0f
                     ? renderedThumbRadiusX
-                    : Math.min(getWidth() / 2f,
-                    Math.max(dp(4), getHeight() * .34f));
+                    : thumbVisible ? Math.min(getWidth() / 2f,
+                    Math.max(dp(1), getHeight() * .22f * thumbScale)) : 0f;
             float available = Math.max(1f, getWidth() - thumbRadius * 2f);
             float fraction = Math.max(0f, Math.min(1f, (x - thumbRadius) / available));
             setProgress(Math.round(fraction * maximum), true);

@@ -49,7 +49,7 @@ public final class MediaPanelInteractionContractTest {
         assertTrue(source.contains("syncSystemVolume()"));
         assertTrue(source.contains("class ResponsiveVolumeBar extends View"));
         assertTrue(source.contains("height * .28f"));
-        assertTrue(source.contains("height * .34f"));
+        assertTrue(source.contains("height * .22f"));
     }
 
     @Test public void progressAndVolumeFillTheirResizableFramesWithoutImplicitSurfaces()
@@ -72,7 +72,8 @@ public final class MediaPanelInteractionContractTest {
         String progress = panel.substring(progressStart, progressEnd);
 
         assertTrue(progress.contains("onTouchEvent(@NonNull MotionEvent event)"));
-        assertTrue(progress.contains("updateFromTouch(event.getX())"));
+        assertTrue(progress.contains("handleUserTouch(event.getActionMasked(), event.getX()"));
+        assertTrue(progress.contains("callback.onProgressCommitted(value)"));
         assertFalse(progress.contains("drawCircle"));
         assertFalse(progress.contains("drawOval"));
         assertTrue(panel.contains("controls.seekTo(positionMs)"));

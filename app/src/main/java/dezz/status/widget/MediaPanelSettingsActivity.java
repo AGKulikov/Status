@@ -350,6 +350,29 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
                             return config.element(MediaPanelConfig.PROGRESS).progressBarHeightDp;
                         },
                         selected -> selected + " dp");
+                addElementSlider(card, "Отступ времени от полосы", element.progressTimeGapDp,
+                        0, 48, selected -> {
+                            config.setProgressTimeGapDp(selected);
+                            return config.element(MediaPanelConfig.PROGRESS).progressTimeGapDp;
+                        }, selected -> selected + " dp");
+            }
+            if (MediaPanelConfig.VOLUME.equals(element.id)) {
+                MaterialSwitch thumbVisible = new MaterialSwitch(this);
+                thumbVisible.setText("Показывать кружок громкости");
+                thumbVisible.setTextSize(13);
+                thumbVisible.setMinHeight(dp(42));
+                thumbVisible.setChecked(element.volumeThumbVisible);
+                thumbVisible.setOnCheckedChangeListener((button, checked) -> {
+                    config.setVolumeThumbVisible(checked);
+                    persistAndPreview();
+                });
+                card.addView(thumbVisible, new LinearLayout.LayoutParams(match(), dp(42)));
+                addElementSlider(card, "Размер кружка", element.volumeThumbSizePercent,
+                        25, 220, selected -> {
+                            config.setVolumeThumbSizePercent(selected);
+                            return config.element(MediaPanelConfig.VOLUME)
+                                    .volumeThumbSizePercent;
+                        }, selected -> selected + "%");
             }
             if (MediaPanelConfig.supportsMarquee(element.id)) {
                 MaterialSwitch marquee = new MaterialSwitch(this);

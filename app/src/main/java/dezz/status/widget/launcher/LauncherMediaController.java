@@ -355,7 +355,23 @@ public final class LauncherMediaController {
     public void seekTo(long positionMs) {
         String target = commandTargetPackage();
         if (target.isEmpty()) return;
-        if (MediaResumeCommand.seekTo(context, target, Math.max(0L, positionMs))
+        long targetPosition = Math.max(0L, positionMs);
+        MediaController selected = current;
+        if (selected != null) {
+            try {
+                // Use the exact Binder-backed controller already selected for HOME. Re-querying
+                // active sessions at the end of every drag can miss an OEM player during its
+                // transient session refresh even though this live controller still accepts seek.
+                if (target.equals(selected.getPackageName())) {
+                    selected.getTransportControls().seekTo(targetPosition);
+                    scheduleCommandReconcile();
+                    return;
+                }
+            } catch (RuntimeException ignored) {
+                // One bounded exact-package lookup below covers a replaced session Binder.
+            }
+        }
+        if (MediaResumeCommand.seekTo(context, target, targetPosition)
                 == MediaResumeCommand.Result.SESSION_COMMAND) {
             scheduleCommandReconcile();
         }

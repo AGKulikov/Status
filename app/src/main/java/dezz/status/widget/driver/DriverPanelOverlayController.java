@@ -63,6 +63,7 @@ import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarControlState;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
+import dezz.status.widget.car.TrunkControlSafety;
 import dezz.status.widget.launcher.HighResolutionAppIconLoader;
 import dezz.status.widget.launcher.AppDrawerTileView;
 import dezz.status.widget.launcher.AppDrawerUninstallPolicy;
@@ -670,6 +671,12 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             Toast.makeText(appContext, "Не удалось открыть избранное",
                     Toast.LENGTH_SHORT).show();
         }
+    }
+
+    @Override
+    @Nullable
+    public CarControlState carControlState(@NonNull String controlId) {
+        return carControlStates.get(controlId);
     }
 
     @Override
@@ -1724,7 +1731,13 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         if (active && shortcut.useVehicleStateColor && state.suggestedColor != null) {
             tint = state.suggestedColor;
         }
-        binding.icon.setImageDrawable(LauncherIconResolver.resolve(appContext, shortcut, tint));
+        if (TrunkControlSafety.isTrunk(shortcut.target)) {
+            binding.icon.setImageDrawable(LauncherIconResolver.resolvePreset(appContext,
+                    TrunkControlSafety.iconKey(shortcut.icon, state), tint));
+        } else {
+            binding.icon.setImageDrawable(LauncherIconResolver.resolve(
+                    appContext, shortcut, tint));
+        }
         if (binding.titleLabel != null) {
             binding.titleLabel.setTextColor(safeColor(tint, Color.WHITE));
         }

@@ -58,6 +58,9 @@ public final class MediaPanelConfigMigrationTest {
         assertTrue(source.setGridSize(16, 8));
         source.setMarqueeEnabled(MediaPanelConfig.TITLE, false);
         source.setProgressBarHeightDp(19);
+        source.setProgressTimeGapDp(14);
+        source.setVolumeThumbVisible(false);
+        source.setVolumeThumbSizePercent(165);
         MediaPanelConfig restored = MediaPanelConfigStore.decode(
                 MediaPanelConfigStore.encode(source).toString());
         assertEquals(16, restored.gridColumns);
@@ -69,6 +72,11 @@ public final class MediaPanelConfigMigrationTest {
         assertFalse(restored.element(MediaPanelConfig.TITLE).marqueeEnabled);
         assertEquals(19,
                 restored.element(MediaPanelConfig.PROGRESS).progressBarHeightDp);
+        assertEquals(14,
+                restored.element(MediaPanelConfig.PROGRESS).progressTimeGapDp);
+        assertFalse(restored.element(MediaPanelConfig.VOLUME).volumeThumbVisible);
+        assertEquals(165,
+                restored.element(MediaPanelConfig.VOLUME).volumeThumbSizePercent);
     }
 
     @Test public void versionThreeDefaultsMarqueeOnForOverflowingText() {
@@ -91,5 +99,22 @@ public final class MediaPanelConfigMigrationTest {
         assertEquals(2, restored.element(MediaPanelConfig.PROGRESS).column);
         assertEquals(3, restored.element(MediaPanelConfig.PROGRESS).row);
         assertEquals(6, restored.element(MediaPanelConfig.PROGRESS).columnSpan);
+    }
+
+    @Test public void versionSixKeepsEdgeToEdgeSurfaceAndGetsNewControlDefaults() {
+        String versionSix = "{\"version\":6,\"backgroundAlpha\":120,"
+                + "\"glassAlpha\":80,\"outlineAlpha\":70,\"elements\":["
+                + "{\"id\":\"media.progress\",\"enabled\":true,\"order\":0,"
+                + "\"scalePercent\":100,\"progressBarHeightDp\":12},"
+                + "{\"id\":\"media.volume\",\"enabled\":true,\"order\":1,"
+                + "\"scalePercent\":100}]}";
+        MediaPanelConfig restored = MediaPanelConfigStore.decode(versionSix);
+        assertEquals(120, restored.backgroundAlpha);
+        assertEquals(80, restored.glassAlpha);
+        assertEquals(70, restored.outlineAlpha);
+        assertEquals(8, restored.element(MediaPanelConfig.PROGRESS).progressTimeGapDp);
+        assertTrue(restored.element(MediaPanelConfig.VOLUME).volumeThumbVisible);
+        assertEquals(100,
+                restored.element(MediaPanelConfig.VOLUME).volumeThumbSizePercent);
     }
 }

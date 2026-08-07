@@ -23,7 +23,9 @@ import dezz.status.widget.Preferences;
 import dezz.status.widget.WidgetAccessibilityService;
 import dezz.status.widget.automation.ScenarioTriggerReceiver;
 import dezz.status.widget.car.CarControlCommand;
+import dezz.status.widget.car.CarControlState;
 import dezz.status.widget.car.CarIntegrations;
+import dezz.status.widget.car.TrunkControlSafety;
 import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.launcher.YandexWindowLauncher;
 import dezz.status.widget.launcher.routes.FavoriteRouteConfig;
@@ -40,6 +42,7 @@ final class DriverPanelActionExecutor {
         void showAllApps(@Nullable View anchor);
         void showFavorites(@NonNull String panelId, @Nullable View anchor);
         void triggerStockClimate();
+        @Nullable CarControlState carControlState(@NonNull String controlId);
     }
 
     private final Context context;
@@ -73,13 +76,20 @@ final class DriverPanelActionExecutor {
                     executeRule(shortcut.target);
                     return;
                 case CAR:
-                    CarIntegrations.get(context).executeControl(new CarControlCommand(
+                    CarControlCommand requested = new CarControlCommand(
                             shortcut.target, shortcut.command, shortcut.commandValue,
-                            shortcut.commandCycleValues),
+                            shortcut.commandCycleValues);
+                    CarControlCommand resolved = TrunkControlSafety.resolve(requested,
+                            host.carControlState(shortcut.target));
+                    Runnable executeCar = () -> CarIntegrations.get(context).executeControl(
+                            resolved,
                             (success, message) -> {
                                 if (!success) toast(message == null
                                         ? "Команда автомобиля не выполнена" : message);
                             });
+                    if (TrunkControlSafety.confirmOpeningIfNeeded(
+                            context, resolved, executeCar)) return;
+                    executeCar.run();
                     return;
                 case INFO:
                 case DIVIDER:

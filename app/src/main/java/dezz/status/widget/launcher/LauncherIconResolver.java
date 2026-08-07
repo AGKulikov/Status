@@ -60,6 +60,8 @@ public final class LauncherIconResolver {
             new Preset("auto_hold", "Auto Hold"),
             new Preset("start_stop", "Start/Stop"),
             new Preset("fuel_save", "Экономия топлива"),
+            new Preset("trunk_closed", "Багажник закрыт"),
+            new Preset("trunk_open", "Багажник открыт"),
             new Preset("water", "Вода"),
             new Preset("humidity", "Влажность"),
             new Preset("motion", "Движение / присутствие"),
@@ -180,6 +182,8 @@ public final class LauncherIconResolver {
             case "wiper": return R.drawable.ic_car_wiper;
             case "drive_mode": return R.drawable.ic_car_drive_mode;
             case "fuel_save": return R.drawable.ic_car_fuel_save;
+            case "trunk_closed": return R.drawable.ic_car_trunk_closed;
+            case "trunk_open": return R.drawable.ic_car_trunk_open;
             case "auto_hold":
             case "start_stop": return R.drawable.ic_popup_power;
             case "water": return R.drawable.ic_popup_water;

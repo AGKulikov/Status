@@ -125,6 +125,7 @@ import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarControlState;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
+import dezz.status.widget.car.TrunkControlSafety;
 import dezz.status.widget.automation.ScenarioTriggerReceiver;
 import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.integration.ConnectorValueRegistry;
@@ -3420,17 +3421,14 @@ public final class LauncherActivity extends AppCompatActivity {
     private void executeShortcut(@NonNull LauncherShortcutStore.Shortcut shortcut) {
         try {
             if (shortcut.kind == LauncherShortcutStore.Kind.CAR) {
-                if (!pendingCarControls.add(shortcut.target)) return;
-                CarControlCommand command = new CarControlCommand(shortcut.target,
+                CarControlCommand requested = new CarControlCommand(shortcut.target,
                         shortcut.command, shortcut.commandValue,
                         shortcut.commandCycleValues);
-                carIntegration.executeControl(command, (success, message) -> {
-                    pendingCarControls.remove(shortcut.target);
-                    if (!success) {
-                        Toast.makeText(this, message == null ? "Команда не выполнена" : message,
-                                Toast.LENGTH_LONG).show();
-                    }
-                });
+                CarControlCommand command = TrunkControlSafety.resolve(requested,
+                        carControlStates.get(shortcut.target));
+                Runnable execute = () -> executeCarControl(shortcut, command);
+                if (TrunkControlSafety.confirmOpeningIfNeeded(this, command, execute)) return;
+                execute.run();
                 return;
             }
             if (shortcut.kind == LauncherShortcutStore.Kind.APP) {
@@ -3465,6 +3463,18 @@ public final class LauncherActivity extends AppCompatActivity {
         }
     }
 
+    private void executeCarControl(@NonNull LauncherShortcutStore.Shortcut shortcut,
+                                   @NonNull CarControlCommand command) {
+        if (!pendingCarControls.add(shortcut.target)) return;
+        carIntegration.executeControl(command, (success, message) -> {
+            pendingCarControls.remove(shortcut.target);
+            if (!success) {
+                Toast.makeText(this, message == null ? "Команда не выполнена" : message,
+                        Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
     private void resubscribeCarControls() {
         if (!activityStarted || carIntegration == null || shortcutStore == null) return;
         LinkedHashSet<String> ids = new LinkedHashSet<>();
@@ -3497,7 +3507,12 @@ public final class LauncherActivity extends AppCompatActivity {
         if (active && shortcut.useVehicleStateColor && state.suggestedColor != null) {
             tint = state.suggestedColor;
         }
-        binding.icon.setImageDrawable(LauncherIconResolver.resolve(this, shortcut, tint));
+        if (TrunkControlSafety.isTrunk(shortcut.target)) {
+            binding.icon.setImageDrawable(LauncherIconResolver.resolvePreset(this,
+                    TrunkControlSafety.iconKey(shortcut.icon, state), tint));
+        } else {
+            binding.icon.setImageDrawable(LauncherIconResolver.resolve(this, shortcut, tint));
+        }
         if (binding.titleLabel != null) {
             try { binding.titleLabel.setTextColor(Color.parseColor(tint)); }
             catch (IllegalArgumentException ignored) {

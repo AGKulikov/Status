@@ -138,6 +138,9 @@ final class GeelyCarIntegration implements CarIntegration {
     private static final int NO_ZONE = Integer.MIN_VALUE;
     private static final String FAN_CONTROL_ID = "climate.fan";
     private static final String AIRFLOW_CONTROL_ID = "climate.airflow";
+    /** Exact extension used by the stock KX11 trunk control. */
+    private static final int TRUNK_FUNCTION_ID = 0x02210100;
+    private static final int TRUNK_ZONE = 0x20000000;
     /** ECARX front-row aggregate zone used by both manual and AUTO fan functions. */
     private static final int FRONT_FAN_ZONE = VehicleZone.ZONE_ROW_1_ALL;
     /**
@@ -648,6 +651,10 @@ final class GeelyCarIntegration implements CarIntegration {
         return Arrays.asList(option(0, "Выкл"), option(1, "Вкл"));
     }
 
+    private static List<CarControlDescriptor.Option> trunkOptions() {
+        return Arrays.asList(option(0, "Закрыт"), option(1, "Открыт"));
+    }
+
     private static List<CarControlDescriptor.Option> heatOptions() {
         return Arrays.asList(option(IHvac.SEAT_HEATING_OFF, "Выкл"),
                 option(IHvac.SEAT_HEATING_LEVEL_1, "1"),
@@ -829,6 +836,10 @@ final class GeelyCarIntegration implements CarIntegration {
                     "drive_mode", CarControlDescriptor.Kind.OPTIONS,
                     IDriveMode.DM_FUNC_DRIVE_MODE_SELECT, NO_ZONE, false,
                     driveModeOptions(), 0, 0, 0, "", "#FFFFC107"),
+            new ControlDefinition(TrunkControlSafety.CONTROL_ID, "Багажник", "Автомобиль",
+                    TrunkControlSafety.ICON_CLOSED, CarControlDescriptor.Kind.TOGGLE,
+                    TRUNK_FUNCTION_ID, TRUNK_ZONE, false,
+                    trunkOptions(), 0, 1, 1, "", "#FFFF9800"),
             new ControlDefinition("vehicle.wiper_service", "Сервисное положение дворников",
                     "Автомобиль", "wiper", CarControlDescriptor.Kind.ACTION,
                     IVehicle.SETTING_FUNC_WINDSCREEN_SERVICE_POSITION, NO_ZONE, false,
@@ -2362,6 +2373,12 @@ final class GeelyCarIntegration implements CarIntegration {
                 && definition.functionId == IHvac.HVAC_FUNC_BLOWING_MODE;
     }
 
+    private static boolean isTrunkDefinition(@NonNull ControlDefinition definition) {
+        return TrunkControlSafety.CONTROL_ID.equals(definition.descriptor.id)
+                && definition.functionId == TRUNK_FUNCTION_ID
+                && definition.zone == TRUNK_ZONE;
+    }
+
     private static boolean isManualFanRuntimeValue(double value) {
         if (!Double.isFinite(value)) return false;
         int rounded = (int) Math.round(value);
@@ -2562,6 +2579,20 @@ final class GeelyCarIntegration implements CarIntegration {
     @NonNull
     private CarControlDescriptor.Availability controlAvailability(
             @NonNull ICarFunction source, @NonNull ControlDefinition definition) {
+        if (isTrunkDefinition(definition)) {
+            try {
+                // The stock KX11 trunk app deliberately skips isFunctionSupported and uses this
+                // zoned extension directly. Do the same first: on some firmware the capability
+                // query throws even though the physical-state read/write path is fully usable.
+                double observed = source.getFunctionValue(
+                        definition.functionId, definition.zone);
+                if (isValidControlValue(definition, observed)) {
+                    return CarControlDescriptor.Availability.SUPPORTED;
+                }
+            } catch (Throwable directReadFailure) {
+                Log.d(TAG, "direct trunk probe is not ready", directReadFailure);
+            }
+        }
         try {
             FunctionStatus status = definition.zoned()
                     ? source.isFunctionSupported(definition.functionId, definition.zone)
