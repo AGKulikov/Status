@@ -26,7 +26,8 @@ public final class Ha1131RegressionContractTest {
         assertTrue(proxy.contains("drawTextFrame(canvas, (TextView) value)"));
         assertTrue(proxy.contains(".setIncludePad(false)"));
         assertTrue(proxy.contains("postInvalidateOnAnimation()"));
-        assertTrue(proxy.contains("drawViewTree(child, canvas, sourceToScreenScaleY)"));
+        assertTrue(proxy.contains("drawViewTree(child, canvas,"));
+        assertTrue(proxy.contains("sourceToScreenScaleX, sourceToScreenScaleY)"));
         assertTrue(proxy.contains("never call setTextSize while a"));
         assertFalse(proxy.contains("compensateTextScale"));
         assertFalse(proxy.contains("card.setCardBackgroundColor(Color.TRANSPARENT)"));

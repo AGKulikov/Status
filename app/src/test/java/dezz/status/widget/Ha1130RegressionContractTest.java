@@ -45,17 +45,20 @@ public final class Ha1130RegressionContractTest {
         assertTrue(method.contains("showInformationGroupSettings(shortcut)"));
     }
 
-    @Test public void newestPhoneNotificationAtomicallyReplacesThePopup()
+    @Test public void phoneNotificationRenderingKeepsTheAutomationContracts()
             throws IOException {
         String service = source("WidgetService.java");
         String show = between(service, "private boolean showPhonePopupNotification(",
                 "private void clearPhonePopupNotification()");
+        String present = between(service, "private boolean presentPhoneNotification(",
+                "private boolean hasActiveRoutinePhoneNotificationDestination(");
         assertTrue(show.contains("PhoneNotificationAutomation.OVERLAY_ID"));
         assertTrue(show.contains("mainHandler.removeCallbacks(phonePopupNotificationExpiry)"));
         assertTrue(show.contains("mainHandler.postDelayed(phonePopupNotificationExpiry"));
         assertFalse(show.contains("Queue"));
         assertTrue(service.contains("clearPhonePopupNotification();"));
-        assertTrue(service.contains("updatePhoneNotificationFieldStates(presentation, selected)"));
+        assertTrue(present.contains(
+                "updatePhoneNotificationFieldStates(delivery.presentation, delivery.selectedFields)"));
         assertTrue(service.contains("PhoneNotificationAutomation.automationIdForField(fieldId)"));
 
         String settings = source("PhoneNotificationAutomationSettingsActivity.java");
