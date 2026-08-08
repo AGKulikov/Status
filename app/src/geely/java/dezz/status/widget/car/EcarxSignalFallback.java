@@ -348,8 +348,11 @@ final class EcarxSignalFallback {
         }
         propertyNames.clear();
         Map<?, ?> names = propertyIdNames();
+        Set<String> integerCallbackGetters = adasRecorderDemand
+                ? discoverIntegerCallbackGetterNames(manager)
+                : Collections.emptySet();
         Set<Integer> integerCallbackIds = adasRecorderDemand
-                ? discoverIntegerCallbackPropertyIds(manager)
+                ? discoverIntegerCallbackPropertyIds(manager, integerCallbackGetters)
                 : Collections.emptySet();
         for (Map.Entry<?, ?> entry : names.entrySet()) {
             Integer id = entry.getKey() instanceof Number
@@ -369,7 +372,7 @@ final class EcarxSignalFallback {
                 recorderDiscoveryIds.add(id);
             }
             if (adasRecorderDemand && (integerCallbackIds.contains(id)
-                    || isIntegerCallbackProperty(manager, name))) {
+                    || isIntegerCallbackProperty(integerCallbackGetters, name))) {
                 recorderDiscoveryIds.add(id);
                 typedRecorderDiscoveryIds.add(id);
             }
@@ -385,14 +388,34 @@ final class EcarxSignalFallback {
      * the Integer-vs-byte[] health-poll flood observed on KX11 while still widening diagnostics
      * beyond guessed limiter names.
      */
-    private static boolean isIntegerCallbackProperty(@Nullable Object manager,
+    private static boolean isIntegerCallbackProperty(@NonNull Set<String> getterNames,
                                                      @Nullable String propertyName) {
-        if (manager == null || propertyName == null) return false;
+        if (propertyName == null) return false;
         String trimmed = propertyName.trim();
         if (trimmed.isEmpty()) return false;
-        String getterName = trimmed.startsWith("get") ? trimmed : "get" + trimmed;
-        Method getter = findMethodIgnoreCase(manager.getClass(), getterName, 0);
-        return getter != null && isIntegerReturnType(getter.getReturnType());
+        String getterName = trimmed.regionMatches(true, 0, "get", 0, 3)
+                ? trimmed
+                : "get" + trimmed;
+        return getterNames.contains(getterName.toLowerCase(Locale.ROOT));
+    }
+
+    /**
+     * Indexes all integer-compatible generated getters once. The HA1187 implementation searched
+     * the complete (very large) CarSignalManager method array once per property/field; on KX11
+     * that kept the single fallback worker busy for the whole 21-second limiter recording and no
+     * {@code ECARX_ADAS_CAPTURE_READY} event was ever emitted.
+     */
+    @NonNull
+    private static Set<String> discoverIntegerCallbackGetterNames(@Nullable Object manager) {
+        if (manager == null) return Collections.emptySet();
+        LinkedHashSet<String> result = new LinkedHashSet<>();
+        for (Method method : manager.getClass().getMethods()) {
+            if (method.getParameterTypes().length == 0
+                    && isIntegerReturnType(method.getReturnType())) {
+                result.add(method.getName().toLowerCase(Locale.ROOT));
+            }
+        }
+        return result;
     }
 
     /**
@@ -401,7 +424,8 @@ final class EcarxSignalFallback {
      * excluding byte-array, floating-point and object payloads from the wide callback filter.
      */
     @NonNull
-    private static Set<Integer> discoverIntegerCallbackPropertyIds(@Nullable Object manager) {
+    private static Set<Integer> discoverIntegerCallbackPropertyIds(
+            @Nullable Object manager, @NonNull Set<String> getterNames) {
         if (manager == null) return Collections.emptySet();
         LinkedHashSet<Integer> result = new LinkedHashSet<>();
         Class<?> managerClass = manager.getClass();
@@ -410,9 +434,9 @@ final class EcarxSignalFallback {
             if (!Modifier.isStatic(field.getModifiers()) || !fieldName.startsWith("SignalId_")) {
                 continue;
             }
-            Method getter = findMethodIgnoreCase(managerClass,
-                    "get" + fieldName.substring("SignalId_".length()), 0);
-            if (getter == null || !isIntegerReturnType(getter.getReturnType())) continue;
+            String getterName = ("get" + fieldName.substring("SignalId_".length()))
+                    .toLowerCase(Locale.ROOT);
+            if (!getterNames.contains(getterName)) continue;
             try {
                 Object rawId = field.get(null);
                 if (rawId instanceof Number) result.add(((Number) rawId).intValue());
@@ -429,15 +453,6 @@ final class EcarxSignalFallback {
                 || type == Integer.TYPE || type == Integer.class
                 || type == Long.TYPE || type == Long.class
                 || Number.class.isAssignableFrom(type);
-    }
-
-    @Nullable
-    private static Method findMethodIgnoreCase(Class<?> type, String name, int parameterCount) {
-        for (Method method : type.getMethods()) {
-            if (method.getName().equalsIgnoreCase(name)
-                    && method.getParameterTypes().length == parameterCount) return method;
-        }
-        return null;
     }
 
     @NonNull

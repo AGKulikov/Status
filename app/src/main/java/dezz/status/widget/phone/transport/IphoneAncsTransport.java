@@ -161,6 +161,12 @@ public final class IphoneAncsTransport {
     private static final long SECURE_TO_CLIENT_CONNECT_DELAY_MS = 400L;
     /** Helper v26 reconnects once with RequiresANCS after the plain BLE trust bootstrap. */
     private static final long ANCS_HANDOFF_RECONNECT_TIMEOUT_MS = 25_000L;
+    /**
+     * Core Bluetooth can report its logical cancel/reconnect while Fluoride keeps the original
+     * physical ATT link alive. Force that bootstrap owner down before phase two so
+     * RequiresANCS is evaluated on a genuinely new connection.
+     */
+    private static final long ANCS_BOOTSTRAP_FORCE_DISCONNECT_DELAY_MS = 350L;
     private static final long DIRECT_FALLBACK_DELAY_MS = 500L;
     private static final int INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS = 3;
     private static final long INCOMING_CLIENT_ATTACH_RETRY_MS = 1_500L;
@@ -465,6 +471,7 @@ public final class IphoneAncsTransport {
     private Runnable helperTelemetryPoll;
     private Runnable serverTelemetryWakePoll;
     private Runnable ancsHandoffReconnectTimeout;
+    private Runnable ancsBootstrapDisconnectTask;
     private long lastHelperTelemetrySuccessLogAt;
     @NonNull private String lastLoggedHelperTelemetry = "";
     private Runnable bondTimeout;
@@ -1718,6 +1725,28 @@ public final class IphoneAncsTransport {
             scheduleManagedIncomingRestart("Helper v26 RequiresANCS handoff timeout");
         };
         main.postDelayed(ancsHandoffReconnectTimeout, ANCS_HANDOFF_RECONNECT_TIMEOUT_MS);
+        final long handoffGeneration = sessionGeneration;
+        ancsBootstrapDisconnectTask = () -> {
+            ancsBootstrapDisconnectTask = null;
+            if (!awaitingAncsHandoffReconnect || closing
+                    || handoffGeneration != sessionGeneration) return;
+            GattServerPeer bootstrapLink = findConnectedServerPeer(device);
+            BluetoothGattServer server = gattServer;
+            if (bootstrapLink == null || server == null) {
+                log("ANCS handoff: bootstrap ATT link уже физически закрыт");
+                return;
+            }
+            try {
+                server.cancelConnection(bootstrapLink.device);
+                log("ANCS handoff: принудительно закрываю bootstrap ATT через "
+                        + ANCS_BOOTSTRAP_FORCE_DISCONNECT_DELAY_MS
+                        + " ms; следующий callback обязан быть новым RequiresANCS link");
+            } catch (RuntimeException failure) {
+                log("ANCS handoff: cancelConnection bootstrap link exception: " + failure);
+            }
+        };
+        main.postDelayed(ancsBootstrapDisconnectTask,
+                ANCS_BOOTSTRAP_FORCE_DISCONNECT_DELAY_MS);
     }
 
     private void cancelAncsHandoffReconnectTimeout() {
@@ -1725,6 +1754,10 @@ public final class IphoneAncsTransport {
             main.removeCallbacks(ancsHandoffReconnectTimeout);
         }
         ancsHandoffReconnectTimeout = null;
+        if (ancsBootstrapDisconnectTask != null) {
+            main.removeCallbacks(ancsBootstrapDisconnectTask);
+        }
+        ancsBootstrapDisconnectTask = null;
     }
 
     private boolean matchesAncsHandoffPeer(BluetoothDevice device) {
