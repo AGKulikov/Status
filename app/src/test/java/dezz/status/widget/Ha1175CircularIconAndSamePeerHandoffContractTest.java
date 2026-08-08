@@ -34,21 +34,22 @@ public final class Ha1175CircularIconAndSamePeerHandoffContractTest {
         assertFalse(icon.contains("outputBounds.set(0f, 0f, width, height)"));
     }
 
-    @Test public void serverReleaseCannotCloseTheSamePeerAncsClient() throws Exception {
+    @Test public void serverFacadeReleaseCannotCloseTheSamePhysicalAncsClient() throws Exception {
         String transport = source("phone/transport/IphoneAncsTransport.java");
         String handler = between(transport,
                 "private void handleVerifiedServerLinkDisconnected",
                 "private static String deviceKey");
 
-        assertTrue(handler.contains("boolean samePeerClientHandoff = managedIncomingMode"));
-        assertTrue(handler.contains("clientConnectInFlight || gattClientConnected"
-                + " || activeClientEstablished"));
-        assertTrue(handler.contains("SAME-PEER HANDOFF · ANCS CLIENT PRESERVED"));
+        assertTrue(handler.contains("boolean samePhysicalLinkClientOwner = "
+                + "exactClientRoleOwnsPhysicalLink(device)"));
+        assertTrue(handler.contains("if (samePhysicalLinkClientOwner)"));
+        assertTrue(handler.contains("SAME PHYSICAL LINK · ANCS CLIENT PRESERVED"));
         assertTrue(handler.contains("Android ANCS client remains owner"));
-        assertTrue(handler.indexOf("if (samePeerClientHandoff)")
+        assertTrue(handler.indexOf("if (samePhysicalLinkClientOwner)")
                 < handler.indexOf("BluetoothGatt current = gatt"));
         assertTrue(handler.indexOf("return;")
                 < handler.indexOf("BluetoothGatt current = gatt"));
+        assertTrue(transport.contains("exactClientRoleOwnsPhysicalLink"));
         assertTrue(transport.contains("iphoneAncsSeen = true"));
     }
 

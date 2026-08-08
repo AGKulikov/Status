@@ -23,7 +23,8 @@ public final class Ha1184IncomingAncsBondContractTest {
                 "private Boolean markSecureAttConfirmed");
 
         assertTrue(connection.contains("recordGattServerPeer(device, status, newState)"));
-        assertTrue(connection.contains("без pre-PAIR createBond"));
+        assertTrue(connection.contains("pre-PAIR createBond"));
+        assertTrue(connection.contains("PAIR/B3 challenge"));
         assertFalse(connection.contains("requestBond(device)"));
         assertFalse(connection.contains("createBond()"));
         assertTrue(pair.contains("requestBond(device)"));

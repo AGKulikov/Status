@@ -44,8 +44,9 @@ public final class Ha1176UnifiedTelemetryRelayContractTest {
         assertTrue(discovery.contains("&& iphonePeripheralMode"));
         assertTrue(continuation.contains("else if (managedIncomingMode)"));
         assertTrue(continuation.contains("handleServices(callbackGatt, GATT_SUCCESS)"));
-        assertTrue(transport.contains("SAME-PEER HANDOFF · ANCS CLIENT PRESERVED"));
+        assertTrue(transport.contains("SAME PHYSICAL LINK · ANCS CLIENT PRESERVED"));
         assertTrue(transport.contains("Android ANCS client remains owner"));
+        assertFalse(transport.contains("ANCS-HANDOFF"));
     }
 
     @Test public void helperPublishesReadNotifyRelayAndEndsBootstrapReconnectLoop()
