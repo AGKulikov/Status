@@ -68,6 +68,20 @@ public final class EcarxAdasSignalCatalog {
             33655, 33657, 33658 // speed warning state/on-off/threshold
     };
 
+    /**
+     * KX11 exposes these PA/system aggregates as {@code byte[]} rather than {@code Integer}.
+     * Their exact bit layout is firmware-specific, so ActionRecorder stores baseline/diff frames
+     * verbatim and lets a real limiter operation identify the changing byte safely.
+     */
+    private static final int[] BINARY_DISCOVERY_PROPERTY_IDS = {
+            33287, // 0x8207 paasyaccandtsr
+            33292, // 0x820c paasyspeedcompensation
+            33462, // 0x82b6 pasyssetspdunit
+            33655, // 0x8377 speed-warning state
+            33657, // speed-warning on/off
+            33658  // speed-warning threshold
+    };
+
     private EcarxAdasSignalCatalog() { }
 
     @NonNull static int[] propertyIds() {
@@ -80,6 +94,10 @@ public final class EcarxAdasSignalCatalog {
 
     @NonNull static int[] discoveryFallbackPropertyIds() {
         return DISCOVERY_FALLBACK_PROPERTY_IDS.clone();
+    }
+
+    @NonNull static int[] binaryDiscoveryPropertyIds() {
+        return BINARY_DISCOVERY_PROPERTY_IDS.clone();
     }
 
     /** Matches vendor names that can carry limiter/cruise selection, set speed or input state. */

@@ -29,14 +29,15 @@ public final class Ha1189AnonymousHandoffAndBinaryLimiterContractTest {
                 "private GattServerPeer findConnectedServerPeer",
                 "private boolean issueCurrentLinkSecurityChallenge");
 
-        assertTrue(binding.contains("ancsBootstrapDisconnectRequested"));
-        assertTrue(binding.contains("ancsBootstrapReleaseObserved"));
+        assertTrue(binding.contains("awaitingAncsHandoffReconnect"));
+        assertTrue(binding.contains("secureAttConfirmed"));
         assertTrue(binding.contains("BluetoothDevice.DEVICE_TYPE_UNKNOWN"));
         assertTrue(binding.contains("BluetoothDevice.BOND_NONE"));
         assertTrue(binding.contains("BluetoothDevice.BOND_BONDED"));
         assertTrue(binding.contains("peer.clientIdentity = stableIdentity"));
         assertTrue(incoming.contains("bindAnonymousHandoffClientIdentity(device, previous)"));
         assertTrue(anonymous.contains("managedResolvedPeer = previous"));
+        assertTrue(incoming.contains("ЖДУ ANCS-READY"));
         assertFalse(anonymous.contains("verifiedPeer = device"));
         assertTrue(lookup.contains("sameDevice(peer.clientIdentity, device)"));
     }
@@ -73,7 +74,7 @@ public final class Ha1189AnonymousHandoffAndBinaryLimiterContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1189() throws Exception {
-        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1190'"));
+        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1191'"));
     }
 
     private static String project(String relative) throws Exception {

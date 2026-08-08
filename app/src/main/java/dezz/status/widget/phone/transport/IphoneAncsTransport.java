@@ -172,14 +172,8 @@ public final class IphoneAncsTransport {
     private static final long LIVE_NOTIFICATION_MAX_AGE_MS = 15_000L;
     private static final int MAX_PENDING_ANCS_REQUESTS = 24;
     private static final long SECURE_TO_CLIENT_CONNECT_DELAY_MS = 400L;
-    /** Helper v28 reconnects once with RequiresANCS after the plain BLE trust bootstrap. */
+    /** Helper v29 reconnects once with RequiresANCS after the plain BLE trust bootstrap. */
     private static final long ANCS_HANDOFF_RECONNECT_TIMEOUT_MS = 25_000L;
-    /**
-     * Core Bluetooth can report its logical cancel/reconnect while Fluoride keeps the original
-     * physical ATT link alive. Force that bootstrap owner down before phase two so
-     * RequiresANCS is evaluated on a genuinely new connection.
-     */
-    private static final long ANCS_BOOTSTRAP_FORCE_DISCONNECT_DELAY_MS = 350L;
     private static final long DIRECT_FALLBACK_DELAY_MS = 500L;
     private static final int INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS = 3;
     private static final long INCOMING_CLIENT_ATTACH_RETRY_MS = 1_500L;
@@ -425,8 +419,6 @@ public final class IphoneAncsTransport {
     private boolean secureAttConfirmed;
     /** Encrypted F04 bootstrap asked Helper to reopen the same bonded peer with RequiresANCS. */
     private boolean awaitingAncsHandoffReconnect;
-    /** The bounded forced-release step was reached for the encrypted phase-one ATT owner. */
-    private boolean ancsBootstrapDisconnectRequested;
     /** The stack subsequently reported that phase-one physical owner as disconnected. */
     private boolean ancsBootstrapReleaseObserved;
     /** A single pre-PAIR bond owner per session prevents rotating RPA callbacks from churning SMP. */
@@ -446,6 +438,10 @@ public final class IphoneAncsTransport {
     private boolean iphoneHelperTelemetrySubscriptionAttempted;
     private boolean iphoneHelperTelemetrySubscribed;
     private boolean iphoneHelperTelemetryReadPending;
+    /** True after this client has attempted to prove both ANCS CCCDs to Helper phase two. */
+    private boolean helperAncsReadyProofAttempted;
+    /** Serialized write of ANCS-SUBSCRIBED to the iPhone-owned B4 relay is in flight. */
+    private boolean helperAncsReadyProofPending;
     /** One deterministic B4 snapshot is read before any potentially encrypted ANCS CCCD. */
     private boolean iphoneHelperInitialReadAttempted;
     /** Service setup resumes only after that first snapshot read (or its bounded timeout). */
@@ -502,7 +498,6 @@ public final class IphoneAncsTransport {
     private Runnable helperTelemetryPoll;
     private Runnable serverTelemetryWakePoll;
     private Runnable ancsHandoffReconnectTimeout;
-    private Runnable ancsBootstrapDisconnectTask;
     private long lastHelperTelemetrySuccessLogAt;
     @NonNull private String lastLoggedHelperTelemetry = "";
     private Runnable bondTimeout;
@@ -1482,7 +1477,6 @@ public final class IphoneAncsTransport {
         iphonePeripheralMode = false;
         iphoneConnectStarted = false;
         awaitingAncsHandoffReconnect = false;
-        ancsBootstrapDisconnectRequested = false;
         ancsBootstrapReleaseObserved = false;
         cancelAncsHandoffReconnectTimeout();
         cancelColdBackgroundAttach();
@@ -1563,7 +1557,6 @@ public final class IphoneAncsTransport {
         directFallbackAttempted = false;
         incomingClientAttachAttempt = 0;
         awaitingAncsHandoffReconnect = false;
-        ancsBootstrapDisconnectRequested = false;
         ancsBootstrapReleaseObserved = false;
         incomingPrePairBondRequested = false;
         incomingPrePairBondTargetKey = null;
@@ -1583,6 +1576,8 @@ public final class IphoneAncsTransport {
         iphoneHelperTelemetrySubscriptionAttempted = false;
         iphoneHelperTelemetrySubscribed = false;
         iphoneHelperTelemetryReadPending = false;
+        helperAncsReadyProofAttempted = false;
+        helperAncsReadyProofPending = false;
         iphoneHelperInitialReadAttempted = false;
         iphoneServiceSetupDeferredForHelperRead = false;
         iphonePostSecureDiscoveryScheduled = false;
@@ -1781,7 +1776,7 @@ public final class IphoneAncsTransport {
         }
         if (managedIncomingMode) {
             state("BOOTSTRAP SECURE OK · ЖДУ ANCS HANDOFF");
-            log("Helper v28 должен записать ANCS-HANDOFF и открыть второй link с "
+            log("Helper v29 должен записать ANCS-HANDOFF и открыть второй link с "
                     + "RequiresANCS; Android client на bootstrap-link не запускается");
             return;
         }
@@ -1789,10 +1784,10 @@ public final class IphoneAncsTransport {
     }
 
     /**
-     * Completes phase one of Helper v28. The command arrives over the encrypted dynamic link,
-     * so preserving this peer while Core Bluetooth deliberately disconnects is safe. Phase two
-     * contains no custom ATT discovery: iOS reconnects with RequiresANCS and Android immediately
-     * registers its ANCS client against the matching bonded server callback.
+     * Completes phase one of Helper v29. The command arrives over the encrypted dynamic link,
+     * so preserving this peer while Core Bluetooth deliberately disconnects is safe. Android
+     * never force-closes that link: the previous 350-ms delayed cancel could run after iOS had
+     * already opened phase two and therefore killed the correct RequiresANCS owner.
      */
     private void beginAncsHandoffReconnect(BluetoothDevice device) {
         if (!managedIncomingMode || !secureAttConfirmed || !isVerifiedPeer(device)) {
@@ -1801,7 +1796,6 @@ public final class IphoneAncsTransport {
         }
         cancelClientAttemptCallbacks();
         awaitingAncsHandoffReconnect = true;
-        ancsBootstrapDisconnectRequested = false;
         ancsBootstrapReleaseObserved = false;
         incomingClientAttachAttempt = 0;
         state("ANCS HANDOFF · ЖДУ REQUIRES_ANCS LINK");
@@ -1814,33 +1808,11 @@ public final class IphoneAncsTransport {
             state("ANCS HANDOFF TIMEOUT · RESTART");
             log("RequiresANCS link не появился за "
                     + ANCS_HANDOFF_RECONNECT_TIMEOUT_MS + " ms; перезапускаю Geely_ANCS");
-            scheduleManagedIncomingRestart("Helper v28 RequiresANCS handoff timeout");
+            scheduleManagedIncomingRestart("Helper v29 RequiresANCS handoff timeout");
         };
         main.postDelayed(ancsHandoffReconnectTimeout, ANCS_HANDOFF_RECONNECT_TIMEOUT_MS);
-        final long handoffGeneration = sessionGeneration;
-        ancsBootstrapDisconnectTask = () -> {
-            ancsBootstrapDisconnectTask = null;
-            if (!awaitingAncsHandoffReconnect || closing
-                    || handoffGeneration != sessionGeneration) return;
-            GattServerPeer bootstrapLink = findConnectedServerPeer(device);
-            BluetoothGattServer server = gattServer;
-            ancsBootstrapDisconnectRequested = true;
-            if (bootstrapLink == null || server == null) {
-                ancsBootstrapReleaseObserved = true;
-                log("ANCS handoff: bootstrap ATT link уже физически закрыт");
-                return;
-            }
-            try {
-                server.cancelConnection(bootstrapLink.device);
-                log("ANCS handoff: принудительно закрываю bootstrap ATT через "
-                        + ANCS_BOOTSTRAP_FORCE_DISCONNECT_DELAY_MS
-                        + " ms; следующий callback обязан быть новым RequiresANCS link");
-            } catch (RuntimeException failure) {
-                log("ANCS handoff: cancelConnection bootstrap link exception: " + failure);
-            }
-        };
-        main.postDelayed(ancsBootstrapDisconnectTask,
-                ANCS_BOOTSTRAP_FORCE_DISCONNECT_DELAY_MS);
+        log("Bootstrap release оставлен Core Bluetooth; Android не ставит delayed cancel, "
+                + "который мог уничтожить уже подключённую phase 2");
     }
 
     private void cancelAncsHandoffReconnectTimeout() {
@@ -1848,10 +1820,6 @@ public final class IphoneAncsTransport {
             main.removeCallbacks(ancsHandoffReconnectTimeout);
         }
         ancsHandoffReconnectTimeout = null;
-        if (ancsBootstrapDisconnectTask != null) {
-            main.removeCallbacks(ancsBootstrapDisconnectTask);
-        }
-        ancsBootstrapDisconnectTask = null;
     }
 
     private boolean matchesAncsHandoffPeer(BluetoothDevice device) {
@@ -1865,12 +1833,13 @@ public final class IphoneAncsTransport {
     /**
      * Maps the fresh anonymous Android-9 server callback to the already verified bonded identity.
      * The callback object itself is retained for server operations; only connectGatt uses the
-     * stable identity. This is deliberately impossible before encrypted B3 handoff plus a
-     * physical phase-one disconnect, so an arbitrary anonymous incoming link cannot be promoted.
+     * stable identity. This is allowed only inside the short encrypted B3 handoff window. The
+     * phase-two ANCS-READY write remains the authoritative proof even when Android 9 coalesces
+     * both server connection callbacks into one physical-link record.
      */
     private boolean bindAnonymousHandoffClientIdentity(BluetoothDevice callbackDevice,
                                                        BluetoothDevice stableIdentity) {
-        if (!ancsBootstrapDisconnectRequested || !ancsBootstrapReleaseObserved
+        if (!awaitingAncsHandoffReconnect || !secureAttConfirmed
                 || safeType(callbackDevice) != BluetoothDevice.DEVICE_TYPE_UNKNOWN
                 || safeBondState(callbackDevice) != BluetoothDevice.BOND_NONE
                 || safeBondState(stableIdentity) != BluetoothDevice.BOND_BONDED) {
@@ -1890,32 +1859,30 @@ public final class IphoneAncsTransport {
 
     private boolean observePlannedAncsBootstrapRelease(int status, int newState) {
         if (!managedIncomingMode || !awaitingAncsHandoffReconnect
-                || !secureAttConfirmed || !ancsBootstrapDisconnectRequested
+                || !secureAttConfirmed
                 || newState != BluetoothProfile.STATE_DISCONNECTED) {
             return false;
         }
         ancsBootstrapReleaseObserved = true;
         state("ANCS HANDOFF · BOOTSTRAP LINK RELEASED");
-        log("Encrypted bootstrap ATT owner физически закрыт; разрешаю один свежий "
-                + "RequiresANCS callback с сохранённой bonded identity");
+        log("Encrypted bootstrap ATT owner физически закрыт; жду явный ANCS-READY "
+                + "на RequiresANCS link с сохранённой bonded identity");
         return status == GATT_SUCCESS;
     }
 
-    /** Returns true whenever the callback belongs to the explicit phase-two waiting window. */
+    /** Records a phase-two candidate but never treats didConnect alone as ANCS proof. */
     private boolean handleIncomingAncsHandoffLink(BluetoothDevice device) {
         if (!awaitingAncsHandoffReconnect) return false;
         BluetoothDevice previous = getVerifiedPeer();
         if (!matchesAncsHandoffPeer(device)) {
             if (previous != null && bindAnonymousHandoffClientIdentity(device, previous)) {
                 managedResolvedPeer = previous;
-                awaitingAncsHandoffReconnect = false;
-                cancelAncsHandoffReconnectTimeout();
-                state("REQUIRES_ANCS ANONYMOUS LINK MAPPED · CLIENT ATTACH");
+                state("REQUIRES_ANCS CANDIDATE MAPPED · ЖДУ ANCS-READY");
                 log("Android 9 anonymous phase-two callback mapped to preserved bonded peer · "
                         + "callback=" + safeAddress(device)
                         + " identity=" + safeAddress(previous)
-                        + " objectId=" + System.identityHashCode(device));
-                scheduleSecureClientStart();
+                        + " objectId=" + System.identityHashCode(device)
+                        + "; didConnect ещё не считается готовностью ANCS");
                 return true;
             }
             log("ANCS handoff: жду resolved bonded peer, callback пока anonymous · "
@@ -1927,14 +1894,72 @@ public final class IphoneAncsTransport {
         }
         managedResolvedPeer = device;
         listener.onVerifiedPeerAddress(safeAddress(device));
+        state("REQUIRES_ANCS CANDIDATE MATCHED · ЖДУ ANCS-READY");
+        log("Helper v29 phase-two peer matched · " + safeAddress(device)
+                + " bond=" + bondLabel(safeBondState(device))
+                + " objectId=" + System.identityHashCode(device)
+                + "; жду подтверждение записи B3");
+        return true;
+    }
+
+    private boolean canAcceptAncsReady(BluetoothDevice device) {
+        if (!managedIncomingMode || !awaitingAncsHandoffReconnect
+                || !secureAttConfirmed || getVerifiedPeer() == null) return false;
+        if (matchesAncsHandoffPeer(device)) return true;
+        return safeType(device) == BluetoothDevice.DEVICE_TYPE_UNKNOWN
+                && safeBondState(device) == BluetoothDevice.BOND_NONE
+                && safeBondState(getVerifiedPeer()) == BluetoothDevice.BOND_BONDED;
+    }
+
+    /**
+     * ANCS-READY is written only after iOS reports the RequiresANCS connection and rediscovers
+     * the current dynamic B3 characteristic. Receiving it is stronger evidence than a coalesced
+     * Android-9 server callback, so revive that exact callback peer before same-link connectGatt.
+     */
+    private void confirmAncsReady(BluetoothDevice callbackDevice) {
+        if (!canAcceptAncsReady(callbackDevice)) {
+            log("ANCS-READY проигнорирован вне защищённого handoff window");
+            return;
+        }
+        BluetoothDevice stableIdentity = getVerifiedPeer();
+        boolean anonymous = !matchesAncsHandoffPeer(callbackDevice);
+        long now = SystemClock.elapsedRealtime();
+        synchronized (gattServerPeers) {
+            GattServerPeer selected = null;
+            for (GattServerPeer peer : gattServerPeers.values()) {
+                if (peer.sessionGeneration != sessionGeneration) continue;
+                if (sameDevice(peer.device, callbackDevice)
+                        || sameDevice(peer.device, stableIdentity)
+                        || sameDevice(peer.clientIdentity, stableIdentity)) {
+                    selected = peer;
+                    break;
+                }
+            }
+            if (selected == null) {
+                selected = new GattServerPeer(sessionGeneration, callbackDevice);
+                gattServerPeers.put(deviceKey(callbackDevice), selected);
+            }
+            selected.device = callbackDevice;
+            selected.connected = true;
+            selected.connectedAtElapsedMs = now;
+            if (anonymous) selected.clientIdentity = stableIdentity;
+        }
+        if (!anonymous) {
+            synchronized (verifiedPeerLock) {
+                verifiedPeer = callbackDevice;
+            }
+            stableIdentity = callbackDevice;
+        }
+        managedResolvedPeer = stableIdentity;
+        listener.onVerifiedPeerAddress(safeAddress(stableIdentity));
         awaitingAncsHandoffReconnect = false;
         cancelAncsHandoffReconnectTimeout();
-        state("REQUIRES_ANCS LINK MATCHED · CLIENT ATTACH");
-        log("Helper v28 phase-two peer matched · " + safeAddress(device)
-                + " bond=" + bondLabel(safeBondState(device))
-                + " objectId=" + System.identityHashCode(device));
+        state("REQUIRES_ANCS READY · CLIENT ATTACH");
+        log("ANCS-READY принят на phase 2 · callback=" + safeAddress(callbackDevice)
+                + " identity=" + safeAddress(stableIdentity)
+                + " anonymous=" + anonymous
+                + " releaseObserved=" + ancsBootstrapReleaseObserved);
         scheduleSecureClientStart();
-        return true;
     }
 
     private void scheduleSecureClientStart() {
@@ -3210,11 +3235,53 @@ public final class IphoneAncsTransport {
     }
 
     private void finishAncsReadySetup(BluetoothGatt callbackGatt) {
+        if (startHelperAncsReadyProof(callbackGatt)) return;
         prepareBatteryBootstrap(callbackGatt);
         log("Обе ANCS-подписки включены; Helper telemetry="
                 + (iphoneHelperTelemetrySubscribed ? "READY" : "UNAVAILABLE")
                 + "; atomic B4 READ and BAS diagnostics use the serialized GATT queue");
         sendNextRequest();
+    }
+
+    /**
+     * Completes the reverse-route proof on the same ATT owner. Core Bluetooth's didConnect and
+     * an unencrypted B4 read only prove a BLE link; the ANCS session is usable only after both
+     * Notification Source and Data Source CCCDs are enabled. The iPhone UI is therefore allowed
+     * to turn green only after this post-CCCD write succeeds.
+     */
+    private boolean startHelperAncsReadyProof(BluetoothGatt callbackGatt) {
+        if (!managedIncomingMode || callbackGatt != gatt || !gattReady
+                || helperAncsReadyProofAttempted || helperAncsReadyProofPending) return false;
+        BluetoothGattCharacteristic telemetry = iphoneTelemetryCharacteristic;
+        if (telemetry == null
+                || !TELEMETRY_RELAY_CHARACTERISTIC.equals(telemetry.getUuid())) return false;
+        helperAncsReadyProofAttempted = true;
+        if ((telemetry.getProperties() & BluetoothGattCharacteristic.PROPERTY_WRITE) == 0) {
+            log("Helper B4 relay не принимает ANCS-SUBSCRIBED; нужен Helper v29+");
+            return false;
+        }
+        telemetry.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+        telemetry.setValue("ANCS-SUBSCRIBED".getBytes(StandardCharsets.UTF_8));
+        boolean started;
+        try {
+            started = callbackGatt.writeCharacteristic(telemetry);
+        } catch (RuntimeException failure) {
+            started = false;
+            log("ANCS-SUBSCRIBED write exception: " + failure);
+        }
+        helperAncsReadyProofPending = started;
+        log("ANCS-SUBSCRIBED proof started=" + started
+                + " after DATA_SOURCE + NOTIFICATION_SOURCE CCCD success");
+        if (started) {
+            main.postDelayed(() -> {
+                if (callbackGatt != gatt || !helperAncsReadyProofPending) return;
+                helperAncsReadyProofPending = false;
+                log("ANCS-SUBSCRIBED callback timeout; ANCS остаётся READY, "
+                        + "Helper сохраняет честный жёлтый статус");
+                finishAncsReadySetup(callbackGatt);
+            }, 4_000L);
+        }
+        return started;
     }
 
     /**
@@ -3863,6 +3930,8 @@ public final class IphoneAncsTransport {
         iphoneHelperTelemetrySubscriptionAttempted = false;
         iphoneHelperTelemetrySubscribed = false;
         iphoneHelperTelemetryReadPending = false;
+        helperAncsReadyProofAttempted = false;
+        helperAncsReadyProofPending = false;
         iphoneHelperInitialReadAttempted = false;
         iphoneServiceSetupDeferredForHelperRead = false;
         descriptorStage = DescriptorStage.NONE;
@@ -4788,7 +4857,16 @@ public final class IphoneAncsTransport {
                             || serverTelemetryCharacteristicUuid.equals(uuid)) {
                         String command = asciiCommand(value);
                         IphoneHelperTelemetry telemetry = IphoneHelperTelemetry.parse(value);
-                        if (!isVerifiedPeer(device)) {
+                        if (serverSecureCharacteristic.equals(uuid)
+                                && "ANCS-READY".equals(command)) {
+                            if (!canAcceptAncsReady(device)) {
+                                status = STATUS_INSUFFICIENT_AUTHORIZATION;
+                                main.post(() -> log("ANCS-READY отклонён: нет активного "
+                                        + "encrypted handoff window · " + safeAddress(device)));
+                            } else {
+                                successAction = () -> confirmAncsReady(device);
+                            }
+                        } else if (!isVerifiedPeer(device)) {
                             status = STATUS_INSUFFICIENT_AUTHORIZATION;
                             main.post(() -> log("SECURE WRITE отклонён: peer не verified · "
                                     + safeAddress(device)));
@@ -4812,7 +4890,8 @@ public final class IphoneAncsTransport {
                         } else if (!"ANCS".equals(command)) {
                             status = BluetoothGatt.GATT_FAILURE;
                             main.post(() -> log("SECURE command отклонена: `" + command
-                                    + "`; ожидается ASCII ANCS, ANCS-HANDOFF или TEL2/TEL3"));
+                                    + "`; ожидается ASCII ANCS, ANCS-HANDOFF, ANCS-READY "
+                                    + "или TEL2/TEL3"));
                         } else {
                             successAction = () -> handleSecureAttSuccess(device, "WRITE");
                         }
@@ -5000,6 +5079,15 @@ public final class IphoneAncsTransport {
                 if (callbackGatt != gatt) return;
                 log("onCharacteristicWrite " + shortUuid(characteristic.getUuid())
                         + " status=" + status);
+                if (TELEMETRY_RELAY_CHARACTERISTIC.equals(characteristic.getUuid())
+                        && helperAncsReadyProofPending) {
+                    helperAncsReadyProofPending = false;
+                    log(status == GATT_SUCCESS
+                            ? "Helper подтвердил ANCS-SUBSCRIBED; reverse route полностью готов"
+                            : "Helper отклонил ANCS-SUBSCRIBED status=" + status);
+                    finishAncsReadySetup(callbackGatt);
+                    return;
+                }
                 if (iphonePeripheralMode
                         && CONTROL_CHARACTERISTIC.equals(characteristic.getUuid())) {
                     iphonePairWritePending = false;

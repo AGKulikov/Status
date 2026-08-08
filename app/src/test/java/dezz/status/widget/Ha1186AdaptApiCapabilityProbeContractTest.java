@@ -42,7 +42,7 @@ public final class Ha1186AdaptApiCapabilityProbeContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1186() throws Exception {
-        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1190'"));
+        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1191'"));
     }
 
     @Test public void discoverySignalsRemainCallbackOnlyDuringHealthPolling() throws Exception {

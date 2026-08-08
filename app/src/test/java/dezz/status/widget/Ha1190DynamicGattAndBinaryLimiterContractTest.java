@@ -76,14 +76,17 @@ public final class Ha1190DynamicGattAndBinaryLimiterContractTest {
         assertTrue(discovery.contains("SignalId_"));
         assertTrue(fallback.contains("binaryRecorderGetterNames.putAll"));
         assertTrue(reads.contains("readBinaryCurrentValues(manager)"));
-        assertTrue(reads.contains("reader.getReturnType() != byte[].class"));
+        assertTrue(reads.contains("findTwoIntMethod(manager.getClass(), \"getBytesProperty\")"));
+        assertTrue(reads.contains("bytesReader.invoke(manager, propertyId, ECARX_GLOBAL_AREA)"));
+        assertTrue(reads.contains("EcarxSignalDecoder.coerceByteArray(value)"));
+        assertFalse(reads.contains("reader.getReturnType() != byte[].class"));
         assertTrue(reads.contains("reader.invoke(manager)"));
         assertTrue(fallback.contains("listener.onAdasBinarySignal"));
         assertTrue(fallback.contains("adasRecorderDemand ? RECORDER_HEALTH_READ_MILLIS"));
     }
 
     @Test public void releaseIdentityAdvancesAsMatchedPair() throws Exception {
-        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1190'"));
+        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1191'"));
         String helperProject = project("ios/KX11-iPhone-ANCS-Helper-v28/"
                 + "KX11ANCSHelper.xcodeproj/project.pbxproj");
         assertTrue(helperProject.contains("MARKETING_VERSION = 28.0"));

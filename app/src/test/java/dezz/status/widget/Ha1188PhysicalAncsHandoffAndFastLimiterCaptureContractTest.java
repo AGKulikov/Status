@@ -13,7 +13,7 @@ import org.junit.Test;
 
 /** HA1188 regressions derived from the first in-car HA1187/v26 trace. */
 public final class Ha1188PhysicalAncsHandoffAndFastLimiterCaptureContractTest {
-    @Test public void encryptedHandoffForcesOldPhysicalAttOwnerDown() throws Exception {
+    @Test public void encryptedHandoffNeverSchedulesDelayedPhysicalCancel() throws Exception {
         String transport = project(
                 "app/src/main/java/dezz/status/widget/phone/transport/IphoneAncsTransport.java");
         String handoff = between(transport,
@@ -23,11 +23,11 @@ public final class Ha1188PhysicalAncsHandoffAndFastLimiterCaptureContractTest {
                 "private void cancelAncsHandoffReconnectTimeout",
                 "private boolean matchesAncsHandoffPeer");
 
-        assertTrue(handoff.contains("ANCS_BOOTSTRAP_FORCE_DISCONNECT_DELAY_MS"));
-        assertTrue(handoff.contains("server.cancelConnection(bootstrapLink.device)"));
-        assertTrue(handoff.contains("handoffGeneration != sessionGeneration"));
-        assertTrue(handoff.contains("main.postDelayed(ancsBootstrapDisconnectTask"));
-        assertTrue(cancel.contains("main.removeCallbacks(ancsBootstrapDisconnectTask)"));
+        assertTrue(handoff.contains("awaitingAncsHandoffReconnect = true"));
+        assertTrue(handoff.contains("ANCS_HANDOFF_RECONNECT_TIMEOUT_MS"));
+        assertTrue(handoff.contains("Android не ставит delayed cancel"));
+        assertFalse(handoff.contains("cancelConnection"));
+        assertFalse(cancel.contains("ancsBootstrapDisconnectTask"));
     }
 
     @Test public void limiterTypeDiscoveryBuildsOneMethodIndex() throws Exception {
@@ -46,7 +46,7 @@ public final class Ha1188PhysicalAncsHandoffAndFastLimiterCaptureContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1188() throws Exception {
-        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1190'"));
+        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1191'"));
     }
 
     private static String project(String relative) throws Exception {

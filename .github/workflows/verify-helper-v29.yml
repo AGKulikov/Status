@@ -1,0 +1,78 @@
+name: Verify iPhone Helper v29
+
+on:
+  push:
+    branches:
+      - 'release/kx11-ancs-helper-v29'
+      - 'release/v2.8.2-ha1191'
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v29/**'
+      - '.github/workflows/verify-helper-v29.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-helper:
+    name: Compile Helper v29 without signing
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Validate project settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v29/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            CODE_SIGNING_ALLOWED=NO \
+            -showBuildSettings >"$RUNNER_TEMP/helper-v29-build-settings.txt"
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper' \
+            "$RUNNER_TEMP/helper-v29-build-settings.txt"
+          grep -q 'MARKETING_VERSION = 29.0' \
+            "$RUNNER_TEMP/helper-v29-build-settings.txt"
+          grep -q 'CURRENT_PROJECT_VERSION = 29' \
+            "$RUNNER_TEMP/helper-v29-build-settings.txt"
+
+      - name: Compile Helper v29
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v29/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            SYMROOT="$RUNNER_TEMP/KX11ANCSHelperProducts" \
+            OBJROOT="$RUNNER_TEMP/KX11ANCSHelperIntermediates" \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Verify dynamic namespace and two-phase ANCS handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          source=ios/KX11-iPhone-ANCS-Helper-v29/KX11ANCSHelper/ViewController.swift
+          plist=ios/KX11-iPhone-ANCS-Helper-v29/KX11ANCSHelper/Info.plist
+          grep -q 'KX11 ANCS HELPER v29' "$source"
+          grep -q 'D2D9E4BF-47F1-4E44-A8BB-A932FD5AFFFF' "$source"
+          grep -q 'decodeCentralNamespace' "$source"
+          grep -q 'applyCentralNamespace(generation)' "$source"
+          grep -Fq 'withServices: [managedIncomingBeaconUUID]' "$source"
+          grep -Fq 'discoverServices([centralServiceUUID])' "$source"
+          grep -q 'Data("ANCS-HANDOFF".utf8)' "$source"
+          grep -q 'Data("ANCS-READY".utf8)' "$source"
+          grep -q 'command == "ANCS-SUBSCRIBED"' "$source"
+          grep -q 'centralHandoffActive && centralAncsProved' "$source"
+          grep -q 'CBConnectPeripheralOptionRequiresANCS: requiresAncs' "$source"
+          grep -q '<string>bluetooth-central</string>' "$plist"
+          grep -q '<string>bluetooth-peripheral</string>' "$plist"
