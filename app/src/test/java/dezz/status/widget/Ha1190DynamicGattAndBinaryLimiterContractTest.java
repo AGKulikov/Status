@@ -86,7 +86,7 @@ public final class Ha1190DynamicGattAndBinaryLimiterContractTest {
     }
 
     @Test public void releaseIdentityAdvancesAsMatchedPair() throws Exception {
-        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1192'"));
+        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1194'"));
         String helperProject = project("ios/KX11-iPhone-ANCS-Helper-v28/"
                 + "KX11ANCSHelper.xcodeproj/project.pbxproj");
         assertTrue(helperProject.contains("MARKETING_VERSION = 28.0"));

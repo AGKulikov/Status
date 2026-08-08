@@ -1,7 +1,7 @@
 KX11 ANCS Helper v30
 ====================
 
-Companion release: Status Widget v2.8.2-ha1192
+Companion release: Status Widget v2.8.2-ha1194
 Bundle identifier: ru.natro.kx11ancshelper
 Marketing version: 30.0
 Build number: 30

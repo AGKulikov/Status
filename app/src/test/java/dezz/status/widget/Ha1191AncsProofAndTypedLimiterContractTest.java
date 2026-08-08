@@ -64,7 +64,7 @@ public final class Ha1191AncsProofAndTypedLimiterContractTest {
     }
 
     @Test public void releaseIdentityAdvancesAsMatchedPair() throws Exception {
-        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1192'"));
+        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1194'"));
         String helperProject = project("ios/KX11-iPhone-ANCS-Helper-v29/"
                 + "KX11ANCSHelper.xcodeproj/project.pbxproj");
         assertTrue(helperProject.contains("MARKETING_VERSION = 29.0"));
