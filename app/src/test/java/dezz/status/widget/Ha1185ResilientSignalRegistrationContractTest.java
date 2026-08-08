@@ -41,7 +41,7 @@ public final class Ha1185ResilientSignalRegistrationContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1185() throws Exception {
-        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1194'"));
+        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1195'"));
         assertTrue(project("release-manifests/HA1185.md").contains("208021185"));
     }
 

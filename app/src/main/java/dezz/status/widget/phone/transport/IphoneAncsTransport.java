@@ -403,7 +403,7 @@ public final class IphoneAncsTransport {
     private boolean activeClientAutoConnect;
     private boolean backgroundAttachAttempted;
     private boolean directFallbackAttempted;
-    /** Direct GATT-client registrations tried while the verified incoming server link stays up. */
+    /** Background GATT-client registrations tried before one durable owner is obtained. */
     private int incomingClientAttachAttempt;
     /** Binder callbacks and the main state machine both read this phase-one proof. */
     private volatile boolean secureAttConfirmed;
@@ -1412,14 +1412,25 @@ public final class IphoneAncsTransport {
             return;
         }
         if (managedIncomingMode) {
-            if (nextClientAttempt != null || clientConnectInFlight) {
-                log("Direct same-peer attach уже выполняется или запланирован");
+            BluetoothGatt pendingOwner = gatt;
+            if (pendingOwner != null) {
+                if (gattClientConnected) {
+                    log("Повторный discoverServices на текущем same-peer GATT owner");
+                    discoverServices(pendingOwner);
+                } else {
+                    awaitIncomingBackgroundOwner(pendingOwner, activeClientGeneration,
+                            "ручной same-peer reconnect");
+                }
                 return;
             }
-            // A manual diagnostic retry starts a fresh bounded group but keeps the verified
-            // incoming link and the published Geely_ANCS service intact.
+            if (nextClientAttempt != null || clientConnectInFlight) {
+                log("Background same-peer owner уже регистрируется или запланирован");
+                return;
+            }
+            // A manual diagnostic retry may allocate a new owner only when no registered
+            // BluetoothGatt exists. An existing owner is always re-armed with connect().
             incomingClientAttachAttempt = 0;
-            startSamePeerAttach(false, "ручной direct same-peer retry");
+            startSamePeerAttach(true, "ручная background-регистрация same-peer owner");
             return;
         }
         if (!backgroundAttachAttempted) {
@@ -1742,13 +1753,24 @@ public final class IphoneAncsTransport {
     }
 
     private void scheduleSecureClientStart() {
-        if (secureConnectStart != null || clientConnectInFlight || gattClientConnected) return;
+        if (secureConnectStart != null || clientConnectInFlight) return;
+        BluetoothGatt current = gatt;
+        if (current != null) {
+            if (gattClientConnected) {
+                discoverServices(current);
+            } else {
+                awaitIncomingBackgroundOwner(current, activeClientGeneration,
+                        "ANCS-READY на уже зарегистрированном owner");
+            }
+            return;
+        }
         secureConnectStart = () -> {
             secureConnectStart = null;
-            // The iPhone already owns the physical link. Register Android's GATT-client role
-            // directly against that exact peer; autoConnect=true is a background/reconnect
-            // request and made the ECARX Android 9 stack reject the dual-role attach.
-            startSamePeerAttach(false, "same-owner ANCS-READY + "
+            // Android 9 maps autoConnect=true to BTA's background open. Fluoride first checks
+            // for an existing connId and binds this client registration to that connection.
+            // A direct open (autoConnect=false) instead asks the controller for another radio
+            // connection and ECARX returns status 133 while the incoming link is already alive.
+            startSamePeerAttach(true, "same-owner ANCS-READY + "
                     + SECURE_TO_CLIENT_CONNECT_DELAY_MS + " ms");
         };
         main.postDelayed(secureConnectStart, SECURE_TO_CLIENT_CONNECT_DELAY_MS);
@@ -1791,14 +1813,15 @@ public final class IphoneAncsTransport {
             verifiedPeer = device;
         }
         if (managedIncomingMode) {
-            if (autoConnect) {
-                log("Reverse route запрещает autoConnect=true на уже активном incoming link");
+            if (!autoConnect) {
+                log("Reverse route запрещает direct autoConnect=false: нужен background open "
+                        + "на существующем incoming link");
                 return;
             }
             if (incomingClientAttachAttempt >= INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS) {
-                state("SAME-PEER ATTACH · LINK KEPT · RETRIES EXHAUSTED");
-                log("Лимит direct same-peer attach исчерпан; Geely_ANCS и incoming link "
-                        + "сохранены без перепубликации");
+                state("SAME-PEER OWNER REGISTRATION · LINK KEPT · RETRIES EXHAUSTED");
+                log("Лимит создания background owner исчерпан; Geely_ANCS и incoming link "
+                        + "сохранены. Существующий owner никогда не заменяется таймером");
                 return;
             }
             incomingClientAttachAttempt++;
@@ -1833,7 +1856,7 @@ public final class IphoneAncsTransport {
         long linkAgeMs = Math.max(0L, android.os.SystemClock.elapsedRealtime()
                 - serverLink.connectedAtElapsedMs);
         state(managedIncomingMode
-                ? "SAME-PEER ATTACH · DIRECT #" + incomingClientAttachAttempt
+                ? "SAME-PEER ATTACH · BACKGROUND OWNER #" + incomingClientAttachAttempt
                 : autoConnect
                 ? "SAME-PEER ATTACH · BACKGROUND"
                 : "SAME-PEER ATTACH · DIRECT FALLBACK");
@@ -1862,6 +1885,14 @@ public final class IphoneAncsTransport {
             } else {
                 BluetoothGatt expected = gatt;
                 boolean expectedAutoConnect = autoConnect;
+                if (managedIncomingMode) {
+                    // A background registration is allowed to outlive any bounded wait. On
+                    // Android 9 BluetoothGatt.connect() reuses its clientIf and remains a
+                    // background open, so the watchdog never closes or replaces this owner.
+                    rearmPersistentGattOwner(expected, expectedGeneration,
+                            "same-peer background owner registered", false);
+                    return;
+                }
                 connectTimeout = () -> {
                     if (gatt != expected || !clientConnectInFlight
                             || !sessionState.isCurrent(expectedGeneration)) return;
@@ -1874,9 +1905,7 @@ public final class IphoneAncsTransport {
                             + " transport=TRANSPORT_LE");
                     closeClientGatt(expected);
                     clearAncsRuntime();
-                    if (managedIncomingMode) {
-                        scheduleIncomingClientAttachRetry("direct attach timeout");
-                    } else if (expectedAutoConnect) {
+                    if (expectedAutoConnect) {
                         scheduleDirectFallback("background attach timeout");
                     } else {
                         state("V6 ATTEMPTS EXHAUSTED");
@@ -1890,7 +1919,7 @@ public final class IphoneAncsTransport {
             state("CONNECT_EXCEPTION");
             log("connectGatt exception: " + failure);
             if (managedIncomingMode) {
-                scheduleIncomingClientAttachRetry("direct attach exception");
+                scheduleIncomingClientAttachRetry("background owner registration exception");
             } else if (autoConnect) {
                 scheduleDirectFallback("background attach exception");
             } else {
@@ -1912,10 +1941,8 @@ public final class IphoneAncsTransport {
     }
 
     /**
-     * A failed Android GATT-client registration is not proof that the incoming BLE link was
-     * lost. Keep the GATT server and its service published while the exact verified server peer
-     * is still connected; otherwise Core Bluetooth receives a false Service Changed event and
-     * tears down the only working half of the reverse route.
+     * Allocates a replacement owner only when connectGatt could not return/register one at all.
+     * Connection errors on a non-null BluetoothGatt are handled by connect() on that same owner.
      */
     private void scheduleIncomingClientAttachRetry(@NonNull String reason) {
         if (closing || !managedReconnectEnabled || !managedIncomingMode
@@ -1927,8 +1954,8 @@ public final class IphoneAncsTransport {
             return;
         }
         if (incomingClientAttachAttempt >= INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS) {
-            state("SAME-PEER ATTACH · LINK KEPT · RETRIES EXHAUSTED");
-            log("Direct same-peer attach не удался после " + incomingClientAttachAttempt
+            state("SAME-PEER OWNER REGISTRATION · LINK KEPT · RETRIES EXHAUSTED");
+            log("Background owner не зарегистрирован после " + incomingClientAttachAttempt
                     + " попыток; Geely_ANCS server/link остаются активны · " + reason);
             return;
         }
@@ -1943,20 +1970,19 @@ public final class IphoneAncsTransport {
                         "incoming link disappeared before client retry");
                 return;
             }
-            startSamePeerAttach(false, "same incoming link retry #" + nextAttempt
+            startSamePeerAttach(true, "background owner registration #" + nextAttempt
                     + " after " + reason);
         };
-        state("SAME-PEER ATTACH · RETRY #" + nextAttempt + " · LINK KEPT");
+        state("SAME-PEER OWNER REGISTRATION · RETRY #" + nextAttempt + " · LINK KEPT");
         main.postDelayed(nextClientAttempt, delay);
-        log("Direct same-peer attach retry #" + nextAttempt + " через " + delay
+        log("Background owner registration retry #" + nextAttempt + " через " + delay
                 + " ms; GATT server не закрывается · " + reason);
     }
 
     /**
-     * Restarts only Android's client registration. Calling disconnect() or closing the GATT
-     * server here would remove Geely_ANCS from the still-connected iPhone and invalidate every
-     * Core Bluetooth handle. BluetoothGatt.close() merely unregisters this failed client owner;
-     * the independently verified GATT-server link remains the physical connection owner.
+     * Recovers Android's client role without unregistering it. Android 9's connect() issues a
+     * background open on the existing clientIf, which is the public equivalent of re-attaching
+     * the ANCS GATT client to the retained physical link.
      */
     private void recoverIncomingClientRole(@NonNull String reason) {
         if (closing || !managedIncomingMode) return;
@@ -1966,25 +1992,38 @@ public final class IphoneAncsTransport {
                     "client recovery observed physical link loss · " + reason);
             return;
         }
+        BluetoothGatt owner = gatt;
+        if (owner != null) {
+            if (gattClientConnected && activeClientEstablished) {
+                restartDiscoveryOnPersistentOwner(owner, activeClientGeneration, reason);
+            } else {
+                awaitIncomingBackgroundOwner(owner, activeClientGeneration, reason);
+            }
+            return;
+        }
+        log("Зарегистрированный Android GATT owner отсутствует; создаю один background owner · "
+                + reason);
+        scheduleIncomingClientAttachRetry(reason);
+    }
+
+    /** Keeps one incoming-route clientIf alive across status 133 and ordinary disconnects. */
+    private void awaitIncomingBackgroundOwner(@NonNull BluetoothGatt expected,
+                                              long expectedGeneration,
+                                              @NonNull String reason) {
+        if (closing || !managedIncomingMode || gatt != expected
+                || !sessionState.isCurrent(expectedGeneration)) return;
         cancelConnectTimeout();
         cancelClientAttemptCallbacks();
         clearAncsRuntime();
-        BluetoothGatt failedClient = gatt;
-        gatt = null;
         gattClientConnected = false;
-        clientConnectInFlight = false;
-        activeClientTarget = null;
-        activeClientAutoConnect = false;
-        activeClientEstablished = false;
-        if (failedClient != null) {
-            try {
-                failedClient.close();
-            } catch (RuntimeException ignored) {
-            }
-        }
-        log("Перезапускаю только Android GATT-client; Geely_ANCS server/link сохранены · "
+        clientConnectInFlight = true;
+        activeClientAutoConnect = true;
+        sessionState.move(expectedGeneration,
+                AncsSessionStateMachine.Phase.BACKGROUND_CONNECT);
+        state("SAME-PEER BACKGROUND OWNER · RETAINED");
+        log("Повторно вооружаю тот же Android GATT owner; close/connectGatt не вызываются · "
                 + reason);
-        scheduleIncomingClientAttachRetry(reason);
+        rearmPersistentGattOwner(expected, expectedGeneration, reason, true);
     }
 
     private void cancelClientAttemptCallbacks() {
@@ -4876,15 +4915,30 @@ public final class IphoneAncsTransport {
                     boolean failedBackgroundAttach =
                             attachWasInFlight && activeClientAutoConnect;
                     cancelConnectTimeout();
-                    clientConnectInFlight = false;
                     gattClientConnected = false;
-                    closeClientGatt(callbackGatt);
-                    clearAncsRuntime();
                     if (managedIncomingMode) {
-                        scheduleIncomingClientAttachRetry(
-                                "same-peer GATT status=" + status);
+                        if (status == BluetoothGatt.GATT_FAILURE
+                                && !activeClientEstablished) {
+                            // onClientRegistered failure has no usable clientIf. This is the only
+                            // callback error that requires a replacement registration.
+                            clientConnectInFlight = false;
+                            closeClientGatt(callbackGatt);
+                            clearAncsRuntime();
+                            scheduleIncomingClientAttachRetry(
+                                    "background owner registration status=" + status);
+                        } else {
+                            // ECARX status 133 is a failed direct/open transition, not proof that
+                            // the registered clientIf is unusable. AOSP BluetoothGatt.connect()
+                            // reuses that clientIf as a background open, so retain the object.
+                            awaitIncomingBackgroundOwner(callbackGatt,
+                                    activeClientGeneration,
+                                    "same-peer GATT status=" + status);
+                        }
                         return;
                     }
+                    clientConnectInFlight = false;
+                    closeClientGatt(callbackGatt);
+                    clearAncsRuntime();
                     state("GATT CONNECTION FAILED · status=" + status);
                     if (failedBackgroundAttach) {
                         scheduleDirectFallback("background attach status=" + status);
@@ -4905,14 +4959,16 @@ public final class IphoneAncsTransport {
                     boolean failedBackgroundAttach =
                             attachWasInFlight && activeClientAutoConnect;
                     cancelConnectTimeout();
-                    clientConnectInFlight = false;
                     gattClientConnected = false;
-                    closeClientGatt(callbackGatt);
-                    clearAncsRuntime();
                     if (managedIncomingMode) {
-                        scheduleIncomingClientAttachRetry("same-peer GATT disconnected");
+                        awaitIncomingBackgroundOwner(callbackGatt,
+                                activeClientGeneration,
+                                "same-peer GATT disconnected");
                         return;
                     }
+                    clientConnectInFlight = false;
+                    closeClientGatt(callbackGatt);
+                    clearAncsRuntime();
                     state("GATT DISCONNECTED · status=" + status);
                     if (failedBackgroundAttach) {
                         scheduleDirectFallback("background attach disconnected");

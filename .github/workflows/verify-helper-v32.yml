@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - 'release/kx11-ancs-helper-v32'
-      - 'release/v2.8.2-ha1194'
+      - 'release/v2.8.2-ha1195'
     paths:
       - 'ios/KX11-iPhone-ANCS-Helper-v32/**'
       - '.github/workflows/verify-helper-v32.yml'

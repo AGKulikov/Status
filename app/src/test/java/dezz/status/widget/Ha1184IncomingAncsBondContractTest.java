@@ -50,7 +50,7 @@ public final class Ha1184IncomingAncsBondContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1184() throws Exception {
-        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1194'"));
+        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1195'"));
         assertTrue(project("release-manifests/HA1184.md").contains("208021184"));
     }
 

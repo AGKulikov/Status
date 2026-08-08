@@ -2,7 +2,7 @@ KX11 ANCS Helper v32
 Bundle ID: ru.natro.kx11ancshelper
 Build: 32
 Marketing version: 32.0
-Matched Android build: Status Widget v2.8.2-ha1194
+Matched Android build: Status Widget v2.8.2-ha1195
 
 This is the single-owner ANCS release:
 

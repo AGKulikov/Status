@@ -99,7 +99,7 @@ jobs:
         grep -qi "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75" /tmp/apk-certs.txt
         mv "$APK" "app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}.apk"
 
-    - name: Package matched HA1194 and Helper v32 release
+    - name: Package matched HA1195 and Helper v32 release
       env:
         VERSION_NAME: ${{ steps.version.outputs.version }}
       shell: bash
@@ -118,7 +118,8 @@ jobs:
           --arg helper "32.0" \
           --arg sourceSha "$GITHUB_SHA" \
           '{android: $android, helper: $helper, sourceSha: $sourceSha,
-            connectionModel: "single-owner RequiresANCS"}' \
+            connectionModel: "single RequiresANCS owner; Android background-open on retained link",
+            androidGattOwner: "one retained clientIf; status 133 re-arms with BluetoothGatt.connect"}' \
           > release-out/matched-pair.json
         sha256sum \
           "release-out/status-widget-ha-${VERSION_NAME}.apk" \
@@ -138,6 +139,7 @@ jobs:
       with:
         tag_name: ${{ steps.version.outputs.version }}
         name: Release ${{ steps.version.outputs.version }}
+        body_path: release-manifests/HA1195.md
         draft: false
         prerelease: false
         files: release-out/*

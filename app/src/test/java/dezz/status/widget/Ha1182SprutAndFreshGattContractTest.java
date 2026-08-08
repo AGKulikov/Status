@@ -50,7 +50,7 @@ public final class Ha1182SprutAndFreshGattContractTest {
         String helperProject = project("ios/KX11-iPhone-ANCS-Helper-v25/"
                 + "KX11ANCSHelper.xcodeproj/project.pbxproj");
 
-        assertTrue(build.contains("return 'v2.8.2-ha1194'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1195'"));
         assertTrue(helperProject.contains("MARKETING_VERSION = 25.0"));
         assertTrue(helperProject.contains("CURRENT_PROJECT_VERSION = 25"));
     }

@@ -24,7 +24,7 @@ public final class Ha1164BleRoleRecoveryContractTest {
         assertTrue(controller.contains(": created.connectSavedIphone(address)"));
     }
 
-    @Test public void reverseRouteAttachesDirectlyAndNeverDropsItsHealthyServerLink()
+    @Test public void reverseRouteUsesOneBackgroundOwnerAndNeverDropsItsHealthyServerLink()
             throws Exception {
         String transport = source("phone/transport/IphoneAncsTransport.java");
         String secureStart = between(transport, "private void scheduleSecureClientStart",
@@ -35,13 +35,15 @@ public final class Ha1164BleRoleRecoveryContractTest {
                 "private final BluetoothGattCallback gattCallback",
                 "@Override\n        public void onServicesDiscovered");
 
-        assertTrue(secureStart.contains("startSamePeerAttach(false"));
-        assertFalse(secureStart.contains("startSamePeerAttach(true"));
-        assertTrue(clientRecovery.contains("failedClient.close()"));
+        assertTrue(secureStart.contains("startSamePeerAttach(true"));
+        assertFalse(secureStart.contains("startSamePeerAttach(false"));
+        assertTrue(clientRecovery.contains("awaitIncomingBackgroundOwner(owner"));
         assertTrue(clientRecovery.contains("scheduleIncomingClientAttachRetry(reason)"));
-        assertFalse(clientRecovery.contains("failedClient.disconnect()"));
+        assertFalse(clientRecovery.contains(".close()"));
+        assertFalse(clientRecovery.contains(".disconnect()"));
         assertFalse(clientRecovery.contains("stopAdvertising()"));
-        assertTrue(callback.contains("scheduleIncomingClientAttachRetry("));
+        assertTrue(callback.contains("awaitIncomingBackgroundOwner(callbackGatt"));
+        assertTrue(callback.contains("background owner registration status="));
         assertFalse(callback.contains("scheduleManagedIncomingRestart("));
     }
 
@@ -67,7 +69,7 @@ public final class Ha1164BleRoleRecoveryContractTest {
     @Test public void releaseIdentityIsHa1164() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1194'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1195'"));
     }
 
     private static String source(String relative) throws Exception {

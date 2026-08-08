@@ -132,7 +132,7 @@ public final class Ha1194SingleOwnerAncsContractTest {
         assertTrue(readiness.contains("valid.network"));
         assertTrue(helperProject.contains("MARKETING_VERSION = 32.0"));
         assertTrue(helperProject.contains("CURRENT_PROJECT_VERSION = 32"));
-        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1194'"));
+        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1195'"));
     }
 
     private static int count(String source, String value) {

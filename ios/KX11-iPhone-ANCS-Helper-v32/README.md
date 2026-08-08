@@ -1,6 +1,6 @@
 # KX11 ANCS Helper v32 for iPhone
 
-Helper v32 is the matched companion for Status Widget `v2.8.2-ha1194`. Select **Central** in
+Helper v32 is the matched companion for Status Widget `v2.8.2-ha1195`. Select **Central** in
 Helper and the iPhone-Central/ANCS route in Status Widget.
 
 ## Connection contract
