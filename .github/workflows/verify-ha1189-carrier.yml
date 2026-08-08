@@ -1,0 +1,205 @@
+name: Verify HA1189 carrier
+
+on:
+  push:
+    branches:
+      - 'build/ha1189'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-ha1189-carrier-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Test and build HA1189 Android handoff
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout carrier
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Materialize exact HA1189 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .ci/ha1189-patch/part-*.b64 | base64 --decode >"$RUNNER_TEMP/ha1189.patch.gz"
+          echo '88dc3521ee2ebdd216f6c55216e627f105e0557225bfed3a8c1e0cf55506714b  '"$RUNNER_TEMP/ha1189.patch.gz" | sha256sum -c -
+          gzip -dc "$RUNNER_TEMP/ha1189.patch.gz" >"$RUNNER_TEMP/ha1189.patch"
+          echo 'dce17773cd83d6b51bbe6c1f84fac83ee2f2296c67afb4d1b20917d85fe2f576  '"$RUNNER_TEMP/ha1189.patch" | sha256sum -c -
+          git apply --check "$RUNNER_TEMP/ha1189.patch"
+          git apply "$RUNNER_TEMP/ha1189.patch"
+          grep -Fq "return 'v2.8.2-ha1189'" build.gradle
+          grep -Fq 'KX11 ANCS HELPER v27' \
+            ios/KX11-iPhone-ANCS-Helper-v27/KX11ANCSHelper/ViewController.swift
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install Android SDK 36
+        shell: bash
+        run: |
+          set +o pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
+          set -o pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Test and build exact unsigned candidate
+        env:
+          VERSION_NAME: v2.8.2-ha1189
+          VERSION_CODE: '208021189'
+          SOURCE_COMMIT: 92874504d36daaf87ee3f7eecf8e2d62f713917a
+          SOURCE_PATCH_SHA256: dce17773cd83d6b51bbe6c1f84fac83ee2f2296c67afb4d1b20917d85fe2f576
+          ALLOW_UNSIGNED_RELEASE: 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e keystore.jks
+          chmod +x gradlew
+          ./gradlew --no-daemon --no-configuration-cache clean
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
+            testGeelyDebugUnitTest
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
+            assembleGeelyRelease
+
+          APK="app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}-release.apk"
+          test -f "$APK"
+          unzip -Z1 "$APK" | grep -Fx 'resources.arsc'
+          RESOURCE_ENTRIES=$(unzip -Z1 "$APK" | grep -c '^res/')
+          test "$RESOURCE_ENTRIES" -gt 500
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump resources "$APK" >/dev/null
+          BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK")
+          echo "$BADGING"
+          echo "$BADGING" | grep -F \
+            "package: name='ru.natro.statuswidget' versionCode='${VERSION_CODE}' versionName='${VERSION_NAME}'"
+          echo "$BADGING" | grep -F "sdkVersion:'28'"
+          echo "$BADGING" | grep -F "targetSdkVersion:'28'"
+          ! echo "$BADGING" | grep -Fq 'application-debuggable'
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$APK" >/dev/null
+          if "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$APK"; then
+            echo 'Candidate unexpectedly contains a signature' >&2
+            exit 1
+          fi
+
+          mkdir -p release-out
+          NAME="status-widget-ha-${VERSION_NAME}-unsigned.apk"
+          cp "$APK" "release-out/$NAME"
+          SHA=$(sha256sum "release-out/$NAME" | awk '{print $1}')
+          printf '%s  %s\n' "$SHA" "$NAME" >"release-out/$NAME.sha256"
+          jq -n \
+            --arg tag "$VERSION_NAME" \
+            --arg package 'ru.natro.statuswidget' \
+            --arg sourceCommit "$SOURCE_COMMIT" \
+            --arg sourcePatchSha256 "$SOURCE_PATCH_SHA256" \
+            --arg carrierSha "$GITHUB_SHA" \
+            --arg workflowRunId "$GITHUB_RUN_ID" \
+            --arg unsignedSha256 "$SHA" \
+            --argjson versionCode "$VERSION_CODE" \
+            '{
+              tag: $tag,
+              package: $package,
+              versionName: $tag,
+              versionCode: $versionCode,
+              sourceCommit: $sourceCommit,
+              sourcePatchSha256: $sourcePatchSha256,
+              carrierSha: $carrierSha,
+              workflowRunId: $workflowRunId,
+              unsignedSha256: $unsignedSha256
+            }' >release-out/manifest.json
+
+          TOOLS='release-out/android-build-tools-36.0.0'
+          mkdir -p "$TOOLS/lib"
+          cp "$ANDROID_HOME/build-tools/36.0.0/apksigner" "$TOOLS/apksigner"
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" \
+            "$TOOLS/lib/apksigner.jar"
+          cp "$ANDROID_HOME/build-tools/36.0.0/zipalign" "$TOOLS/zipalign"
+          cp "$ANDROID_HOME/build-tools/36.0.0/NOTICE.txt" "$TOOLS/NOTICE.txt"
+
+      - name: Upload verified unsigned Android handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: status-widget-ha-v2.8.2-ha1189-unsigned
+          path: release-out/*
+          if-no-files-found: error
+          retention-days: 30
+
+  helper:
+    name: Compile iPhone Helper v27 without signing
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout carrier
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Materialize exact HA1189 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .ci/ha1189-patch/part-*.b64 | base64 --decode >"$RUNNER_TEMP/ha1189.patch.gz"
+          echo '88dc3521ee2ebdd216f6c55216e627f105e0557225bfed3a8c1e0cf55506714b  '"$RUNNER_TEMP/ha1189.patch.gz" | shasum -a 256 -c -
+          gzip -dc "$RUNNER_TEMP/ha1189.patch.gz" >"$RUNNER_TEMP/ha1189.patch"
+          echo 'dce17773cd83d6b51bbe6c1f84fac83ee2f2296c67afb4d1b20917d85fe2f576  '"$RUNNER_TEMP/ha1189.patch" | shasum -a 256 -c -
+          git apply --check "$RUNNER_TEMP/ha1189.patch"
+          git apply "$RUNNER_TEMP/ha1189.patch"
+
+      - name: Validate project settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v27/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            CODE_SIGNING_ALLOWED=NO \
+            -showBuildSettings >"$RUNNER_TEMP/helper-v27-build-settings.txt"
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper' \
+            "$RUNNER_TEMP/helper-v27-build-settings.txt"
+          grep -q 'MARKETING_VERSION = 27.0' \
+            "$RUNNER_TEMP/helper-v27-build-settings.txt"
+          grep -q 'CURRENT_PROJECT_VERSION = 27' \
+            "$RUNNER_TEMP/helper-v27-build-settings.txt"
+
+      - name: Compile Helper v27
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v27/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            SYMROOT="$RUNNER_TEMP/KX11ANCSHelperProducts" \
+            OBJROOT="$RUNNER_TEMP/KX11ANCSHelperIntermediates" \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Verify optional B4 handoff policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE=ios/KX11-iPhone-ANCS-Helper-v27/KX11ANCSHelper/ViewController.swift
+          grep -q 'KX11 ANCS HELPER v27' "$SOURCE"
+          grep -q 'CBConnectPeripheralOptionRequiresANCS: requiresAncs' "$SOURCE"
+          grep -q 'ANCS OWNER АКТИВЕН · B4 OPTIONAL' "$SOURCE"
+          OPTIONAL=$(sed -n \
+            '/private func observeOptionalCentralTelemetryRelay/,/private func cancelCentralConnectTimeout/p' \
+            "$SOURCE")
+          echo "$OPTIONAL" | grep -q 'сохраняю без reset'
+          ! echo "$OPTIONAL" | grep -q 'resetCentralLink('
