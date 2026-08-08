@@ -232,7 +232,8 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(services.contains("descriptorStage = DescriptorStage.DATA_SOURCE"));
         assertTrue(descriptor.contains("descriptorStage = DescriptorStage.NOTIFICATION_SOURCE"));
         assertTrue(descriptor.contains("gattReady = true"));
-        assertTrue(descriptor.contains("state(\"ANCS READY · ОТПРАВЬТЕ УВЕДОМЛЕНИЕ\")"));
+        assertTrue(descriptor.contains("ANCS READY · ОТПРАВЬТЕ УВЕДОМЛЕНИЕ"));
+        assertTrue(descriptor.contains("ANCS CCCD OK · ЖДУ B4 ДАННЫЕ"));
         assertTrue(transport.contains("isAuthorizationError(status)"));
         assertTrue(transport.contains("requestBond(callbackGatt.getDevice())"));
         assertTrue(transport.contains("scheduleAncsRetryAfterBond("));

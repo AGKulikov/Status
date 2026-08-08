@@ -34,21 +34,25 @@ public final class Ha1187TwoPhaseAncsAndLimiterCaptureContractTest {
         assertTrue(secure.contains("Android client на bootstrap-link не запускается"));
         assertTrue(disconnect.contains("BOOTSTRAP LINK RELEASED"));
         assertTrue(disconnect.contains("verified peer и Geely_ANCS"));
-        assertTrue(serverConnection.indexOf("handleIncomingAncsHandoffLink(device)")
-                < serverConnection.indexOf("requestIncomingPrePairLeBond(device)"));
+        assertTrue(serverConnection.contains("handleIncomingAncsHandoffLink(device)"));
+        assertTrue(serverConnection.contains("без pre-PAIR createBond"));
+        assertFalse(serverConnection.contains("requestBond(device)"));
     }
 
-    @Test public void rotatingAnonymousCallbacksCannotStartRepeatedBonding() throws Exception {
+    @Test public void rotatingAnonymousCallbacksCannotStartPrematureBonding() throws Exception {
         String transport = project(
                 "app/src/main/java/dezz/status/widget/phone/transport/IphoneAncsTransport.java");
-        String prePair = between(transport,
-                "private void requestIncomingPrePairLeBond",
-                "private boolean createLeBond");
+        String connection = between(transport,
+                "public void onConnectionStateChange(BluetoothDevice device,",
+                "public void onCharacteristicReadRequest");
+        String challenge = between(transport,
+                "private boolean issueCurrentLinkSecurityChallenge",
+                "private void recordGattServerPeer");
 
-        assertTrue(prePair.contains("incomingPrePairBondRequested"));
-        assertTrue(prePair.contains("PRE-PAIR LE bond deduplicated"));
-        assertTrue(prePair.contains("incomingPrePairBondTargetKey"));
-        assertFalse(prePair.contains("claimVerifiedPeer"));
+        assertFalse(connection.contains("requestBond(device)"));
+        assertFalse(transport.contains("incomingPrePairBondRequested"));
+        assertTrue(challenge.contains("peer.linkSecurityChallengeIssued"));
+        assertTrue(challenge.contains("peer.linkSecurityChallengeIssued = true"));
     }
 
     @Test public void helperUsesPlainBootstrapThenRequiresAncsWithoutCustomDiscovery()
@@ -86,7 +90,7 @@ public final class Ha1187TwoPhaseAncsAndLimiterCaptureContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1187() throws Exception {
-        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1191'"));
+        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1192'"));
     }
 
     private static String project(String relative) throws Exception {

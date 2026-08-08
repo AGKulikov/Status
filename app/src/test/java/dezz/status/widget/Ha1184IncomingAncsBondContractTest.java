@@ -11,49 +11,45 @@ import java.nio.file.Paths;
 
 import org.junit.Test;
 
-/** HA1184 barriers for the pre-didConnect LE-security bootstrap on the reverse ANCS route. */
+/** Reverse-route barriers updated after the pre-PAIR Android 9 bonding race was reproduced. */
 public final class Ha1184IncomingAncsBondContractTest {
-    @Test public void incomingF04LinkStartsOneLeBondBeforeHelperPair() throws Exception {
+    @Test public void incomingF04LinkWaitsForHelperPairBeforeAnyBondRequest() throws Exception {
         String transport = source("phone/transport/IphoneAncsTransport.java");
-        String prePair = between(transport,
-                "private void requestIncomingPrePairLeBond",
-                "private boolean createLeBond");
         String connection = between(transport,
                 "public void onConnectionStateChange(BluetoothDevice device,",
                 "public void onCharacteristicReadRequest");
+        String pair = between(transport,
+                "private void handlePairCommand",
+                "private Boolean markSecureAttConfirmed");
 
         assertTrue(connection.contains("recordGattServerPeer(device, status, newState)"));
-        assertTrue(connection.contains("requestIncomingPrePairLeBond(device)"));
-        assertTrue(prePair.contains("managedIncomingMode"));
-        assertTrue(prePair.contains("getVerifiedPeer() != null"));
-        assertTrue(prePair.contains("peer.prePairBondRequested"));
-        assertTrue(prePair.contains("createLeBond(device)"));
+        assertTrue(connection.contains("без pre-PAIR createBond"));
+        assertFalse(connection.contains("requestBond(device)"));
+        assertFalse(connection.contains("createBond()"));
+        assertTrue(pair.contains("requestBond(device)"));
     }
 
     @Test public void bondUsesVerifierSafePublicApiAndDoesNotBypassPairVerification()
             throws Exception {
         String transport = source("phone/transport/IphoneAncsTransport.java");
         String create = between(transport,
-                "private boolean createLeBond",
-                "private void handleSecureAttSuccess");
-        String prePair = between(transport,
-                "private void requestIncomingPrePairLeBond",
-                "private boolean createLeBond");
+                "private void requestBond(BluetoothDevice device)",
+                "private void scheduleAncsRetryAfterBond");
         String pair = between(transport,
                 "private void handlePairCommand",
-                "private void requestIncomingPrePairLeBond");
+                "private Boolean markSecureAttConfirmed");
 
         assertTrue(create.contains("device.createBond()"));
         assertFalse(create.contains("getMethod("));
         assertFalse(create.contains("method.invoke("));
         assertFalse(transport.contains("import java.lang.reflect.Method;"));
         assertTrue(pair.contains("isVerifiedPeer(device)"));
-        assertFalse(prePair.contains("claimVerifiedPeer"));
         assertTrue(transport.contains("claimVerifiedPeer(device)"));
+        assertFalse(transport.contains("requestIncomingPrePairLeBond"));
     }
 
     @Test public void releaseIdentityAdvancesToHa1184() throws Exception {
-        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1191'"));
+        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1192'"));
         assertTrue(project("release-manifests/HA1184.md").contains("208021184"));
     }
 

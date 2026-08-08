@@ -97,7 +97,7 @@ public final class Ha1176UnifiedTelemetryRelayContractTest {
         String project = project("ios/KX11-iPhone-ANCS-Helper-v19/"
                 + "KX11ANCSHelper.xcodeproj/project.pbxproj");
 
-        assertTrue(build.contains("return 'v2.8.2-ha1191'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1192'"));
         assertTrue(project.contains("MARKETING_VERSION = 19.0"));
         assertTrue(project.contains("CURRENT_PROJECT_VERSION = 19"));
     }

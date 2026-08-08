@@ -46,7 +46,7 @@ public final class Ha1188PhysicalAncsHandoffAndFastLimiterCaptureContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1188() throws Exception {
-        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1191'"));
+        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1192'"));
     }
 
     private static String project(String relative) throws Exception {

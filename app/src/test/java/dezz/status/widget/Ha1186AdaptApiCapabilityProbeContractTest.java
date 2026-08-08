@@ -42,7 +42,7 @@ public final class Ha1186AdaptApiCapabilityProbeContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1186() throws Exception {
-        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1191'"));
+        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1192'"));
     }
 
     @Test public void discoverySignalsRemainCallbackOnlyDuringHealthPolling() throws Exception {
@@ -59,13 +59,14 @@ public final class Ha1186AdaptApiCapabilityProbeContractTest {
         String transport = project(
                 "app/src/main/java/dezz/status/widget/phone/transport/IphoneAncsTransport.java");
         String createBond = between(transport,
-                "private boolean createLeBond",
-                "private void handleSecureAttSuccess");
+                "private void requestBond(BluetoothDevice device)",
+                "private void scheduleAncsRetryAfterBond");
 
         assertTrue(createBond.contains("device.createBond()"));
         assertFalse(createBond.contains("getMethod("));
         assertFalse(createBond.contains("method.invoke("));
         assertFalse(transport.contains("import java.lang.reflect.Method;"));
+        assertFalse(transport.contains("requestIncomingPrePairLeBond"));
     }
 
     private static String geely(String relative) throws Exception {
