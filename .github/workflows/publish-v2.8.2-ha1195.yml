@@ -1,0 +1,173 @@
+name: Publish v2.8.2-ha1195 matched pair
+
+on:
+  push:
+    branches:
+      - connector-release-v2.8.2-ha1195
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-v2.8.2-ha1195
+  cancel-in-progress: false
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  RELEASE_TAG: v2.8.2-ha1195
+  TARGET_SHA: c7a2e27fc2b2f03ca0b451a5a94eb4bf34cf4b71
+  TARGET_TREE: 7daeb4298ade127992d5b7fdd3efb6ee38203811
+  STAGING: .release-staging/v2.8.2-ha1195
+  APK_SIZE: '26719683'
+  APK_SHA256: c4d7a3976d5e7404d6a4aec89755167ae58f31ba52a5a460bbf03360337444c7
+  HELPER_SHA256: 0033faf52d0f61f531315dbe3668958712d12a1b8dfdd6053828b3f9673256fe
+  MATCHED_SHA256: b892ccd3ca5378e08cb611368c43b65749c469aace9f0b3b38230377a6ce6312
+  CERT_SHA256: 6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75
+
+jobs:
+  publish:
+    name: Verify and publish matched Android/iOS pair
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout connector staging branch
+        uses: actions/checkout@v4
+
+      - name: Install Android SDK verification tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +o pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
+          set -o pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Reconstruct and verify exact release pair
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="release-out/status-widget-ha-$RELEASE_TAG.apk"
+          HELPER="release-out/KX11-iPhone-ANCS-Helper-v32.zip"
+          TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+
+          mkdir -p release-out
+          cat "$STAGING"/apk/chunk-* > "$APK"
+          cp "$STAGING/KX11-iPhone-ANCS-Helper-v32.zip" "$HELPER"
+          cp "$STAGING/matched-pair.json" release-out/
+          cp "$STAGING/SHA256SUMS.txt" release-out/
+
+          test "$(wc -c < "$APK")" -eq "$APK_SIZE"
+          test "$(sha256sum "$APK" | awk '{print $1}')" = "$APK_SHA256"
+          test "$(sha256sum "$HELPER" | awk '{print $1}')" = "$HELPER_SHA256"
+          test "$(sha256sum release-out/matched-pair.json | awk '{print $1}')" = "$MATCHED_SHA256"
+          (cd release-out && sha256sum -c SHA256SUMS.txt)
+          unzip -t "$APK" >/dev/null
+          unzip -t "$HELPER" >/dev/null
+
+          test "$(jq -r .android release-out/matched-pair.json)" = "$RELEASE_TAG"
+          test "$(jq -r .helper release-out/matched-pair.json)" = "32.0"
+          test "$(jq -r .sourceSha release-out/matched-pair.json)" = "$TARGET_SHA"
+          test "$(jq -r .treeSha release-out/matched-pair.json)" = "$TARGET_TREE"
+          test "$(jq -r .connectionModel release-out/matched-pair.json)" = \
+            "persistent background clientIf on existing LE link"
+          test "$(jq -r .certificateSha256 release-out/matched-pair.json)" = "$CERT_SHA256"
+          test "$(jq -r .androidSha256 release-out/matched-pair.json)" = "$APK_SHA256"
+          test "$(jq -r .helperSha256 release-out/matched-pair.json)" = "$HELPER_SHA256"
+
+          unzip -Z1 "$APK" | grep -Fx 'resources.arsc'
+          RESOURCE_ENTRIES=$(unzip -Z1 "$APK" | grep -c '^res/')
+          test "$RESOURCE_ENTRIES" -gt 500
+          "$TOOLS/aapt" dump resources "$APK" >/dev/null
+          BADGING=$("$TOOLS/aapt" dump badging "$APK")
+          echo "$BADGING" | grep -F \
+            "package: name='ru.natro.statuswidget' versionCode='208021195' versionName='$RELEASE_TAG'"
+          echo "$BADGING" | grep -F "sdkVersion:'28'"
+          echo "$BADGING" | grep -F "targetSdkVersion:'28'"
+          if echo "$BADGING" | grep -Fq 'application-debuggable'; then
+            echo 'Published release must not be debuggable' >&2
+            exit 1
+          fi
+
+          "$TOOLS/zipalign" -c -P 16 -v 4 "$APK" >/dev/null
+          VERIFY=$("$TOOLS/apksigner" verify --verbose --print-certs "$APK")
+          echo "$VERIFY"
+          echo "$VERIFY" | grep -F 'Verifies'
+          echo "$VERIFY" | grep -F 'Verified using v3 scheme (APK Signature Scheme v3): true'
+          echo "$VERIFY" | grep -F 'Number of signers: 1'
+          ACTUAL_CERT=$(echo "$VERIFY" | awk -F': ' \
+            '/Signer #1 certificate SHA-256 digest:/ {print $2}')
+          test "$ACTUAL_CERT" = "$CERT_SHA256"
+
+          unzip -p "$HELPER" \
+            KX11-iPhone-ANCS-Helper-v32/KX11ANCSHelper/ViewController.swift \
+            > "$RUNNER_TEMP/helper-v32.swift"
+          HELPER_SOURCE="$RUNNER_TEMP/helper-v32.swift"
+          grep -q 'CBConnectPeripheralOptionRequiresANCS: true' "$HELPER_SOURCE"
+          grep -q 'CBConnectPeripheralOptionEnableAutoReconnect' "$HELPER_SOURCE"
+          grep -q 'Data("ANCS-READY".utf8)' "$HELPER_SOURCE"
+          grep -q 'command == "ANCS-SUBSCRIBED"' "$HELPER_SOURCE"
+          grep -q 'centralAncsCccdConfirmed' "$HELPER_SOURCE"
+          grep -q 'centralB4Subscribed' "$HELPER_SOURCE"
+          grep -Fq 'peripheral.setNotifyValue(true, for: wake)' "$HELPER_SOURCE"
+          test "$(grep -Fc 'centralManager.connect(peripheral, options: options)' "$HELPER_SOURCE")" -eq 1
+          if grep -q 'ANCS-HANDOFF\|centralPlannedAncsReconnect' "$HELPER_SOURCE"; then
+            echo 'Legacy two-phase Helper handoff found in release asset' >&2
+            exit 1
+          fi
+
+      - name: Create or update GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="release-out/status-widget-ha-$RELEASE_TAG.apk"
+          HELPER="release-out/KX11-iPhone-ANCS-Helper-v32.zip"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" \
+              "$APK" "$HELPER" \
+              release-out/matched-pair.json release-out/SHA256SUMS.txt \
+              --clobber
+            gh release edit "$RELEASE_TAG" \
+              --title "Status Widget $RELEASE_TAG + KX11 ANCS Helper v32" \
+              --notes-file "$STAGING/RELEASE_NOTES.md" \
+              --latest
+          else
+            gh release create "$RELEASE_TAG" \
+              "$APK" "$HELPER" \
+              release-out/matched-pair.json release-out/SHA256SUMS.txt \
+              --target "$TARGET_SHA" \
+              --title "Status Widget $RELEASE_TAG + KX11 ANCS Helper v32" \
+              --notes-file "$STAGING/RELEASE_NOTES.md" \
+              --latest
+          fi
+
+      - name: Download and verify published Release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p published
+          gh release download "$RELEASE_TAG" --dir published
+          cmp release-out/SHA256SUMS.txt published/SHA256SUMS.txt
+          (cd published && sha256sum -c SHA256SUMS.txt)
+          test "$(wc -c < "published/status-widget-ha-$RELEASE_TAG.apk")" -eq "$APK_SIZE"
+
+          REF=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG")
+          TYPE=$(jq -r .object.type <<<"$REF")
+          TAG_SHA=$(jq -r .object.sha <<<"$REF")
+          if test "$TYPE" = tag; then
+            TAG_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$TAG_SHA" --jq .object.sha)
+          fi
+          test "$TAG_SHA" = "$TARGET_SHA"
+
+          RELEASE=$(gh release view "$RELEASE_TAG" \
+            --json tagName,isDraft,isPrerelease,url,assets)
+          test "$(jq -r .tagName <<<"$RELEASE")" = "$RELEASE_TAG"
+          test "$(jq -r .isDraft <<<"$RELEASE")" = false
+          test "$(jq -r .isPrerelease <<<"$RELEASE")" = false
+          test "$(jq '.assets | length' <<<"$RELEASE")" -eq 4
+          jq -e --arg n "status-widget-ha-$RELEASE_TAG.apk" \
+            '.assets | any(.name == $n)' <<<"$RELEASE" >/dev/null
+          jq -e '.assets | any(.name == "KX11-iPhone-ANCS-Helper-v32.zip")' \
+            <<<"$RELEASE" >/dev/null
+          jq -r .url <<<"$RELEASE"

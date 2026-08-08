@@ -1,0 +1,12 @@
+{
+  "android": "v2.8.2-ha1195",
+  "helper": "32.0",
+  "sourceSha": "c7a2e27fc2b2f03ca0b451a5a94eb4bf34cf4b71",
+  "treeSha": "7daeb4298ade127992d5b7fdd3efb6ee38203811",
+  "unsignedWorkflowRunId": "31277801506",
+  "unsignedArtifactId": "9027550266",
+  "connectionModel": "persistent background clientIf on existing LE link",
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "androidSha256": "c4d7a3976d5e7404d6a4aec89755167ae58f31ba52a5a460bbf03360337444c7",
+  "helperSha256": "0033faf52d0f61f531315dbe3668958712d12a1b8dfdd6053828b3f9673256fe"
+}
