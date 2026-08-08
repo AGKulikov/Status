@@ -53,7 +53,11 @@ final class SprutCloudChallenge {
 
         byte[] rootSalt = decode(data, "rootSalt");
         byte[] challenge = decode(data, "challenge");
-        byte[] info = requiredString(data, "info").getBytes(StandardCharsets.UTF_8);
+        // HKDF explicitly permits an empty context. Current beta.spruthub.ru challenges omit
+        // `info` altogether, while older web clients sent it as a non-empty string. Treat an
+        // absent/null/empty field as the same empty byte sequence instead of rejecting a valid
+        // challenge before the password proof is calculated.
+        byte[] info = optionalString(data, "info").getBytes(StandardCharsets.UTF_8);
         KdfSettings settings = KdfSettings.parse(requiredString(data, "kdfParams"));
         if (rootSalt.length < 8 || rootSalt.length > MAX_BINARY_FIELD_BYTES) {
             throw invalid("rootSalt length is outside the supported range");
@@ -114,6 +118,13 @@ final class SprutCloudChallenge {
         String value = data.optString(name, "");
         if (value.isEmpty()) throw invalid("missing " + name);
         return value;
+    }
+
+    private static String optionalString(JSONObject data, String name) throws IOException {
+        if (!data.has(name) || data.isNull(name)) return "";
+        Object value = data.opt(name);
+        if (!(value instanceof String)) throw invalid(name + " is not a string");
+        return (String) value;
     }
 
     private static IOException invalid(String detail) {

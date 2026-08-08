@@ -42,4 +42,33 @@ public final class SprutCloudChallengeTest {
             assertTrue(!expected.getMessage().contains("secret"));
         }
     }
+
+    @Test public void acceptsCurrentBetaChallengeWithoutOptionalHkdfInfo() throws Exception {
+        JSONObject withoutInfo = new JSONObject()
+                .put("rootSalt", "AAECAwQFBgcICQoLDA0ODw==")
+                .put("challenge", "//79/Pv6+fj39vX08/Lx8O/u7ezr6uno5+bl5OPi4eA=")
+                .put("kdfParams", "m=32,t=2,p=1");
+        JSONObject withEmptyInfo = new JSONObject(withoutInfo.toString()).put("info", "");
+
+        String missingAnswer = SprutCloudChallenge.answer("secret", withoutInfo.toString());
+        String emptyAnswer = SprutCloudChallenge.answer("secret", withEmptyInfo.toString());
+
+        assertEquals(emptyAnswer, missingAnswer);
+        assertEquals(64, java.util.Base64.getDecoder().decode(missingAnswer).length);
+    }
+
+    @Test public void rejectsNonStringHkdfInfoWithoutLeakingPassword() throws Exception {
+        JSONObject data = new JSONObject()
+                .put("rootSalt", "AAECAwQFBgcICQoLDA0ODw==")
+                .put("challenge", "AQIDBAUGBwg=")
+                .put("kdfParams", "m=32,t=2,p=1")
+                .put("info", new JSONObject());
+        try {
+            SprutCloudChallenge.answer("must-not-appear", data.toString());
+            fail("Expected non-string info to be rejected");
+        } catch (IOException expected) {
+            assertTrue(expected.getMessage().contains("info is not a string"));
+            assertTrue(!expected.getMessage().contains("must-not-appear"));
+        }
+    }
 }
