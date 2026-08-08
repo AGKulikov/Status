@@ -93,6 +93,12 @@ public final class Ha1187TwoPhaseAncsAndLimiterCaptureContractTest {
         Path current = Paths.get("").toAbsolutePath();
         for (int depth = 0; depth < 8 && current != null;
              depth++, current = current.getParent()) {
+            // Gradle runs unit tests with app/ as the working directory. Requiring the root
+            // settings file prevents a request for build.gradle from accidentally reading
+            // app/build.gradle before reaching the repository root.
+            if (!Files.isRegularFile(current.resolve("settings.gradle"))) {
+                continue;
+            }
             Path candidate = current.resolve(relative);
             if (Files.isRegularFile(candidate)) {
                 return new String(Files.readAllBytes(candidate), StandardCharsets.UTF_8);
