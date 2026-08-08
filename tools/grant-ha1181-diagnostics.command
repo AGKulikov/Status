@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Однократная выдача диагностических прав Status Widget HA1183.
+# Однократная выдача диагностических прав Status Widget HA1186.
 # Не изменяет прошивку, ECARX/CAN, Bluetooth или системные разделы.
 
 set -u
@@ -14,7 +14,7 @@ fail() {
   exit 1
 }
 
-echo "Status Widget HA1183 — расширенный регистратор действий"
+echo "Status Widget HA1186 — расширенный регистратор действий"
 echo
 
 command -v adb >/dev/null 2>&1 || fail \
@@ -46,7 +46,7 @@ echo
 
 PACKAGE_PATH="$(adb shell pm path "$PACKAGE" 2>/dev/null | tr -d '\r')"
 [ -n "$PACKAGE_PATH" ] || fail \
-  "Пакет $PACKAGE не найден. Сначала установите Status Widget HA1183."
+  "Пакет $PACKAGE не найден. Сначала установите Status Widget HA1186."
 
 echo "[1/4] Выдаю READ_LOGS..."
 adb shell pm grant "$PACKAGE" android.permission.READ_LOGS || fail \

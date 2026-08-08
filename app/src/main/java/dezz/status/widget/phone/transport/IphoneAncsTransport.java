@@ -159,6 +159,8 @@ public final class IphoneAncsTransport {
     private static final long LIVE_NOTIFICATION_MAX_AGE_MS = 15_000L;
     private static final int MAX_PENDING_ANCS_REQUESTS = 24;
     private static final long SECURE_TO_CLIENT_CONNECT_DELAY_MS = 400L;
+    /** Helper v26 reconnects once with RequiresANCS after the plain BLE trust bootstrap. */
+    private static final long ANCS_HANDOFF_RECONNECT_TIMEOUT_MS = 25_000L;
     private static final long DIRECT_FALLBACK_DELAY_MS = 500L;
     private static final int INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS = 3;
     private static final long INCOMING_CLIENT_ATTACH_RETRY_MS = 1_500L;
@@ -347,6 +349,8 @@ public final class IphoneAncsTransport {
         BluetoothDevice device;
         long connectedAtElapsedMs;
         boolean connected;
+        /** One bounded LE-security request made before Core Bluetooth releases didConnect. */
+        boolean prePairBondRequested;
         boolean linkSecurityChallengeIssued;
         boolean telemetrySubscribed;
 
@@ -393,6 +397,11 @@ public final class IphoneAncsTransport {
     /** Direct GATT-client registrations tried while the verified incoming server link stays up. */
     private int incomingClientAttachAttempt;
     private boolean secureAttConfirmed;
+    /** Encrypted F04 bootstrap asked Helper to reopen the same bonded peer with RequiresANCS. */
+    private boolean awaitingAncsHandoffReconnect;
+    /** A single pre-PAIR bond owner per session prevents rotating RPA callbacks from churning SMP. */
+    private boolean incomingPrePairBondRequested;
+    @Nullable private String incomingPrePairBondTargetKey;
     private boolean gattClientConnected;
     private boolean activeClientEstablished;
     private long activeClientGeneration;
@@ -455,6 +464,7 @@ public final class IphoneAncsTransport {
     private Runnable helperTelemetryReadTimeout;
     private Runnable helperTelemetryPoll;
     private Runnable serverTelemetryWakePoll;
+    private Runnable ancsHandoffReconnectTimeout;
     private long lastHelperTelemetrySuccessLogAt;
     @NonNull private String lastLoggedHelperTelemetry = "";
     private Runnable bondTimeout;
@@ -1378,6 +1388,8 @@ public final class IphoneAncsTransport {
     public void disconnect() {
         iphonePeripheralMode = false;
         iphoneConnectStarted = false;
+        awaitingAncsHandoffReconnect = false;
+        cancelAncsHandoffReconnectTimeout();
         cancelColdBackgroundAttach();
         cancelAmbiguousAclProbe();
         sessionState.begin(AncsSessionStateMachine.Phase.IDLE);
@@ -1439,6 +1451,7 @@ public final class IphoneAncsTransport {
 
     private void resetVerifiedPeerSession() {
         cancelServerTelemetryWakePoll();
+        cancelAncsHandoffReconnectTimeout();
         synchronized (verifiedPeerLock) {
             verifiedPeer = null;
         }
@@ -1454,6 +1467,9 @@ public final class IphoneAncsTransport {
         backgroundAttachAttempted = false;
         directFallbackAttempted = false;
         incomingClientAttachAttempt = 0;
+        awaitingAncsHandoffReconnect = false;
+        incomingPrePairBondRequested = false;
+        incomingPrePairBondTargetKey = null;
         clientConnectInFlight = false;
         secureAttConfirmed = false;
         gattClientConnected = false;
@@ -1565,6 +1581,84 @@ public final class IphoneAncsTransport {
         }
     }
 
+    /**
+     * Requests security once on the plain phase-one F04 link. Rotating anonymous callbacks are
+     * deduplicated at session level; PAIR plus the encrypted B3 challenge still provide trust,
+     * and phase two is not accepted until Helper explicitly writes ANCS-HANDOFF.
+     */
+    private void requestIncomingPrePairLeBond(BluetoothDevice device) {
+        if (!managedIncomingMode || device == null || getVerifiedPeer() != null
+                || awaitingAncsHandoffReconnect) return;
+        int bondState = safeBondState(device);
+        if (bondState == BluetoothDevice.BOND_BONDED) {
+            log("Incoming F04 link уже LE-bonded; жду Helper PAIR");
+            return;
+        }
+        if (bondState == BluetoothDevice.BOND_BONDING) {
+            log("Incoming F04 link уже выполняет LE bonding; жду Helper didConnect/PAIR");
+            return;
+        }
+        synchronized (gattServerPeers) {
+            GattServerPeer peer = gattServerPeers.get(deviceKey(device));
+            if (peer == null || peer.sessionGeneration != sessionGeneration
+                    || !peer.connected || peer.prePairBondRequested) {
+                return;
+            }
+            if (incomingPrePairBondRequested) {
+                log("PRE-PAIR LE bond deduplicated: session=" + sessionGeneration
+                        + " owner=" + incomingPrePairBondTargetKey
+                        + " ignored=" + deviceKey(device));
+                return;
+            }
+            peer.prePairBondRequested = true;
+            incomingPrePairBondRequested = true;
+            incomingPrePairBondTargetKey = deviceKey(device);
+        }
+
+        boolean started = createLeBond(device);
+        log("PRE-PAIR LE bond на incoming F04 link: started=" + started
+                + " peer=" + safeAddress(device)
+                + " bond=" + bondLabel(safeBondState(device)));
+        if (started || safeBondState(device) == BluetoothDevice.BOND_BONDING) {
+            leBondAttemptObserved = true;
+            state("IPHONE CENTRAL · PRE-PAIR LE BONDING");
+        } else {
+            // A synthetic/anonymous Android callback can reject createBond() before the stack
+            // resolves the actual LE BluetoothDevice. Release only that failed ownership so the
+            // later resolved peer gets one real attempt; successful/BONDING attempts stay
+            // session-deduplicated.
+            synchronized (gattServerPeers) {
+                GattServerPeer peer = gattServerPeers.get(deviceKey(device));
+                if (peer != null) peer.prePairBondRequested = false;
+                if (deviceKey(device).equals(incomingPrePairBondTargetKey)) {
+                    incomingPrePairBondRequested = false;
+                    incomingPrePairBondTargetKey = null;
+                }
+            }
+            state("IPHONE CENTRAL · PRE-PAIR LE BOND START FAILED");
+        }
+    }
+
+    /**
+     * Starts bonding on the already-connected incoming LE peer.
+     *
+     * <p>Keep this on the public no-argument API. A reflective call to the hidden
+     * {@code createBond(int)} overload produced invalid optimized DEX on the KX11 Android 9
+     * verifier (a register became a reference/boolean type conflict), which rejected this entire
+     * class before the transport could start. The peer passed here is the active GATT-server LE
+     * link, so {@link BluetoothDevice#createBond()} negotiates security for that link directly.</p>
+     */
+    private boolean createLeBond(BluetoothDevice device) {
+        try {
+            boolean started = device.createBond();
+            log("createBond()=" + started + " на активном incoming LE link");
+            return started;
+        } catch (RuntimeException failure) {
+            log("createBond() exception на incoming LE link: " + failure);
+            return false;
+        }
+    }
+
     private void handleSecureAttSuccess(BluetoothDevice device, String operation) {
         if (!isVerifiedPeer(device)) {
             log("SECURE callback проигнорирован: это не verified peer");
@@ -1588,7 +1682,80 @@ public final class IphoneAncsTransport {
             log("Same-peer attach отменён: verified GATT-server link уже не активен");
             return;
         }
+        if (managedIncomingMode) {
+            state("BOOTSTRAP SECURE OK · ЖДУ ANCS HANDOFF");
+            log("Helper v26 должен записать ANCS-HANDOFF и открыть второй link с "
+                    + "RequiresANCS; Android client на bootstrap-link не запускается");
+            return;
+        }
         scheduleSecureClientStart();
+    }
+
+    /**
+     * Completes phase one of Helper v26. The command itself arrives over the encrypted F04 link,
+     * so preserving this peer while Core Bluetooth deliberately disconnects is safe. Phase two
+     * contains no custom ATT discovery: iOS reconnects with RequiresANCS and Android immediately
+     * registers its ANCS client against the matching bonded server callback.
+     */
+    private void beginAncsHandoffReconnect(BluetoothDevice device) {
+        if (!managedIncomingMode || !secureAttConfirmed || !isVerifiedPeer(device)) {
+            log("ANCS-HANDOFF отклонён: bootstrap peer/security не подтверждены");
+            return;
+        }
+        cancelClientAttemptCallbacks();
+        awaitingAncsHandoffReconnect = true;
+        incomingClientAttachAttempt = 0;
+        state("ANCS HANDOFF · ЖДУ REQUIRES_ANCS LINK");
+        log("ANCS-HANDOFF принят на encrypted F04; verified peer сохраняется между фазами");
+        cancelAncsHandoffReconnectTimeout();
+        ancsHandoffReconnectTimeout = () -> {
+            ancsHandoffReconnectTimeout = null;
+            if (!awaitingAncsHandoffReconnect || closing) return;
+            awaitingAncsHandoffReconnect = false;
+            state("ANCS HANDOFF TIMEOUT · RESTART");
+            log("RequiresANCS link не появился за "
+                    + ANCS_HANDOFF_RECONNECT_TIMEOUT_MS + " ms; перезапускаю Geely_ANCS");
+            scheduleManagedIncomingRestart("Helper v26 RequiresANCS handoff timeout");
+        };
+        main.postDelayed(ancsHandoffReconnectTimeout, ANCS_HANDOFF_RECONNECT_TIMEOUT_MS);
+    }
+
+    private void cancelAncsHandoffReconnectTimeout() {
+        if (ancsHandoffReconnectTimeout != null) {
+            main.removeCallbacks(ancsHandoffReconnectTimeout);
+        }
+        ancsHandoffReconnectTimeout = null;
+    }
+
+    private boolean matchesAncsHandoffPeer(BluetoothDevice device) {
+        BluetoothDevice previous = getVerifiedPeer();
+        if (sameDevice(previous, device)) return true;
+        if (safeBondState(device) != BluetoothDevice.BOND_BONDED) return false;
+        if (previous != null && uniqueBondedNameMatch(previous, device)) return true;
+        return managedSavedPeer != null && uniqueBondedNameMatch(managedSavedPeer, device);
+    }
+
+    /** Returns true whenever the callback belongs to the explicit phase-two waiting window. */
+    private boolean handleIncomingAncsHandoffLink(BluetoothDevice device) {
+        if (!awaitingAncsHandoffReconnect) return false;
+        if (!matchesAncsHandoffPeer(device)) {
+            log("ANCS handoff: жду resolved bonded peer, callback пока anonymous · "
+                    + safeAddress(device) + " bond=" + bondLabel(safeBondState(device)));
+            return true;
+        }
+        synchronized (verifiedPeerLock) {
+            verifiedPeer = device;
+        }
+        managedResolvedPeer = device;
+        listener.onVerifiedPeerAddress(safeAddress(device));
+        awaitingAncsHandoffReconnect = false;
+        cancelAncsHandoffReconnectTimeout();
+        state("REQUIRES_ANCS LINK MATCHED · CLIENT ATTACH");
+        log("Helper v26 phase-two peer matched · " + safeAddress(device)
+                + " bond=" + bondLabel(safeBondState(device))
+                + " objectId=" + System.identityHashCode(device));
+        scheduleSecureClientStart();
+        return true;
     }
 
     private void scheduleSecureClientStart() {
@@ -1889,6 +2056,7 @@ public final class IphoneAncsTransport {
             if (status == GATT_SUCCESS && newState == BluetoothProfile.STATE_CONNECTED) {
                 if (!peer.connected) {
                     peer.connectedAtElapsedMs = now;
+                    peer.prePairBondRequested = false;
                     peer.linkSecurityChallengeIssued = false;
                 }
                 peer.connected = true;
@@ -2015,6 +2183,13 @@ public final class IphoneAncsTransport {
     }
 
     private void handleVerifiedServerLinkDisconnected(BluetoothDevice device) {
+        if (managedIncomingMode && awaitingAncsHandoffReconnect
+                && isVerifiedPeer(device)) {
+            state("ANCS HANDOFF · BOOTSTRAP LINK RELEASED");
+            log("Encrypted bootstrap link закрыт по плану; verified peer и Geely_ANCS "
+                    + "сохраняются до RequiresANCS reconnect");
+            return;
+        }
         boolean samePeerClientHandoff = managedIncomingMode
                 && secureAttConfirmed
                 && activeClientTarget != null
@@ -2096,7 +2271,7 @@ public final class IphoneAncsTransport {
                 DIAGNOSTIC_CHARACTERISTIC,
                 BluetoothGattCharacteristic.PROPERTY_READ,
                 BluetoothGattCharacteristic.PERMISSION_READ);
-        information.setValue((LOCAL_LOGICAL_NAME + "/2")
+        information.setValue((LOCAL_LOGICAL_NAME + "/3")
                 .getBytes(StandardCharsets.UTF_8));
 
         BluetoothGattCharacteristic control = new BluetoothGattCharacteristic(
@@ -4211,6 +4386,9 @@ public final class IphoneAncsTransport {
                                     + "; ожидаю защищённый PAIR/ANCS handshake"
                                     : "Peer станет verified только после ASCII PAIR в CONTROL "
                                     + CONTROL_CHARACTERISTIC);
+                            if (!handleIncomingAncsHandoffLink(device)) {
+                                requestIncomingPrePairLeBond(device);
+                            }
                         } else if (newState == BluetoothProfile.STATE_DISCONNECTED
                                 && isVerifiedPeer(device)) {
                             handleVerifiedServerLinkDisconnected(device);
@@ -4233,7 +4411,7 @@ public final class IphoneAncsTransport {
                             + " bond=" + bondLabel(safeBondState(device))));
                     if (DIAGNOSTIC_CHARACTERISTIC.equals(uuid)) {
                         sendGattReadResponse(device, requestId, offset,
-                                (LOCAL_LOGICAL_NAME + "/2")
+                                (LOCAL_LOGICAL_NAME + "/3")
                                         .getBytes(StandardCharsets.UTF_8));
                         return;
                     }
@@ -4412,10 +4590,18 @@ public final class IphoneAncsTransport {
                         } else if (TELEMETRY_CHARACTERISTIC.equals(uuid)) {
                             status = BluetoothGatt.GATT_FAILURE;
                             main.post(() -> log("TELEMETRY write rejected: malformed TEL3/TEL2"));
+                        } else if (SECURE_CHARACTERISTIC.equals(uuid)
+                                && "ANCS-HANDOFF".equals(command)) {
+                            if (!secureAttConfirmed) {
+                                status = STATUS_INSUFFICIENT_AUTHENTICATION;
+                                main.post(() -> log("ANCS-HANDOFF отклонён до SECURE ATT OK"));
+                            } else {
+                                successAction = () -> beginAncsHandoffReconnect(device);
+                            }
                         } else if (!"ANCS".equals(command)) {
                             status = BluetoothGatt.GATT_FAILURE;
                             main.post(() -> log("SECURE command отклонена: `" + command
-                                    + "`; ожидается ASCII ANCS или TEL2/TEL3"));
+                                    + "`; ожидается ASCII ANCS, ANCS-HANDOFF или TEL2/TEL3"));
                         } else {
                             successAction = () -> handleSecureAttSuccess(device, "WRITE");
                         }

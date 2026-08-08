@@ -73,6 +73,10 @@ final class EcarxSignalFallback {
     private final Set<Integer> manualModeIds = new LinkedHashSet<>();
     private final Set<Integer> highBeamIds = new LinkedHashSet<>();
     private final Set<Integer> recorderDiscoveryIds = new LinkedHashSet<>();
+    /** Runtime catalog entries whose generated getter proves an integer-compatible payload. */
+    private final Set<Integer> typedRecorderDiscoveryIds = new LinkedHashSet<>();
+    private final Set<Integer> unsupportedRecorderIds = new LinkedHashSet<>();
+    private final Set<Integer> activeRecorderIds = new LinkedHashSet<>();
     private final Map<Integer, String> propertyNames = new HashMap<>();
     @Nullable private Integer selectorRaw;
     @Nullable private Integer actualGearRaw;
@@ -98,6 +102,7 @@ final class EcarxSignalFallback {
             selectorRaw = null;
             actualGearRaw = null;
             manualMode = null;
+            activeRecorderIds.clear();
             retryAttempts = 0;
             retryScheduled = false;
             highBeamDiscoveryRetryScheduled = false;
@@ -136,7 +141,7 @@ final class EcarxSignalFallback {
                 return;
             }
             signalManager = manager;
-            scanPropertyIds();
+            scanPropertyIds(manager);
             if (!registerCallback(manager)) {
                 signalManager = null;
                 if (gearDemand || !highBeamIds.isEmpty()) releaseProxy();
@@ -177,7 +182,7 @@ final class EcarxSignalFallback {
             worker.schedule(() -> {
                 highBeamDiscoveryRetryScheduled = false;
                 if (!hasDemand() || !highBeamDemand) return;
-                scanPropertyIds();
+                scanPropertyIds(signalManager);
                 if (highBeamIds.isEmpty()) {
                     scheduleHighBeamDiscoveryRetry();
                     return;
@@ -333,15 +338,19 @@ final class EcarxSignalFallback {
         }
     }
 
-    private void scanPropertyIds() {
+    private void scanPropertyIds(@Nullable Object manager) {
         manualModeIds.clear();
         highBeamIds.clear();
         recorderDiscoveryIds.clear();
+        typedRecorderDiscoveryIds.clear();
         for (int propertyId : EcarxAdasSignalCatalog.discoveryFallbackPropertyIds()) {
             recorderDiscoveryIds.add(propertyId);
         }
         propertyNames.clear();
         Map<?, ?> names = propertyIdNames();
+        Set<Integer> integerCallbackIds = adasRecorderDemand
+                ? discoverIntegerCallbackPropertyIds(manager)
+                : Collections.emptySet();
         for (Map.Entry<?, ?> entry : names.entrySet()) {
             Integer id = entry.getKey() instanceof Number
                     ? ((Number) entry.getKey()).intValue() : null;
@@ -359,9 +368,76 @@ final class EcarxSignalFallback {
             if (EcarxAdasSignalCatalog.isDiscoveryPropertyName(name)) {
                 recorderDiscoveryIds.add(id);
             }
+            if (adasRecorderDemand && (integerCallbackIds.contains(id)
+                    || isIntegerCallbackProperty(manager, name))) {
+                recorderDiscoveryIds.add(id);
+                typedRecorderDiscoveryIds.add(id);
+            }
         }
         Log.d(TAG, "Discovered manualMode=" + manualModeIds + ", highBeam=" + highBeamIds
-                + ", vehicleControl=" + recorderPropertyIds());
+                + ", vehicleControl=" + recorderPropertyIds()
+                + ", runtimeTypedCallbackCount=" + typedRecorderDiscoveryIds.size());
+    }
+
+    /**
+     * Uses the generated zero-argument CarSignalManager getter only as a type declaration. The
+     * getter is never invoked here: runtime-discovered IDs remain callback-only, which prevents
+     * the Integer-vs-byte[] health-poll flood observed on KX11 while still widening diagnostics
+     * beyond guessed limiter names.
+     */
+    private static boolean isIntegerCallbackProperty(@Nullable Object manager,
+                                                     @Nullable String propertyName) {
+        if (manager == null || propertyName == null) return false;
+        String trimmed = propertyName.trim();
+        if (trimmed.isEmpty()) return false;
+        String getterName = trimmed.startsWith("get") ? trimmed : "get" + trimmed;
+        Method getter = findMethodIgnoreCase(manager.getClass(), getterName, 0);
+        return getter != null && isIntegerReturnType(getter.getReturnType());
+    }
+
+    /**
+     * Builds the authoritative SDK ID-to-getter-type map without reading a signal. This covers
+     * vendor PropertyIdString spellings that differ from the generated getter while still
+     * excluding byte-array, floating-point and object payloads from the wide callback filter.
+     */
+    @NonNull
+    private static Set<Integer> discoverIntegerCallbackPropertyIds(@Nullable Object manager) {
+        if (manager == null) return Collections.emptySet();
+        LinkedHashSet<Integer> result = new LinkedHashSet<>();
+        Class<?> managerClass = manager.getClass();
+        for (Field field : managerClass.getFields()) {
+            String fieldName = field.getName();
+            if (!Modifier.isStatic(field.getModifiers()) || !fieldName.startsWith("SignalId_")) {
+                continue;
+            }
+            Method getter = findMethodIgnoreCase(managerClass,
+                    "get" + fieldName.substring("SignalId_".length()), 0);
+            if (getter == null || !isIntegerReturnType(getter.getReturnType())) continue;
+            try {
+                Object rawId = field.get(null);
+                if (rawId instanceof Number) result.add(((Number) rawId).intValue());
+            } catch (IllegalAccessException | RuntimeException ignored) {
+                // Public SDK constants normally succeed; a vendor-hidden alias is simply skipped.
+            }
+        }
+        return result;
+    }
+
+    private static boolean isIntegerReturnType(Class<?> type) {
+        return type == Byte.TYPE || type == Byte.class
+                || type == Short.TYPE || type == Short.class
+                || type == Integer.TYPE || type == Integer.class
+                || type == Long.TYPE || type == Long.class
+                || Number.class.isAssignableFrom(type);
+    }
+
+    @Nullable
+    private static Method findMethodIgnoreCase(Class<?> type, String name, int parameterCount) {
+        for (Method method : type.getMethods()) {
+            if (method.getName().equalsIgnoreCase(name)
+                    && method.getParameterTypes().length == parameterCount) return method;
+        }
+        return null;
     }
 
     @NonNull
@@ -390,24 +466,27 @@ final class EcarxSignalFallback {
     }
 
     private boolean registerCallback(Object manager) throws Exception {
-        LinkedHashSet<Integer> ids = new LinkedHashSet<>();
+        LinkedHashSet<Integer> requiredIds = new LinkedHashSet<>();
         if (gearDemand) {
-            ids.add(EcarxSignalDecoder.PROPERTY_GEAR_ACTUAL);
-            ids.add(EcarxSignalDecoder.PROPERTY_GEAR_SELECTOR);
-            ids.addAll(manualModeIds);
+            requiredIds.add(EcarxSignalDecoder.PROPERTY_GEAR_ACTUAL);
+            requiredIds.add(EcarxSignalDecoder.PROPERTY_GEAR_SELECTOR);
+            requiredIds.addAll(manualModeIds);
         }
-        if (highBeamDemand) ids.addAll(highBeamIds);
-        LinkedHashSet<Integer> recorderIds = recorderPropertyIds();
-        if (adasRecorderDemand) ids.addAll(recorderIds);
+        if (highBeamDemand) requiredIds.addAll(highBeamIds);
+        LinkedHashSet<Integer> recorderIds = new LinkedHashSet<>();
+        if (adasRecorderDemand) {
+            for (int propertyId : EcarxAdasSignalCatalog.propertyIds()) {
+                requiredIds.add(propertyId);
+                recorderIds.add(propertyId);
+            }
+        }
         // In a high-beam-only subscription an empty discovery result is not a successful
         // registration: retry while ecarxcar_service finishes publishing PropertyIdString.
-        if (ids.isEmpty()) return false;
+        if (requiredIds.isEmpty()) return false;
 
         Class<?> filterClass = Class.forName("ecarx.car.hardware.signal.SignalFilter");
-        Object filter = filterClass.getDeclaredConstructor().newInstance();
         Method add = findIntMethod(filterClass, "add");
         if (add == null) return false;
-        for (Integer id : ids) add.invoke(filter, id);
 
         Class<?> callbackClass = Class.forName(
                 "ecarx.car.hardware.signal.CarSignalManager$CarSignalEventCallback");
@@ -438,19 +517,120 @@ final class EcarxSignalFallback {
         Object callback = Proxy.newProxyInstance(callbackClass.getClassLoader(),
                 new Class<?>[] { callbackClass }, handler);
         callbackHolder[0] = callback;
-        Registration registration = findRegistrationMethod(manager.getClass(), callback, filter);
+        Object methodProbeFilter = buildSignalFilter(filterClass, add, requiredIds);
+        Registration registration = findRegistrationMethod(
+                manager.getClass(), callback, methodProbeFilter);
         if (registration == null) return false;
-        if (registration.callbackFirst) {
-            registration.method.invoke(manager, callback, filter);
-        } else {
-            registration.method.invoke(manager, filter, callback);
+
+        LinkedHashSet<Integer> ids = new LinkedHashSet<>(requiredIds);
+        if (adasRecorderDemand) {
+            ids.addAll(typedRecorderDiscoveryIds);
+            recorderIds.addAll(typedRecorderDiscoveryIds);
+            Object passiveCallback = createPassiveSignalCallback(callbackClass);
+            for (Integer propertyId : recorderDiscoveryIds) {
+                if (requiredIds.contains(propertyId)
+                        || typedRecorderDiscoveryIds.contains(propertyId)
+                        || unsupportedRecorderIds.contains(propertyId)) continue;
+                if (probeRecorderProperty(manager, registration, filterClass, add,
+                        passiveCallback, propertyId)) {
+                    ids.add(propertyId);
+                    recorderIds.add(propertyId);
+                }
+            }
+        }
+
+        Object filter = buildSignalFilter(filterClass, add, ids);
+        try {
+            invokeRegistration(manager, registration, callback, filter);
+        } catch (Exception combinedFailure) {
+            // A vendor service can accept a one-ID probe and still reject a mixed filter. Keep
+            // the eleven confirmed IDs alive instead of allowing optional discovery to take the
+            // whole recorder down.
+            if (!adasRecorderDemand || ids.equals(requiredIds)) throw combinedFailure;
+            Log.w(TAG, "Combined recorder filter rejected; using confirmed property IDs",
+                    combinedFailure);
+            ids.clear();
+            ids.addAll(requiredIds);
+            recorderIds.clear();
+            for (int propertyId : EcarxAdasSignalCatalog.propertyIds()) {
+                recorderIds.add(propertyId);
+            }
+            filter = buildSignalFilter(filterClass, add, ids);
+            invokeRegistration(manager, registration, callback, filter);
         }
         signalCallback = callback;
+        activeRecorderIds.clear();
+        activeRecorderIds.addAll(recorderIds);
         Log.d(TAG, "Registered low-level signal fallback for " + ids);
         if (adasRecorderDemand) {
             listener.onAdasCaptureReady(recorderIds.size(), recorderIds.toString());
         }
         return true;
+    }
+
+    @NonNull
+    private static Object buildSignalFilter(Class<?> filterClass, Method add,
+                                            Collection<Integer> ids) throws Exception {
+        Object filter = filterClass.getDeclaredConstructor().newInstance();
+        for (Integer id : ids) add.invoke(filter, id);
+        return filter;
+    }
+
+    @NonNull
+    private static Object createPassiveSignalCallback(Class<?> callbackClass) {
+        return Proxy.newProxyInstance(callbackClass.getClassLoader(),
+                new Class<?>[] { callbackClass }, (proxy, method, args) -> {
+                    String name = method.getName();
+                    if (name.equals("toString")) return "StatusWidgetSignalProbe";
+                    if (name.equals("hashCode")) return System.identityHashCode(proxy);
+                    if (name.equals("equals")) return args != null && args.length == 1
+                            && proxy == args[0];
+                    return primitiveDefault(method.getReturnType());
+                });
+    }
+
+    private boolean probeRecorderProperty(Object manager, Registration registration,
+                                          Class<?> filterClass, Method add,
+                                          Object passiveCallback, int propertyId) {
+        boolean registered = false;
+        try {
+            Object filter = buildSignalFilter(filterClass, add,
+                    Collections.singleton(propertyId));
+            invokeRegistration(manager, registration, passiveCallback, filter);
+            registered = true;
+            return true;
+        } catch (Throwable error) {
+            if (isInvalidPropertyIdError(error)) {
+                unsupportedRecorderIds.add(propertyId);
+                Log.w(TAG, "Skipping unsupported recorder property id " + propertyId);
+            } else {
+                Log.w(TAG, "Recorder property probe failed for " + propertyId, error);
+            }
+            return false;
+        } finally {
+            if (registered) unregisterSpecificCallback(manager, passiveCallback);
+        }
+    }
+
+    private static void invokeRegistration(Object manager, Registration registration,
+                                           Object callback, Object filter) throws Exception {
+        if (registration.callbackFirst) {
+            registration.method.invoke(manager, callback, filter);
+        } else {
+            registration.method.invoke(manager, filter, callback);
+        }
+    }
+
+    private static boolean isInvalidPropertyIdError(Throwable error) {
+        Throwable current = error;
+        for (int depth = 0; current != null && depth < 8; depth++) {
+            String message = current.getMessage();
+            if (current instanceof IllegalArgumentException
+                    || (message != null && message.toLowerCase(Locale.ROOT)
+                    .contains("invalid property id"))) return true;
+            current = current.getCause();
+        }
+        return false;
     }
 
     @Nullable
@@ -527,7 +707,16 @@ final class EcarxSignalFallback {
             ids.addAll(manualModeIds);
         }
         if (highBeamDemand) ids.addAll(highBeamIds);
-        if (adasRecorderDemand) ids.addAll(recorderPropertyIds());
+        if (adasRecorderDemand) {
+            // Runtime-discovered ECARX properties are not guaranteed to be integer-valued.
+            // Several valid callback sources on KX11 (for example 0x8207 and 0x820c) expose
+            // byte[] payloads, and polling them through getSignalValue(int) floods the vendor log
+            // with type errors. Keep discovery IDs callback-only; health reads cover the fixed,
+            // confirmed integer ADAS catalog and still exercise the channel once per interval.
+            for (int propertyId : EcarxAdasSignalCatalog.propertyIds()) {
+                ids.add(propertyId);
+            }
+        }
         for (String methodName : new String[] {
                 "getSignalValue", "getSignalLatestValue", "getCarPropertyValue", "getProperty"
         }) {
@@ -657,7 +846,7 @@ final class EcarxSignalFallback {
 
     private void handleSignal(int propertyId, int raw) {
         if (adasRecorderDemand && (EcarxAdasSignalCatalog.contains(propertyId)
-                || recorderDiscoveryIds.contains(propertyId))) {
+                || activeRecorderIds.contains(propertyId))) {
             String runtimeName = propertyNames.get(propertyId);
             listener.onAdasSignal(propertyId,
                     runtimeName == null || runtimeName.trim().isEmpty()
@@ -728,7 +917,12 @@ final class EcarxSignalFallback {
         Object manager = signalManager;
         Object callback = signalCallback;
         signalCallback = null;
+        activeRecorderIds.clear();
         if (manager == null || callback == null) return;
+        unregisterSpecificCallback(manager, callback);
+    }
+
+    private static void unregisterSpecificCallback(Object manager, Object callback) {
         for (Method method : manager.getClass().getMethods()) {
             Class<?>[] parameters = method.getParameterTypes();
             if (!method.getName().equals("unregisterCallback") || parameters.length != 1
