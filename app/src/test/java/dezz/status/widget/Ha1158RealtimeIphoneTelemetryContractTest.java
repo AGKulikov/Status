@@ -44,8 +44,9 @@ public final class Ha1158RealtimeIphoneTelemetryContractTest {
 
         assertTrue(controller.contains("boolean powerChanged = hasPower"));
         assertTrue(controller.contains("boolean networkChanged = hasNetwork"));
+        assertTrue(controller.contains("boolean lockChanged = hasLock"));
         assertTrue(controller.contains(
-                "if (powerChanged || networkChanged) publishSnapshot(token)"));
+                "if (powerChanged || networkChanged || lockChanged) publishSnapshot(token)"));
         assertTrue(controller.contains(
                 "Do not rewrite\n            // SharedPreferences or replace the UI snapshot"));
     }

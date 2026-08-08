@@ -25,8 +25,8 @@ public final class Ha1180VehicleActionCaptureContractTest {
         assertTrue(client.contains("data.writeInterfaceToken(INTERFACE_DESCRIPTOR)"));
         assertTrue(client.contains("binder.transact(TRANSACTION_OPEN_HVAC_MAIN"));
         assertTrue(driverService.contains("StockHvacPopupClient.openMainPopup"));
-        String trigger = between(driver, "private void triggerStockClimate()",
-                "private void executeShortcut(");
+        String trigger = between(driver, "public void triggerStockClimate()",
+                "private void dismissAllApps()");
         assertTrue(trigger.contains("DriverPanelService.triggerStockClimate(appContext)"));
         assertFalse(trigger.contains("performTap"));
         assertFalse(trigger.contains("input tap"));

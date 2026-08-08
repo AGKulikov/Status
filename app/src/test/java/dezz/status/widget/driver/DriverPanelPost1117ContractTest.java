@@ -46,7 +46,8 @@ public final class DriverPanelPost1117ContractTest {
         assertTrue(shortcuts.contains("public boolean liveClimateIcon = false"));
         assertTrue(shortcuts.contains("public int climateDetailsGapPx = 0"));
         assertTrue(overlay.contains("shortcut.climateDetailsGapPx"));
-        assertTrue(overlay.contains("boolean stockClimateAction = isStockClimateAction"));
+        assertTrue(overlay.contains("DriverPanelService.triggerStockClimate(appContext)"));
+        assertFalse(overlay.contains("isStockClimateAction(shortcut)"));
     }
 
     @Test
@@ -112,15 +113,16 @@ public final class DriverPanelPost1117ContractTest {
     }
 
     @Test
-    public void yandexWindowButtonsDoNotAddASecondClickSound() throws Exception {
+    public void driverAndLauncherWindowButtonsKeepTheNormalClickSound() throws Exception {
         String overlay = read("driver/DriverPanelOverlayController.java");
         String launcher = read("LauncherActivity.java");
 
-        assertTrue(overlay.contains(
-                "stockClimateAction || opensWindowedYandex(shortcut)"));
-        assertTrue(overlay.contains("button.setSoundEffectsEnabled(false)"));
-        assertTrue(launcher.contains("if (!addButton && opensWindowedYandex(shortcut))"));
-        assertTrue(launcher.contains("card.setSoundEffectsEnabled(false)"));
+        assertTrue(overlay.contains("button.setSoundEffectsEnabled(true)"));
+        assertTrue(overlay.contains("content.setSoundEffectsEnabled(true)"));
+        assertTrue(launcher.contains("card.setSoundEffectsEnabled(true)"));
+        assertTrue(launcher.contains("content.setSoundEffectsEnabled(true)"));
+        assertFalse(overlay.contains("button.setSoundEffectsEnabled(false)"));
+        assertFalse(launcher.contains("card.setSoundEffectsEnabled(false)"));
     }
 
     private static String read(String relative) throws Exception {

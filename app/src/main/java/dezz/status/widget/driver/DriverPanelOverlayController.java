@@ -57,7 +57,6 @@ import java.util.concurrent.Executors;
 
 import dezz.status.widget.Preferences;
 import dezz.status.widget.R;
-import dezz.status.widget.WidgetAccessibilityService;
 import dezz.status.widget.WidgetService;
 import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarControlState;
@@ -90,8 +89,8 @@ import dezz.status.widget.sprut.SprutHubController;
  * Owns the selected Monjaro driver rail and the overlay all-apps drawer.
  *
  * <p>The rail is always one continuous window. A live climate presentation is independent from
- * its assigned primary/long action. Only the stock-climate action temporarily removes the whole
- * rail from input hit-testing while an accessibility gesture taps the covered OEM coordinate.</p>
+ * its assigned primary/long action. The stock-climate action opens the OEM popup through its
+ * exported Binder service, so the rail never has to leave input hit-testing.</p>
  */
 final class DriverPanelOverlayController implements DriverPanelActionExecutor.Host {
     interface StatusListener {
@@ -100,9 +99,6 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
     private static final String TAG = "DriverPanelOverlay";
     private static final int DISPLAY_ID = Display.DEFAULT_DISPLAY;
-    private static final long PROXY_TAP_SETTLE_MS = 70L;
-    /** Accessibility callbacks are not reliable on ECARX; never block repeat taps for seconds. */
-    private static final long PROXY_TAP_HARD_RESTORE_MS = 450L;
     /** Let a busy ECARX rail process the same outside-touch before closing its open drawer. */
     private static final long FAVORITES_OUTSIDE_DISMISS_DELAY_MS = 450L;
 
@@ -1204,7 +1200,6 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         int requested = Math.max(LauncherShortcutStore.MIN_ICON_SIZE_PX,
                 Math.min(LauncherShortcutStore.MAX_ICON_SIZE_PX, shortcut.iconSizePx));
         boolean liveClimate = isLiveClimate(shortcut);
-        boolean stockClimateAction = isStockClimateAction(shortcut);
         boolean expandedClimate = isExpandedClimate(shortcut);
         View icon;
         @Nullable ImageView stateIcon = null;
@@ -1391,23 +1386,10 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 && LauncherShortcutStore.isInteractive(shortcut);
     }
 
-    private static boolean isStockClimateAction(
-            @NonNull LauncherShortcutStore.Shortcut shortcut) {
-        return shortcut.kind == LauncherShortcutStore.Kind.BUILTIN
-                && LauncherShortcutStore.Builtin.STOCK_CLIMATE.key.equals(shortcut.target);
-    }
-
     private static boolean isExpandedClimate(
             @NonNull LauncherShortcutStore.Shortcut shortcut) {
         // HA1085 keeps the detailed climate tile at the same height as every other rail button.
         return false;
-    }
-
-    private static boolean opensWindowedYandex(
-            @NonNull LauncherShortcutStore.Shortcut shortcut) {
-        if (shortcut.kind != LauncherShortcutStore.Kind.BUILTIN) return false;
-        return LauncherShortcutStore.Builtin.MAPS_WINDOW.key.equals(shortcut.target)
-                || LauncherShortcutStore.Builtin.NAVIGATOR_WINDOW.key.equals(shortcut.target);
     }
 
     @NonNull
@@ -1706,20 +1688,6 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private static String smartHomeKey(@NonNull SourceBinding value) {
         return value.connectorType.jsonName() + '\u0000' + value.connectorId + '\u0000'
                 + value.resourceId;
-    }
-
-    private void setPanelTouchable(boolean touchable) {
-        for (AttachedWindow window : panelWindows) {
-            if (touchable) {
-                window.params.flags &= ~WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
-            } else {
-                window.params.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
-            }
-            try {
-                window.manager.updateViewLayout(window.view, window.params);
-            } catch (RuntimeException ignored) {
-            }
-        }
     }
 
     private static int safeColor(@Nullable String raw, int fallback) {

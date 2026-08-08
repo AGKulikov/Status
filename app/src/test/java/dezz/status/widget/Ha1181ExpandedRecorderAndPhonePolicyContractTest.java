@@ -85,7 +85,7 @@ public final class Ha1181ExpandedRecorderAndPhonePolicyContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1181() throws Exception {
-        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1181'"));
+        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1181'"));
     }
 
     private static String source(String relative) throws Exception {
@@ -102,6 +102,19 @@ public final class Ha1181ExpandedRecorderAndPhonePolicyContractTest {
             }
         }
         throw new IllegalStateException("Project file not found: " + relative);
+    }
+
+    private static String rootProject(String relative) throws Exception {
+        Path current = Paths.get("").toAbsolutePath();
+        for (int depth = 0; depth < 8 && current != null;
+             depth++, current = current.getParent()) {
+            if (!Files.isRegularFile(current.resolve("settings.gradle"))) continue;
+            Path candidate = current.resolve(relative);
+            if (Files.isRegularFile(candidate)) {
+                return new String(Files.readAllBytes(candidate), StandardCharsets.UTF_8);
+            }
+        }
+        throw new IllegalStateException("Root project file not found: " + relative);
     }
 
     private static String between(String source, String start, String end) {

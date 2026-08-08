@@ -12,7 +12,7 @@ import java.nio.file.Paths;
 
 public class DriverPanelOverlayContractTest {
     @Test
-    public void productionRailIsContinuousAndClimateTapPassesThroughInput() throws Exception {
+    public void productionRailIsContinuousAndClimateUsesDirectBinder() throws Exception {
         String root = System.getProperty("user.dir");
         Path controller = Paths.get(root, "src/main/java/dezz/status/widget/driver/"
                 + "DriverPanelOverlayController.java");
@@ -23,10 +23,12 @@ public class DriverPanelOverlayContractTest {
         String source = read(controller);
         assertTrue(source.contains("interactiveCount,"));
         assertTrue(source.contains("false);"));
-        assertTrue(source.contains("setPanelTouchable(false)"));
         assertTrue(source.contains("FLAG_NOT_TOUCHABLE"));
-        assertTrue(source.contains("performTap(target.x, target.y"));
-        assertTrue(source.contains("\"input tap \" + target.x + \" \" + target.y"));
+        String trigger = source.substring(source.indexOf("public void triggerStockClimate()"),
+                source.indexOf("private void dismissAllApps()"));
+        assertTrue(trigger.contains("DriverPanelService.triggerStockClimate(appContext)"));
+        assertFalse(trigger.contains("performTap"));
+        assertFalse(trigger.contains("input tap"));
         assertFalse(source.contains("shortcuts.subList"));
         assertTrue(source.contains("windowContext(display, attachedType)"));
         assertFalse(source.contains("fullScreenParams(attachedType)"));
@@ -50,18 +52,9 @@ public class DriverPanelOverlayContractTest {
         assertTrue(source.contains("DriverPanelLayoutPolicy.referencePanelWidth("));
         assertTrue(source.contains(
                 "geometry.contentBottom - geometry.contentTop"));
-        int fallbackStart = source.indexOf("private void fallbackStockClimateTap");
-        int fallbackEnd = source.indexOf("private void dismissAllApps", fallbackStart);
-        assertTrue(fallbackStart >= 0);
-        assertTrue(fallbackEnd > fallbackStart);
-        String fallbackSource = source.substring(fallbackStart, fallbackEnd);
-        assertTrue(fallbackSource.contains("setPanelTouchable(true)"));
-        assertFalse(fallbackSource.contains("detachPanel()"));
-        assertFalse(fallbackSource.contains("applyPreferences()"));
-        assertTrue(source.contains("PROXY_TAP_SETTLE_MS = 70L"));
-        assertTrue(source.contains("}, PROXY_TAP_SETTLE_MS);"));
-        assertTrue(source.contains("PROXY_TAP_HARD_RESTORE_MS = 450L"));
-        assertFalse(source.contains("PROXY_TAP_WATCHDOG_MS"));
+        assertFalse(source.contains("fallbackStockClimateTap"));
+        assertFalse(source.contains("PROXY_TAP_SETTLE_MS"));
+        assertFalse(source.contains("PROXY_TAP_HARD_RESTORE_MS"));
         assertTrue(source.contains(
                 "WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED"));
 
@@ -97,10 +90,10 @@ public class DriverPanelOverlayContractTest {
         assertTrue(source.contains("ViewGroup.LayoutParams.WRAP_CONTENT"));
         assertTrue(source.contains("DriverPanelLayoutPolicy.shortcutIconHeight("));
         assertTrue(source.contains("boolean liveClimate = isLiveClimate(shortcut)"));
-        assertTrue(source.contains("boolean stockClimateAction = isStockClimateAction(shortcut)"));
+        assertFalse(source.contains("isStockClimateAction(shortcut)"));
         assertTrue(source.contains("shortcut.liveClimateIcon"));
         assertTrue(source.contains("shortcut.climateDetailsGapPx"));
-        assertTrue(source.contains("button.setSoundEffectsEnabled(false)"));
+        assertTrue(source.contains("button.setSoundEffectsEnabled(true)"));
     }
 
     @Test

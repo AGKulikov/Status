@@ -3412,13 +3412,6 @@ public final class LauncherActivity extends AppCompatActivity {
         return card;
     }
 
-    private static boolean opensWindowedYandex(
-            @NonNull LauncherShortcutStore.Shortcut shortcut) {
-        if (shortcut.kind != LauncherShortcutStore.Kind.BUILTIN) return false;
-        return LauncherShortcutStore.Builtin.MAPS_WINDOW.key.equals(shortcut.target)
-                || LauncherShortcutStore.Builtin.NAVIGATOR_WINDOW.key.equals(shortcut.target);
-    }
-
     private void executeShortcut(@NonNull LauncherShortcutStore.Shortcut shortcut) {
         try {
             if (shortcut.kind == LauncherShortcutStore.Kind.CAR) {

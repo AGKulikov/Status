@@ -13,17 +13,15 @@ import java.nio.file.Paths;
 
 /** Guard rails for the two driver-panel regressions reported from HA1138. */
 public final class Ha1139RegressionContractTest {
-    @Test public void acceptedClimateGestureNeverFallsBackToASecondTap() throws Exception {
+    @Test public void stockClimateUsesDirectBinderWithoutSyntheticTap() throws Exception {
         String controller = source("driver/DriverPanelOverlayController.java");
-        String accessibility = source("WidgetAccessibilityService.java");
+        String trigger = between(controller, "public void triggerStockClimate()",
+                "private void dismissAllApps()");
 
-        String gesture = between(controller,
-                "if (WidgetAccessibilityService.performTap(target.x, target.y",
-                "}, PROXY_TAP_SETTLE_MS);");
-        assertTrue(gesture.contains("restore.run();"));
-        assertFalse(gesture.contains("else fallbackStockClimateTap"));
-        assertTrue(accessibility.contains("return dispatchTap(current, main, x, y, callback)"));
-        assertTrue(accessibility.contains("return current.dispatchGesture(gesture"));
+        assertTrue(trigger.contains("DriverPanelService.triggerStockClimate(appContext)"));
+        assertFalse(trigger.contains("performTap"));
+        assertFalse(trigger.contains("input tap"));
+        assertFalse(controller.contains("fallbackStockClimateTap"));
     }
 
     @Test public void favoriteRailTapWinsOverTheSameOutsideTouch() throws Exception {
