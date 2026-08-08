@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Однократная выдача диагностических прав Status Widget HA1181.
+# Однократная выдача диагностических прав Status Widget HA1183.
 # Не изменяет прошивку, ECARX/CAN, Bluetooth или системные разделы.
 
 set -u
@@ -14,7 +14,7 @@ fail() {
   exit 1
 }
 
-echo "Status Widget HA1181 — расширенный регистратор действий"
+echo "Status Widget HA1183 — расширенный регистратор действий"
 echo
 
 command -v adb >/dev/null 2>&1 || fail \
@@ -46,17 +46,21 @@ echo
 
 PACKAGE_PATH="$(adb shell pm path "$PACKAGE" 2>/dev/null | tr -d '\r')"
 [ -n "$PACKAGE_PATH" ] || fail \
-  "Пакет $PACKAGE не найден. Сначала установите Status Widget HA1181."
+  "Пакет $PACKAGE не найден. Сначала установите Status Widget HA1183."
 
-echo "[1/3] Выдаю READ_LOGS..."
+echo "[1/4] Выдаю READ_LOGS..."
 adb shell pm grant "$PACKAGE" android.permission.READ_LOGS || fail \
   "Не удалось выдать READ_LOGS."
 
-echo "[2/3] Выдаю DUMP..."
+echo "[2/4] Выдаю DUMP..."
 adb shell pm grant "$PACKAGE" android.permission.DUMP || fail \
   "Не удалось выдать DUMP."
 
-echo "[3/3] Разрешаю Usage Access..."
+echo "[3/4] Выдаю PACKAGE_USAGE_STATS..."
+adb shell pm grant "$PACKAGE" android.permission.PACKAGE_USAGE_STATS || fail \
+  "Не удалось выдать PACKAGE_USAGE_STATS."
+
+echo "[4/4] Разрешаю Usage Access через AppOps..."
 adb shell appops set "$PACKAGE" GET_USAGE_STATS allow || fail \
   "Не удалось разрешить GET_USAGE_STATS."
 
@@ -67,6 +71,9 @@ echo "$PACKAGE_DUMP" | grep -q \
   'android.permission.READ_LOGS: granted=true' || fail "READ_LOGS не подтвердился."
 echo "$PACKAGE_DUMP" | grep -q \
   'android.permission.DUMP: granted=true' || fail "DUMP не подтвердился."
+echo "$PACKAGE_DUMP" | grep -q \
+  'android.permission.PACKAGE_USAGE_STATS: granted=true' || fail \
+  "PACKAGE_USAGE_STATS не подтвердился."
 echo "$APPOPS_DUMP" | grep -Eiq \
   'GET_USAGE_STATS: (allow|foreground)|UsageStats.*(allow|foreground)' || fail \
   "Usage Access не подтвердился: $APPOPS_DUMP"
@@ -75,6 +82,7 @@ echo
 echo "ГОТОВО:"
 echo "  READ_LOGS: есть"
 echo "  DUMP: есть"
+echo "  PACKAGE_USAGE_STATS: есть"
 echo "  Usage Access: есть"
 echo
 echo "Права сохраняются после перезагрузки и обновления APK."

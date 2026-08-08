@@ -328,7 +328,8 @@ public final class DiagnosticsActivity extends AppCompatActivity {
             expandedAccessState.setText("Системный захват: " + standard
                     + "\nREAD_LOGS: " + yesNo(access.readLogs)
                     + "\nDUMP: " + yesNo(access.dump)
-                    + "\nUsage Access: " + yesNo(access.usageAccess)
+                    + "\nPACKAGE_USAGE_STATS: " + yesNo(access.usageStatsPermission)
+                    + "\nUsage Access AppOp: " + yesNo(access.usageAccess)
                     + "\nsu/root: " + yesNo(access.root)
                     + "\nRoot EV_KEY: "
                     + (access.rootInputEnabled && access.root ? "включён" : "выключен"));
@@ -372,7 +373,7 @@ public final class DiagnosticsActivity extends AppCompatActivity {
             value.append("adb shell ").append(command);
         }
         manager.setPrimaryClip(ClipData.newPlainText("Status Widget ADB grants", value));
-        Toast.makeText(this, "Три одноразовые ADB-команды скопированы",
+        Toast.makeText(this, "Четыре одноразовые ADB-команды скопированы",
                 Toast.LENGTH_SHORT).show();
     }
 
@@ -382,6 +383,7 @@ public final class DiagnosticsActivity extends AppCompatActivity {
         return new String[] {
                 "pm grant " + packageName + " android.permission.READ_LOGS",
                 "pm grant " + packageName + " android.permission.DUMP",
+                "pm grant " + packageName + " android.permission.PACKAGE_USAGE_STATS",
                 "appops set " + packageName + " GET_USAGE_STATS allow"
         };
     }

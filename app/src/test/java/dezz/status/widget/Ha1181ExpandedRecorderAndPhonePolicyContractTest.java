@@ -21,6 +21,8 @@ public final class Ha1181ExpandedRecorderAndPhonePolicyContractTest {
         assertTrue(manifest.contains("android.permission.DUMP"));
         assertTrue(screen.contains("pm grant \" + packageName + \" android.permission.READ_LOGS"));
         assertTrue(screen.contains("pm grant \" + packageName + \" android.permission.DUMP"));
+        assertTrue(screen.contains(
+                "pm grant \" + packageName + \" android.permission.PACKAGE_USAGE_STATS"));
         assertTrue(screen.contains("GET_USAGE_STATS allow"));
         assertTrue(screen.contains("Выдать через встроенный ADB"));
         assertTrue(screen.contains("Копировать команды"));
@@ -85,7 +87,7 @@ public final class Ha1181ExpandedRecorderAndPhonePolicyContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1181() throws Exception {
-        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1182'"));
+        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1183'"));
     }
 
     private static String source(String relative) throws Exception {

@@ -18,6 +18,7 @@
 package dezz.status.widget.shell;
 
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -605,8 +606,12 @@ public class PrivilegedShell {
             }
             if (request.usageAccess) {
                 applyPermission(transport,
-                        new String[]{"appops set " + pkg + " GET_USAGE_STATS allow"},
-                        () -> Permissions.isUsageAccessGranted(appContext),
+                        new String[]{
+                                "pm grant " + pkg
+                                        + " android.permission.PACKAGE_USAGE_STATS",
+                                "appops set " + pkg + " GET_USAGE_STATS allow"
+                        },
+                        this::isCompleteUsageAccess,
                         PermissionKind.USAGE_ACCESS,
                         granted, failed);
             }
@@ -679,6 +684,16 @@ public class PrivilegedShell {
             granted.add(kind);
         } else {
             failed.add(kind);
+        }
+    }
+
+    private boolean isCompleteUsageAccess() {
+        try {
+            return appContext.checkSelfPermission("android.permission.PACKAGE_USAGE_STATS")
+                    == PackageManager.PERMISSION_GRANTED
+                    && Permissions.isUsageAccessGranted(appContext);
+        } catch (RuntimeException ignored) {
+            return false;
         }
     }
 

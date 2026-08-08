@@ -46,7 +46,8 @@ public final class PrivilegedActionCollector {
 
     private static final Pattern RELEVANT_LOG = Pattern.compile(
             "(?i)(ecarx.{0,80}(car|hvac|adas|pilot)|car.?signal|steer|cruise|g.?pilot|"
-                    + "adas|limiter|speed.?limit|openhvac|hvac|climate|key.?event|"
+                    + "adas|limiter|speed.?limit|spd.?lim|crs.?ctrl|adj.?spd|"
+                    + "signalid|propertyid|hardkeyservice|drvr.?crs|openhvac|hvac|climate|key.?event|"
                     + "inputdispatcher|inputreader|mcu.{0,40}(key|button)|"
                     + "button.{0,40}(acc|pilot|cruise))");
     private static final Pattern WINDOW_DUMP = Pattern.compile(
@@ -129,6 +130,7 @@ public final class PrivilegedActionCollector {
                     "EXPANDED_CAPTURE_STATUS", ActionRecorder.object(
                             "read_logs", access.readLogs,
                             "dump", access.dump,
+                            "package_usage_stats_permission", access.usageStatsPermission,
                             "usage_access", access.usageAccess,
                             "root_available", access.root,
                             "root_input_enabled", access.rootInputEnabled,
@@ -181,7 +183,7 @@ public final class PrivilegedActionCollector {
             ActionRecorder.record(ActionRecorder.SOURCE_SYSTEM_TRACE,
                     "SYSTEM_LOG_CAPTURE_STARTED", ActionRecorder.object(
                             "buffers", "main,system,events,crash",
-                            "filter", "vehicle/input/climate/ADAS",
+                            "filter", "vehicle/input/climate/ADAS/cruise/limiter/property",
                             "max_events", MAX_LOG_EVENTS));
             daemonThread(() -> readSystemLog(process, expectedGeneration),
                     "status-system-log-reader").start();

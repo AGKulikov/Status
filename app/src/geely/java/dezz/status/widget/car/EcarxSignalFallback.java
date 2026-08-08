@@ -43,7 +43,7 @@ final class EcarxSignalFallback {
     private static final long HEALTH_READ_MILLIS = 1_000L;
 
     interface Listener {
-        void onAdasCaptureReady(int propertyCount);
+        void onAdasCaptureReady(int propertyCount, @NonNull String propertyIds);
         void onAdasSignal(int propertyId, @NonNull String signalName, int raw);
         void onGear(int adaptGear, int actualGear, boolean manualMode);
         void onHighBeam(int enabled);
@@ -72,6 +72,7 @@ final class EcarxSignalFallback {
     @Nullable private Object signalCallback;
     private final Set<Integer> manualModeIds = new LinkedHashSet<>();
     private final Set<Integer> highBeamIds = new LinkedHashSet<>();
+    private final Set<Integer> recorderDiscoveryIds = new LinkedHashSet<>();
     private final Map<Integer, String> propertyNames = new HashMap<>();
     @Nullable private Integer selectorRaw;
     @Nullable private Integer actualGearRaw;
@@ -335,6 +336,10 @@ final class EcarxSignalFallback {
     private void scanPropertyIds() {
         manualModeIds.clear();
         highBeamIds.clear();
+        recorderDiscoveryIds.clear();
+        for (int propertyId : EcarxAdasSignalCatalog.discoveryFallbackPropertyIds()) {
+            recorderDiscoveryIds.add(propertyId);
+        }
         propertyNames.clear();
         Map<?, ?> names = propertyIdNames();
         for (Map.Entry<?, ?> entry : names.entrySet()) {
@@ -351,8 +356,20 @@ final class EcarxSignalFallback {
             propertyNames.put(id, name);
             if (EcarxSignalDecoder.isManualModePropertyName(name)) manualModeIds.add(id);
             if (EcarxSignalDecoder.isHighBeamPropertyName(name)) highBeamIds.add(id);
+            if (EcarxAdasSignalCatalog.isDiscoveryPropertyName(name)) {
+                recorderDiscoveryIds.add(id);
+            }
         }
-        Log.d(TAG, "Discovered manualMode=" + manualModeIds + ", highBeam=" + highBeamIds);
+        Log.d(TAG, "Discovered manualMode=" + manualModeIds + ", highBeam=" + highBeamIds
+                + ", vehicleControl=" + recorderPropertyIds());
+    }
+
+    @NonNull
+    private LinkedHashSet<Integer> recorderPropertyIds() {
+        LinkedHashSet<Integer> ids = new LinkedHashSet<>();
+        for (int propertyId : EcarxAdasSignalCatalog.propertyIds()) ids.add(propertyId);
+        ids.addAll(recorderDiscoveryIds);
+        return ids;
     }
 
     private static Map<?, ?> propertyIdNames() {
@@ -380,11 +397,8 @@ final class EcarxSignalFallback {
             ids.addAll(manualModeIds);
         }
         if (highBeamDemand) ids.addAll(highBeamIds);
-        if (adasRecorderDemand) {
-            for (int propertyId : EcarxAdasSignalCatalog.propertyIds()) {
-                ids.add(propertyId);
-            }
-        }
+        LinkedHashSet<Integer> recorderIds = recorderPropertyIds();
+        if (adasRecorderDemand) ids.addAll(recorderIds);
         // In a high-beam-only subscription an empty discovery result is not a successful
         // registration: retry while ecarxcar_service finishes publishing PropertyIdString.
         if (ids.isEmpty()) return false;
@@ -434,7 +448,7 @@ final class EcarxSignalFallback {
         signalCallback = callback;
         Log.d(TAG, "Registered low-level signal fallback for " + ids);
         if (adasRecorderDemand) {
-            listener.onAdasCaptureReady(EcarxAdasSignalCatalog.propertyIds().length);
+            listener.onAdasCaptureReady(recorderIds.size(), recorderIds.toString());
         }
         return true;
     }
@@ -513,11 +527,7 @@ final class EcarxSignalFallback {
             ids.addAll(manualModeIds);
         }
         if (highBeamDemand) ids.addAll(highBeamIds);
-        if (adasRecorderDemand) {
-            for (int propertyId : EcarxAdasSignalCatalog.propertyIds()) {
-                ids.add(propertyId);
-            }
-        }
+        if (adasRecorderDemand) ids.addAll(recorderPropertyIds());
         for (String methodName : new String[] {
                 "getSignalValue", "getSignalLatestValue", "getCarPropertyValue", "getProperty"
         }) {
@@ -646,9 +656,13 @@ final class EcarxSignalFallback {
     }
 
     private void handleSignal(int propertyId, int raw) {
-        if (adasRecorderDemand && EcarxAdasSignalCatalog.contains(propertyId)) {
+        if (adasRecorderDemand && (EcarxAdasSignalCatalog.contains(propertyId)
+                || recorderDiscoveryIds.contains(propertyId))) {
+            String runtimeName = propertyNames.get(propertyId);
             listener.onAdasSignal(propertyId,
-                    EcarxAdasSignalCatalog.signalName(propertyId), raw);
+                    runtimeName == null || runtimeName.trim().isEmpty()
+                            ? EcarxAdasSignalCatalog.signalName(propertyId) : runtimeName,
+                    raw);
         }
         if (propertyId == EcarxSignalDecoder.PROPERTY_GEAR_SELECTOR && gearDemand) {
             selectorRaw = raw;

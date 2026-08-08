@@ -29,4 +29,21 @@ public final class EcarxAdasSignalCatalogTest {
         assertEquals("TemporaryFailure", EcarxAdasSignalCatalog.decode(29044, 7));
         assertEquals("raw=42", EcarxAdasSignalCatalog.decode(30469, 42));
     }
+
+    @Test public void limiterDiscoveryMatchesControlNamesButNotGearIndication() {
+        assertTrue(EcarxAdasSignalCatalog.isDiscoveryPropertyName("AdjSpdLimnSts"));
+        assertTrue(EcarxAdasSignalCatalog.isDiscoveryPropertyName("DrvrCrsCtrlFctSeldTyp"));
+        assertTrue(EcarxAdasSignalCatalog.isDiscoveryPropertyName("paspeedwarnspeedlimit"));
+        assertTrue(EcarxAdasSignalCatalog.isDiscoveryPropertyName("BtnR4Req"));
+        assertFalse(EcarxAdasSignalCatalog.isDiscoveryPropertyName("GearLvrIndcn"));
+        assertEquals("vehicle_control_discovery",
+                EcarxAdasSignalCatalog.signalKind(33658));
+        assertTrue(contains(EcarxAdasSignalCatalog.discoveryFallbackPropertyIds(), 33658));
+        assertTrue(contains(EcarxAdasSignalCatalog.discoveryFallbackPropertyIds(), 30862));
+    }
+
+    private static boolean contains(int[] values, int expected) {
+        for (int value : values) if (value == expected) return true;
+        return false;
+    }
 }

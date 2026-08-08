@@ -9,6 +9,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.util.Arrays;
+import java.util.Locale;
 
 /** Read-only KX11 ADAS/steering signals confirmed in the supplied vehicle dumps. */
 public final class EcarxAdasSignalCatalog {
@@ -42,6 +43,31 @@ public final class EcarxAdasSignalCatalog {
             new Definition(CRUISE_CONTROLLER_STATE, "CrsCtrlrSts", "getCrsCtrlrSts", false)
     };
 
+    /*
+     * Read-only discovery candidates used only while ActionRecorder is active.  The original
+     * eleven IDs were too narrow on the tested KX11 firmware: a complete limiter cycle and set
+     * speed changes between 30 and 37 km/h produced no matching event.  Keep a small fallback
+     * list so capture still works while PropertyIdString is being populated, then augment it at
+     * runtime by name via isDiscoveryPropertyName().
+     */
+    private static final int[] DISCOVERY_FALLBACK_PROPERTY_IDS = {
+            28691, // OffsForSpdWarnSetgReq
+            28707, // SpdAlrmActvForRoadSgnInfoSts
+            28986, // OffsForSpdWarnSetgSts
+            29018, // SpdAlrmActvSts
+            29045, 29046, // AsyALgtSts checksum/counter
+            30800, 30856, // SpeedWarnOnOffReq / SpeedWarnSetReq
+            30862, 30863, 30864, 30865, 30866, 30867, 30868, // BtnR1Req..BtnR7Req
+            30912, 30913, 30914, 30915, // steering-wheel touch requests
+            30943, 30944, 30945, 30946, 30947, // right touch-board state/data
+            32768, 32773, // cbasyaccandtsr / cbasyspeedcompensation
+            32907, // cbsyssetspdunit
+            33044, 33046, // cbspeedwarnset / cbspeedwarnonoff
+            33287, 33292, // paasyaccandtsr / paasyspeedcompensation
+            33462, // pasyssetspdunit
+            33655, 33657, 33658 // speed warning state/on-off/threshold
+    };
+
     private EcarxAdasSignalCatalog() { }
 
     @NonNull static int[] propertyIds() {
@@ -50,6 +76,33 @@ public final class EcarxAdasSignalCatalog {
             result[index] = DEFINITIONS[index].propertyId;
         }
         return result;
+    }
+
+    @NonNull static int[] discoveryFallbackPropertyIds() {
+        return DISCOVERY_FALLBACK_PROPERTY_IDS.clone();
+    }
+
+    /** Matches vendor names that can carry limiter/cruise selection, set speed or input state. */
+    static boolean isDiscoveryPropertyName(@Nullable String rawName) {
+        if (rawName == null) return false;
+        String name = rawName.trim().toLowerCase(Locale.ROOT);
+        if (name.isEmpty()) return false;
+        return name.contains("adjspdlimn")
+                || name.contains("crsctrl")
+                || name.contains("drvrcrs")
+                || name.contains("spdlim")
+                || name.contains("speedlim")
+                || name.contains("spdwarn")
+                || name.contains("speedwarn")
+                || name.contains("asyacc")
+                || name.contains("asyspeedcompensation")
+                || name.contains("asyalgt")
+                || name.contains("tigapsetforlgtctrl")
+                || name.contains("steerwhlbtn")
+                || name.contains("steerwhltouch")
+                || name.matches(".*btnr[1-7]req.*")
+                || name.contains("btnconfireq")
+                || name.contains("btnl3req");
     }
 
     static boolean contains(int propertyId) { return find(propertyId) != null; }
@@ -66,8 +119,8 @@ public final class EcarxAdasSignalCatalog {
 
     @NonNull static String signalKind(int propertyId) {
         Definition definition = find(propertyId);
-        return definition != null && definition.steeringInput
-                ? "steering_input" : "adas_state";
+        if (definition == null) return "vehicle_control_discovery";
+        return definition.steeringInput ? "steering_input" : "adas_state";
     }
 
     @NonNull static String decode(int propertyId, int value) {
@@ -100,6 +153,10 @@ public final class EcarxAdasSignalCatalog {
     }
 
     @NonNull static String idSummary() { return Arrays.toString(propertyIds()); }
+
+    @NonNull static String discoveryFallbackIdSummary() {
+        return Arrays.toString(discoveryFallbackPropertyIds());
+    }
 
     @Nullable private static Definition find(int propertyId) {
         for (Definition definition : DEFINITIONS) {

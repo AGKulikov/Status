@@ -881,12 +881,14 @@ final class GeelyCarIntegration implements CarIntegration {
                         deliverLowLevelHighBeam(enabled);
                     }
 
-                    @Override public void onAdasCaptureReady(int propertyCount) {
+                    @Override public void onAdasCaptureReady(int propertyCount,
+                                                             @NonNull String propertyIds) {
                         if (adasRecorderDemand && ActionRecorder.isRecording()) {
                             ActionRecorder.record(ActionRecorder.SOURCE_STEERING_KEY,
                                     "ECARX_ADAS_CAPTURE_READY", ActionRecorder.object(
                                             "signal_count", propertyCount,
-                                            "property_ids", EcarxAdasSignalCatalog.idSummary()));
+                                            "property_ids", propertyIds,
+                                            "selection", "fixed_and_runtime_name_discovery"));
                         }
                     }
 
@@ -915,9 +917,12 @@ final class GeelyCarIntegration implements CarIntegration {
                     "ECARX_ADAS_CAPTURE_REQUESTED", ActionRecorder.object(
                             "channel", "ecarx.car.hardware.signal",
                             "property_ids", EcarxAdasSignalCatalog.idSummary(),
+                            "fallback_discovery_property_ids",
+                            EcarxAdasSignalCatalog.discoveryFallbackIdSummary(),
+                            "selection", "fixed_and_runtime_name_discovery",
                             "write_enabled", false));
             DiagnosticJournal.info("adas.capture",
-                    "requested read-only KX11 steering/ADAS signal capture");
+                    "requested read-only KX11 vehicle-control signal discovery");
         }
         reconcileSignalFallback();
     }

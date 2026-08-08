@@ -27,6 +27,8 @@ import dezz.status.widget.Preferences;
 public final class PrivilegedDiagnosticsAccess {
     public static final String READ_LOGS_PERMISSION = "android.permission.READ_LOGS";
     public static final String DUMP_PERMISSION = "android.permission.DUMP";
+    public static final String USAGE_STATS_PERMISSION =
+            "android.permission.PACKAGE_USAGE_STATS";
 
     private static final long ROOT_PROBE_TIMEOUT_MS = 1_500L;
     private static final long ROOT_CACHE_MS = 30_000L;
@@ -50,14 +52,17 @@ public final class PrivilegedDiagnosticsAccess {
     public static final class State {
         public final boolean readLogs;
         public final boolean dump;
+        public final boolean usageStatsPermission;
         public final boolean usageAccess;
         public final boolean root;
         public final boolean rootInputEnabled;
 
-        State(boolean readLogs, boolean dump, boolean usageAccess, boolean root,
+        State(boolean readLogs, boolean dump, boolean usageStatsPermission,
+              boolean usageAccess, boolean root,
               boolean rootInputEnabled) {
             this.readLogs = readLogs;
             this.dump = dump;
+            this.usageStatsPermission = usageStatsPermission;
             this.usageAccess = usageAccess;
             this.root = root;
             this.rootInputEnabled = rootInputEnabled;
@@ -82,10 +87,11 @@ public final class PrivilegedDiagnosticsAccess {
         Context appContext = context.getApplicationContext();
         boolean readLogs = granted(appContext, READ_LOGS_PERMISSION);
         boolean dump = granted(appContext, DUMP_PERMISSION);
+        boolean usagePermission = granted(appContext, USAGE_STATS_PERMISSION);
         boolean usage = Permissions.isUsageAccessGranted(appContext);
         boolean root = probeRoot ? hasRoot() : cachedRoot;
         boolean rootInput = new Preferences(appContext).actionRecorderRootInputEnabled.get();
-        return new State(readLogs, dump, usage, root, rootInput);
+        return new State(readLogs, dump, usagePermission, usage, root, rootInput);
     }
 
     private static boolean granted(@NonNull Context context, @NonNull String permission) {
