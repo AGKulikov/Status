@@ -86,7 +86,7 @@ public final class Ha1187TwoPhaseAncsAndLimiterCaptureContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1187() throws Exception {
-        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1187'"));
+        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1188'"));
     }
 
     private static String project(String relative) throws Exception {

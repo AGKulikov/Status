@@ -56,7 +56,7 @@ public final class Ha1173Android9NotificationSurfaceContractTest {
         assertTrue(config.contains("borderWidthPx"));
         assertTrue(config.contains("borderColor"));
         assertTrue(config.contains("iconCornerRadiusPx"));
-        assertTrue(build.contains("return 'v2.8.2-ha1187'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1188'"));
     }
 
     private static String source(String relative) throws Exception {
