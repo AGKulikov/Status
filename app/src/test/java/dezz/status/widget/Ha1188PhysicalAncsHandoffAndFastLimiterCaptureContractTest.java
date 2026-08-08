@@ -13,21 +13,19 @@ import org.junit.Test;
 
 /** HA1188 regressions derived from the first in-car HA1187/v26 trace. */
 public final class Ha1188PhysicalAncsHandoffAndFastLimiterCaptureContractTest {
-    @Test public void encryptedHandoffNeverSchedulesDelayedPhysicalCancel() throws Exception {
+    @Test public void sameOwnerReadyNeverSchedulesPhysicalHandoff() throws Exception {
         String transport = project(
                 "app/src/main/java/dezz/status/widget/phone/transport/IphoneAncsTransport.java");
-        String handoff = between(transport,
-                "private void beginAncsHandoffReconnect",
-                "private void cancelAncsHandoffReconnectTimeout");
-        String cancel = between(transport,
-                "private void cancelAncsHandoffReconnectTimeout",
-                "private boolean matchesAncsHandoffPeer");
+        String ready = between(transport,
+                "private boolean canAcceptAncsReady",
+                "private void scheduleSecureClientStart");
 
-        assertTrue(handoff.contains("awaitingAncsHandoffReconnect = true"));
-        assertTrue(handoff.contains("ANCS_HANDOFF_RECONNECT_TIMEOUT_MS"));
-        assertTrue(handoff.contains("Android не ставит delayed cancel"));
-        assertFalse(handoff.contains("cancelConnection"));
-        assertFalse(cancel.contains("ancsBootstrapDisconnectTask"));
+        assertTrue(ready.contains("findConnectedServerPeer(device) != null"));
+        assertTrue(ready.contains("BluetoothDevice exactIncomingDevice = serverLink.device"));
+        assertTrue(ready.contains("ANCS-READY принят без disconnect"));
+        assertFalse(ready.contains("cancelConnection"));
+        assertFalse(transport.contains("ANCS_HANDOFF_RECONNECT_TIMEOUT_MS"));
+        assertFalse(transport.contains("ANCS-HANDOFF"));
     }
 
     @Test public void limiterTypeDiscoveryBuildsOneMethodIndex() throws Exception {

@@ -99,11 +99,37 @@ jobs:
         grep -qi "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75" /tmp/apk-certs.txt
         mv "$APK" "app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}.apk"
 
-    - name: Upload verified installable APK
+    - name: Package matched HA1194 and Helper v32 release
+      env:
+        VERSION_NAME: ${{ steps.version.outputs.version }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p release-out
+        APK="app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}.apk"
+        cp "$APK" "release-out/status-widget-ha-${VERSION_NAME}.apk"
+        git archive \
+          --format=zip \
+          --prefix=KX11-iPhone-ANCS-Helper-v32/ \
+          --output=release-out/KX11-iPhone-ANCS-Helper-v32.zip \
+          HEAD:ios/KX11-iPhone-ANCS-Helper-v32
+        jq -n \
+          --arg android "$VERSION_NAME" \
+          --arg helper "32.0" \
+          --arg sourceSha "$GITHUB_SHA" \
+          '{android: $android, helper: $helper, sourceSha: $sourceSha,
+            connectionModel: "single-owner RequiresANCS"}' \
+          > release-out/matched-pair.json
+        sha256sum \
+          "release-out/status-widget-ha-${VERSION_NAME}.apk" \
+          release-out/KX11-iPhone-ANCS-Helper-v32.zip \
+          > release-out/SHA256SUMS.txt
+
+    - name: Upload verified matched release pair
       uses: actions/upload-artifact@v4
       with:
-        name: status-widget-ha-${{ steps.version.outputs.version }}-release
-        path: app/build/outputs/apk/geely/release/status-widget-ha-${{ steps.version.outputs.version }}.apk
+        name: status-widget-ha-${{ steps.version.outputs.version }}-helper-v32
+        path: release-out/*
         if-no-files-found: error
         retention-days: 30
 
@@ -114,4 +140,4 @@ jobs:
         name: Release ${{ steps.version.outputs.version }}
         draft: false
         prerelease: false
-        files: app/build/outputs/apk/geely/release/status-widget-ha-${{ steps.version.outputs.version }}.apk
+        files: release-out/*

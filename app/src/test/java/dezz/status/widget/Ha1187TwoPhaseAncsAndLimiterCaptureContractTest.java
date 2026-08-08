@@ -11,9 +11,9 @@ import java.nio.file.Paths;
 
 import org.junit.Test;
 
-/** HA1187 barriers for the two-link ANCS bootstrap and typed callback-only car recorder. */
+/** HA1187-era car barriers plus the superseding HA1194 single-owner ANCS contract. */
 public final class Ha1187TwoPhaseAncsAndLimiterCaptureContractTest {
-    @Test public void androidPreservesTrustAcrossExplicitRequiresAncsHandoff()
+    @Test public void androidKeepsTrustOnTheOriginalRequiresAncsOwner()
             throws Exception {
         String transport = project(
                 "app/src/main/java/dezz/status/widget/phone/transport/IphoneAncsTransport.java");
@@ -27,15 +27,13 @@ public final class Ha1187TwoPhaseAncsAndLimiterCaptureContractTest {
                 "public void onConnectionStateChange(BluetoothDevice device,",
                 "public void onCharacteristicReadRequest");
 
-        assertTrue(transport.contains("ANCS-HANDOFF"));
-        assertTrue(transport.contains("awaitingAncsHandoffReconnect"));
-        assertTrue(transport.contains("beginAncsHandoffReconnect"));
-        assertTrue(transport.contains("handleIncomingAncsHandoffLink"));
-        assertTrue(secure.contains("Android client на bootstrap-link не запускается"));
-        assertTrue(disconnect.contains("BOOTSTRAP LINK RELEASED"));
-        assertTrue(disconnect.contains("verified peer и Geely_ANCS"));
-        assertTrue(serverConnection.contains("handleIncomingAncsHandoffLink(device)"));
-        assertTrue(serverConnection.contains("без pre-PAIR createBond"));
+        assertFalse(transport.contains("ANCS-HANDOFF"));
+        assertFalse(transport.contains("awaitingAncsHandoffReconnect"));
+        assertTrue(secure.contains("REQUIRES_ANCS LINK SECURE · ЖДУ HELPER READY"));
+        assertTrue(secure.contains("ANCS-READY принят без disconnect"));
+        assertTrue(disconnect.contains("preserveManagedIncomingPublicationAfterLinkLoss"));
+        assertTrue(disconnect.contains("GATT server, реклама и namespace"));
+        assertTrue(serverConnection.contains("Единственный RequiresANCS Central link"));
         assertFalse(serverConnection.contains("requestBond(device)"));
     }
 

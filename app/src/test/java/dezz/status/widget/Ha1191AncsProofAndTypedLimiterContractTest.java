@@ -13,22 +13,20 @@ import org.junit.Test;
 
 /** HA1191 regressions derived from the 17:49 handoff race and the KX11 byte-array trace. */
 public final class Ha1191AncsProofAndTypedLimiterContractTest {
-    @Test public void phaseTwoIsNeverCancelledAndNeedsExplicitReadyProof() throws Exception {
+    @Test public void oneRequiresAncsOwnerNeedsExplicitReadyProof() throws Exception {
         String transport = project(
                 "app/src/main/java/dezz/status/widget/phone/transport/IphoneAncsTransport.java");
-        String handoff = between(transport,
-                "private void beginAncsHandoffReconnect",
-                "private void cancelAncsHandoffReconnectTimeout");
-        String incoming = between(transport,
-                "private boolean handleIncomingAncsHandoffLink",
-                "private boolean canAcceptAncsReady");
+        String ready = between(transport,
+                "private boolean canAcceptAncsReady",
+                "private void scheduleSecureClientStart");
 
-        assertFalse(handoff.contains("cancelConnection"));
-        assertTrue(handoff.contains("Android не ставит delayed cancel"));
-        assertTrue(incoming.contains("didConnect ещё не считается готовностью ANCS"));
+        assertFalse(transport.contains("ANCS-HANDOFF"));
+        assertTrue(ready.contains("secureAttConfirmed"));
+        assertTrue(ready.contains("findConnectedServerPeer(device) != null"));
+        assertTrue(ready.contains("exactIncomingDevice"));
         assertTrue(transport.contains("\"ANCS-READY\".equals(command)"));
         assertTrue(transport.contains("ANCS-SUBSCRIBED"));
-        assertTrue(transport.contains("DATA_SOURCE + NOTIFICATION_SOURCE CCCD success"));
+        assertTrue(transport.contains("both ANCS CCCD + B4 CCCD"));
     }
 
     @Test public void helperTurnsGreenOnlyAfterAndroidCccdAcknowledgement() throws Exception {

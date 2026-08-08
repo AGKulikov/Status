@@ -21,7 +21,8 @@ public final class Ha1153Kx11RegressionContractTest {
         assertTrue(transport.contains("startOptionalHelperTelemetrySubscription"));
         assertTrue(transport.contains(
                 "acceptHelperTelemetryFrame(callbackGatt, telemetry, \"notification\")"));
-        assertTrue(transport.contains("iphoneHelperTelemetryFrameReceived = true"));
+        assertTrue(transport.contains("iphoneHelperValidTelemetryReceived = true"));
+        assertTrue(transport.contains("iphoneHelperTelemetrySubscribed"));
         assertTrue(transport.contains("listener.onHelperTelemetry(telemetry)"));
     }
 

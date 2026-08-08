@@ -13,33 +13,26 @@ import org.junit.Test;
 
 /** HA1189 regressions derived from the latest Android 9/v26 in-car traces. */
 public final class Ha1189AnonymousHandoffAndBinaryLimiterContractTest {
-    @Test public void anonymousPhaseTwoNeedsEncryptedPhysicalReleaseWindow() throws Exception {
+    @Test public void clientAttachUsesExactIncomingBluetoothDevice() throws Exception {
         String transport = project(
                 "app/src/main/java/dezz/status/widget/phone/transport/IphoneAncsTransport.java");
-        String binding = between(transport,
-                "private boolean bindAnonymousHandoffClientIdentity",
-                "private boolean observePlannedAncsBootstrapRelease");
-        String incoming = between(transport,
-                "private boolean handleIncomingAncsHandoffLink",
+        String ready = between(transport,
+                "private boolean canAcceptAncsReady",
                 "private void scheduleSecureClientStart");
-        String anonymous = between(incoming,
-                "if (previous != null && bindAnonymousHandoffClientIdentity",
-                "log(\"ANCS handoff: жду resolved bonded peer");
+        String attach = between(transport,
+                "private void startSamePeerAttach",
+                "private void scheduleDirectFallback");
         String lookup = between(transport,
                 "private GattServerPeer findConnectedServerPeer",
                 "private boolean issueCurrentLinkSecurityChallenge");
 
-        assertTrue(binding.contains("awaitingAncsHandoffReconnect"));
-        assertTrue(binding.contains("secureAttConfirmed"));
-        assertTrue(binding.contains("BluetoothDevice.DEVICE_TYPE_UNKNOWN"));
-        assertTrue(binding.contains("BluetoothDevice.BOND_NONE"));
-        assertTrue(binding.contains("BluetoothDevice.BOND_BONDED"));
-        assertTrue(binding.contains("peer.clientIdentity = stableIdentity"));
-        assertTrue(incoming.contains("bindAnonymousHandoffClientIdentity(device, previous)"));
-        assertTrue(anonymous.contains("managedResolvedPeer = previous"));
-        assertTrue(incoming.contains("ЖДУ ANCS-READY"));
-        assertFalse(anonymous.contains("verifiedPeer = device"));
-        assertTrue(lookup.contains("sameDevice(peer.clientIdentity, device)"));
+        assertTrue(ready.contains("BluetoothDevice exactIncomingDevice = serverLink.device"));
+        assertTrue(ready.contains("verifiedPeer = exactIncomingDevice"));
+        assertTrue(attach.contains("BluetoothDevice device = serverLink.device"));
+        assertTrue(attach.contains("EXACT SAME VERIFIED BluetoothDevice"));
+        assertTrue(lookup.contains("sameDevice(peer.device, device)"));
+        assertFalse(transport.contains("clientIdentity"));
+        assertFalse(transport.contains("bindAnonymousHandoffClientIdentity"));
     }
 
     @Test public void helperKeepsRequiresAncsOwnerWhenB4IsAbsent() throws Exception {

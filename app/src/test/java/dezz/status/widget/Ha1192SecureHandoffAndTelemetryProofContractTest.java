@@ -40,7 +40,8 @@ public final class Ha1192SecureHandoffAndTelemetryProofContractTest {
         assertFalse(transport.contains("requestIncomingPrePairLeBond"));
         assertFalse(transport.contains("incomingPrePairBondRequested"));
         assertFalse(connection.contains("requestBond(device)"));
-        assertTrue(connection.contains("LE security начинается только после PAIR/B3 challenge"));
+        assertTrue(connection.contains("LE security начинается только после"));
+        assertTrue(connection.contains("PAIR/B3 challenge"));
     }
 
     @Test public void readyProofRequiresActualB4PayloadAndRetries() throws Exception {
@@ -53,13 +54,15 @@ public final class Ha1192SecureHandoffAndTelemetryProofContractTest {
                 "private boolean startHelperAncsReadyProof",
                 "private void scheduleHelperAncsReadyProofRetry");
 
-        assertTrue(transport.contains("iphoneHelperTelemetryFrameReceived"));
+        assertTrue(transport.contains("iphoneHelperValidTelemetryReceived"));
         assertTrue(transport.contains("acceptHelperTelemetryFrame"));
-        assertTrue(proof.contains("!iphoneHelperTelemetryFrameReceived"));
-        assertTrue(proof.contains("valid B4 payload"));
+        assertTrue(proof.contains("!iphoneHelperValidTelemetryReceived"));
+        assertTrue(proof.contains("!iphoneHelperTelemetrySubscribed"));
+        assertTrue(proof.contains("valid battery/network payload"));
         assertTrue(transport.contains("helperAncsReadyProofAcknowledged"));
         assertTrue(transport.contains("ANCS-SUBSCRIBED retry через 1 с"));
-        assertTrue(publicReady.contains("iphoneHelperTelemetryFrameReceived"));
+        assertTrue(publicReady.contains("iphoneHelperValidTelemetryReceived"));
+        assertTrue(publicReady.contains("iphoneHelperTelemetrySubscribed"));
         assertTrue(publicReady.contains("helperAncsReadyProofAcknowledged"));
         assertTrue(transport.contains("ANCS CCCD OK · ЖДУ B4 ДАННЫЕ"));
         assertTrue(transport.contains("ANCS READY · B4 VERIFIED"));

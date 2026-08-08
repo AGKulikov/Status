@@ -24,8 +24,8 @@ public final class Ha1190DynamicGattAndBinaryLimiterContractTest {
                 "private void rotateManagedIncomingDiagnosticNamespace",
                 "/** Legacy comparison test");
         String disconnect = between(transport,
-                "private void scheduleUnverifiedNamespaceRotation",
-                "private boolean issueCurrentLinkSecurityChallenge");
+                "private void preserveManagedIncomingPublicationAfterLinkLoss",
+                "private static String deviceKey");
 
         assertTrue(transport.contains("d2d9e4bf-47f1-4e44-a8bb-a932fd5affff"));
         assertTrue(start.contains("rotateManagedIncomingDiagnosticNamespace()"));
@@ -35,7 +35,10 @@ public final class Ha1190DynamicGattAndBinaryLimiterContractTest {
         assertTrue(namespace.contains("managedIncomingUuid(0, generation)"));
         assertTrue(namespace.contains("serverControlCharacteristic = managedIncomingUuid(2"));
         assertTrue(namespace.contains("serverSecureCharacteristic = managedIncomingUuid(3"));
-        assertTrue(disconnect.contains("scheduleManagedIncomingRestart"));
+        assertTrue(disconnect.contains("resetVerifiedPeerSession()"));
+        assertFalse(disconnect.contains("stopAdvertising()"));
+        assertFalse(disconnect.contains("closeGattServer()"));
+        assertFalse(disconnect.contains("rotateManagedIncomingDiagnosticNamespace"));
         assertTrue(transport.contains("serverDiagnosticService.equals(service.getUuid())"));
     }
 
