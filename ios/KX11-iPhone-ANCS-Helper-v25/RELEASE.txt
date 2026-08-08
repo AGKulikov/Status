@@ -1,0 +1,29 @@
+KX11 ANCS Helper v25
+====================
+
+Companion release: Status Widget v2.8.2-ha1182
+Bundle identifier: ru.natro.kx11ancshelper
+Marketing version: 25.0
+Build number: 25
+Minimum iOS version: 13.0
+
+Release verification
+--------------------
+
+- Bootstrap D2D9 moves from cached generation 2/F02 to fresh generation 4/F04.
+- The iPhone-owned B4 relay moves from cached generation 3/F03 to generation 5/F05.
+- Status Widget HA1182 and Helper v25 use the same F04/F05 protocol pair.
+- Restoration identifiers move to v25/g4/g5 so stale v24 operations cannot be restored.
+- D2D9 service discovery is targeted by the new UUID.
+- B2/B3 characteristic discovery remains unfiltered and serialized.
+- B2/B3 discovery requests are serialized outside the preceding delegate callback.
+- CBError.uuidNotAllowed retries are bounded on the current ATT link.
+- A current-service rediscovery is attempted before a destructive link reset.
+- didModifyServices discards invalidated service handles and rediscovers on the live link.
+- A B4 unsubscribe never clears an already-proven ANCS owner or forces a Central bootstrap.
+- Protected-data lock/unlock events still update B4 flag bit 5 immediately.
+- The B4 frame remains A5/01, eight bytes, little-endian sequence and CRC-8/ATM.
+- Central bootstrap still requires ANCS and system auto-reconnect remains disabled.
+- v25 restoration identifiers isolate this build from pending v24 Core Bluetooth operations.
+- Classic Bluetooth profiles, names, pairing, the system LE bond and ANCS authorization remain
+  untouched.

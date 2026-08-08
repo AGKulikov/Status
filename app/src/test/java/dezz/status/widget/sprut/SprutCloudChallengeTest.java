@@ -12,19 +12,18 @@ import java.io.IOException;
 
 public final class SprutCloudChallengeTest {
     /**
-     * Vector generated independently with the same primitives used by Sprut's current web client:
-     * hash-wasm Argon2id, WebCrypto-compatible HKDF-SHA256 and noble Ed25519.
+     * Vector generated independently with hash-wasm Argon2id and Node's Ed25519 implementation,
+     * matching the direct Argon2id-to-Ed25519 flow in Sprut's current web client.
      */
     @Test public void matchesCurrentSprutWebClientProof() throws Exception {
         JSONObject data = new JSONObject()
                 .put("rootSalt", "AAECAwQFBgcICQoLDA0ODw==")
                 .put("challenge", "//79/Pv6+fj39vX08/Lx8O/u7ezr6uno5+bl5OPi4eA=")
-                .put("kdfParams", "m=32,t=2,p=1")
-                .put("info", "Sprut.hub challenge test");
+                .put("kdfParams", "m=32,t=2,p=1");
 
         assertEquals(
-                "4b3jD8tSAaWH/xuatU8emTtxid+czxyBgzIXEXAtO7gW22apw96PZ9zYGZEhWcQS"
-                        + "gwSoiLkUzndw24T35EUQDg==",
+                "ldfelFZ82knxzp4BQR8CuDVx0ggCAcIUvJm/AQvoyA7l/DcsbkZ2n31RlakKq2gw"
+                        + "mAumvr3hxLfLlm7zMrkOAA==",
                 SprutCloudChallenge.answer("пароль-StatusWidget-2026", data.toString()));
     }
 
@@ -43,32 +42,31 @@ public final class SprutCloudChallengeTest {
         }
     }
 
-    @Test public void acceptsCurrentBetaChallengeWithoutOptionalHkdfInfo() throws Exception {
+    @Test public void legacyInfoFieldDoesNotChangeOfficialProof() throws Exception {
         JSONObject withoutInfo = new JSONObject()
                 .put("rootSalt", "AAECAwQFBgcICQoLDA0ODw==")
                 .put("challenge", "//79/Pv6+fj39vX08/Lx8O/u7ezr6uno5+bl5OPi4eA=")
                 .put("kdfParams", "m=32,t=2,p=1");
-        JSONObject withEmptyInfo = new JSONObject(withoutInfo.toString()).put("info", "");
+        JSONObject withLegacyInfo = new JSONObject(withoutInfo.toString())
+                .put("info", "legacy client context");
 
         String missingAnswer = SprutCloudChallenge.answer("secret", withoutInfo.toString());
-        String emptyAnswer = SprutCloudChallenge.answer("secret", withEmptyInfo.toString());
+        String legacyAnswer = SprutCloudChallenge.answer("secret", withLegacyInfo.toString());
 
-        assertEquals(emptyAnswer, missingAnswer);
+        assertEquals(legacyAnswer, missingAnswer);
         assertEquals(64, java.util.Base64.getDecoder().decode(missingAnswer).length);
     }
 
-    @Test public void rejectsNonStringHkdfInfoWithoutLeakingPassword() throws Exception {
-        JSONObject data = new JSONObject()
+    @Test public void ignoresUnknownChallengeFields() throws Exception {
+        JSONObject base = new JSONObject()
                 .put("rootSalt", "AAECAwQFBgcICQoLDA0ODw==")
                 .put("challenge", "AQIDBAUGBwg=")
-                .put("kdfParams", "m=32,t=2,p=1")
+                .put("kdfParams", "m=32,t=2,p=1");
+        JSONObject withUnknownFields = new JSONObject(base.toString())
                 .put("info", new JSONObject());
-        try {
-            SprutCloudChallenge.answer("must-not-appear", data.toString());
-            fail("Expected non-string info to be rejected");
-        } catch (IOException expected) {
-            assertTrue(expected.getMessage().contains("info is not a string"));
-            assertTrue(!expected.getMessage().contains("must-not-appear"));
-        }
+
+        assertEquals(
+                SprutCloudChallenge.answer("secret", base.toString()),
+                SprutCloudChallenge.answer("secret", withUnknownFields.toString()));
     }
 }

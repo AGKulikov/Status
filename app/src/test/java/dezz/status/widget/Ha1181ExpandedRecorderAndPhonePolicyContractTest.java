@@ -85,7 +85,7 @@ public final class Ha1181ExpandedRecorderAndPhonePolicyContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1181() throws Exception {
-        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1181'"));
+        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1182'"));
     }
 
     private static String source(String relative) throws Exception {

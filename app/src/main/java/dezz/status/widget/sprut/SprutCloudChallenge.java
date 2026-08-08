@@ -1,11 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package dezz.status.widget.sprut;
 
-import org.bouncycastle.crypto.digests.SHA256Digest;
 import org.bouncycastle.crypto.generators.Argon2BytesGenerator;
-import org.bouncycastle.crypto.generators.HKDFBytesGenerator;
 import org.bouncycastle.crypto.params.Argon2Parameters;
-import org.bouncycastle.crypto.params.HKDFParameters;
 import org.bouncycastle.math.ec.rfc8032.Ed25519;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -22,14 +19,13 @@ import java.util.Objects;
  * Answers the proof-of-password challenge used by Sprut's current cloud client.
  *
  * <p>The server-provided salt and KDF settings are public authentication parameters. Password
- * bytes, the Argon2 result and the derived Ed25519 seed remain local and are cleared as soon as
- * the signature has been produced.</p>
+ * bytes and the Argon2 result remain local and are cleared as soon as the signature has been
+ * produced.</p>
  */
 final class SprutCloudChallenge {
     private static final int DERIVED_KEY_BYTES = 32;
     private static final int MAX_QUESTION_DATA_CHARS = 16_384;
     private static final int MAX_BINARY_FIELD_BYTES = 4_096;
-    private static final int MAX_INFO_BYTES = 4_096;
     private static final int MAX_MEMORY_KIB = 262_144;
     private static final int MAX_ITERATIONS = 16;
     private static final int MAX_PARALLELISM = 16;
@@ -53,11 +49,6 @@ final class SprutCloudChallenge {
 
         byte[] rootSalt = decode(data, "rootSalt");
         byte[] challenge = decode(data, "challenge");
-        // HKDF explicitly permits an empty context. Current beta.spruthub.ru challenges omit
-        // `info` altogether, while older web clients sent it as a non-empty string. Treat an
-        // absent/null/empty field as the same empty byte sequence instead of rejecting a valid
-        // challenge before the password proof is calculated.
-        byte[] info = optionalString(data, "info").getBytes(StandardCharsets.UTF_8);
         KdfSettings settings = KdfSettings.parse(requiredString(data, "kdfParams"));
         if (rootSalt.length < 8 || rootSalt.length > MAX_BINARY_FIELD_BYTES) {
             throw invalid("rootSalt length is outside the supported range");
@@ -65,13 +56,9 @@ final class SprutCloudChallenge {
         if (challenge.length == 0 || challenge.length > MAX_BINARY_FIELD_BYTES) {
             throw invalid("challenge length is outside the supported range");
         }
-        if (info.length > MAX_INFO_BYTES) {
-            throw invalid("HKDF info is too large");
-        }
 
         byte[] passwordBytes = password.getBytes(StandardCharsets.UTF_8);
         byte[] argonResult = new byte[DERIVED_KEY_BYTES];
-        byte[] signingSeed = new byte[DERIVED_KEY_BYTES];
         byte[] signature = new byte[Ed25519.SIGNATURE_SIZE];
         try {
             Argon2Parameters parameters = new Argon2Parameters.Builder(
@@ -86,18 +73,15 @@ final class SprutCloudChallenge {
             argon2.init(parameters);
             argon2.generateBytes(passwordBytes, argonResult);
 
-            HKDFBytesGenerator hkdf = new HKDFBytesGenerator(new SHA256Digest());
-            hkdf.init(new HKDFParameters(argonResult, new byte[0], info));
-            hkdf.generateBytes(signingSeed, 0, signingSeed.length);
-
-            Ed25519.sign(signingSeed, 0, challenge, 0, challenge.length, signature, 0);
+            // This deliberately mirrors beta.spruthub.ru: the 32-byte Argon2id result is the
+            // Ed25519 seed. There is no HKDF stage in the official web client.
+            Ed25519.sign(argonResult, 0, challenge, 0, challenge.length, signature, 0);
             return Base64.getEncoder().encodeToString(signature);
         } catch (RuntimeException cryptoFailure) {
             throw invalid("cryptographic proof failed", cryptoFailure);
         } finally {
             Arrays.fill(passwordBytes, (byte) 0);
             Arrays.fill(argonResult, (byte) 0);
-            Arrays.fill(signingSeed, (byte) 0);
         }
     }
 
@@ -118,13 +102,6 @@ final class SprutCloudChallenge {
         String value = data.optString(name, "");
         if (value.isEmpty()) throw invalid("missing " + name);
         return value;
-    }
-
-    private static String optionalString(JSONObject data, String name) throws IOException {
-        if (!data.has(name) || data.isNull(name)) return "";
-        Object value = data.opt(name);
-        if (!(value instanceof String)) throw invalid(name + " is not a string");
-        return (String) value;
     }
 
     private static IOException invalid(String detail) {

@@ -72,26 +72,31 @@ import dezz.status.widget.phone.IphoneHelperTelemetry;
 public final class IphoneAncsTransport {
     public static final String LOCAL_LOGICAL_NAME = "Geely_ANCS";
     public static final String REMOTE_LOGICAL_NAME = "iPhone_ANCS";
+    /**
+     * Generation 4 deliberately replaces the long-lived F02 bootstrap namespace. Android 9 and
+     * Core Bluetooth had both cached the old service database; iOS then rejected even an
+     * unfiltered B2/B3 discovery with CBError.uuidNotAllowed before the PAIR exchange started.
+     */
     private static final UUID DIAGNOSTIC_SERVICE =
-            UUID.fromString("d2d9e4b0-47f1-4e44-a8bb-a932fd5a2f02");
+            UUID.fromString("d2d9e4b0-47f1-4e44-a8bb-a932fd5a2f04");
     private static final UUID DIAGNOSTIC_CHARACTERISTIC =
-            UUID.fromString("d2d9e4b1-47f1-4e44-a8bb-a932fd5a2f02");
+            UUID.fromString("d2d9e4b1-47f1-4e44-a8bb-a932fd5a2f04");
     private static final UUID CONTROL_CHARACTERISTIC =
-            UUID.fromString("d2d9e4b2-47f1-4e44-a8bb-a932fd5a2f02");
+            UUID.fromString("d2d9e4b2-47f1-4e44-a8bb-a932fd5a2f04");
     private static final UUID SECURE_CHARACTERISTIC =
-            UUID.fromString("d2d9e4b3-47f1-4e44-a8bb-a932fd5a2f02");
+            UUID.fromString("d2d9e4b3-47f1-4e44-a8bb-a932fd5a2f04");
     /** Dedicated Helper telemetry endpoint on the current verified GATT-server connection. */
     private static final UUID TELEMETRY_CHARACTERISTIC =
-            UUID.fromString("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f02");
+            UUID.fromString("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f04");
     /**
      * iPhone-owned telemetry relay discovered by Android on the already-working ANCS owner.
-     * Generation 3 is intentionally separate from Android's generation-2 bootstrap database:
+     * Generation 5 is intentionally separate from Android's generation-4 bootstrap database:
      * Android 9 and Core Bluetooth otherwise reuse the opposite GATT role's stale B4 handle.
      */
     private static final UUID TELEMETRY_RELAY_SERVICE =
-            UUID.fromString("d2d9e4b0-47f1-4e44-a8bb-a932fd5a2f03");
+            UUID.fromString("d2d9e4b0-47f1-4e44-a8bb-a932fd5a2f05");
     private static final UUID TELEMETRY_RELAY_CHARACTERISTIC =
-            UUID.fromString("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f03");
+            UUID.fromString("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f05");
     private static final UUID GENERIC_ATTRIBUTE_SERVICE =
             UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
     private static final UUID SERVICE_CHANGED =
@@ -2383,9 +2388,9 @@ public final class IphoneAncsTransport {
             iphoneTelemetryCharacteristic = discoveredTelemetry;
             log("Helper telemetry endpoint="
                     + (TELEMETRY_RELAY_CHARACTERISTIC.equals(discoveredTelemetryUuid)
-                    ? "B4 relay generation 3 on ANCS owner"
+                    ? "B4 relay generation 5 on ANCS owner"
                     : iphoneTelemetryCharacteristic != null
-                    ? "bootstrap B4 generation 2" : "legacy TEL2/B3"));
+                    ? "bootstrap B4 generation 4" : "legacy TEL2/B3"));
 
             // Helper v9+ deliberately makes B4 readable before ANCS authorization. Read one
             // atomic snapshot before touching an encrypted ANCS CCCD: otherwise a pending

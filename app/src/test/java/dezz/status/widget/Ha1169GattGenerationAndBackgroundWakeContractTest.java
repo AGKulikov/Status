@@ -41,15 +41,15 @@ public final class Ha1169GattGenerationAndBackgroundWakeContractTest {
         assertTrue(card.contains("slotBottom - childTop - visibleHeight"));
     }
 
-    @Test public void androidPublishesGenerationTwoB4NotifyWithRealCccd() throws Exception {
+    @Test public void androidPublishesCurrentBootstrapB4NotifyWithRealCccd() throws Exception {
         String transport = source("phone/transport/IphoneAncsTransport.java");
         String server = between(transport, "private void openGattServer()",
                 "private void startPreparedAdvertising()");
         String callbacks = between(transport, "private final BluetoothGattServerCallback",
                 "private void handleIphonePeripheralConnectionState");
 
-        assertTrue(transport.contains("d2d9e4b0-47f1-4e44-a8bb-a932fd5a2f02"));
-        assertTrue(transport.contains("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f02"));
+        assertTrue(transport.contains("d2d9e4b0-47f1-4e44-a8bb-a932fd5a2f04"));
+        assertTrue(transport.contains("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f04"));
         assertTrue(server.contains("BluetoothGattCharacteristic.PROPERTY_NOTIFY"));
         assertTrue(server.contains("telemetry.addDescriptor(telemetryCccd)"));
         assertTrue(callbacks.contains("public void onDescriptorWriteRequest"));
@@ -76,7 +76,7 @@ public final class Ha1169GattGenerationAndBackgroundWakeContractTest {
     @Test public void releaseIdentityIsHa1169() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1181'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1182'"));
     }
 
     private static String source(String relative) throws Exception {

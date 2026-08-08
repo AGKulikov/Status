@@ -13,7 +13,7 @@ import org.junit.Test;
 
 /** Regression barriers for Helper v19 telemetry on the established reverse-route ANCS owner. */
 public final class Ha1176UnifiedTelemetryRelayContractTest {
-    @Test public void androidDiscoversGenerationThreeRelayInBothClientRoutes()
+    @Test public void androidDiscoversCurrentRelayInBothClientRoutes()
             throws Exception {
         String transport = source("phone/transport/IphoneAncsTransport.java");
         String discovery = between(transport, "private void handleServices",
@@ -21,8 +21,8 @@ public final class Ha1176UnifiedTelemetryRelayContractTest {
         String relayGate = between(transport, "private boolean helperTelemetryClientEnabled",
                 "private void continueAfterHelperTelemetrySubscription");
 
-        assertTrue(transport.contains("d2d9e4b0-47f1-4e44-a8bb-a932fd5a2f03"));
-        assertTrue(transport.contains("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f03"));
+        assertTrue(transport.contains("d2d9e4b0-47f1-4e44-a8bb-a932fd5a2f05"));
+        assertTrue(transport.contains("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f05"));
         assertTrue(discovery.contains("getService(TELEMETRY_RELAY_SERVICE)"));
         assertTrue(discovery.contains("getCharacteristic(TELEMETRY_RELAY_CHARACTERISTIC)"));
         assertTrue(discovery.contains("getCharacteristic(TELEMETRY_CHARACTERISTIC)"));
@@ -97,7 +97,7 @@ public final class Ha1176UnifiedTelemetryRelayContractTest {
         String project = project("ios/KX11-iPhone-ANCS-Helper-v19/"
                 + "KX11ANCSHelper.xcodeproj/project.pbxproj");
 
-        assertTrue(build.contains("return 'v2.8.2-ha1181'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1182'"));
         assertTrue(project.contains("MARKETING_VERSION = 19.0"));
         assertTrue(project.contains("CURRENT_PROJECT_VERSION = 19"));
     }
