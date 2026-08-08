@@ -205,8 +205,12 @@ public final class PhoneConnectorControllerContractTest {
 
         assertTrue(transport.contains("LOCAL_LOGICAL_NAME = \"Geely_ANCS\""));
         assertTrue(transport.contains("REMOTE_LOGICAL_NAME = \"iPhone_ANCS\""));
-        assertTrue(advertising.contains(".addServiceUuid(new ParcelUuid(DIAGNOSTIC_SERVICE))"));
-        assertTrue(advertising.contains(".addServiceData(new ParcelUuid(DIAGNOSTIC_SERVICE)"));
+        assertTrue(advertising.contains(
+                ".addServiceUuid(new ParcelUuid(MANAGED_INCOMING_BEACON_SERVICE))"));
+        assertTrue(advertising.contains(
+                ".addServiceData(new ParcelUuid(MANAGED_INCOMING_BEACON_SERVICE)"));
+        assertTrue(advertising.contains(
+                ".addManufacturerData(MANAGED_INCOMING_MANUFACTURER_ID, namespaceFrame)"));
         assertFalse(advertising.contains(".setIncludeDeviceName(true)"));
         assertFalse(transport.contains("adapter.setName("));
         assertTrue(source.contains("\"transport.ancs.local_name\""));
