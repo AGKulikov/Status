@@ -77,7 +77,7 @@ public final class Ha1161CarPlayQualityContractTest {
 
     @Test public void releaseIdentityIsHa1161() throws Exception {
         String build = project("build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1183'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1190'"));
     }
 
     private static String source(String relative) throws Exception {

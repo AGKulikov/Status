@@ -149,6 +149,16 @@ public final class EcarxSignalDecoder {
         return coerceInteger(value, 0);
     }
 
+    /**
+     * Extracts a vendor byte-array payload without interpreting or writing it. Some KX11 limiter
+     * candidates are valid ECARX callback properties whose generated SDK type is {@code byte[]}.
+     * Returning a clone keeps the diagnostic snapshot independent from the vendor's reused Binder
+     * buffer.
+     */
+    static byte[] coerceByteArray(Object value) {
+        return coerceByteArray(value, 0);
+    }
+
     private static Integer coerceInteger(Object value, int depth) {
         if (value == null || depth > 2) return null;
         if (value instanceof Number) return ((Number) value).intValue();
@@ -165,6 +175,22 @@ public final class EcarxSignalDecoder {
                 Method method = value.getClass().getMethod(methodName);
                 if (method.getParameterTypes().length != 0) continue;
                 Integer decoded = coerceInteger(method.invoke(value), depth + 1);
+                if (decoded != null) return decoded;
+            } catch (ReflectiveOperationException | RuntimeException ignored) {
+                // Try the next wrapper convention.
+            }
+        }
+        return null;
+    }
+
+    private static byte[] coerceByteArray(Object value, int depth) {
+        if (value == null || depth > 2) return null;
+        if (value instanceof byte[]) return ((byte[]) value).clone();
+        for (String methodName : new String[] { "getData", "getValue" }) {
+            try {
+                Method method = value.getClass().getMethod(methodName);
+                if (method.getParameterTypes().length != 0) continue;
+                byte[] decoded = coerceByteArray(method.invoke(value), depth + 1);
                 if (decoded != null) return decoded;
             } catch (ReflectiveOperationException | RuntimeException ignored) {
                 // Try the next wrapper convention.

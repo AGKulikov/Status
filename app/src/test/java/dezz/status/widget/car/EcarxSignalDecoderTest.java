@@ -2,6 +2,7 @@
 package dezz.status.widget.car;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -97,6 +98,15 @@ public final class EcarxSignalDecoderTest {
         assertEquals(Integer.valueOf(9),
                 EcarxSignalDecoder.coerceInteger(new ValueWrapper(new DataWrapper(9))));
         assertNull(EcarxSignalDecoder.coerceInteger(new Object()));
+    }
+
+    @Test public void binaryWrapperValuesAreClonedForPassiveDiagnostics() {
+        byte[] source = new byte[] { (byte) 0xA5, 0x01, 0x2A };
+        byte[] decoded = EcarxSignalDecoder.coerceByteArray(new ValueWrapper(source));
+        assertArrayEquals(source, decoded);
+        source[0] = 0;
+        assertEquals(0xA5, decoded[0] & 0xFF);
+        assertNull(EcarxSignalDecoder.coerceByteArray(42));
     }
 
     public static final class ValueWrapper {

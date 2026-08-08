@@ -56,6 +56,7 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -92,6 +93,24 @@ import dezz.status.widget.launcher.vehicle.VehicleDerivedMetrics;
 final class GeelyCarIntegration implements CarIntegration {
 
     private static final String TAG = "GeelyCarIntegration";
+    private static final int ADAPT_API_CAPABILITY_PROBE_MAX_ATTEMPTS = 3;
+    private static final long ADAPT_API_CAPABILITY_PROBE_RETRY_MS = 1_500L;
+    /**
+     * Public AdaptAPI concepts which may be declared by the SDK but absent from a vehicle build.
+     * The action recorder probes these functions read-only before any control is ever exposed.
+     */
+    private static final int[] ADAPT_API_CAPABILITY_FUNCTION_IDS = {
+            IVehicle.SETTING_FUNC_SPEED_LIMITATION,
+            IVehicle.SETTING_FUNC_SPEED_LIMITATION_MODE,
+            IVehicle.SETTING_FUNC_SPEED_CONTROL,
+            IVehicle.SETTING_FUNC_SPEED_CONTROL_MODE
+    };
+    private static final String[] ADAPT_API_CAPABILITY_FUNCTION_NAMES = {
+            "SETTING_FUNC_SPEED_LIMITATION",
+            "SETTING_FUNC_SPEED_LIMITATION_MODE",
+            "SETTING_FUNC_SPEED_CONTROL",
+            "SETTING_FUNC_SPEED_CONTROL_MODE"
+    };
 
     /**
      * Sanity bounds for cabin/ambient readings — values outside are momentary CAN glitches or
@@ -253,8 +272,11 @@ final class GeelyCarIntegration implements CarIntegration {
     private final EcarxProfileCloudAccess profileCloudAccess;
     private final Object adasRecorderLock = new Object();
     private final Map<Integer, Integer> lastRecordedAdasSignals = new HashMap<>();
+    private final Map<Integer, byte[]> lastRecordedAdasBinarySignals = new HashMap<>();
     private final ActionRecorder.RecordingListener adasRecordingListener =
             this::onActionRecordingChanged;
+    /** Prevents a late Binder result from one recording session leaking into the next one. */
+    private final AtomicLong adaptApiCapabilityProbeGeneration = new AtomicLong();
     private volatile boolean adasRecorderDemand;
     /** Prefer the richer callback once it has produced a value; AdaptAPI remains the cold fallback. */
     private volatile boolean lowLevelGearKnown;
@@ -888,13 +910,20 @@ final class GeelyCarIntegration implements CarIntegration {
                                     "ECARX_ADAS_CAPTURE_READY", ActionRecorder.object(
                                             "signal_count", propertyCount,
                                             "property_ids", propertyIds,
-                                            "selection", "fixed_and_runtime_name_discovery"));
+                                            "selection",
+                                            "fixed_name_and_runtime_typed_callback_discovery"));
                         }
                     }
 
                     @Override public void onAdasSignal(int propertyId,
                                                        @NonNull String signalName, int raw) {
                         recordAdasSignal(propertyId, signalName, raw);
+                    }
+
+                    @Override public void onAdasBinarySignal(int propertyId,
+                                                             @NonNull String signalName,
+                                                             @NonNull byte[] raw) {
+                        recordAdasBinarySignal(propertyId, signalName, raw);
                     }
 
                     @Override public void onChannelLost() {
@@ -908,9 +937,11 @@ final class GeelyCarIntegration implements CarIntegration {
     }
 
     private void onActionRecordingChanged(boolean recording) {
+        long capabilityProbeGeneration = adaptApiCapabilityProbeGeneration.incrementAndGet();
         adasRecorderDemand = recording;
         synchronized (adasRecorderLock) {
             lastRecordedAdasSignals.clear();
+            lastRecordedAdasBinarySignals.clear();
         }
         if (recording) {
             ActionRecorder.record(ActionRecorder.SOURCE_STEERING_KEY,
@@ -919,12 +950,179 @@ final class GeelyCarIntegration implements CarIntegration {
                             "property_ids", EcarxAdasSignalCatalog.idSummary(),
                             "fallback_discovery_property_ids",
                             EcarxAdasSignalCatalog.discoveryFallbackIdSummary(),
-                            "selection", "fixed_and_runtime_name_discovery",
+                            "selection", "fixed_name_and_runtime_typed_callback_discovery",
+                            "runtime_discovery_polling", false,
                             "write_enabled", false));
             DiagnosticJournal.info("adas.capture",
                     "requested read-only KX11 vehicle-control signal discovery");
+            ActionRecorder.record(ActionRecorder.SOURCE_STEERING_KEY,
+                    "ECARX_ADAPTAPI_CAPABILITY_PROBE_REQUESTED", ActionRecorder.object(
+                            "functions", Arrays.toString(ADAPT_API_CAPABILITY_FUNCTION_IDS),
+                            "queries", "isFunctionSupported,getSupportedFunctionValue,"
+                                    + "getFunctionValue",
+                            "write_enabled", false));
+            scheduleAdaptApiCapabilityProbe(capabilityProbeGeneration, 1, 0L);
         }
         reconcileSignalFallback();
+    }
+
+    private boolean isAdaptApiCapabilityProbeActive(long generation) {
+        return generation == adaptApiCapabilityProbeGeneration.get()
+                && adasRecorderDemand && ActionRecorder.isRecording() && !controlsShuttingDown;
+    }
+
+    private void scheduleAdaptApiCapabilityProbe(long generation, int attempt, long delayMillis) {
+        Runnable submit = () -> {
+            if (!isAdaptApiCapabilityProbeActive(generation)) return;
+            if (!executeControlTask(() -> probeAdaptApiCapabilities(generation, attempt))) {
+                ActionRecorder.record(ActionRecorder.SOURCE_STEERING_KEY,
+                        "ECARX_ADAPTAPI_CAPABILITY_PROBE_UNAVAILABLE", ActionRecorder.object(
+                                "attempt", attempt,
+                                "reason", "control_worker_unavailable",
+                                "write_enabled", false));
+            }
+        };
+        if (delayMillis <= 0L) submit.run();
+        else mainHandler.postDelayed(submit, delayMillis);
+    }
+
+    /**
+     * Passive capability probe. It deliberately calls only support/discovery/read methods and
+     * never setFunctionValue/setCustomizeFunctionValue or a low-level property writer.
+     */
+    private void probeAdaptApiCapabilities(long generation, int attempt) {
+        if (!isAdaptApiCapabilityProbeActive(generation)) return;
+        ICarFunction source = ensureCarFunctions();
+        if (source == null) {
+            boolean retry = attempt < ADAPT_API_CAPABILITY_PROBE_MAX_ATTEMPTS;
+            ActionRecorder.record(ActionRecorder.SOURCE_STEERING_KEY,
+                    retry ? "ECARX_ADAPTAPI_CAPABILITY_PROBE_WAITING"
+                            : "ECARX_ADAPTAPI_CAPABILITY_PROBE_UNAVAILABLE",
+                    ActionRecorder.object(
+                            "attempt", attempt,
+                            "reason", "function_manager_not_ready",
+                            "retry_scheduled", retry,
+                            "write_enabled", false));
+            if (retry) {
+                scheduleAdaptApiCapabilityProbe(generation, attempt + 1,
+                        ADAPT_API_CAPABILITY_PROBE_RETRY_MS);
+            }
+            return;
+        }
+
+        int definitiveSupportResults = 0;
+        for (int index = 0; index < ADAPT_API_CAPABILITY_FUNCTION_IDS.length; index++) {
+            if (!isAdaptApiCapabilityProbeActive(generation)) return;
+            int functionId = ADAPT_API_CAPABILITY_FUNCTION_IDS[index];
+            String functionName = ADAPT_API_CAPABILITY_FUNCTION_NAMES[index];
+
+            FunctionStatus status = null;
+            String supportError = null;
+            try {
+                status = source.isFunctionSupported(functionId);
+                if (status != null && status != FunctionStatus.error) definitiveSupportResults++;
+            } catch (Throwable error) {
+                supportError = summarizeAdaptApiProbeError(error);
+            }
+
+            int[] supportedValues = null;
+            boolean supportedValuesRead = false;
+            String supportedValuesError = null;
+            try {
+                supportedValues = source.getSupportedFunctionValue(functionId);
+                supportedValuesRead = true;
+            } catch (Throwable error) {
+                supportedValuesError = summarizeAdaptApiProbeError(error);
+            }
+
+            Integer currentValue = null;
+            boolean currentValueRead = false;
+            String currentValueError = null;
+            try {
+                currentValue = source.getFunctionValue(functionId);
+                currentValueRead = true;
+            } catch (Throwable error) {
+                currentValueError = summarizeAdaptApiProbeError(error);
+            }
+
+            if (!isAdaptApiCapabilityProbeActive(generation)) return;
+            ActionRecorder.record(ActionRecorder.SOURCE_STEERING_KEY,
+                    "ECARX_ADAPTAPI_CAPABILITY", ActionRecorder.object(
+                            "attempt", attempt,
+                            "function_id", functionId,
+                            "function", functionName,
+                            "status", status == null ? null : status.name(),
+                            "support_query", supportError == null ? "ok" : "error",
+                            "support_error", supportError,
+                            "supported_values_query",
+                            supportedValuesRead ? "ok" : "error",
+                            "supported_values", supportedValuesRead
+                                    ? supportedValues == null ? "null"
+                                    : Arrays.toString(supportedValues) : null,
+                            "supported_values_decoded", supportedValuesRead
+                                    ? decodeAdaptApiCapabilityValues(functionId, supportedValues)
+                                    : null,
+                            "supported_values_error", supportedValuesError,
+                            "current_value_query", currentValueRead ? "ok" : "error",
+                            "current_value", currentValue,
+                            "current_value_decoded", currentValueRead && currentValue != null
+                                    ? decodeAdaptApiCapabilityValue(functionId, currentValue) : null,
+                            "current_value_error", currentValueError,
+                            "write_enabled", false));
+        }
+
+        boolean retry = definitiveSupportResults == 0
+                && attempt < ADAPT_API_CAPABILITY_PROBE_MAX_ATTEMPTS;
+        ActionRecorder.record(ActionRecorder.SOURCE_STEERING_KEY,
+                "ECARX_ADAPTAPI_CAPABILITY_PROBE_COMPLETE", ActionRecorder.object(
+                        "attempt", attempt,
+                        "function_count", ADAPT_API_CAPABILITY_FUNCTION_IDS.length,
+                        "definitive_support_results", definitiveSupportResults,
+                        "retry_scheduled", retry,
+                        "write_enabled", false));
+        if (retry) {
+            scheduleAdaptApiCapabilityProbe(generation, attempt + 1,
+                    ADAPT_API_CAPABILITY_PROBE_RETRY_MS);
+        }
+    }
+
+    @NonNull
+    private static String decodeAdaptApiCapabilityValues(int functionId,
+                                                          @Nullable int[] values) {
+        if (values == null) return "null";
+        List<String> decoded = new ArrayList<>();
+        for (int value : values) decoded.add(decodeAdaptApiCapabilityValue(functionId, value));
+        return decoded.toString();
+    }
+
+    @NonNull
+    private static String decodeAdaptApiCapabilityValue(int functionId, int value) {
+        if (functionId == IVehicle.SETTING_FUNC_SPEED_LIMITATION_MODE) {
+            if (value == IVehicle.SPEED_LIMITATION_MODE_AVSL) return "AVSL";
+            if (value == IVehicle.SPEED_LIMITATION_MODE_ASL) return "ASL";
+            if (value == IVehicle.SPEED_LIMITATION_MODE_OFF) return "Off";
+        } else if (functionId == IVehicle.SETTING_FUNC_SPEED_CONTROL_MODE) {
+            if (value == IVehicle.SPEED_CONTROL_MODE_CC) return "CC";
+            if (value == IVehicle.SPEED_CONTROL_MODE_ACC) return "ACC";
+            if (value == IVehicle.SPEED_CONTROL_MODE_GPILOT) return "GPILOT";
+            if (value == IVehicle.SPEED_CONTROL_MODE_OFF) return "Off";
+        } else if (functionId == IVehicle.SETTING_FUNC_SPEED_LIMITATION
+                || functionId == IVehicle.SETTING_FUNC_SPEED_CONTROL) {
+            if (value == ICarFunction.COMMON_VALUE_ON) return "On";
+            if (value == ICarFunction.COMMON_VALUE_OFF) return "Off";
+        }
+        if (value == ICarFunction.COMMON_VALUE_ERROR) return "Error";
+        if (value == ICarFunction.COMMON_VALUE_NONE) return "None";
+        if (value == ICarFunction.COMMON_VALUE_UNKNOWN) return "Unknown";
+        return "raw=" + value;
+    }
+
+    @NonNull
+    private static String summarizeAdaptApiProbeError(@NonNull Throwable error) {
+        String message = error.getMessage();
+        String summary = error.getClass().getSimpleName()
+                + (message == null || message.trim().isEmpty() ? "" : ": " + message.trim());
+        return summary.length() <= 240 ? summary : summary.substring(0, 240);
     }
 
     private void recordAdasSignal(int propertyId, @NonNull String signalName, int raw) {
@@ -943,6 +1141,55 @@ final class GeelyCarIntegration implements CarIntegration {
                         "raw", raw,
                         "decoded", EcarxAdasSignalCatalog.decode(propertyId, raw),
                         "previous_raw", previous));
+    }
+
+    private void recordAdasBinarySignal(int propertyId, @NonNull String signalName,
+                                        @NonNull byte[] raw) {
+        if (!adasRecorderDemand || !ActionRecorder.isRecording()) return;
+        byte[] snapshot = raw.clone();
+        byte[] previous;
+        synchronized (adasRecorderLock) {
+            previous = lastRecordedAdasBinarySignals.put(propertyId, snapshot);
+        }
+        if (previous != null && Arrays.equals(previous, snapshot)) return;
+        ActionRecorder.record(ActionRecorder.SOURCE_STEERING_KEY,
+                previous == null ? "ECARX_ADAS_BINARY_BASELINE"
+                        : "ECARX_ADAS_BINARY_CHANGE",
+                ActionRecorder.object(
+                        "property_id", propertyId,
+                        "signal", signalName,
+                        "kind", EcarxAdasSignalCatalog.signalKind(propertyId),
+                        "length", snapshot.length,
+                        "hex", binaryHex(snapshot, 64),
+                        "changed_indices", previous == null
+                                ? "[]" : changedBinaryIndices(previous, snapshot, 64),
+                        "previous_hex", previous == null
+                                ? null : binaryHex(previous, 64),
+                        "truncated", snapshot.length > 64,
+                        "write_enabled", false));
+    }
+
+    @NonNull
+    private static String binaryHex(@NonNull byte[] value, int limit) {
+        int length = Math.min(value.length, Math.max(0, limit));
+        StringBuilder result = new StringBuilder(length * 2);
+        for (int index = 0; index < length; index++) {
+            result.append(String.format(Locale.US, "%02X", value[index] & 0xFF));
+        }
+        return result.toString();
+    }
+
+    @NonNull
+    private static String changedBinaryIndices(@NonNull byte[] previous,
+                                               @NonNull byte[] current, int limit) {
+        int length = Math.min(Math.max(previous.length, current.length), Math.max(0, limit));
+        List<Integer> changed = new ArrayList<>();
+        for (int index = 0; index < length; index++) {
+            int before = index < previous.length ? previous[index] & 0xFF : -1;
+            int after = index < current.length ? current[index] & 0xFF : -1;
+            if (before != after) changed.add(index);
+        }
+        return changed.toString();
     }
 
     private static int sensorTypeFor(@NonNull BrickType type) {
@@ -3966,6 +4213,7 @@ final class GeelyCarIntegration implements CarIntegration {
     @Override
     public void shutdown() {
         ActionRecorder.removeRecordingListener(adasRecordingListener);
+        adaptApiCapabilityProbeGeneration.incrementAndGet();
         adasRecorderDemand = false;
         controlsShuttingDown = true;
         hudArRequestGeneration.incrementAndGet();

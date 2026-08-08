@@ -115,6 +115,16 @@ jobs:
               unsignedSha256: $unsignedSha256
             }' > release-out/manifest.json
 
+          # Keep offline recovery signing on the trusted workstation: upload the official
+          # Android SDK signer beside the unsigned bytes, never a keystore or password.
+          TOOLS="release-out/android-build-tools-36.0.0"
+          mkdir -p "$TOOLS/lib"
+          cp "$ANDROID_HOME/build-tools/36.0.0/apksigner" "$TOOLS/apksigner"
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" \
+            "$TOOLS/lib/apksigner.jar"
+          cp "$ANDROID_HOME/build-tools/36.0.0/zipalign" "$TOOLS/zipalign"
+          cp "$ANDROID_HOME/build-tools/36.0.0/NOTICE.txt" "$TOOLS/NOTICE.txt"
+
       - name: Upload verified unsigned handoff
         uses: actions/upload-artifact@v4
         with:

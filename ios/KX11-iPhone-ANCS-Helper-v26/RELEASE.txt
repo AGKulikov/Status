@@ -1,0 +1,23 @@
+KX11 ANCS Helper v26
+====================
+
+Companion release: Status Widget v2.8.2-ha1187
+Bundle identifier: ru.natro.kx11ancshelper
+Marketing version: 26.0
+Build number: 26
+Minimum iOS version: 13.0
+
+Release verification
+--------------------
+
+- Phase one connects to F04 with RequiresANCS=false and is the only phase that discovers B2/B3.
+- The encrypted phase-one peer writes ANCS-HANDOFF before the intentional disconnect.
+- Phase two reconnects to the same CBPeripheral with RequiresANCS=true.
+- Phase two deliberately skips all custom F04 discovery and waits for Android's ANCS owner.
+- The iPhone-owned B4 relay remains generation 5/F05 and proves the post-handoff owner.
+- Core Bluetooth auto-reconnect remains disabled; the two transitions have one app owner.
+- Restoration identifiers move to v26/g4/g5 so v25 callbacks cannot own the new state machine.
+- Protected-data lock/unlock events still update B4 flag bit 5 immediately.
+- The B4 frame remains A5/01, eight bytes, little-endian sequence and CRC-8/ATM.
+- Classic Bluetooth profiles, names, pairing, the system LE bond and ANCS authorization remain
+  untouched.
