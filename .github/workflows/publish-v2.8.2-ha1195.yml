@@ -171,3 +171,23 @@ jobs:
           jq -e '.assets | any(.name == "KX11-iPhone-ANCS-Helper-v32.zip")' \
             <<<"$RELEASE" >/dev/null
           jq -r .url <<<"$RELEASE"
+
+      - name: Record verified publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          MARKER="$STAGING/PUBLISHED_RUN.txt"
+          {
+            echo "release=$RELEASE_TAG"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "source_sha=$TARGET_SHA"
+            echo "apk_sha256=$APK_SHA256"
+            echo "helper_sha256=$HELPER_SHA256"
+            echo "certificate_sha256=$CERT_SHA256"
+            echo "verified=true"
+          } > "$MARKER"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add "$MARKER"
+          git commit -m "Record $RELEASE_TAG publication [skip ci]"
+          git push origin "HEAD:$GITHUB_REF_NAME"
