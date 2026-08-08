@@ -241,8 +241,10 @@ public final class PhoneConnectorController {
     @Nullable private Boolean helperExternalPower;
     private String helperChargeState = "";
     private String helperNetworkType = "";
+    @Nullable private Boolean helperPhoneLocked;
     private long helperPowerUpdatedAtElapsed;
     private long helperNetworkUpdatedAtElapsed;
+    private long helperLockUpdatedAtElapsed;
     @Nullable private Runnable helperTelemetryExpiryTask;
     @Nullable private PhoneTelemetryStore.Record retainedTelemetry;
     private boolean batteryLiveSeenThisConnection;
@@ -1335,12 +1337,16 @@ public final class PhoneConnectorController {
                 || telemetry.kind == IphoneHelperTelemetry.Kind.SNAPSHOT;
         boolean hasNetwork = telemetry.kind == IphoneHelperTelemetry.Kind.NETWORK
                 || telemetry.kind == IphoneHelperTelemetry.Kind.SNAPSHOT;
+        boolean hasLock = telemetry.kind == IphoneHelperTelemetry.Kind.SNAPSHOT
+                && telemetry.phoneLocked != null;
         boolean powerChanged = hasPower && (helperPowerUpdatedAtElapsed <= 0L
                 || !Objects.equals(helperBatteryLevel, telemetry.batteryLevel)
                 || !Objects.equals(helperExternalPower, telemetry.externalPower)
                 || !Objects.equals(helperChargeState, telemetry.chargeState));
         boolean networkChanged = hasNetwork && (helperNetworkUpdatedAtElapsed <= 0L
                 || !Objects.equals(helperNetworkType, telemetry.networkType));
+        boolean lockChanged = hasLock && (helperLockUpdatedAtElapsed <= 0L
+                || !Objects.equals(helperPhoneLocked, telemetry.phoneLocked));
         if (hasPower) {
             helperBatteryLevel = telemetry.batteryLevel;
             helperExternalPower = telemetry.externalPower;
@@ -1352,12 +1358,17 @@ public final class PhoneConnectorController {
             helperNetworkType = telemetry.networkType;
             helperNetworkUpdatedAtElapsed = now;
         }
-        if (powerChanged || networkChanged) {
+        if (hasLock) {
+            helperPhoneLocked = telemetry.phoneLocked;
+            helperLockUpdatedAtElapsed = now;
+        }
+        if (powerChanged || networkChanged || lockChanged) {
             PhoneConnectionJournal.append("helper-telemetry",
                     "kind=" + telemetry.kind + ", battery=" + telemetry.batteryLevel
                             + ", externalPower=" + telemetry.externalPower
                             + ", chargeState=" + telemetry.chargeState
-                            + ", network=" + telemetry.networkType);
+                            + ", network=" + telemetry.networkType
+                            + ", locked=" + telemetry.phoneLocked);
             markTelemetryUpdated(hasPower, hasNetwork);
         } else {
             // A one-second identical control read only refreshes liveness. Do not rewrite
@@ -1368,7 +1379,7 @@ public final class PhoneConnectorController {
             telemetryStale = false;
         }
         scheduleHelperTelemetryExpiry(token);
-        if (powerChanged || networkChanged) publishSnapshot(token);
+        if (powerChanged || networkChanged || lockChanged) publishSnapshot(token);
     }
 
     private void scheduleHelperTelemetryExpiry(long token) {
@@ -1385,6 +1396,10 @@ public final class PhoneConnectorController {
         if (helperNetworkUpdatedAtElapsed > 0L) {
             nextDeadline = Math.min(nextDeadline,
                     helperNetworkUpdatedAtElapsed + HELPER_TELEMETRY_TIMEOUT_MS);
+        }
+        if (helperLockUpdatedAtElapsed > 0L) {
+            nextDeadline = Math.min(nextDeadline,
+                    helperLockUpdatedAtElapsed + HELPER_TELEMETRY_TIMEOUT_MS);
         }
         if (nextDeadline == Long.MAX_VALUE) {
             helperTelemetryExpiryTask = null;
@@ -1408,6 +1423,12 @@ public final class PhoneConnectorController {
                 helperNetworkUpdatedAtElapsed = 0L;
                 changed = true;
             }
+            if (helperLockUpdatedAtElapsed > 0L
+                    && checkedAt - helperLockUpdatedAtElapsed >= HELPER_TELEMETRY_TIMEOUT_MS) {
+                helperPhoneLocked = null;
+                helperLockUpdatedAtElapsed = 0L;
+                changed = true;
+            }
             if (changed) {
                 refreshBatteryValues();
                 publishSnapshot(token);
@@ -1427,8 +1448,10 @@ public final class PhoneConnectorController {
         helperExternalPower = null;
         helperChargeState = "";
         helperNetworkType = "";
+        helperPhoneLocked = null;
         helperPowerUpdatedAtElapsed = 0L;
         helperNetworkUpdatedAtElapsed = 0L;
+        helperLockUpdatedAtElapsed = 0L;
     }
 
     private void handleAncsTransportState(long token, @Nullable String rawState) {
@@ -3511,6 +3534,7 @@ public final class PhoneConnectorController {
         snapshot.add(value("profiles.map", null, false, "boolean", "", now));
         snapshot.add(value("profiles.ble", null, false, "boolean", "", now));
         snapshot.add(value("profiles.ancs", null, false, "boolean", "", now));
+        snapshot.add(value("device.locked", null, false, "boolean", "", now));
         snapshot.add(value("battery.level", null, false, "number", "%", now));
         snapshot.add(value("battery.level_source", null, false, "string", "", now));
         snapshot.add(value("battery.charging", null, false, "boolean", "", now));
@@ -3616,6 +3640,8 @@ public final class PhoneConnectorController {
         snapshot.add(value("profiles.map", mapConnected, active, "boolean", "", now));
         snapshot.add(value("profiles.ble", gattConnected, active, "boolean", "", now));
         snapshot.add(value("profiles.ancs", ancsReady, active, "boolean", "", now));
+        snapshot.add(value("device.locked", helperPhoneLocked,
+                helperLockUpdatedAtElapsed > 0L, "boolean", "", now));
         snapshot.add(value("battery.level", effectiveBatteryLevel,
                 effectiveBatteryLevel != null, "number", "%", now));
         snapshot.add(value("battery.level_source",

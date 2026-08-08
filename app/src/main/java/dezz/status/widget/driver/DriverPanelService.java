@@ -14,6 +14,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.IBinder;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -23,6 +24,7 @@ import androidx.core.content.ContextCompat;
 import dezz.status.widget.DriverPanelSettingsActivity;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.R;
+import dezz.status.widget.climate.StockHvacPopupClient;
 
 /** Foreground owner of the driver rail so it survives app switches and process pressure. */
 public final class DriverPanelService extends Service {
@@ -64,7 +66,12 @@ public final class DriverPanelService extends Service {
     }
 
     public static void triggerStockClimate(@NonNull Context context) {
-        start(context, ACTION_STOCK_CLIMATE);
+        StockHvacPopupClient.openMainPopup(context, (success, message) -> {
+            if (!success) {
+                Toast.makeText(context.getApplicationContext(), message,
+                        Toast.LENGTH_LONG).show();
+            }
+        });
     }
 
     public static void showFavorites(@NonNull Context context) {
@@ -121,6 +128,14 @@ public final class DriverPanelService extends Service {
         String action = intent == null ? ACTION_APPLY : intent.getAction();
         dezz.status.widget.diagnostics.ActionRecorder.recordServiceIntent(
                 getClass().getName(), action, startId);
+        if (ACTION_STOCK_CLIMATE.equals(action)) {
+            triggerStockClimate(this);
+            if (preferences != null && preferences.driverPanelEnabled.get()) {
+                return START_STICKY;
+            }
+            stopSelfSafely();
+            return START_NOT_STICKY;
+        }
         if (ACTION_STOP.equals(action)
                 || preferences == null
                 || !preferences.driverPanelEnabled.get()) {
@@ -131,8 +146,7 @@ public final class DriverPanelService extends Service {
         }
         if (controller != null) {
             boolean refreshed = controller.setNavigationHidden(navigationHidden);
-            if (ACTION_STOCK_CLIMATE.equals(action)) controller.triggerStockClimate();
-            else if (ACTION_FAVORITES.equals(action)) {
+            if (ACTION_FAVORITES.equals(action)) {
                 String panelId = intent == null ? DriverFavoritesPanelConfig.DEFAULT_ID
                         : intent.getStringExtra(EXTRA_FAVORITES_PANEL_ID);
                 controller.showFavorites(panelId == null

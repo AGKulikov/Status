@@ -21,17 +21,25 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.service.notification.NotificationListenerService;
+import android.util.Log;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 import dezz.status.widget.MediaNotificationListener;
+import dezz.status.widget.Permissions;
 import dezz.status.widget.Preferences;
+import dezz.status.widget.diagnostics.ActionRecorder;
 import dezz.status.widget.launcher.media.MediaAppLauncher;
+import dezz.status.widget.shell.PrivilegedShell;
 
 /**
  * Chooses the active Android media session and augments it with the media broadcast used by
@@ -56,6 +64,8 @@ public final class LauncherMediaController {
     private static final long COMMAND_RECONCILE_FINAL_MS = 2_400L;
     /** Small tolerance for publishers whose wall-clock timestamps are not emitted atomically. */
     private static final long DIFFERENT_SOURCE_RECENCY_SLOP_MS = 10_000L;
+    private static final long SEEK_COMMAND_INTERVAL_MS = 90L;
+    private static final String TAG = "LauncherMedia";
 
     public interface Listener { void onMediaChanged(@NonNull Snapshot state); }
 
@@ -177,6 +187,16 @@ public final class LauncherMediaController {
     private boolean cacheReloadPending;
     private int cacheLoadGeneration;
     private long lastSessionRefreshElapsedMs;
+    private long lastSeekDispatchElapsedMs;
+    private long pendingSeekPositionMs = -1L;
+    private boolean seekDispatchScheduled;
+    private boolean seekFailureToastShown;
+    private boolean sessionAccessGrantAttempted;
+    @NonNull private List<MediaController> seekGestureControllers = Collections.emptyList();
+    @NonNull private String seekGesturePackage = "";
+    @NonNull private String visiblePackage = "";
+    @NonNull private String visibleTitle = "";
+    @NonNull private String visibleArtist = "";
 
     private final Runnable ticker = new Runnable() {
         @Override public void run() {
@@ -207,6 +227,11 @@ public final class LauncherMediaController {
             if (!started) return;
             refresh();
         }
+    };
+
+    private final Runnable pendingSeekDispatch = () -> {
+        seekDispatchScheduled = false;
+        dispatchPendingSeek(false);
     };
 
     private final Runnable broadcastExpiry = new Runnable() {
@@ -279,16 +304,8 @@ public final class LauncherMediaController {
         started = true;
         registerBroadcastReceiver();
         loadCachedBroadcast();
-        if (manager != null && !sessionsListenerRegistered) {
-            try {
-                manager.addOnActiveSessionsChangedListener(sessionsListener, listenerComponent(),
-                        mainHandler);
-                sessionsListenerRegistered = true;
-            } catch (RuntimeException ignored) {
-                // The compatible broadcast remains available without notification access.
-                sessionsListenerRegistered = false;
-            }
-        }
+        registerSessionsListener();
+        ensureSessionAccessForTransportControls();
         refresh();
     }
 
@@ -298,6 +315,10 @@ public final class LauncherMediaController {
         mainHandler.removeCallbacks(ticker);
         mainHandler.removeCallbacks(commandReconcile);
         mainHandler.removeCallbacks(broadcastExpiry);
+        mainHandler.removeCallbacks(pendingSeekDispatch);
+        pendingSeekPositionMs = -1L;
+        seekDispatchScheduled = false;
+        clearSeekGesture();
         lastSessionRefreshElapsedMs = 0L;
         boolean removeSessionsListener = sessionsListenerRegistered;
         sessionsListenerRegistered = false;
@@ -308,6 +329,7 @@ public final class LauncherMediaController {
         unregisterBroadcastReceiver();
         replace(null);
         sessionState = null;
+        clearVisibleMedia();
         // Keep the disk-backed state: the exported receiver may update it while HOME is closed.
         invalidateCacheRead();
         // Clear ImageView references before the owned broadcast bitmap is recycled on the next
@@ -351,30 +373,179 @@ public final class LauncherMediaController {
         scheduleCommandReconcile();
     }
 
-    /** Seeks only the exact active player represented on HOME; there is no global fallback. */
+    /** Coalesces live scrubbing while preserving the exact player represented on HOME. */
     public void seekTo(long positionMs) {
-        String target = commandTargetPackage();
-        if (target.isEmpty()) return;
-        long targetPosition = Math.max(0L, positionMs);
-        MediaController selected = current;
-        if (selected != null) {
+        pendingSeekPositionMs = Math.max(0L, positionMs);
+        long elapsed = SystemClock.elapsedRealtime() - lastSeekDispatchElapsedMs;
+        if (!seekDispatchScheduled && elapsed >= SEEK_COMMAND_INTERVAL_MS) {
+            dispatchPendingSeek(false);
+            return;
+        }
+        if (seekDispatchScheduled) return;
+        seekDispatchScheduled = true;
+        mainHandler.postDelayed(pendingSeekDispatch,
+                Math.max(1L, SEEK_COMMAND_INTERVAL_MS - Math.max(0L, elapsed)));
+    }
+
+    /** Commits ACTION_UP immediately, including players visible only through notifications. */
+    public void finishSeek(long positionMs) {
+        pendingSeekPositionMs = Math.max(0L, positionMs);
+        mainHandler.removeCallbacks(pendingSeekDispatch);
+        seekDispatchScheduled = false;
+        dispatchPendingSeek(true);
+        clearSeekGesture();
+        lastSeekDispatchElapsedMs = 0L;
+    }
+
+    private void dispatchPendingSeek(boolean finish) {
+        long positionMs = pendingSeekPositionMs;
+        if (positionMs < 0L) return;
+        pendingSeekPositionMs = -1L;
+        lastSeekDispatchElapsedMs = SystemClock.elapsedRealtime();
+        String targetPackage = seekTargetPackage();
+        if (!targetPackage.equals(seekGesturePackage)
+                || seekGestureControllers.isEmpty() || finish) {
+            seekGesturePackage = targetPackage;
+            seekGestureControllers = resolveSeekControllers(finish);
+        }
+        int routes = sendSeekToMatchingControllers(
+                seekGestureControllers, targetPackage, positionMs);
+        if (routes == 0 && !finish) {
+            seekGestureControllers = resolveSeekControllers(true);
+            routes = sendSeekToMatchingControllers(
+                    seekGestureControllers, targetPackage, positionMs);
+        }
+        if (routes > 0) {
+            seekFailureToastShown = false;
+            scheduleCommandReconcile();
+        } else if (finish) {
+            onSeekRouteMissing(targetPackage, positionMs);
+        }
+        if (finish) {
+            Log.i(TAG, "seek finish package=" + targetPackage
+                    + " positionMs=" + positionMs + " routes=" + routes
+                    + " notificationAccess="
+                    + Permissions.isNotificationAccessGranted(context));
+            ActionRecorder.record(ActionRecorder.SOURCE_ACTIVITY, "MEDIA_SEEK",
+                    ActionRecorder.object(
+                            "package", targetPackage,
+                            "position_ms", positionMs,
+                            "routes", routes,
+                            "notification_access",
+                            Permissions.isNotificationAccessGranted(context)));
+        }
+    }
+
+    @NonNull
+    private List<MediaController> resolveSeekControllers(boolean includeManagerLookup) {
+        List<MediaController> result = new ArrayList<>();
+        for (MediaController controller
+                : MediaNotificationListener.activeMediaNotificationControllers(context)) {
+            addSeekController(result, controller);
+        }
+        addSeekController(result, current);
+        if (includeManagerLookup && manager != null) {
             try {
-                // Use the exact Binder-backed controller already selected for HOME. Re-querying
-                // active sessions at the end of every drag can miss an OEM player during its
-                // transient session refresh even though this live controller still accepts seek.
-                if (target.equals(selected.getPackageName())) {
-                    selected.getTransportControls().seekTo(targetPosition);
-                    scheduleCommandReconcile();
-                    return;
+                List<MediaController> active = manager.getActiveSessions(listenerComponent());
+                if (active != null) {
+                    for (MediaController controller : active) addSeekController(result, controller);
                 }
             } catch (RuntimeException ignored) {
-                // One bounded exact-package lookup below covers a replaced session Binder.
             }
         }
-        if (MediaResumeCommand.seekTo(context, target, targetPosition)
-                == MediaResumeCommand.Result.SESSION_COMMAND) {
-            scheduleCommandReconcile();
+        return result;
+    }
+
+    private static void addSeekController(@NonNull List<MediaController> result,
+                                          @Nullable MediaController candidate) {
+        if (candidate == null) return;
+        for (MediaController existing : result) {
+            if (sameSession(existing, candidate)) return;
         }
+        result.add(candidate);
+    }
+
+    private int sendSeekToMatchingControllers(@NonNull List<MediaController> controllers,
+                                              @NonNull String targetPackage,
+                                              long positionMs) {
+        int sent = 0;
+        for (MediaController controller : controllers) {
+            boolean matches = !targetPackage.isEmpty()
+                    ? samePackage(targetPackage, controllerPackage(controller))
+                    : controllerMatchesVisibleTrack(controller)
+                    || sameSession(current, controller);
+            if (!matches) continue;
+            try {
+                controller.getTransportControls().seekTo(positionMs);
+                sent++;
+            } catch (RuntimeException ignored) {
+            }
+        }
+        return sent;
+    }
+
+    private boolean controllerMatchesVisibleTrack(@NonNull MediaController controller) {
+        if (visibleTitle.isEmpty() && visibleArtist.isEmpty()) return false;
+        MediaMetadata metadata;
+        try {
+            metadata = controller.getMetadata();
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+        if (metadata == null) return false;
+        String title = first(metadata, MediaMetadata.METADATA_KEY_TITLE,
+                MediaMetadata.METADATA_KEY_DISPLAY_TITLE);
+        String artist = first(metadata, MediaMetadata.METADATA_KEY_ARTIST,
+                MediaMetadata.METADATA_KEY_ALBUM_ARTIST,
+                MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE);
+        int evidence = 0;
+        if (!visibleTitle.isEmpty() && !title.isEmpty()) {
+            if (!visibleTitle.equalsIgnoreCase(title)) return false;
+            evidence++;
+        }
+        if (!visibleArtist.isEmpty() && !artist.isEmpty()) {
+            if (!visibleArtist.equalsIgnoreCase(artist)) return false;
+            evidence++;
+        }
+        return evidence > 0;
+    }
+
+    @NonNull
+    private String seekTargetPackage() {
+        if (preferences.launcherMediaFixedPlayerEnabled.get()) {
+            String fixed = cleanText(preferences.launcherMediaFixedPlayerPackage.get());
+            if (!fixed.isEmpty()) return fixed;
+        }
+        if (!visiblePackage.isEmpty()) return visiblePackage;
+        MediaState broadcast = broadcastState;
+        if (broadcast != null && !broadcast.packageName.isEmpty()) return broadcast.packageName;
+        MediaState session = sessionState;
+        return session != null && !session.packageName.isEmpty()
+                ? session.packageName : commandTargetPackage();
+    }
+
+    private void onSeekRouteMissing(@NonNull String targetPackage, long positionMs) {
+        boolean notificationAccess = Permissions.isNotificationAccessGranted(context);
+        Log.w(TAG, "seek route missing package=" + targetPackage
+                + " positionMs=" + positionMs
+                + " notificationAccess=" + notificationAccess);
+        try {
+            NotificationListenerService.requestRebind(listenerComponent());
+        } catch (RuntimeException ignored) {
+        }
+        ensureSessionAccessForTransportControls();
+        if (seekFailureToastShown) return;
+        seekFailureToastShown = true;
+        Toast.makeText(context,
+                notificationAccess
+                        ? "Плеер не передал медиасессию для перемотки"
+                        : "Для перемотки нужен доступ к уведомлениям",
+                Toast.LENGTH_LONG).show();
+    }
+
+    private void clearSeekGesture() {
+        seekGestureControllers = Collections.emptyList();
+        seekGesturePackage = "";
     }
 
     /** Opens the same player that owns HOME transport commands. */
@@ -391,6 +562,46 @@ public final class LauncherMediaController {
         mainHandler.postDelayed(commandReconcile, COMMAND_RECONCILE_FAST_MS);
         mainHandler.postDelayed(commandReconcile, COMMAND_RECONCILE_SETTLED_MS);
         mainHandler.postDelayed(commandReconcile, COMMAND_RECONCILE_FINAL_MS);
+    }
+
+    private void ensureSessionAccessForTransportControls() {
+        if (sessionAccessGrantAttempted) return;
+        sessionAccessGrantAttempted = true;
+        if (Permissions.isNotificationAccessGranted(context)) {
+            try {
+                NotificationListenerService.requestRebind(listenerComponent());
+            } catch (RuntimeException ignored) {
+            }
+            registerSessionsListener();
+            return;
+        }
+        PrivilegedShell.get(context).ensurePrivileges(
+                PrivilegedShell.Request.forPackage(context.getPackageName())
+                        .withNotificationListener(PrivilegedShell.notificationListenerComponent(
+                                context.getPackageName(), MediaNotificationListener.class))
+                        .build(), result -> {
+                    if (!Permissions.isNotificationAccessGranted(context)) return;
+                    try {
+                        NotificationListenerService.requestRebind(listenerComponent());
+                    } catch (RuntimeException ignored) {
+                    }
+                    if (started) {
+                        registerSessionsListener();
+                        refresh();
+                    }
+                });
+    }
+
+    private void registerSessionsListener() {
+        if (manager == null || sessionsListenerRegistered) return;
+        try {
+            manager.addOnActiveSessionsChangedListener(
+                    sessionsListener, listenerComponent(), mainHandler);
+            sessionsListenerRegistered = true;
+        } catch (RuntimeException ignored) {
+            // The durable broadcast source remains usable without MediaSession authorization.
+            sessionsListenerRegistered = false;
+        }
     }
 
     private void registerBroadcastReceiver() {
@@ -866,6 +1077,7 @@ public final class LauncherMediaController {
         MediaState session = sessionState;
         MediaState broadcast = broadcastState;
         if (session == null && broadcast == null) {
+            clearVisibleMedia();
             listener.onMediaChanged(Snapshot.empty(volume));
             scheduleTicker(false);
             return;
@@ -939,6 +1151,8 @@ public final class LauncherMediaController {
         String album = preferred(content.album, supplement == null ? "" : supplement.album);
         String application = preferred(content.application,
                 supplement == null ? "" : supplement.application);
+        String packageName = preferred(content.packageName,
+                supplement == null ? "" : supplement.packageName);
         Bitmap artworkBitmap = artwork.artwork;
         long duration = content.durationMs > 0L ? content.durationMs
                 : supplement == null ? 0L : supplement.durationMs;
@@ -946,11 +1160,20 @@ public final class LauncherMediaController {
         if (position <= 0L && supplement != null) {
             position = supplement.currentPosition(System.currentTimeMillis());
         }
-        MediaPlaybackHistoryStore.record(context, content.packageName, playback.playing);
+        visiblePackage = packageName;
+        visibleTitle = title;
+        visibleArtist = artist;
+        MediaPlaybackHistoryStore.record(context, packageName, playback.playing);
         listener.onMediaChanged(new Snapshot(title.isEmpty() ? "Неизвестный трек" : title,
                 artist, album, application, artworkBitmap, duration, position, playback.playing, true,
                 volume));
         scheduleTicker(playback.playing);
+    }
+
+    private void clearVisibleMedia() {
+        visiblePackage = "";
+        visibleTitle = "";
+        visibleArtist = "";
     }
 
     private void scheduleTicker(boolean playing) {

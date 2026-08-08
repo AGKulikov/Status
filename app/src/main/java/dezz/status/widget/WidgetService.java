@@ -135,6 +135,7 @@ import dezz.status.widget.phone.PhoneConnectorController;
 import dezz.status.widget.phone.PhoneLowBatteryAlertPolicy;
 import dezz.status.widget.phone.PhoneNotificationAutomation;
 import dezz.status.widget.phone.PhoneNetworkTypePolicy;
+import dezz.status.widget.phone.PhoneNotificationLockPolicy;
 import dezz.status.widget.phone.PhoneStatusBarPolicy;
 import dezz.status.widget.phone.PhoneIndicatorVisualPolicy;
 import dezz.status.widget.phone.PhoneSprutPresenceExporter;
@@ -399,6 +400,10 @@ public class WidgetService extends Service {
             if (!presented) {
                 if (queuedPhoneNotifications.isEmpty()) finishPhoneNotificationBurst();
                 else mainHandler.post(this);
+                return;
+            }
+            if (queuedPhoneNotifications.isEmpty()) {
+                releasePhoneNotificationBurstToConfiguredExpiry();
                 return;
             }
             long nextSlot = SystemClock.elapsedRealtime()
@@ -2251,6 +2256,7 @@ public class WidgetService extends Service {
             }
         }
         if (!phoneValueChanged) return;
+        suppressPhoneNotificationsUnlessLockAllows();
         if (sessionEnded) {
             phoneAncsReady = false;
             observedPhoneNotificationKeys.clear();
@@ -2270,7 +2276,7 @@ public class WidgetService extends Service {
                     && !observedPhoneNotificationKeys.contains(latestKey);
             rememberPhoneNotificationItems(notificationItems);
             rememberPhoneNotificationKey(latestKey);
-            if (latestIsNew) {
+            if (latestIsNew && phoneNotificationAllowedByLockState()) {
                 if (prefs.phoneStatusBarNotificationsEnabled.get()
                         || prefs.phonePopupNotificationsEnabled.get()) {
                     Set<String> selected = PhoneStatusBarPolicy.parseIds(
@@ -2327,6 +2333,7 @@ public class WidgetService extends Service {
     private void enqueuePhoneNotification(
             @NonNull PhoneStatusBarPolicy.NotificationPresentation presentation,
             @NonNull Set<String> selectedFields) {
+        if (!phoneNotificationAllowedByLockState()) return;
         QueuedPhoneNotification delivery = new QueuedPhoneNotification(
                 presentation, selectedFields);
         if (phoneNotificationBurstActive) {
@@ -2357,7 +2364,7 @@ public class WidgetService extends Service {
     }
 
     private boolean presentPhoneNotification(@NonNull QueuedPhoneNotification delivery) {
-        if (prefs == null) return false;
+        if (prefs == null || !phoneNotificationAllowedByLockState()) return false;
         updatePhoneNotificationFieldStates(delivery.presentation, delivery.selectedFields);
         boolean presentedInStatusRow = prefs.phoneStatusBarNotificationsEnabled.get()
                 && showPhoneStatusNotification(
@@ -2409,6 +2416,26 @@ public class WidgetService extends Service {
             applyBrickVisibility(currentBrickSet());
         }
         schedulePopupRefresh();
+    }
+
+    /** The last item keeps the normal configured timer set by showPhone*Notification(). */
+    private void releasePhoneNotificationBurstToConfiguredExpiry() {
+        mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
+        queuedPhoneNotifications.clear();
+        phoneNotificationBurstActive = false;
+    }
+
+    private boolean phoneNotificationAllowedByLockState() {
+        return prefs != null && PhoneNotificationLockPolicy.mayPresent(
+                prefs.phoneNotificationsOnlyWhenLocked.get(),
+                phoneBoolean("device.locked"));
+    }
+
+    private void suppressPhoneNotificationsUnlessLockAllows() {
+        if (prefs == null || phoneNotificationAllowedByLockState()) return;
+        cancelPhoneNotificationQueue();
+        if (activePhoneNotification != null) clearPhoneStatusNotification(true);
+        if (activePhonePopupNotificationExpiresAt > 0L) clearPhonePopupNotification();
     }
 
     private void cancelPhoneNotificationQueue() {

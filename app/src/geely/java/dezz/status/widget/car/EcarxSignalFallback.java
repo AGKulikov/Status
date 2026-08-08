@@ -43,6 +43,8 @@ final class EcarxSignalFallback {
     private static final long HEALTH_READ_MILLIS = 1_000L;
 
     interface Listener {
+        void onAdasCaptureReady(int propertyCount);
+        void onAdasSignal(int propertyId, @NonNull String signalName, int raw);
         void onGear(int adaptGear, int actualGear, boolean manualMode);
         void onHighBeam(int enabled);
         void onChannelLost();
@@ -59,6 +61,7 @@ final class EcarxSignalFallback {
 
     private volatile boolean gearDemand;
     private volatile boolean highBeamDemand;
+    private volatile boolean adasRecorderDemand;
     private volatile boolean closed;
 
     /** Worker-thread-owned reflection state. */
@@ -82,10 +85,12 @@ final class EcarxSignalFallback {
         this.listener = listener;
     }
 
-    void updateDemand(boolean needsGear, boolean needsHighBeam) {
-        if (closed || (gearDemand == needsGear && highBeamDemand == needsHighBeam)) return;
+    void updateDemand(boolean needsGear, boolean needsHighBeam, boolean needsAdasRecorder) {
+        if (closed || (gearDemand == needsGear && highBeamDemand == needsHighBeam
+                && adasRecorderDemand == needsAdasRecorder)) return;
         gearDemand = needsGear;
         highBeamDemand = needsHighBeam;
+        adasRecorderDemand = needsAdasRecorder;
         execute(() -> {
             listener.onChannelLost();
             unregisterCallback();
@@ -108,6 +113,7 @@ final class EcarxSignalFallback {
         closed = true;
         gearDemand = false;
         highBeamDemand = false;
+        adasRecorderDemand = false;
         execute(() -> {
             unregisterCallback();
             releaseProxy();
@@ -116,7 +122,7 @@ final class EcarxSignalFallback {
     }
 
     private boolean hasDemand() {
-        return !closed && (gearDemand || highBeamDemand);
+        return !closed && (gearDemand || highBeamDemand || adasRecorderDemand);
     }
 
     private void connectAndRegister() {
@@ -374,6 +380,11 @@ final class EcarxSignalFallback {
             ids.addAll(manualModeIds);
         }
         if (highBeamDemand) ids.addAll(highBeamIds);
+        if (adasRecorderDemand) {
+            for (int propertyId : EcarxAdasSignalCatalog.propertyIds()) {
+                ids.add(propertyId);
+            }
+        }
         // In a high-beam-only subscription an empty discovery result is not a successful
         // registration: retry while ecarxcar_service finishes publishing PropertyIdString.
         if (ids.isEmpty()) return false;
@@ -422,6 +433,9 @@ final class EcarxSignalFallback {
         }
         signalCallback = callback;
         Log.d(TAG, "Registered low-level signal fallback for " + ids);
+        if (adasRecorderDemand) {
+            listener.onAdasCaptureReady(EcarxAdasSignalCatalog.propertyIds().length);
+        }
         return true;
     }
 
@@ -499,6 +513,11 @@ final class EcarxSignalFallback {
             ids.addAll(manualModeIds);
         }
         if (highBeamDemand) ids.addAll(highBeamIds);
+        if (adasRecorderDemand) {
+            for (int propertyId : EcarxAdasSignalCatalog.propertyIds()) {
+                ids.add(propertyId);
+            }
+        }
         for (String methodName : new String[] {
                 "getSignalValue", "getSignalLatestValue", "getCarPropertyValue", "getProperty"
         }) {
@@ -549,6 +568,8 @@ final class EcarxSignalFallback {
             names.add("getGearLvrIndcn");
             names.add("getGearLvrPosn");
         }
+        String adasGetter = EcarxAdasSignalCatalog.getterName(propertyId);
+        if (adasGetter != null) names.add(adasGetter);
         for (String name : names) {
             Method method = findMethod(managerClass, name, 0);
             if (method != null) return method;
@@ -625,6 +646,10 @@ final class EcarxSignalFallback {
     }
 
     private void handleSignal(int propertyId, int raw) {
+        if (adasRecorderDemand && EcarxAdasSignalCatalog.contains(propertyId)) {
+            listener.onAdasSignal(propertyId,
+                    EcarxAdasSignalCatalog.signalName(propertyId), raw);
+        }
         if (propertyId == EcarxSignalDecoder.PROPERTY_GEAR_SELECTOR && gearDemand) {
             selectorRaw = raw;
             if (manualModeIds.isEmpty()) manualMode = raw == 4;

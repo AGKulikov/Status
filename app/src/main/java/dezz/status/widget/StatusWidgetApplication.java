@@ -35,6 +35,7 @@ import dezz.status.widget.diagnostics.ActionRecorder;
 import dezz.status.widget.diagnostics.ActionRecorderOverlayService;
 import dezz.status.widget.diagnostics.DiagnosticJournal;
 import dezz.status.widget.diagnostics.MainThreadWatchdog;
+import dezz.status.widget.diagnostics.PrivilegedActionCollector;
 import dezz.status.widget.launcher.EcarxSystemStatusBarPolicy;
 
 /**
@@ -64,6 +65,7 @@ public class StatusWidgetApplication extends Application {
             return;
         }
         ActionRecorder.initialize(this);
+        PrivilegedActionCollector.initialize(this);
         registerLifecycleJournal();
         MainThreadWatchdog.setEnabled(preferences.debugModeEnabled.get());
         if (preferences.actionRecorderOverlayVisible.get()) {

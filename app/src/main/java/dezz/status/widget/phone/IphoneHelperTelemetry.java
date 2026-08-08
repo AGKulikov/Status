@@ -39,6 +39,7 @@ public final class IphoneHelperTelemetry {
     private static final int FLAG_CHARGE_STATE_VALID = 1 << 2;
     private static final int FLAG_CHARGING = 1 << 3;
     private static final int FLAG_FULL = 1 << 4;
+    private static final int FLAG_PHONE_LOCKED = 1 << 5;
     private static final String PREFIX_V2 = "TEL2";
     private static final String PREFIX_V3 = "TEL3";
 
@@ -49,6 +50,7 @@ public final class IphoneHelperTelemetry {
     @Nullable public final Boolean externalPower;
     @NonNull public final String chargeState;
     @NonNull public final String networkType;
+    @Nullable public final Boolean phoneLocked;
     public final int sequence;
 
     private IphoneHelperTelemetry(@NonNull Kind kind,
@@ -56,12 +58,14 @@ public final class IphoneHelperTelemetry {
                                   @Nullable Boolean externalPower,
                                   @NonNull String chargeState,
                                   @NonNull String networkType,
+                                  @Nullable Boolean phoneLocked,
                                   int sequence) {
         this.kind = kind;
         this.batteryLevel = batteryLevel;
         this.externalPower = externalPower;
         this.chargeState = chargeState;
         this.networkType = networkType;
+        this.phoneLocked = phoneLocked;
         this.sequence = sequence;
     }
 
@@ -88,7 +92,7 @@ public final class IphoneHelperTelemetry {
                 if (power == null && !"-".equals(fields[2].trim())) return null;
                 if (state.isEmpty() || type == null) return null;
                 return new IphoneHelperTelemetry(
-                        Kind.SNAPSHOT, level, power, state, type, sequence);
+                        Kind.SNAPSHOT, level, power, state, type, null, sequence);
             }
             if (!PREFIX_V2.equals(prefix)) return null;
             String kind = fields[1].trim().toUpperCase(Locale.US);
@@ -101,14 +105,14 @@ public final class IphoneHelperTelemetry {
                 if (power == null && !"-".equals(fields[3].trim())) return null;
                 if (state.isEmpty()) return null;
                 return new IphoneHelperTelemetry(
-                        Kind.POWER, level, power, state, "", sequence);
+                        Kind.POWER, level, power, state, "", null, sequence);
             }
             if ("N".equals(kind) && fields.length == 4) {
                 String type = normalizeNetworkType(fields[2]);
                 int sequence = sequence(fields[3]);
                 if (type == null) return null;
                 return new IphoneHelperTelemetry(
-                        Kind.NETWORK, null, null, "", type, sequence);
+                        Kind.NETWORK, null, null, "", type, null, sequence);
             }
         } catch (NumberFormatException ignored) {
             return null;
@@ -143,7 +147,8 @@ public final class IphoneHelperTelemetry {
         if (networkType == null) return null;
         int sequence = (payload[5] & 0xFF) | ((payload[6] & 0xFF) << 8);
         return new IphoneHelperTelemetry(
-                Kind.SNAPSHOT, level, externalPower, chargeState, networkType, sequence);
+                Kind.SNAPSHOT, level, externalPower, chargeState, networkType,
+                (flags & FLAG_PHONE_LOCKED) != 0, sequence);
     }
 
     /** CRC-8/ATM (polynomial 0x07, initial value 0). */

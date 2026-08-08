@@ -38,6 +38,7 @@ import androidx.core.content.ContextCompat;
 import dezz.status.widget.DiagnosticsActivity;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.R;
+import dezz.status.widget.car.CarIntegrations;
 
 /** Movable always-on-top control for action recording. */
 public final class ActionRecorderOverlayService extends Service {
@@ -91,6 +92,7 @@ public final class ActionRecorderOverlayService extends Service {
         preferences = new Preferences(this);
         DiagnosticJournal.initialize(this, preferences.debugModeEnabled.get());
         ActionRecorder.initialize(this);
+        CarIntegrations.get(this);
         createNotificationChannel();
         startForeground(NOTIFICATION_ID, notification());
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);

@@ -69,6 +69,7 @@ import java.util.function.Supplier;
 
 import dezz.status.widget.launcher.CombinedNavigationPanelPolicy;
 import dezz.status.widget.launcher.EcarxSystemStatusBarPolicy;
+import dezz.status.widget.launcher.EcarxBtPhoneBridge;
 import dezz.status.widget.launcher.AppDrawerTileView;
 import dezz.status.widget.launcher.AppDrawerUninstallPolicy;
 import dezz.status.widget.launcher.AppUninstallLauncher;
@@ -456,6 +457,7 @@ public final class LauncherActivity extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
         activityStarted = true;
+        EcarxBtPhoneBridge.onLauncherVisible(this);
         if (!panelsInitialized) {
             navigationUiHandler.removeCallbacks(allowPanelInitialization);
             navigationUiHandler.removeCallbacks(panelInitializationStep);
@@ -2800,6 +2802,9 @@ public final class LauncherActivity extends AppCompatActivity {
                     @Override public void seekTo(long positionMs) {
                         if (mediaController != null) mediaController.seekTo(positionMs);
                     }
+                    @Override public void finishSeek(long positionMs) {
+                        if (mediaController != null) mediaController.finishSeek(positionMs);
+                    }
                     @Override public boolean openPlayer() {
                         return mediaController != null && mediaController.openTargetPlayer();
                     }
@@ -3365,13 +3370,9 @@ public final class LauncherActivity extends AppCompatActivity {
             stateLabel.setBackground(badge);
         }
         card.addView(content, new MaterialCardView.LayoutParams(matchWidth(), matchHeight()));
-        if (!addButton && opensWindowedYandex(shortcut)) {
-            // ECARX/Yandex acknowledges creation of the floating window itself. Suppress the
-            // launcher-card effect so one tap cannot produce two audible clicks.
-            card.setSoundEffectsEnabled(false);
-            content.setSoundEffectsEnabled(false);
-            icon.setSoundEffectsEnabled(false);
-        }
+        card.setSoundEffectsEnabled(true);
+        content.setSoundEffectsEnabled(true);
+        icon.setSoundEffectsEnabled(true);
         if (stateLabel != null) {
             FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(
                     matchWidth(), wrapContent(), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);

@@ -65,6 +65,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import dezz.status.widget.BrickType;
+import dezz.status.widget.diagnostics.ActionRecorder;
+import dezz.status.widget.diagnostics.DiagnosticJournal;
 import dezz.status.widget.hud.HudProfileWirePatcher;
 import dezz.status.widget.launcher.vehicle.VehicleDerivedMetrics;
 
@@ -249,6 +251,11 @@ final class GeelyCarIntegration implements CarIntegration {
     private volatile ICarFunction carFunctions;
     private final EcarxSignalFallback signalFallback;
     private final EcarxProfileCloudAccess profileCloudAccess;
+    private final Object adasRecorderLock = new Object();
+    private final Map<Integer, Integer> lastRecordedAdasSignals = new HashMap<>();
+    private final ActionRecorder.RecordingListener adasRecordingListener =
+            this::onActionRecordingChanged;
+    private volatile boolean adasRecorderDemand;
     /** Prefer the richer callback once it has produced a value; AdaptAPI remains the cold fallback. */
     private volatile boolean lowLevelGearKnown;
     private volatile boolean lowLevelHighBeamKnown;
@@ -874,6 +881,20 @@ final class GeelyCarIntegration implements CarIntegration {
                         deliverLowLevelHighBeam(enabled);
                     }
 
+                    @Override public void onAdasCaptureReady(int propertyCount) {
+                        if (adasRecorderDemand && ActionRecorder.isRecording()) {
+                            ActionRecorder.record(ActionRecorder.SOURCE_STEERING_KEY,
+                                    "ECARX_ADAS_CAPTURE_READY", ActionRecorder.object(
+                                            "signal_count", propertyCount,
+                                            "property_ids", EcarxAdasSignalCatalog.idSummary()));
+                        }
+                    }
+
+                    @Override public void onAdasSignal(int propertyId,
+                                                       @NonNull String signalName, int raw) {
+                        recordAdasSignal(propertyId, signalName, raw);
+                    }
+
                     @Override public void onChannelLost() {
                         lowLevelGearKnown = false;
                         lowLevelHighBeamKnown = false;
@@ -881,6 +902,42 @@ final class GeelyCarIntegration implements CarIntegration {
                         lowLevelHighBeamObservedMonoMillis = 0L;
                     }
                 });
+        ActionRecorder.addRecordingListener(adasRecordingListener);
+    }
+
+    private void onActionRecordingChanged(boolean recording) {
+        adasRecorderDemand = recording;
+        synchronized (adasRecorderLock) {
+            lastRecordedAdasSignals.clear();
+        }
+        if (recording) {
+            ActionRecorder.record(ActionRecorder.SOURCE_STEERING_KEY,
+                    "ECARX_ADAS_CAPTURE_REQUESTED", ActionRecorder.object(
+                            "channel", "ecarx.car.hardware.signal",
+                            "property_ids", EcarxAdasSignalCatalog.idSummary(),
+                            "write_enabled", false));
+            DiagnosticJournal.info("adas.capture",
+                    "requested read-only KX11 steering/ADAS signal capture");
+        }
+        reconcileSignalFallback();
+    }
+
+    private void recordAdasSignal(int propertyId, @NonNull String signalName, int raw) {
+        if (!adasRecorderDemand || !ActionRecorder.isRecording()) return;
+        Integer previous;
+        synchronized (adasRecorderLock) {
+            previous = lastRecordedAdasSignals.put(propertyId, raw);
+        }
+        if (previous != null && previous == raw) return;
+        ActionRecorder.record(ActionRecorder.SOURCE_STEERING_KEY,
+                previous == null ? "ECARX_ADAS_BASELINE" : "ECARX_ADAS_SIGNAL_CHANGE",
+                ActionRecorder.object(
+                        "property_id", propertyId,
+                        "signal", signalName,
+                        "kind", EcarxAdasSignalCatalog.signalKind(propertyId),
+                        "raw", raw,
+                        "decoded", EcarxAdasSignalCatalog.decode(propertyId, raw),
+                        "previous_raw", previous));
     }
 
     private static int sensorTypeFor(@NonNull BrickType type) {
@@ -1863,7 +1920,7 @@ final class GeelyCarIntegration implements CarIntegration {
             lowLevelHighBeamKnown = false;
             lowLevelHighBeamObservedMonoMillis = 0L;
         }
-        signalFallback.updateDemand(needsGear, needsHighBeam);
+        signalFallback.updateDemand(needsGear, needsHighBeam, adasRecorderDemand);
     }
 
     private void deliverLowLevelGear(int adaptGear, int actualGear, boolean manualMode) {
@@ -3903,6 +3960,8 @@ final class GeelyCarIntegration implements CarIntegration {
 
     @Override
     public void shutdown() {
+        ActionRecorder.removeRecordingListener(adasRecordingListener);
+        adasRecorderDemand = false;
         controlsShuttingDown = true;
         hudArRequestGeneration.incrementAndGet();
         hudModeRequestGeneration.incrementAndGet();

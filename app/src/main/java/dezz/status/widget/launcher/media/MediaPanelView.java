@@ -55,6 +55,7 @@ public final class MediaPanelView extends FrameLayout {
         void playPause();
         void next();
         void seekTo(long positionMs);
+        void finishSeek(long positionMs);
         boolean openPlayer();
     }
 
@@ -376,7 +377,7 @@ public final class MediaPanelView extends FrameLayout {
             if (controls == null || layoutEditor != null || durationMs <= 0L) return;
             long selected = Math.round(durationMs * value / 1_000d);
             positionMs = MediaTimeline.clampPosition(selected, durationMs);
-            controls.seekTo(positionMs);
+            controls.finishSeek(positionMs);
         });
         progress.setMinimumHeight(dp(Math.max(2, Math.min(40, progressBarHeightDp))));
         root.addView(progress, new LinearLayout.LayoutParams(

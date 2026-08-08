@@ -45,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import dezz.status.widget.climate.StockHvacPopupClient;
 import dezz.status.widget.launcher.NavigationCollectionDemand;
 import dezz.status.widget.launcher.NavigationCollectionPolicy;
 import dezz.status.widget.launcher.NavigationDataRepository;
@@ -80,6 +81,10 @@ public class WidgetAccessibilityService extends AccessibilityService {
 
     /** displayId → current foreground package. Updated on every window change event. */
     private final Map<Integer, String> foregroundByDisplay = new HashMap<>();
+    private final ActionRecorder.RecordingListener actionRecordingListener =
+            this::onActionRecordingChanged;
+    private boolean stockHvacWindowObserved;
+    private int stockHvacWindowId = -1;
     private int consecutiveMissingNavigationScans;
     private HandlerThread navigationThread;
     private volatile Handler navigationHandler;
@@ -259,10 +264,19 @@ public class WidgetAccessibilityService extends AccessibilityService {
     public void onCreate() {
         super.onCreate();
         instance = this;
+        ActionRecorder.initialize(this);
+        ActionRecorder.addRecordingListener(actionRecordingListener);
     }
 
     @Override
     public void onDestroy() {
+        if (ActionRecorder.isRecording() && serviceConnected) {
+            ActionRecorder.record(ActionRecorder.SOURCE_ACCESSIBILITY,
+                    "ACCESSIBILITY_CAPTURE_LOST", ActionRecorder.object(
+                            "service", getClass().getName()));
+        }
+        ActionRecorder.removeRecordingListener(actionRecordingListener);
+        resetStockHvacObservation();
         serviceConnected = false;
         if (navigationDemand != null) {
             navigationDemand.stop();
@@ -310,6 +324,7 @@ public class WidgetAccessibilityService extends AccessibilityService {
             Log.i(TAG, "Android 9 safe mode: accessibility window traversal disabled");
         }
         Log.i(TAG, "Connected. Seeded " + foregroundByDisplay.size() + " display(s).");
+        recordAccessibilityCaptureReady();
         WidgetService widget = WidgetService.getInstance();
         if (widget != null) {
             widget.onForegroundTrackingPathChanged();
@@ -333,16 +348,21 @@ public class WidgetAccessibilityService extends AccessibilityService {
         int type = event.getEventType();
         CharSequence packageValue = event.getPackageName();
         String eventPackage = packageValue == null ? "" : packageValue.toString().trim();
-        if (ActionRecorder.isRecording()) {
-            CharSequence classValue = event.getClassName();
+        CharSequence classValue = event.getClassName();
+        String eventClass = classValue == null ? "" : classValue.toString().trim();
+        if (!ActionRecorder.isRecording()) {
+            resetStockHvacObservation();
+        } else {
             ActionRecorder.record(ActionRecorder.SOURCE_ACCESSIBILITY,
                     AccessibilityEvent.eventTypeToString(type),
                     ActionRecorder.object(
-                            "package", packageValue == null ? "" : packageValue.toString(),
-                            "class", classValue == null ? "" : classValue.toString(),
+                            "package", eventPackage,
+                            "class", eventClass,
                             "window_id", event.getWindowId(),
+                            "display_id", accessibilityDisplayId(event),
                             "action", event.getAction(),
                             "content_change_types", event.getContentChangeTypes()));
+            recordStockHvacWindowEvent(event, eventPackage, eventClass);
         }
         boolean windowChanged = type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
                 || type == AccessibilityEvent.TYPE_WINDOWS_CHANGED;
@@ -391,6 +411,73 @@ public class WidgetAccessibilityService extends AccessibilityService {
     /** Android 9 ECARX window traversal is a native-process hazard and cannot be caught in Java. */
     private static boolean supportsSafeWindowTraversal() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q;
+    }
+
+    private void onActionRecordingChanged(boolean recording) {
+        resetStockHvacObservation();
+        if (recording && serviceConnected) recordAccessibilityCaptureReady();
+    }
+
+    private void recordAccessibilityCaptureReady() {
+        if (!ActionRecorder.isRecording() || !serviceConnected) return;
+        ActionRecorder.record(ActionRecorder.SOURCE_ACCESSIBILITY,
+                "ACCESSIBILITY_CAPTURE_READY", ActionRecorder.object(
+                        "service", getClass().getName(),
+                        "window_events", true,
+                        "hardware_key_events", true,
+                        "android_9_safe_mode", !supportsSafeWindowTraversal(),
+                        "stock_hvac_package", StockHvacPopupClient.SERVICE_PACKAGE));
+    }
+
+    private void recordStockHvacWindowEvent(@NonNull AccessibilityEvent event,
+                                            @NonNull String eventPackage,
+                                            @NonNull String eventClass) {
+        int type = event.getEventType();
+        if (StockHvacPopupClient.isStockHvacWindow(eventPackage, eventClass)) {
+            boolean alreadyObserved = stockHvacWindowObserved;
+            stockHvacWindowObserved = true;
+            stockHvacWindowId = event.getWindowId();
+            ActionRecorder.record(ActionRecorder.SOURCE_ACCESSIBILITY,
+                    alreadyObserved ? "STOCK_HVAC_WINDOW_EVENT"
+                            : "STOCK_HVAC_WINDOW_OBSERVED",
+                    ActionRecorder.object(
+                            "package", eventPackage,
+                            "class", eventClass,
+                            "window_id", stockHvacWindowId,
+                            "display_id", accessibilityDisplayId(event),
+                            "event_type", AccessibilityEvent.eventTypeToString(type),
+                            "detection", "stock package/class"));
+            if (!alreadyObserved) {
+                DiagnosticJournal.info("climate.capture",
+                        "stock HVAC window observed, window=" + stockHvacWindowId
+                                + " display=" + accessibilityDisplayId(event));
+            }
+            return;
+        }
+        if (stockHvacWindowObserved && type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                && !eventPackage.isEmpty()) {
+            ActionRecorder.record(ActionRecorder.SOURCE_ACCESSIBILITY,
+                    "STOCK_HVAC_WINDOW_REPLACED_OR_HIDDEN", ActionRecorder.object(
+                            "previous_window_id", stockHvacWindowId,
+                            "next_package", eventPackage,
+                            "next_class", eventClass,
+                            "display_id", accessibilityDisplayId(event)));
+            resetStockHvacObservation();
+        }
+    }
+
+    private void resetStockHvacObservation() {
+        stockHvacWindowObserved = false;
+        stockHvacWindowId = -1;
+    }
+
+    private static int accessibilityDisplayId(@NonNull AccessibilityEvent event) {
+        try {
+            Object value = event.getClass().getMethod("getDisplayId").invoke(event);
+            return value instanceof Number ? ((Number) value).intValue() : -1;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return -1;
+        }
     }
 
     @Override

@@ -44,10 +44,13 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.diagnostics.ActionRecorder;
 import dezz.status.widget.diagnostics.ActionRecorderOverlayService;
 import dezz.status.widget.diagnostics.DiagnosticJournal;
 import dezz.status.widget.diagnostics.MainThreadWatchdog;
+import dezz.status.widget.diagnostics.PrivilegedDiagnosticsAccess;
+import dezz.status.widget.shell.PrivilegedShell;
 
 /** Human-readable diagnostic journal and structured action-recorder controls. */
 public final class DiagnosticsActivity extends AppCompatActivity {
@@ -63,8 +66,10 @@ public final class DiagnosticsActivity extends AppCompatActivity {
     private TextView timeline;
     private TextView widthValue;
     private TextView alphaValue;
+    private TextView expandedAccessState;
     private Button recorderToggle;
     private EditText markerComment;
+    private Switch rootInputEnabled;
 
     @Override
     protected void onCreate(@Nullable Bundle state) {
@@ -72,6 +77,7 @@ public final class DiagnosticsActivity extends AppCompatActivity {
         preferences = new Preferences(this);
         DiagnosticJournal.initialize(this, preferences.debugModeEnabled.get());
         ActionRecorder.initialize(this);
+        CarIntegrations.get(this);
         View screen = buildScreen();
         setContentView(screen);
         dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(this, screen);
@@ -143,9 +149,12 @@ public final class DiagnosticsActivity extends AppCompatActivity {
         page.addView(journalActions, topMargin(8));
 
         page.addView(heading("Регистратор воспроизводимых действий", 21), topMargin(28));
-        page.addView(label("Сессия фиксирует порядок: кнопки руля (keyCode/down/up/long/repeat), "
-                + "экраны и нажатия из спецвозможностей, запуск наших сервисов, Intent action "
-                + "без персональных extras и открытие/закрытие оверлеев. Файлы записываются "
+        page.addView(label("Сессия фиксирует порядок: обычные кнопки руля "
+                + "(keyCode/down/up/long/repeat), а на KX11 также прямые низкоуровневые "
+                + "ECARX-сигналы кнопок ACC/G-Pilot/ограничителя и ответные состояния ADAS; "
+                + "штатное появление окна ecarx.hvac.app и прямой openHvacMain; экраны и "
+                + "нажатия из спецвозможностей, запуск наших сервисов, Intent action без "
+                + "персональных extras и открытие/закрытие оверлеев. Файлы записываются "
                 + "немедленно, поэтому незавершённая при падении сессия не теряется."),
                 topMargin(6));
 
@@ -216,12 +225,53 @@ public final class DiagnosticsActivity extends AppCompatActivity {
         timeline = logText();
         page.addView(timeline, topMargin(8));
 
+        page.addView(heading("Расширенный системный захват", 20), topMargin(24));
+        page.addView(label("READ_LOGS добавляет фильтрованный след ECARX/ADAS/климата/ввода, "
+                + "а DUMP — снимки Window, Activity, Input и MediaSession при старте и каждой "
+                + "метке. Права выдаются один раз, сохраняются после перезагрузки и обновления "
+                + "APK; удаление приложения их сбрасывает."), topMargin(5));
+        expandedAccessState = logText();
+        expandedAccessState.setText("Проверяю права…");
+        page.addView(expandedAccessState, topMargin(8));
+
+        LinearLayout accessActions = row();
+        Button grantInternally = button("Выдать через встроенный ADB");
+        grantInternally.setOnClickListener(view -> grantExpandedAccess(0));
+        accessActions.addView(grantInternally, weighted());
+        Button copyGrants = button("Копировать команды");
+        copyGrants.setOnClickListener(view -> copyExpandedGrantCommands());
+        accessActions.addView(copyGrants, weightedWithMargin(8));
+        page.addView(accessActions, topMargin(8));
+
+        rootInputEnabled = switchView(
+                "Root: пассивно записывать только EV_KEY (без координат касаний)",
+                preferences.actionRecorderRootInputEnabled.get());
+        rootInputEnabled.setOnCheckedChangeListener((button, checked) -> {
+            if (!checked) {
+                preferences.actionRecorderRootInputEnabled.set(false);
+                return;
+            }
+            PrivilegedDiagnosticsAccess.inspectAsync(this, access -> {
+                if (access.root) {
+                    preferences.actionRecorderRootInputEnabled.set(true);
+                    Toast.makeText(this, "EV_KEY будет захватываться только во время записи",
+                            Toast.LENGTH_SHORT).show();
+                } else {
+                    preferences.actionRecorderRootInputEnabled.set(false);
+                    rootInputEnabled.setChecked(false);
+                    Toast.makeText(this, "su не предоставил root; опция не включена",
+                            Toast.LENGTH_LONG).show();
+                }
+                refreshExpandedAccess();
+            });
+        });
+        page.addView(rootInputEnabled, topMargin(10));
+
         page.addView(heading("Доступные источники", 20), topMargin(24));
-        page.addView(label("Без компьютера приложение видит собственные Activity/Service/"
-                + "оверлеи и события, которые Android передал службе спецвозможностей. "
-                + "Закрытые CAN/ECARX-сервисы и чужие фоновые процессы Android не разрешает "
-                + "перехватывать обычному APK; для них журнал явно отмечает границу видимости, "
-                + "а расширенный системный след требует ADB/root-доступа."),
+        page.addView(label("Прямой read-only канал ECARX ловит подтверждённые сигналы кнопок "
+                + "ACC/G-Pilot/ограничителя без root. Спецвозможности фиксируют штатные окна и "
+                + "обычные KeyEvent. Расширенные права дополняют их системным следом. "
+                + "Регистратор ничего не отправляет в CAN/ECARX и не включает функции авто."),
                 topMargin(5));
         Button accessibility = button("Открыть настройки спецвозможностей");
         accessibility.setOnClickListener(view -> {
@@ -267,6 +317,78 @@ public final class DiagnosticsActivity extends AppCompatActivity {
         if (overlayVisible != null) {
             overlayVisible.setChecked(preferences.actionRecorderOverlayVisible.get());
         }
+        refreshExpandedAccess();
+    }
+
+    private void refreshExpandedAccess() {
+        if (expandedAccessState == null) return;
+        PrivilegedDiagnosticsAccess.inspectAsync(this, access -> {
+            if (isFinishing() || isDestroyed() || expandedAccessState == null) return;
+            String standard = access.standardCaptureReady() ? "ГОТОВ" : "НУЖНЫ ПРАВА";
+            expandedAccessState.setText("Системный захват: " + standard
+                    + "\nREAD_LOGS: " + yesNo(access.readLogs)
+                    + "\nDUMP: " + yesNo(access.dump)
+                    + "\nUsage Access: " + yesNo(access.usageAccess)
+                    + "\nsu/root: " + yesNo(access.root)
+                    + "\nRoot EV_KEY: "
+                    + (access.rootInputEnabled && access.root ? "включён" : "выключен"));
+            if (rootInputEnabled != null
+                    && rootInputEnabled.isChecked() != access.rootInputEnabled) {
+                rootInputEnabled.setChecked(access.rootInputEnabled);
+            }
+        });
+    }
+
+    private void grantExpandedAccess(int commandIndex) {
+        String[] commands = expandedGrantCommands();
+        if (commandIndex >= commands.length) {
+            Toast.makeText(this, "Команды выполнены; проверяю права", Toast.LENGTH_SHORT).show();
+            refreshExpandedAccess();
+            return;
+        }
+        if (expandedAccessState != null) {
+            expandedAccessState.setText("Выдаю расширенные права: "
+                    + (commandIndex + 1) + "/" + commands.length + "…");
+        }
+        PrivilegedShell.get(this).runCommand(commands[commandIndex], (output, error) -> {
+            if (error != null) {
+                Toast.makeText(this, "Встроенный ADB недоступен: " + error
+                                + ". Используйте скопированные команды один раз с компьютера.",
+                        Toast.LENGTH_LONG).show();
+                refreshExpandedAccess();
+                return;
+            }
+            grantExpandedAccess(commandIndex + 1);
+        });
+    }
+
+    private void copyExpandedGrantCommands() {
+        ClipboardManager manager =
+                (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (manager == null) return;
+        StringBuilder value = new StringBuilder();
+        for (String command : expandedGrantCommands()) {
+            if (value.length() > 0) value.append('\n');
+            value.append("adb shell ").append(command);
+        }
+        manager.setPrimaryClip(ClipData.newPlainText("Status Widget ADB grants", value));
+        Toast.makeText(this, "Три одноразовые ADB-команды скопированы",
+                Toast.LENGTH_SHORT).show();
+    }
+
+    @NonNull
+    private String[] expandedGrantCommands() {
+        String packageName = getPackageName();
+        return new String[] {
+                "pm grant " + packageName + " android.permission.READ_LOGS",
+                "pm grant " + packageName + " android.permission.DUMP",
+                "appops set " + packageName + " GET_USAGE_STATS allow"
+        };
+    }
+
+    @NonNull
+    private static String yesNo(boolean value) {
+        return value ? "есть" : "нет";
     }
 
     private void refreshComponentChoices() {

@@ -40,6 +40,12 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission
+        android:name="android.permission.READ_LOGS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission
+        android:name="android.permission.DUMP"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission
         android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -317,6 +323,14 @@
              receiver manifest-declared means the latest state is cached even when HOME and the
              settings UI are not open. The controller also listens dynamically while HOME is
              visible for head units that restrict implicit manifest broadcasts. -->
+        <receiver
+            android:name="dezz.status.widget.launcher.EcarxBtPhoneEventReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.ecarx.btphone" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".launcher.MediaInfoBroadcastReceiver"
             android:directBootAware="true"

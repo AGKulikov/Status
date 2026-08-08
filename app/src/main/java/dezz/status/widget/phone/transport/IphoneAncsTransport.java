@@ -2919,7 +2919,8 @@ public final class IphoneAncsTransport {
 
     private boolean shouldLogHelperTelemetry(@NonNull IphoneHelperTelemetry telemetry) {
         String fingerprint = telemetry.batteryLevel + "|" + telemetry.externalPower + "|"
-                + telemetry.chargeState + "|" + telemetry.networkType;
+                + telemetry.chargeState + "|" + telemetry.networkType + "|"
+                + telemetry.phoneLocked;
         long now = SystemClock.elapsedRealtime();
         boolean changed = !Objects.equals(lastLoggedHelperTelemetry, fingerprint);
         if (!changed && now - lastHelperTelemetrySuccessLogAt < 30_000L) return false;
@@ -4643,6 +4644,7 @@ public final class IphoneAncsTransport {
                                     + " chargeState=" + telemetry.chargeState
                                     + " network=" + (telemetry.networkType.isEmpty()
                                     ? "unknown" : telemetry.networkType)
+                                    + " locked=" + telemetry.phoneLocked
                                     + " seq=" + telemetry.sequence);
                         }
                     } else {

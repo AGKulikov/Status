@@ -717,6 +717,9 @@ public class Preferences {
     /** Whole-frame alpha, 80..255. */
     public final Int actionRecorderOverlayAlpha = new Int(this,
             "actionRecorderOverlayAlpha", 235);
+    /** Passive raw EV_KEY capture. Requires an already-authorised su and is never enabled itself. */
+    public final Bool actionRecorderRootInputEnabled = new Bool(this,
+            "actionRecorderRootInputEnabled", false);
 
     public final Bool mqttEnabled = new Bool(this, "mqttEnabled", false);
     public final Str mqttHost = new Str(this, "mqttHost", "");
@@ -766,6 +769,9 @@ public class Preferences {
     /** Whether the newest ANCS event is also rendered by its dedicated automation overlay. */
     public final Bool phonePopupNotificationsEnabled = new Bool(this,
             "phoneNotificationPopupEnabled", false);
+    /** Suppresses both phone notification destinations unless helper telemetry says locked. */
+    public final Bool phoneNotificationsOnlyWhenLocked = new Bool(this,
+            "phoneNotificationsOnlyWhenLocked", false);
     /** How long the temporary notification presentation remains visible. */
     public final Int phoneStatusBarNotificationSeconds = new Int(this,
             "phoneNotificationTickerSeconds", 10);

@@ -28,6 +28,8 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -44,16 +46,24 @@ public final class ActionRecorder {
     public static final String SOURCE_STEERING_KEY = "steering_key";
     public static final String SOURCE_SERVICE = "service";
     public static final String SOURCE_OVERLAY = "overlay";
+    public static final String SOURCE_ROOT_INPUT = "root_input";
+    public static final String SOURCE_SYSTEM_TRACE = "system_trace";
     public static final String SOURCE_USER = "user";
 
     private static final Object LOCK = new Object();
     private static final String ACTIVE_MARKER = "recorder-active.json";
     private static final AtomicLong SEQUENCE = new AtomicLong();
+    private static final Set<RecordingListener> RECORDING_LISTENERS =
+            new CopyOnWriteArraySet<>();
 
     @Nullable private static Context appContext;
     @Nullable private static Session activeSession;
 
     private ActionRecorder() {
+    }
+
+    public interface RecordingListener {
+        void onRecordingChanged(boolean recording);
     }
 
     public static final class Session {
@@ -101,7 +111,9 @@ public final class ActionRecorder {
                     "reason", DiagnosticJournal.redact(reason),
                     "session", id));
             DiagnosticJournal.info("recorder", "action session started: " + id);
-            return activeSession;
+            Session session = activeSession;
+            notifyRecordingChanged(true);
+            return session;
         }
     }
 
@@ -117,8 +129,18 @@ public final class ActionRecorder {
             activeSession = null;
             deleteMarkerLocked();
             DiagnosticJournal.info("recorder", "action session stopped: " + session.id);
+            notifyRecordingChanged(false);
             return session;
         }
+    }
+
+    public static void addRecordingListener(@NonNull RecordingListener listener) {
+        RECORDING_LISTENERS.add(listener);
+        listener.onRecordingChanged(isRecording());
+    }
+
+    public static void removeRecordingListener(@NonNull RecordingListener listener) {
+        RECORDING_LISTENERS.remove(listener);
     }
 
     public static void record(@NonNull String source, @NonNull String event,
@@ -132,6 +154,7 @@ public final class ActionRecorder {
     public static void mark(@Nullable String comment) {
         record(SOURCE_USER, "MARK", object(
                 "comment", DiagnosticJournal.redact(comment)));
+        PrivilegedActionCollector.captureMarkerSnapshot();
     }
 
     /** Records one application-owned service launch without serialising arbitrary Intent extras. */
@@ -213,6 +236,16 @@ public final class ActionRecorder {
         Session session = activeSession;
         if (session == null) return;
         appendToSessionLocked(session, source, event, details);
+    }
+
+    private static void notifyRecordingChanged(boolean recording) {
+        for (RecordingListener listener : RECORDING_LISTENERS) {
+            try {
+                listener.onRecordingChanged(recording);
+            } catch (RuntimeException error) {
+                DiagnosticJournal.error("recorder", "recording-state listener failed", error);
+            }
+        }
     }
 
     private static void appendToSessionLocked(@NonNull Session session,

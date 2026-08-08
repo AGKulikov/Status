@@ -38,6 +38,7 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
     private Preferences prefs;
     private Switch statusRow;
     private Switch popup;
+    private Switch onlyWhenLocked;
     private TextView fieldsSummary;
     private TextView durationSummary;
     private MaterialButton statusColor;
@@ -64,6 +65,7 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         binding = true;
         statusRow.setChecked(prefs.phoneStatusBarNotificationsEnabled.get());
         popup.setChecked(prefs.phonePopupNotificationsEnabled.get());
+        onlyWhenLocked.setChecked(prefs.phoneNotificationsOnlyWhenLocked.get());
         binding = false;
         refreshSummaries();
     }
@@ -93,8 +95,9 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         page.addView(header, matchWrap());
 
         page.addView(label("Новейшее уведомление iPhone может независимо появляться в строке "
-                + "состояния и в отдельном плавающем оверлее. Если во время показа приходит "
-                + "следующее уведомление, оно сразу заменяет предыдущее."), topMargin(8));
+                + "состояния и в отдельном плавающем оверлее. В серии промежуточные "
+                + "уведомления сменяются раз в секунду, а последнее остаётся на полный "
+                + "заданный срок."), topMargin(8));
 
         LinearLayout destinations = card();
         statusRow = switchView("Показывать в строке состояния",
@@ -103,10 +106,16 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         popup = switchView("Показывать во всплывающем оверлее",
                 prefs.phonePopupNotificationsEnabled.get());
         destinations.addView(popup, topMargin(8));
+        onlyWhenLocked = switchView("Показывать только когда телефон заблокирован",
+                prefs.phoneNotificationsOnlyWhenLocked.get());
+        destinations.addView(onlyWhenLocked, topMargin(8));
+        destinations.addView(label("Состояние блокировки передаёт KX11 ANCS Helper v21."),
+                topMargin(4));
         page.addView(destinations, topMargin(16));
 
         statusRow.setOnCheckedChangeListener((button, checked) -> persist());
         popup.setOnCheckedChangeListener((button, checked) -> persist());
+        onlyWhenLocked.setOnCheckedChangeListener((button, checked) -> persist());
 
         Button fields = button("Состав текста уведомления");
         fields.setOnClickListener(view -> chooseFields());
@@ -293,6 +302,7 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
             boolean popupEnabled = popup.isChecked();
             prefs.phoneStatusBarNotificationsEnabled.set(statusEnabled);
             prefs.phonePopupNotificationsEnabled.set(popupEnabled);
+            prefs.phoneNotificationsOnlyWhenLocked.set(onlyWhenLocked.isChecked());
             prefs.phoneStatusBarNotificationFields.set(PhoneStatusBarPolicy.serializeIds(
                     selectedFields, PhoneStatusBarPolicy.notificationFieldIds()));
             prefs.phoneStatusBarNotificationSeconds.set(clamp(durationSeconds, 1, 120));

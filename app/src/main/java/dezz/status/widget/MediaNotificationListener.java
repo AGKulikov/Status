@@ -17,6 +17,10 @@
 
 package dezz.status.widget;
 
+import android.app.Notification;
+import android.content.Context;
+import android.media.session.MediaController;
+import android.media.session.MediaSession;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Process;
@@ -24,9 +28,15 @@ import android.os.SystemClock;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 
+import androidx.annotation.NonNull;
+import androidx.core.app.NotificationCompat;
+
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import dezz.status.widget.launcher.NavigationCollectionDemand;
@@ -40,6 +50,9 @@ import dezz.status.widget.launcher.NavigationDataRepository;
  */
 public class MediaNotificationListener extends NotificationListenerService {
     private static final long NAVIGATION_MISSING_GRACE_MS = 1_500L;
+    private static final Object MEDIA_SESSION_LOCK = new Object();
+    private static final Map<String, MediaNotificationSession> MEDIA_SESSIONS =
+            new LinkedHashMap<>();
     private int consecutiveNoRouteScans;
     private HandlerThread navigationThread;
     private volatile Handler navigationHandler;
@@ -79,6 +92,7 @@ public class MediaNotificationListener extends NotificationListenerService {
     public void onListenerConnected() {
         super.onListenerConnected();
         listenerConnected = true;
+        rebuildMediaSessions();
         if (navigationDemand == null) {
             navigationDemand = new NavigationCollectionDemand(this);
             navigationDemand.start(this::onNavigationDemandChanged);
@@ -89,6 +103,7 @@ public class MediaNotificationListener extends NotificationListenerService {
     @Override
     public void onListenerDisconnected() {
         listenerConnected = false;
+        clearMediaSessions();
         stopNavigationWorker();
         if (navigationDemand != null) {
             navigationDemand.stop();
@@ -99,6 +114,7 @@ public class MediaNotificationListener extends NotificationListenerService {
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
+        rememberMediaSession(sbn);
         if (sbn != null && NavigationDataRepository.isSupportedPackage(sbn.getPackageName())) {
             // Reconciliation handles replacement and chooses the most complete notification.
             // The worker coalesces rapid ETA updates and keeps RemoteViews inflation off main.
@@ -108,6 +124,7 @@ public class MediaNotificationListener extends NotificationListenerService {
 
     @Override
     public void onNotificationRemoved(StatusBarNotification sbn) {
+        forgetMediaSession(sbn);
         if (sbn != null && NavigationDataRepository.isSupportedPackage(sbn.getPackageName())) {
             // Reconcile immediately instead of clearing the old key first: Navigator commonly
             // replaces a notification with a new key, and persisting the replacement before the
@@ -119,12 +136,82 @@ public class MediaNotificationListener extends NotificationListenerService {
     @Override
     public void onDestroy() {
         listenerConnected = false;
+        clearMediaSessions();
         stopNavigationWorker();
         if (navigationDemand != null) {
             navigationDemand.stop();
             navigationDemand = null;
         }
         super.onDestroy();
+    }
+
+    /** Media notification tokens remain available even when ECARX hides active-session access. */
+    public static List<MediaController> activeMediaNotificationControllers(Context context) {
+        List<MediaNotificationSession> sessions;
+        synchronized (MEDIA_SESSION_LOCK) {
+            sessions = new ArrayList<>(MEDIA_SESSIONS.values());
+        }
+        Collections.reverse(sessions);
+        List<MediaController> result = new ArrayList<>(sessions.size());
+        List<MediaSession.Token> seen = new ArrayList<>(sessions.size());
+        for (MediaNotificationSession session : sessions) {
+            if (seen.contains(session.token)) continue;
+            try {
+                result.add(new MediaController(context, session.token));
+                seen.add(session.token);
+            } catch (RuntimeException ignored) {
+            }
+        }
+        return result;
+    }
+
+    private void rebuildMediaSessions() {
+        try {
+            StatusBarNotification[] active = getActiveNotifications();
+            clearMediaSessions();
+            if (active == null) return;
+            for (StatusBarNotification notification : active) rememberMediaSession(notification);
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    private static void rememberMediaSession(StatusBarNotification sbn) {
+        if (sbn == null || sbn.getNotification() == null) return;
+        try {
+            Notification notification = sbn.getNotification();
+            Object token = notification.extras == null ? null
+                    : notification.extras.get(NotificationCompat.EXTRA_MEDIA_SESSION);
+            String key = sbn.getKey();
+            if (!(token instanceof MediaSession.Token) || key == null || key.isEmpty()) return;
+            synchronized (MEDIA_SESSION_LOCK) {
+                // Reinsert so LinkedHashMap order reflects the newest notification update.
+                MEDIA_SESSIONS.remove(key);
+                MEDIA_SESSIONS.put(key,
+                        new MediaNotificationSession((MediaSession.Token) token));
+            }
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+    }
+
+    private static void forgetMediaSession(StatusBarNotification sbn) {
+        if (sbn == null || sbn.getKey() == null) return;
+        synchronized (MEDIA_SESSION_LOCK) {
+            MEDIA_SESSIONS.remove(sbn.getKey());
+        }
+    }
+
+    private static void clearMediaSessions() {
+        synchronized (MEDIA_SESSION_LOCK) {
+            MEDIA_SESSIONS.clear();
+        }
+    }
+
+    private static final class MediaNotificationSession {
+        @NonNull final MediaSession.Token token;
+
+        MediaNotificationSession(@NonNull MediaSession.Token token) {
+            this.token = token;
+        }
     }
 
     private void ensureNavigationWorker() {

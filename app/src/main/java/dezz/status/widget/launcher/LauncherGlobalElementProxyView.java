@@ -59,6 +59,9 @@ public final class LauncherGlobalElementProxyView extends View {
     @NonNull private final Source source;
     @NonNull private LauncherGlobalElementLayoutStore.Appearance appearance;
     @Nullable private View styledSource;
+    @Nullable private View gestureSource;
+    @Nullable private DrawTransform gestureTransform;
+    private boolean ignoreGestureUntilUp;
     private final Map<TextView, TextSnapshot> originalTexts = new IdentityHashMap<>();
     private final Map<ImageView, ColorFilter> originalImageFilters = new IdentityHashMap<>();
     private final Map<TextView, MarqueeState> marqueeStates = new IdentityHashMap<>();
@@ -82,6 +85,7 @@ public final class LauncherGlobalElementProxyView extends View {
 
     public void setAppearance(
             @NonNull LauncherGlobalElementLayoutStore.Appearance value) {
+        cancelForwardedGesture();
         restoreOriginalStyles();
         appearance = value.copy();
         styledSource = null;
@@ -143,32 +147,68 @@ public final class LauncherGlobalElementProxyView extends View {
 
     @Override
     public boolean onTouchEvent(@NonNull MotionEvent event) {
-        View value = sourceView();
-
+        int action = event.getActionMasked();
+        View actionSource = action == MotionEvent.ACTION_DOWN ? sourceView() : gestureSource;
         LauncherGlobalElementLayoutStore.TapAction tapAction = appearance.tapAction;
+        // These two elements are controls, even if an older saved layout still contains a
+        // custom tap action from before direct manipulation was introduced.
+        if (actionSource != null && isResponsiveMediaControl(actionSource)) {
+            tapAction = LauncherGlobalElementLayoutStore.TapAction.INHERIT;
+        }
         if (tapAction != LauncherGlobalElementLayoutStore.TapAction.INHERIT) {
-            if (event.getActionMasked() == MotionEvent.ACTION_UP
+            cancelForwardedGesture();
+            if (action == MotionEvent.ACTION_UP
                     && tapAction == LauncherGlobalElementLayoutStore.TapAction.APP) {
                 launchConfiguredApp();
                 performClick();
             }
             return true;
         }
-        if (value == null || value.getWidth() <= 0 || value.getHeight() <= 0
-                || getWidth() <= 0 || getHeight() <= 0) return false;
-        DrawTransform transform = transform(value);
-        if (!transform.drawable()) return false;
+
+        if (ignoreGestureUntilUp) {
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                ignoreGestureUntilUp = false;
+                finishForwardedGesture();
+            }
+            return true;
+        }
+
+        View value;
+        DrawTransform transform;
+        if (action == MotionEvent.ACTION_DOWN) {
+            cancelForwardedGesture();
+            value = sourceView();
+            if (value == null || value.getWidth() <= 0 || value.getHeight() <= 0
+                    || getWidth() <= 0 || getHeight() <= 0) return false;
+            transform = transform(value);
+            if (!transform.drawable()) return false;
+        } else {
+            value = gestureSource;
+            transform = gestureTransform;
+            if (value == null || transform == null) return true;
+        }
+
         float mappedX = transform.sourceLeft
                 + (event.getX() - transform.offsetX) / transform.scaleX;
         float mappedY = transform.sourceTop
                 + (event.getY() - transform.offsetY) / transform.scaleY;
-        if (appearance.scaleMode == LauncherGlobalElementLayoutStore.ScaleMode.FIT
+        if (action == MotionEvent.ACTION_DOWN
+                && appearance.scaleMode == LauncherGlobalElementLayoutStore.ScaleMode.FIT
                 && (mappedX < transform.sourceLeft
                 || mappedX > transform.sourceRight
                 || mappedY < transform.sourceTop
                 || mappedY > transform.sourceBottom)) {
+            ignoreGestureUntilUp = true;
             return true;
         }
+
+        if (action == MotionEvent.ACTION_DOWN) {
+            gestureSource = value;
+            gestureTransform = transform;
+            ViewParent parent = getParent();
+            if (parent != null) parent.requestDisallowInterceptTouchEvent(true);
+        }
+
         MotionEvent forwarded = MotionEvent.obtain(event);
         forwarded.setLocation(clamp(mappedX, 0f, value.getWidth()),
                 clamp(mappedY, 0f, value.getHeight()));
@@ -178,17 +218,50 @@ public final class LauncherGlobalElementProxyView extends View {
         } finally {
             forwarded.recycle();
         }
-        if (!handled && event.getActionMasked() == MotionEvent.ACTION_UP) {
+        if (!handled && action == MotionEvent.ACTION_UP) {
             performClickableAncestor(value);
+        }
+        if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            finishForwardedGesture();
         }
         invalidate();
         return true;
     }
 
     @Override
+    protected void onDetachedFromWindow() {
+        cancelForwardedGesture();
+        super.onDetachedFromWindow();
+    }
+
+    @Override
     public boolean performClick() {
         super.performClick();
         return true;
+    }
+
+    private void cancelForwardedGesture() {
+        View value = gestureSource;
+        if (value != null) {
+            long now = SystemClock.uptimeMillis();
+            MotionEvent cancel = MotionEvent.obtain(now, now, MotionEvent.ACTION_CANCEL,
+                    0f, 0f, 0);
+            try {
+                value.dispatchTouchEvent(cancel);
+            } catch (RuntimeException ignored) {
+            } finally {
+                cancel.recycle();
+            }
+        }
+        finishForwardedGesture();
+        ignoreGestureUntilUp = false;
+    }
+
+    private void finishForwardedGesture() {
+        ViewParent parent = getParent();
+        if (parent != null) parent.requestDisallowInterceptTouchEvent(false);
+        gestureSource = null;
+        gestureTransform = null;
     }
 
     private void launchConfiguredApp() {

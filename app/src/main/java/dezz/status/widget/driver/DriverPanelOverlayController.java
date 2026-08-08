@@ -476,6 +476,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         drawer.addView(title, titleParams);
 
         ImageButton close = new ImageButton(context);
+        close.setSoundEffectsEnabled(true);
         close.setImageResource(R.drawable.ic_driver_close);
         close.setColorFilter(Color.WHITE);
         close.setBackground(rippleBackground(Color.argb(45, 255, 255, 255), 18));
@@ -486,6 +487,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         drawer.addView(close, closeParams);
 
         TextView done = new TextView(context);
+        done.setSoundEffectsEnabled(true);
         done.setText("Готово");
         done.setTextColor(Color.WHITE);
         done.setTextSize(17);
@@ -686,59 +688,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             return;
         }
         dismissAllApps();
-        Display display = defaultDisplay();
-        if (display == null) return;
-        DisplayMetrics metrics = new DisplayMetrics();
-        display.getRealMetrics(metrics);
-        Preferences.DriverPanelProfile profile = preferences.activeDriverPanelProfile();
-        DriverPanelLayoutPolicy.TapTarget target =
-                DriverPanelLayoutPolicy.stockClimateTapTarget(
-                        metrics.widthPixels, metrics.heightPixels,
-                        profile.side.get() == 1,
-                        profile.style == Preferences.DriverPanelStyle.NEW);
-        int generation = ++proxyTapGeneration;
-
-        // Keep the panel visually stable but remove it from input hit-testing for the duration of
-        // the injected gesture. That makes the event land on the covered OEM climate icon.
-        setPanelTouchable(false);
-        Runnable restore = () -> mainHandler.postDelayed(() -> {
-            if (generation != proxyTapGeneration) return;
-            setPanelTouchable(true);
-        }, 90L);
-        mainHandler.postDelayed(() -> {
-            if (generation == proxyTapGeneration) setPanelTouchable(true);
-        }, PROXY_TAP_HARD_RESTORE_MS);
-        // updateViewLayout() is asynchronous on Android. Wait for one short WindowManager
-        // relayout before injecting the gesture, otherwise the still-interactive rail can consume
-        // the synthetic tap even though its opaque pixels never left the screen.
-        mainHandler.postDelayed(() -> {
-            if (generation != proxyTapGeneration) return;
-            if (WidgetAccessibilityService.performTap(target.x, target.y, success -> {
-                if (generation != proxyTapGeneration) return;
-                // A cancelled callback can arrive after ECARX has already consumed the tap while
-                // replacing its climate surface. Retrying here generated a second click and could
-                // toggle the panel back to its original state. One accepted gesture means one tap.
-                restore.run();
-            })) return;
-            fallbackStockClimateTap(target, generation);
-        }, PROXY_TAP_SETTLE_MS);
-    }
-
-    private void fallbackStockClimateTap(@NonNull DriverPanelLayoutPolicy.TapTarget target,
-                                         int generation) {
-        // The shared settle delay above already made the opaque rail input-transparent. The shell
-        // fallback therefore injects immediately without detaching or visually exposing OEM UI.
-        PrivilegedShell.get(appContext).runCommand(
-                "input tap " + target.x + " " + target.y, (output, error) ->
-                        mainHandler.post(() -> {
-                            if (generation != proxyTapGeneration) return;
-                            setPanelTouchable(true);
-                            if (error != null) {
-                                Toast.makeText(appContext,
-                                        "Включите спецвозможности для кнопки штатного климата",
-                                        Toast.LENGTH_LONG).show();
-                            }
-                        }));
+        DriverPanelService.triggerStockClimate(appContext);
     }
 
     private void dismissAllApps() {
@@ -1279,14 +1229,9 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             icon = image;
             stateIcon = image;
         }
-        if (stockClimateAction || opensWindowedYandex(shortcut)) {
-            // The destination surface already produces its own audible acknowledgement. Keeping
-            // the proxy button silent prevents the intermittent double click heard when ECARX
-            // creates a Yandex floating window (and does the same for the stock-climate proxy).
-            button.setSoundEffectsEnabled(false);
-            content.setSoundEffectsEnabled(false);
-            icon.setSoundEffectsEnabled(false);
-        }
+        button.setSoundEffectsEnabled(true);
+        content.setSoundEffectsEnabled(true);
+        icon.setSoundEffectsEnabled(true);
         // A live climate tile without a caption is the complete visual content.  Add it directly
         // to the physical FrameLayout with CENTER gravity: the ECARX Android 9 LinearLayout path
         // retained the child's old top after buttonHeightPx changed, even when its wrapper filled
@@ -1884,6 +1829,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             if (appearance == null) appearance = new FavoriteAppConfig(app.packageName);
             AppDrawerTileView cell = convertView instanceof AppDrawerTileView
                     ? (AppDrawerTileView) convertView : new AppDrawerTileView(context);
+            cell.setSoundEffectsEnabled(true);
             LinearLayout tile = LauncherAppTileRenderer.render(
                     context, cell.reusableContent(), app.label,
                     LauncherAppCatalog.loadIcon(context, app),
