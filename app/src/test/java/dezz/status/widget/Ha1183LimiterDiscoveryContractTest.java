@@ -24,7 +24,8 @@ public final class Ha1183LimiterDiscoveryContractTest {
         assertTrue(fallback.contains("listener.onAdasSignal"));
         assertTrue(integration.contains("fixed_and_runtime_name_discovery"));
         assertTrue(integration.contains("fallback_discovery_property_ids"));
-        assertTrue(catalog.contains("paspeedwarnspeedlimit"));
+        assertTrue(catalog.contains("name.contains(\"spdlim\")"));
+        assertTrue(catalog.contains("name.contains(\"speedwarn\")"));
         assertTrue(catalog.contains("vehicle_control_discovery"));
         assertFalse(fallback.contains("setProperty("));
     }
