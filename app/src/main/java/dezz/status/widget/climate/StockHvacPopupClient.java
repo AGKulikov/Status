@@ -44,6 +44,12 @@ public final class StockHvacPopupClient {
         thread.setDaemon(true);
         return thread;
     });
+    private boolean binding;
+    private boolean bound;
+    private boolean requestPending;
+    private boolean transactionRunning;
+    private IBinder remote;
+    @NonNull private Callback pendingCallback = (success, message) -> { };
     private final Runnable connectTimeout = () -> {
         if (!requestPending) return;
         requestPending = false;
@@ -90,13 +96,6 @@ public final class StockHvacPopupClient {
             finish(false, "Штатная служба климата вернула пустой Binder");
         }
     };
-
-    private boolean binding;
-    private boolean bound;
-    private boolean requestPending;
-    private boolean transactionRunning;
-    private IBinder remote;
-    @NonNull private Callback pendingCallback = (success, message) -> { };
 
     private StockHvacPopupClient(@NonNull Context context) {
         appContext = context.getApplicationContext();
