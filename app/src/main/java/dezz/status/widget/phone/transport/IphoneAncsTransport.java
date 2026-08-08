@@ -347,6 +347,8 @@ public final class IphoneAncsTransport {
         BluetoothDevice device;
         long connectedAtElapsedMs;
         boolean connected;
+        /** One bounded LE-security request made before Core Bluetooth releases didConnect. */
+        boolean prePairBondRequested;
         boolean linkSecurityChallengeIssued;
         boolean telemetrySubscribed;
 
@@ -1565,6 +1567,71 @@ public final class IphoneAncsTransport {
         }
     }
 
+    /**
+     * Breaks the iPhone-Central bootstrap deadlock observed on KX11 Android 9.
+     *
+     * <p>With {@code CBConnectPeripheralOptionRequiresANCS}, iOS can establish the physical LE
+     * link but withhold the app's {@code didConnect} callback until that link has security.  The
+     * previous protocol waited for Helper's PAIR write before calling {@code createBond()}, so
+     * neither side could advance: Android reported {@code STATE_CONNECTED/bond=NONE}, Helper
+     * remained in {@code .connecting}, and iOS dropped the link without issuing any ATT request.
+     *
+     * <p>Request LE bonding once on the actual incoming GATT-server peer.  This does not trust the
+     * peer or expose data: PAIR plus the encrypted B3 challenge are still required before
+     * {@link #claimVerifiedPeer(BluetoothDevice)} and the ANCS client handoff.</p>
+     */
+    private void requestIncomingPrePairLeBond(BluetoothDevice device) {
+        if (!managedIncomingMode || device == null || getVerifiedPeer() != null) return;
+        int bondState = safeBondState(device);
+        if (bondState == BluetoothDevice.BOND_BONDED) {
+            log("Incoming F04 link уже LE-bonded; жду Helper PAIR");
+            return;
+        }
+        if (bondState == BluetoothDevice.BOND_BONDING) {
+            log("Incoming F04 link уже выполняет LE bonding; жду Helper didConnect/PAIR");
+            return;
+        }
+        synchronized (gattServerPeers) {
+            GattServerPeer peer = gattServerPeers.get(deviceKey(device));
+            if (peer == null || peer.sessionGeneration != sessionGeneration
+                    || !peer.connected || peer.prePairBondRequested) {
+                return;
+            }
+            peer.prePairBondRequested = true;
+        }
+
+        boolean started = createLeBond(device);
+        log("PRE-PAIR LE bond на incoming F04 link: started=" + started
+                + " peer=" + safeAddress(device)
+                + " bond=" + bondLabel(safeBondState(device)));
+        if (started || safeBondState(device) == BluetoothDevice.BOND_BONDING) {
+            leBondAttemptObserved = true;
+            state("IPHONE CENTRAL · PRE-PAIR LE BONDING");
+        } else {
+            state("IPHONE CENTRAL · PRE-PAIR LE BOND START FAILED");
+        }
+    }
+
+    /**
+     * Starts bonding on the already-connected incoming LE peer.
+     *
+     * <p>Keep this on the public no-argument API. A reflective call to the hidden
+     * {@code createBond(int)} overload produced invalid optimized DEX on the KX11 Android 9
+     * verifier (a register became a reference/boolean type conflict), which rejected this entire
+     * class before the transport could start. The peer passed here is the active GATT-server LE
+     * link, so {@link BluetoothDevice#createBond()} negotiates security for that link directly.</p>
+     */
+    private boolean createLeBond(BluetoothDevice device) {
+        try {
+            boolean started = device.createBond();
+            log("createBond()=" + started + " на активном incoming LE link");
+            return started;
+        } catch (RuntimeException failure) {
+            log("createBond() exception на incoming LE link: " + failure);
+            return false;
+        }
+    }
+
     private void handleSecureAttSuccess(BluetoothDevice device, String operation) {
         if (!isVerifiedPeer(device)) {
             log("SECURE callback проигнорирован: это не verified peer");
@@ -1889,6 +1956,7 @@ public final class IphoneAncsTransport {
             if (status == GATT_SUCCESS && newState == BluetoothProfile.STATE_CONNECTED) {
                 if (!peer.connected) {
                     peer.connectedAtElapsedMs = now;
+                    peer.prePairBondRequested = false;
                     peer.linkSecurityChallengeIssued = false;
                 }
                 peer.connected = true;
@@ -4211,6 +4279,7 @@ public final class IphoneAncsTransport {
                                     + "; ожидаю защищённый PAIR/ANCS handshake"
                                     : "Peer станет verified только после ASCII PAIR в CONTROL "
                                     + CONTROL_CHARACTERISTIC);
+                            requestIncomingPrePairLeBond(device);
                         } else if (newState == BluetoothProfile.STATE_DISCONNECTED
                                 && isVerifiedPeer(device)) {
                             handleVerifiedServerLinkDisconnected(device);

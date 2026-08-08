@@ -38,7 +38,7 @@ public final class Ha1163PhoneSettingsScrollContractTest {
         if (!build.contains("String getVersionName()")) {
             build = project("../build.gradle");
         }
-        assertTrue(build.contains("return 'v2.8.2-ha1183'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1186'"));
     }
 
     private static String source(String relative) throws Exception {
