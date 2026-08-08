@@ -77,6 +77,7 @@ public final class MediaPanelInteractionContractTest {
         assertFalse(progress.contains("drawCircle"));
         assertFalse(progress.contains("drawOval"));
         assertTrue(panel.contains("controls.seekTo(positionMs)"));
+        assertTrue(panel.contains("controls.finishSeek(positionMs)"));
         assertTrue(panel.contains("progress == null || !progress.isPressed()"));
         assertTrue(controller.contains("public void seekTo(long positionMs)"));
         assertTrue(command.contains("controller.getTransportControls().seekTo("));

@@ -49,6 +49,7 @@ public final class Ha1177ResponsiveMediaAndNotificationQueueContractTest {
 
         assertTrue(panel.contains("progress.setOnProgressChanged((value, fromUser) ->"));
         assertTrue(panel.contains("controls.seekTo(positionMs)"));
+        assertTrue(panel.contains("controls.finishSeek(positionMs)"));
         assertTrue(panel.contains("progress == null || !progress.isPressed()"));
         assertTrue(controller.contains("public void seekTo(long positionMs)"));
         assertTrue(command.contains("controller.getTransportControls().seekTo("));
@@ -97,7 +98,7 @@ public final class Ha1177ResponsiveMediaAndNotificationQueueContractTest {
 
     @Test public void releaseIdentityAdvancesToHa1177() throws Exception {
         String build = rootProject("build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1178'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1181'"));
     }
 
     private static String source(String relative) throws Exception {

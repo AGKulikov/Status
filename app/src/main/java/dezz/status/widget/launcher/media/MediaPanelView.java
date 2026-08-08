@@ -372,6 +372,7 @@ public final class MediaPanelView extends FrameLayout {
                 setTextIfChanged(timeline, MediaTimeline.format(positionMs) + " / "
                         + MediaTimeline.format(durationMs));
             }
+            if (controls != null) controls.seekTo(positionMs);
         });
         progress.setOnProgressCommitted(value -> {
             if (controls == null || layoutEditor != null || durationMs <= 0L) return;

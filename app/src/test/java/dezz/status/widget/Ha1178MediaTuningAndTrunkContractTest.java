@@ -27,8 +27,9 @@ public final class Ha1178MediaTuningAndTrunkContractTest {
         assertTrue(panel.contains("setOnProgressCommitted"));
         String changed = between(panel, "progress.setOnProgressChanged(",
                 "progress.setOnProgressCommitted(");
-        assertFalse(changed.contains("controls.seekTo"));
-        assertTrue(controller.contains("selected.getTransportControls().seekTo(targetPosition)"));
+        assertTrue(changed.contains("controls.seekTo(positionMs)"));
+        assertTrue(panel.contains("controls.finishSeek(positionMs)"));
+        assertTrue(controller.contains("controller.getTransportControls().seekTo(positionMs)"));
     }
 
     @Test public void volumeThumbCanBeHiddenAndResizedProportionally() throws Exception {
@@ -63,7 +64,7 @@ public final class Ha1178MediaTuningAndTrunkContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1178() throws Exception {
-        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1178'"));
+        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1181'"));
     }
 
     private static String source(String relative) throws Exception {
