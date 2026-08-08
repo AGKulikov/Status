@@ -20,7 +20,9 @@ public final class Ha1154HelperAndDriverFavoritesContractTest {
         assertTrue(transport.contains("PROPERTY_READ"));
         assertTrue(transport.contains("startHelperTelemetryRead"));
         assertTrue(transport.contains("scheduleHelperTelemetryRecovery"));
-        assertTrue(transport.contains("Helper B4 atomic read accepted"));
+        assertTrue(transport.contains(
+                "acceptHelperTelemetryFrame(callbackGatt, telemetry, \"notification\")"));
+        assertTrue(transport.contains("callbackGatt, telemetry, \"atomic read\")"));
     }
 
     @Test public void atomicSnapshotUpdatesPowerAndNetworkTogether() throws Exception {
