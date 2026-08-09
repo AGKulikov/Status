@@ -1,0 +1,25 @@
+KX11 ANCS Helper v38
+Bundle ID: ru.natro.kx11ancshelper
+Build: 38
+Marketing version: 38.0
+Matched Android build: Status Widget v2.8.2-ha1201
+
+Architecture replacement:
+
+- permanent Android link-anchor instead of rotating service UUIDs;
+- one RequiresANCS Central owner with stable state restoration;
+- stable-F04 PAIR/B3 current-link proof gates Android ANCS discovery on its direct client;
+- no 15-second pending-connect/system-reconnect cancellation;
+- restored `.connecting` is reconciled from same-owner F04 system-table or beacon proof, never
+  from elapsed time alone;
+- increasingly sparse read-only F04 table probes cover an ACL established after Helper startup;
+- one evidence-driven cancel waits for didDisconnect/didFailToConnect, then reopens the same
+  CBPeripheral with RequiresANCS and AutoReconnect;
+- retrieveConnectedPeripherals is physical-link evidence only and cannot start protocol readiness;
+- official restore -> known peripheral -> system-connected service -> scan resolution ladder;
+- normal resolution claims a system-connected peer without disconnecting it; only the proven
+  stale-restoration request uses the one-shot cancel/terminal-callback rescue;
+- iOS 17+ system AutoReconnect has exclusive ownership while isReconnecting=true;
+- manual reconnect waits for didDisconnect before issuing a new connect;
+- Android owns ANCS discovery/CCCD after B3 and returns idempotent readiness via F05/B4;
+- bundle identifier and non-versioned restoration identifiers are unchanged for in-place update.
