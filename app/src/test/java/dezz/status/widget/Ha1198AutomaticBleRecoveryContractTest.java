@@ -12,32 +12,25 @@ import java.nio.file.Paths;
 
 import org.junit.Test;
 
-/** Release gate for boot-safe Core Bluetooth restoration and fresh Android GATT generations. */
+/** Regression gate: v35 remains archived while HA1199 supersedes its rotating namespace. */
 public final class Ha1198AutomaticBleRecoveryContractTest {
-    @Test public void unverifiedIncomingDisconnectRotatesTheAndroidNamespace() throws Exception {
+    @Test public void ha1199KeepsOneStableAnchorAndAdoptsTheIncomingOwner() throws Exception {
         String transport = project(
                 "app/src/main/java/dezz/status/widget/phone/transport/IphoneAncsTransport.java");
         String callback = between(transport,
                 "private final BluetoothGattServerCallback gattServerCallback",
                 "private final BluetoothGattCallback gattCallback");
 
-        assertTrue(callback.contains("managedIncomingMode && getVerifiedPeer() == null"));
-        assertTrue(callback.contains("scheduleManagedIncomingRestart(\n"
-                + "                                    \"unverified incoming link closed before PAIR/B3\")"));
-        assertFalse(callback.contains("Непроверенный link закрыт; GATT server, реклама и namespace "
-                + "\n                                    + \"остаются опубликованы"));
-
-        String restart = between(transport,
-                "private void scheduleManagedIncomingRestart",
-                "private static boolean requiresControllerRetry");
-        assertTrue(restart.contains("stopAdvertising()"));
-        assertTrue(restart.contains("startGeelyAncsAdvertising()"));
+        assertTrue(callback.contains("attachAncsClientToIncomingOwner(device)"));
+        assertTrue(callback.contains("стабильная реклама сохранена"));
+        assertFalse(callback.contains("unverified incoming link closed before PAIR/B3"));
 
         String publication = between(transport,
                 "private boolean startGeelyAncsAdvertising",
-                "private void useStaticDiagnosticNamespace");
-        assertTrue(publication.contains("rotateManagedIncomingDiagnosticNamespace()"));
-        assertTrue(publication.contains("MANAGED_INCOMING_NAMESPACE_GENERATION"));
+                "/** Allocates one persistent namespace");
+        assertTrue(publication.contains("useStaticDiagnosticNamespace()"));
+        assertFalse(publication.contains("rotateManagedIncomingDiagnosticNamespace()"));
+        assertTrue(publication.contains("Публикую стабильный BLE link-anchor"));
     }
 
     @Test public void helperDefersCommandsUntilPoweredOnAndQuarantinesPoisonedNamespace()
