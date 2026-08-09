@@ -100,12 +100,13 @@ jobs:
         run: |
           set -euo pipefail
           tools="$RUNNER_TEMP/android-build-tools-36"
-          mkdir -p "$tools/lib"
+          mkdir -p "$tools/lib" "$tools/lib64"
           cp "$ANDROID_HOME/build-tools/36.0.0/apksigner" "$tools/"
           cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" "$tools/lib/"
           cp "$ANDROID_HOME/build-tools/36.0.0/zipalign" "$tools/"
           cp "$ANDROID_HOME/build-tools/36.0.0/aapt" "$tools/"
           cp "$ANDROID_HOME/build-tools/36.0.0/aapt2" "$tools/"
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib64/libc++.so" "$tools/lib64/"
 
       - name: Upload official Android signing tools
         uses: actions/upload-artifact@v4
