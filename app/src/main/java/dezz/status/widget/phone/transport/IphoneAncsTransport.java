@@ -180,6 +180,12 @@ public final class IphoneAncsTransport {
     private static final long DIRECT_FALLBACK_DELAY_MS = 500L;
     private static final int INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS = 3;
     private static final long INCOMING_CLIENT_ATTACH_RETRY_MS = 1_500L;
+    /**
+     * A direct virtual open against an already-connected incoming peer must produce a callback
+     * promptly. Unlike a cold {@code autoConnect=true} registration, this attempt is bounded and
+     * only its client wrapper is replaced when Android never reports a result.
+     */
+    private static final long INCOMING_DIRECT_ATTACH_TIMEOUT_MS = 10_000L;
     private static final long CANDIDATE_UI_INTERVAL_MS = 500L;
     private static final int MAX_CANDIDATES = 150;
 
@@ -410,8 +416,14 @@ public final class IphoneAncsTransport {
     private boolean activeClientAutoConnect;
     private boolean backgroundAttachAttempted;
     private boolean directFallbackAttempted;
-    /** Background GATT-client registrations tried before one durable owner is obtained. */
+    /** Bounded direct virtual opens tried before one durable incoming-route owner is obtained. */
     private int incomingClientAttachAttempt;
+    /** Exact bonded BluetoothDevice facade delivered by the current GATT-server link. */
+    private BluetoothDevice incomingClientCandidate;
+    /** Protocol authorization gate written by Helper only after RequiresANCS is active. */
+    private boolean incomingAncsReadyGateOpen;
+    /** Prevents duplicate discovery starts for the current connected client owner. */
+    private boolean incomingDiscoveryStarted;
     /** Binder callbacks and the main state machine both read this phase-one proof. */
     private volatile boolean secureAttConfirmed;
     private boolean gattClientConnected;
@@ -1429,20 +1441,21 @@ public final class IphoneAncsTransport {
                 if (gattClientConnected) {
                     log("Повторный discoverServices на текущем same-peer GATT owner");
                     discoverServices(pendingOwner);
-                } else {
+                } else if (activeClientEstablished) {
                     awaitIncomingBackgroundOwner(pendingOwner, activeClientGeneration,
                             "ручной same-peer reconnect");
+                } else {
+                    log("Первичный direct attach уже ожидает callback; ручной дубль не создаю");
                 }
                 return;
             }
             if (nextClientAttempt != null || clientConnectInFlight) {
-                log("Background same-peer owner уже регистрируется или запланирован");
+                log("Direct same-peer clientIf уже регистрируется или запланирован");
                 return;
             }
-            // A manual diagnostic retry may allocate a new owner only when no registered
-            // BluetoothGatt exists. An existing owner is always re-armed with connect().
+            // A manual diagnostic retry resets only the bounded never-established attempts.
             incomingClientAttachAttempt = 0;
-            startSamePeerAttach(true, "ручная background-регистрация same-peer owner");
+            startSamePeerAttach(false, "ручная direct-регистрация same-peer clientIf");
             return;
         }
         if (!backgroundAttachAttempted) {
@@ -1494,6 +1507,10 @@ public final class IphoneAncsTransport {
         gattClientConnected = false;
         clientConnectInFlight = false;
         activeClientTarget = null;
+        activeClientEstablished = false;
+        incomingClientCandidate = null;
+        incomingAncsReadyGateOpen = false;
+        incomingDiscoveryStarted = false;
         BluetoothGatt old = gatt;
         gatt = null;
         if (old != null) {
@@ -1559,9 +1576,13 @@ public final class IphoneAncsTransport {
         }
         activeClientTarget = null;
         activeClientAutoConnect = false;
+        activeClientEstablished = false;
         backgroundAttachAttempted = false;
         directFallbackAttempted = false;
         incomingClientAttachAttempt = 0;
+        incomingClientCandidate = null;
+        incomingAncsReadyGateOpen = false;
+        incomingDiscoveryStarted = false;
         clientConnectInFlight = false;
         gattClientConnected = false;
         log("Новая test-session=" + sessionGeneration
@@ -1652,21 +1673,59 @@ public final class IphoneAncsTransport {
     }
 
     /**
-     * Records an incoming RequiresANCS candidate without claiming it as the secure owner. Android
-     * may deliver an anonymous BOND_NONE facade before the resolved iPhone facade on Android 9.
-     * The peer is therefore fixed only by PAIR on this exact server link, and the reverse GATT
-     * client is registered only after B3 proves encryption and ANCS-READY proves iOS authorization.
+     * Adopts the exact bonded facade from the incoming link for one direct GATT virtual open.
+     * Android 9 may first deliver an anonymous BOND_NONE facade, so that callback is retained only
+     * as a server peer and never used for {@code connectGatt}. Starting the client registration is
+     * independent from PAIR/B3/ANCS-READY: those protocol gates still control authorization and
+     * service discovery, while the direct clientIf can bind to the physical link already in use.
      */
     private void attachAncsClientToIncomingOwner(BluetoothDevice device) {
         if (!managedIncomingMode || device == null || findConnectedServerPeer(device) == null) {
             return;
         }
-        state("REQUIRES_ANCS LINK · ЖДУ PAIR/B3");
-        log("Incoming RequiresANCS candidate сохранён без client attach · objectId="
+        if (!isSelectedBondedIncomingDevice(device)) {
+            state("REQUIRES_ANCS LINK · ЖДУ BONDED IDENTITY");
+            log("Incoming facade не используется для client attach · objectId="
+                    + System.identityHashCode(device)
+                    + " address=" + safeAddress(device)
+                    + " bond=" + bondLabel(safeBondState(device))
+                    + "; жду exact BOND_BONDED facade выбранного iPhone");
+            return;
+        }
+        adoptIncomingClientCandidate(device, "bonded incoming GATT-server callback");
+    }
+
+    private boolean isSelectedBondedIncomingDevice(@NonNull BluetoothDevice device) {
+        if (safeBondState(device) != BluetoothDevice.BOND_BONDED
+                || managedSavedPeer == null) return false;
+        return sameDevice(managedSavedPeer, device)
+                || sameDevice(managedResolvedPeer, device)
+                || (safeBondState(managedSavedPeer) == BluetoothDevice.BOND_BONDED
+                && uniqueBondedNameMatch(managedSavedPeer, device));
+    }
+
+    private void adoptIncomingClientCandidate(@NonNull BluetoothDevice device,
+                                              @NonNull String reason) {
+        if (!managedIncomingMode || !isSelectedBondedIncomingDevice(device)
+                || findConnectedServerPeer(device) == null) return;
+        BluetoothDevice previous = incomingClientCandidate;
+        if (previous != null && !sameDevice(previous, device)) {
+            log("Incoming direct candidate conflict: сохраняю первый exact bonded facade "
+                    + safeAddress(previous) + ", отклоняю " + safeAddress(device));
+            return;
+        }
+        incomingClientCandidate = device;
+        managedResolvedPeer = device;
+        state("REQUIRES_ANCS LINK · DIRECT CLIENT ATTACH");
+        log("Exact bonded incoming facade принят для direct clientIf · objectId="
                 + System.identityHashCode(device)
                 + " address=" + safeAddress(device)
-                + " bond=" + bondLabel(safeBondState(device))
-                + "; owner зафиксирует только PAIR → B3 → ANCS-READY");
+                + "; authorization: ЖДУ PAIR/B3, затем ANCS-READY; "
+                + "это отдельные discovery gates · " + reason);
+        if (gatt == null && !clientConnectInFlight && !gattClientConnected
+                && nextClientAttempt == null) {
+            startSamePeerAttach(false, "initial direct virtual open · " + reason);
+        }
     }
 
     private boolean isVerifiedPeer(BluetoothDevice device) {
@@ -1687,6 +1746,9 @@ public final class IphoneAncsTransport {
             log("PAIR callback проигнорирован: peer не совпадает с verified peer");
             return;
         }
+        if (managedIncomingMode && isSelectedBondedIncomingDevice(device)) {
+            adoptIncomingClientCandidate(device, "PAIR on exact incoming link");
+        }
         state("VERIFIED PEER · CURRENT LINK CHALLENGE");
         log("PAIR принят. VERIFIED PEER: " + safeName(device)
                 + " " + safeAddress(device)
@@ -1695,7 +1757,8 @@ public final class IphoneAncsTransport {
                 + " bond=" + bondLabel(safeBondState(device)));
         if (safeBondState(device) == BluetoothDevice.BOND_BONDED) {
             log("PAIR: общий Classic/LE peer уже BOND_BONDED; первая B3 READ запросит "
-                    + "security именно текущего LE link. Ранний reverse connect запрещён");
+                    + "security именно текущего LE link. Direct clientIf может уже ждать, "
+                    + "но discovery заблокирован до ANCS-READY");
         } else {
             requestBond(device);
             log("connectGatt отложен до подтверждения текущего ATT link");
@@ -1750,8 +1813,12 @@ public final class IphoneAncsTransport {
         }
         if (managedIncomingMode) {
             state("REQUIRES_ANCS LINK SECURE · ЖДУ HELPER READY");
-            log("Единственный iOS Central owner уже открыт с RequiresANCS=true; "
-                    + "жду ANCS-READY на этом же ATT link без разрыва");
+            if (incomingClientCandidate == null && isSelectedBondedIncomingDevice(device)) {
+                adoptIncomingClientCandidate(device, "B3 current-link proof");
+            }
+            log("Текущий ATT link прошёл B3; direct clientIf "
+                    + (gattClientConnected ? "уже attached" : "подключается")
+                    + ", discovery ждёт ANCS-READY без разрыва");
             return;
         }
         scheduleSecureClientStart();
@@ -1775,18 +1842,34 @@ public final class IphoneAncsTransport {
         }
         managedResolvedPeer = exactIncomingDevice;
         listener.onVerifiedPeerAddress(safeAddress(exactIncomingDevice));
+        incomingAncsReadyGateOpen = true;
         state("ONE REQUIRES_ANCS OWNER · CLIENT ATTACH");
         log("ANCS-READY принят без disconnect · exact incoming objectId="
                 + System.identityHashCode(exactIncomingDevice)
-                + " address=" + safeAddress(exactIncomingDevice));
+                + " address=" + safeAddress(exactIncomingDevice)
+                + "; discovery gate открыт");
         scheduleSecureClientStart();
     }
 
     private void scheduleSecureClientStart() {
         if (secureConnectStart != null || clientConnectInFlight) return;
+        if (managedIncomingMode && nextClientAttempt != null) {
+            log("ANCS-READY gate открыт; bounded direct retry уже запланирован");
+            return;
+        }
         BluetoothGatt current = gatt;
         if (current != null) {
-            if (gattClientConnected) {
+            if (managedIncomingMode) {
+                if (gattClientConnected && activeClientEstablished) {
+                    maybeStartIncomingAncsDiscovery(current,
+                            "ANCS-READY after direct client attach");
+                } else if (activeClientEstablished) {
+                    awaitIncomingBackgroundOwner(current, activeClientGeneration,
+                            "ANCS-READY on previously established owner");
+                } else {
+                    log("ANCS-READY gate открыт; жду callback первичного direct clientIf");
+                }
+            } else if (gattClientConnected) {
                 discoverServices(current);
             } else {
                 awaitIncomingBackgroundOwner(current, activeClientGeneration,
@@ -1796,11 +1879,11 @@ public final class IphoneAncsTransport {
         }
         secureConnectStart = () -> {
             secureConnectStart = null;
-            // Android 9 maps autoConnect=true to BTA's background open. Fluoride first checks
-            // for an existing connId and binds this client registration to that connection.
-            // A direct open (autoConnect=false) instead asks the controller for another radio
-            // connection and ECARX returns status 133 while the incoming link is already alive.
-            startSamePeerAttach(true, "same-owner ANCS-READY + "
+            // AOSP/ESP-IDF use a direct GATT virtual open when adopting an already-connected
+            // incoming peer. autoConnect=true only registers for a future advertiser and may
+            // never emit a callback while this server-owned ACL is already alive.
+            startSamePeerAttach(managedIncomingMode ? false : true,
+                    "same-owner ANCS-READY + "
                     + SECURE_TO_CLIENT_CONNECT_DELAY_MS + " ms");
         };
         main.postDelayed(secureConnectStart, SECURE_TO_CLIENT_CONNECT_DELAY_MS);
@@ -1808,8 +1891,33 @@ public final class IphoneAncsTransport {
                 + SECURE_TO_CLIENT_CONNECT_DELAY_MS + " ms после ANCS-READY");
     }
 
+    private void maybeStartIncomingAncsDiscovery(@NonNull BluetoothGatt expected,
+                                                  @NonNull String reason) {
+        if (!managedIncomingMode || expected != gatt || !secureAttConfirmed
+                || !incomingAncsReadyGateOpen || !gattClientConnected
+                || !activeClientEstablished) return;
+        if (incomingDiscoveryStarted) {
+            log("ANCS discovery уже стартовал на текущем direct clientIf · " + reason);
+            return;
+        }
+        incomingDiscoveryStarted = true;
+        state("DIRECT CLIENT ATTACHED + ANCS-READY · DISCOVERY");
+        log("Оба независимых gate готовы: direct client attached + valid ANCS-READY · "
+                + reason);
+        discoverServices(expected);
+    }
+
     private void startSamePeerAttach(boolean autoConnect, String reason) {
         if (!ensureAdapter()) return;
+        if (managedIncomingMode) {
+            if (autoConnect) {
+                log("Reverse route отклоняет initial autoConnect=true: background open ждёт "
+                        + "будущую рекламу и не adopts текущий server-owned ACL");
+                return;
+            }
+            startIncomingDirectAttach(reason);
+            return;
+        }
         if (!secureAttConfirmed) {
             log("connectGatt не запущен: SECURE ATT ещё не подтверждён");
             return;
@@ -1829,10 +1937,6 @@ public final class IphoneAncsTransport {
             state("VERIFIED SERVER LINK LOST");
             log("Same-peer attach отменён: exact verified GATT-server link "
                     + safeAddress(verified) + " не активен");
-            if (managedIncomingMode) {
-                preserveManagedIncomingPublicationAfterLinkLoss(
-                        "exact server link missing before client attach");
-            }
             return;
         }
         // Do not resolve the address again through bonded-device aliases. Android 9 may return a
@@ -1842,20 +1946,7 @@ public final class IphoneAncsTransport {
         synchronized (verifiedPeerLock) {
             verifiedPeer = device;
         }
-        if (managedIncomingMode) {
-            if (!autoConnect) {
-                log("Reverse route запрещает direct autoConnect=false: нужен background open "
-                        + "на существующем incoming link");
-                return;
-            }
-            if (incomingClientAttachAttempt >= INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS) {
-                state("SAME-PEER OWNER REGISTRATION · LINK KEPT · RETRIES EXHAUSTED");
-                log("Лимит создания background owner исчерпан; Geely_ANCS и incoming link "
-                        + "сохранены. Существующий owner никогда не заменяется таймером");
-                return;
-            }
-            incomingClientAttachAttempt++;
-        } else if (autoConnect) {
+        if (autoConnect) {
             if (backgroundAttachAttempted) {
                 log("Повтор autoConnect=true заблокирован");
                 return;
@@ -1885,9 +1976,7 @@ public final class IphoneAncsTransport {
         String address = safeAddress(device);
         long linkAgeMs = Math.max(0L, android.os.SystemClock.elapsedRealtime()
                 - serverLink.connectedAtElapsedMs);
-        state(managedIncomingMode
-                ? "SAME-PEER ATTACH · BACKGROUND OWNER #" + incomingClientAttachAttempt
-                : autoConnect
+        state(autoConnect
                 ? "SAME-PEER ATTACH · BACKGROUND"
                 : "SAME-PEER ATTACH · DIRECT FALLBACK");
         log("connectGatt(autoConnect=" + autoConnect + ", TRANSPORT_LE): "
@@ -1905,9 +1994,7 @@ public final class IphoneAncsTransport {
                 activeClientTarget = null;
                 state("CONNECT_GATT_RETURNED_NULL");
                 log("connectGatt вернул null");
-                if (managedIncomingMode) {
-                    scheduleIncomingClientAttachRetry("connectGatt returned null");
-                } else if (autoConnect) {
+                if (autoConnect) {
                     scheduleDirectFallback("connectGatt(autoConnect=true) returned null");
                 } else {
                     state("V6 ATTEMPTS EXHAUSTED");
@@ -1915,14 +2002,6 @@ public final class IphoneAncsTransport {
             } else {
                 BluetoothGatt expected = gatt;
                 boolean expectedAutoConnect = autoConnect;
-                if (managedIncomingMode) {
-                    // A background registration is allowed to outlive any bounded wait. On
-                    // Android 9 BluetoothGatt.connect() reuses its clientIf and remains a
-                    // background open, so the watchdog never closes or replaces this owner.
-                    rearmPersistentGattOwner(expected, expectedGeneration,
-                            "same-peer background owner registered", false);
-                    return;
-                }
                 connectTimeout = () -> {
                     if (gatt != expected || !clientConnectInFlight
                             || !sessionState.isCurrent(expectedGeneration)) return;
@@ -1948,13 +2027,101 @@ public final class IphoneAncsTransport {
             activeClientTarget = null;
             state("CONNECT_EXCEPTION");
             log("connectGatt exception: " + failure);
-            if (managedIncomingMode) {
-                scheduleIncomingClientAttachRetry("background owner registration exception");
-            } else if (autoConnect) {
+            if (autoConnect) {
                 scheduleDirectFallback("background attach exception");
             } else {
                 state("V6 ATTEMPTS EXHAUSTED");
             }
+        }
+    }
+
+    /**
+     * Creates a clientIf directly on the exact bonded facade of the live incoming connection.
+     * This mirrors the direct virtual-open used by production dual-role BLE implementations:
+     * the registration may happen before application authorization, but discovery cannot.
+     */
+    private void startIncomingDirectAttach(@NonNull String reason) {
+        if (closing || !managedReconnectEnabled || !managedIncomingMode) return;
+        if (clientConnectInFlight || gattClientConnected || gatt != null) {
+            log("Incoming direct clientIf уже активен; дубль пропущен · " + reason);
+            return;
+        }
+        BluetoothDevice candidate = incomingClientCandidate;
+        if (candidate == null || !isSelectedBondedIncomingDevice(candidate)) {
+            state("REQUIRES_ANCS LINK · ЖДУ BONDED IDENTITY");
+            log("Direct client attach отложен: exact bonded incoming facade отсутствует");
+            return;
+        }
+        GattServerPeer serverLink = findConnectedServerPeer(candidate);
+        if (serverLink == null) {
+            preserveManagedIncomingPublicationAfterLinkLoss(
+                    "exact incoming link missing before direct client attach");
+            return;
+        }
+        if (incomingClientAttachAttempt >= INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS) {
+            state("SAME-PEER DIRECT ATTACH · LINK KEPT · RETRIES EXHAUSTED");
+            log("Direct clientIf не attached после " + incomingClientAttachAttempt
+                    + " попыток; GATT server/reconnect anchor остаётся опубликован");
+            return;
+        }
+
+        // Always reuse the live callback object, never adapter.getRemoteDevice(savedAddress).
+        BluetoothDevice device = serverLink.device;
+        incomingClientCandidate = device;
+        incomingClientAttachAttempt++;
+        clearAncsRuntime();
+        incomingDiscoveryStarted = false;
+        gattClientConnected = false;
+        activeClientTarget = device;
+        activeClientAutoConnect = false;
+        activeClientEstablished = false;
+        clientConnectInFlight = true;
+        activeClientGeneration = sessionState.begin(
+                AncsSessionStateMachine.Phase.DIRECT_CONNECT);
+        long expectedGeneration = activeClientGeneration;
+        long linkAgeMs = Math.max(0L, SystemClock.elapsedRealtime()
+                - serverLink.connectedAtElapsedMs);
+        state("SAME-PEER DIRECT ATTACH #" + incomingClientAttachAttempt);
+        log("connectGatt(autoConnect=false, TRANSPORT_LE): "
+                + safeName(device) + " " + safeAddress(device)
+                + " · exact bonded incoming objectId=" + System.identityHashCode(device)
+                + " · serverLinkAgeMs=" + linkAgeMs
+                + " · discoveryGate=" + incomingAncsReadyGateOpen
+                + " · " + reason);
+        try {
+            BluetoothGatt created = device.connectGatt(context, false, gattCallback,
+                    BluetoothDevice.TRANSPORT_LE);
+            gatt = created;
+            if (created == null) {
+                clientConnectInFlight = false;
+                activeClientTarget = null;
+                state("SAME-PEER DIRECT ATTACH RETURNED NULL");
+                scheduleIncomingClientAttachRetry("direct connectGatt returned null");
+                return;
+            }
+            BluetoothGatt expected = created;
+            connectTimeout = () -> {
+                if (gatt != expected || !clientConnectInFlight
+                        || activeClientEstablished
+                        || !sessionState.is(expectedGeneration,
+                        AncsSessionStateMachine.Phase.DIRECT_CONNECT)) return;
+                log("Первичный direct clientIf не дал callback за "
+                        + INCOMING_DIRECT_ATTACH_TIMEOUT_MS
+                        + " ms; закрываю только never-established wrapper · target="
+                        + safeAddress(expected.getDevice()));
+                closeClientGatt(expected);
+                clearAncsRuntime();
+                incomingDiscoveryStarted = false;
+                scheduleIncomingClientAttachRetry("direct attach callback timeout");
+            };
+            main.postDelayed(connectTimeout, INCOMING_DIRECT_ATTACH_TIMEOUT_MS);
+        } catch (RuntimeException failure) {
+            clientConnectInFlight = false;
+            activeClientTarget = null;
+            gatt = null;
+            state("SAME-PEER DIRECT ATTACH EXCEPTION");
+            log("Direct connectGatt exception: " + failure);
+            scheduleIncomingClientAttachRetry("direct connectGatt exception");
         }
     }
 
@@ -1970,22 +2137,19 @@ public final class IphoneAncsTransport {
                 + DIRECT_FALLBACK_DELAY_MS + " ms · " + reason);
     }
 
-    /**
-     * Allocates a replacement owner only when connectGatt could not return/register one at all.
-     * Connection errors on a non-null BluetoothGatt are handled by connect() on that same owner.
-     */
+    /** Replaces only a never-established direct client wrapper, with a bounded attempt count. */
     private void scheduleIncomingClientAttachRetry(@NonNull String reason) {
         if (closing || !managedReconnectEnabled || !managedIncomingMode
                 || nextClientAttempt != null) return;
-        BluetoothDevice device = getVerifiedPeer();
+        BluetoothDevice device = incomingClientCandidate;
         if (device == null || findConnectedServerPeer(device) == null) {
             preserveManagedIncomingPublicationAfterLinkLoss(
                     "client attach failed after physical link loss · " + reason);
             return;
         }
         if (incomingClientAttachAttempt >= INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS) {
-            state("SAME-PEER OWNER REGISTRATION · LINK KEPT · RETRIES EXHAUSTED");
-            log("Background owner не зарегистрирован после " + incomingClientAttachAttempt
+            state("SAME-PEER DIRECT ATTACH · LINK KEPT · RETRIES EXHAUSTED");
+            log("Direct clientIf не attached после " + incomingClientAttachAttempt
                     + " попыток; Geely_ANCS server/link остаются активны · " + reason);
             return;
         }
@@ -1993,26 +2157,25 @@ public final class IphoneAncsTransport {
         long delay = INCOMING_CLIENT_ATTACH_RETRY_MS * incomingClientAttachAttempt;
         nextClientAttempt = () -> {
             nextClientAttempt = null;
-            if (closing || !managedIncomingMode || !secureAttConfirmed) return;
-            BluetoothDevice current = getVerifiedPeer();
+            if (closing || !managedIncomingMode) return;
+            BluetoothDevice current = incomingClientCandidate;
             if (current == null || findConnectedServerPeer(current) == null) {
                 preserveManagedIncomingPublicationAfterLinkLoss(
                         "incoming link disappeared before client retry");
                 return;
             }
-            startSamePeerAttach(true, "background owner registration #" + nextAttempt
+            startSamePeerAttach(false, "direct client attach #" + nextAttempt
                     + " after " + reason);
         };
-        state("SAME-PEER OWNER REGISTRATION · RETRY #" + nextAttempt + " · LINK KEPT");
+        state("SAME-PEER DIRECT ATTACH · RETRY #" + nextAttempt + " · LINK KEPT");
         main.postDelayed(nextClientAttempt, delay);
-        log("Background owner registration retry #" + nextAttempt + " через " + delay
+        log("Direct client attach retry #" + nextAttempt + " через " + delay
                 + " ms; GATT server не закрывается · " + reason);
     }
 
     /**
-     * Recovers Android's client role without unregistering it. Android 9's connect() issues a
-     * background open on the existing clientIf, which is the public equivalent of re-attaching
-     * the ANCS GATT client to the retained physical link.
+     * Recovers by phase: a never-established wrapper gets a bounded direct replacement, while an
+     * owner that reached CONNECTED is retained and re-armed with {@link BluetoothGatt#connect()}.
      */
     private void recoverIncomingClientRole(@NonNull String reason) {
         if (closing || !managedIncomingMode) return;
@@ -2025,13 +2188,24 @@ public final class IphoneAncsTransport {
         BluetoothGatt owner = gatt;
         if (owner != null) {
             if (gattClientConnected && activeClientEstablished) {
-                restartDiscoveryOnPersistentOwner(owner, activeClientGeneration, reason);
-            } else {
+                if (incomingAncsReadyGateOpen) {
+                    restartDiscoveryOnPersistentOwner(owner, activeClientGeneration, reason);
+                } else {
+                    log("Established direct clientIf сохранён; recovery ждёт ANCS-READY · "
+                            + reason);
+                }
+            } else if (activeClientEstablished) {
                 awaitIncomingBackgroundOwner(owner, activeClientGeneration, reason);
+            } else {
+                closeClientGatt(owner);
+                clearAncsRuntime();
+                incomingDiscoveryStarted = false;
+                scheduleIncomingClientAttachRetry(
+                        "never-established direct owner recovery · " + reason);
             }
             return;
         }
-        log("Зарегистрированный Android GATT owner отсутствует; создаю один background owner · "
+        log("Android GATT clientIf отсутствует; создаю bounded direct owner · "
                 + reason);
         scheduleIncomingClientAttachRetry(reason);
     }
@@ -2042,9 +2216,19 @@ public final class IphoneAncsTransport {
                                               @NonNull String reason) {
         if (closing || !managedIncomingMode || gatt != expected
                 || !sessionState.isCurrent(expectedGeneration)) return;
+        if (!activeClientEstablished) {
+            log("gatt.connect() запрещён для never-established clientIf; "
+                    + "закрываю только wrapper и планирую bounded direct retry · " + reason);
+            closeClientGatt(expected);
+            clearAncsRuntime();
+            incomingDiscoveryStarted = false;
+            scheduleIncomingClientAttachRetry(reason);
+            return;
+        }
         cancelConnectTimeout();
         cancelClientAttemptCallbacks();
         clearAncsRuntime();
+        incomingDiscoveryStarted = false;
         gattClientConnected = false;
         clientConnectInFlight = true;
         activeClientAutoConnect = true;
@@ -2182,7 +2366,8 @@ public final class IphoneAncsTransport {
      */
     private boolean exactClientRoleOwnsPhysicalLink(BluetoothDevice device) {
         return managedIncomingMode
-                && secureAttConfirmed
+                && incomingClientCandidate != null
+                && sameDevice(incomingClientCandidate, device)
                 && activeClientTarget != null
                 && sameDevice(activeClientTarget, device)
                 && gatt != null
@@ -2483,6 +2668,11 @@ public final class IphoneAncsTransport {
 
     private void discoverServices(BluetoothGatt callbackGatt) {
         if (callbackGatt != gatt) return;
+        if (managedIncomingMode && !incomingAncsReadyGateOpen) {
+            log("discoverServices заблокирован: direct clientIf может быть attached, "
+                    + "но valid ANCS-READY ещё не получен");
+            return;
+        }
         long expectedGeneration = activeClientGeneration;
         if (!sessionState.isCurrent(expectedGeneration)) return;
         if (discoveryPending) {
@@ -4069,6 +4259,7 @@ public final class IphoneAncsTransport {
             activeClientTarget = null;
             activeClientAutoConnect = false;
             activeClientEstablished = false;
+            incomingDiscoveryStarted = false;
         }
         try {
             callbackGatt.close();
@@ -5009,22 +5200,22 @@ public final class IphoneAncsTransport {
                     cancelConnectTimeout();
                     gattClientConnected = false;
                     if (managedIncomingMode) {
-                        if (status == BluetoothGatt.GATT_FAILURE
-                                && !activeClientEstablished) {
-                            // onClientRegistered failure has no usable clientIf. This is the only
-                            // callback error that requires a replacement registration.
+                        if (!activeClientEstablished) {
+                            // Before the first CONNECTED callback there is no durable clientIf to
+                            // re-arm. Close only this wrapper and repeat the same direct virtual
+                            // open with the exact bonded incoming facade.
                             clientConnectInFlight = false;
                             closeClientGatt(callbackGatt);
                             clearAncsRuntime();
+                            incomingDiscoveryStarted = false;
                             scheduleIncomingClientAttachRetry(
-                                    "background owner registration status=" + status);
+                                    "initial direct attach status=" + status);
                         } else {
-                            // ECARX status 133 is a failed direct/open transition, not proof that
-                            // the registered clientIf is unusable. AOSP BluetoothGatt.connect()
-                            // reuses that clientIf as a background open, so retain the object.
+                            // Only a clientIf that has reached CONNECTED is durable. Re-arm that
+                            // same object indefinitely after later radio loss/status 133.
                             awaitIncomingBackgroundOwner(callbackGatt,
                                     activeClientGeneration,
-                                    "same-peer GATT status=" + status);
+                                    "established same-peer GATT status=" + status);
                         }
                         return;
                     }
@@ -5042,20 +5233,42 @@ public final class IphoneAncsTransport {
                     clientConnectInFlight = false;
                     gattClientConnected = true;
                     activeClientEstablished = true;
-                    state("SAME-PEER GATT CONNECTED");
-                    log("GATT client зарегистрирован на exact verified peer; "
-                            + "discoverServices сразу, без requestMtu");
-                    discoverServices(callbackGatt);
+                    if (managedIncomingMode) {
+                        state(incomingAncsReadyGateOpen
+                                ? "SAME-PEER DIRECT CLIENT ATTACHED · READY GATE OPEN"
+                                : "SAME-PEER DIRECT CLIENT ATTACHED · ЖДУ ANCS-READY");
+                        log("Direct GATT clientIf attached к exact bonded incoming peer; "
+                                + (incomingAncsReadyGateOpen
+                                ? "valid ANCS-READY уже получен"
+                                : "service discovery намеренно не запускается до ANCS-READY"));
+                        maybeStartIncomingAncsDiscovery(callbackGatt,
+                                "onConnectionStateChange CONNECTED");
+                    } else {
+                        state("SAME-PEER GATT CONNECTED");
+                        log("GATT client зарегистрирован на exact verified peer; "
+                                + "discoverServices сразу, без requestMtu");
+                        discoverServices(callbackGatt);
+                    }
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     boolean attachWasInFlight = clientConnectInFlight;
                     boolean failedBackgroundAttach =
                             attachWasInFlight && activeClientAutoConnect;
+                    boolean establishedOwner = activeClientEstablished;
                     cancelConnectTimeout();
                     gattClientConnected = false;
                     if (managedIncomingMode) {
-                        awaitIncomingBackgroundOwner(callbackGatt,
-                                activeClientGeneration,
-                                "same-peer GATT disconnected");
+                        if (establishedOwner) {
+                            awaitIncomingBackgroundOwner(callbackGatt,
+                                    activeClientGeneration,
+                                    "established same-peer GATT disconnected");
+                        } else {
+                            clientConnectInFlight = false;
+                            closeClientGatt(callbackGatt);
+                            clearAncsRuntime();
+                            incomingDiscoveryStarted = false;
+                            scheduleIncomingClientAttachRetry(
+                                    "initial direct attach disconnected");
+                        }
                         return;
                     }
                     clientConnectInFlight = false;
@@ -5311,8 +5524,13 @@ public final class IphoneAncsTransport {
                         }
                     }
                 } else {
-                    log("BOND_BONDED подтверждён; reverse connect всё ещё ждёт "
-                            + "SECURE ATT OK");
+                    if (managedIncomingMode && findConnectedServerPeer(device) != null
+                            && isSelectedBondedIncomingDevice(device)) {
+                        adoptIncomingClientCandidate(device,
+                                "BOND_BONDED on current incoming link");
+                    }
+                    log("BOND_BONDED подтверждён; direct clientIf может attach сейчас, "
+                            + "но discovery всё ещё ждёт B3 + ANCS-READY");
                 }
                 if (!iphonePeripheralMode && gattClientConnected && current != null) {
                     main.postDelayed(() -> {
