@@ -69,7 +69,7 @@ public final class Ha1164BleRoleRecoveryContractTest {
     @Test public void releaseIdentityIsHa1164() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1195'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1196'"));
     }
 
     private static String source(String relative) throws Exception {
