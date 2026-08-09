@@ -2775,9 +2775,17 @@ final class GeelyCarIntegration implements CarIntegration {
                 } else {
                     availability = controlAvailability(source, definition);
                 }
-                // A definitive unsupported result hides a control for this exact vehicle. During
-                // the boot Binder window UNKNOWN remains visible and can be retried safely.
-                if (availability != CarControlDescriptor.Availability.UNSUPPORTED) {
+                // Ordinary definitively unsupported controls stay hidden. The KX11 trunk is an
+                // exact stock zoned extension whose capability query is known to return
+                // notavailable before its direct read path wakes, so keep it selectable as
+                // UNKNOWN. Command execution still re-probes and never writes until support is
+                // confirmed on the live vehicle.
+                if (availability != CarControlDescriptor.Availability.UNSUPPORTED
+                        || isTrunkDefinition(definition)) {
+                    if (isTrunkDefinition(definition)
+                            && availability == CarControlDescriptor.Availability.UNSUPPORTED) {
+                        availability = CarControlDescriptor.Availability.UNKNOWN;
+                    }
                     CarControlDescriptor descriptor = definition.descriptor;
                     if (isFanDefinition(definition)) {
                         descriptor = definition.descriptorWithOptions(
