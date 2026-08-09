@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   test:
-    name: Unit tests and geelyDebug compile
+    name: Protocol tests and unsigned geelyRelease compile
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -63,9 +63,19 @@ jobs:
             --tests dezz.status.widget.Ha1196AuthorizedAncsAndTrunkCatalogContractTest \
             --tests dezz.status.widget.Ha1197TrunkAndReconnectContractTest
 
-      - name: Compile complete geelyDebug APK
+      - name: Compile complete unsigned geelyRelease APK
         shell: bash
+        env:
+          ALLOW_UNSIGNED_RELEASE: 'true'
         run: |
           set -euo pipefail
           ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
-            assembleGeelyDebug
+            assembleGeelyRelease
+
+      - name: Upload exact unsigned release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: ha1197-unsigned-release
+          path: app/build/outputs/apk/geely/release/*.apk
+          if-no-files-found: error
+          retention-days: 7
