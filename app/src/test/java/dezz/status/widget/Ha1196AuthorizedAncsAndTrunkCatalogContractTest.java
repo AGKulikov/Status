@@ -77,7 +77,7 @@ public final class Ha1196AuthorizedAncsAndTrunkCatalogContractTest {
                 "private void attemptPulseControl");
         assertTrue(command.contains(
                 "availability != CarControlDescriptor.Availability.SUPPORTED"));
-        assertTrue(command.contains("listener.onFinished"));
+        assertTrue(command.contains("completeControlCommand(active, false"));
     }
 
     private static String project(String relative) throws Exception {
