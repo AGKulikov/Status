@@ -1,0 +1,32 @@
+name: Export HA1203 source snapshot
+
+on:
+  push:
+    branches:
+      - 'work/ha1203-climate-icons-backgrounds'
+    paths:
+      - '.github/workflows/export-ha1203-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack exact source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar --exclude=.git --exclude='*/build/*' --exclude='*/.gradle/*' \
+            -czf "$RUNNER_TEMP/status-ha1203-source.tar.gz" .
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: ha1203-source-snapshot
+          path: ${{ runner.temp }}/status-ha1203-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
