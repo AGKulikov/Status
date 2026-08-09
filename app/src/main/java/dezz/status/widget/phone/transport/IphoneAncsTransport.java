@@ -1177,7 +1177,10 @@ public final class IphoneAncsTransport {
         }
         if (advertising || advertisingPending || advertisingDesired) return true;
 
-        rotateManagedIncomingDiagnosticNamespace();
+        // A production ANCS accessory exposes one stable GATT database. The iPhone-side helper
+        // only uses the beacon as a link anchor and never discovers this Android service, so
+        // rotating UUIDs cannot improve cache correctness and only creates reconnect deadlocks.
+        useStaticDiagnosticNamespace();
         byte[] namespaceFrame = managedIncomingNamespaceFrame();
 
         preparedAdvertiseSettings = new AdvertiseSettings.Builder()
@@ -1202,9 +1205,9 @@ public final class IphoneAncsTransport {
         solicitationAdvertising = false;
         advertisingDesired = true;
         state(LOCAL_LOGICAL_NAME + " · STARTING");
-        log("Публикую отдельный BLE service " + serverDiagnosticService
+        log("Публикую стабильный BLE link-anchor " + serverDiagnosticService
                 + " как " + LOCAL_LOGICAL_NAME
-                + "; cache-busting generation="
+                + "; fixed generation="
                 + String.format(Locale.US, "%04X", serverDiagnosticGeneration)
                 + " beacon=" + MANAGED_INCOMING_BEACON_SERVICE
                 + "; системное имя Classic-адаптера не меняется");
@@ -1647,6 +1650,40 @@ public final class IphoneAncsTransport {
             }
             return false;
         }
+    }
+
+    /**
+     * Adopts the sole incoming RequiresANCS link and immediately registers Android's GATT-client
+     * role on it. This is the topology used by real ANCS accessories: the iPhone is GAP Central
+     * and ANCS GATT server, while the accessory is GAP Peripheral and ANCS GATT client on the
+     * same physical connection. No Helper-side discovery of Android's custom service is needed.
+     */
+    private void attachAncsClientToIncomingOwner(BluetoothDevice device) {
+        if (!managedIncomingMode || device == null || findConnectedServerPeer(device) == null) {
+            return;
+        }
+        BluetoothDevice current = getVerifiedPeer();
+        if (current == null) {
+            if (!claimVerifiedPeer(device)) {
+                log("Incoming ANCS owner отклонён: peer уже зафиксирован");
+                return;
+            }
+        } else if (!sameDevice(current, device)) {
+            // Android 9 may later resolve the anonymous RPA into a second BluetoothDevice facade.
+            // The first exact object already owns the live link; never create another GATT client.
+            log("Incoming resolved facade замечен после link adoption; owner сохраняю · "
+                    + safeAddress(device));
+            return;
+        }
+        synchronized (verifiedPeerLock) {
+            secureAttConfirmed = true;
+        }
+        managedResolvedPeer = device;
+        listener.onVerifiedPeerAddress(safeAddress(device));
+        state("REQUIRES_ANCS LINK · EVENT-DRIVEN CLIENT ATTACH");
+        log("Incoming RequiresANCS owner принят без PAIR/B3 bootstrap; "
+                + "Android запускает стандартный ANCS discovery на том же ACL");
+        scheduleSecureClientStart();
     }
 
     private boolean isVerifiedPeer(BluetoothDevice device) {
@@ -4647,29 +4684,24 @@ public final class IphoneAncsTransport {
                                     : "GATT SERVER LINK · В LIGHTBLUE ЗАПИШИТЕ PAIR");
                             log(managedReconnectEnabled
                                     ? REMOTE_LOGICAL_NAME
-                                    + " подключился к отдельному сервису "
+                                    + " подключился к стабильному link-anchor "
                                     + LOCAL_LOGICAL_NAME
-                                    + "; ожидаю защищённый PAIR/ANCS handshake"
+                                    + "; запускаю event-driven ANCS client attach"
                                     : "Peer станет verified только после ASCII PAIR в CONTROL "
                                     + serverControlCharacteristic);
-                            log("Единственный RequiresANCS Central link зарегистрирован без "
-                                    + "pre-PAIR createBond; LE security начинается только после "
-                                    + "PAIR/B3 challenge");
+                            if (managedIncomingMode) {
+                                attachAncsClientToIncomingOwner(device);
+                            } else {
+                                log("Diagnostic link ждёт явный PAIR/B3 challenge");
+                            }
                         } else if (newState == BluetoothProfile.STATE_DISCONNECTED
                                 && isVerifiedPeer(device)) {
                             handleVerifiedServerLinkDisconnected(device);
                         } else if (newState == BluetoothProfile.STATE_DISCONNECTED
                                 && managedIncomingMode && getVerifiedPeer() == null) {
-                            // The Helper disconnects before PAIR/B3 when Core Bluetooth reports
-                            // uuidNotAllowed for a stale ATT database. Reusing this namespace
-                            // makes iOS reconnect to the same poisoned handles forever. A link
-                            // that never became verified has no state worth preserving, so rotate
-                            // only this failed publication; ordinary verified losses still retain
-                            // their server/namespace in handleVerifiedServerLinkDisconnected().
-                            log("Непроверенный link закрыт до PAIR/B3; перепубликую GATT "
-                                    + "с новой cache-busting generation");
-                            scheduleManagedIncomingRestart(
-                                    "unverified incoming link closed before PAIR/B3");
+                            // Keep the stable advertiser alive. The iPhone owns reconnect and will
+                            // return to this same anchor; rotating the UUID deadlocked v35.
+                            log("Incoming link закрылся до adoption; стабильная реклама сохранена");
                         }
                     });
                 }
