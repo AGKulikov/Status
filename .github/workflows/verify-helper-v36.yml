@@ -7,6 +7,10 @@ on:
     paths:
       - 'ios/KX11-iPhone-ANCS-Helper-v36/**'
       - '.github/workflows/verify-helper-v36.yml'
+  pull_request:
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v36/**'
+      - '.github/workflows/verify-helper-v36.yml'
   workflow_dispatch:
 
 permissions:
