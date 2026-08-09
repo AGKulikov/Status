@@ -113,7 +113,7 @@ public final class Ha1202ColdStartAuthorizationContractTest {
         String transport = transport();
         String wait = between(transport,
                 "private void waitForIncomingAncsAuthorizationEvent",
-                "private void flushEarlyNotificationSourceFrames");
+                "private void scheduleMandatoryDescriptorStatus133Retry");
         assertTrue(wait.contains("subscribeServiceChangedIfAvailable(expected);"));
         assertTrue(wait.contains("exact BluetoothGatt owner и current epoch"));
         assertFalse(wait.contains("discoverServices("));
@@ -446,7 +446,7 @@ public final class Ha1202ColdStartAuthorizationContractTest {
 
         String freshEpoch = between(transport,
                 "private void beginFreshIncomingSecurityEpoch",
-                "private void resetIncomingSecurityAfterClientLoss");
+                "private boolean resetIncomingSecurityAfterClientLoss");
         assertTrue(freshEpoch.contains("clearAncsRuntime();"));
 
         String publicationReset = between(transport,
@@ -541,7 +541,7 @@ public final class Ha1202ColdStartAuthorizationContractTest {
         int closedAfterReset = recovery.indexOf(
                 "rawOwnerClosed || gatt != expected", exactClosedBranch + 1);
         int waitNextLink = recovery.indexOf(
-                "preserveManagedIncomingPublicationAfterLinkLoss(");
+                "preserveManagedIncomingPublicationAfterLinkLoss(", closedAfterReset);
         int physicalRearm = recovery.indexOf(
                 "awaitIncomingBackgroundOwner(expected", retainedRearm + 1);
         assertTrue(physicalReset > retainedRearm);
