@@ -27,7 +27,10 @@ public final class Ha1200CurrentLinkSecurityContractTest {
         String candidate = between(transport,
                 "private void attachAncsClientToIncomingOwner",
                 "private boolean isVerifiedPeer");
-        assertTrue(candidate.contains("ЖДУ PAIR/B3"));
+        // HA1201 may pre-register a clientIf only from the exact selected bonded facade. That
+        // transport adoption must still never manufacture the PAIR/B3 security proof.
+        assertTrue(candidate.contains("BOND_BONDED"));
+        assertTrue(candidate.contains("adoptIncomingClientCandidate"));
         assertFalse(candidate.contains("secureAttConfirmed = true"));
         assertFalse(candidate.contains("scheduleSecureClientStart();"));
         assertFalse(candidate.contains("claimVerifiedPeer(device)"));
