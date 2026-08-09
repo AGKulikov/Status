@@ -53,7 +53,7 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Preserved trunk and HA1201 same-ACL contracts
+      - name: Preserved HA1197-HA1200 and HA1201 same-ACL contracts
         shell: bash
         run: |
           set -euo pipefail
@@ -61,6 +61,9 @@ jobs:
           ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
             testGeelyDebugUnitTest \
             --tests dezz.status.widget.Ha1197TrunkAndReconnectContractTest \
+            --tests dezz.status.widget.Ha1198AutomaticBleRecoveryContractTest \
+            --tests dezz.status.widget.Ha1199ReferenceAncsConnectionContractTest \
+            --tests dezz.status.widget.Ha1200CurrentLinkSecurityContractTest \
             --tests dezz.status.widget.Ha1201DirectAttachContractTest
 
       - name: Compile complete unsigned geelyRelease APK
