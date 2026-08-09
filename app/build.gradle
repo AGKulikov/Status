@@ -75,6 +75,11 @@ android {
             // downstream forks, but never silently fall back to Android's debug key in CI.
             keyAlias System.getenv("KEY_ALIAS") ?: "status-widget-ha"
             keyPassword System.getenv("KEY_PASSWORD")
+            // Android 9 KX11 upgrades are verified against the installed v3-signed lineage.
+            // Keep v2 for broad verifier compatibility and require v3 for in-place updates.
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = false
         }
     }
 

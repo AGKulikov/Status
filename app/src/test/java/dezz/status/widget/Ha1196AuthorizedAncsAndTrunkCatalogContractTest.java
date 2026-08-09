@@ -65,7 +65,7 @@ public final class Ha1196AuthorizedAncsAndTrunkCatalogContractTest {
         String catalog = between(integration,
                 "public void requestControlCatalog",
                 "static List<CarControlDescriptor.Option> safeAutoFanOptions");
-        assertTrue(integration.contains("TRUNK_FUNCTION_ID = 0x02210100"));
+        assertTrue(integration.contains("TRUNK_FUNCTION_ID = 0x21020100"));
         assertTrue(integration.contains("TRUNK_ZONE = 0x20000000"));
         assertTrue(catalog.contains("|| isTrunkDefinition(definition)"));
         assertTrue(catalog.contains(

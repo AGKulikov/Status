@@ -1,0 +1,81 @@
+name: Verify iPhone Helper v34
+
+on:
+  push:
+    branches:
+      - 'release/v2.8.2-ha1197'
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v34/**'
+      - '.github/workflows/verify-helper-v34.yml'
+  pull_request:
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v34/**'
+      - '.github/workflows/verify-helper-v34.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-helper:
+    name: Compile Helper v34 without signing
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate project settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v34/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            CODE_SIGNING_ALLOWED=NO \
+            -showBuildSettings >"$RUNNER_TEMP/helper-v34-build-settings.txt"
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper' \
+            "$RUNNER_TEMP/helper-v34-build-settings.txt"
+          grep -q 'MARKETING_VERSION = 34.0' "$RUNNER_TEMP/helper-v34-build-settings.txt"
+          grep -q 'CURRENT_PROJECT_VERSION = 34' "$RUNNER_TEMP/helper-v34-build-settings.txt"
+
+      - name: Compile Helper v34
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v34/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            SYMROOT="$RUNNER_TEMP/KX11ANCSHelperProducts" \
+            OBJROOT="$RUNNER_TEMP/KX11ANCSHelperIntermediates" \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Verify bounded single-owner reconnect contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          source=ios/KX11-iPhone-ANCS-Helper-v34/KX11ANCSHelper/ViewController.swift
+          grep -q 'KX11 ANCS HELPER v34' "$source"
+          grep -q 'CBConnectPeripheralOptionRequiresANCS: true' "$source"
+          grep -q 'CBConnectPeripheralOptionEnableAutoReconnect' "$source"
+          grep -q 'centralConnectTimeout: TimeInterval = 15' "$source"
+          grep -q 'Central .connecting завис' "$source"
+          grep -q 'stale .connecting watchdog' "$source"
+          grep -q 'centralRequireFreshAdvertisement = true' "$source"
+          grep -Fq 'centralManager.cancelPeripheralConnection(peripheral)' "$source"
+          grep -q 'Data("ANCS-READY".utf8)' "$source"
+          grep -q 'command == "ANCS-SUBSCRIBED"' "$source"
+          test "$(grep -Fc 'centralManager.connect(peripheral, options: options)' "$source")" -eq 1
+          if grep -q 'Central остаётся .connecting; pending owner не отменяю\|centralConnectingObservationInterval' "$source"; then
+            echo 'Unbounded v33 connecting wait is still present' >&2
+            exit 1
+          fi
+          if grep -q 'ANCS-HANDOFF\|centralLinkPhase\|centralPlannedAncsReconnect' "$source"; then
+            echo 'Legacy two-owner handoff is still present' >&2
+            exit 1
+          fi
