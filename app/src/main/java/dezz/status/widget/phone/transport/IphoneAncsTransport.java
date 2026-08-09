@@ -168,7 +168,6 @@ public final class IphoneAncsTransport {
     /** Central mode: a tiny B4 notification wakes Core Bluetooth so Helper can push fresh data. */
     private static final long SERVER_TELEMETRY_WAKE_POLL_MS = 5_000L;
     private static final long HELPER_TELEMETRY_BUSY_RETRY_MS = 1_000L;
-    private static final long HELPER_SERVICE_REDISCOVERY_MS = 30_000L;
     private static final long BOND_TIMEOUT_MS = 90_000L;
     private static final long ANCS_REQUEST_GAP_MS = 120L;
     private static final long LIVE_NOTIFICATION_MAX_AGE_MS = 15_000L;
@@ -1177,7 +1176,10 @@ public final class IphoneAncsTransport {
         }
         if (advertising || advertisingPending || advertisingDesired) return true;
 
-        rotateManagedIncomingDiagnosticNamespace();
+        // A production ANCS accessory exposes one stable GATT database. The iPhone-side helper
+        // only uses the beacon as a link anchor and never discovers this Android service, so
+        // rotating UUIDs cannot improve cache correctness and only creates reconnect deadlocks.
+        useStaticDiagnosticNamespace();
         byte[] namespaceFrame = managedIncomingNamespaceFrame();
 
         preparedAdvertiseSettings = new AdvertiseSettings.Builder()
@@ -1202,9 +1204,9 @@ public final class IphoneAncsTransport {
         solicitationAdvertising = false;
         advertisingDesired = true;
         state(LOCAL_LOGICAL_NAME + " · STARTING");
-        log("Публикую отдельный BLE service " + serverDiagnosticService
+        log("Публикую стабильный BLE link-anchor " + serverDiagnosticService
                 + " как " + LOCAL_LOGICAL_NAME
-                + "; cache-busting generation="
+                + "; fixed generation="
                 + String.format(Locale.US, "%04X", serverDiagnosticGeneration)
                 + " beacon=" + MANAGED_INCOMING_BEACON_SERVICE
                 + "; системное имя Classic-адаптера не меняется");
@@ -1647,6 +1649,24 @@ public final class IphoneAncsTransport {
             }
             return false;
         }
+    }
+
+    /**
+     * Records an incoming RequiresANCS candidate without claiming it as the secure owner. Android
+     * may deliver an anonymous BOND_NONE facade before the resolved iPhone facade on Android 9.
+     * The peer is therefore fixed only by PAIR on this exact server link, and the reverse GATT
+     * client is registered only after B3 proves encryption and ANCS-READY proves iOS authorization.
+     */
+    private void attachAncsClientToIncomingOwner(BluetoothDevice device) {
+        if (!managedIncomingMode || device == null || findConnectedServerPeer(device) == null) {
+            return;
+        }
+        state("REQUIRES_ANCS LINK · ЖДУ PAIR/B3");
+        log("Incoming RequiresANCS candidate сохранён без client attach · objectId="
+                + System.identityHashCode(device)
+                + " address=" + safeAddress(device)
+                + " bond=" + bondLabel(safeBondState(device))
+                + "; owner зафиксирует только PAIR → B3 → ANCS-READY");
     }
 
     private boolean isVerifiedPeer(BluetoothDevice device) {
@@ -2749,7 +2769,9 @@ public final class IphoneAncsTransport {
                 + (iphonePeripheralMode
                 ? " после прямого Android-central подключения"
                 : ""));
-        scheduleHelperTelemetryRecovery(callbackGatt, HELPER_TELEMETRY_BUSY_RETRY_MS);
+        // ANCS may be published only after the current ACL becomes encrypted. Service Changed is
+        // the protocol signal for that transition; polling discoverServices once per second only
+        // re-reads Android 9's same cache and can overwrite the useful beginning of diagnostics.
         subscribeServiceChangedIfAvailable(callbackGatt);
         sendNextRequest();
     }
@@ -3262,13 +3284,7 @@ public final class IphoneAncsTransport {
                     || activeRequest != null || batteryReadPendingUuid != null
                     || iphoneHelperTelemetryReadPending;
             if (endpoint == null) {
-                if (!busy) {
-                    log("Helper B4/B3 пока не найден; повторяю discovery на существующем ANCS link");
-                    discoverServices(expectedGatt);
-                }
-                scheduleHelperTelemetryRecovery(expectedGatt,
-                        busy ? HELPER_TELEMETRY_BUSY_RETRY_MS
-                                : HELPER_SERVICE_REDISCOVERY_MS);
+                log("Helper F05/B4 пока не найден; жду Service Changed на существующем owner");
                 return;
             }
 
@@ -3276,13 +3292,7 @@ public final class IphoneAncsTransport {
                     && (endpoint.getProperties()
                     & BluetoothGattCharacteristic.PROPERTY_NOTIFY) == 0;
             if (legacyWithoutNotify) {
-                if (!busy) {
-                    log("Legacy Helper B3 не передаёт telemetry; ищу выделенный B4 повторным discovery");
-                    discoverServices(expectedGatt);
-                }
-                scheduleHelperTelemetryRecovery(expectedGatt,
-                        busy ? HELPER_TELEMETRY_BUSY_RETRY_MS
-                                : HELPER_SERVICE_REDISCOVERY_MS);
+                log("Legacy Helper B3 не передаёт telemetry; жду F05 через Service Changed");
                 return;
             }
 
@@ -4647,29 +4657,24 @@ public final class IphoneAncsTransport {
                                     : "GATT SERVER LINK · В LIGHTBLUE ЗАПИШИТЕ PAIR");
                             log(managedReconnectEnabled
                                     ? REMOTE_LOGICAL_NAME
-                                    + " подключился к отдельному сервису "
+                                    + " подключился к стабильному link-anchor "
                                     + LOCAL_LOGICAL_NAME
-                                    + "; ожидаю защищённый PAIR/ANCS handshake"
+                                    + "; жду PAIR/B3 current-link proof"
                                     : "Peer станет verified только после ASCII PAIR в CONTROL "
                                     + serverControlCharacteristic);
-                            log("Единственный RequiresANCS Central link зарегистрирован без "
-                                    + "pre-PAIR createBond; LE security начинается только после "
-                                    + "PAIR/B3 challenge");
+                            if (managedIncomingMode) {
+                                attachAncsClientToIncomingOwner(device);
+                            } else {
+                                log("Diagnostic link ждёт явный PAIR/B3 challenge");
+                            }
                         } else if (newState == BluetoothProfile.STATE_DISCONNECTED
                                 && isVerifiedPeer(device)) {
                             handleVerifiedServerLinkDisconnected(device);
                         } else if (newState == BluetoothProfile.STATE_DISCONNECTED
                                 && managedIncomingMode && getVerifiedPeer() == null) {
-                            // The Helper disconnects before PAIR/B3 when Core Bluetooth reports
-                            // uuidNotAllowed for a stale ATT database. Reusing this namespace
-                            // makes iOS reconnect to the same poisoned handles forever. A link
-                            // that never became verified has no state worth preserving, so rotate
-                            // only this failed publication; ordinary verified losses still retain
-                            // their server/namespace in handleVerifiedServerLinkDisconnected().
-                            log("Непроверенный link закрыт до PAIR/B3; перепубликую GATT "
-                                    + "с новой cache-busting generation");
-                            scheduleManagedIncomingRestart(
-                                    "unverified incoming link closed before PAIR/B3");
+                            // Keep the stable advertiser alive. The iPhone owns reconnect and will
+                            // return to this same anchor; rotating the UUID deadlocked v35.
+                            log("Incoming link закрылся до adoption; стабильная реклама сохранена");
                         }
                     });
                 }
