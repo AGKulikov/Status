@@ -59,6 +59,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          sh ios/KX11-iPhone-ANCS-Helper-v38/verify-v38-contract.sh
           source=ios/KX11-iPhone-ANCS-Helper-v38/KX11ANCSHelper/ViewController.swift
           grep -q 'KX11 ANCS HELPER v38' "$source"
           grep -q 'CBConnectPeripheralOptionRequiresANCS: true' "$source"
