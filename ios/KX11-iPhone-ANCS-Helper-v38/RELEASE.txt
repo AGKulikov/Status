@@ -17,7 +17,15 @@ Architecture replacement:
   CBPeripheral with RequiresANCS and AutoReconnect;
 - if both post-cancel callbacks are absent, read-only same-owner state observation reopens only
   after `.disconnected`; other states cause no second cancel/connect and have no age deadline;
+- poweredOn re-arms that read-only post-cancel observer without another cancel/connect;
 - didFailToConnect consumes manual-reconnect intent exactly like didDisconnect;
+- delayed restore/manual/hard-reset reconnects synchronously retain one exact-owner RAM intent;
+- issueCentralConnect has a poweredOn gate and queues that intent instead of issuing an illegal
+  Core Bluetooth command while the manager is unavailable;
+- the poweredOn normal route atomically consumes the intent once; stop/role change clears it;
+- poweredOn/F05 converts a pending manual/hard-reset source into one exact-owner intent only after
+  `.disconnected`, clearing both source flags before connect; other states are observed read-only;
+- didConnect cannot accept an owner while a pre-terminal manual/hard-reset source is still pending;
 - retrieveConnectedPeripherals is physical-link evidence only and cannot start protocol readiness;
 - official restore -> known peripheral -> system-connected service -> scan resolution ladder;
 - normal resolution claims a system-connected peer without disconnecting it; only the proven
