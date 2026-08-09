@@ -158,8 +158,13 @@ final class ViewController: UIViewController {
     private var centralRestorationProofProbeWorkItem: DispatchWorkItem?
     private var centralRestorationProofProbeAttempt = 0
     /// Set only after the one evidence-driven cancel was issued. The replacement connect is
-    /// intentionally deferred until Core Bluetooth closes the old owner in a terminal callback.
+    /// deferred until a terminal callback or the same owner's `.disconnected` state proves close.
     private var centralRestorationReconnectPending = false
+    /// Core Bluetooth can also omit the terminal delegate callback after canceling a restored
+    /// request. Observe CBPeripheral.state without issuing any second cancel/connect; `.disconnected`
+    /// is an equivalent terminal boundary for reopening the same app-local owner.
+    private var centralRestorationPostCancelProbeWorkItem: DispatchWorkItem?
+    private var centralRestorationPostCancelProbeAttempt = 0
     private var centralDeferredStopScan = false
     private var centralDeferredCancellations: [UUID: CBPeripheral] = [:]
     private var centralReconnectFailureCount = 0
@@ -175,6 +180,7 @@ final class ViewController: UIViewController {
     private let centralReadinessProofTimeout: TimeInterval = 30
     private let centralRestorationEvidenceGrace: TimeInterval = 1.5
     private let centralRestorationProofProbeDelays: [TimeInterval] = [0.5, 1, 2, 5, 10]
+    private let centralRestorationPostCancelProbeDelays: [TimeInterval] = [0.25, 0.5, 1, 2, 5]
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -223,6 +229,7 @@ final class ViewController: UIViewController {
         centralReconnectWorkItem?.cancel()
         centralRestorationRecoveryWorkItem?.cancel()
         centralRestorationProofProbeWorkItem?.cancel()
+        centralRestorationPostCancelProbeWorkItem?.cancel()
         centralSecureRetryWorkItem?.cancel()
         centralCharacteristicDiscoveryWorkItem?.cancel()
         centralServiceRediscoveryWorkItem?.cancel()
@@ -542,6 +549,7 @@ final class ViewController: UIViewController {
             return
         }
         if centralRestorationReconnectPending {
+            armRestoredOwnerPostCancelObservation()
             setStatus("CENTRAL · ЖДУ RESTORE DISCONNECT", color: .systemOrange)
             return
         }
@@ -691,6 +699,7 @@ final class ViewController: UIViewController {
                     + "cancel restored request once and wait for didDisconnect")
                 self.cancelCentralConnectionSafely(restored, manager: self.centralManager,
                     reason: "claim app-local RequiresANCS owner after F04 proof")
+                self.armRestoredOwnerPostCancelObservation()
             case .connecting:
                 self.centralRestorationReconnectPending = true
                 self.centralSystemAutoReconnectActive = false
@@ -701,10 +710,12 @@ final class ViewController: UIViewController {
                     + "cancel once, then wait for terminal callback")
                 self.cancelCentralConnectionSafely(restored, manager: self.centralManager,
                     reason: "one-shot restored-owner recovery after stable F04 proof")
+                self.armRestoredOwnerPostCancelObservation()
             case .disconnecting:
                 self.centralRestorationReconnectPending = true
                 self.centralSystemAutoReconnectActive = false
                 self.append("Restored owner is already .disconnecting; wait before reconnect")
+                self.armRestoredOwnerPostCancelObservation()
             case .disconnected:
                 self.centralOwnerConfiguredForAncs = false
                 self.centralSystemAutoReconnectActive = false
@@ -727,9 +738,44 @@ final class ViewController: UIViewController {
         centralRestorationProofProbeWorkItem?.cancel()
         centralRestorationProofProbeWorkItem = nil
         centralRestorationProofProbeAttempt = 0
+        centralRestorationPostCancelProbeWorkItem?.cancel()
+        centralRestorationPostCancelProbeWorkItem = nil
+        centralRestorationPostCancelProbeAttempt = 0
         centralRestoredPendingOwner = false
         centralRestorationRecoveryAttempted = false
         centralRestorationReconnectPending = false
+    }
+
+    /// A terminal callback is preferred, but state restoration has already demonstrated that
+    /// callbacks can be lost. This read-only observer never makes an age-based decision and never
+    /// repeats cancel/connect. It only reuses the terminal path once the same owner reports
+    /// `.disconnected`.
+    private func armRestoredOwnerPostCancelObservation() {
+        guard centralRestorationReconnectPending,
+              centralRestorationPostCancelProbeWorkItem == nil,
+              let peripheral = geelyPeripheral else { return }
+        let index = min(centralRestorationPostCancelProbeAttempt,
+                        centralRestorationPostCancelProbeDelays.count - 1)
+        let delay = centralRestorationPostCancelProbeDelays[index]
+        let item = DispatchWorkItem { [weak self, weak peripheral] in
+            guard let self = self, let peripheral = peripheral else { return }
+            self.centralRestorationPostCancelProbeWorkItem = nil
+            guard self.runRequested, self.role == .central,
+                  self.centralRestorationReconnectPending,
+                  peripheral.identifier == self.geelyPeripheral?.identifier,
+                  self.centralManager.state == .poweredOn else { return }
+            if peripheral.state == .disconnected {
+                self.reopenRestoredOwnerAfterTerminalCallback(peripheral,
+                    callback: "read-only post-cancel state=.disconnected")
+                return
+            }
+            self.centralRestorationPostCancelProbeAttempt = min(
+                self.centralRestorationPostCancelProbeAttempt + 1,
+                self.centralRestorationPostCancelProbeDelays.count - 1)
+            self.armRestoredOwnerPostCancelObservation()
+        }
+        centralRestorationPostCancelProbeWorkItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
     }
 
     /// Complete the evidence-driven handover only after Core Bluetooth confirms that the stale
@@ -754,6 +800,31 @@ final class ViewController: UIViewController {
                   peripheral.state == .disconnected else { return }
             self.issueCentralConnect(peripheral,
                 reason: "same stable owner after one-shot restoration rescue")
+        }
+    }
+
+    /// Manual reconnect uses the same terminal boundary for both possible Core Bluetooth
+    /// callbacks. Consuming the flag here prevents a cancelled pending connect's
+    /// didFailToConnect from leaking manual intent into a later system reconnect.
+    private func reopenManualOwnerAfterTerminalCallback(_ peripheral: CBPeripheral,
+                                                         callback: String) {
+        guard centralManualReconnectPending,
+              peripheral.identifier == geelyPeripheral?.identifier else { return }
+        centralManualReconnectPending = false
+        centralHardResetReason = nil
+        centralOwnerConfiguredForAncs = false
+        centralSystemAutoReconnectActive = false
+        centralRequireFreshAdvertisement = false
+        clearCentralRuntime(keepPeripheral: true)
+        append("Manual reconnect terminal callback received · \(callback); "
+            + "reopen same owner")
+        guard runRequested, role == .central else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self, weak peripheral] in
+            guard let self = self, let peripheral = peripheral,
+                  self.runRequested, self.role == .central,
+                  peripheral.identifier == self.geelyPeripheral?.identifier,
+                  peripheral.state == .disconnected else { return }
+            self.issueCentralConnect(peripheral, reason: "explicit manual reconnect")
         }
     }
 
@@ -1890,6 +1961,8 @@ extension ViewController: CBCentralManagerDelegate {
             centralRestorationRecoveryWorkItem = nil
             centralRestorationProofProbeWorkItem?.cancel()
             centralRestorationProofProbeWorkItem = nil
+            centralRestorationPostCancelProbeWorkItem?.cancel()
+            centralRestorationPostCancelProbeWorkItem = nil
             centralSystemAutoReconnectActive = false
             // willRestoreState may arrive before this state callback. Preserve that exact owner;
             // it is the only one known to have the RequiresANCS contract.
@@ -1997,6 +2070,7 @@ extension ViewController: CBCentralManagerDelegate {
         }
         if centralRestorationReconnectPending {
             append("Late didConnect arrived after one-shot cancel; wait for didDisconnect")
+            armRestoredOwnerPostCancelObservation()
             setStatus("CENTRAL · ЖДУ RESTORE DISCONNECT", color: .systemOrange)
             return
         }
@@ -2026,6 +2100,11 @@ extension ViewController: CBCentralManagerDelegate {
         append("Central connect failed · \(error?.localizedDescription ?? "без ошибки")")
         if centralRestorationReconnectPending {
             reopenRestoredOwnerAfterTerminalCallback(peripheral,
+                callback: "didFailToConnect")
+            return
+        }
+        if centralManualReconnectPending {
+            reopenManualOwnerAfterTerminalCallback(peripheral,
                 callback: "didFailToConnect")
             return
         }
@@ -2076,17 +2155,8 @@ extension ViewController: CBCentralManagerDelegate {
             return
         }
         if centralManualReconnectPending {
-            centralManualReconnectPending = false
-            centralOwnerConfiguredForAncs = false
-            centralSystemAutoReconnectActive = false
-            centralRequireFreshAdvertisement = false
-            clearCentralRuntime(keepPeripheral: true)
-            guard runRequested, role == .central else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-                guard let self = self, self.runRequested, self.role == .central,
-                      peripheral.state == .disconnected else { return }
-                self.issueCentralConnect(peripheral, reason: "explicit manual reconnect")
-            }
+            reopenManualOwnerAfterTerminalCallback(peripheral,
+                callback: "didDisconnect")
             return
         }
         if let hardReset = hardReset {
