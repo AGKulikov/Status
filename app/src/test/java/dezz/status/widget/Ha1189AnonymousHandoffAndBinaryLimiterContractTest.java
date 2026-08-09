@@ -67,7 +67,7 @@ public final class Ha1189AnonymousHandoffAndBinaryLimiterContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1189() throws Exception {
-        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1195'"));
+        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1196'"));
     }
 
     private static String project(String relative) throws Exception {
