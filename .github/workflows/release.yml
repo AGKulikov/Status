@@ -143,3 +143,52 @@ jobs:
         draft: false
         prerelease: false
         files: release-out/*
+
+  report-release-result:
+    name: Record release result
+    if: ${{ always() }}
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+    - name: Checkout release branch
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.ref_name }}
+
+    - name: Record production result
+      env:
+        GH_TOKEN: ${{ github.token }}
+        RELEASE_RESULT: ${{ needs.build-and-release.result }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p ci-status
+        gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs?per_page=100" > /tmp/release-jobs.json
+        jq \
+          --arg runId "${GITHUB_RUN_ID}" \
+          --arg runAttempt "${GITHUB_RUN_ATTEMPT}" \
+          --arg sourceSha "${GITHUB_SHA}" \
+          --arg result "${RELEASE_RESULT}" \
+          '{
+            runId: $runId,
+            runAttempt: $runAttempt,
+            sourceSha: $sourceSha,
+            result: $result,
+            jobs: [.jobs[] | {
+              id,
+              name,
+              status,
+              conclusion,
+              html_url,
+              steps: [.steps[]? | {number, name, status, conclusion}]
+            }]
+          }' /tmp/release-jobs.json > ci-status/HA1196-release.json
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add ci-status/HA1196-release.json
+        git commit -m "ci: record HA1196 production result"
+        git push origin "HEAD:${GITHUB_REF_NAME}"
