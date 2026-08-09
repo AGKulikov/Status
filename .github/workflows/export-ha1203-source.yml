@@ -6,6 +6,9 @@ on:
       - 'work/ha1203-climate-icons-backgrounds'
     paths:
       - '.github/workflows/export-ha1203-source.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/export-ha1203-source.yml'
   workflow_dispatch:
 
 permissions:
