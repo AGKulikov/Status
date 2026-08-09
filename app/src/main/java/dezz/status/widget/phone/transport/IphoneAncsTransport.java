@@ -179,6 +179,8 @@ public final class IphoneAncsTransport {
     private static final long SECURE_TO_CLIENT_CONNECT_DELAY_MS = 400L;
     private static final long DIRECT_FALLBACK_DELAY_MS = 500L;
     private static final int INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS = 3;
+    /** At most one poisoned client wrapper may be replaced before a full handshake succeeds. */
+    private static final int RSSI_POISONED_WRAPPER_REPLACEMENT_MAX_ATTEMPTS = 1;
     private static final long INCOMING_CLIENT_ATTACH_RETRY_MS = 1_500L;
     /**
      * A direct virtual open against an already-connected incoming peer must produce a callback
@@ -372,7 +374,7 @@ public final class IphoneAncsTransport {
         long connectedAtElapsedMs;
         long securityEpoch;
         boolean connected;
-        /** Server facade disappeared only after an already-connected clientIf took ownership. */
+        /** Server facade disappeared and retained clientIf passed a bounded liveness proof. */
         boolean roleFacadeHandoff;
         /** Server facade disappeared while the exact direct client callback is still pending. */
         boolean roleFacadeHandoffPending;
@@ -425,6 +427,7 @@ public final class IphoneAncsTransport {
     private boolean directFallbackAttempted;
     /** Bounded direct virtual opens tried before one durable incoming-route owner is obtained. */
     private int incomingClientAttachAttempt;
+    private int poisonedWrapperReplacementAttempt;
     /** Exact bonded BluetoothDevice facade delivered by the current GATT-server link. */
     private BluetoothDevice incomingClientCandidate;
     /** Protocol authorization gate written by Helper only after RequiresANCS is active. */
@@ -435,6 +438,8 @@ public final class IphoneAncsTransport {
     private volatile boolean secureAttConfirmed;
     private boolean gattClientConnected;
     private boolean activeClientEstablished;
+    /** Current incoming security epoch for which retained client liveness was proven. */
+    private long activeClientProvenSecurityEpoch;
     private long activeClientGeneration;
     private long activeScanGeneration;
     private boolean iphonePeripheralMode;
@@ -527,6 +532,29 @@ public final class IphoneAncsTransport {
     private Runnable linkProbeTimeout;
     private BluetoothGatt linkProbeGatt;
     private long linkProbeGeneration;
+    /** A timed-out raw read may still callback later; do not reuse this callback channel yet. */
+    private BluetoothGatt poisonedRssiProbeGatt;
+    /** True when the serialized RSSI operation verifies a server-facade handoff. */
+    private boolean linkProbeForServerFacadeHandoff;
+    private boolean linkProbeForIncomingSecurityEpoch;
+    /** Raw RSSI read from an older epoch is draining; its callback must be discarded. */
+    private boolean linkProbeDiscardResult;
+    private BluetoothDevice linkProbeServerDevice;
+    private long linkProbeSecurityEpoch;
+    @NonNull private String linkProbeReason = "";
+    /** Exact post-DISCONNECTED probe waiting for an older generic RSSI operation to finish. */
+    private boolean serverFacadeProbeQueued;
+    private BluetoothGatt queuedServerFacadeProbeGatt;
+    private long queuedServerFacadeProbeGeneration;
+    private BluetoothDevice queuedServerFacadeProbeDevice;
+    private long queuedServerFacadeProbeSecurityEpoch;
+    @NonNull private String queuedServerFacadeProbeReason = "";
+    private boolean incomingEpochProbeQueued;
+    private BluetoothGatt queuedIncomingEpochProbeGatt;
+    private long queuedIncomingEpochProbeGeneration;
+    private BluetoothDevice queuedIncomingEpochProbeDevice;
+    private long queuedIncomingEpochProbeSecurityEpoch;
+    @NonNull private String queuedIncomingEpochProbeReason = "";
     private int managedReconnectAttempt;
     private UUID batteryReadPendingUuid;
     private BatteryStage batteryStage = BatteryStage.NOT_STARTED;
@@ -977,6 +1005,12 @@ public final class IphoneAncsTransport {
                 state(REMOTE_LOGICAL_NAME + " · RECOVERING");
                 return;
             }
+            if (isRssiProbeChannelPoisoned(expected)) {
+                log("RSSI liveness probe заблокирован: callback channel poisoned");
+                poisonRssiProbeChannelAndRearm(expected, expectedGeneration,
+                        expected.getDevice(), reason + "; RSSI callback channel poisoned");
+                return;
+            }
             sessionState.move(expectedGeneration,
                     AncsSessionStateMachine.Phase.VERIFYING_LINK);
             boolean started;
@@ -993,15 +1027,20 @@ public final class IphoneAncsTransport {
             }
             linkProbeGatt = expected;
             linkProbeGeneration = expectedGeneration;
+            linkProbeForServerFacadeHandoff = false;
+            linkProbeServerDevice = null;
+            linkProbeSecurityEpoch = 0L;
+            linkProbeReason = reason;
             linkProbeTimeout = () -> {
-                linkProbeTimeout = null;
-                linkProbeGatt = null;
+                if (!ownsGenericLinkProbe(expected, expectedGeneration)) return;
                 if (closing || expected != gatt
                         || !sessionState.isCurrent(expectedGeneration)) return;
                 log("GATT liveness probe не дал callback за "
                         + LINK_PROBE_TIMEOUT_MS + " ms");
-                scheduleManagedReconnect(reason + "; liveness probe timeout");
-                state(REMOTE_LOGICAL_NAME + " · RECOVERING");
+                BluetoothDevice recoveryDevice = queuedServerFacadeProbeDevice != null
+                        ? queuedServerFacadeProbeDevice : expected.getDevice();
+                poisonRssiProbeChannelAndRearm(expected, expectedGeneration,
+                        recoveryDevice, reason + "; liveness probe timeout");
             };
             main.postDelayed(linkProbeTimeout, LINK_PROBE_TIMEOUT_MS);
             log("Тип ACL transport не указан; проверяю живой ANCS GATT, "
@@ -1017,6 +1056,487 @@ public final class IphoneAncsTransport {
         linkProbeTimeout = null;
         linkProbeGatt = null;
         linkProbeGeneration = 0L;
+        linkProbeForServerFacadeHandoff = false;
+        linkProbeForIncomingSecurityEpoch = false;
+        linkProbeDiscardResult = false;
+        linkProbeServerDevice = null;
+        linkProbeSecurityEpoch = 0L;
+        linkProbeReason = "";
+        serverFacadeProbeQueued = false;
+        queuedServerFacadeProbeGatt = null;
+        queuedServerFacadeProbeGeneration = 0L;
+        queuedServerFacadeProbeDevice = null;
+        queuedServerFacadeProbeSecurityEpoch = 0L;
+        queuedServerFacadeProbeReason = "";
+        incomingEpochProbeQueued = false;
+        queuedIncomingEpochProbeGatt = null;
+        queuedIncomingEpochProbeGeneration = 0L;
+        queuedIncomingEpochProbeDevice = null;
+        queuedIncomingEpochProbeSecurityEpoch = 0L;
+        queuedIncomingEpochProbeReason = "";
+    }
+
+    private boolean ownsGenericLinkProbe(@NonNull BluetoothGatt expected,
+                                         long expectedGeneration) {
+        return linkProbeGatt == expected
+                && linkProbeGeneration == expectedGeneration
+                && !linkProbeForServerFacadeHandoff
+                && !linkProbeForIncomingSecurityEpoch
+                && !linkProbeDiscardResult;
+    }
+
+    private boolean isRssiProbeChannelPoisoned(@NonNull BluetoothGatt expected) {
+        return poisonedRssiProbeGatt == expected;
+    }
+
+    private void clearRssiProbePoisonAfterGattClosed(@NonNull BluetoothGatt expected) {
+        if (poisonedRssiProbeGatt != expected) return;
+        poisonedRssiProbeGatt = null;
+        log("RSSI callback channel poison очищен только после close GATT wrapper");
+    }
+
+    /**
+     * A timeout cannot prove that Bluetooth finished the raw read. Clear all logical probe state,
+     * poison this callback channel against future reads, and invalidate current-link authorization.
+     * The same BluetoothGatt can never probe again: an RSSI callback carries no connection
+     * lifecycle id, so even a late callback after reconnect could be mistaken for a newer read.
+     * Only closing/replacing the wrapper creates an unambiguous callback-channel boundary.
+     */
+    private void poisonRssiProbeChannelAndRearm(@NonNull BluetoothGatt expected,
+                                                long expectedGeneration,
+                                                @NonNull BluetoothDevice device,
+                                                @NonNull String reason) {
+        if (gatt != expected || !sessionState.isCurrent(expectedGeneration)) {
+            cancelAmbiguousAclProbe();
+            return;
+        }
+        GattServerPeer connectedServer = managedIncomingMode
+                ? findConnectedServerPeer(device) : null;
+        BluetoothDevice exactIncoming = connectedServer == null
+                ? null : connectedServer.device;
+        boolean canReplaceOnCurrentIncomingLink = exactIncoming != null
+                && isSelectedBondedIncomingDevice(exactIncoming)
+                && poisonedWrapperReplacementAttempt
+                < RSSI_POISONED_WRAPPER_REPLACEMENT_MAX_ATTEMPTS;
+        poisonedRssiProbeGatt = expected;
+        cancelAmbiguousAclProbe();
+        log("RSSI callback timeout: channel poisoned until GATT wrapper replacement · "
+                + reason);
+        // close() is the only safe callback-channel barrier. A late RSSI callback from expected
+        // then fails callbackGatt == gatt after a replacement object is installed.
+        closeClientGatt(expected);
+        clearAncsRuntime();
+        incomingDiscoveryStarted = false;
+        if (managedIncomingMode) {
+            if (canReplaceOnCurrentIncomingLink) {
+                poisonedWrapperReplacementAttempt++;
+                cancelClientAttemptCallbacks();
+                incomingClientAttachAttempt = 0;
+                activeClientProvenSecurityEpoch = 0L;
+                log("Poisoned client wrapper closed; bounded replacement #"
+                        + poisonedWrapperReplacementAttempt
+                        + " uses still-CONNECTED exact server facade; current PAIR/B3/ANCS-READY "
+                        + "epoch is retained and only client liveness proof is reset");
+                adoptIncomingClientCandidate(exactIncoming,
+                        "bounded replacement after RSSI timeout");
+            } else {
+                resetIncomingSecurityAfterClientLoss(device,
+                        "poisoned wrapper has no safe replacement link · " + reason);
+                preserveManagedIncomingPublicationAfterLinkLoss(
+                        "RSSI timeout; wait for next incoming link");
+            }
+            return;
+        }
+        scheduleManagedReconnect("poisoned GATT wrapper replaced · " + reason);
+        state(REMOTE_LOGICAL_NAME + " · RECOVERING");
+    }
+
+    private boolean ownsServerFacadeHandoffProbe(@NonNull BluetoothGatt expected,
+                                                  long expectedGeneration,
+                                                  long expectedSecurityEpoch,
+                                                  @NonNull BluetoothDevice serverDevice) {
+        return linkProbeGatt == expected
+                && linkProbeGeneration == expectedGeneration
+                && linkProbeForServerFacadeHandoff
+                && !linkProbeDiscardResult
+                && linkProbeSecurityEpoch == expectedSecurityEpoch
+                && linkProbeServerDevice != null
+                && sameDevice(linkProbeServerDevice, serverDevice);
+    }
+
+    private void cancelServerFacadeHandoffProbeIfOwned(@NonNull BluetoothGatt expected,
+                                                        long expectedGeneration,
+                                                        long expectedSecurityEpoch,
+                                                        @NonNull BluetoothDevice serverDevice) {
+        if (ownsServerFacadeHandoffProbe(expected, expectedGeneration,
+                expectedSecurityEpoch, serverDevice)) {
+            cancelAmbiguousAclProbe();
+        }
+    }
+
+    private boolean ownsIncomingEpochProbe(@NonNull BluetoothGatt expected,
+                                            long expectedGeneration,
+                                            long expectedSecurityEpoch,
+                                            @NonNull BluetoothDevice serverDevice) {
+        return linkProbeGatt == expected
+                && linkProbeGeneration == expectedGeneration
+                && linkProbeForIncomingSecurityEpoch
+                && !linkProbeDiscardResult
+                && linkProbeSecurityEpoch == expectedSecurityEpoch
+                && linkProbeServerDevice != null
+                && sameDevice(linkProbeServerDevice, serverDevice);
+    }
+
+    private void cancelIncomingEpochProbeIfOwned(@NonNull BluetoothGatt expected,
+                                                  long expectedGeneration,
+                                                  long expectedSecurityEpoch,
+                                                  @NonNull BluetoothDevice serverDevice) {
+        if (ownsIncomingEpochProbe(expected, expectedGeneration,
+                expectedSecurityEpoch, serverDevice)) {
+            cancelAmbiguousAclProbe();
+        }
+    }
+
+    private void queueServerFacadeHandoffProbe(@NonNull BluetoothGatt expected,
+                                                long expectedGeneration,
+                                                long expectedSecurityEpoch,
+                                                @NonNull BluetoothDevice serverDevice,
+                                                @NonNull String reason) {
+        // A post-DISCONNECTED read is stronger than a queued new-epoch read: when it succeeds it
+        // proves both retained-client liveness for this epoch and the role-facade handoff. Keep
+        // only that one successor so a single raw RSSI operation remains in flight at a time.
+        incomingEpochProbeQueued = false;
+        queuedIncomingEpochProbeGatt = null;
+        queuedIncomingEpochProbeGeneration = 0L;
+        queuedIncomingEpochProbeDevice = null;
+        queuedIncomingEpochProbeSecurityEpoch = 0L;
+        queuedIncomingEpochProbeReason = "";
+        serverFacadeProbeQueued = true;
+        queuedServerFacadeProbeGatt = expected;
+        queuedServerFacadeProbeGeneration = expectedGeneration;
+        queuedServerFacadeProbeDevice = serverDevice;
+        queuedServerFacadeProbeSecurityEpoch = expectedSecurityEpoch;
+        queuedServerFacadeProbeReason = reason;
+        log("Server-facade probe поставлен после текущего raw RSSI; "
+                + "его pre-DISCONNECTED результат не будет переиспользован");
+    }
+
+    /**
+     * Finishes any operation that began before server DISCONNECTED, discards its result for
+     * handoff purposes, and issues a new post-DISCONNECTED RSSI read. The legacy method name is
+     * retained because generic ACL probing was the first caller, but incoming-epoch reads use the
+     * same serialization barrier. Returns true whenever a queued request consumed the result.
+     */
+    private boolean drainQueuedServerFacadeProbeAfterGeneric(
+            @NonNull BluetoothGatt completedGatt, long completedGeneration,
+            @NonNull String completion) {
+        if (!serverFacadeProbeQueued
+                || queuedServerFacadeProbeGatt != completedGatt
+                || queuedServerFacadeProbeGeneration != completedGeneration
+                || queuedServerFacadeProbeDevice == null) return false;
+        BluetoothDevice serverDevice = queuedServerFacadeProbeDevice;
+        long securityEpoch = queuedServerFacadeProbeSecurityEpoch;
+        String reason = queuedServerFacadeProbeReason;
+        // This cancel owns the completed generic probe and its exact queued successor. No newer
+        // operation has been started yet, so clearing both is atomic on the main looper.
+        cancelAmbiguousAclProbe();
+        if (closing || gatt != completedGatt || !managedIncomingMode
+                || !activeClientEstablished || !gattClientConnected
+                || !sessionState.isCurrent(completedGeneration)
+                || incomingSecurityEpoch != securityEpoch) return true;
+        log("Prior RSSI завершён (" + completion
+                + "); запускаю отдельный post-DISCONNECTED handoff probe");
+        scheduleServerFacadeHandoffProbe(serverDevice,
+                reason + "; new RSSI after generic " + completion);
+        return true;
+    }
+
+    /** Logically cancels an old raw read but keeps its callback slot until it drains. */
+    private void prepareInFlightLinkProbeForFreshEpoch() {
+        if (linkProbeGatt == null) {
+            cancelAmbiguousAclProbe();
+            return;
+        }
+        if (ambiguousAclProbeTask != null) main.removeCallbacks(ambiguousAclProbeTask);
+        if (linkProbeTimeout != null) main.removeCallbacks(linkProbeTimeout);
+        ambiguousAclProbeTask = null;
+        linkProbeTimeout = null;
+        linkProbeForServerFacadeHandoff = false;
+        linkProbeForIncomingSecurityEpoch = false;
+        linkProbeDiscardResult = true;
+        linkProbeServerDevice = null;
+        linkProbeSecurityEpoch = 0L;
+        linkProbeReason = "superseded by fresh incoming epoch";
+        serverFacadeProbeQueued = false;
+        queuedServerFacadeProbeGatt = null;
+        queuedServerFacadeProbeGeneration = 0L;
+        queuedServerFacadeProbeDevice = null;
+        queuedServerFacadeProbeSecurityEpoch = 0L;
+        queuedServerFacadeProbeReason = "";
+        incomingEpochProbeQueued = false;
+        queuedIncomingEpochProbeGatt = null;
+        queuedIncomingEpochProbeGeneration = 0L;
+        queuedIncomingEpochProbeDevice = null;
+        queuedIncomingEpochProbeSecurityEpoch = 0L;
+        queuedIncomingEpochProbeReason = "";
+        armDiscardedRawProbeDrainTimeout();
+        log("Старый raw RSSI probe логически отменён; его результат будет отброшен "
+                + "до запуска любого successor read");
+    }
+
+    private void armDiscardedRawProbeDrainTimeout() {
+        BluetoothGatt drainingGatt = linkProbeGatt;
+        long drainingGeneration = linkProbeGeneration;
+        if (!linkProbeDiscardResult || drainingGatt == null) return;
+        if (linkProbeTimeout != null) main.removeCallbacks(linkProbeTimeout);
+        linkProbeTimeout = () -> {
+            if (!linkProbeDiscardResult || linkProbeGatt != drainingGatt
+                    || linkProbeGeneration != drainingGeneration) return;
+            BluetoothDevice recoveryDevice = queuedServerFacadeProbeDevice != null
+                    ? queuedServerFacadeProbeDevice
+                    : queuedIncomingEpochProbeDevice != null
+                    ? queuedIncomingEpochProbeDevice : drainingGatt.getDevice();
+            poisonRssiProbeChannelAndRearm(drainingGatt, drainingGeneration,
+                    recoveryDevice, "discarded raw probe timeout");
+        };
+        main.postDelayed(linkProbeTimeout, LINK_PROBE_TIMEOUT_MS);
+    }
+
+    private void queueIncomingEpochProbeBehindDiscardedRead(
+            @NonNull BluetoothGatt expected, long expectedGeneration,
+            long expectedSecurityEpoch, @NonNull BluetoothDevice serverDevice,
+            @NonNull String reason) {
+        incomingEpochProbeQueued = true;
+        queuedIncomingEpochProbeGatt = expected;
+        queuedIncomingEpochProbeGeneration = expectedGeneration;
+        queuedIncomingEpochProbeDevice = serverDevice;
+        queuedIncomingEpochProbeSecurityEpoch = expectedSecurityEpoch;
+        queuedIncomingEpochProbeReason = reason;
+        armDiscardedRawProbeDrainTimeout();
+        log("New-epoch client proof ожидает завершения старого raw RSSI callback");
+    }
+
+    private void finishDiscardedRawProbeAndStartQueuedEpoch(@NonNull String completion) {
+        if (!linkProbeDiscardResult || linkProbeGatt == null) return;
+        boolean facadeQueued = serverFacadeProbeQueued;
+        BluetoothGatt facadeGatt = queuedServerFacadeProbeGatt;
+        long facadeGeneration = queuedServerFacadeProbeGeneration;
+        BluetoothDevice facadeDevice = queuedServerFacadeProbeDevice;
+        long facadeSecurityEpoch = queuedServerFacadeProbeSecurityEpoch;
+        String facadeReason = queuedServerFacadeProbeReason;
+        boolean queued = incomingEpochProbeQueued;
+        BluetoothGatt expected = queuedIncomingEpochProbeGatt;
+        long generation = queuedIncomingEpochProbeGeneration;
+        BluetoothDevice serverDevice = queuedIncomingEpochProbeDevice;
+        long securityEpoch = queuedIncomingEpochProbeSecurityEpoch;
+        String reason = queuedIncomingEpochProbeReason;
+        cancelAmbiguousAclProbe();
+        if (facadeQueued && facadeGatt != null && facadeDevice != null
+                && !closing && gatt == facadeGatt && managedIncomingMode
+                && activeClientEstablished && gattClientConnected
+                && sessionState.isCurrent(facadeGeneration)
+                && incomingSecurityEpoch == facadeSecurityEpoch) {
+            log("Старый RSSI result отброшен (" + completion
+                    + "); запускаю новый post-DISCONNECTED facade read");
+            scheduleServerFacadeHandoffProbe(facadeDevice,
+                    facadeReason + "; after discarded " + completion);
+            return;
+        }
+        if (!queued || expected == null || serverDevice == null
+                || closing || gatt != expected || !managedIncomingMode
+                || !activeClientEstablished || !gattClientConnected
+                || !sessionState.isCurrent(generation)
+                || incomingSecurityEpoch != securityEpoch) return;
+        log("Старый RSSI result отброшен (" + completion
+                + "); теперь запускаю новый read для security epoch=" + securityEpoch);
+        scheduleIncomingEpochClientLivenessProbe(serverDevice,
+                reason + "; after discarded " + completion);
+    }
+
+    /**
+     * A server DISCONNECTED callback is not enough to distinguish Android's role-facade handoff
+     * from real ACL loss. Verify the retained, already-established clientIf without disconnecting
+     * it. Only a successful RSSI callback promotes the pending facade to a confirmed handoff.
+     */
+    private void scheduleServerFacadeHandoffProbe(@NonNull BluetoothDevice serverDevice,
+                                                  @NonNull String reason) {
+        BluetoothGatt expected = gatt;
+        long expectedGeneration = activeClientGeneration;
+        long expectedSecurityEpoch = incomingSecurityEpoch;
+        if (closing || !managedIncomingMode || expected == null
+                || !activeClientEstablished || !gattClientConnected
+                || !sessionState.isCurrent(expectedGeneration)
+                || findCurrentServerPeer(serverDevice) == null) {
+            log("Server-facade liveness probe не стартовал: established owner уже отсутствует");
+            return;
+        }
+        if (isRssiProbeChannelPoisoned(expected)) {
+            log("Server-facade probe заблокирован: RSSI channel poisoned");
+            poisonRssiProbeChannelAndRearm(expected, expectedGeneration, serverDevice,
+                    reason + "; poisoned callback channel");
+            return;
+        }
+        if (linkProbeForServerFacadeHandoff && linkProbeGatt == expected
+                && linkProbeServerDevice != null
+                && sameDevice(linkProbeServerDevice, serverDevice)
+                && linkProbeSecurityEpoch == expectedSecurityEpoch) {
+            log("Server-facade liveness probe уже выполняется; дубль пропущен");
+            return;
+        }
+
+        if (linkProbeGatt == expected) {
+            // Never reinterpret any read that started before server DISCONNECTED. Its callback
+            // says nothing about post-disconnect liveness. Queue a second physical read; this also
+            // supersedes a queued/active new-epoch proof because the facade read proves both.
+            queueServerFacadeHandoffProbe(expected, expectedGeneration,
+                    expectedSecurityEpoch, serverDevice, reason);
+            return;
+        }
+
+        cancelAmbiguousAclProbe();
+        linkProbeGatt = expected;
+        linkProbeGeneration = expectedGeneration;
+        linkProbeForServerFacadeHandoff = true;
+        linkProbeServerDevice = serverDevice;
+        linkProbeSecurityEpoch = expectedSecurityEpoch;
+        linkProbeReason = reason;
+        boolean started;
+        try {
+            started = expected.readRemoteRssi();
+        } catch (RuntimeException failure) {
+            started = false;
+            log("Server-facade readRemoteRssi exception: " + failure);
+        }
+        if (!started) {
+            cancelAmbiguousAclProbe();
+            failServerFacadeHandoffProbe(expected, expectedGeneration,
+                    expectedSecurityEpoch, serverDevice,
+                    reason + "; readRemoteRssi rejected");
+            return;
+        }
+        armServerFacadeHandoffProbeTimeout(expected, expectedGeneration,
+                expectedSecurityEpoch, serverDevice, reason);
+        state("SERVER FACADE LOST · VERIFYING RETAINED CLIENT");
+        log("readRemoteRssi handoff probe started; живой GATT owner не разрывается · "
+                + reason);
+    }
+
+    private void armServerFacadeHandoffProbeTimeout(@NonNull BluetoothGatt expected,
+                                                     long expectedGeneration,
+                                                     long expectedSecurityEpoch,
+                                                     @NonNull BluetoothDevice serverDevice,
+                                                     @NonNull String reason) {
+        linkProbeTimeout = () -> {
+            if (!ownsServerFacadeHandoffProbe(expected, expectedGeneration,
+                    expectedSecurityEpoch, serverDevice)) return;
+            if (closing || gatt != expected
+                    || !sessionState.isCurrent(expectedGeneration)
+                    || incomingSecurityEpoch != expectedSecurityEpoch) {
+                // This runnable still owns the exact old probe, so it may clear it. Never clear a
+                // newer probe whose GATT/generation/epoch/kind no longer match these captures.
+                cancelServerFacadeHandoffProbeIfOwned(expected, expectedGeneration,
+                        expectedSecurityEpoch, serverDevice);
+                return;
+            }
+            log("Server-facade RSSI probe не дал callback за "
+                    + LINK_PROBE_TIMEOUT_MS + " ms");
+            poisonRssiProbeChannelAndRearm(expected, expectedGeneration, serverDevice,
+                    reason + "; liveness probe timeout");
+        };
+        main.postDelayed(linkProbeTimeout, LINK_PROBE_TIMEOUT_MS);
+    }
+
+    private void failServerFacadeHandoffProbe(@NonNull BluetoothGatt expected,
+                                               long expectedGeneration,
+                                               long expectedSecurityEpoch,
+                                               @NonNull BluetoothDevice serverDevice,
+                                               @NonNull String reason) {
+        if (closing || !managedIncomingMode || gatt != expected
+                || !activeClientEstablished
+                || !sessionState.isCurrent(expectedGeneration)
+                || incomingSecurityEpoch != expectedSecurityEpoch) return;
+        gattClientConnected = false;
+        resetIncomingSecurityAfterClientLoss(serverDevice, reason);
+        awaitIncomingBackgroundOwner(expected, expectedGeneration,
+                "server-facade liveness failed · " + reason);
+    }
+
+    /** Proves that a retained clientIf is live in the newly-created server security epoch. */
+    private void scheduleIncomingEpochClientLivenessProbe(
+            @NonNull BluetoothDevice serverDevice, @NonNull String reason) {
+        BluetoothGatt expected = gatt;
+        long expectedGeneration = activeClientGeneration;
+        long expectedSecurityEpoch = incomingSecurityEpoch;
+        if (closing || !managedIncomingMode || expected == null
+                || !activeClientEstablished || !gattClientConnected
+                || activeClientProvenSecurityEpoch == expectedSecurityEpoch
+                || !sessionState.isCurrent(expectedGeneration)
+                || activeClientTarget == null
+                || !sameDevice(activeClientTarget, serverDevice)
+                || findCurrentServerPeer(serverDevice) == null) return;
+        if (isRssiProbeChannelPoisoned(expected)) {
+            log("New-epoch probe заблокирован: RSSI channel poisoned");
+            poisonRssiProbeChannelAndRearm(expected, expectedGeneration, serverDevice,
+                    reason + "; poisoned callback channel");
+            return;
+        }
+
+        if (ownsIncomingEpochProbe(expected, expectedGeneration,
+                expectedSecurityEpoch, serverDevice)) return;
+        if (ownsServerFacadeHandoffProbe(expected, expectedGeneration,
+                expectedSecurityEpoch, serverDevice)
+                || (serverFacadeProbeQueued
+                && queuedServerFacadeProbeGatt == expected
+                && queuedServerFacadeProbeGeneration == expectedGeneration
+                && queuedServerFacadeProbeSecurityEpoch == expectedSecurityEpoch)) {
+            // A current-epoch post-DISCONNECTED facade read is the stronger proof and will open
+            // the same discovery gate on success.
+            return;
+        }
+        if (linkProbeGatt != null) {
+            if (!linkProbeDiscardResult) {
+                prepareInFlightLinkProbeForFreshEpoch();
+            }
+            if (linkProbeDiscardResult && linkProbeGatt != null) {
+                queueIncomingEpochProbeBehindDiscardedRead(expected, expectedGeneration,
+                        expectedSecurityEpoch, serverDevice, reason);
+                return;
+            }
+        }
+        cancelAmbiguousAclProbe();
+        linkProbeGatt = expected;
+        linkProbeGeneration = expectedGeneration;
+        linkProbeForServerFacadeHandoff = false;
+        linkProbeForIncomingSecurityEpoch = true;
+        linkProbeDiscardResult = false;
+        linkProbeServerDevice = serverDevice;
+        linkProbeSecurityEpoch = expectedSecurityEpoch;
+        linkProbeReason = reason;
+        boolean started;
+        try {
+            started = expected.readRemoteRssi();
+        } catch (RuntimeException failure) {
+            started = false;
+            log("New-epoch readRemoteRssi exception: " + failure);
+        }
+        if (!started) {
+            cancelIncomingEpochProbeIfOwned(expected, expectedGeneration,
+                    expectedSecurityEpoch, serverDevice);
+            failServerFacadeHandoffProbe(expected, expectedGeneration,
+                    expectedSecurityEpoch, serverDevice,
+                    reason + "; new-epoch readRemoteRssi rejected");
+            return;
+        }
+        linkProbeTimeout = () -> {
+            if (!ownsIncomingEpochProbe(expected, expectedGeneration,
+                    expectedSecurityEpoch, serverDevice)) return;
+            poisonRssiProbeChannelAndRearm(expected, expectedGeneration, serverDevice,
+                    reason + "; new-epoch liveness timeout");
+        };
+        main.postDelayed(linkProbeTimeout, LINK_PROBE_TIMEOUT_MS);
+        state("NEW SERVER EPOCH · VERIFYING RETAINED CLIENT");
+        log("Новый post-CONNECTED RSSI read доказывает retained owner для epoch="
+                + expectedSecurityEpoch);
     }
 
     /**
@@ -1515,12 +2035,14 @@ public final class IphoneAncsTransport {
         clientConnectInFlight = false;
         activeClientTarget = null;
         activeClientEstablished = false;
+        activeClientProvenSecurityEpoch = 0L;
         incomingClientCandidate = null;
         incomingAncsReadyGateOpen = false;
         incomingDiscoveryStarted = false;
         BluetoothGatt old = gatt;
         gatt = null;
         if (old != null) {
+            clearRssiProbePoisonAfterGattClosed(old);
             try {
                 old.disconnect();
             } catch (RuntimeException ignored) {
@@ -1569,6 +2091,7 @@ public final class IphoneAncsTransport {
     }
 
     private void resetVerifiedPeerSession() {
+        cancelAmbiguousAclProbe();
         cancelServerTelemetryWakePoll();
         synchronized (verifiedPeerLock) {
             verifiedPeer = null;
@@ -1585,9 +2108,11 @@ public final class IphoneAncsTransport {
         activeClientTarget = null;
         activeClientAutoConnect = false;
         activeClientEstablished = false;
+        activeClientProvenSecurityEpoch = 0L;
         backgroundAttachAttempted = false;
         directFallbackAttempted = false;
         incomingClientAttachAttempt = 0;
+        poisonedWrapperReplacementAttempt = 0;
         incomingClientCandidate = null;
         incomingAncsReadyGateOpen = false;
         incomingDiscoveryStarted = false;
@@ -1904,11 +2429,16 @@ public final class IphoneAncsTransport {
                                                   @NonNull String reason) {
         if (!managedIncomingMode || expected != gatt || !secureAttConfirmed
                 || !incomingAncsReadyGateOpen || !gattClientConnected
-                || !activeClientEstablished) return;
+                || !activeClientEstablished
+                || activeClientProvenSecurityEpoch == 0L
+                || activeClientProvenSecurityEpoch != incomingSecurityEpoch) return;
         if (incomingDiscoveryStarted) {
             log("ANCS discovery уже стартовал на текущем direct clientIf · " + reason);
             return;
         }
+        // A full current-link B3 + ANCS-READY + client-liveness handshake succeeded. A later,
+        // independent physical incident may spend one fresh poisoned-wrapper replacement budget.
+        poisonedWrapperReplacementAttempt = 0;
         incomingDiscoveryStarted = true;
         state("DIRECT CLIENT ATTACHED + ANCS-READY · DISCOVERY");
         log("Оба независимых gate готовы: direct client attached + valid ANCS-READY · "
@@ -2090,6 +2620,7 @@ public final class IphoneAncsTransport {
         clearAncsRuntime();
         incomingDiscoveryStarted = false;
         gattClientConnected = false;
+        activeClientProvenSecurityEpoch = 0L;
         activeClientTarget = device;
         activeClientAutoConnect = false;
         activeClientEstablished = false;
@@ -2373,10 +2904,10 @@ public final class IphoneAncsTransport {
         long now = android.os.SystemClock.elapsedRealtime();
         String key = deviceKey(device);
         boolean freshConnection = false;
-        boolean establishedHandoff = newState == BluetoothProfile.STATE_DISCONNECTED
+        boolean establishedHandoffCandidate = newState == BluetoothProfile.STATE_DISCONNECTED
                 && establishedClientOwnsPhysicalLink(device);
         boolean pendingHandoff = newState == BluetoothProfile.STATE_DISCONNECTED
-                && !establishedHandoff && pendingExactClientAttach(device);
+                && (establishedHandoffCandidate || pendingExactClientAttach(device));
         synchronized (gattServerPeers) {
             boolean anotherFacadeOwnsCurrentLink = false;
             for (GattServerPeer existing : gattServerPeers.values()) {
@@ -2405,10 +2936,13 @@ public final class IphoneAncsTransport {
                 // Never claim that the server facade is connected after its own callback says
                 // DISCONNECTED. A separately tracked client-role handoff may still own the ACL.
                 peer.connected = false;
-                peer.roleFacadeHandoff = establishedHandoff;
+                // Even a CONNECTED clientIf is only a handoff candidate until one bounded,
+                // non-destructive liveness probe succeeds. ECARX may omit the later client loss
+                // callback, so treating wrapper state alone as proof would retain stale B3/READY.
+                peer.roleFacadeHandoff = false;
                 peer.roleFacadeHandoffPending = pendingHandoff;
                 peer.telemetrySubscribed = false;
-                if (!establishedHandoff && !pendingHandoff) {
+                if (!pendingHandoff) {
                     peer.linkSecurityChallengeIssued = false;
                 }
             }
@@ -2417,8 +2951,9 @@ public final class IphoneAncsTransport {
                 && !hasServerTelemetrySubscribers()) {
             cancelServerTelemetryWakePoll();
         }
-        if (establishedHandoff) {
-            log("GATT-server facade DISCONNECTED; already-CONNECTED clientIf owns the ACL");
+        if (establishedHandoffCandidate) {
+            log("GATT-server facade DISCONNECTED; CONNECTED clientIf требует bounded "
+                    + "RSSI liveness proof перед подтверждением role handoff");
         } else if (pendingHandoff) {
             log("GATT-server facade DISCONNECTED; exact direct callback pending, "
                     + "physical-loss decision deferred to client callback");
@@ -2441,7 +2976,13 @@ public final class IphoneAncsTransport {
     private void beginFreshIncomingSecurityEpoch(@NonNull BluetoothDevice device,
                                                  @NonNull String reason) {
         if (!managedIncomingMode) return;
+        // Keep one raw controller operation serialized: a read already submitted to Bluetooth
+        // cannot be physically cancelled. Mark it discard-only, then queue the current-epoch read
+        // after its callback/timeout instead of issuing a competing read.
+        prepareInFlightLinkProbeForFreshEpoch();
         incomingSecurityEpoch++;
+        activeClientProvenSecurityEpoch = 0L;
+        poisonedWrapperReplacementAttempt = 0;
         cancelClientAttemptCallbacks();
         cancelBondTimeout();
         synchronized (verifiedPeerLock) {
@@ -2484,7 +3025,9 @@ public final class IphoneAncsTransport {
     private void resetIncomingSecurityAfterClientLoss(@NonNull BluetoothDevice device,
                                                        @NonNull String reason) {
         if (!managedIncomingMode) return;
+        cancelAmbiguousAclProbe();
         incomingSecurityEpoch++;
+        activeClientProvenSecurityEpoch = 0L;
         cancelClientAttemptCallbacks();
         cancelBondTimeout();
         synchronized (verifiedPeerLock) {
@@ -2512,19 +3055,21 @@ public final class IphoneAncsTransport {
                 + " · stale B3/ANCS-READY invalidated · " + reason);
     }
 
-    private void confirmPendingServerFacadeHandoff(@NonNull BluetoothDevice device) {
+    private boolean confirmPendingServerFacadeHandoff(@NonNull BluetoothDevice device) {
         synchronized (gattServerPeers) {
             for (GattServerPeer peer : gattServerPeers.values()) {
                 if (peer.sessionGeneration != sessionGeneration
                         || peer.securityEpoch != incomingSecurityEpoch
-                        || !peer.roleFacadeHandoffPending
                         || !sameDevice(peer.device, device)) continue;
+                if (peer.roleFacadeHandoff) return true;
+                if (!peer.roleFacadeHandoffPending) continue;
                 peer.roleFacadeHandoffPending = false;
                 peer.roleFacadeHandoff = true;
-                log("Pending server-facade handoff подтверждён CONNECTED clientIf");
-                return;
+                log("Pending server-facade handoff подтверждён client liveness proof");
+                return true;
             }
         }
+        return false;
     }
 
     private boolean hasServerTelemetrySubscribers() {
@@ -2661,18 +3206,16 @@ public final class IphoneAncsTransport {
         }
     }
 
-    private void handleVerifiedServerLinkDisconnected(BluetoothDevice device) {
+    private void handleServerFacadeDisconnected(BluetoothDevice device) {
         if (establishedClientOwnsPhysicalLink(device)) {
-            state("SAME PHYSICAL LINK · ANCS CLIENT PRESERVED");
+            state("SERVER FACADE LOST · VERIFYING CLIENT HANDOFF");
             log("GATT-server callback released after exact-device client registration: "
                     + safeAddress(device)
-                    + "; Android ANCS client remains owner"
+                    + "; retained Android clientIf проверяется non-destructive RSSI probe"
                     + " connected=" + gattClientConnected
                     + " inFlight=" + clientConnectInFlight);
-            // Registering Android's GATT-client role on the exact incoming ATT peer can make the
-            // Android 9 server API report STATE_DISCONNECTED even though the client callback is
-            // already connected (or queued). Closing that client here created the v17 loop.
-            // Its own bounded callback/timeout now owns success or recovery.
+            scheduleServerFacadeHandoffProbe(device,
+                    "GATT-server facade DISCONNECTED on established clientIf");
             return;
         }
         if (pendingExactClientAttach(device)) {
@@ -2878,6 +3421,13 @@ public final class IphoneAncsTransport {
         if (managedIncomingMode && !incomingAncsReadyGateOpen) {
             log("discoverServices заблокирован: direct clientIf может быть attached, "
                     + "но valid ANCS-READY ещё не получен");
+            return;
+        }
+        if (managedIncomingMode
+                && (activeClientProvenSecurityEpoch == 0L
+                || activeClientProvenSecurityEpoch != incomingSecurityEpoch)) {
+            log("discoverServices заблокирован: retained clientIf не доказан "
+                    + "для current incoming security epoch=" + incomingSecurityEpoch);
             return;
         }
         long expectedGeneration = activeClientGeneration;
@@ -4460,12 +5010,15 @@ public final class IphoneAncsTransport {
     private void closeClientGatt(BluetoothGatt callbackGatt) {
         if (callbackGatt == null) return;
         if (gatt == callbackGatt) {
+            if (linkProbeGatt == callbackGatt) cancelAmbiguousAclProbe();
+            clearRssiProbePoisonAfterGattClosed(callbackGatt);
             gatt = null;
             gattClientConnected = false;
             clientConnectInFlight = false;
             activeClientTarget = null;
             activeClientAutoConnect = false;
             activeClientEstablished = false;
+            activeClientProvenSecurityEpoch = 0L;
             incomingDiscoveryStarted = false;
         }
         try {
@@ -5049,6 +5602,11 @@ public final class IphoneAncsTransport {
                                         "new GATT-server CONNECTED callback");
                             }
                             bindServerPeerToCurrentSecurityEpoch(device);
+                            if (managedIncomingMode && freshIncomingLink
+                                    && activeClientEstablished && gattClientConnected) {
+                                scheduleIncomingEpochClientLivenessProbe(device,
+                                        "retained client after fresh GATT-server CONNECTED");
+                            }
                         }
                         log("GATT SERVER LINK: session=" + sessionGeneration
                                 + " securityEpoch=" + incomingSecurityEpoch
@@ -5076,8 +5634,15 @@ public final class IphoneAncsTransport {
                                 log("Diagnostic link ждёт явный PAIR/B3 challenge");
                             }
                         } else if (newState == BluetoothProfile.STATE_DISCONNECTED
+                                && managedIncomingMode
+                                && establishedClientOwnsPhysicalLink(device)) {
+                            // Client attach can complete before Helper writes PAIR. Liveness of
+                            // that exact candidate is a transport question and must be checked
+                            // independently from the still-closed authorization gates.
+                            handleServerFacadeDisconnected(device);
+                        } else if (newState == BluetoothProfile.STATE_DISCONNECTED
                                 && isVerifiedPeer(device)) {
-                            handleVerifiedServerLinkDisconnected(device);
+                            handleServerFacadeDisconnected(device);
                         } else if (newState == BluetoothProfile.STATE_DISCONNECTED
                                 && managedIncomingMode && getVerifiedPeer() == null) {
                             // Keep the stable advertiser alive. The iPhone owns reconnect and will
@@ -5466,7 +6031,20 @@ public final class IphoneAncsTransport {
                     gattClientConnected = true;
                     activeClientEstablished = true;
                     if (managedIncomingMode) {
-                        confirmPendingServerFacadeHandoff(callbackGatt.getDevice());
+                        boolean callbackConfirmedHandoff =
+                                confirmPendingServerFacadeHandoff(callbackGatt.getDevice());
+                        activeClientProvenSecurityEpoch = incomingSecurityEpoch;
+                        if (linkProbeGatt == callbackGatt) {
+                            // Bluetooth has already accepted a fresh client CONNECTED callback for
+                            // this epoch. Ignore any older RSSI result, but retain its physical
+                            // callback slot so a later facade probe cannot overlap the raw read.
+                            prepareInFlightLinkProbeForFreshEpoch();
+                            log("Fresh client CONNECTED callback подтвердил current epoch; "
+                                    + "старый RSSI result будет отброшен");
+                        } else if (callbackConfirmedHandoff) {
+                            log("Fresh client CONNECTED callback подтвердил handoff "
+                                    + "без RSSI probe");
+                        }
                         state(incomingAncsReadyGateOpen
                                 ? "SAME-PEER DIRECT CLIENT ATTACHED · READY GATE OPEN"
                                 : "SAME-PEER DIRECT CLIENT ATTACHED · ЖДУ ANCS-READY");
@@ -5684,9 +6262,97 @@ public final class IphoneAncsTransport {
         @Override
         public void onReadRemoteRssi(BluetoothGatt callbackGatt, int rssi, int status) {
             main.post(() -> {
-                if (callbackGatt != gatt || callbackGatt != linkProbeGatt
-                        || !sessionState.isCurrent(linkProbeGeneration)) return;
+                if (callbackGatt != linkProbeGatt) return;
                 long generation = linkProbeGeneration;
+                boolean serverFacadeProbe = linkProbeForServerFacadeHandoff;
+                boolean incomingEpochProbe = linkProbeForIncomingSecurityEpoch;
+                boolean discardResult = linkProbeDiscardResult;
+                BluetoothDevice serverDevice = linkProbeServerDevice;
+                long securityEpoch = linkProbeSecurityEpoch;
+                String probeReason = linkProbeReason;
+                if (discardResult) {
+                    // This callback belongs to the one raw operation submitted before a newer
+                    // security event. Its status/RSSI can only drain the slot; it cannot prove the
+                    // new epoch or a server-facade handoff.
+                    finishDiscardedRawProbeAndStartQueuedEpoch(
+                            "old callback status=" + status);
+                    return;
+                }
+                if (drainQueuedServerFacadeProbeAfterGeneric(callbackGatt, generation,
+                        "prior callback status=" + status)) return;
+                if (callbackGatt != gatt || !sessionState.isCurrent(generation)) {
+                    if (serverFacadeProbe && serverDevice != null) {
+                        cancelServerFacadeHandoffProbeIfOwned(callbackGatt, generation,
+                                securityEpoch, serverDevice);
+                    } else if (incomingEpochProbe && serverDevice != null) {
+                        cancelIncomingEpochProbeIfOwned(callbackGatt, generation,
+                                securityEpoch, serverDevice);
+                    } else if (ownsGenericLinkProbe(callbackGatt, generation)) {
+                        cancelAmbiguousAclProbe();
+                    }
+                    return;
+                }
+                if (serverFacadeProbe) {
+                    if (serverDevice == null) {
+                        cancelAmbiguousAclProbe();
+                        return;
+                    }
+                    if (incomingSecurityEpoch != securityEpoch) {
+                        cancelServerFacadeHandoffProbeIfOwned(callbackGatt, generation,
+                                securityEpoch, serverDevice);
+                        return;
+                    }
+                    cancelServerFacadeHandoffProbeIfOwned(callbackGatt, generation,
+                            securityEpoch, serverDevice);
+                    if (status == GATT_SUCCESS && gattClientConnected
+                            && activeClientEstablished
+                            && confirmPendingServerFacadeHandoff(serverDevice)) {
+                        activeClientProvenSecurityEpoch = securityEpoch;
+                        if (gattReady) {
+                            sessionState.move(generation,
+                                    AncsSessionStateMachine.Phase.READY);
+                        }
+                        state("SAME PHYSICAL LINK · RSSI HANDOFF CONFIRMED");
+                        log("Server-facade handoff liveness OK, RSSI=" + rssi
+                                + "; retained GATT owner не разрывается");
+                        maybeStartIncomingAncsDiscovery(callbackGatt,
+                                "post-DISCONNECTED facade liveness");
+                    } else {
+                        log("Server-facade handoff liveness failed status=" + status);
+                        failServerFacadeHandoffProbe(callbackGatt, generation,
+                                securityEpoch, serverDevice,
+                                probeReason + "; RSSI status=" + status);
+                    }
+                    return;
+                }
+                if (incomingEpochProbe) {
+                    if (serverDevice == null) {
+                        cancelAmbiguousAclProbe();
+                        return;
+                    }
+                    if (incomingSecurityEpoch != securityEpoch) {
+                        cancelIncomingEpochProbeIfOwned(callbackGatt, generation,
+                                securityEpoch, serverDevice);
+                        return;
+                    }
+                    cancelIncomingEpochProbeIfOwned(callbackGatt, generation,
+                            securityEpoch, serverDevice);
+                    if (status == GATT_SUCCESS && gattClientConnected
+                            && activeClientEstablished) {
+                        activeClientProvenSecurityEpoch = securityEpoch;
+                        log("New-epoch retained-client liveness OK, RSSI=" + rssi
+                                + " · securityEpoch=" + securityEpoch);
+                        maybeStartIncomingAncsDiscovery(callbackGatt,
+                                "new security epoch liveness");
+                    } else {
+                        log("New-epoch retained-client liveness failed status=" + status);
+                        failServerFacadeHandoffProbe(callbackGatt, generation,
+                                securityEpoch, serverDevice,
+                                probeReason + "; new-epoch RSSI status=" + status);
+                    }
+                    return;
+                }
+                if (!ownsGenericLinkProbe(callbackGatt, generation)) return;
                 cancelAmbiguousAclProbe();
                 if (status == GATT_SUCCESS && gattClientConnected && gattReady) {
                     sessionState.move(generation, AncsSessionStateMachine.Phase.READY);
