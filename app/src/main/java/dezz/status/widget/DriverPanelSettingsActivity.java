@@ -52,6 +52,7 @@ import dezz.status.widget.launcher.InformationShortcutView;
 import dezz.status.widget.launcher.InstalledAppCatalog;
 import dezz.status.widget.launcher.LauncherIconResolver;
 import dezz.status.widget.launcher.LauncherShortcutStore;
+import dezz.status.widget.launcher.LiveClimateIconPolicy;
 import dezz.status.widget.launcher.ShortcutActionPicker;
 import dezz.status.widget.launcher.information.StatusBarInformationCatalog;
 import dezz.status.widget.settings.AppleColorPickerDialog;
@@ -576,8 +577,11 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                             && action == LauncherShortcutStore.Builtin.STOCK_CLIMATE) {
                         shortcut.iconSizePx = 76;
                     }
-                    shortcut.liveClimateIcon =
-                            action == LauncherShortcutStore.Builtin.STOCK_CLIMATE;
+                    shortcut.liveClimateIcon = LiveClimateIconPolicy.afterPrimaryActionChange(
+                            existing != null,
+                            shortcut.liveClimateIcon,
+                            shortcut.kind,
+                            shortcut.target);
                     store.upsert(shortcut);
                     refreshButtons();
                     applyPanel();
@@ -611,7 +615,6 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                     shortcut.title = app.label;
                     shortcut.icon = "app";
                     shortcut.iconCustomized = false;
-                    shortcut.liveClimateIcon = false;
                     shortcut.showTitle = false;
                     shortcut.backgroundColor = "#00000000";
                     store.upsert(shortcut);
@@ -1223,9 +1226,9 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 "Живая иконка климата", R.drawable.ic_car_climate);
         VectorIconPickerDialog.Option none = VectorIconPickerDialog.option("none",
                 "Без иконки", R.drawable.ic_delete);
-        boolean stockClimate = isStockClimate(shortcut);
+        boolean interactive = LauncherShortcutStore.isInteractive(shortcut);
         List<VectorIconPickerDialog.Option> options;
-        if (stockClimate) {
+        if (interactive) {
             options = "none".equalsIgnoreCase(shortcut.icon)
                     ? VectorIconPickerDialog.withFirst(live, none)
                     : VectorIconPickerDialog.withFirst(live);
@@ -1234,7 +1237,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                     ? VectorIconPickerDialog.withFirst(none)
                     : VectorIconPickerDialog.catalog();
         }
-        String selected = stockClimate && shortcut.liveClimateIcon ? live.key : shortcut.icon;
+        String selected = interactive && shortcut.liveClimateIcon ? live.key : shortcut.icon;
         VectorIconPickerDialog.show(this, "Иконка · " + shortcut.title, options, selected,
                 option -> {
                     if (live.key.equals(option.key)) {
@@ -1576,14 +1579,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
     private static boolean isLiveClimate(
             @NonNull LauncherShortcutStore.Shortcut shortcut) {
         return shortcut.liveClimateIcon
-                && isStockClimate(shortcut)
                 && LauncherShortcutStore.isInteractive(shortcut);
-    }
-
-    private static boolean isStockClimate(
-            @NonNull LauncherShortcutStore.Shortcut shortcut) {
-        return shortcut.kind == LauncherShortcutStore.Kind.BUILTIN
-                && LauncherShortcutStore.Builtin.STOCK_CLIMATE.key.equals(shortcut.target);
     }
 
     @NonNull

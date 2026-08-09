@@ -1,4 +1,4 @@
-name: Verify HA1203 climate, vector icons and passive backdrops
+name: Verify HA1204 live climate and modern automotive icons
 
 on:
   push:
@@ -10,8 +10,9 @@ on:
       - 'gradle/**'
       - 'gradlew'
       - 'settings.gradle'
-      - 'release-manifests/HA1203.md'
-      - '.github/workflows/verify-ha1203.yml'
+      - 'third_party/**'
+      - 'release-manifests/HA1204.md'
+      - '.github/workflows/verify-ha1204.yml'
   pull_request:
     paths:
       - 'app/**'
@@ -19,8 +20,9 @@ on:
       - 'gradle/**'
       - 'gradlew'
       - 'settings.gradle'
-      - 'release-manifests/HA1203.md'
-      - '.github/workflows/verify-ha1203.yml'
+      - 'third_party/**'
+      - 'release-manifests/HA1204.md'
+      - '.github/workflows/verify-ha1204.yml'
   workflow_dispatch:
 
 permissions:
@@ -28,7 +30,7 @@ permissions:
 
 jobs:
   test:
-    name: Climate zero, vector gallery, passive backdrops and geelyRelease
+    name: Preserved HA1203, live climate, modern icons and geelyRelease
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -41,13 +43,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git bundle create "$RUNNER_TEMP/status-ha1203-source.bundle" HEAD
+          git bundle create "$RUNNER_TEMP/status-ha1204-source.bundle" HEAD
 
       - name: Upload exact source snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: ha1203-source-bundle
-          path: ${{ runner.temp }}/status-ha1203-source.bundle
+          name: ha1204-source-bundle
+          path: ${{ runner.temp }}/status-ha1204-source.bundle
           if-no-files-found: error
           retention-days: 1
 
@@ -71,13 +73,15 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Preserved transport plus HA1203 behavior contracts
+      - name: Preserved transport plus HA1203 and HA1204 behavior contracts
         shell: bash
         run: |
           set -euo pipefail
           chmod +x gradlew
           ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
             testGeelyDebugUnitTest \
+            --tests dezz.status.widget.Ha1152RegressionContractTest \
+            --tests dezz.status.widget.Ha1154HelperAndDriverFavoritesContractTest \
             --tests dezz.status.widget.Ha1197TrunkAndReconnectContractTest \
             --tests dezz.status.widget.Ha1198AutomaticBleRecoveryContractTest \
             --tests dezz.status.widget.Ha1199ReferenceAncsConnectionContractTest \
@@ -85,6 +89,8 @@ jobs:
             --tests dezz.status.widget.Ha1201DirectAttachContractTest \
             --tests dezz.status.widget.Ha1202ColdStartAuthorizationContractTest \
             --tests dezz.status.widget.Ha1203VectorIconPickerContractTest \
+            --tests dezz.status.widget.Ha1204LiveClimateAndModernIconContractTest \
+            --tests dezz.status.widget.launcher.LiveClimateIconPolicyTest \
             --tests dezz.status.widget.car.CarThreeLevelCyclePolicyTest \
             --tests dezz.status.widget.car.GeelyClimateControlReliabilityTest \
             --tests dezz.status.widget.launcher.climate.ClimateLevelCyclePlannerTest \
@@ -96,8 +102,8 @@ jobs:
         shell: bash
         env:
           ALLOW_UNSIGNED_RELEASE: 'true'
-          VERSION_NAME: 'v2.8.2-ha1203'
-          VERSION_CODE: '208021203'
+          VERSION_NAME: 'v2.8.2-ha1204'
+          VERSION_CODE: '208021204'
         run: |
           set -euo pipefail
           ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
@@ -106,7 +112,7 @@ jobs:
       - name: Upload exact unsigned release candidate
         uses: actions/upload-artifact@v4
         with:
-          name: ha1203-unsigned-release
+          name: ha1204-unsigned-release
           path: app/build/outputs/apk/geely/release/*.apk
           if-no-files-found: error
           retention-days: 7
@@ -127,7 +133,7 @@ jobs:
       - name: Upload official Android signing tools
         uses: actions/upload-artifact@v4
         with:
-          name: ha1203-android-build-tools
+          name: ha1204-android-build-tools
           path: ${{ runner.temp }}/android-build-tools-36
           if-no-files-found: error
           retention-days: 1

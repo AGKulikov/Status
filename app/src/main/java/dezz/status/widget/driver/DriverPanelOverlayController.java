@@ -1255,7 +1255,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         }
         @Nullable TextView stateLabel = null;
         if ((shortcut.kind == LauncherShortcutStore.Kind.RULE
-                || shortcut.kind == LauncherShortcutStore.Kind.CAR && !liveClimate)
+                || shortcut.kind == LauncherShortcutStore.Kind.CAR)
+                && !liveClimate
                 && shortcut.showState) {
             stateLabel = new TextView(context);
             stateLabel.setText("…");
@@ -1383,8 +1384,6 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private static boolean isLiveClimate(
             @NonNull LauncherShortcutStore.Shortcut shortcut) {
         return shortcut.liveClimateIcon
-                && shortcut.kind == LauncherShortcutStore.Kind.BUILTIN
-                && LauncherShortcutStore.Builtin.STOCK_CLIMATE.key.equals(shortcut.target)
                 && LauncherShortcutStore.isInteractive(shortcut);
     }
 

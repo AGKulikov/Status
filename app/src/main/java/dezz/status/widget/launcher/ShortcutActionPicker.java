@@ -244,8 +244,14 @@ public final class ShortcutActionPicker {
                         value.iconCustomized = false;
                         value.iconColor = "#FFE0E5F3";
                         value.stateBinding = null;
-                        if (action == LauncherShortcutStore.Builtin.STOCK_CLIMATE) {
-                            value.liveClimateIcon = true;
+                        boolean stockClimate =
+                                action == LauncherShortcutStore.Builtin.STOCK_CLIMATE;
+                        value.liveClimateIcon = LiveClimateIconPolicy.afterPrimaryActionChange(
+                                existing != null,
+                                value.liveClimateIcon,
+                                value.kind,
+                                value.target);
+                        if (existing == null && stockClimate) {
                             value.iconSizePx = Math.max(value.iconSizePx, 76);
                         }
                         save(value);
@@ -740,10 +746,6 @@ public final class ShortcutActionPicker {
     }
 
     private void save(@NonNull LauncherShortcutStore.Shortcut value) {
-        if (value.kind != LauncherShortcutStore.Kind.BUILTIN
-                || !LauncherShortcutStore.Builtin.STOCK_CLIMATE.key.equals(value.target)) {
-            value.liveClimateIcon = false;
-        }
         if (!store.upsert(value)) {
             toast("На панели водителя уже 10 кнопок. "
                     + "Информационные плитки и разделители можно добавлять без ограничения.");

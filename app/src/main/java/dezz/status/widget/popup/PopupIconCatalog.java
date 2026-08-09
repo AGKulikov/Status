@@ -5,6 +5,7 @@ import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -13,6 +14,10 @@ import dezz.status.widget.launcher.LauncherIconResolver;
 
 /** Offline-only icon allow-list. MQTT never supplies arbitrary paths, files or URLs. */
 public final class PopupIconCatalog {
+    private static final List<String> PERSISTED_ONLY_IDS = Collections.unmodifiableList(
+            Arrays.asList("hood_open", "car_window", "sunroof", "mirror_fold",
+                    "parking_sensor", "child_lock"));
+
     private PopupIconCatalog() {}
 
     public static final List<String> IDS = buildIds();
@@ -25,7 +30,8 @@ public final class PopupIconCatalog {
         String id = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
         // The allow-list is still compiled into the APK: this never resolves a file, URI, URL,
         // resource name or server-provided path. Unknown persisted values remain rejected.
-        return IDS.contains(id) ? LauncherIconResolver.resource(id) : 0;
+        return IDS.contains(id) || PERSISTED_ONLY_IDS.contains(id)
+                ? LauncherIconResolver.resource(id) : 0;
     }
 
     public static boolean isAllowed(@NonNull String id) { return resolve(id) != 0; }
