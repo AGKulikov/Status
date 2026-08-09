@@ -1,0 +1,134 @@
+{
+  "runId": "31304070157",
+  "runAttempt": "1",
+  "sourceSha": "942dcd84d4619bad5e63c86eb3e45ed6106463c7",
+  "result": "failure",
+  "jobs": [
+    {
+      "id": 93221462551,
+      "name": "Build and Release",
+      "status": "completed",
+      "conclusion": "failure",
+      "html_url": "https://github.com/AGKulikov/Status/actions/runs/31304070157/job/93221462551",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Checkout code",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Determine version",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Set up JDK 21",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Set up Android SDK",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Decode stable update keystore",
+          "status": "completed",
+          "conclusion": "failure"
+        },
+        {
+          "number": 7,
+          "name": "Make gradlew executable",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 8,
+          "name": "Test and build release APK",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 9,
+          "name": "Package matched HA1197 and Helper v34 release",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 10,
+          "name": "Upload verified matched release pair",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 11,
+          "name": "Create GitHub Release",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 21,
+          "name": "Post Set up JDK 21",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 22,
+          "name": "Post Checkout code",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 23,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 93221539604,
+      "name": "Record release result",
+      "status": "in_progress",
+      "conclusion": null,
+      "html_url": "https://github.com/AGKulikov/Status/actions/runs/31304070157/job/93221539604",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Checkout release branch",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Record production result",
+          "status": "pending",
+          "conclusion": null
+        },
+        {
+          "number": 6,
+          "name": "Post Checkout release branch",
+          "status": "pending",
+          "conclusion": null
+        }
+      ]
+    }
+  ]
+}
