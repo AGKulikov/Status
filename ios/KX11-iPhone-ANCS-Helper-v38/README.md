@@ -28,6 +28,22 @@ Helper and the iPhone-Central/ANCS route in Status Widget.
   read-only observer checks only the same `CBPeripheral.state`. It reuses the terminal reopen path
   after the state becomes `.disconnected`; every other state keeps waiting without another cancel
   or connect and without an elapsed-time deadline.
+- Bluetooth power loss cancels the pending observer. After the manager returns to `poweredOn`, the
+  retained `centralRestorationReconnectPending` route re-arms only that read-only observer; it does
+  not send another cancel or connect.
+- Every delayed restoration, manual or hard-reset reconnect is first stored synchronously as one
+  RAM intent containing the exact `CBPeripheral`, reason and earliest execution time. Therefore a
+  Bluetooth power transition cannot erase the owner in the gap before a delayed closure runs.
+- `issueCentralConnect` itself requires `CBCentralManager.state == .poweredOn`. If unavailable, it
+  retains that exact-owner intent and sends no Core Bluetooth command. Once F05 is published after
+  `poweredOn`, the normal Central route atomically removes and consumes the intent exactly once.
+  Stop and role change cancel the intent and its wake item.
+- If power returns after a manual/hard-reset cancel has already changed the exact owner to
+  `.disconnected` but before its terminal callback, the poweredOn/F05 route atomically clears the
+  source flag, materializes one exact-owner intent and consumes it before ordinary routing. While
+  the owner is still connected/connecting/disconnecting, a read-only state observer waits; it does
+  not issue another cancel or connect. A late `didConnect` also waits and cannot accept stale
+  manual/hard-reset state.
 - A `retrieveConnectedPeripherals` result proves only a system-wide physical link; it never starts
   PAIR/B3 or marks readiness. Protocol discovery begins only after this app receives `didConnect`,
   or when `willRestoreState` originally returns an already `.connected` app-local owner.
@@ -60,3 +76,5 @@ Loss of a readiness proof changes the UI state but does not tear down the physic
 Open `KX11ANCSHelper.xcodeproj`, select a physical iPhone, keep the existing bundle identifier
 `ru.natro.kx11ancshelper`, and install over the previous Helper. Do not force-quit Helper from the
 iOS app switcher: Apple does not relaunch a force-quit app for Bluetooth restoration.
+
+Run `sh ./verify-v38-contract.sh` before packaging to check the restoration/power-resume invariants.
