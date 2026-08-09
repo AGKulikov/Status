@@ -61,10 +61,22 @@ public final class Ha1201DirectAttachContractTest {
         String discovery = between(transport,
                 "private void discoverServices",
                 "private boolean startIphonePeripheralSecurity");
+        assertTrue(discovery.contains("incomingAncsReadyGateOpen"));
         assertTrue(discovery.contains(
-                "managedIncomingMode && !incomingAncsReadyGateOpen"));
+                "incomingAncsReadyPublicationToken == publicationToken"));
         assertTrue(discovery.contains(
-                "activeClientProvenSecurityEpoch != incomingSecurityEpoch"));
+                "activeClientProvenSecurityEpoch == incomingSecurityEpoch"));
+        int publicationProof = discovery.indexOf("boolean currentPublicationProof");
+        int clientProof = discovery.indexOf("boolean currentClientProof");
+        int blocked = discovery.indexOf(
+                "if (!currentPublicationProof || !currentClientProof)");
+        int arm = discovery.indexOf("armDiscoveryOperation(");
+        int raw = discovery.indexOf("callbackGatt.discoverServices()");
+        assertTrue(publicationProof >= 0);
+        assertTrue(clientProof > publicationProof);
+        assertTrue(blocked > clientProof);
+        assertTrue(arm > blocked);
+        assertTrue(raw > arm);
         assertTrue(discovery.contains("return;"));
     }
 
@@ -109,7 +121,7 @@ public final class Ha1201DirectAttachContractTest {
 
         String fresh = between(transport,
                 "private void beginFreshIncomingSecurityEpoch",
-                "private void resetIncomingSecurityAfterClientLoss");
+                "private boolean resetIncomingSecurityAfterClientLoss");
         assertTrue(fresh.contains("incomingSecurityEpoch++;"));
         assertTrue(fresh.contains("secureAttConfirmed = false;"));
         assertTrue(fresh.contains("incomingAncsReadyGateOpen = false;"));
@@ -118,12 +130,8 @@ public final class Ha1201DirectAttachContractTest {
         String callback = between(transport,
                 "private final BluetoothGattCallback gattCallback",
                 "public void onServicesDiscovered");
-        int establishedLoss = callback.indexOf(
-                "resetIncomingSecurityAfterClientLoss(callbackGatt.getDevice(),");
-        int backgroundRearm = callback.indexOf(
-                "awaitIncomingBackgroundOwner(callbackGatt,", establishedLoss);
-        assertTrue(establishedLoss >= 0);
-        assertTrue(backgroundRearm > establishedLoss);
+        assertTrue(occurrences(callback,
+                "recoverEstablishedIncomingClientAfterCallbackLoss(callbackGatt,") == 2);
         assertTrue(callback.contains("confirmPendingServerFacadeHandoff("));
     }
 
@@ -149,9 +157,9 @@ public final class Ha1201DirectAttachContractTest {
 
         String failure = between(transport,
                 "private void failServerFacadeHandoffProbe",
-                "/**\n     * Keeps the one successfully established Android GATT client alive");
-        assertTrue(failure.contains("resetIncomingSecurityAfterClientLoss("));
-        assertTrue(failure.contains("awaitIncomingBackgroundOwner("));
+                "private void scheduleIncomingEpochClientLivenessProbe");
+        assertTrue(failure.contains(
+                "recoverEstablishedIncomingClientAfterCallbackLoss(expected,"));
 
         String callback = between(transport,
                 "public void onReadRemoteRssi",
@@ -188,7 +196,7 @@ public final class Ha1201DirectAttachContractTest {
         String transport = transport();
         String fresh = between(transport,
                 "private void beginFreshIncomingSecurityEpoch",
-                "private void resetIncomingSecurityAfterClientLoss");
+                "private boolean resetIncomingSecurityAfterClientLoss");
         assertTrue(fresh.indexOf("prepareInFlightLinkProbeForFreshEpoch();")
                 < fresh.indexOf("incomingSecurityEpoch++;"));
         assertTrue(fresh.indexOf("activeClientProvenSecurityEpoch = 0L;")
@@ -196,8 +204,8 @@ public final class Ha1201DirectAttachContractTest {
         assertTrue(fresh.contains("poisonedWrapperReplacementAttempt = 0;"));
 
         String loss = between(transport,
-                "private void resetIncomingSecurityAfterClientLoss",
-                "private boolean confirmPendingServerFacadeHandoff");
+                "private boolean resetIncomingSecurityAfterClientLoss",
+                "private void recoverEstablishedIncomingClientAfterCallbackLoss");
         assertTrue(loss.indexOf("cancelAmbiguousAclProbe();")
                 < loss.indexOf("incomingSecurityEpoch++;"));
 
@@ -268,7 +276,7 @@ public final class Ha1201DirectAttachContractTest {
         String transport = transport();
         String fresh = between(transport,
                 "private void beginFreshIncomingSecurityEpoch",
-                "private void resetIncomingSecurityAfterClientLoss");
+                "private boolean resetIncomingSecurityAfterClientLoss");
         assertTrue(fresh.indexOf("prepareInFlightLinkProbeForFreshEpoch();")
                 < fresh.indexOf("incomingSecurityEpoch++;"));
         assertTrue(fresh.contains("activeClientProvenSecurityEpoch = 0L;"));
