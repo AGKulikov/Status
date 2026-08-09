@@ -370,7 +370,12 @@ public final class IphoneAncsTransport {
         final long sessionGeneration;
         BluetoothDevice device;
         long connectedAtElapsedMs;
+        long securityEpoch;
         boolean connected;
+        /** Server facade disappeared only after an already-connected clientIf took ownership. */
+        boolean roleFacadeHandoff;
+        /** Server facade disappeared while the exact direct client callback is still pending. */
+        boolean roleFacadeHandoffPending;
         boolean linkSecurityChallengeIssued;
         boolean telemetrySubscribed;
 
@@ -412,6 +417,8 @@ public final class IphoneAncsTransport {
     private final LinkedHashMap<String, GattServerPeer> gattServerPeers =
             new LinkedHashMap<>();
     private long sessionGeneration;
+    /** Every physical incoming link gets a new PAIR/B3/ANCS-READY authorization epoch. */
+    private long incomingSecurityEpoch;
     private boolean clientConnectInFlight;
     private boolean activeClientAutoConnect;
     private boolean backgroundAttachAttempted;
@@ -1571,6 +1578,7 @@ public final class IphoneAncsTransport {
         cancelColdBackgroundAttach();
         cancelClientAttemptCallbacks();
         sessionGeneration++;
+        incomingSecurityEpoch++;
         synchronized (gattServerPeers) {
             gattServerPeers.clear();
         }
@@ -1742,8 +1750,8 @@ public final class IphoneAncsTransport {
     }
 
     private void handlePairCommand(BluetoothDevice device) {
-        if (!isVerifiedPeer(device)) {
-            log("PAIR callback проигнорирован: peer не совпадает с verified peer");
+        if (!isVerifiedPeer(device) || findCurrentServerPeer(device) == null) {
+            log("PAIR callback проигнорирован: peer/epoch не совпадает с current link");
             return;
         }
         if (managedIncomingMode && isSelectedBondedIncomingDevice(device)) {
@@ -1768,6 +1776,7 @@ public final class IphoneAncsTransport {
     /** Commits the current-link proof before ATT success is returned to Core Bluetooth. */
     @Nullable
     private Boolean markSecureAttConfirmed(BluetoothDevice device) {
+        if (findCurrentServerPeer(device) == null) return null;
         synchronized (verifiedPeerLock) {
             if (!sameDevice(verifiedPeer, device)) return null;
             boolean first = !secureAttConfirmed;
@@ -1802,7 +1811,7 @@ public final class IphoneAncsTransport {
             log("Повторный SECURE ATT OK не создаёт новую connectGatt-попытку");
             return;
         }
-        if (findConnectedServerPeer(device) == null) {
+        if (findCurrentServerPeer(device) == null) {
             state("VERIFIED SERVER LINK LOST");
             log("Same-peer attach отменён: verified GATT-server link уже не активен");
             if (managedIncomingMode) {
@@ -1826,7 +1835,7 @@ public final class IphoneAncsTransport {
 
     private boolean canAcceptAncsReady(BluetoothDevice device) {
         return managedIncomingMode && secureAttConfirmed && isVerifiedPeer(device)
-                && findConnectedServerPeer(device) != null;
+                && findCurrentServerPeer(device) != null;
     }
 
     /** Helper confirms that this one encrypted Central owner was opened with RequiresANCS. */
@@ -1835,7 +1844,7 @@ public final class IphoneAncsTransport {
             log("ANCS-READY отклонён: нет защищённого exact incoming link");
             return;
         }
-        GattServerPeer serverLink = findConnectedServerPeer(callbackDevice);
+        GattServerPeer serverLink = findCurrentServerPeer(callbackDevice);
         BluetoothDevice exactIncomingDevice = serverLink.device;
         synchronized (verifiedPeerLock) {
             verifiedPeer = exactIncomingDevice;
@@ -2052,16 +2061,25 @@ public final class IphoneAncsTransport {
             log("Direct client attach отложен: exact bonded incoming facade отсутствует");
             return;
         }
-        GattServerPeer serverLink = findConnectedServerPeer(candidate);
+        GattServerPeer serverLink = findCurrentServerPeer(candidate);
         if (serverLink == null) {
             preserveManagedIncomingPublicationAfterLinkLoss(
                     "exact incoming link missing before direct client attach");
             return;
         }
-        if (incomingClientAttachAttempt >= INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS) {
-            state("SAME-PEER DIRECT ATTACH · LINK KEPT · RETRIES EXHAUSTED");
-            log("Direct clientIf не attached после " + incomingClientAttachAttempt
-                    + " попыток; GATT server/reconnect anchor остаётся опубликован");
+        int attemptLimit = incomingAncsReadyGateOpen
+                ? INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS
+                : INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS - 1;
+        if (incomingClientAttachAttempt >= attemptLimit) {
+            if (!incomingAncsReadyGateOpen) {
+                state("SAME-PEER DIRECT ATTACH · FINAL ATTEMPT RESERVED FOR ANCS-READY");
+                log("Pre-ready direct attempts=" + incomingClientAttachAttempt
+                        + "; последняя попытка зарезервирована до valid ANCS-READY");
+            } else {
+                state("SAME-PEER DIRECT ATTACH · LINK KEPT · RETRIES EXHAUSTED");
+                log("Direct clientIf не attached после " + incomingClientAttachAttempt
+                        + " попыток; GATT server/reconnect anchor остаётся опубликован");
+            }
             return;
         }
 
@@ -2112,7 +2130,14 @@ public final class IphoneAncsTransport {
                 closeClientGatt(expected);
                 clearAncsRuntime();
                 incomingDiscoveryStarted = false;
-                scheduleIncomingClientAttachRetry("direct attach callback timeout");
+                if (findConnectedServerPeer(expected.getDevice()) == null) {
+                    resetIncomingSecurityAfterClientLoss(expected.getDevice(),
+                            "never-established timeout after server facade loss");
+                    preserveManagedIncomingPublicationAfterLinkLoss(
+                            "direct attach timeout after server facade loss");
+                } else {
+                    scheduleIncomingClientAttachRetry("direct attach callback timeout");
+                }
             };
             main.postDelayed(connectTimeout, INCOMING_DIRECT_ATTACH_TIMEOUT_MS);
         } catch (RuntimeException failure) {
@@ -2142,15 +2167,24 @@ public final class IphoneAncsTransport {
         if (closing || !managedReconnectEnabled || !managedIncomingMode
                 || nextClientAttempt != null) return;
         BluetoothDevice device = incomingClientCandidate;
-        if (device == null || findConnectedServerPeer(device) == null) {
+        if (device == null || findCurrentServerPeer(device) == null) {
             preserveManagedIncomingPublicationAfterLinkLoss(
                     "client attach failed after physical link loss · " + reason);
             return;
         }
-        if (incomingClientAttachAttempt >= INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS) {
-            state("SAME-PEER DIRECT ATTACH · LINK KEPT · RETRIES EXHAUSTED");
-            log("Direct clientIf не attached после " + incomingClientAttachAttempt
-                    + " попыток; Geely_ANCS server/link остаются активны · " + reason);
+        int attemptLimit = incomingAncsReadyGateOpen
+                ? INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS
+                : INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS - 1;
+        if (incomingClientAttachAttempt >= attemptLimit) {
+            if (!incomingAncsReadyGateOpen) {
+                state("SAME-PEER DIRECT ATTACH · ЖДУ ANCS-READY · FINAL RESERVED");
+                log("Останавливаю pre-ready retries после " + incomingClientAttachAttempt
+                        + " попыток; final direct attach зарезервирован · " + reason);
+            } else {
+                state("SAME-PEER DIRECT ATTACH · LINK KEPT · RETRIES EXHAUSTED");
+                log("Direct clientIf не attached после " + incomingClientAttachAttempt
+                        + " попыток; Geely_ANCS server/link остаются активны · " + reason);
+            }
             return;
         }
         int nextAttempt = incomingClientAttachAttempt + 1;
@@ -2159,7 +2193,7 @@ public final class IphoneAncsTransport {
             nextClientAttempt = null;
             if (closing || !managedIncomingMode) return;
             BluetoothDevice current = incomingClientCandidate;
-            if (current == null || findConnectedServerPeer(current) == null) {
+            if (current == null || findCurrentServerPeer(current) == null) {
                 preserveManagedIncomingPublicationAfterLinkLoss(
                         "incoming link disappeared before client retry");
                 return;
@@ -2180,7 +2214,7 @@ public final class IphoneAncsTransport {
     private void recoverIncomingClientRole(@NonNull String reason) {
         if (closing || !managedIncomingMode) return;
         BluetoothDevice device = getVerifiedPeer();
-        if (device == null || findConnectedServerPeer(device) == null) {
+        if (device == null || findCurrentServerPeer(device) == null) {
             preserveManagedIncomingPublicationAfterLinkLoss(
                     "client recovery observed physical link loss · " + reason);
             return;
@@ -2197,11 +2231,19 @@ public final class IphoneAncsTransport {
             } else if (activeClientEstablished) {
                 awaitIncomingBackgroundOwner(owner, activeClientGeneration, reason);
             } else {
+                BluetoothDevice failedDevice = owner.getDevice();
                 closeClientGatt(owner);
                 clearAncsRuntime();
                 incomingDiscoveryStarted = false;
-                scheduleIncomingClientAttachRetry(
-                        "never-established direct owner recovery · " + reason);
+                if (findConnectedServerPeer(failedDevice) == null) {
+                    resetIncomingSecurityAfterClientLoss(failedDevice,
+                            "never-established recovery after server facade loss");
+                    preserveManagedIncomingPublicationAfterLinkLoss(
+                            "never-established recovery lost physical link");
+                } else {
+                    scheduleIncomingClientAttachRetry(
+                            "never-established direct owner recovery · " + reason);
+                }
             }
             return;
         }
@@ -2219,10 +2261,18 @@ public final class IphoneAncsTransport {
         if (!activeClientEstablished) {
             log("gatt.connect() запрещён для never-established clientIf; "
                     + "закрываю только wrapper и планирую bounded direct retry · " + reason);
+            BluetoothDevice failedDevice = expected.getDevice();
             closeClientGatt(expected);
             clearAncsRuntime();
             incomingDiscoveryStarted = false;
-            scheduleIncomingClientAttachRetry(reason);
+            if (findConnectedServerPeer(failedDevice) == null) {
+                resetIncomingSecurityAfterClientLoss(failedDevice,
+                        "never-established rearm after server facade loss");
+                preserveManagedIncomingPublicationAfterLinkLoss(
+                        "never-established rearm lost physical link");
+            } else {
+                scheduleIncomingClientAttachRetry(reason);
+            }
             return;
         }
         cancelConnectTimeout();
@@ -2258,7 +2308,24 @@ public final class IphoneAncsTransport {
         synchronized (gattServerPeers) {
             for (GattServerPeer peer : gattServerPeers.values()) {
                 if (peer.sessionGeneration == sessionGeneration
+                        && peer.securityEpoch == incomingSecurityEpoch
                         && peer.connected
+                        && sameDevice(peer.device, device)) {
+                    return peer;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Current physical link, even if Android released only its server-role facade. */
+    private GattServerPeer findCurrentServerPeer(BluetoothDevice device) {
+        synchronized (gattServerPeers) {
+            for (GattServerPeer peer : gattServerPeers.values()) {
+                if (peer.sessionGeneration == sessionGeneration
+                        && peer.securityEpoch == incomingSecurityEpoch
+                        && (peer.connected || peer.roleFacadeHandoff
+                        || peer.roleFacadeHandoffPending)
                         && sameDevice(peer.device, device)) {
                     return peer;
                 }
@@ -2287,7 +2354,10 @@ public final class IphoneAncsTransport {
         synchronized (gattServerPeers) {
             for (GattServerPeer peer : gattServerPeers.values()) {
                 if (peer.sessionGeneration != sessionGeneration
-                        || !peer.connected || !sameDevice(peer.device, device)) continue;
+                        || peer.securityEpoch != incomingSecurityEpoch
+                        || (!peer.connected && !peer.roleFacadeHandoff
+                        && !peer.roleFacadeHandoffPending)
+                        || !sameDevice(peer.device, device)) continue;
                 if (peer.linkSecurityChallengeIssued) return false;
                 peer.linkSecurityChallengeIssued = true;
                 return true;
@@ -2298,13 +2368,24 @@ public final class IphoneAncsTransport {
         return true;
     }
 
-    private void recordGattServerPeer(BluetoothDevice device, int status, int newState) {
-        if (device == null) return;
+    private boolean recordGattServerPeer(BluetoothDevice device, int status, int newState) {
+        if (device == null) return false;
         long now = android.os.SystemClock.elapsedRealtime();
         String key = deviceKey(device);
-        boolean preserveLogicalOwner = newState == BluetoothProfile.STATE_DISCONNECTED
-                && exactClientRoleOwnsPhysicalLink(device);
+        boolean freshConnection = false;
+        boolean establishedHandoff = newState == BluetoothProfile.STATE_DISCONNECTED
+                && establishedClientOwnsPhysicalLink(device);
+        boolean pendingHandoff = newState == BluetoothProfile.STATE_DISCONNECTED
+                && !establishedHandoff && pendingExactClientAttach(device);
         synchronized (gattServerPeers) {
+            boolean anotherFacadeOwnsCurrentLink = false;
+            for (GattServerPeer existing : gattServerPeers.values()) {
+                if (existing.sessionGeneration == sessionGeneration
+                        && existing.connected) {
+                    anotherFacadeOwnsCurrentLink = true;
+                    break;
+                }
+            }
             GattServerPeer peer = gattServerPeers.get(key);
             if (peer == null || peer.sessionGeneration != sessionGeneration) {
                 peer = new GattServerPeer(sessionGeneration, device);
@@ -2312,25 +2393,137 @@ public final class IphoneAncsTransport {
             }
             peer.device = device;
             if (status == GATT_SUCCESS && newState == BluetoothProfile.STATE_CONNECTED) {
+                freshConnection = !peer.connected && !anotherFacadeOwnsCurrentLink;
                 if (!peer.connected) {
                     peer.connectedAtElapsedMs = now;
                     peer.linkSecurityChallengeIssued = false;
                 }
                 peer.connected = true;
-            } else if (newState == BluetoothProfile.STATE_DISCONNECTED
-                    && !preserveLogicalOwner) {
+                peer.roleFacadeHandoff = false;
+                peer.roleFacadeHandoffPending = false;
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                // Never claim that the server facade is connected after its own callback says
+                // DISCONNECTED. A separately tracked client-role handoff may still own the ACL.
                 peer.connected = false;
+                peer.roleFacadeHandoff = establishedHandoff;
+                peer.roleFacadeHandoffPending = pendingHandoff;
+                peer.telemetrySubscribed = false;
+                if (!establishedHandoff && !pendingHandoff) {
+                    peer.linkSecurityChallengeIssued = false;
+                }
+            }
+        }
+        if (newState == BluetoothProfile.STATE_DISCONNECTED
+                && !hasServerTelemetrySubscribers()) {
+            cancelServerTelemetryWakePoll();
+        }
+        if (establishedHandoff) {
+            log("GATT-server facade DISCONNECTED; already-CONNECTED clientIf owns the ACL");
+        } else if (pendingHandoff) {
+            log("GATT-server facade DISCONNECTED; exact direct callback pending, "
+                    + "physical-loss decision deferred to client callback");
+        }
+        return freshConnection;
+    }
+
+    private void bindServerPeerToCurrentSecurityEpoch(@NonNull BluetoothDevice device) {
+        synchronized (gattServerPeers) {
+            GattServerPeer peer = gattServerPeers.get(deviceKey(device));
+            if (peer == null || peer.sessionGeneration != sessionGeneration) return;
+            if (peer.securityEpoch != incomingSecurityEpoch) {
+                peer.securityEpoch = incomingSecurityEpoch;
+                peer.linkSecurityChallengeIssued = false;
+            }
+        }
+    }
+
+    /** Starts a clean PAIR/B3/ANCS-READY epoch without discarding an established GATT clientIf. */
+    private void beginFreshIncomingSecurityEpoch(@NonNull BluetoothDevice device,
+                                                 @NonNull String reason) {
+        if (!managedIncomingMode) return;
+        incomingSecurityEpoch++;
+        cancelClientAttemptCallbacks();
+        cancelBondTimeout();
+        synchronized (verifiedPeerLock) {
+            verifiedPeer = null;
+            secureAttConfirmed = false;
+        }
+        incomingAncsReadyGateOpen = false;
+        incomingDiscoveryStarted = false;
+        incomingClientAttachAttempt = 0;
+        incomingClientCandidate = null;
+
+        BluetoothGatt owner = gatt;
+        boolean establishedOwner = owner != null && activeClientEstablished;
+        if (owner != null && !establishedOwner) {
+            cancelConnectTimeout();
+            closeClientGatt(owner);
+        }
+        clearAncsRuntime();
+        synchronized (gattServerPeers) {
+            for (GattServerPeer peer : gattServerPeers.values()) {
+                if (peer.sessionGeneration != sessionGeneration) continue;
+                peer.roleFacadeHandoff = false;
+                peer.roleFacadeHandoffPending = false;
+                peer.telemetrySubscribed = false;
+                peer.linkSecurityChallengeIssued = false;
+            }
+        }
+        if (establishedOwner && !gattClientConnected && clientConnectInFlight
+                && sessionState.is(activeClientGeneration,
+                AncsSessionStateMachine.Phase.BACKGROUND_CONNECT)) {
+            rearmPersistentGattOwner(owner, activeClientGeneration,
+                    "fresh incoming security epoch", false);
+        }
+        log("Fresh incoming security epoch=" + incomingSecurityEpoch
+                + " · peer=" + safeAddress(device)
+                + " · PAIR/B3/ANCS-READY reset · " + reason);
+    }
+
+    /** Invalidates all server proofs only after the established client confirms physical loss. */
+    private void resetIncomingSecurityAfterClientLoss(@NonNull BluetoothDevice device,
+                                                       @NonNull String reason) {
+        if (!managedIncomingMode) return;
+        incomingSecurityEpoch++;
+        cancelClientAttemptCallbacks();
+        cancelBondTimeout();
+        synchronized (verifiedPeerLock) {
+            verifiedPeer = null;
+            secureAttConfirmed = false;
+        }
+        incomingAncsReadyGateOpen = false;
+        incomingDiscoveryStarted = false;
+        incomingClientAttachAttempt = 0;
+        incomingClientCandidate = null;
+        synchronized (gattServerPeers) {
+            for (GattServerPeer peer : gattServerPeers.values()) {
+                if (peer.sessionGeneration != sessionGeneration) continue;
+                peer.connected = false;
+                peer.roleFacadeHandoff = false;
+                peer.roleFacadeHandoffPending = false;
                 peer.linkSecurityChallengeIssued = false;
                 peer.telemetrySubscribed = false;
             }
         }
-        if (newState == BluetoothProfile.STATE_DISCONNECTED
-                && !preserveLogicalOwner && !hasServerTelemetrySubscribers()) {
-            cancelServerTelemetryWakePoll();
-        }
-        if (preserveLogicalOwner) {
-            log("GATT-server facade disconnected during exact-device client attach; "
-                    + "logical peer and B4 wake CCCD retained");
+        cancelServerTelemetryWakePoll();
+        clearAncsRuntime();
+        log("Confirmed client physical loss: security epoch=" + incomingSecurityEpoch
+                + " · peer=" + safeAddress(device)
+                + " · stale B3/ANCS-READY invalidated · " + reason);
+    }
+
+    private void confirmPendingServerFacadeHandoff(@NonNull BluetoothDevice device) {
+        synchronized (gattServerPeers) {
+            for (GattServerPeer peer : gattServerPeers.values()) {
+                if (peer.sessionGeneration != sessionGeneration
+                        || peer.securityEpoch != incomingSecurityEpoch
+                        || !peer.roleFacadeHandoffPending
+                        || !sameDevice(peer.device, device)) continue;
+                peer.roleFacadeHandoffPending = false;
+                peer.roleFacadeHandoff = true;
+                log("Pending server-facade handoff подтверждён CONNECTED clientIf");
+                return;
+            }
         }
     }
 
@@ -2364,14 +2557,23 @@ public final class IphoneAncsTransport {
      * the exact same LE peer. The controller link is still owned by the client registration, so
      * dropping the peer/CCCD here would silently stop Helper background telemetry wake-ups.
      */
-    private boolean exactClientRoleOwnsPhysicalLink(BluetoothDevice device) {
+    private boolean exactClientTargetsDevice(BluetoothDevice device) {
         return managedIncomingMode
                 && incomingClientCandidate != null
                 && sameDevice(incomingClientCandidate, device)
                 && activeClientTarget != null
                 && sameDevice(activeClientTarget, device)
-                && gatt != null
-                && (clientConnectInFlight || gattClientConnected || activeClientEstablished);
+                && gatt != null;
+    }
+
+    private boolean establishedClientOwnsPhysicalLink(BluetoothDevice device) {
+        return exactClientTargetsDevice(device)
+                && activeClientEstablished && gattClientConnected;
+    }
+
+    private boolean pendingExactClientAttach(BluetoothDevice device) {
+        return exactClientTargetsDevice(device)
+                && !activeClientEstablished && clientConnectInFlight;
     }
 
     private void setServerTelemetrySubscription(BluetoothDevice device, boolean enabled) {
@@ -2460,8 +2662,7 @@ public final class IphoneAncsTransport {
     }
 
     private void handleVerifiedServerLinkDisconnected(BluetoothDevice device) {
-        boolean samePhysicalLinkClientOwner = exactClientRoleOwnsPhysicalLink(device);
-        if (samePhysicalLinkClientOwner) {
+        if (establishedClientOwnsPhysicalLink(device)) {
             state("SAME PHYSICAL LINK · ANCS CLIENT PRESERVED");
             log("GATT-server callback released after exact-device client registration: "
                     + safeAddress(device)
@@ -2472,6 +2673,12 @@ public final class IphoneAncsTransport {
             // Android 9 server API report STATE_DISCONNECTED even though the client callback is
             // already connected (or queued). Closing that client here created the v17 loop.
             // Its own bounded callback/timeout now owns success or recovery.
+            return;
+        }
+        if (pendingExactClientAttach(device)) {
+            state("SERVER FACADE LOST · ЖДУ DIRECT CLIENT CALLBACK");
+            log("Server facade помечен DISCONNECTED; never-established wrapper сохранён "
+                    + "только до bounded callback/timeout, proof epoch пока не переносится");
             return;
         }
         cancelClientAttemptCallbacks();
@@ -4365,7 +4572,7 @@ public final class IphoneAncsTransport {
 
         if (managedIncomingMode) {
             BluetoothDevice verified = getVerifiedPeer();
-            if (verified != null && findConnectedServerPeer(verified) != null) {
+            if (verified != null && findCurrentServerPeer(verified) != null) {
                 recoverIncomingClientRole(reason);
             } else {
                 preserveManagedIncomingPublicationAfterLinkLoss(reason);
@@ -4833,8 +5040,18 @@ public final class IphoneAncsTransport {
                 public void onConnectionStateChange(BluetoothDevice device,
                                                     int status, int newState) {
                     main.post(() -> {
-                        recordGattServerPeer(device, status, newState);
+                        boolean freshIncomingLink = recordGattServerPeer(
+                                device, status, newState);
+                        if (status == GATT_SUCCESS
+                                && newState == BluetoothProfile.STATE_CONNECTED) {
+                            if (managedIncomingMode && freshIncomingLink) {
+                                beginFreshIncomingSecurityEpoch(device,
+                                        "new GATT-server CONNECTED callback");
+                            }
+                            bindServerPeerToCurrentSecurityEpoch(device);
+                        }
                         log("GATT SERVER LINK: session=" + sessionGeneration
+                                + " securityEpoch=" + incomingSecurityEpoch
                                 + " peer=" + safeAddress(device)
                                 + " objectId=" + System.identityHashCode(device)
                                 + " status=" + status + " newState=" + newState
@@ -5049,6 +5266,10 @@ public final class IphoneAncsTransport {
                             status = BluetoothGatt.GATT_FAILURE;
                             main.post(() -> log("CONTROL command отклонена: `" + command
                                     + "`; ожидается ASCII PAIR"));
+                        } else if (findCurrentServerPeer(device) == null) {
+                            status = STATUS_INSUFFICIENT_AUTHORIZATION;
+                            main.post(() -> log("PAIR отклонён: stale server security epoch · "
+                                    + safeAddress(device)));
                         } else if (!claimVerifiedPeer(device)) {
                             status = STATUS_INSUFFICIENT_AUTHORIZATION;
                             main.post(() -> log("PAIR отклонён: verified peer уже зафиксирован, "
@@ -5208,11 +5429,22 @@ public final class IphoneAncsTransport {
                             closeClientGatt(callbackGatt);
                             clearAncsRuntime();
                             incomingDiscoveryStarted = false;
-                            scheduleIncomingClientAttachRetry(
-                                    "initial direct attach status=" + status);
+                            if (findConnectedServerPeer(callbackGatt.getDevice()) == null) {
+                                resetIncomingSecurityAfterClientLoss(
+                                        callbackGatt.getDevice(),
+                                        "never-established status=" + status
+                                                + " after server facade loss");
+                                preserveManagedIncomingPublicationAfterLinkLoss(
+                                        "direct attach failed after server facade loss");
+                            } else {
+                                scheduleIncomingClientAttachRetry(
+                                        "initial direct attach status=" + status);
+                            }
                         } else {
                             // Only a clientIf that has reached CONNECTED is durable. Re-arm that
                             // same object indefinitely after later radio loss/status 133.
+                            resetIncomingSecurityAfterClientLoss(callbackGatt.getDevice(),
+                                    "established same-peer GATT status=" + status);
                             awaitIncomingBackgroundOwner(callbackGatt,
                                     activeClientGeneration,
                                     "established same-peer GATT status=" + status);
@@ -5234,6 +5466,7 @@ public final class IphoneAncsTransport {
                     gattClientConnected = true;
                     activeClientEstablished = true;
                     if (managedIncomingMode) {
+                        confirmPendingServerFacadeHandoff(callbackGatt.getDevice());
                         state(incomingAncsReadyGateOpen
                                 ? "SAME-PEER DIRECT CLIENT ATTACHED · READY GATE OPEN"
                                 : "SAME-PEER DIRECT CLIENT ATTACHED · ЖДУ ANCS-READY");
@@ -5258,6 +5491,8 @@ public final class IphoneAncsTransport {
                     gattClientConnected = false;
                     if (managedIncomingMode) {
                         if (establishedOwner) {
+                            resetIncomingSecurityAfterClientLoss(callbackGatt.getDevice(),
+                                    "established same-peer GATT disconnected");
                             awaitIncomingBackgroundOwner(callbackGatt,
                                     activeClientGeneration,
                                     "established same-peer GATT disconnected");
@@ -5266,8 +5501,16 @@ public final class IphoneAncsTransport {
                             closeClientGatt(callbackGatt);
                             clearAncsRuntime();
                             incomingDiscoveryStarted = false;
-                            scheduleIncomingClientAttachRetry(
-                                    "initial direct attach disconnected");
+                            if (findConnectedServerPeer(callbackGatt.getDevice()) == null) {
+                                resetIncomingSecurityAfterClientLoss(
+                                        callbackGatt.getDevice(),
+                                        "never-established disconnect after server facade loss");
+                                preserveManagedIncomingPublicationAfterLinkLoss(
+                                        "direct attach disconnected after server facade loss");
+                            } else {
+                                scheduleIncomingClientAttachRetry(
+                                        "initial direct attach disconnected");
+                            }
                         }
                         return;
                     }
@@ -5524,7 +5767,7 @@ public final class IphoneAncsTransport {
                         }
                     }
                 } else {
-                    if (managedIncomingMode && findConnectedServerPeer(device) != null
+                    if (managedIncomingMode && findCurrentServerPeer(device) != null
                             && isSelectedBondedIncomingDevice(device)) {
                         adoptIncomingClientCandidate(device,
                                 "BOND_BONDED on current incoming link");
