@@ -11,6 +11,14 @@ on:
       - 'gradlew'
       - 'settings.gradle'
       - '.github/workflows/verify-ha1199.yml'
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'build.gradle'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'settings.gradle'
+      - '.github/workflows/verify-ha1199.yml'
   workflow_dispatch:
 
 permissions:
