@@ -32,6 +32,16 @@ final class ViewController: UIViewController {
         let networkCode: UInt8
     }
 
+    /// A delayed connect is represented as data before any delay begins. Keeping the exact
+    /// CBPeripheral strongly referenced closes the power-off race between a terminal callback and
+    /// its delayed reconnect closure.
+    private struct DeferredCentralConnectIntent {
+        let peripheral: CBPeripheral
+        let reason: String
+        let notBefore: Date
+        let token: UInt64
+    }
+
     // F04 is the permanent link-anchor UUID. Central mode scans the stable FFFF beacon and uses
     // only F04's B2/B3/B4 handshake; Peripheral mode keeps the legacy diagnostic service.
     private let serviceUUID = CBUUID(string: "D2D9E4B0-47F1-4E44-A8BB-A932FD5A2F04")
@@ -167,6 +177,14 @@ final class ViewController: UIViewController {
     private var centralRestorationPostCancelProbeAttempt = 0
     private var centralDeferredStopScan = false
     private var centralDeferredCancellations: [UUID: CBPeripheral] = [:]
+    private var centralDeferredConnectIntent: DeferredCentralConnectIntent?
+    private var centralDeferredConnectWorkItem: DispatchWorkItem?
+    private var centralDeferredConnectToken: UInt64 = 0
+    /// Manual/hard-reset cancel may cross a Bluetooth power transition before its terminal
+    /// callback. Observe only state until the exact owner becomes disconnected, then materialize
+    /// one deferred connect intent through the poweredOn/F05 route.
+    private var centralPendingTerminalStateProbeWorkItem: DispatchWorkItem?
+    private var centralPendingTerminalStateProbeAttempt = 0
     private var centralReconnectFailureCount = 0
     private let centralReconnectDelays: [TimeInterval] = [1, 2, 5, 10, 20, 30]
     private var centralHelperConfirmed = false
@@ -181,6 +199,7 @@ final class ViewController: UIViewController {
     private let centralRestorationEvidenceGrace: TimeInterval = 1.5
     private let centralRestorationProofProbeDelays: [TimeInterval] = [0.5, 1, 2, 5, 10]
     private let centralRestorationPostCancelProbeDelays: [TimeInterval] = [0.25, 0.5, 1, 2, 5]
+    private let centralPendingTerminalStateProbeDelays: [TimeInterval] = [0.25, 0.5, 1, 2, 5]
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -230,6 +249,8 @@ final class ViewController: UIViewController {
         centralRestorationRecoveryWorkItem?.cancel()
         centralRestorationProofProbeWorkItem?.cancel()
         centralRestorationPostCancelProbeWorkItem?.cancel()
+        centralDeferredConnectWorkItem?.cancel()
+        centralPendingTerminalStateProbeWorkItem?.cancel()
         centralSecureRetryWorkItem?.cancel()
         centralCharacteristicDiscoveryWorkItem?.cancel()
         centralServiceRediscoveryWorkItem?.cancel()
@@ -355,7 +376,10 @@ final class ViewController: UIViewController {
         } else {
             append("Ручной reconnect: отменяю только текущий owner и жду didDisconnect")
             cancelCentralReconnect()
+            clearCentralDeferredConnectIntent()
+            clearCentralPendingTerminalStateObservation()
             clearCentralRestorationRecovery()
+            centralHardResetReason = nil
             centralManualReconnectPending = true
             centralHelperConfirmed = false
             centralB4Subscribed = false
@@ -544,11 +568,14 @@ final class ViewController: UIViewController {
             setStatus("CENTRAL · ПУБЛИКУЮ F05", color: .systemOrange)
             return
         }
+        if consumePoweredOnPendingTerminalIntentIfPossible() { return }
+        if consumeCentralDeferredConnectIfPossible() { return }
         if centralHelperConfirmed && geelyPeripheral?.state == .connected {
             updateConnectionStatus()
             return
         }
         if centralRestorationReconnectPending {
+            // CONTRACT_V38_REARM_POST_CANCEL_AFTER_POWER: read-only state observation only.
             armRestoredOwnerPostCancelObservation()
             setStatus("CENTRAL · ЖДУ RESTORE DISCONNECT", color: .systemOrange)
             return
@@ -793,14 +820,8 @@ final class ViewController: UIViewController {
         append("Restored-owner terminal callback received · \(callback); "
             + "reopen same owner with RequiresANCS")
         guard runRequested, role == .central else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self, weak peripheral] in
-            guard let self = self, let peripheral = peripheral,
-                  self.runRequested, self.role == .central,
-                  peripheral.identifier == self.geelyPeripheral?.identifier,
-                  peripheral.state == .disconnected else { return }
-            self.issueCentralConnect(peripheral,
-                reason: "same stable owner after one-shot restoration rescue")
-        }
+        queueCentralConnectIntent(peripheral,
+            reason: "same stable owner after one-shot restoration rescue", delay: 0.25)
     }
 
     /// Manual reconnect uses the same terminal boundary for both possible Core Bluetooth
@@ -819,13 +840,8 @@ final class ViewController: UIViewController {
         append("Manual reconnect terminal callback received · \(callback); "
             + "reopen same owner")
         guard runRequested, role == .central else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self, weak peripheral] in
-            guard let self = self, let peripheral = peripheral,
-                  self.runRequested, self.role == .central,
-                  peripheral.identifier == self.geelyPeripheral?.identifier,
-                  peripheral.state == .disconnected else { return }
-            self.issueCentralConnect(peripheral, reason: "explicit manual reconnect")
-        }
+        queueCentralConnectIntent(peripheral,
+            reason: "explicit manual reconnect", delay: 0.25)
     }
 
     private func startCentralScan() {
@@ -893,6 +909,198 @@ final class ViewController: UIViewController {
         }
     }
 
+    /// Power can return after Core Bluetooth has already moved a cancelled manual/hard-reset
+    /// owner to `.disconnected` but before delivering its terminal callback. Consume that state
+    /// exactly once before the ordinary retained-owner route can reconnect with stale source flags.
+    private func consumePoweredOnPendingTerminalIntentIfPossible() -> Bool {
+        guard centralDeferredConnectIntent == nil,
+              centralManualReconnectPending || centralHardResetReason != nil,
+              let peripheral = geelyPeripheral else { return false }
+        guard centralManager != nil, centralManager.state == .poweredOn else { return true }
+        switch peripheral.state {
+        case .disconnected:
+            let source: String
+            if centralManualReconnectPending {
+                source = "power-resume explicit manual reconnect"
+            } else {
+                source = "power-resume hard reset · \(centralHardResetReason ?? "unknown")"
+            }
+            // CONTRACT_V38_POWER_RESUME_SOURCE_FLAGS_CLEAR_BEFORE_CONNECT
+            centralManualReconnectPending = false
+            centralHardResetReason = nil
+            clearCentralPendingTerminalStateObservation()
+            centralOwnerConfiguredForAncs = false
+            centralSystemAutoReconnectActive = false
+            centralRequireFreshAdvertisement = false
+            clearCentralRuntime(keepPeripheral: true)
+            append("PoweredOn/F05 observed exact owner disconnected; "
+                + "materialize one deferred intent · \(source)")
+            guard queueCentralConnectIntent(peripheral, reason: source) else { return true }
+            _ = consumeCentralDeferredConnectIfPossible()
+            return true
+        case .connected, .connecting, .disconnecting:
+            armCentralPendingTerminalStateObservation()
+            setStatus("CENTRAL · ЖДУ TERMINAL STATE", color: .systemOrange)
+            return true
+        @unknown default:
+            armCentralPendingTerminalStateObservation()
+            return true
+        }
+    }
+
+    /// Read-only state reconciliation for a manual/hard-reset cancellation that crossed power
+    /// state. No second cancel/connect is issued; the poweredOn/F05 route owns materialization.
+    private func armCentralPendingTerminalStateObservation() {
+        guard centralDeferredConnectIntent == nil,
+              centralManualReconnectPending || centralHardResetReason != nil,
+              centralPendingTerminalStateProbeWorkItem == nil,
+              let peripheral = geelyPeripheral else { return }
+        let index = min(centralPendingTerminalStateProbeAttempt,
+                        centralPendingTerminalStateProbeDelays.count - 1)
+        let delay = centralPendingTerminalStateProbeDelays[index]
+        let item = DispatchWorkItem { [weak self, weak peripheral] in
+            guard let self = self, let peripheral = peripheral else { return }
+            self.centralPendingTerminalStateProbeWorkItem = nil
+            guard self.runRequested, self.role == .central,
+                  self.centralDeferredConnectIntent == nil,
+                  self.centralManualReconnectPending || self.centralHardResetReason != nil,
+                  peripheral.identifier == self.geelyPeripheral?.identifier,
+                  self.centralManager.state == .poweredOn else { return }
+            if peripheral.state == .disconnected {
+                // CONTRACT_V38_PENDING_SOURCE_STATE_REENTERS_F05_ROUTE
+                self.startCentralRouteIfPossible()
+                return
+            }
+            self.centralPendingTerminalStateProbeAttempt = min(
+                self.centralPendingTerminalStateProbeAttempt + 1,
+                self.centralPendingTerminalStateProbeDelays.count - 1)
+            self.armCentralPendingTerminalStateObservation()
+        }
+        centralPendingTerminalStateProbeWorkItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
+    }
+
+    private func clearCentralPendingTerminalStateObservation() {
+        centralPendingTerminalStateProbeWorkItem?.cancel()
+        centralPendingTerminalStateProbeWorkItem = nil
+        centralPendingTerminalStateProbeAttempt = 0
+    }
+
+    /// Record delayed connect intent synchronously, before returning from a terminal callback.
+    /// No Core Bluetooth command is sent here. The first exact-owner intent wins until it is
+    /// consumed or explicitly cleared by stop/role change.
+    @discardableResult
+    private func queueCentralConnectIntent(_ peripheral: CBPeripheral,
+                                           reason: String,
+                                           delay: TimeInterval = 0) -> Bool {
+        guard runRequested, role == .central else { return false }
+        if let current = geelyPeripheral,
+           current.identifier != peripheral.identifier {
+            append("Deferred connect ignored for stale owner · \(peripheral.identifier.uuidString)")
+            return false
+        }
+        if let existing = centralDeferredConnectIntent {
+            guard existing.peripheral.identifier == peripheral.identifier else {
+                append("Deferred connect already belongs to another exact owner; new intent ignored")
+                return false
+            }
+            geelyPeripheral = existing.peripheral
+            existing.peripheral.delegate = self
+            armCentralDeferredConnectWake()
+            return true
+        }
+        clearCentralPendingTerminalStateObservation()
+        centralDeferredConnectToken &+= 1
+        let intent = DeferredCentralConnectIntent(
+            peripheral: peripheral,
+            reason: reason,
+            notBefore: Date().addingTimeInterval(max(0, delay)),
+            token: centralDeferredConnectToken
+        )
+        centralDeferredConnectIntent = intent
+        geelyPeripheral = peripheral
+        peripheral.delegate = self
+        centralOwnerConfiguredForAncs = false
+        centralSystemAutoReconnectActive = false
+        armCentralDeferredConnectWake()
+        setStatus("CENTRAL · CONNECT ОТЛОЖЕН", color: .systemOrange)
+        append("Deferred exact-owner connect retained in RAM · "
+            + peripheral.identifier.uuidString + " · \(reason)")
+        return true
+    }
+
+    private func armCentralDeferredConnectWake() {
+        guard centralDeferredConnectWorkItem == nil,
+              let intent = centralDeferredConnectIntent else { return }
+        let delay = max(0, intent.notBefore.timeIntervalSinceNow)
+        let token = intent.token
+        let item = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            self.centralDeferredConnectWorkItem = nil
+            guard self.runRequested, self.role == .central,
+                  self.centralDeferredConnectIntent?.token == token else { return }
+            // CONTRACT_V38_DEFERRED_WAKE_USES_NORMAL_ROUTE: the route owns the only consume.
+            self.startCentralRouteIfPossible()
+        }
+        centralDeferredConnectWorkItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
+    }
+
+    /// Atomically remove one intent before entering the ordinary exact-owner connection path.
+    /// Returning true means route processing is fully owned by the deferred intent, including
+    /// when it is still waiting for its notBefore boundary.
+    private func consumeCentralDeferredConnectIfPossible() -> Bool {
+        guard let intent = centralDeferredConnectIntent else { return false }
+        guard runRequested, role == .central else {
+            clearCentralDeferredConnectIntent()
+            return false
+        }
+        guard centralManager != nil, centralManager.state == .poweredOn else { return true }
+        guard geelyPeripheral == nil
+                || geelyPeripheral?.identifier == intent.peripheral.identifier else {
+            append("Deferred connect dropped: retained owner identity changed")
+            clearCentralDeferredConnectIntent()
+            return false
+        }
+        let remaining = intent.notBefore.timeIntervalSinceNow
+        if remaining > 0 {
+            armCentralDeferredConnectWake()
+            setStatus("CENTRAL · CONNECT ОТЛОЖЕН", color: .systemOrange)
+            return true
+        }
+        if intent.peripheral.state == .disconnecting {
+            centralDeferredConnectWorkItem?.cancel()
+            centralDeferredConnectWorkItem = nil
+            centralDeferredConnectToken &+= 1
+            let replacement = DeferredCentralConnectIntent(
+                peripheral: intent.peripheral,
+                reason: intent.reason,
+                notBefore: Date().addingTimeInterval(0.25),
+                token: centralDeferredConnectToken
+            )
+            centralDeferredConnectIntent = replacement
+            armCentralDeferredConnectWake()
+            setStatus("CENTRAL · ЖДУ DISCONNECT", color: .systemOrange)
+            return true
+        }
+        // CONTRACT_V38_POWERED_ON_SINGLE_CONSUME: clear before the normal connect path.
+        centralDeferredConnectIntent = nil
+        centralDeferredConnectToken &+= 1
+        centralDeferredConnectWorkItem?.cancel()
+        centralDeferredConnectWorkItem = nil
+        geelyPeripheral = intent.peripheral
+        append("Deferred exact-owner connect consumed once after poweredOn · \(intent.reason)")
+        connectCentral(intent.peripheral, reason: "deferred after poweredOn · \(intent.reason)")
+        return true
+    }
+
+    private func clearCentralDeferredConnectIntent() {
+        centralDeferredConnectToken &+= 1
+        centralDeferredConnectWorkItem?.cancel()
+        centralDeferredConnectWorkItem = nil
+        centralDeferredConnectIntent = nil
+    }
+
     private func advertisedCentralNamespace(
         _ advertisementData: [String: Any]
     ) -> UInt16? {
@@ -956,7 +1164,15 @@ final class ViewController: UIViewController {
     }
 
     private func connectCentral(_ peripheral: CBPeripheral, reason: String) {
-        guard runRequested, role == .central, centralManager.state == .poweredOn else { return }
+        guard runRequested, role == .central else { return }
+        guard centralManager != nil else {
+            queueCentralConnectIntent(peripheral, reason: reason)
+            return
+        }
+        guard centralManager.state == .poweredOn else {
+            queueCentralConnectIntent(peripheral, reason: reason)
+            return
+        }
         cancelCentralReconnect()
         stopCentralScanSafely(centralManager, reason: "connect owner")
         if let previous = geelyPeripheral, previous.identifier != peripheral.identifier,
@@ -996,6 +1212,23 @@ final class ViewController: UIViewController {
     }
 
     private func issueCentralConnect(_ peripheral: CBPeripheral, reason: String) {
+        guard runRequested, role == .central else { return }
+        guard centralManager != nil else {
+            queueCentralConnectIntent(peripheral, reason: reason)
+            return
+        }
+        // CONTRACT_V38_ISSUE_CONNECT_POWER_GATE: never call Core Bluetooth while unavailable.
+        guard centralManager.state == .poweredOn else {
+            queueCentralConnectIntent(peripheral, reason: reason)
+            return
+        }
+        if let intent = centralDeferredConnectIntent {
+            guard intent.peripheral.identifier == peripheral.identifier else {
+                append("connect blocked: deferred intent belongs to another exact owner")
+                return
+            }
+            clearCentralDeferredConnectIntent()
+        }
         var options: [String: Any] = [
             CBConnectPeripheralOptionRequiresANCS: true,
             CBConnectPeripheralOptionNotifyOnConnectionKey: false,
@@ -1044,6 +1277,8 @@ final class ViewController: UIViewController {
 
     private func stopCentralRoute(cancelConnection: Bool) {
         cancelCentralReconnect()
+        clearCentralDeferredConnectIntent()
+        clearCentralPendingTerminalStateObservation()
         clearCentralRestorationRecovery()
         centralSecureRetryWorkItem?.cancel()
         centralSecureRetryWorkItem = nil
@@ -1053,6 +1288,7 @@ final class ViewController: UIViewController {
         centralB4Subscribed = false
         centralAncsCccdConfirmed = false
         centralHardResetReason = nil
+        centralManualReconnectPending = false
         centralOwnerConfiguredForAncs = false
         centralSystemAutoReconnectActive = false
         centralNamespaceResolved = false
@@ -1963,13 +2199,22 @@ extension ViewController: CBCentralManagerDelegate {
             centralRestorationProofProbeWorkItem = nil
             centralRestorationPostCancelProbeWorkItem?.cancel()
             centralRestorationPostCancelProbeWorkItem = nil
+            centralPendingTerminalStateProbeWorkItem?.cancel()
+            centralPendingTerminalStateProbeWorkItem = nil
             centralSystemAutoReconnectActive = false
             // willRestoreState may arrive before this state callback. Preserve that exact owner;
             // it is the only one known to have the RequiresANCS contract.
             if !centralRestorationAwaitingPower && !centralRestoredPendingOwner
-                && !centralRestorationReconnectPending {
+                && !centralRestorationReconnectPending
+                && !centralManualReconnectPending
+                && centralHardResetReason == nil
+                && centralDeferredConnectIntent == nil {
                 centralOwnerConfiguredForAncs = false
                 clearCentralRuntime(keepPeripheral: false)
+            } else if centralDeferredConnectIntent != nil {
+                // CONTRACT_V38_POWER_OFF_PRESERVES_DEFERRED_EXACT_OWNER
+                clearCentralRuntime(keepPeripheral: true)
+                append("Bluetooth unavailable; deferred exact-owner connect retained in RAM")
             }
             if runRequested { setStatus("BLUETOOTH НЕДОСТУПЕН", color: .systemRed) }
             return
@@ -1977,6 +2222,7 @@ extension ViewController: CBCentralManagerDelegate {
         flushDeferredCentralCommands(central)
         guard role == .central else {
             centralRestorationAwaitingPower = false
+            clearCentralDeferredConnectIntent()
             clearCentralRestorationRecovery()
             stopCentralScanSafely(central, reason: "role is not Central")
             return
@@ -1985,7 +2231,10 @@ extension ViewController: CBCentralManagerDelegate {
             centralRestorationAwaitingPower = false
             append("Central restoration продолжен после poweredOn")
         }
-        if runRequested { startCentralRouteIfPossible() }
+        if runRequested {
+            // CONTRACT_V38_POWERED_ON_ENTERS_SINGLE_CONSUME_ROUTE
+            startCentralRouteIfPossible()
+        }
     }
 
     func centralManager(_ central: CBCentralManager,
@@ -2074,16 +2323,16 @@ extension ViewController: CBCentralManagerDelegate {
             setStatus("CENTRAL · ЖДУ RESTORE DISCONNECT", color: .systemOrange)
             return
         }
+        if centralManualReconnectPending || centralHardResetReason != nil {
+            append("Late didConnect arrived while manual/hard terminal state is pending; wait")
+            armCentralPendingTerminalStateObservation()
+            setStatus("CENTRAL · ЖДУ TERMINAL STATE", color: .systemOrange)
+            return
+        }
         guard centralOwnerConfiguredForAncs else {
             append("didConnect не принят: owner не был открыт/восстановлен с RequiresANCS")
             cancelCentralConnectionSafely(peripheral, manager: central,
                                             reason: "didConnect without RequiresANCS")
-            return
-        }
-        guard centralHardResetReason == nil else {
-            append("Late didConnect ignored: BLE reset уже начат")
-            cancelCentralConnectionSafely(peripheral, manager: central,
-                                            reason: "late didConnect during reset")
             return
         }
         cancelCentralReconnect()
@@ -2119,7 +2368,9 @@ extension ViewController: CBCentralManagerDelegate {
             centralRequireFreshAdvertisement = false
             clearCentralRuntime(keepPeripheral: true)
             centralOwnerConfiguredForAncs = false
-            scheduleCentralReconnect(reason: "same stable owner after \(hardReset)")
+            clearCentralPendingTerminalStateObservation()
+            queueCentralConnectIntent(peripheral,
+                reason: "same stable owner after \(hardReset)", delay: 0.5)
         } else {
             centralRequireFreshAdvertisement = false
             clearCentralRuntime(keepPeripheral: true)
@@ -2164,12 +2415,9 @@ extension ViewController: CBCentralManagerDelegate {
             clearCentralRuntime(keepPeripheral: true)
             guard runRequested, role == .central else { return }
             centralOwnerConfiguredForAncs = false
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                guard let self = self, self.runRequested, self.role == .central,
-                      peripheral.state == .disconnected else { return }
-                self.issueCentralConnect(peripheral,
-                    reason: "same stable owner after \(hardReset)")
-            }
+            clearCentralPendingTerminalStateObservation()
+            queueCentralConnectIntent(peripheral,
+                reason: "same stable owner after \(hardReset)", delay: 0.5)
             return
         }
 
