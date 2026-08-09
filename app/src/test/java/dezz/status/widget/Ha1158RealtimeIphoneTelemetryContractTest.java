@@ -36,7 +36,7 @@ public final class Ha1158RealtimeIphoneTelemetryContractTest {
                 "Helper B4 realtime subscription started before ANCS subscriptions"));
         assertTrue(transport.indexOf(
                 "Helper B4 realtime subscription started before ANCS subscriptions")
-                < transport.indexOf("ANCS найден. Подписываюсь Data Source"));
+                < transport.indexOf("ANCS найден. Сначала включаю обязательную Notification Source"));
     }
 
     @Test public void unchangedControlReadsDoNotRebuildUiEverySecond() throws Exception {
