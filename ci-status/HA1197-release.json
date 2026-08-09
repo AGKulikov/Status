@@ -1,15 +1,15 @@
 {
-  "runId": "31304070157",
+  "runId": "31304347911",
   "runAttempt": "1",
-  "sourceSha": "942dcd84d4619bad5e63c86eb3e45ed6106463c7",
+  "sourceSha": "a9e1fefdd8aa1d89296552d0773a0aaafb94915b",
   "result": "failure",
   "jobs": [
     {
-      "id": 93221462551,
+      "id": 93222180157,
       "name": "Build and Release",
       "status": "completed",
       "conclusion": "failure",
-      "html_url": "https://github.com/AGKulikov/Status/actions/runs/31304070157/job/93221462551",
+      "html_url": "https://github.com/AGKulikov/Status/actions/runs/31304347911/job/93222180157",
       "steps": [
         {
           "number": 1,
@@ -98,11 +98,11 @@
       ]
     },
     {
-      "id": 93221539604,
+      "id": 93222272662,
       "name": "Record release result",
       "status": "in_progress",
       "conclusion": null,
-      "html_url": "https://github.com/AGKulikov/Status/actions/runs/31304070157/job/93221539604",
+      "html_url": "https://github.com/AGKulikov/Status/actions/runs/31304347911/job/93222272662",
       "steps": [
         {
           "number": 1,
@@ -113,8 +113,8 @@
         {
           "number": 2,
           "name": "Checkout release branch",
-          "status": "completed",
-          "conclusion": "success"
+          "status": "in_progress",
+          "conclusion": null
         },
         {
           "number": 3,
