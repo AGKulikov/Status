@@ -10,6 +10,7 @@ import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
@@ -62,6 +63,27 @@ public final class LauncherIconResolver {
             new Preset("fuel_save", "Экономия топлива"),
             new Preset("trunk_closed", "Багажник закрыт"),
             new Preset("trunk_open", "Багажник открыт"),
+            new Preset("front_car", "Автомобиль спереди"),
+            new Preset("car_side", "Автомобиль сбоку"),
+            new Preset("car_rear", "Автомобиль сзади"),
+            new Preset("car_lock", "Закрыть автомобиль"),
+            new Preset("car_unlock", "Открыть автомобиль"),
+            new Preset("car_doors", "Двери автомобиля"),
+            new Preset("headlights", "Фары"),
+            new Preset("high_beam", "Дальний свет"),
+            new Preset("fog_lights", "Противотуманные фары"),
+            new Preset("hazard", "Аварийная сигнализация"),
+            new Preset("horn", "Клаксон"),
+            new Preset("air_recirculation", "Рециркуляция воздуха"),
+            new Preset("steering", "Рулевое колесо"),
+            new Preset("charging", "Зарядка автомобиля"),
+            new Preset("ev_battery", "Тяговая батарея"),
+            new Preset("fuel", "Топливо"),
+            new Preset("tire_pressure", "Давление в шинах"),
+            new Preset("parking", "Парковка"),
+            new Preset("car_camera", "Камера автомобиля"),
+            new Preset("car_key", "Ключ автомобиля"),
+            new Preset("wiper_wash", "Омыватель стекла"),
             new Preset("water", "Вода"),
             new Preset("humidity", "Влажность"),
             new Preset("motion", "Движение / присутствие"),
@@ -101,6 +123,11 @@ public final class LauncherIconResolver {
             new Preset("status_bluetooth", "Bluetooth статусной строки"),
             new Preset("status_phone_cellular", "Оператор и сигнал iPhone"),
             new Preset("status_phone_battery", "Батарея iPhone"),
+            // Kept as selectable aliases because popup/scenario configurations have stored
+            // these offline identifiers since the first icon catalog.
+            new Preset("wifi", "Wi-Fi"),
+            new Preset("gps", "GPS"),
+            new Preset("bluetooth", "Bluetooth"),
             new Preset("devices", "Умный дом"),
             new Preset("scenario", "Сценарий"),
             new Preset("edit", "Изменить"),
@@ -110,6 +137,18 @@ public final class LauncherIconResolver {
     private LauncherIconResolver() {}
 
     @NonNull public static List<Preset> presets() { return PRESETS; }
+
+    /** Finds a catalog item without changing or normalizing its persistent key. */
+    @Nullable public static Preset preset(@Nullable String key) {
+        if (key == null) return null;
+        for (Preset preset : PRESETS) if (preset.key.equals(key)) return preset;
+        return null;
+    }
+
+    @NonNull public static String label(@Nullable String key) {
+        Preset preset = preset(key);
+        return preset == null ? "Иконка" : preset.label;
+    }
 
     @Nullable
     public static Drawable resolve(@NonNull Context context,
@@ -121,6 +160,7 @@ public final class LauncherIconResolver {
     public static Drawable resolve(@NonNull Context context,
                                    @NonNull LauncherShortcutStore.Shortcut shortcut,
                                    @Nullable String colorOverride) {
+        if ("none".equalsIgnoreCase(shortcut.icon)) return null;
         Drawable source = null;
         if ("app".equals(shortcut.icon) && shortcut.kind == LauncherShortcutStore.Kind.APP) {
             ComponentName component = ComponentName.unflattenFromString(shortcut.target);
@@ -144,7 +184,8 @@ public final class LauncherIconResolver {
     @Nullable
     public static Drawable resolvePreset(@NonNull Context context, @NonNull String iconKey,
                                          @Nullable String colorOverride) {
-        Drawable source = ContextCompat.getDrawable(context, drawable(iconKey));
+        if ("none".equalsIgnoreCase(iconKey)) return null;
+        Drawable source = ContextCompat.getDrawable(context, resource(iconKey));
         if (source == null) return null;
         source = DrawableCompat.wrap(source).mutate();
         if (colorOverride != null && !"none".equalsIgnoreCase(colorOverride)) {
@@ -154,7 +195,9 @@ public final class LauncherIconResolver {
         return source;
     }
 
-    private static int drawable(String key) {
+    /** Resource-only resolver used by every visual icon picker and popup allow-list. */
+    @DrawableRes public static int resource(@Nullable String key) {
+        if (key == null) return R.drawable.ic_launcher_apps;
         switch (key) {
             case "navigation": return R.drawable.ic_launcher_navigation;
             case "home": return R.drawable.ic_launcher_home;
@@ -170,10 +213,10 @@ public final class LauncherIconResolver {
             case "light": return R.drawable.ic_popup_light;
             case "power": return R.drawable.ic_popup_power;
             case "temperature": return R.drawable.ic_popup_temperature;
-            case "climate":
-            case "climate_ac":
-            case "climate_auto":
-            case "fan": return R.drawable.ic_car_climate;
+            case "climate": return R.drawable.ic_car_climate;
+            case "climate_ac": return R.drawable.ic_car_ac;
+            case "climate_auto": return R.drawable.ic_car_climate_auto;
+            case "fan": return R.drawable.ic_car_fan;
             case "seat_heat": return R.drawable.ic_car_seat_heat;
             case "seat_vent": return R.drawable.ic_car_seat_vent;
             case "wheel_heat": return R.drawable.ic_car_wheel_heat;
@@ -184,6 +227,33 @@ public final class LauncherIconResolver {
             case "fuel_save": return R.drawable.ic_car_fuel_save;
             case "trunk_closed": return R.drawable.ic_car_trunk_closed;
             case "trunk_open": return R.drawable.ic_car_trunk_open;
+            case "front_car": return R.drawable.ic_car_front;
+            case "car_side": return R.drawable.ic_car_side;
+            case "car_rear": return R.drawable.ic_car_rear;
+            case "car_lock": return R.drawable.ic_car_lock;
+            case "car_unlock": return R.drawable.ic_car_unlock;
+            case "hood_open": return R.drawable.ic_car_hood_open;
+            case "car_doors": return R.drawable.ic_car_doors;
+            case "car_window": return R.drawable.ic_car_window;
+            case "sunroof": return R.drawable.ic_car_sunroof;
+            case "mirror_fold": return R.drawable.ic_car_mirror_fold;
+            case "headlights": return R.drawable.ic_car_headlight;
+            case "high_beam": return R.drawable.ic_car_high_beam;
+            case "fog_lights": return R.drawable.ic_car_fog_light;
+            case "hazard": return R.drawable.ic_car_hazard;
+            case "horn": return R.drawable.ic_car_horn;
+            case "air_recirculation": return R.drawable.ic_car_air_recirculation;
+            case "steering": return R.drawable.ic_car_steering;
+            case "charging": return R.drawable.ic_car_charging;
+            case "ev_battery": return R.drawable.ic_car_ev_battery;
+            case "fuel": return R.drawable.ic_car_fuel;
+            case "tire_pressure": return R.drawable.ic_car_tire_pressure;
+            case "parking": return R.drawable.ic_car_parking;
+            case "parking_sensor": return R.drawable.ic_car_parking_sensor;
+            case "car_camera": return R.drawable.ic_car_camera;
+            case "car_key": return R.drawable.ic_car_key;
+            case "child_lock": return R.drawable.ic_car_child_lock;
+            case "wiper_wash": return R.drawable.ic_car_wiper_wash;
             case "auto_hold":
             case "start_stop": return R.drawable.ic_popup_power;
             case "water": return R.drawable.ic_popup_water;
@@ -225,6 +295,9 @@ public final class LauncherIconResolver {
             case "status_bluetooth": return R.drawable.ic_status_iphone_bluetooth_solid;
             case "status_phone_cellular": return R.drawable.ic_status_iphone_cellular_level;
             case "status_phone_battery": return R.drawable.ic_status_iphone_battery;
+            case "wifi": return R.drawable.ic_status_filled_wifi_internet;
+            case "gps": return R.drawable.ic_status_iphone_gps_active;
+            case "bluetooth": return R.drawable.ic_status_iphone_bluetooth_solid;
             case "devices": return R.drawable.ic_section_widget;
             case "scenario": return R.drawable.ic_section_content;
             case "edit": return R.drawable.ic_drag_handle;
@@ -246,6 +319,6 @@ public final class LauncherIconResolver {
                 return R.drawable.ic_car_seat_vent_passenger;
             }
         }
-        return drawable(shortcut.icon);
+        return resource(shortcut.icon);
     }
 }

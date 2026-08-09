@@ -44,6 +44,7 @@ import dezz.status.widget.launcher.routes.FavoriteRoutesPanelView;
 import dezz.status.widget.launcher.routes.RouteDestinationParser;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
+import dezz.status.widget.settings.VectorIconPickerDialog;
 
 /** Visual autosaving editor for the idle state of the combined navigation HOME panel. */
 public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
@@ -318,15 +319,16 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
         editorHost.addView(floating, new LinearLayout.LayoutParams(match(), dp(52)));
 
         addLabel(editorHost, "Иконка");
-        Spinner icon = new Spinner(this);
-        List<LauncherIconResolver.Preset> presets = LauncherIconResolver.presets();
-        icon.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, presets));
-        icon.setSelection(indexOfIcon(presets, route.icon));
-        icon.setOnItemSelectedListener(new SimpleSelection(position -> {
-            route.icon = presets.get(position).key;
-            persistWithoutList();
-        }));
+        MaterialButton icon = button(LauncherIconResolver.label(route.icon));
+        VectorIconPickerDialog.Option currentIcon = VectorIconPickerDialog.find(
+                VectorIconPickerDialog.catalog(), route.icon);
+        if (currentIcon != null) VectorIconPickerDialog.decorate(icon, currentIcon);
+        icon.setOnClickListener(view -> VectorIconPickerDialog.show(this, "Иконка маршрута",
+                route.icon, option -> {
+                    route.icon = option.key;
+                    VectorIconPickerDialog.decorate(icon, option);
+                    persistWithoutList();
+                }));
         editorHost.addView(icon, fieldLp());
 
         addSlider(editorHost, "Размер иконки", route.iconSizePx, 24, 180, value -> {
@@ -457,14 +459,6 @@ public final class FavoriteRoutesSettingsActivity extends AppCompatActivity {
         block.addView(heading);
         block.addView(seek, new LinearLayout.LayoutParams(match(), dp(42)));
         parent.addView(block, new LinearLayout.LayoutParams(match(), wrap()));
-    }
-
-    private int indexOfIcon(@NonNull List<LauncherIconResolver.Preset> values,
-                            @NonNull String key) {
-        for (int index = 0; index < values.size(); index++) {
-            if (values.get(index).key.equals(key)) return index;
-        }
-        return 0;
     }
 
     private EditText input(@NonNull String hint, @NonNull String value) {

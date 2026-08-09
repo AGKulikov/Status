@@ -65,6 +65,7 @@ import dezz.status.widget.scenario.Rule;
 import dezz.status.widget.scenario.RuleSet;
 import dezz.status.widget.scenario.ScenarioPresets;
 import dezz.status.widget.settings.AppleColorPickerDialog;
+import dezz.status.widget.settings.VectorIconPickerDialog;
 
 /** Visual, slider-based appearance editor shared by the main row and popup tiles. */
 public final class VisualBrickEditorActivity extends AppCompatActivity {
@@ -342,6 +343,9 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
 
         page.addView(section("Иконка"), topMargin(20));
         Button icon = button("Выбрать иконку: " + c.icon);
+        VectorIconPickerDialog.Option selectedIcon =
+                VectorIconPickerDialog.find(VectorIconPickerDialog.catalog(), c.icon);
+        if (selectedIcon != null) VectorIconPickerDialog.decorate(icon, selectedIcon);
         icon.setOnClickListener(v -> chooseIcon(icon));
         page.addView(icon, topMargin(5));
         addSlider(page, "Размер иконки", 0, 200, c.iconSize,
@@ -948,12 +952,11 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
     }
 
     private void chooseIcon(Button button) {
-        String[] labels = PopupIconCatalog.LABELS.toArray(new String[0]);
-        new AlertDialog.Builder(this).setTitle("Иконка").setItems(labels, (d, which) -> {
-            popup.icon = PopupIconCatalog.IDS.get(which);
-            button.setText("Выбрать иконку: " + labels[which]);
+        VectorIconPickerDialog.show(this, "Иконка", popup.icon, option -> {
+            popup.icon = option.key;
+            VectorIconPickerDialog.decorate(button, option);
             onConfigChanged();
-        }).setNegativeButton("Отмена", null).show();
+        });
     }
 
     private String actionSummary() {

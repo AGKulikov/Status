@@ -244,8 +244,14 @@ public final class ShortcutActionPicker {
                         value.iconCustomized = false;
                         value.iconColor = "#FFE0E5F3";
                         value.stateBinding = null;
-                        if (action == LauncherShortcutStore.Builtin.STOCK_CLIMATE) {
-                            value.liveClimateIcon = true;
+                        boolean stockClimate =
+                                action == LauncherShortcutStore.Builtin.STOCK_CLIMATE;
+                        value.liveClimateIcon = LiveClimateIconPolicy.afterPrimaryActionChange(
+                                existing != null,
+                                value.liveClimateIcon,
+                                value.kind,
+                                value.target);
+                        if (existing == null && stockClimate) {
                             value.iconSizePx = Math.max(value.iconSizePx, 76);
                         }
                         save(value);
@@ -407,8 +413,8 @@ public final class ShortcutActionPicker {
             @NonNull List<Double> ascending,
             @NonNull List<Double> descending) {
         List<String> labels = new ArrayList<>();
-        labels.add("Цикл уровней 1 → 2 → 3");
-        labels.add("Цикл уровней 3 → 2 → 1");
+        labels.add("Цикл уровней 0 → 1 → 2 → 3");
+        labels.add("Цикл уровней 3 → 2 → 1 → 0");
         labels.add("Выбрать собственный набор уровней…");
         for (CarControlDescriptor.Option option : control.options) {
             labels.add("Установить: " + option.label);
@@ -439,13 +445,25 @@ public final class ShortcutActionPicker {
         String[] labels = new String[control.options.size()];
         boolean[] checked = new boolean[control.options.size()];
         for (int index = 0; index < control.options.size(); index++) {
-            labels[index] = control.options.get(index).label;
+            CarControlDescriptor.Option option = control.options.get(index);
+            labels[index] = CarThreeLevelCyclePolicy.isMandatoryOffValue(
+                    control, option.value) ? "0 · Выкл" : option.label;
             checked[index] = true;
         }
         AlertDialog dialog = new AlertDialog.Builder(activity)
                 .setTitle(control.label + " · цикл")
                 .setMultiChoiceItems(labels, checked,
-                        (value, which, selected) -> checked[which] = selected)
+                        (value, which, selected) -> {
+                            double option = control.options.get(which).value;
+                            if (!selected && CarThreeLevelCyclePolicy.isMandatoryOffValue(
+                                    control, option)) {
+                                checked[which] = true;
+                                ((AlertDialog) value).getListView().setItemChecked(which, true);
+                                toast("Уровень 0 обязателен для этой карусели");
+                            } else {
+                                checked[which] = selected;
+                            }
+                        })
                 .setPositiveButton("Сохранить", null)
                 .setNegativeButton("Отмена", null)
                 .create();
@@ -524,6 +542,7 @@ public final class ShortcutActionPicker {
     private void saveCarCycle(@Nullable LauncherShortcutStore.Shortcut existing,
                               @NonNull CarControlDescriptor control,
                               @NonNull List<Double> selected) {
+        selected = CarThreeLevelCyclePolicy.withMandatoryOff(control, selected);
         LauncherShortcutStore.Shortcut value = existing == null
                 ? new LauncherShortcutStore.Shortcut() : existing;
         if (longPress) {

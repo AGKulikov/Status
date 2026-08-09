@@ -10,6 +10,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.view.MotionEvent;
 import android.view.View;
 
 import androidx.annotation.ColorInt;
@@ -27,11 +28,23 @@ public final class LauncherBackdropView extends View {
         this.backdrop = backdrop.copy();
         setLayerType(LAYER_TYPE_SOFTWARE, null);
         setBackgroundColor(Color.TRANSPARENT);
+        // This is paint only. LauncherElementFrame enables manipulation exclusively while the
+        // explicit HOME editor is active; the surface must never become a runtime touch target.
+        setClickable(false);
+        setLongClickable(false);
+        setFocusable(false);
+        setFocusableInTouchMode(false);
+        setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
     }
 
     public void setBackdrop(@NonNull LauncherBackdropStore.Backdrop value) {
         backdrop = value.copy();
         invalidate();
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        return false;
     }
 
     @Override

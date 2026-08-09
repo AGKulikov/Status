@@ -629,7 +629,8 @@ public final class ClimatePanelView extends FrameLayout {
         int tint = active ? accent : inactive;
         binding.icon.setColorFilter(tint);
         String displayValue = previewSample ? previewValue(id)
-                : climateOff ? "Выкл" : displayStateValue(id, state);
+                : climateOff ? (config.hasLevelCycleOrder(id) ? "0" : "Выкл")
+                : displayStateValue(id, state);
         // The fan tile is numeric at all times. While its command is pending keep the last
         // confirmed 1–5 value instead of temporarily replacing it with a word.
         binding.value.setText(!climateOff && pending.containsKey(id)
@@ -702,6 +703,11 @@ public final class ClimatePanelView extends FrameLayout {
             return Integer.toString(indicator.activeSegments);
         }
         String value = state.valueLabel == null ? "" : state.valueLabel.trim();
+        if (config.hasLevelCycleOrder(id)
+                && (!state.active || "0".equals(value) || "off".equalsIgnoreCase(value)
+                || value.toLowerCase(java.util.Locale.ROOT).contains("выкл"))) {
+            return "0";
+        }
         return value.isEmpty() || "—".equals(value) || "-".equals(value)
                 ? "Неизвестно" : value;
     }

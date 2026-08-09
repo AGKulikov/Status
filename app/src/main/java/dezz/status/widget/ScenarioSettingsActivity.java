@@ -57,7 +57,6 @@ import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.integration.SystemConditionResolver;
 import dezz.status.widget.popup.PopupItemConfig;
 import dezz.status.widget.popup.PopupItemConfigStore;
-import dezz.status.widget.popup.PopupIconCatalog;
 import dezz.status.widget.popup.PopupOverlayConfig;
 import dezz.status.widget.popup.PopupOverlayConfigStore;
 import dezz.status.widget.phone.PhoneNotificationAutomation;
@@ -71,6 +70,7 @@ import dezz.status.widget.scenario.Scenario;
 import dezz.status.widget.scenario.TargetScope;
 import dezz.status.widget.scenario.ValueReference;
 import dezz.status.widget.settings.AppleColorPickerDialog;
+import dezz.status.widget.settings.VectorIconPickerDialog;
 import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.sprut.SprutCatalog;
 import dezz.status.widget.sprut.SprutHubCatalogStore;
@@ -1422,13 +1422,11 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             EditText destination = falseBranch ? falseStringValue : stringValue;
             Button destinationButton = falseBranch ? chooseFalseStyleValue : chooseStyleValue;
             if (field == LocalField.ICON) {
-                String[] labels = PopupIconCatalog.LABELS.toArray(new String[0]);
-                new AlertDialog.Builder(ScenarioSettingsActivity.this).setTitle("Иконка")
-                        .setItems(labels, (d, which) -> {
-                            String value = PopupIconCatalog.IDS.get(which);
-                            destination.setText(value);
-                            destinationButton.setText("Выбрано: " + labels[which]);
-                        }).setNegativeButton("Отмена", null).show();
+                VectorIconPickerDialog.show(ScenarioSettingsActivity.this, "Иконка",
+                        text(destination), option -> {
+                            destination.setText(option.key);
+                            VectorIconPickerDialog.decorate(destinationButton, option);
+                        });
                 return;
             }
             String current = text(destination).isEmpty() ? "#FFFFFFFF" : text(destination);

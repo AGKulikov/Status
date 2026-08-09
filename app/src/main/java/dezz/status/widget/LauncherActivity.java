@@ -1018,6 +1018,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 frame.setRadius(0);
                 frame.setPreserveAspectRatio(false);
                 frame.setStayBehindSiblings(true);
+                frame.setPassThroughTouchesOutsideEditMode(true);
                 frame.setOnClickListener(view -> {
                     if (editMode) showLauncherBackdropEditor(id);
                 });

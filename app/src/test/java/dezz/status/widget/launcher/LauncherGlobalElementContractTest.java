@@ -57,16 +57,33 @@ public final class LauncherGlobalElementContractTest {
         String activity = read("LauncherActivity.java");
         String store = read("launcher/LauncherBackdropStore.java");
         String surface = read("launcher/LauncherBackdropView.java");
+        String frame = read("launcher/LauncherElementFrame.java");
 
         assertTrue(read("launcher/LauncherWidgetCatalog.java")
                 .contains("Kind.BACKDROP, \"Подложка\""));
         assertTrue(activity.contains("workspace.addView(frame, Math.min(backdropIndex"));
         assertTrue(activity.contains("frame.setStayBehindSiblings(true)"));
+        assertTrue(activity.contains("frame.setPassThroughTouchesOutsideEditMode(true)"));
+        assertTrue(activity.contains("if (editMode) showLauncherBackdropEditor(id)"));
         assertTrue(activity.contains("Тень · только HOME"));
         assertTrue(store.contains("launcherBackdropsJson"));
         assertTrue(store.contains("public Backdrop create()"));
         assertTrue(!store.contains("MAX_BACKDROPS"));
         assertTrue(surface.contains("paint.setShadowLayer("));
+        assertTrue(surface.contains("setClickable(false)"));
+        assertTrue(surface.contains("setImportantForAccessibility("));
+        assertTrue(surface.contains("public boolean onTouchEvent(MotionEvent event)"));
+        assertTrue(surface.contains("return false;"));
+        String passThroughGuard =
+                "if (!editMode && passThroughTouchesOutsideEditMode) return false;";
+        assertTrue(frame.indexOf(passThroughGuard) >= 0);
+        assertTrue(frame.indexOf(passThroughGuard) != frame.lastIndexOf(passThroughGuard));
+        assertTrue(frame.contains("if (!editMode) return super.onTouchEvent(event);"));
+        assertTrue(frame.contains("if (!stayBehindSiblings) bringToFront();"));
+
+        int initialClickState = frame.indexOf("setClickable(enabled);");
+        int unchangedModeReturn = frame.indexOf("if (!modeChanged) return;");
+        assertTrue(initialClickState >= 0 && initialClickState < unchangedModeReturn);
     }
 
     @Test

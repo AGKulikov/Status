@@ -20,9 +20,19 @@ public final class ClimateLevelCycleContractTest {
     @Test
     public void settingsExposeThePerElementCycleSelector() throws IOException {
         String settings = source("dezz/status/widget/ClimatePanelSettingsActivity.java");
+        String homeSettings = source("dezz/status/widget/LauncherShortcutSettingsActivity.java");
+        String config = source("dezz/status/widget/launcher/climate/ClimatePanelConfig.java");
         assertTrue(settings.contains("addLevelCycleOrderSelector(block, element.id)"));
         assertTrue(settings.contains("config.setLevelCycleOrder(elementId, selected)"));
         assertTrue(settings.contains("Уровни по нажатию"));
+        assertTrue(config.contains("ASCENDING(\"0 → 1 → 2 → 3\")"));
+        assertTrue(config.contains("DESCENDING(\"3 → 2 → 1 → 0\")"));
+        assertTrue(homeSettings.contains("CarThreeLevelCyclePolicy.orderedValues"));
+        assertTrue(homeSettings.contains("Цикл уровней 0 → 1 → 2 → 3"));
+        assertTrue(homeSettings.contains("Цикл уровней 3 → 2 → 1 → 0"));
+        assertTrue(homeSettings.contains("CarControlCommand.Operation.SET, option.value"));
+        assertTrue(homeSettings.contains(
+                "selected = CarThreeLevelCyclePolicy.withMandatoryOff(control, selected)"));
     }
 
     @Test
@@ -38,6 +48,20 @@ public final class ClimateLevelCycleContractTest {
                 "return Integer.toString(indicator.activeSegments)"));
         assertTrue(panel.contains("pending.containsKey(id)"));
         assertTrue(panel.contains("&& !ClimatePanelConfig.FAN.equals(id)"));
+        assertTrue(panel.contains(
+                "climateOff ? (config.hasLevelCycleOrder(id) ? \"0\" : \"Выкл\")"));
+        assertTrue(panel.contains("if (config.hasLevelCycleOrder(id)"));
+    }
+
+    @Test
+    public void savedAndLegacyThreeLevelCyclesCannotDropOff() throws IOException {
+        String picker = source("dezz/status/widget/launcher/ShortcutActionPicker.java");
+        String geely = source("dezz/status/widget/car/GeelyCarIntegration.java");
+        assertTrue(picker.contains(
+                "selected = CarThreeLevelCyclePolicy.withMandatoryOff(control, selected)"));
+        assertTrue(picker.contains("Уровень 0 обязателен для этой карусели"));
+        assertTrue(geely.contains("cycleTargetWithMandatoryOff("));
+        assertTrue(geely.contains("!containsCycleValue(normalized, current)"));
     }
 
     @Test
@@ -53,7 +77,12 @@ public final class ClimateLevelCycleContractTest {
     private static String source(String relative) throws IOException {
         Path fromRoot = Paths.get("app", "src", "main", "java").resolve(relative);
         Path fromApp = Paths.get("src", "main", "java").resolve(relative);
+        Path fromGeelyRoot = Paths.get("app", "src", "geely", "java").resolve(relative);
+        Path fromGeelyApp = Paths.get("src", "geely", "java").resolve(relative);
         Path file = Files.isRegularFile(fromRoot) ? fromRoot : fromApp;
+        if (!Files.isRegularFile(file)) {
+            file = Files.isRegularFile(fromGeelyRoot) ? fromGeelyRoot : fromGeelyApp;
+        }
         return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
     }
 }

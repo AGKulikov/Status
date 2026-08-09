@@ -37,21 +37,25 @@ public final class Ha1154HelperAndDriverFavoritesContractTest {
 
     @Test public void driverFavoritesExposeBothThreeLevelOrders() throws Exception {
         String picker = source("launcher/ShortcutActionPicker.java");
-        assertTrue(picker.contains("Цикл уровней 1 → 2 → 3"));
-        assertTrue(picker.contains("Цикл уровней 3 → 2 → 1"));
+        assertTrue(picker.contains("Цикл уровней 0 → 1 → 2 → 3"));
+        assertTrue(picker.contains("Цикл уровней 3 → 2 → 1 → 0"));
         assertTrue(picker.contains("saveCarCycle(existing, control, ascending)"));
         assertTrue(picker.contains("saveCarCycle(existing, control, descending)"));
     }
 
-    @Test public void passengerSeatArtworkIsResolvedByCarTarget() throws Exception {
+    @Test public void passengerSeatArtworkUsesOfficialRightHandGlyphs() throws Exception {
         String resolver = source("launcher/LauncherIconResolver.java");
         assertTrue(resolver.contains("shortcut.target.endsWith(\"_passenger\")"));
         assertTrue(resolver.contains("ic_car_seat_heat_passenger"));
         assertTrue(resolver.contains("ic_car_seat_vent_passenger"));
         String heat = resource("drawable/ic_car_seat_heat_passenger.xml");
         String vent = resource("drawable/ic_car_seat_vent_passenger.xml");
-        assertTrue(heat.contains("android:scaleX=\"-1\""));
-        assertTrue(vent.contains("android:scaleX=\"-1\""));
+        assertTrue(heat.contains("Google Material Symbols Rounded @ 50f0603"));
+        assertTrue(heat.contains("(seat_heat_right, 24px, wght400, fill0)"));
+        assertTrue(vent.contains("Google Material Symbols Rounded @ 50f0603"));
+        assertTrue(vent.contains("(seat_vent_right, 24px, wght400, fill0)"));
+        assertFalse(heat.contains("android:scaleX=\"-1\""));
+        assertFalse(vent.contains("android:scaleX=\"-1\""));
     }
 
     @Test public void explicitDriverButtonSpacingUsesNaturalHeightAndInternalInsets()

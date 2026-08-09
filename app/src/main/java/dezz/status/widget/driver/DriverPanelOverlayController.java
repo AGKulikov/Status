@@ -1255,7 +1255,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         }
         @Nullable TextView stateLabel = null;
         if ((shortcut.kind == LauncherShortcutStore.Kind.RULE
-                || shortcut.kind == LauncherShortcutStore.Kind.CAR && !liveClimate)
+                || shortcut.kind == LauncherShortcutStore.Kind.CAR)
+                && !liveClimate
                 && shortcut.showState) {
             stateLabel = new TextView(context);
             stateLabel.setText("…");

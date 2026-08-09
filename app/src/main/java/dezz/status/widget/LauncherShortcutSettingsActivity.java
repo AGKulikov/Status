@@ -64,10 +64,12 @@ import dezz.status.widget.launcher.panels.PanelGridLayout;
 import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarControlDescriptor;
 import dezz.status.widget.car.CarIntegrations;
+import dezz.status.widget.car.CarThreeLevelCyclePolicy;
 import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.scenario.IntentActionRule;
 import dezz.status.widget.scenario.IntentActionRuleStore;
 import dezz.status.widget.settings.AppleColorPickerDialog;
+import dezz.status.widget.settings.VectorIconPickerDialog;
 
 /** Visual, code-free editor for arbitrary HOME icons. */
 public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
@@ -953,6 +955,12 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
             saveCarAction(existing, control, CarControlCommand.Operation.ACTIVATE, 1);
             return;
         }
+        List<Double> ascending = CarThreeLevelCyclePolicy.orderedValues(control, false);
+        if (!ascending.isEmpty()) {
+            chooseCarThreeLevelBehavior(existing, control, ascending,
+                    CarThreeLevelCyclePolicy.orderedValues(control, true));
+            return;
+        }
         List<String> labels = new ArrayList<>();
         List<CarControlCommand.Operation> operations = new ArrayList<>();
         List<Double> values = new ArrayList<>();
@@ -983,18 +991,59 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
                 .setNegativeButton(android.R.string.cancel, null).show();
     }
 
+    private void chooseCarThreeLevelBehavior(
+            @Nullable LauncherShortcutStore.Shortcut existing,
+            @NonNull CarControlDescriptor control,
+            @NonNull List<Double> ascending,
+            @NonNull List<Double> descending) {
+        List<String> labels = new ArrayList<>();
+        labels.add("Цикл уровней 0 → 1 → 2 → 3");
+        labels.add("Цикл уровней 3 → 2 → 1 → 0");
+        labels.add("Выбрать собственный набор уровней…");
+        for (CarControlDescriptor.Option option : control.options) {
+            labels.add("Установить: " + (CarThreeLevelCyclePolicy.isMandatoryOffValue(
+                    control, option.value) ? "0 · Выкл" : option.label));
+        }
+        new AlertDialog.Builder(this).setTitle(control.label + " — нажатие")
+                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
+                    if (which == 0) saveCarCycle(existing, control, ascending);
+                    else if (which == 1) saveCarCycle(existing, control, descending);
+                    else if (which == 2) chooseCarCycleSubset(existing, control);
+                    else {
+                        CarControlDescriptor.Option option = control.options.get(which - 3);
+                        saveCarAction(existing, control,
+                                CarControlCommand.Operation.SET, option.value);
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null).show();
+    }
+
     private void chooseCarCycleSubset(@Nullable LauncherShortcutStore.Shortcut existing,
                                       @NonNull CarControlDescriptor control) {
         String[] labels = new String[control.options.size()];
         boolean[] checked = new boolean[control.options.size()];
         for (int index = 0; index < control.options.size(); index++) {
-            labels[index] = control.options.get(index).label;
+            CarControlDescriptor.Option option = control.options.get(index);
+            labels[index] = CarThreeLevelCyclePolicy.isMandatoryOffValue(
+                    control, option.value) ? "0 · Выкл" : option.label;
             checked[index] = true;
         }
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(control.label + " · выбранный цикл")
                 .setMultiChoiceItems(labels, checked,
-                        (value, which, selected) -> checked[which] = selected)
+                        (value, which, selected) -> {
+                            double option = control.options.get(which).value;
+                            if (!selected && CarThreeLevelCyclePolicy.isMandatoryOffValue(
+                                    control, option)) {
+                                checked[which] = true;
+                                ((AlertDialog) value).getListView().setItemChecked(which, true);
+                                Toast.makeText(this,
+                                        "Уровень 0 обязателен для этой карусели",
+                                        Toast.LENGTH_SHORT).show();
+                            } else {
+                                checked[which] = selected;
+                            }
+                        })
                 .setPositiveButton("Выбрать", null)
                 .setNegativeButton("Отмена", null)
                 .create();
@@ -1089,6 +1138,7 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
     private void saveCarCycle(@Nullable LauncherShortcutStore.Shortcut existing,
                               @NonNull CarControlDescriptor control,
                               @NonNull List<Double> selected) {
+        selected = CarThreeLevelCyclePolicy.withMandatoryOff(control, selected);
         LauncherShortcutStore.Shortcut shortcut = existing == null
                 ? new LauncherShortcutStore.Shortcut() : existing;
         if (editingLongAction) {
@@ -1480,13 +1530,27 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
 
         TextView iconLabel = formLabel("Иконка");
         form.addView(iconLabel);
-        Spinner icon = new Spinner(this);
-        List<LauncherIconResolver.Preset> presets = LauncherIconResolver.presets();
-        String automaticIcon = value.icon;
-        icon.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, presets));
-        int selectedIcon = 0;
-        for (int i = 0; i < presets.size(); i++) if (presets.get(i).key.equals(value.icon)) selectedIcon = i;
-        icon.setSelection(selectedIcon);
+        final String[] selectedIconKey = {value.icon};
+        String originalIcon = value.icon;
+        VectorIconPickerDialog.Option none = VectorIconPickerDialog.option("none",
+                "Без иконки", R.drawable.ic_delete);
+        List<VectorIconPickerDialog.Option> iconOptions = "none".equalsIgnoreCase(value.icon)
+                ? VectorIconPickerDialog.withFirst(none)
+                : VectorIconPickerDialog.catalog();
+        VectorIconPickerDialog.Option selectedIcon = VectorIconPickerDialog.find(
+                iconOptions, selectedIconKey[0]);
+        if (selectedIcon == null) {
+            selectedIcon = iconOptions.get(0);
+            selectedIconKey[0] = selectedIcon.key;
+        }
+        MaterialButton icon = new MaterialButton(this);
+        icon.setAllCaps(false);
+        VectorIconPickerDialog.decorate(icon, selectedIcon);
+        icon.setOnClickListener(view -> VectorIconPickerDialog.show(this,
+                "Иконка · " + value.title, iconOptions, selectedIconKey[0], option -> {
+                    selectedIconKey[0] = option.key;
+                    VectorIconPickerDialog.decorate(icon, option);
+                }));
         form.addView(icon, new LinearLayout.LayoutParams(match(), dp(54)));
 
         ColorSelection background = colorSelection(form, "Цвет плитки",
@@ -1540,8 +1604,8 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
         new AlertDialog.Builder(this).setTitle("Оформление иконки")
                 .setView(scrollDialog(form)).setPositiveButton("Применить", (dialog, which) -> {
                     value.title = title.getText().toString().trim();
-                    value.icon = presets.get(icon.getSelectedItemPosition()).key;
-                    if (!value.icon.equals(automaticIcon)) value.iconCustomized = true;
+                    value.icon = selectedIconKey[0];
+                    if (!value.icon.equals(originalIcon)) value.iconCustomized = true;
                     value.backgroundColor = background.value;
                     value.iconColor = iconColor.value;
                     value.textColor = textColor.value;

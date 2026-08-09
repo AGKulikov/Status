@@ -41,7 +41,8 @@ public final class Ha1152RegressionContractTest {
         String driver = source("driver/DriverPanelOverlayController.java");
         assertTrue(driver.contains("drawerCarBindings"));
         assertTrue(driver.contains("carIntegration.subscribeControlStates(ids, carStateListener)"));
-        assertTrue(driver.contains("shortcut.kind == LauncherShortcutStore.Kind.CAR && !liveClimate"));
+        assertTrue(driver.contains("|| shortcut.kind == LauncherShortcutStore.Kind.CAR)\n"
+                + "                && !liveClimate"));
         assertTrue(driver.contains("binding.stateLabel.setText(state == null ? \"…\" : state.valueLabel)"));
         assertTrue(driver.contains("applyCarState(binding, carControlStates.get(shortcut.target))"));
     }

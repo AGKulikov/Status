@@ -40,6 +40,7 @@ public final class LauncherElementFrame extends MaterialCardView {
     private final GeometryListener listener;
     private boolean editMode;
     private boolean contentTouchBlocked;
+    private boolean passThroughTouchesOutsideEditMode;
     private boolean preserveAspectRatio;
     private boolean stayBehindSiblings;
     private int snapPx = 20;
@@ -125,6 +126,9 @@ public final class LauncherElementFrame extends MaterialCardView {
         setStrokeWidth(0);
         setStrokeColor(Color.TRANSPARENT);
         setCardElevation(0);
+        // setOnClickListener() makes a View clickable. Apply the runtime state even on the first
+        // no-op binding so a frame created while HOME is locked cannot retain that side effect.
+        setClickable(enabled);
         if (!modeChanged) return;
         editBadge.setVisibility(enabled ? VISIBLE : GONE);
         for (ImageView handle : resizeHandles) {
@@ -132,7 +136,15 @@ public final class LauncherElementFrame extends MaterialCardView {
         }
         // The four handles and the badge are sufficient editor chrome. Drawing a rectangle around
         // every item made those technical contours look like real launcher underlays.
-        setClickable(enabled);
+    }
+
+    /**
+     * Makes a decorative frame absent from runtime hit testing while retaining its complete
+     * drag, resize and tap-to-edit behavior in the explicit HOME editor.
+     */
+    public void setPassThroughTouchesOutsideEditMode(boolean passThrough) {
+        passThroughTouchesOutsideEditMode = passThrough;
+        if (passThrough && !editMode) setClickable(false);
     }
 
     /** Prevents the invisible legacy source panel from receiving touches behind global proxies. */
@@ -159,12 +171,14 @@ public final class LauncherElementFrame extends MaterialCardView {
     @Override
     public boolean onInterceptTouchEvent(MotionEvent event) {
         if (contentTouchBlocked) return true;
+        if (!editMode && passThroughTouchesOutsideEditMode) return false;
         return editMode || super.onInterceptTouchEvent(event);
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         if (contentTouchBlocked) return false;
+        if (!editMode && passThroughTouchesOutsideEditMode) return false;
         if (!editMode) return super.onTouchEvent(event);
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) getLayoutParams();
         if (lp == null) return false;
