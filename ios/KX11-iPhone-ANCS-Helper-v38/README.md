@@ -24,6 +24,10 @@ Helper and the iPhone-Central/ANCS route in Status Widget.
   request is still stale, Helper cancels that owner exactly once, waits for `didDisconnect` (or
   `didFailToConnect` for a cancelled pending request), and reconnects the same `CBPeripheral` with
   `RequiresANCS` and iOS 17 `AutoReconnect`. No periodic cancel loop or identity rotation is used.
+- If Core Bluetooth omits both terminal delegate callbacks after that single cancel, a sparse
+  read-only observer checks only the same `CBPeripheral.state`. It reuses the terminal reopen path
+  after the state becomes `.disconnected`; every other state keeps waiting without another cancel
+  or connect and without an elapsed-time deadline.
 - A `retrieveConnectedPeripherals` result proves only a system-wide physical link; it never starts
   PAIR/B3 or marks readiness. Protocol discovery begins only after this app receives `didConnect`,
   or when `willRestoreState` originally returns an already `.connected` app-local owner.
@@ -35,8 +39,11 @@ Helper and the iPhone-Central/ANCS route in Status Widget.
 - Restoration uses stable Central and Peripheral identifiers. Resolution order is restored owner,
   saved `CBPeripheral` identifier, system-connected permanent service, then filtered scan.
 - All Central commands are gated on `poweredOn`. A manual reconnect and the one evidence-driven
-  restoration rescue are the only normal paths that cancel a live owner; both wait for a terminal
-  Core Bluetooth callback before reconnecting.
+  restoration rescue are the only normal paths that cancel a live owner. Manual reconnect waits
+  for a terminal callback; restoration waits for that callback or the same owner's confirmed
+  `.disconnected` state before reopening.
+- Manual reconnect consumes its pending intent on either `didDisconnect` or `didFailToConnect`, so
+  a cancelled pending connection cannot make a later system reconnect look manual.
 - The iPhone-owned F05/B4 relay remains available on the same link for battery/network telemetry
   and Android's idempotent `ANCS-SUBSCRIBED` readiness proof.
 - F05 publication completes before a fresh Central connect is issued, preventing Android 9 from
