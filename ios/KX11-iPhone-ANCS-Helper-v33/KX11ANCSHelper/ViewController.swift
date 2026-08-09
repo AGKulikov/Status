@@ -658,7 +658,7 @@ final class ViewController: UIViewController {
         if peripheral.state == .connecting {
             guard centralOwnerConfiguredForAncs else {
                 setStatus("CENTRAL · ОТМЕНЯЮ ЧУЖОЙ PENDING OWNER", color: .systemOrange)
-                append("Не принимаю неизвестный .connecting owner без v33 restoration; 
+                append("Не принимаю неизвестный .connecting owner без v33 restoration; "
                     + "следующий connect сразу получит RequiresANCS")
                 centralSystemAutoReconnectActive = false
                 centralManager.cancelPeripheralConnection(peripheral)
