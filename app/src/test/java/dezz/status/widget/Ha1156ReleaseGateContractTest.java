@@ -30,7 +30,7 @@ public final class Ha1156ReleaseGateContractTest {
         assertTrue(direct.contains("connectGatt(context, false, gattCallback"));
         assertFalse(direct.contains("connectGatt(context, true, gattCallback"));
         int helperRead = services.indexOf("startHelperTelemetryRead(callbackGatt)");
-        int ancsSubscribe = services.indexOf("descriptorStage = DescriptorStage.DATA_SOURCE");
+        int ancsSubscribe = services.indexOf("descriptorStage = DescriptorStage.NOTIFICATION_SOURCE");
         assertTrue(helperRead >= 0);
         assertTrue(ancsSubscribe > helperRead);
     }
