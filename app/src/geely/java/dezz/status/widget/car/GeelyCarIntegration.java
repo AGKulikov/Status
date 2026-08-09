@@ -4147,14 +4147,6 @@ final class GeelyCarIntegration implements CarIntegration {
         return false;
     }
 
-    private static boolean containsOptionValue(
-            @NonNull List<CarControlDescriptor.Option> values, double target) {
-        for (CarControlDescriptor.Option value : values) {
-            if (sameValue(value.value, target)) return true;
-        }
-        return false;
-    }
-
     @NonNull
     private List<CarControlDescriptor.Option> supportedOptions(ICarFunction source,
                                                                 ControlDefinition definition) {
