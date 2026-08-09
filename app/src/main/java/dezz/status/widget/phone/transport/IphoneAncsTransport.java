@@ -122,6 +122,8 @@ public final class IphoneAncsTransport {
             UUID.fromString("00002bed-0000-1000-8000-00805f9b34fb");
     private static final String LOG_TAG = "KX11ANCS";
     private static final int GATT_SUCCESS = BluetoothGatt.GATT_SUCCESS;
+    /** ATT write-not-permitted. On ANCS Notification Source this means iOS has not authorized ANCS. */
+    private static final int STATUS_WRITE_NOT_PERMITTED = 3;
     private static final int STATUS_INSUFFICIENT_AUTHENTICATION = 5;
     private static final int STATUS_INSUFFICIENT_AUTHORIZATION = 8;
     private static final int STATUS_INSUFFICIENT_KEY_SIZE = 12;
@@ -171,6 +173,10 @@ public final class IphoneAncsTransport {
     private static final long ANCS_REQUEST_GAP_MS = 120L;
     private static final long LIVE_NOTIFICATION_MAX_AGE_MS = 15_000L;
     private static final int MAX_PENDING_ANCS_REQUESTS = 24;
+    private static final int MAX_EARLY_NOTIFICATION_SOURCE_FRAMES = 32;
+    private static final long ANCS_PERMISSION_RETRY_MS = 5_000L;
+    private static final int ANCS_PERMISSION_RETRY_LIMIT = 12;
+    private static final long ANCS_SECOND_CCCD_DELAY_MS = 150L;
     private static final long SECURE_TO_CLIENT_CONNECT_DELAY_MS = 400L;
     private static final long DIRECT_FALLBACK_DELAY_MS = 500L;
     private static final int INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS = 3;
@@ -376,6 +382,8 @@ public final class IphoneAncsTransport {
     private final BluetoothAdapter adapter;
     private final LinkedHashMap<String, Candidate> candidates = new LinkedHashMap<>();
     private final ArrayDeque<Request> requests = new ArrayDeque<>();
+    /** Apple may emit Notification Source immediately after CCCD; retain it until DS is ready. */
+    private final ArrayDeque<byte[]> earlyNotificationSourceFrames = new ArrayDeque<>();
     private final Map<Long, AncsProtocol.Event> events = new HashMap<>();
     private final Map<Long, Long> eventObservedAtElapsedMs = new HashMap<>();
     private final Map<String, String> appNames = new HashMap<>();
@@ -423,7 +431,7 @@ public final class IphoneAncsTransport {
     private boolean iphoneHelperTelemetryReadPending;
     /** At least one complete battery+network TEL3 frame was transferred from Helper B4. */
     private boolean iphoneHelperValidTelemetryReceived;
-    /** True after this client has attempted to prove both ANCS CCCDs to Helper v32. */
+    /** True after this client has attempted to prove both ANCS CCCDs to Helper v33. */
     private boolean helperAncsReadyProofAttempted;
     /** Serialized write of ANCS-SUBSCRIBED to the iPhone-owned B4 relay is in flight. */
     private boolean helperAncsReadyProofPending;
@@ -445,6 +453,8 @@ public final class IphoneAncsTransport {
     private boolean ancsAuthorizationFailureSeen;
     private boolean leBondAttemptObserved;
     private int ancsBondRetryCount;
+    private Runnable ancsPermissionRetry;
+    private int ancsPermissionRetryCount;
     private boolean scanning;
     private boolean advertising;
     private boolean advertisingDesired;
@@ -2705,13 +2715,14 @@ public final class IphoneAncsTransport {
                         + " CP=" + (controlPoint != null));
                 return;
             }
-            state("ANCS-FIRST · ПОДПИСКА DATA SOURCE");
-            log("ANCS найден. Подписываюсь Data Source → Notification Source; "
-                    + "это настоящая защищённая операция ANCS");
-            descriptorStage = DescriptorStage.DATA_SOURCE;
+            earlyNotificationSourceFrames.clear();
+            state("ANCS-FIRST · ПОДПИСКА NOTIFICATION SOURCE");
+            log("ANCS найден. Сначала включаю обязательную Notification Source, "
+                    + "затем Data Source; ранние события буферизуются");
+            descriptorStage = DescriptorStage.NOTIFICATION_SOURCE;
             sessionState.move(activeClientGeneration,
                     AncsSessionStateMachine.Phase.SUBSCRIBING);
-            if (!subscribe(callbackGatt, dataSource, false)) {
+            if (!subscribe(callbackGatt, notificationSource, false)) {
                 descriptorStage = DescriptorStage.NONE;
             }
             return;
@@ -2883,6 +2894,18 @@ public final class IphoneAncsTransport {
                 sendNextRequest();
                 return;
             }
+            boolean iphonePermissionDenied =
+                    failedStage == DescriptorStage.NOTIFICATION_SOURCE
+                            && status == STATUS_WRITE_NOT_PERMITTED;
+            if (iphonePermissionDenied) {
+                ancsAuthorizationFailureSeen = true;
+                state("ANCS НЕ РАЗРЕШЕН · ВКЛЮЧИТЕ УВЕДОМЛЕНИЯ НА IPHONE");
+                log("Notification Source CCCD отклонён ATT status=3: "
+                        + "iOS не разрешил ANCS этому RequiresANCS owner. "
+                        + "Физический link и BluetoothGatt owner сохраняются");
+                scheduleAncsPermissionRetry(callbackGatt);
+                return;
+            }
             if (isAuthorizationError(status)) {
                 ancsRetryAfterBond = true;
                 ancsAuthorizationFailureSeen = true;
@@ -2919,24 +2942,41 @@ public final class IphoneAncsTransport {
                     ? "GPS-LINK OK · ЖДУ SERVICE CHANGED"
                     : "ЖДУ SERVICE CHANGED / ANCS");
             sendNextRequest();
-        } else if (descriptorStage == DescriptorStage.DATA_SOURCE) {
-            state("DATA SOURCE OK · ПОДПИСКА NOTIFICATION SOURCE");
-            log("Data Source CCCD включён; включаю Notification Source");
-            descriptorStage = DescriptorStage.NOTIFICATION_SOURCE;
-            if (!subscribe(callbackGatt, notificationSource, false)) {
-                descriptorStage = DescriptorStage.NONE;
-            }
         } else if (descriptorStage == DescriptorStage.NOTIFICATION_SOURCE) {
+            state("NOTIFICATION SOURCE OK · ПОДПИСКА DATA SOURCE");
+            log("Notification Source CCCD включён; сериализованно включаю Data Source");
+            descriptorStage = DescriptorStage.DATA_SOURCE;
+            main.postDelayed(() -> {
+                if (callbackGatt != gatt || !gattClientConnected
+                        || descriptorStage != DescriptorStage.DATA_SOURCE) return;
+                if (!subscribe(callbackGatt, dataSource, false)) {
+                    descriptorStage = DescriptorStage.NONE;
+                }
+            }, ANCS_SECOND_CCCD_DELAY_MS);
+        } else if (descriptorStage == DescriptorStage.DATA_SOURCE) {
             descriptorStage = DescriptorStage.NONE;
             gattReady = true;
+            ancsPermissionRetryCount = 0;
+            if (ancsPermissionRetry != null) {
+                main.removeCallbacks(ancsPermissionRetry);
+                ancsPermissionRetry = null;
+            }
             sessionState.move(activeClientGeneration, AncsSessionStateMachine.Phase.READY);
             cancelAutoAncsWaitTimeout();
+            flushEarlyNotificationSourceFrames();
             state(managedIncomingMode
                     ? "ANCS CCCD OK · ЖДУ B4 ДАННЫЕ"
                     : "ANCS READY · ОТПРАВЬТЕ УВЕДОМЛЕНИЕ");
             if (!startOptionalHelperTelemetrySubscription(callbackGatt)) {
                 finishAncsReadySetup(callbackGatt);
             }
+        }
+    }
+
+    private void flushEarlyNotificationSourceFrames() {
+        while (gattReady && !earlyNotificationSourceFrames.isEmpty()) {
+            byte[] frame = earlyNotificationSourceFrames.pollFirst();
+            if (frame != null) handleNotificationSource(frame);
         }
     }
 
@@ -2981,8 +3021,18 @@ public final class IphoneAncsTransport {
         } else if (AncsProtocol.NOTIFICATION_SOURCE.equals(uuid)) {
             if (gattReady) {
                 handleNotificationSource(value);
+            } else if (value != null
+                    && (descriptorStage == DescriptorStage.NOTIFICATION_SOURCE
+                    || descriptorStage == DescriptorStage.DATA_SOURCE)) {
+                if (earlyNotificationSourceFrames.size()
+                        >= MAX_EARLY_NOTIFICATION_SOURCE_FRAMES) {
+                    earlyNotificationSourceFrames.pollFirst();
+                }
+                earlyNotificationSourceFrames.addLast(value.clone());
+                log("Буферизую ранний Notification Source до обеих CCCD · pending="
+                        + earlyNotificationSourceFrames.size());
             } else {
-                log("Игнорирую Notification Source до актуального ANCS READY");
+                log("Notification Source пришёл вне актуальной ANCS-подписки");
             }
         } else if (AncsProtocol.DATA_SOURCE.equals(uuid)) {
             if (gattReady) {
@@ -3147,7 +3197,7 @@ public final class IphoneAncsTransport {
                 || !TELEMETRY_RELAY_CHARACTERISTIC.equals(telemetry.getUuid())) return false;
         helperAncsReadyProofAttempted = true;
         if ((telemetry.getProperties() & BluetoothGattCharacteristic.PROPERTY_WRITE) == 0) {
-            log("Helper B4 relay не принимает ANCS-SUBSCRIBED; нужен matched Helper v32");
+            log("Helper B4 relay не принимает ANCS-SUBSCRIBED; нужен matched Helper v33");
             return false;
         }
         telemetry.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
@@ -3780,6 +3830,31 @@ public final class IphoneAncsTransport {
         state(started ? "BONDING · ПОДТВЕРДИТЕ НА IPHONE" : "BOND_START_FAILED");
     }
 
+    private void scheduleAncsPermissionRetry(@NonNull BluetoothGatt expected) {
+        if (expected != gatt || !gattClientConnected || gattReady
+                || ancsPermissionRetry != null) return;
+        if (ancsPermissionRetryCount >= ANCS_PERMISSION_RETRY_LIMIT) {
+            state("ANCS НЕ РАЗРЕШЕН НА IPHONE · LINK СОХРАНЁН");
+            log("ANCS permission всё ещё отсутствует; автоматические проверки остановлены, "
+                    + "но тот же BluetoothGatt owner остаётся активным");
+            return;
+        }
+        ancsPermissionRetryCount++;
+        int attempt = ancsPermissionRetryCount;
+        ancsPermissionRetry = () -> {
+            ancsPermissionRetry = null;
+            if (expected != gatt || !gattClientConnected || gattReady) return;
+            descriptorStage = DescriptorStage.NONE;
+            resetBatteryBootstrap();
+            log("Повторяю ANCS discovery на том же owner после ожидания iPhone permission · #"
+                    + attempt);
+            discoverServices(expected);
+        };
+        main.postDelayed(ancsPermissionRetry, ANCS_PERMISSION_RETRY_MS);
+        log("Проверка iPhone ANCS permission #" + attempt + " через "
+                + ANCS_PERMISSION_RETRY_MS + " ms; link не закрывается");
+    }
+
     private void scheduleAncsRetryAfterBond(BluetoothGatt expected, String reason) {
         if (!ancsRetryAfterBond || expected == null || expected != gatt
                 || !gattClientConnected || ancsBondRetry != null) {
@@ -3810,6 +3885,7 @@ public final class IphoneAncsTransport {
     private void clearAncsRuntime() {
         if (requestTimeout != null) main.removeCallbacks(requestTimeout);
         if (ancsBondRetry != null) main.removeCallbacks(ancsBondRetry);
+        if (ancsPermissionRetry != null) main.removeCallbacks(ancsPermissionRetry);
         cancelAutoAncsWaitTimeout();
         cancelConnectTimeout();
         cancelDiscoveryTimeout();
@@ -3823,7 +3899,10 @@ public final class IphoneAncsTransport {
         cancelBondTimeout();
         requestTimeout = null;
         ancsBondRetry = null;
+        ancsPermissionRetry = null;
+        ancsPermissionRetryCount = 0;
         requests.clear();
+        earlyNotificationSourceFrames.clear();
         events.clear();
         eventObservedAtElapsedMs.clear();
         queuedNotificationUids.clear();
