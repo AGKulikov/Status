@@ -94,3 +94,23 @@ jobs:
           path: app/build/outputs/apk/geely/release/*.apk
           if-no-files-found: error
           retention-days: 7
+
+      - name: Pack official Android signing tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          tools="$RUNNER_TEMP/android-build-tools-36"
+          mkdir -p "$tools/lib"
+          cp "$ANDROID_HOME/build-tools/36.0.0/apksigner" "$tools/"
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" "$tools/lib/"
+          cp "$ANDROID_HOME/build-tools/36.0.0/zipalign" "$tools/"
+          cp "$ANDROID_HOME/build-tools/36.0.0/aapt" "$tools/"
+          cp "$ANDROID_HOME/build-tools/36.0.0/aapt2" "$tools/"
+
+      - name: Upload official Android signing tools
+        uses: actions/upload-artifact@v4
+        with:
+          name: ha1203-android-build-tools
+          path: ${{ runner.temp }}/android-build-tools-36
+          if-no-files-found: error
+          retention-days: 1
