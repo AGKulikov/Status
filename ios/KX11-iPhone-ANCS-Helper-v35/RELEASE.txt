@@ -1,0 +1,29 @@
+KX11 ANCS Helper v35
+Bundle ID: ru.natro.kx11ancshelper
+Build: 35
+Marketing version: 35.0
+Matched Android build: Status Widget v2.8.2-ha1198
+
+This is the single-owner ANCS release:
+
+- RequiresANCS=true is present on the first and only Central connection.
+- PAIR and B3 execute on the same encrypted ATT owner.
+- ANCS-READY waits for `ancsAuthorized` and resumes only from
+  `didUpdateANCSAuthorizationFor` on that same owner.
+- ANCS-HANDOFF and the deliberate second connection are removed.
+- iOS 17+ uses Core Bluetooth auto-reconnect; older iOS uses retained-owner backoff.
+- System AutoReconnect and manual reconnect are mutually exclusive; no competing connect call.
+- A .connecting owner that has made no progress for 15 seconds is cancelled by the watchdog.
+- The watchdog invalidates the stale namespace and waits for a fresh D2D9 advertisement before
+  reconnecting, so no second Central owner is opened in parallel.
+- stopScan/cancelPeripheralConnection are deferred until CBCentralManager is poweredOn; the
+  API-MISUSE restoration race is removed.
+- A generation rejected with uuidNotAllowed is quarantined until Android advertises a genuinely
+  new namespace; reconnect backoff no longer resets on a merely connected but invalid ATT owner.
+- Core Bluetooth managers are created synchronously on background restoration launch.
+- Central and Peripheral state restoration use stable, non-versioned identifiers.
+- The selected role, Android peripheral identifier and dynamic namespace persist across relaunch.
+- Ordinary disconnect preserves the reverse F05/B4 GATT server and namespace.
+- Android B4 wake notifications keep battery/network sampling alive while Helper is backgrounded.
+- Green requires iOS ANCS authorization, Helper confirmation, both ANCS CCCDs, B4 CCCD,
+  battery and network data.
