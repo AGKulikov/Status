@@ -229,8 +229,8 @@ public final class PhoneConnectorControllerContractTest {
         assertTrue(services.contains("AncsProtocol.DATA_SOURCE"));
         assertTrue(services.contains("AncsProtocol.NOTIFICATION_SOURCE"));
         assertTrue(services.contains("AncsProtocol.CONTROL_POINT"));
-        assertTrue(services.contains("descriptorStage = DescriptorStage.DATA_SOURCE"));
-        assertTrue(descriptor.contains("descriptorStage = DescriptorStage.NOTIFICATION_SOURCE"));
+        assertTrue(services.contains("descriptorStage = DescriptorStage.NOTIFICATION_SOURCE"));
+        assertTrue(descriptor.contains("descriptorStage = DescriptorStage.DATA_SOURCE"));
         assertTrue(descriptor.contains("gattReady = true"));
         assertTrue(descriptor.contains("ANCS READY · ОТПРАВЬТЕ УВЕДОМЛЕНИЕ"));
         assertTrue(descriptor.contains("ANCS CCCD OK · ЖДУ B4 ДАННЫЕ"));
