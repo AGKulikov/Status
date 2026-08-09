@@ -87,6 +87,37 @@ public final class GeelyClimateControlReliabilityTest {
                 available, Collections.singletonList(99d), 1d));
     }
 
+    @Test public void bothThreeLevelOrdersSendTheRealOffValue() {
+        List<CarControlDescriptor.Option> available = Arrays.asList(
+                new CarControlDescriptor.Option(IHvac.STEERING_WHEEL_HEAT_OFF, "Выкл"),
+                new CarControlDescriptor.Option(IHvac.STEERING_WHEEL_HEAT_LOW, "1"),
+                new CarControlDescriptor.Option(IHvac.STEERING_WHEEL_HEAT_MID, "2"),
+                new CarControlDescriptor.Option(IHvac.STEERING_WHEEL_HEAT_HIGH, "3"),
+                new CarControlDescriptor.Option(IHvac.STEERING_WHEEL_HEAT_AUTO, "Auto"));
+        CarControlDescriptor wheel = new CarControlDescriptor("climate.wheel_heat",
+                "Подогрев руля", "Климат", "wheel_heat",
+                CarControlDescriptor.Kind.LEVELS,
+                CarControlDescriptor.Availability.SUPPORTED,
+                available, 0, 3, 1, "", "#FFFF9800");
+
+        List<Double> ascending = CarThreeLevelCyclePolicy.orderedValues(wheel, false);
+        List<Double> descending = CarThreeLevelCyclePolicy.orderedValues(wheel, true);
+        assertEquals(Double.valueOf(IHvac.STEERING_WHEEL_HEAT_OFF),
+                GeelyCarIntegration.cycleTarget(available, ascending,
+                        IHvac.STEERING_WHEEL_HEAT_HIGH));
+        assertEquals(Double.valueOf(IHvac.STEERING_WHEEL_HEAT_OFF),
+                GeelyCarIntegration.cycleTarget(available, descending,
+                        IHvac.STEERING_WHEEL_HEAT_LOW));
+        assertEquals(Double.valueOf(IHvac.STEERING_WHEEL_HEAT_OFF),
+                GeelyCarIntegration.cycleTargetWithMandatoryOff(wheel, available, descending,
+                        IHvac.STEERING_WHEEL_HEAT_AUTO));
+        assertEquals(Double.valueOf(IHvac.STEERING_WHEEL_HEAT_OFF),
+                GeelyCarIntegration.cycleTargetWithMandatoryOff(wheel, available,
+                        Arrays.asList((double) IHvac.STEERING_WHEEL_HEAT_HIGH,
+                                (double) IHvac.STEERING_WHEEL_HEAT_LOW),
+                        IHvac.STEERING_WHEEL_HEAT_MID));
+    }
+
     @Test public void cycleCommandDeduplicationIncludesTheSelectedModes() {
         CarControlCommand first = new CarControlCommand("drive.mode",
                 CarControlCommand.Operation.CYCLE, 0,

@@ -44,6 +44,7 @@ import dezz.status.widget.launcher.information.InformationPanelView;
 import dezz.status.widget.launcher.information.InformationSourcePicker;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
+import dezz.status.widget.settings.VectorIconPickerDialog;
 
 /** Visual editor for the read-only HOME “Information” grid. */
 public final class InformationPanelSettingsActivity extends AppCompatActivity {
@@ -258,18 +259,24 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
 
         TextView iconLabel = text("Иконка", 13, false);
         form.addView(iconLabel);
-        Spinner icon = new Spinner(this);
-        List<String> iconLabels = new ArrayList<>();
-        List<String> iconKeys = new ArrayList<>();
-        iconLabels.add("Автоматически по типу");
-        iconKeys.add("auto");
-        for (LauncherIconResolver.Preset preset : LauncherIconResolver.presets()) {
-            iconLabels.add(preset.label);
-            iconKeys.add(preset.key);
+        VectorIconPickerDialog.Option automaticIcon = VectorIconPickerDialog.option("auto",
+                "Автоматически по типу", R.drawable.ic_section_content);
+        List<VectorIconPickerDialog.Option> iconOptions =
+                VectorIconPickerDialog.withFirst(automaticIcon);
+        final String[] selectedIconKey = {item.iconKey};
+        VectorIconPickerDialog.Option currentIcon =
+                VectorIconPickerDialog.find(iconOptions, selectedIconKey[0]);
+        if (currentIcon == null) {
+            currentIcon = automaticIcon;
+            selectedIconKey[0] = automaticIcon.key;
         }
-        icon.setAdapter(new ArrayAdapter<>(this,
-                android.R.layout.simple_spinner_dropdown_item, iconLabels));
-        icon.setSelection(Math.max(0, iconKeys.indexOf(item.iconKey)));
+        MaterialButton icon = button(currentIcon.label);
+        VectorIconPickerDialog.decorate(icon, currentIcon);
+        icon.setOnClickListener(view -> VectorIconPickerDialog.show(this,
+                "Иконка информационной панели", iconOptions, selectedIconKey[0], option -> {
+                    selectedIconKey[0] = option.key;
+                    VectorIconPickerDialog.decorate(icon, option);
+                }));
         form.addView(icon, new LinearLayout.LayoutParams(match(), dp(52)));
 
         TextView visibilityLabel = text("Видимость", 13, false);
@@ -348,7 +355,7 @@ public final class InformationPanelSettingsActivity extends AppCompatActivity {
                 item.valueColor = valueColor[0];
                 item.labelColor = labelColor[0];
                 item.iconColor = iconColor[0];
-                item.iconKey = iconKeys.get(icon.getSelectedItemPosition());
+                item.iconKey = selectedIconKey[0];
                 item.visibility = InformationPanelConfig.Visibility.values()[
                         visibility.getSelectedItemPosition()];
                 item.column = positive(column, "Столбец") - 1;

@@ -4081,7 +4081,8 @@ final class GeelyCarIntegration implements CarIntegration {
                 }
                 return 1d;
             case CYCLE:
-                return cycleTarget(availableOptions, command.cycleValues, current);
+                return cycleTargetWithMandatoryOff(definition.descriptor, availableOptions,
+                        command.cycleValues, current);
             default:
                 return null;
         }
@@ -4116,6 +4117,42 @@ final class GeelyCarIntegration implements CarIntegration {
             }
         }
         return options.get(0).value;
+    }
+
+    /**
+     * Three-level climate carousels leave AUTO and unknown vendor values through the real OFF
+     * state before entering either manual direction. Other controls retain the generic cycle.
+     */
+    @Nullable
+    static Double cycleTargetWithMandatoryOff(
+            @NonNull CarControlDescriptor control,
+            @NonNull List<CarControlDescriptor.Option> availableOptions,
+            @NonNull List<Double> selectedValues,
+            double current) {
+        List<Double> normalized = CarThreeLevelCyclePolicy.withMandatoryOff(
+                control, selectedValues);
+        Double off = CarThreeLevelCyclePolicy.mandatoryOffValue(control);
+        if (off != null && !normalized.isEmpty()
+                && !containsCycleValue(normalized, current)
+                && containsOptionValue(availableOptions, off)) {
+            return off;
+        }
+        return cycleTarget(availableOptions, normalized, current);
+    }
+
+    private static boolean containsCycleValue(@NonNull List<Double> values, double target) {
+        for (Double value : values) {
+            if (value != null && sameValue(value, target)) return true;
+        }
+        return false;
+    }
+
+    private static boolean containsOptionValue(
+            @NonNull List<CarControlDescriptor.Option> values, double target) {
+        for (CarControlDescriptor.Option value : values) {
+            if (sameValue(value.value, target)) return true;
+        }
+        return false;
     }
 
     @NonNull

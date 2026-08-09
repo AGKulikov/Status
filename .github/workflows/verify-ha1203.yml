@@ -1,0 +1,96 @@
+name: Verify HA1203 climate, vector icons and passive backdrops
+
+on:
+  push:
+    branches:
+      - 'work/ha1203-climate-icons-backgrounds'
+    paths:
+      - 'app/**'
+      - 'build.gradle'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'settings.gradle'
+      - 'release-manifests/HA1203.md'
+      - '.github/workflows/verify-ha1203.yml'
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'build.gradle'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'settings.gradle'
+      - 'release-manifests/HA1203.md'
+      - '.github/workflows/verify-ha1203.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Climate zero, vector gallery, passive backdrops and geelyRelease
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v2
+
+      - name: Install Android SDK 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +o pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
+          set -o pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Preserved transport plus HA1203 behavior contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
+            testGeelyDebugUnitTest \
+            --tests dezz.status.widget.Ha1197TrunkAndReconnectContractTest \
+            --tests dezz.status.widget.Ha1198AutomaticBleRecoveryContractTest \
+            --tests dezz.status.widget.Ha1199ReferenceAncsConnectionContractTest \
+            --tests dezz.status.widget.Ha1200CurrentLinkSecurityContractTest \
+            --tests dezz.status.widget.Ha1201DirectAttachContractTest \
+            --tests dezz.status.widget.Ha1202ColdStartAuthorizationContractTest \
+            --tests dezz.status.widget.Ha1203VectorIconPickerContractTest \
+            --tests dezz.status.widget.car.CarThreeLevelCyclePolicyTest \
+            --tests dezz.status.widget.car.GeelyClimateControlReliabilityTest \
+            --tests dezz.status.widget.launcher.climate.ClimateLevelCyclePlannerTest \
+            --tests dezz.status.widget.launcher.climate.ClimateLevelCycleContractTest \
+            --tests dezz.status.widget.launcher.LauncherGlobalElementContractTest \
+            --tests dezz.status.widget.launcher.VectorIconQualityContractTest
+
+      - name: Compile complete unsigned geelyRelease APK
+        shell: bash
+        env:
+          ALLOW_UNSIGNED_RELEASE: 'true'
+          VERSION_NAME: 'v2.8.2-ha1203'
+          VERSION_CODE: '208021203'
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
+            assembleGeelyRelease
+
+      - name: Upload exact unsigned release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: ha1203-unsigned-release
+          path: app/build/outputs/apk/geely/release/*.apk
+          if-no-files-found: error
+          retention-days: 7

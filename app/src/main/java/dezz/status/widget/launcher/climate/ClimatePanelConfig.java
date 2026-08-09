@@ -34,8 +34,8 @@ public final class ClimatePanelConfig {
 
     /** Manual level direction used when a heat/ventilation tile is pressed. */
     public enum LevelCycleOrder {
-        ASCENDING("1 → 2 → 3"),
-        DESCENDING("3 → 2 → 1");
+        ASCENDING("0 → 1 → 2 → 3"),
+        DESCENDING("3 → 2 → 1 → 0");
 
         @NonNull public final String label;
 

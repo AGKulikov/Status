@@ -37,6 +37,7 @@ import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.launcher.ShortcutActionPicker;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
+import dezz.status.widget.settings.VectorIconPickerDialog;
 
 /** Editor for the independent mixed-content Favorites drawer on the driver rail. */
 public final class DriverFavoritesSettingsActivity extends AppCompatActivity {
@@ -304,16 +305,18 @@ public final class DriverFavoritesSettingsActivity extends AppCompatActivity {
         new AlertDialog.Builder(this).setTitle("Оформление · " + shortcut.title)
                 .setItems(choices, (dialog, which) -> {
                     if (which == 0) {
-                        List<LauncherIconResolver.Preset> presets = LauncherIconResolver.presets();
-                        String[] labels = new String[presets.size()];
-                        for (int i = 0; i < presets.size(); i++) labels[i] = presets.get(i).label;
-                        new AlertDialog.Builder(this).setTitle("Иконка")
-                                .setItems(labels, (d, selected) -> {
-                                    shortcut.icon = presets.get(selected).key;
-                                    shortcut.iconCustomized = true;
-                                    store.upsert(shortcut);
-                                    changed();
-                                }).show();
+                        VectorIconPickerDialog.Option none = VectorIconPickerDialog.option(
+                                "none", "Без иконки", R.drawable.ic_delete);
+                        List<VectorIconPickerDialog.Option> options = "none".equalsIgnoreCase(
+                                shortcut.icon) ? VectorIconPickerDialog.withFirst(none)
+                                : VectorIconPickerDialog.catalog();
+                        VectorIconPickerDialog.show(this, "Иконка", options, shortcut.icon,
+                                option -> {
+                            shortcut.icon = option.key;
+                            shortcut.iconCustomized = true;
+                            store.upsert(shortcut);
+                            changed();
+                        });
                         return;
                     }
                     String current = which == 1 ? shortcut.backgroundColor

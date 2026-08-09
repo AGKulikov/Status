@@ -1383,6 +1383,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private static boolean isLiveClimate(
             @NonNull LauncherShortcutStore.Shortcut shortcut) {
         return shortcut.liveClimateIcon
+                && shortcut.kind == LauncherShortcutStore.Kind.BUILTIN
+                && LauncherShortcutStore.Builtin.STOCK_CLIMATE.key.equals(shortcut.target)
                 && LauncherShortcutStore.isInteractive(shortcut);
     }
 

@@ -37,8 +37,8 @@ public final class Ha1154HelperAndDriverFavoritesContractTest {
 
     @Test public void driverFavoritesExposeBothThreeLevelOrders() throws Exception {
         String picker = source("launcher/ShortcutActionPicker.java");
-        assertTrue(picker.contains("Цикл уровней 1 → 2 → 3"));
-        assertTrue(picker.contains("Цикл уровней 3 → 2 → 1"));
+        assertTrue(picker.contains("Цикл уровней 0 → 1 → 2 → 3"));
+        assertTrue(picker.contains("Цикл уровней 3 → 2 → 1 → 0"));
         assertTrue(picker.contains("saveCarCycle(existing, control, ascending)"));
         assertTrue(picker.contains("saveCarCycle(existing, control, descending)"));
     }
