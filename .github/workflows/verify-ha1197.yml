@@ -1,0 +1,62 @@
+name: Verify HA1197 without signing
+
+on:
+  push:
+    branches:
+      - 'release/v2.8.2-ha1197'
+    paths:
+      - 'app/**'
+      - 'build.gradle'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'settings.gradle'
+      - '.github/workflows/verify-ha1197.yml'
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'build.gradle'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'settings.gradle'
+      - '.github/workflows/verify-ha1197.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Unit tests and geelyDebug compile
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v2
+
+      - name: Install Android SDK 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +o pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
+          set -o pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Unit tests and debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
+            testGeelyDebugUnitTest assembleGeelyDebug
