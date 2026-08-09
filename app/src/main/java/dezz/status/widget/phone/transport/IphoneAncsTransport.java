@@ -4660,8 +4660,16 @@ public final class IphoneAncsTransport {
                             handleVerifiedServerLinkDisconnected(device);
                         } else if (newState == BluetoothProfile.STATE_DISCONNECTED
                                 && managedIncomingMode && getVerifiedPeer() == null) {
-                            log("Непроверенный link закрыт; GATT server, реклама и namespace "
-                                    + "остаются опубликованы для следующей попытки");
+                            // The Helper disconnects before PAIR/B3 when Core Bluetooth reports
+                            // uuidNotAllowed for a stale ATT database. Reusing this namespace
+                            // makes iOS reconnect to the same poisoned handles forever. A link
+                            // that never became verified has no state worth preserving, so rotate
+                            // only this failed publication; ordinary verified losses still retain
+                            // their server/namespace in handleVerifiedServerLinkDisconnected().
+                            log("Непроверенный link закрыт до PAIR/B3; перепубликую GATT "
+                                    + "с новой cache-busting generation");
+                            scheduleManagedIncomingRestart(
+                                    "unverified incoming link closed before PAIR/B3");
                         }
                     });
                 }
