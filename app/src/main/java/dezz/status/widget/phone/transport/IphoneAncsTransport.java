@@ -168,7 +168,6 @@ public final class IphoneAncsTransport {
     /** Central mode: a tiny B4 notification wakes Core Bluetooth so Helper can push fresh data. */
     private static final long SERVER_TELEMETRY_WAKE_POLL_MS = 5_000L;
     private static final long HELPER_TELEMETRY_BUSY_RETRY_MS = 1_000L;
-    private static final long HELPER_SERVICE_REDISCOVERY_MS = 30_000L;
     private static final long BOND_TIMEOUT_MS = 90_000L;
     private static final long ANCS_REQUEST_GAP_MS = 120L;
     private static final long LIVE_NOTIFICATION_MAX_AGE_MS = 15_000L;
@@ -1653,37 +1652,21 @@ public final class IphoneAncsTransport {
     }
 
     /**
-     * Adopts the sole incoming RequiresANCS link and immediately registers Android's GATT-client
-     * role on it. This is the topology used by real ANCS accessories: the iPhone is GAP Central
-     * and ANCS GATT server, while the accessory is GAP Peripheral and ANCS GATT client on the
-     * same physical connection. No Helper-side discovery of Android's custom service is needed.
+     * Records an incoming RequiresANCS candidate without claiming it as the secure owner. Android
+     * may deliver an anonymous BOND_NONE facade before the resolved iPhone facade on Android 9.
+     * The peer is therefore fixed only by PAIR on this exact server link, and the reverse GATT
+     * client is registered only after B3 proves encryption and ANCS-READY proves iOS authorization.
      */
     private void attachAncsClientToIncomingOwner(BluetoothDevice device) {
         if (!managedIncomingMode || device == null || findConnectedServerPeer(device) == null) {
             return;
         }
-        BluetoothDevice current = getVerifiedPeer();
-        if (current == null) {
-            if (!claimVerifiedPeer(device)) {
-                log("Incoming ANCS owner отклонён: peer уже зафиксирован");
-                return;
-            }
-        } else if (!sameDevice(current, device)) {
-            // Android 9 may later resolve the anonymous RPA into a second BluetoothDevice facade.
-            // The first exact object already owns the live link; never create another GATT client.
-            log("Incoming resolved facade замечен после link adoption; owner сохраняю · "
-                    + safeAddress(device));
-            return;
-        }
-        synchronized (verifiedPeerLock) {
-            secureAttConfirmed = true;
-        }
-        managedResolvedPeer = device;
-        listener.onVerifiedPeerAddress(safeAddress(device));
-        state("REQUIRES_ANCS LINK · EVENT-DRIVEN CLIENT ATTACH");
-        log("Incoming RequiresANCS owner принят без PAIR/B3 bootstrap; "
-                + "Android запускает стандартный ANCS discovery на том же ACL");
-        scheduleSecureClientStart();
+        state("REQUIRES_ANCS LINK · ЖДУ PAIR/B3");
+        log("Incoming RequiresANCS candidate сохранён без client attach · objectId="
+                + System.identityHashCode(device)
+                + " address=" + safeAddress(device)
+                + " bond=" + bondLabel(safeBondState(device))
+                + "; owner зафиксирует только PAIR → B3 → ANCS-READY");
     }
 
     private boolean isVerifiedPeer(BluetoothDevice device) {
@@ -2786,7 +2769,9 @@ public final class IphoneAncsTransport {
                 + (iphonePeripheralMode
                 ? " после прямого Android-central подключения"
                 : ""));
-        scheduleHelperTelemetryRecovery(callbackGatt, HELPER_TELEMETRY_BUSY_RETRY_MS);
+        // ANCS may be published only after the current ACL becomes encrypted. Service Changed is
+        // the protocol signal for that transition; polling discoverServices once per second only
+        // re-reads Android 9's same cache and can overwrite the useful beginning of diagnostics.
         subscribeServiceChangedIfAvailable(callbackGatt);
         sendNextRequest();
     }
@@ -3299,13 +3284,7 @@ public final class IphoneAncsTransport {
                     || activeRequest != null || batteryReadPendingUuid != null
                     || iphoneHelperTelemetryReadPending;
             if (endpoint == null) {
-                if (!busy) {
-                    log("Helper B4/B3 пока не найден; повторяю discovery на существующем ANCS link");
-                    discoverServices(expectedGatt);
-                }
-                scheduleHelperTelemetryRecovery(expectedGatt,
-                        busy ? HELPER_TELEMETRY_BUSY_RETRY_MS
-                                : HELPER_SERVICE_REDISCOVERY_MS);
+                log("Helper F05/B4 пока не найден; жду Service Changed на существующем owner");
                 return;
             }
 
@@ -3313,13 +3292,7 @@ public final class IphoneAncsTransport {
                     && (endpoint.getProperties()
                     & BluetoothGattCharacteristic.PROPERTY_NOTIFY) == 0;
             if (legacyWithoutNotify) {
-                if (!busy) {
-                    log("Legacy Helper B3 не передаёт telemetry; ищу выделенный B4 повторным discovery");
-                    discoverServices(expectedGatt);
-                }
-                scheduleHelperTelemetryRecovery(expectedGatt,
-                        busy ? HELPER_TELEMETRY_BUSY_RETRY_MS
-                                : HELPER_SERVICE_REDISCOVERY_MS);
+                log("Legacy Helper B3 не передаёт telemetry; жду F05 через Service Changed");
                 return;
             }
 
@@ -4686,7 +4659,7 @@ public final class IphoneAncsTransport {
                                     ? REMOTE_LOGICAL_NAME
                                     + " подключился к стабильному link-anchor "
                                     + LOCAL_LOGICAL_NAME
-                                    + "; запускаю event-driven ANCS client attach"
+                                    + "; жду PAIR/B3 current-link proof"
                                     : "Peer станет verified только после ASCII PAIR в CONTROL "
                                     + serverControlCharacteristic);
                             if (managedIncomingMode) {
