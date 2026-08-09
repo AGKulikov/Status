@@ -1,0 +1,75 @@
+name: Verify iPhone Helper v36
+
+on:
+  push:
+    branches:
+      - 'work/ha1199-reference-ancs'
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v36/**'
+      - '.github/workflows/verify-helper-v36.yml'
+  pull_request:
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v36/**'
+      - '.github/workflows/verify-helper-v36.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-helper:
+    name: Compile Helper v36 without signing
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate project settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v36/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            CODE_SIGNING_ALLOWED=NO \
+            -showBuildSettings >"$RUNNER_TEMP/helper-v36-build-settings.txt"
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper' \
+            "$RUNNER_TEMP/helper-v36-build-settings.txt"
+          grep -q 'MARKETING_VERSION = 36.0' "$RUNNER_TEMP/helper-v36-build-settings.txt"
+          grep -q 'CURRENT_PROJECT_VERSION = 36' "$RUNNER_TEMP/helper-v36-build-settings.txt"
+
+      - name: Compile Helper v36
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v36/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            SYMROOT="$RUNNER_TEMP/KX11ANCSHelperProducts" \
+            OBJROOT="$RUNNER_TEMP/KX11ANCSHelperIntermediates" \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Verify non-destructive reconnect contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          source=ios/KX11-iPhone-ANCS-Helper-v36/KX11ANCSHelper/ViewController.swift
+          grep -q 'KX11 ANCS HELPER v36' "$source"
+          grep -q 'CBConnectPeripheralOptionRequiresANCS: true' "$source"
+          grep -q 'retrieveConnectedPeripherals' "$source"
+          grep -q 'pendingConnect=system-owned/no-timeout' "$source"
+          test "$(grep -Fc 'centralManager.connect(peripheral, options: options)' "$source")" -eq 1
+          connect="$(sed -n '/private func connectCentral/,/private func beginCentralDiscovery/p' "$source")"
+          ! grep -q 'armCentralConnectTimeout' <<<"$connect"
+          connected="$(sed -n '/private func continueCentralConnected/,/private func startCentralRouteIfPossible/p' "$source")"
+          ! grep -q 'discoverServices\|discoverCharacteristics' <<<"$connected"
+          restore="$(sed -n '/willRestoreState dict/,/didDiscover peripheral/p' "$source")"
+          ! grep -q 'central\.stopScan()\|central\.cancelPeripheralConnection' <<<"$restore"
+          grep -q '_ = controller.view' \
+            ios/KX11-iPhone-ANCS-Helper-v36/KX11ANCSHelper/AppDelegate.swift

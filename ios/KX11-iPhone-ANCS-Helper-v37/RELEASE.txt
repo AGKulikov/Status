@@ -1,0 +1,18 @@
+KX11 ANCS Helper v37
+Bundle ID: ru.natro.kx11ancshelper
+Build: 37
+Marketing version: 37.0
+Matched Android build: Status Widget v2.8.2-ha1200
+
+Architecture replacement:
+
+- permanent Android link-anchor instead of rotating service UUIDs;
+- one RequiresANCS Central owner with stable state restoration;
+- stable-F04 PAIR/B3 current-link proof before Android registers its reverse ANCS client;
+- no 15-second pending-connect/system-reconnect cancellation;
+- official restore -> known peripheral -> system-connected service -> scan resolution ladder;
+- app-local connect on a system-connected peer without first disconnecting it;
+- iOS 17+ system AutoReconnect has exclusive ownership while isReconnecting=true;
+- manual reconnect waits for didDisconnect before issuing a new connect;
+- Android owns ANCS discovery/CCCD after B3 and returns idempotent readiness via F05/B4;
+- bundle identifier and non-versioned restoration identifiers are unchanged for in-place update.
