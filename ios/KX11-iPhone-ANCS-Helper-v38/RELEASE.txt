@@ -15,6 +15,9 @@ Architecture replacement:
 - increasingly sparse read-only F04 table probes cover an ACL established after Helper startup;
 - one evidence-driven cancel waits for didDisconnect/didFailToConnect, then reopens the same
   CBPeripheral with RequiresANCS and AutoReconnect;
+- if both post-cancel callbacks are absent, read-only same-owner state observation reopens only
+  after `.disconnected`; other states cause no second cancel/connect and have no age deadline;
+- didFailToConnect consumes manual-reconnect intent exactly like didDisconnect;
 - retrieveConnectedPeripherals is physical-link evidence only and cannot start protocol readiness;
 - official restore -> known peripheral -> system-connected service -> scan resolution ladder;
 - normal resolution claims a system-connected peer without disconnecting it; only the proven
