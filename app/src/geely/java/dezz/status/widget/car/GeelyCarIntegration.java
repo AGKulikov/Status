@@ -159,8 +159,8 @@ final class GeelyCarIntegration implements CarIntegration {
     private static final int NO_ZONE = Integer.MIN_VALUE;
     private static final String FAN_CONTROL_ID = "climate.fan";
     private static final String AIRFLOW_CONTROL_ID = "climate.airflow";
-    /** Exact extension used by the stock KX11 trunk control. */
-    private static final int TRUNK_FUNCTION_ID = 0x02210100;
+    /** Exact zoned extension decoded from the working stock-compatible KX11 trunk APK. */
+    private static final int TRUNK_FUNCTION_ID = 0x21020100;
     private static final int TRUNK_ZONE = 0x20000000;
     /** ECARX front-row aggregate zone used by both manual and AUTO fan functions. */
     private static final int FRONT_FAN_ZONE = VehicleZone.ZONE_ROW_1_ALL;
