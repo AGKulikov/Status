@@ -26,7 +26,7 @@ public final class Ha1155SingleLinkTelemetryContractTest {
         String services = between(transport, "private void handleServices",
                 "private void subscribeServiceChangedIfAvailable");
         int initialRead = services.indexOf("Helper B4 initial snapshot started");
-        int ancsSubscribe = services.indexOf("descriptorStage = DescriptorStage.DATA_SOURCE");
+        int ancsSubscribe = services.indexOf("descriptorStage = DescriptorStage.NOTIFICATION_SOURCE");
         assertTrue(initialRead >= 0);
         assertTrue(ancsSubscribe > initialRead);
         assertTrue(transport.contains("iphoneServiceSetupDeferredForHelperRead"));

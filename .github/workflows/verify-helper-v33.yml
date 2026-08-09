@@ -1,0 +1,110 @@
+name: Verify iPhone Helper v33
+
+on:
+  push:
+    branches:
+      - 'release/kx11-ancs-helper-v33'
+      - 'release/v2.8.2-ha1196'
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v33/**'
+      - '.github/workflows/verify-helper-v33.yml'
+  pull_request:
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v33/**'
+      - '.github/workflows/verify-helper-v33.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-helper:
+    name: Compile Helper v33 without signing
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Validate project settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v33/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            CODE_SIGNING_ALLOWED=NO \
+            -showBuildSettings >"$RUNNER_TEMP/helper-v33-build-settings.txt"
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper' \
+            "$RUNNER_TEMP/helper-v33-build-settings.txt"
+          grep -q 'MARKETING_VERSION = 33.0' \
+            "$RUNNER_TEMP/helper-v33-build-settings.txt"
+          grep -q 'CURRENT_PROJECT_VERSION = 33' \
+            "$RUNNER_TEMP/helper-v33-build-settings.txt"
+
+      - name: Compile Helper v33
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v33/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            SYMROOT="$RUNNER_TEMP/KX11ANCSHelperProducts" \
+            OBJROOT="$RUNNER_TEMP/KX11ANCSHelperIntermediates" \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Verify single-owner ANCS and persistent reconnect contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          source=ios/KX11-iPhone-ANCS-Helper-v33/KX11ANCSHelper/ViewController.swift
+          plist=ios/KX11-iPhone-ANCS-Helper-v33/KX11ANCSHelper/Info.plist
+          grep -q 'KX11 ANCS HELPER v33' "$source"
+          grep -q 'D2D9E4BF-47F1-4E44-A8BB-A932FD5AFFFF' "$source"
+          grep -q 'decodeCentralNamespace' "$source"
+          grep -q 'applyCentralNamespace(generation)' "$source"
+          grep -Fq 'withServices: [managedIncomingBeaconUUID]' "$source"
+          grep -Fq 'discoverServices([centralServiceUUID])' "$source"
+          grep -q 'Data("ANCS-READY".utf8)' "$source"
+          grep -q 'command == "ANCS-SUBSCRIBED"' "$source"
+          grep -q 'CBConnectPeripheralOptionRequiresANCS: true' "$source"
+          grep -q 'centralAncsAuthorized = peripheral.ancsAuthorized' "$source"
+          grep -q 'guard centralAncsAuthorized else' "$source"
+          grep -q 'didUpdateANCSAuthorizationFor peripheral' "$source"
+          grep -q 'continueCentralAfterSecurity(peripheral)' "$source"
+          grep -q 'case waitingAncsAuthorization' "$source"
+          grep -q 'CBConnectPeripheralOptionEnableAutoReconnect' "$source"
+          grep -q 'centralHelperConfirmed' "$source"
+          grep -q 'centralAncsCccdConfirmed' "$source"
+          grep -q 'centralB4Subscribed' "$source"
+          grep -q 'centralWakeCharacteristic' "$source"
+          grep -Fq 'peripheral.setNotifyValue(true, for: wake)' "$source"
+          grep -q 'KX11 background wake poll' "$source"
+          grep -q 'valid.battery' "$source"
+          grep -q 'valid.network' "$source"
+          grep -q 'Central остаётся .connecting; pending owner не отменяю' "$source"
+          grep -q 'System AutoReconnect остаётся владельцем disconnected state' "$source"
+          grep -q 'retrieveConnectedPeripherals here' "$source"
+          if grep -Fq 'centralManager.retrieveConnectedPeripherals(' "$source"; then
+            echo 'Helper must not adopt a system-wide connection without RequiresANCS proof' >&2
+            exit 1
+          fi
+          test "$(grep -Fc 'centralManager.connect(peripheral, options: options)' "$source")" -eq 1
+          grep -q 'Central restore owner retained' "$source"
+          grep -q 'peripheral.stable' "$source"
+          grep -q 'central.stable' "$source"
+          grep -q 'uuidNotAllowed on current ATT owner' "$source"
+          if grep -q 'ANCS-HANDOFF\|centralLinkPhase\|centralPlannedAncsReconnect' "$source"; then
+            echo 'Legacy two-phase handoff is still present' >&2
+            exit 1
+          fi
+          grep -q '<string>bluetooth-central</string>' "$plist"
+          grep -q '<string>bluetooth-peripheral</string>' "$plist"

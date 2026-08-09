@@ -64,7 +64,7 @@ public final class Ha1165NotificationEditorAndClimateContractTest {
     @Test public void releaseIdentityIsHa1165() throws Exception {
         String build = project("build.gradle");
         if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1195'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1196'"));
     }
 
     @Test public void ancsSmartHomeBindingUsesConfirmedSubscriptionStateOnly()

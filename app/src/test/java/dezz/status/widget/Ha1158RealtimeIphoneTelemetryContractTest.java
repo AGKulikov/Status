@@ -36,7 +36,7 @@ public final class Ha1158RealtimeIphoneTelemetryContractTest {
                 "Helper B4 realtime subscription started before ANCS subscriptions"));
         assertTrue(transport.indexOf(
                 "Helper B4 realtime subscription started before ANCS subscriptions")
-                < transport.indexOf("ANCS найден. Подписываюсь Data Source"));
+                < transport.indexOf("ANCS найден. Сначала включаю обязательную Notification Source"));
     }
 
     @Test public void unchangedControlReadsDoNotRebuildUiEverySecond() throws Exception {
@@ -53,7 +53,7 @@ public final class Ha1158RealtimeIphoneTelemetryContractTest {
 
     @Test public void releaseIdentityMovesForward() throws Exception {
         String build = project("build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1195'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1196'"));
     }
 
     private static String source(String relative) throws Exception {
