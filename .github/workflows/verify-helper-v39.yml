@@ -1,0 +1,62 @@
+name: Verify iPhone Helper v39
+
+on:
+  push:
+    branches:
+      - 'work/ha1202-cold-start-authorization'
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v39/**'
+      - '.github/workflows/verify-helper-v39.yml'
+  pull_request:
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v39/**'
+      - '.github/workflows/verify-helper-v39.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-helper:
+    name: Compile Helper v39 without signing
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate project settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v39/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            CODE_SIGNING_ALLOWED=NO \
+            -showBuildSettings >"$RUNNER_TEMP/helper-v39-build-settings.txt"
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper' \
+            "$RUNNER_TEMP/helper-v39-build-settings.txt"
+          grep -q 'MARKETING_VERSION = 39.0' "$RUNNER_TEMP/helper-v39-build-settings.txt"
+          grep -q 'CURRENT_PROJECT_VERSION = 39' "$RUNNER_TEMP/helper-v39-build-settings.txt"
+
+      - name: Compile Helper v39
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v39/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            SYMROOT="$RUNNER_TEMP/KX11ANCSHelperProducts" \
+            OBJROOT="$RUNNER_TEMP/KX11ANCSHelperIntermediates" \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Verify current-owner authorization and bounded restoration contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh ios/KX11-iPhone-ANCS-Helper-v39/verify-v39-contract.sh
