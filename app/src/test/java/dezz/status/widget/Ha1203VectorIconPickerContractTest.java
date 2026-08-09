@@ -127,7 +127,8 @@ public final class Ha1203VectorIconPickerContractTest {
         assertTrue(mdiNotice.contains("9e04201d4557e729822fb57f62a316c3dea1d4a8"));
         assertTrue(googleNotice.contains("50f0603134ce7b70b2d71b686cc13e8b57ccb74c"));
         assertTrue(mdiNotice.contains("stable icon resource names and persisted catalog keys"));
-        assertTrue(googleNotice.contains("stable icon resource names and persisted catalog keys"));
+        assertTrue(googleNotice.contains("stable icon resource names"));
+        assertTrue(googleNotice.contains("persisted catalog keys were retained"));
         assertTrue(mdiLicense.contains("Version 2.0, January 2004"));
         assertTrue(googleLicense.contains("Version 2.0, January 2004"));
     }

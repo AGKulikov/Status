@@ -89,7 +89,7 @@ public final class Ha1204LiveClimateAndModernIconContractTest {
     }
 
     @Test public void releaseIdentityIsMonotonicAndInstallCompatible() throws Exception {
-        String rootBuild = project("build.gradle");
+        String rootBuild = rootProject("build.gradle");
         String workflow = project(".github/workflows/verify-ha1204.yml");
         String manifest = project("release-manifests/HA1204.md");
         assertTrue(rootBuild.contains("return 'v2.8.2-ha1204'"));
@@ -143,6 +143,10 @@ public final class Ha1204LiveClimateAndModernIconContractTest {
 
     private static String project(String relative) throws Exception {
         return read(Paths.get(relative), Paths.get("..").resolve(relative));
+    }
+
+    private static String rootProject(String relative) throws Exception {
+        return read(Paths.get("..").resolve(relative), Paths.get(relative));
     }
 
     private static String read(Path fromRoot, Path fromApp) throws Exception {
