@@ -56,7 +56,7 @@ public final class Ha1146AncsReliabilityContractTest {
         String transport = source("phone/transport/IphoneAncsTransport.java");
         String controller = source("phone/PhoneConnectorController.java");
 
-        assertTrue(transport.contains("Data Source → Notification Source"));
+        assertTrue(transport.contains("Сначала включаю обязательную Notification Source"));
         assertTrue(transport.contains("ANCS_DESCRIPTOR_WRITE_TIMEOUT_MS = 90_000L"));
         assertTrue(transport.contains("optional operation skipped, ANCS stays READY"));
         assertFalse(transport.contains("state(\"BAS OPERATION TIMEOUT"));
