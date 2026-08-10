@@ -132,6 +132,8 @@ public final class IphoneAncsTransport {
     private static final int STATUS_GATT_AUTH_FAIL = 0x89;
     /** Android's generic GATT callback failure; a delivered callback is not channel ambiguity. */
     private static final int STATUS_GATT_ERROR = 133;
+    /** AOSP GATT_CONN_TERMINATE_LOCAL_HOST: Android retired its local client-role owner. */
+    private static final int STATUS_GATT_CONN_TERMINATE_LOCAL_HOST = 22;
     private static final long REQUEST_TIMEOUT_MS = 10_000L;
     /** A direct attempt after a real advertisement may legitimately take longer on Android 9. */
     private static final long CONNECT_TIMEOUT_MS = 35_000L;
@@ -430,6 +432,16 @@ public final class IphoneAncsTransport {
     /** Bounded direct virtual opens tried before one durable incoming-route owner is obtained. */
     private int incomingClientAttachAttempt;
     private int poisonedWrapperReplacementAttempt;
+    /** Closed status=22 clientIf retained only as a transfer identity until fresh F04 is ready. */
+    private BluetoothGatt incomingStaleEstablishedOwner;
+    /** Status=22 cannot authorize a replacement until a later physical incoming-link epoch. */
+    private boolean incomingStaleOwnerAwaitingFreshEpoch;
+    /** Fresh B3/ANCS-READY epoch allowed to consume the retained stale owner exactly once. */
+    private long incomingStaleOwnerReplacementEpoch;
+    /** Suppresses duplicate PAIR/READY callbacks after the one fresh attach was consumed. */
+    private long incomingFreshReplacementConsumedEpoch;
+    /** Exact never-established wrapper created by the one-shot status=22 replacement. */
+    private BluetoothGatt incomingFreshReplacementGatt;
     /** One same-wrapper rediscovery after a real mandatory CCCD status=133 callback. */
     private int mandatoryDescriptorStatus133RetryCount;
     /** Exact bonded BluetoothDevice facade delivered by the current GATT-server link. */
@@ -492,6 +504,10 @@ public final class IphoneAncsTransport {
     /** Service setup resumes only after that first snapshot read (or its bounded timeout). */
     private boolean iphoneServiceSetupDeferredForHelperRead;
     private boolean iphonePostSecureDiscoveryScheduled;
+    private Runnable iphonePostSecureDiscovery;
+    private long iphonePostSecureDiscoveryToken;
+    /** Prevents optional B4 from re-entering itself while cached ANCS services resume. */
+    private boolean iphoneHelperTelemetrySetupBypass;
     private boolean iphoneAncsSeen;
     private boolean closing;
     private boolean retrySignalled;
@@ -573,6 +589,7 @@ public final class IphoneAncsTransport {
     private Runnable scanTimeout;
     private Runnable ancsBondRetry;
     private Runnable autoAncsWaitTimeout;
+    private long autoAncsWaitToken;
     private Runnable coldBackgroundAttachTask;
     private Runnable managedReconnectTask;
     private Runnable ambiguousAclProbeTask;
@@ -1606,7 +1623,7 @@ public final class IphoneAncsTransport {
                 || incomingSecurityEpoch != expectedSecurityEpoch) return;
         gattClientConnected = false;
         recoverEstablishedIncomingClientAfterCallbackLoss(expected,
-                "server-facade liveness failed · " + reason);
+                "server-facade liveness failed · " + reason, false);
     }
 
     /** Proves that a retained clientIf is live in the newly-created server security epoch. */
@@ -2198,6 +2215,7 @@ public final class IphoneAncsTransport {
         activeClientEstablished = false;
         activeClientProvenSecurityEpoch = 0L;
         incomingClientCandidate = null;
+        clearIncomingStaleOwnerReplacement();
         incomingAncsReadyGateOpen = false;
         secureAttPublicationToken = 0L;
         incomingAncsReadyPublicationToken = 0L;
@@ -2276,6 +2294,7 @@ public final class IphoneAncsTransport {
         directFallbackAttempted = false;
         incomingClientAttachAttempt = 0;
         poisonedWrapperReplacementAttempt = 0;
+        clearIncomingStaleOwnerReplacement();
         mandatoryDescriptorStatus133RetryCount = 0;
         incomingClientCandidate = null;
         incomingAncsReadyGateOpen = false;
@@ -2286,6 +2305,24 @@ public final class IphoneAncsTransport {
         gattClientConnected = false;
         log("Новая test-session=" + sessionGeneration
                 + "; verified peer и runtime-состояние очищены");
+    }
+
+    private void clearIncomingStaleOwnerReplacement() {
+        clearIncomingStaleOwnerTransfer();
+        incomingFreshReplacementConsumedEpoch = 0L;
+    }
+
+    private void clearIncomingStaleOwnerTransfer() {
+        incomingStaleEstablishedOwner = null;
+        incomingStaleOwnerAwaitingFreshEpoch = false;
+        incomingStaleOwnerReplacementEpoch = 0L;
+        incomingFreshReplacementGatt = null;
+    }
+
+    private boolean hasPendingStaleOwnerReplacementForCurrentEpoch() {
+        return incomingStaleOwnerReplacementEpoch != 0L
+                && incomingStaleOwnerReplacementEpoch == incomingSecurityEpoch
+                && incomingFreshReplacementConsumedEpoch != incomingSecurityEpoch;
     }
 
     private void clearIphonePeripheralRuntime(boolean clearMode) {
@@ -2307,7 +2344,8 @@ public final class IphoneAncsTransport {
         helperAncsReadyProofAcknowledged = false;
         iphoneHelperInitialReadAttempted = false;
         iphoneServiceSetupDeferredForHelperRead = false;
-        iphonePostSecureDiscoveryScheduled = false;
+        cancelIphonePostSecureDiscovery();
+        iphoneHelperTelemetrySetupBypass = false;
         iphoneAncsSeen = false;
         ancsRetryAfterBond = false;
         ancsAuthorizationFailureSeen = false;
@@ -2436,6 +2474,17 @@ public final class IphoneAncsTransport {
         long publicationToken = publishedDiagnosticServicePublicationToken;
         if (!managedIncomingMode
                 || !isCurrentDiagnosticServicePublicationToken(publicationToken)) return;
+        if (hasPendingStaleOwnerReplacementForCurrentEpoch()) {
+            log("Fresh F04 facade принят; status=22 stale replacement ждёт B3/ANCS-READY");
+            return;
+        }
+        if (AncsRecoveryPolicy.replacementConsumedForEpoch(
+                incomingFreshReplacementConsumedEpoch, incomingSecurityEpoch)
+                && gatt == null && !clientConnectInFlight) {
+            log("Fresh status=22 replacement уже использован в epoch="
+                    + incomingSecurityEpoch + "; duplicate F04/PAIR attach отброшен");
+            return;
+        }
         BluetoothDevice candidate = incomingClientCandidate;
         if (candidate == null || !isSelectedBondedIncomingDevice(candidate)
                 || findConnectedServerPeer(candidate) == null) return;
@@ -2588,11 +2637,73 @@ public final class IphoneAncsTransport {
                 + System.identityHashCode(exactIncomingDevice)
                 + " address=" + safeAddress(exactIncomingDevice)
                 + "; discovery gate открыт независимо от provisional iOS permission");
+        if (replaceStaleEstablishedOwnerAfterFreshReady(
+                serverLink, exactIncomingDevice, publicationToken)) {
+            return;
+        }
         scheduleSecureClientStart();
+    }
+
+    /**
+     * Consumes a status=22 stale owner only after the exact still-connected F04 facade, or the next
+     * physical F04 link if that facade disappears, has completed current B3 and ANCS-READY. The old
+     * wrapper was closed immediately on status=22; at this proof boundary exactly one direct virtual
+     * open is issued against the exact BluetoothDevice facade of the current server callback.
+     */
+    private boolean replaceStaleEstablishedOwnerAfterFreshReady(
+            @NonNull GattServerPeer serverLink,
+            @NonNull BluetoothDevice exactIncomingDevice,
+            long publicationToken) {
+        BluetoothGatt staleOwner = incomingStaleEstablishedOwner;
+        boolean staleSlotIsExact = staleOwner != null && gatt == null;
+        boolean exactCurrentFacade = serverLink.securityEpoch == incomingSecurityEpoch
+                && serverLink.sessionGeneration == sessionGeneration
+                && serverLink.device == exactIncomingDevice
+                && findCurrentServerPeer(exactIncomingDevice) == serverLink;
+        boolean shouldReplace = AncsRecoveryPolicy.shouldReplaceStaleOwnerOnReady(
+                hasPendingStaleOwnerReplacementForCurrentEpoch(),
+                incomingStaleOwnerReplacementEpoch,
+                incomingSecurityEpoch,
+                staleSlotIsExact,
+                gattClientConnected,
+                exactCurrentFacade,
+                isCurrentDiagnosticServicePublicationToken(publicationToken)
+                        && secureAttConfirmed
+                        && secureAttPublicationToken == publicationToken,
+                incomingAncsReadyGateOpen
+                        && incomingAncsReadyPublicationToken == publicationToken);
+        if (!shouldReplace) return false;
+
+        // Consume first. Re-entrant/repeated READY and PAIR callbacks cannot create a second
+        // wrapper even if connectGatt returns null or reports a synchronous failure.
+        incomingFreshReplacementConsumedEpoch = incomingSecurityEpoch;
+        incomingStaleOwnerAwaitingFreshEpoch = false;
+        incomingStaleOwnerReplacementEpoch = 0L;
+        incomingStaleEstablishedOwner = null;
+        cancelConnectTimeout();
+        cancelClientAttemptCallbacks();
+        clearAncsRuntime();
+        incomingDiscoveryStarted = false;
+        incomingClientAttachAttempt = 0;
+        incomingClientCandidate = exactIncomingDevice;
+        managedResolvedPeer = exactIncomingDevice;
+        state("FRESH F04 READY · ONE DIRECT ATTACH");
+        log("Status=22 recovery consumed once for securityEpoch="
+                + incomingSecurityEpoch + " · exact current facade objectId="
+                + System.identityHashCode(exactIncomingDevice));
+        startIncomingDirectAttach(
+                "fresh F04 epoch + B3 + ANCS-READY after status=22", true);
+        return true;
     }
 
     private void scheduleSecureClientStart() {
         if (secureConnectStart != null || clientConnectInFlight) return;
+        if (AncsRecoveryPolicy.replacementConsumedForEpoch(
+                incomingFreshReplacementConsumedEpoch, incomingSecurityEpoch)
+                && gatt == null) {
+            log("ANCS-READY duplicate не повторяет использованный status=22 direct attach");
+            return;
+        }
         if (managedIncomingMode && nextClientAttempt != null) {
             log("ANCS-READY gate открыт; bounded direct retry уже запланирован");
             return;
@@ -2665,7 +2776,7 @@ public final class IphoneAncsTransport {
                         + "будущую рекламу и не adopts текущий server-owned ACL");
                 return;
             }
-            startIncomingDirectAttach(reason);
+            startIncomingDirectAttach(reason, false);
             return;
         }
         if (!secureAttConfirmed) {
@@ -2790,7 +2901,8 @@ public final class IphoneAncsTransport {
      * This mirrors the direct virtual-open used by production dual-role BLE implementations:
      * the registration may happen before application authorization, but discovery cannot.
      */
-    private void startIncomingDirectAttach(@NonNull String reason) {
+    private void startIncomingDirectAttach(@NonNull String reason,
+                                           boolean oneShotFreshReplacement) {
         if (closing || !managedReconnectEnabled || !managedIncomingMode) return;
         long publicationToken = publishedDiagnosticServicePublicationToken;
         if (!isCurrentDiagnosticServicePublicationToken(publicationToken)) {
@@ -2800,6 +2912,17 @@ public final class IphoneAncsTransport {
         }
         if (clientConnectInFlight || gattClientConnected || gatt != null) {
             log("Incoming direct clientIf уже активен; дубль пропущен · " + reason);
+            return;
+        }
+        if (!oneShotFreshReplacement && hasPendingStaleOwnerReplacementForCurrentEpoch()) {
+            log("Direct attach отложен: status=22 replacement ждёт fresh B3/ANCS-READY");
+            return;
+        }
+        if (!oneShotFreshReplacement
+                && AncsRecoveryPolicy.replacementConsumedForEpoch(
+                incomingFreshReplacementConsumedEpoch, incomingSecurityEpoch)) {
+            log("Direct attach пропущен: status=22 replacement уже consumed в epoch="
+                    + incomingSecurityEpoch);
             return;
         }
         BluetoothDevice candidate = incomingClientCandidate;
@@ -2814,7 +2937,7 @@ public final class IphoneAncsTransport {
                     "exact incoming link missing before direct client attach");
             return;
         }
-        int attemptLimit = incomingAncsReadyGateOpen
+        int attemptLimit = oneShotFreshReplacement ? 1 : incomingAncsReadyGateOpen
                 ? INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS
                 : INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS - 1;
         if (incomingClientAttachAttempt >= attemptLimit) {
@@ -2853,6 +2976,7 @@ public final class IphoneAncsTransport {
                 + " · exact bonded incoming objectId=" + System.identityHashCode(device)
                 + " · serverLinkAgeMs=" + linkAgeMs
                 + " · discoveryGate=" + incomingAncsReadyGateOpen
+                + " · oneShotFreshReplacement=" + oneShotFreshReplacement
                 + " · " + reason);
         try {
             BluetoothGatt created = device.connectGatt(context, false, gattCallback,
@@ -2862,10 +2986,16 @@ public final class IphoneAncsTransport {
                 clientConnectInFlight = false;
                 activeClientTarget = null;
                 state("SAME-PEER DIRECT ATTACH RETURNED NULL");
-                scheduleIncomingClientAttachRetry("direct connectGatt returned null");
+                if (oneShotFreshReplacement) {
+                    state("FRESH STATUS=22 ATTACH FAILED · ЖДУ НОВЫЙ LINK");
+                    log("One-shot fresh direct attach returned null; retry в том же epoch запрещён");
+                } else {
+                    scheduleIncomingClientAttachRetry("direct connectGatt returned null");
+                }
                 return;
             }
             BluetoothGatt expected = created;
+            if (oneShotFreshReplacement) incomingFreshReplacementGatt = expected;
             connectTimeout = () -> {
                 if (gatt != expected || !clientConnectInFlight
                         || activeClientEstablished
@@ -2875,9 +3005,18 @@ public final class IphoneAncsTransport {
                         + INCOMING_DIRECT_ATTACH_TIMEOUT_MS
                         + " ms; закрываю только never-established wrapper · target="
                         + safeAddress(expected.getDevice()));
+                boolean exactFreshReplacement = oneShotFreshReplacement
+                        && incomingFreshReplacementGatt == expected;
                 closeClientGatt(expected);
                 clearAncsRuntime();
                 incomingDiscoveryStarted = false;
+                if (exactFreshReplacement) {
+                    incomingFreshReplacementGatt = null;
+                    state("FRESH STATUS=22 ATTACH TIMEOUT · ЖДУ НОВЫЙ LINK");
+                    log("One-shot fresh direct attach timeout; duplicate retry в securityEpoch="
+                            + incomingSecurityEpoch + " запрещён");
+                    return;
+                }
                 if (findConnectedServerPeer(expected.getDevice()) == null) {
                     resetIncomingSecurityAfterClientLoss(expected.getDevice(),
                             "never-established timeout after server facade loss");
@@ -2894,7 +3033,12 @@ public final class IphoneAncsTransport {
             gatt = null;
             state("SAME-PEER DIRECT ATTACH EXCEPTION");
             log("Direct connectGatt exception: " + failure);
-            scheduleIncomingClientAttachRetry("direct connectGatt exception");
+            if (oneShotFreshReplacement) {
+                state("FRESH STATUS=22 ATTACH EXCEPTION · ЖДУ НОВЫЙ LINK");
+                log("One-shot fresh direct attach exception; retry в том же epoch запрещён");
+            } else {
+                scheduleIncomingClientAttachRetry("direct connectGatt exception");
+            }
         }
     }
 
@@ -2914,6 +3058,12 @@ public final class IphoneAncsTransport {
     private void scheduleIncomingClientAttachRetry(@NonNull String reason) {
         if (closing || !managedReconnectEnabled || !managedIncomingMode
                 || nextClientAttempt != null) return;
+        if (AncsRecoveryPolicy.replacementConsumedForEpoch(
+                incomingFreshReplacementConsumedEpoch, incomingSecurityEpoch)) {
+            log("Bounded retry запрещён: one-shot status=22 replacement уже consumed · "
+                    + reason);
+            return;
+        }
         BluetoothDevice device = incomingClientCandidate;
         if (device == null || findCurrentServerPeer(device) == null) {
             preserveManagedIncomingPublicationAfterLinkLoss(
@@ -3202,6 +3352,12 @@ public final class IphoneAncsTransport {
         // after its callback/timeout instead of issuing a competing read.
         prepareInFlightLinkProbeForFreshEpoch();
         incomingSecurityEpoch++;
+        if (incomingStaleOwnerAwaitingFreshEpoch
+                && incomingStaleEstablishedOwner != null) {
+            incomingStaleOwnerReplacementEpoch = incomingSecurityEpoch;
+            log("Fresh incoming epoch=" + incomingSecurityEpoch
+                    + " принял status=22 stale owner; replacement ждёт B3/ANCS-READY");
+        }
         activeClientProvenSecurityEpoch = 0L;
         poisonedWrapperReplacementAttempt = 0;
         mandatoryDescriptorStatus133RetryCount = 0;
@@ -3234,7 +3390,8 @@ public final class IphoneAncsTransport {
                 peer.linkSecurityChallengeIssued = false;
             }
         }
-        if (establishedOwner && !gattClientConnected && clientConnectInFlight
+        if (establishedOwner && !hasPendingStaleOwnerReplacementForCurrentEpoch()
+                && !gattClientConnected && clientConnectInFlight
                 && sessionState.is(activeClientGeneration,
                 AncsSessionStateMachine.Phase.BACKGROUND_CONNECT)) {
             rearmPersistentGattOwner(owner, activeClientGeneration,
@@ -3250,6 +3407,7 @@ public final class IphoneAncsTransport {
                                                           @NonNull String reason) {
         if (!managedIncomingMode) return false;
         cancelAmbiguousAclProbe();
+        clearIncomingStaleOwnerTransfer();
         incomingSecurityEpoch++;
         activeClientProvenSecurityEpoch = 0L;
         cancelClientAttemptCallbacks();
@@ -3285,12 +3443,80 @@ public final class IphoneAncsTransport {
     /**
      * A client-role failure does not prove ACL loss while the exact current F04 server facade is
      * still CONNECTED. Retain that authority and replace only an ambiguous closed wrapper;
-     * otherwise invalidate the link epoch and wait for the next incoming connection.
+     * otherwise invalidate the link epoch and wait for the next incoming connection. Status=22
+     * is stricter: its retired client wrapper closes immediately, while the independent server
+     * facade/ACL and a one-shot fresh-epoch transfer token remain intact.
      */
     private void recoverEstablishedIncomingClientAfterCallbackLoss(
-            @NonNull BluetoothGatt expected, @NonNull String reason) {
+            @NonNull BluetoothGatt expected, @NonNull String reason,
+            boolean replaceAfterFreshSecurity) {
         if (!managedIncomingMode) return;
         BluetoothDevice device = expected.getDevice();
+        if (replaceAfterFreshSecurity) {
+            // Any old/new-epoch RSSI callback is now discard-only. It must never reach the
+            // generic recovery path and revive this retired wrapper with BluetoothGatt.connect().
+            cancelAmbiguousAclProbe();
+            GattServerPeer exactConnectedFacade = findConnectedServerPeer(device);
+            boolean currentFacadeAlreadyArrived =
+                    AncsRecoveryPolicy.status22MayUseAlreadyConnectedFacade(
+                            exactConnectedFacade != null,
+                            exactConnectedFacade != null
+                                    && isSelectedBondedIncomingDevice(
+                                    exactConnectedFacade.device),
+                            exactConnectedFacade != null
+                                    && exactConnectedFacade.securityEpoch
+                                    == incomingSecurityEpoch,
+                            isCurrentDiagnosticServicePublicationToken(
+                                    publishedDiagnosticServicePublicationToken));
+            boolean rawOwnerClosed;
+            if (currentFacadeAlreadyArrived) {
+                // Callback inversion seen on ECARX: the next server-role CONNECTED callback can
+                // reach the app just before status=22 retires the old client role. That facade is
+                // already the fresh epoch; never erase it or wait for a connection after it.
+                cancelClientAttemptCallbacks();
+                rawOwnerClosed = clearAncsRuntime();
+                incomingDiscoveryStarted = false;
+            } else {
+                rawOwnerClosed = resetIncomingSecurityAfterClientLoss(
+                        device, reason + " · local-host clientIf retired");
+            }
+            // status=22 is the stack's final word for this local client role. Closing its Java
+            // wrapper cannot close the independent GATT-server/ACL role, and makes every late
+            // callback fail the callbackGatt != gatt ownership gate before it can mutate state.
+            if (!rawOwnerClosed && gatt == expected) {
+                closeClientGatt(expected);
+            }
+            incomingStaleEstablishedOwner = expected;
+            // Keep this transfer latch armed until B3/READY actually consumes it. If the facade
+            // seen above was the tail of the old link, its DISCONNECTED followed by a genuinely
+            // fresh CONNECTED callback simply rebinds replacementEpoch in beginFresh...().
+            incomingStaleOwnerAwaitingFreshEpoch = true;
+            incomingStaleOwnerReplacementEpoch = currentFacadeAlreadyArrived
+                    ? incomingSecurityEpoch : 0L;
+            incomingFreshReplacementGatt = null;
+            clientConnectInFlight = false;
+            gattClientConnected = false;
+            state("STATUS=22 · ЖДУ FRESH F04 + B3 + READY");
+            log("Established clientIf status=22 больше не rearm через gatt.connect(); "
+                    + "stale wrapper "
+                    + "закрыт немедленно без изменения GATT-server/ACL"
+                    + (currentFacadeAlreadyArrived
+                    ? "; fresh exact F04 facade уже пришёл до client callback"
+                    : "; следующий physical incoming epoch получит ровно один exact attach"));
+            if (currentFacadeAlreadyArrived
+                    && secureAttConfirmed && incomingAncsReadyGateOpen) {
+                replaceStaleEstablishedOwnerAfterFreshReady(
+                        exactConnectedFacade, exactConnectedFacade.device,
+                        publishedDiagnosticServicePublicationToken);
+            }
+            return;
+        }
+        if (incomingStaleOwnerAwaitingFreshEpoch
+                && incomingStaleEstablishedOwner == expected) {
+            log("Поздний RSSI/client recovery проигнорирован: status=22 owner ждёт "
+                    + "fresh F04 + B3/READY и не может быть rearm через gatt.connect()");
+            return;
+        }
         GattServerPeer connectedFacade = findConnectedServerPeer(device);
         if (connectedFacade != null
                 && isCurrentDiagnosticServicePublicationToken(
@@ -3491,6 +3717,14 @@ public final class IphoneAncsTransport {
     }
 
     private void handleServerFacadeDisconnected(BluetoothDevice device) {
+        BluetoothGatt staleStatus22Owner = incomingStaleEstablishedOwner;
+        if (incomingStaleOwnerAwaitingFreshEpoch && staleStatus22Owner != null
+                && sameDevice(staleStatus22Owner.getDevice(), device)) {
+            state("STATUS=22 · OLD FACADE LOST · ЖДУ FRESH CONNECTED");
+            log("Server facade DISCONNECTED не сбрасывает pending status=22 recovery; "
+                    + "следующий CONNECTED перенесёт replacement на свой epoch");
+            return;
+        }
         if (establishedClientOwnsPhysicalLink(device)) {
             state("SERVER FACADE LOST · VERIFYING CLIENT HANDOFF");
             log("GATT-server callback released after exact-device client registration: "
@@ -3961,23 +4195,84 @@ public final class IphoneAncsTransport {
     }
 
     private void scheduleIphonePostSecureDiscovery(BluetoothGatt callbackGatt) {
-        if (iphonePostSecureDiscoveryScheduled) return;
+        if (!canRunIphonePostSecureDiscovery(callbackGatt)
+                || iphonePostSecureDiscoveryScheduled) return;
+        long expectedClientGeneration = activeClientGeneration;
+        long scheduledToken = ++iphonePostSecureDiscoveryToken;
         iphonePostSecureDiscoveryScheduled = true;
-        main.postDelayed(() -> {
-            if (!iphonePeripheralMode || callbackGatt != gatt || !gattClientConnected) return;
+        iphonePostSecureDiscovery = () -> {
+            if (scheduledToken != iphonePostSecureDiscoveryToken) return;
+            // The latch represents one queued runnable, never the whole connection lifetime.
+            // Release it before a busy retry so the successor can be scheduled exactly once.
+            iphonePostSecureDiscovery = null;
+            iphonePostSecureDiscoveryScheduled = false;
+            if (expectedClientGeneration != activeClientGeneration
+                    || !sessionState.isCurrent(expectedClientGeneration)
+                    || !canRunIphonePostSecureDiscovery(callbackGatt)
+                    || gattReady || iphoneAncsSeen) return;
+            if (hasSerializedGattOperationInFlight()) {
+                log("Post-secure discovery ждёт свободный serialized GATT channel");
+                scheduleIphonePostSecureDiscovery(callbackGatt);
+                return;
+            }
             log("SECURE IPHONE OK; повторяю полный discovery и ищу ANCS 7905…");
             discoverServices(callbackGatt);
-        }, GPS_POST_SECURE_DISCOVERY_DELAY_MS);
+        };
+        main.postDelayed(iphonePostSecureDiscovery, GPS_POST_SECURE_DISCOVERY_DELAY_MS);
+    }
+
+    private boolean canRunIphonePostSecureDiscovery(BluetoothGatt callbackGatt) {
+        if (!iphonePeripheralMode || callbackGatt != gatt || !gattClientConnected
+                || !activeClientEstablished
+                || activeClientTarget == null
+                || !sameDevice(activeClientTarget, callbackGatt.getDevice())
+                || !sessionState.isCurrent(activeClientGeneration)) return false;
+        if (helperBootstrapMode) return iphoneSecureConfirmed;
+        return safeBondState(callbackGatt.getDevice()) == BluetoothDevice.BOND_BONDED;
+    }
+
+    private boolean hasSerializedGattOperationInFlight() {
+        return discoveryPending || activeDiscoveryOperationGeneration != 0L
+                || descriptorStage != DescriptorStage.NONE
+                || activeDescriptorWriteOperationGeneration != 0L
+                || activeRequest != null || iphonePairWritePending
+                || iphoneSecureReadPending || iphoneHelperTelemetryReadPending
+                || helperAncsReadyProofPending || batteryReadPendingUuid != null;
+    }
+
+    private void cancelIphonePostSecureDiscovery() {
+        if (iphonePostSecureDiscovery != null) {
+            main.removeCallbacks(iphonePostSecureDiscovery);
+        }
+        iphonePostSecureDiscoveryToken++;
+        iphonePostSecureDiscovery = null;
+        iphonePostSecureDiscoveryScheduled = false;
     }
 
     private void scheduleAutoAncsWaitTimeout(BluetoothGatt expected) {
-        if (helperBootstrapMode || expected == null || expected != gatt
+        scheduleAutoAncsWaitTimeout(expected, AUTO_ANCS_WAIT_TIMEOUT_MS);
+    }
+
+    private void scheduleAutoAncsWaitTimeout(BluetoothGatt expected, long delayMs) {
+        if (helperBootstrapMode || expected == null
+                || !canRunIphonePostSecureDiscovery(expected)
                 || autoAncsWaitTimeout != null) {
             return;
         }
+        long expectedClientGeneration = activeClientGeneration;
+        long scheduledToken = ++autoAncsWaitToken;
         autoAncsWaitTimeout = () -> {
+            if (scheduledToken != autoAncsWaitToken) return;
             autoAncsWaitTimeout = null;
-            if (helperBootstrapMode || expected != gatt || !gattClientConnected || gattReady) {
+            if (helperBootstrapMode || expectedClientGeneration != activeClientGeneration
+                    || !sessionState.isCurrent(expectedClientGeneration)
+                    || !canRunIphonePostSecureDiscovery(expected) || gattReady) {
+                return;
+            }
+            if (hasSerializedGattOperationInFlight()) {
+                log("ANCS wait watchdog ждёт свободный serialized GATT channel; "
+                        + "B4/descriptor/request не прерываются");
+                scheduleAutoAncsWaitTimeout(expected, HELPER_TELEMETRY_BUSY_RETRY_MS);
                 return;
             }
             state("AUTO LINK OK · ANCS REDISCOVERY");
@@ -3986,13 +4281,14 @@ public final class IphoneAncsTransport {
                     + " ms; сохраняю живой encrypted link и повторяю discovery");
             discoverServices(expected);
         };
-        main.postDelayed(autoAncsWaitTimeout, AUTO_ANCS_WAIT_TIMEOUT_MS);
-        log("ANCS wait watchdog=" + AUTO_ANCS_WAIT_TIMEOUT_MS
+        main.postDelayed(autoAncsWaitTimeout, Math.max(1L, delayMs));
+        log("ANCS wait watchdog=" + delayMs
                 + " ms; Helper fallback внутри active daily link не запускается");
     }
 
     private void cancelAutoAncsWaitTimeout() {
         if (autoAncsWaitTimeout != null) main.removeCallbacks(autoAncsWaitTimeout);
+        autoAncsWaitToken++;
         autoAncsWaitTimeout = null;
     }
 
@@ -4092,6 +4388,7 @@ public final class IphoneAncsTransport {
             // therefore stay live even while the first ANCS authorization is still pending.
             if (iphoneTelemetryCharacteristic != null
                     && iphonePeripheralMode
+                    && !iphoneHelperTelemetrySetupBypass
                     && !iphoneHelperTelemetrySubscribed
                     && !iphoneHelperTelemetrySubscriptionAttempted
                     && descriptorStage == DescriptorStage.NONE && !gattReady) {
@@ -4165,6 +4462,14 @@ public final class IphoneAncsTransport {
                     + "current BluetoothGatt owner/epoch сохранены, polling/reconnect не нужны");
             subscribeServiceChangedIfAvailable(callbackGatt);
             if (descriptorStage == DescriptorStage.NONE) sendNextRequest();
+            return;
+        }
+
+        if (iphonePeripheralMode && helperBootstrapMode && iphoneSecureConfirmed) {
+            state("GPS-LINK OK · POST-SECURE ANCS REDISCOVERY");
+            log("Cached pre-secure services не содержат ANCS; планирую один serialized "
+                    + "post-secure discovery на том же owner");
+            scheduleIphonePostSecureDiscovery(callbackGatt);
             return;
         }
 
@@ -4672,14 +4977,32 @@ public final class IphoneAncsTransport {
 
     private void continueAfterHelperTelemetrySubscription(BluetoothGatt callbackGatt) {
         scheduleHelperTelemetryRecovery(callbackGatt, 200L);
-        if (gattReady) finishAncsReadySetup(callbackGatt);
-        else if (managedIncomingMode) {
-            // In the reverse route there is no Helper B3 phase on this client owner. Resume the
-            // same discovery result immediately so ANCS subscriptions follow the optional B4
-            // relay CCCD instead of waiting for the direct-route post-secure scheduler.
-            continueDiscoveredServiceSetup(callbackGatt);
-        } else {
+        AncsRecoveryPolicy.PostTelemetryAction action =
+                AncsRecoveryPolicy.afterHelperTelemetrySubscription(
+                        gattReady,
+                        callbackGatt == gatt && ownsAcceptedDiscoveryLineage(callbackGatt),
+                        iphonePeripheralMode,
+                        canRunIphonePostSecureDiscovery(callbackGatt));
+        if (action == AncsRecoveryPolicy.PostTelemetryAction.FINISH_READY) {
+            finishAncsReadySetup(callbackGatt);
+            return;
+        }
+        if (action == AncsRecoveryPolicy.PostTelemetryAction.CONTINUE_ACCEPTED_SERVICES) {
+            // B4 is optional and already completed its raw descriptor callback. Resume the exact
+            // accepted service snapshot, bypassing only another B4 attempt, so cached ANCS can
+            // advance Notification Source -> Data Source without a competing discovery call.
+            iphoneHelperTelemetrySetupBypass = true;
+            try {
+                continueDiscoveredServiceSetup(callbackGatt);
+            } finally {
+                iphoneHelperTelemetrySetupBypass = false;
+            }
+            return;
+        }
+        if (action == AncsRecoveryPolicy.PostTelemetryAction.REDISCOVER_CURRENT_OWNER) {
             scheduleIphonePostSecureDiscovery(callbackGatt);
+        } else {
+            log("Helper B4 завершён; ANCS continuation ждёт accepted discovery/SECURE proof");
         }
     }
 
@@ -5450,6 +5773,7 @@ public final class IphoneAncsTransport {
         if (ancsBondRetry != null) main.removeCallbacks(ancsBondRetry);
         if (ancsPermissionRetry != null) main.removeCallbacks(ancsPermissionRetry);
         cancelAutoAncsWaitTimeout();
+        cancelIphonePostSecureDiscovery();
         cancelConnectTimeout();
         cancelDiscoveryTimeout();
         cancelDescriptorWriteTimeout();
@@ -5491,6 +5815,7 @@ public final class IphoneAncsTransport {
         helperAncsReadyProofAcknowledged = false;
         iphoneHelperInitialReadAttempted = false;
         iphoneServiceSetupDeferredForHelperRead = false;
+        iphoneHelperTelemetrySetupBypass = false;
         descriptorStage = DescriptorStage.NONE;
         gattReady = false;
         discoveryPending = false;
@@ -6671,6 +6996,8 @@ public final class IphoneAncsTransport {
                 }
                 if (status != GATT_SUCCESS) {
                     boolean attachWasInFlight = clientConnectInFlight;
+                    boolean freshReplacementAttempt =
+                            callbackGatt == incomingFreshReplacementGatt;
                     boolean failedBackgroundAttach =
                             attachWasInFlight && activeClientAutoConnect;
                     cancelConnectTimeout();
@@ -6684,6 +7011,14 @@ public final class IphoneAncsTransport {
                             closeClientGatt(callbackGatt);
                             clearAncsRuntime();
                             incomingDiscoveryStarted = false;
+                            if (freshReplacementAttempt) {
+                                incomingFreshReplacementGatt = null;
+                                state("FRESH STATUS=22 ATTACH FAILED · ЖДУ НОВЫЙ LINK");
+                                log("One-shot exact-facade attach status=" + status
+                                        + "; retry в securityEpoch="
+                                        + incomingSecurityEpoch + " запрещён");
+                                return;
+                            }
                             if (findConnectedServerPeer(callbackGatt.getDevice()) == null) {
                                 resetIncomingSecurityAfterClientLoss(
                                         callbackGatt.getDevice(),
@@ -6699,7 +7034,8 @@ public final class IphoneAncsTransport {
                             // Only a clientIf that has reached CONNECTED is durable. Re-arm that
                             // same object indefinitely after later radio loss/status 133.
                             recoverEstablishedIncomingClientAfterCallbackLoss(callbackGatt,
-                                    "established same-peer GATT status=" + status);
+                                    "established same-peer GATT status=" + status,
+                                    status == STATUS_GATT_CONN_TERMINATE_LOCAL_HOST);
                         }
                         return;
                     }
@@ -6713,11 +7049,18 @@ public final class IphoneAncsTransport {
                         state("V6 ATTEMPTS EXHAUSTED");
                     }
                 } else if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    boolean freshReplacementAttempt =
+                            callbackGatt == incomingFreshReplacementGatt;
                     cancelConnectTimeout();
                     clientConnectInFlight = false;
                     gattClientConnected = true;
                     activeClientEstablished = true;
                     if (managedIncomingMode) {
+                        if (freshReplacementAttempt) {
+                            incomingFreshReplacementGatt = null;
+                            log("One-shot status=22 replacement получил CONNECTED; "
+                                    + "epoch остаётся consumed до следующего fresh CONNECTED");
+                        }
                         boolean callbackConfirmedHandoff =
                                 confirmPendingServerFacadeHandoff(callbackGatt.getDevice());
                         activeClientProvenSecurityEpoch = incomingSecurityEpoch;
@@ -6749,6 +7092,8 @@ public final class IphoneAncsTransport {
                     }
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     boolean attachWasInFlight = clientConnectInFlight;
+                    boolean freshReplacementAttempt =
+                            callbackGatt == incomingFreshReplacementGatt;
                     boolean failedBackgroundAttach =
                             attachWasInFlight && activeClientAutoConnect;
                     boolean establishedOwner = activeClientEstablished;
@@ -6757,12 +7102,20 @@ public final class IphoneAncsTransport {
                     if (managedIncomingMode) {
                         if (establishedOwner) {
                             recoverEstablishedIncomingClientAfterCallbackLoss(callbackGatt,
-                                    "established same-peer GATT disconnected");
+                                    "established same-peer GATT disconnected", false);
                         } else {
                             clientConnectInFlight = false;
                             closeClientGatt(callbackGatt);
                             clearAncsRuntime();
                             incomingDiscoveryStarted = false;
+                            if (freshReplacementAttempt) {
+                                incomingFreshReplacementGatt = null;
+                                state("FRESH STATUS=22 ATTACH DISCONNECTED · ЖДУ НОВЫЙ LINK");
+                                log("One-shot exact-facade attach disconnected до CONNECTED; "
+                                        + "retry в securityEpoch=" + incomingSecurityEpoch
+                                        + " запрещён");
+                                return;
+                            }
                             if (findConnectedServerPeer(callbackGatt.getDevice()) == null) {
                                 resetIncomingSecurityAfterClientLoss(
                                         callbackGatt.getDevice(),
