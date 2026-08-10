@@ -288,7 +288,7 @@ public final class Ha1205AncsRecoveryContractTest {
              depth++, current = current.getParent()) {
             Path candidate = current.resolve(relative).normalize();
             if (Files.isRegularFile(candidate)) {
-                return Files.readString(candidate, StandardCharsets.UTF_8);
+                return new String(Files.readAllBytes(candidate), StandardCharsets.UTF_8);
             }
         }
         throw new IllegalStateException("Project file not found: " + relative);
