@@ -174,10 +174,41 @@ public final class Ha1202ColdStartAuthorizationContractTest {
         assertTrue(readToken >= 0);
         assertTrue(b3Mutation > readToken);
         assertTrue(server.contains("publicationToken == 0L"));
-        assertTrue(server.contains("handlePairCommand(device, publicationToken)"));
         assertTrue(server.contains("canAcceptAncsReady(device, publicationToken)"));
         assertTrue(server.contains("confirmAncsReady(\n"
                 + "                                        device, publicationToken)"));
+
+        String write = between(transport,
+                "public void onCharacteristicWriteRequest",
+                "private void handleIphonePeripheralConnectionState");
+        int control = write.indexOf("serverControlCharacteristic.equals(uuid)");
+        int route = write.indexOf("handlePairWriteRequestOnMain(", control);
+        int post = write.indexOf("main.post(pairTransaction)", route);
+        int routeReturn = write.indexOf("return;", post);
+        assertTrue(control >= 0);
+        assertTrue(route > control);
+        assertTrue(post > route);
+        assertTrue(routeReturn > post);
+
+        String transaction = between(transport,
+                "private void handlePairWriteRequestOnMain",
+                "private int retirePreAdoptionServerAliases");
+        int currentToken = transaction.indexOf(
+                "currentDiagnosticServicePublicationToken(characteristic)");
+        int staleGuard = transaction.indexOf("publicationToken == 0L", currentToken);
+        int bind = transaction.indexOf(
+                "bindExactPairRequestFacadeIfSafe(device, publicationToken)", staleGuard);
+        int claim = transaction.indexOf("claimVerifiedPeer(device)", bind);
+        int response = transaction.indexOf(
+                "sendGattServerResponse(device, requestId, status, 0, null)", claim);
+        int acceptedPair = transaction.indexOf(
+                "handlePairCommand(device, publicationToken)", response);
+        assertTrue(currentToken >= 0);
+        assertTrue(staleGuard > currentToken);
+        assertTrue(bind > staleGuard);
+        assertTrue(claim > bind);
+        assertTrue(response > claim);
+        assertTrue(acceptedPair > response);
     }
 
     @Test public void everyManagedDiscoveryEntryRechecksPublicationAndLinkProofs()

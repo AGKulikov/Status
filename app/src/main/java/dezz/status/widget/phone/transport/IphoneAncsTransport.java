@@ -425,6 +425,8 @@ public final class IphoneAncsTransport {
     private long sessionGeneration;
     /** Every physical incoming link gets a new PAIR/B3/ANCS-READY ownership epoch. */
     private long incomingSecurityEpoch;
+    /** At most one bonded request facade may coalesce with an anonymous alias in each epoch. */
+    private long incomingPairRequestFacadeBoundEpoch;
     private boolean clientConnectInFlight;
     private boolean activeClientAutoConnect;
     private boolean backgroundAttachAttempted;
@@ -2283,6 +2285,7 @@ public final class IphoneAncsTransport {
         cancelClientAttemptCallbacks();
         sessionGeneration++;
         incomingSecurityEpoch++;
+        incomingPairRequestFacadeBoundEpoch = 0L;
         synchronized (gattServerPeers) {
             gattServerPeers.clear();
         }
@@ -2605,12 +2608,13 @@ public final class IphoneAncsTransport {
     }
 
     private boolean canAcceptAncsReady(BluetoothDevice device, long publicationToken) {
-        return managedIncomingMode
-                && isCurrentDiagnosticServicePublicationToken(publicationToken)
-                && secureAttConfirmed
-                && secureAttPublicationToken == publicationToken
-                && isVerifiedPeer(device)
-                && findCurrentServerPeer(device) != null;
+        return AncsRecoveryPolicy.canAcceptAncsReadyProof(
+                managedIncomingMode,
+                isCurrentDiagnosticServicePublicationToken(publicationToken),
+                secureAttConfirmed,
+                secureAttPublicationToken == publicationToken,
+                isVerifiedPeer(device),
+                findCurrentServerPeer(device) != null);
     }
 
     /**
@@ -3236,6 +3240,194 @@ public final class IphoneAncsTransport {
         return null;
     }
 
+    /**
+     * ECARX Android 9 can report the incoming link first as one anonymous BOND_NONE facade and
+     * later deliver the exact bonded facade only with the current B2 PAIR request. The request can
+     * coalesce those two framework objects because its characteristic already proved the exact
+     * current F04 publication. No B3 or READY proof is granted here.
+     */
+    private AncsRecoveryPolicy.PairFacadeBindDecision bindExactPairRequestFacadeIfSafe(
+            @NonNull BluetoothDevice device, long publicationToken) {
+        BluetoothDevice claimed = getVerifiedPeer();
+        boolean conflictingVerifiedPeer = claimed != null && !sameDevice(claimed, device);
+        GattServerPeer soleAnonymousAlias = null;
+        int anonymousAliasCount = 0;
+        boolean conflictingCurrentPeer = false;
+        boolean currentPeerPresent = false;
+        AncsRecoveryPolicy.PairFacadeBindDecision decision;
+        synchronized (gattServerPeers) {
+            for (GattServerPeer peer : gattServerPeers.values()) {
+                if (peer.sessionGeneration != sessionGeneration
+                        || peer.securityEpoch != incomingSecurityEpoch
+                        || (!peer.connected && !peer.roleFacadeHandoff
+                        && !peer.roleFacadeHandoffPending)) continue;
+                if (sameDevice(peer.device, device)) {
+                    currentPeerPresent = true;
+                }
+                if (peer.connected
+                        && safeBondState(peer.device) == BluetoothDevice.BOND_NONE) {
+                    anonymousAliasCount++;
+                    soleAnonymousAlias = peer;
+                } else if (!sameDevice(peer.device, device)) {
+                    conflictingCurrentPeer = true;
+                }
+            }
+            decision = AncsRecoveryPolicy.pairFacadeBindDecision(
+                    currentPeerPresent,
+                    managedIncomingMode,
+                    isCurrentDiagnosticServicePublicationToken(publicationToken),
+                    isSelectedBondedIncomingDevice(device),
+                    conflictingVerifiedPeer,
+                    conflictingCurrentPeer,
+                    incomingPairRequestFacadeBoundEpoch == incomingSecurityEpoch,
+                    anonymousAliasCount);
+        }
+        boolean freshRequestBind = AncsRecoveryPolicy.beginsFreshSecurityEpoch(decision);
+        if (freshRequestBind) {
+            long previousEpoch = incomingSecurityEpoch;
+            long connectedAtElapsedMs = soleAnonymousAlias == null
+                    ? SystemClock.elapsedRealtime()
+                    : soleAnonymousAlias.connectedAtElapsedMs;
+            // Synchronous by contract: ATT success must not reach Helper before stale B3/READY
+            // proofs and the old one-shot challenge are invalidated for this request-owned epoch.
+            beginFreshIncomingSecurityEpoch(device,
+                    "exact current-F04 PAIR request facade recovery");
+            synchronized (gattServerPeers) {
+                if (soleAnonymousAlias != null
+                        && soleAnonymousAlias.sessionGeneration == sessionGeneration
+                        && soleAnonymousAlias.securityEpoch == previousEpoch) {
+                    soleAnonymousAlias.connected = false;
+                    soleAnonymousAlias.roleFacadeHandoff = false;
+                    soleAnonymousAlias.roleFacadeHandoffPending = false;
+                    soleAnonymousAlias.linkSecurityChallengeIssued = false;
+                    soleAnonymousAlias.telemetrySubscribed = false;
+                }
+                GattServerPeer peer = gattServerPeers.get(deviceKey(device));
+                if (peer == null || peer.sessionGeneration != sessionGeneration) {
+                    peer = new GattServerPeer(sessionGeneration, device);
+                    gattServerPeers.put(deviceKey(device), peer);
+                }
+                peer.device = device;
+                peer.connectedAtElapsedMs = connectedAtElapsedMs;
+                peer.securityEpoch = incomingSecurityEpoch;
+                peer.connected = true;
+                peer.roleFacadeHandoff = false;
+                peer.roleFacadeHandoffPending = false;
+                peer.linkSecurityChallengeIssued = false;
+                peer.telemetrySubscribed = false;
+                incomingPairRequestFacadeBoundEpoch = incomingSecurityEpoch;
+            }
+        }
+        if (freshRequestBind) {
+            log("Exact current-F04 PAIR request bound selected bonded facade in fresh epoch"
+                    + " · anonymousAliases=" + anonymousAliasCount
+                    + " · epoch=" + incomingSecurityEpoch
+                    + " objectId=" + System.identityHashCode(device));
+        }
+        return decision;
+    }
+
+    /**
+     * Runs the complete PAIR admission transaction on the main-owned transport state. The ATT
+     * response is sent from this transaction only after a missing request facade has opened a
+     * fresh epoch and synchronously cleared every old B3/READY proof.
+     */
+    private void handlePairWriteRequestOnMain(
+            @NonNull BluetoothDevice device, int requestId,
+            @Nullable BluetoothGattCharacteristic characteristic,
+            boolean preparedWrite, boolean responseNeeded, int offset,
+            @Nullable byte[] value) {
+        int status = BluetoothGatt.GATT_SUCCESS;
+        String rejection = null;
+        long publicationToken = currentDiagnosticServicePublicationToken(characteristic);
+        String command = asciiCommand(value);
+        if (preparedWrite) {
+            status = BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED;
+            rejection = "prepared PAIR write is unsupported";
+        } else if (offset != 0) {
+            status = BluetoothGatt.GATT_INVALID_OFFSET;
+            rejection = "PAIR offset=" + offset;
+        } else if (!"PAIR".equals(command)) {
+            status = BluetoothGatt.GATT_FAILURE;
+            rejection = "CONTROL command is not ASCII PAIR · command=`" + command + "`";
+        } else if (publicationToken == 0L) {
+            status = STATUS_INSUFFICIENT_AUTHORIZATION;
+            rejection = "stale/pending F04 publication token";
+        } else {
+            // The explicit LightBlue diagnostic route already has its exact current callback
+            // facade and needs no selected-phone alias reconciliation. Managed recovery always
+            // passes through the full pure-policy guard set below.
+            AncsRecoveryPolicy.PairFacadeBindDecision facadeDecision =
+                    !managedIncomingMode && findCurrentServerPeer(device) != null
+                    ? AncsRecoveryPolicy.PairFacadeBindDecision.ALREADY_CURRENT
+                    : bindExactPairRequestFacadeIfSafe(device, publicationToken);
+            if (facadeDecision
+                    != AncsRecoveryPolicy.PairFacadeBindDecision.ALREADY_CURRENT
+                    && facadeDecision
+                    != AncsRecoveryPolicy.PairFacadeBindDecision
+                    .BIND_EXACT_REQUEST_FRESH_EPOCH
+                    && facadeDecision
+                    != AncsRecoveryPolicy.PairFacadeBindDecision
+                    .BIND_SOLE_ANONYMOUS_ALIAS) {
+                status = STATUS_INSUFFICIENT_AUTHORIZATION;
+                rejection = "current peer reconciliation=" + facadeDecision.name();
+            } else if (!claimVerifiedPeer(device)) {
+                status = STATUS_INSUFFICIENT_AUTHORIZATION;
+                rejection = "verified peer conflict after current-facade proof";
+            }
+        }
+        if (rejection != null) {
+            // This log is in the same main transaction and necessarily precedes the ATT response.
+            log("PAIR ATT REJECT PRE-RESPONSE · reason=" + rejection
+                    + " · status=" + status
+                    + " · peer=" + safeAddress(device)
+                    + " · publicationToken=" + publicationToken
+                    + " · epoch=" + incomingSecurityEpoch);
+        }
+        if (responseNeeded) {
+            sendGattServerResponse(device, requestId, status, 0, null);
+        }
+        if (status == BluetoothGatt.GATT_SUCCESS) {
+            handlePairCommand(device, publicationToken);
+        }
+    }
+
+    /**
+     * A pre-adoption bonded DISCONNECTED callback closes the whole alias set of that one incoming
+     * epoch. Otherwise an anonymous facade can remain falsely connected forever and suppress the
+     * next physical-link epoch after a hot APK replacement.
+     */
+    private int retirePreAdoptionServerAliases(@NonNull BluetoothDevice disconnectedDevice) {
+        boolean verifiedPeerPresent = getVerifiedPeer() != null;
+        boolean establishedHandoff = establishedClientOwnsPhysicalLink(disconnectedDevice);
+        boolean pendingHandoff = pendingExactClientAttach(disconnectedDevice);
+        if (!AncsRecoveryPolicy.shouldRetirePreAdoptionAliases(
+                managedIncomingMode,
+                isSelectedBondedIncomingDevice(disconnectedDevice),
+                verifiedPeerPresent,
+                establishedHandoff,
+                pendingHandoff)) return 0;
+        int retired = 0;
+        synchronized (gattServerPeers) {
+            for (GattServerPeer peer : gattServerPeers.values()) {
+                if (peer.sessionGeneration != sessionGeneration
+                        || peer.securityEpoch != incomingSecurityEpoch
+                        || !peer.connected) continue;
+                peer.connected = false;
+                peer.roleFacadeHandoff = false;
+                peer.roleFacadeHandoffPending = false;
+                peer.linkSecurityChallengeIssued = false;
+                peer.telemetrySubscribed = false;
+                retired++;
+            }
+        }
+        if (retired > 0) {
+            cancelServerTelemetryWakePoll();
+            incomingClientCandidate = null;
+        }
+        return retired;
+    }
+
     private boolean hasConnectedServerPeer() {
         synchronized (gattServerPeers) {
             for (GattServerPeer peer : gattServerPeers.values()) {
@@ -3260,7 +3452,8 @@ public final class IphoneAncsTransport {
                         || (!peer.connected && !peer.roleFacadeHandoff
                         && !peer.roleFacadeHandoffPending)
                         || !sameDevice(peer.device, device)) continue;
-                if (peer.linkSecurityChallengeIssued) return false;
+                if (AncsRecoveryPolicy.b3ReadAction(peer.linkSecurityChallengeIssued)
+                        != AncsRecoveryPolicy.B3ReadAction.RETURN_ATT_STATUS_5) return false;
                 peer.linkSecurityChallengeIssued = true;
                 return true;
             }
@@ -3283,6 +3476,7 @@ public final class IphoneAncsTransport {
             boolean anotherFacadeOwnsCurrentLink = false;
             for (GattServerPeer existing : gattServerPeers.values()) {
                 if (existing.sessionGeneration == sessionGeneration
+                        && existing.securityEpoch == incomingSecurityEpoch
                         && existing.connected) {
                     anotherFacadeOwnsCurrentLink = true;
                     break;
@@ -3352,6 +3546,7 @@ public final class IphoneAncsTransport {
         // after its callback/timeout instead of issuing a competing read.
         prepareInFlightLinkProbeForFreshEpoch();
         incomingSecurityEpoch++;
+        incomingPairRequestFacadeBoundEpoch = 0L;
         if (incomingStaleOwnerAwaitingFreshEpoch
                 && incomingStaleEstablishedOwner != null) {
             incomingStaleOwnerReplacementEpoch = incomingSecurityEpoch;
@@ -3409,6 +3604,7 @@ public final class IphoneAncsTransport {
         cancelAmbiguousAclProbe();
         clearIncomingStaleOwnerTransfer();
         incomingSecurityEpoch++;
+        incomingPairRequestFacadeBoundEpoch = 0L;
         activeClientProvenSecurityEpoch = 0L;
         cancelClientAttemptCallbacks();
         cancelBondTimeout();
@@ -6622,9 +6818,14 @@ public final class IphoneAncsTransport {
                             handleServerFacadeDisconnected(device);
                         } else if (newState == BluetoothProfile.STATE_DISCONNECTED
                                 && managedIncomingMode && getVerifiedPeer() == null) {
+                            // One physical iPhone link can surface as anonymous and bonded facade
+                            // objects. Retire the complete pre-adoption alias set so the anonymous
+                            // object cannot suppress the next fresh epoch after an APK hot update.
+                            int retiredAliases = retirePreAdoptionServerAliases(device);
                             // Keep the stable advertiser alive. The iPhone owns reconnect and will
                             // return to this same anchor; rotating the UUID deadlocked v35.
-                            log("Incoming link закрылся до adoption; стабильная реклама сохранена");
+                            log("Incoming link закрылся до adoption; стабильная реклама сохранена"
+                                    + " · retiredCurrentEpochAliases=" + retiredAliases);
                         }
                     });
                 }
@@ -6812,6 +7013,18 @@ public final class IphoneAncsTransport {
                             : "GATT SERVER WRITE TELEMETRY: kind=" + diagnosticTelemetry.kind
                             + " seq=" + diagnosticTelemetry.sequence
                             + " peer=" + safeAddress(device)));
+                    if (serverControlCharacteristic.equals(uuid)) {
+                        // The main-owned transaction validates/binds the facade, sends the ATT
+                        // response, and only then processes the accepted PAIR command.
+                        Runnable pairTransaction = () -> handlePairWriteRequestOnMain(
+                                device, requestId, characteristic, preparedWrite,
+                                responseNeeded, offset, rawValue);
+                        // onConnectionStateChange uses this same unconditional main queue. Keep
+                        // Binder callback arrival FIFO so a queued DISCONNECTED cannot run after
+                        // and retire a newer PAIR-owned facade from the same callback stream.
+                        main.post(pairTransaction);
+                        return;
+                    }
                     int status = BluetoothGatt.GATT_SUCCESS;
                     Runnable successAction = null;
                     long publicationToken =
@@ -6821,28 +7034,6 @@ public final class IphoneAncsTransport {
                         status = BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED;
                     } else if (offset != 0) {
                         status = BluetoothGatt.GATT_INVALID_OFFSET;
-                    } else if (serverControlCharacteristic.equals(uuid)) {
-                        String command = asciiCommand(value);
-                        if (!"PAIR".equals(command)) {
-                            status = BluetoothGatt.GATT_FAILURE;
-                            main.post(() -> log("CONTROL command отклонена: `" + command
-                                    + "`; ожидается ASCII PAIR"));
-                        } else if (publicationToken == 0L) {
-                            status = STATUS_INSUFFICIENT_AUTHORIZATION;
-                            main.post(() -> log("PAIR отклонён: stale/pending F04 "
-                                    + "publication token · " + safeAddress(device)));
-                        } else if (findCurrentServerPeer(device) == null) {
-                            status = STATUS_INSUFFICIENT_AUTHORIZATION;
-                            main.post(() -> log("PAIR отклонён: stale server security epoch · "
-                                    + safeAddress(device)));
-                        } else if (!claimVerifiedPeer(device)) {
-                            status = STATUS_INSUFFICIENT_AUTHORIZATION;
-                            main.post(() -> log("PAIR отклонён: verified peer уже зафиксирован, "
-                                    + "чужой callback " + safeAddress(device)
-                                    + " его не заменит"));
-                        } else {
-                            successAction = () -> handlePairCommand(device, publicationToken);
-                        }
                     } else if (serverSecureCharacteristic.equals(uuid)
                             || serverTelemetryCharacteristicUuid.equals(uuid)) {
                         String command = asciiCommand(value);

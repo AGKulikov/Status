@@ -1,0 +1,32 @@
+KX11 ANCS Helper v41
+Bundle ID: ru.natro.kx11ancshelper
+Build: 41
+Marketing version: 41.0
+Matched Android build: Status Widget v2.8.2-ha1206
+
+Recommended production configuration: Helper **Peripheral** + Status Widget **iPhone
+Peripheral** (the defaults). The Central/Central ANCS configuration remains available only as an
+alternate diagnostic/recovery route.
+
+Changes from v40:
+
+- an ordinary terminal reconnect left in `.connecting` after a hot Status Widget update now runs
+  exact saved-identifier F04 beacon and `retrieveConnectedPeripherals` observers in parallel;
+- only exact F04 physical-link proof arms a short `didConnect` grace and one bounded
+  cancel -> terminal/.disconnected -> same-owner RequiresANCS reopen; elapsed time cannot trigger
+  it and the lineage has no second claim;
+- a matching late exact `didConnect` atomically cancels reclaim and consumes the retained intent;
+- a Bluetooth off/on transition invalidates old F04 proof but preserves the exact owner and
+  one-shot lineage; a disconnected issued request is rematerialized once through the normal
+  poweredOn/F05 deferred-connect route without a cancel or a new budget;
+- `.connecting` observation and logs are sparse instead of repeating every 0.5 seconds;
+- exact F04 Service Changed invalidation no longer re-arms destructive recovery by itself; a
+  different exact CBService object with validated B2/B3/B4, a different owner/route, or full green
+  B3 + ANCS-READY + Android ANCS/B4 CCCD proof is required; same-object and incomplete/error
+  candidates remain on sparse read-only discovery and never reach PAIR/reset;
+- Service Changed atomically invalidates old READY/B3/Helper/ANCS/B4 proof so a validated
+  replacement always emits a fresh PAIR -> B3 -> ANCS-READY handshake;
+- all v40 one-destructive-recovery, exact-owner B3/ANCS-READY, authoritative Android CCCD proof,
+  bounded restoration claims, two-sided restored-B4 proof, publication object-lineage and
+  poweredOn gating remain unchanged;
+- bundle identifier, restoration identifiers, saved Geely identity and system pairing are kept.
