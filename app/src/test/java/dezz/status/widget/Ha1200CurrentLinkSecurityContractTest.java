@@ -36,10 +36,12 @@ public final class Ha1200CurrentLinkSecurityContractTest {
         assertFalse(candidate.contains("claimVerifiedPeer(device)"));
 
         String ready = between(transport,
-                "private void confirmAncsReady",
-                "private void scheduleSecureClientStart");
+                "private IncomingReadyAttach commitAncsReady",
+                "private void scheduleCapturedIncomingAttachAfterReady");
         assertTrue(ready.contains("canAcceptAncsReady"));
-        assertTrue(ready.contains("scheduleSecureClientStart();"));
+        assertTrue(ready.contains("armIncomingReadyAttachLatch("));
+        assertTrue(ready.contains("incomingAncsReadyGateOpen = true;"));
+        assertFalse(ready.contains("connectGatt("));
         assertTrue(transport.contains("issueCurrentLinkSecurityChallenge(device)"));
         assertTrue(transport.contains("STATUS_INSUFFICIENT_AUTHENTICATION"));
     }

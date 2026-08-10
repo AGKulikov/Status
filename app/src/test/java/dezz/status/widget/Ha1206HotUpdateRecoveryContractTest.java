@@ -51,7 +51,7 @@ public final class Ha1206HotUpdateRecoveryContractTest {
         String binding = between(transport,
                 "private AncsRecoveryPolicy.PairFacadeBindDecision "
                         + "bindExactPairRequestFacadeIfSafe",
-                "private int retirePreAdoptionServerAliases");
+                "private void handlePairWriteRequestOnMain");
         assertTrue(binding.contains("isCurrentDiagnosticServicePublicationToken(publicationToken)"));
         assertTrue(binding.contains("isSelectedBondedIncomingDevice(device)"));
         assertTrue(binding.contains("conflictingVerifiedPeer"));
@@ -59,8 +59,8 @@ public final class Ha1206HotUpdateRecoveryContractTest {
                 + "== incomingSecurityEpoch"));
         assertTrue(binding.contains("safeBondState(peer.device) == BluetoothDevice.BOND_NONE"));
         assertTrue(binding.contains("pairFacadeBindDecision("));
-        assertTrue(binding.contains("BIND_EXACT_REQUEST_FRESH_EPOCH"));
-        assertTrue(binding.contains("BIND_SOLE_ANONYMOUS_ALIAS"));
+        assertTrue(binding.contains("beginsFreshSecurityEpoch(decision)"));
+        assertTrue(binding.contains("exactCurrentRawFacade"));
         assertTrue(binding.contains("beginFreshIncomingSecurityEpoch(device,"));
         assertTrue(binding.contains("peer.securityEpoch = incomingSecurityEpoch;"));
         assertTrue(binding.contains("incomingPairRequestFacadeBoundEpoch = incomingSecurityEpoch;"));
@@ -70,20 +70,22 @@ public final class Ha1206HotUpdateRecoveryContractTest {
 
         String pair = between(transport,
                 "private void handlePairWriteRequestOnMain",
-                "private int retirePreAdoptionServerAliases");
+                "private void handleSecureReadRequestOnMain");
         int token = pair.indexOf("currentDiagnosticServicePublicationToken(characteristic)");
         int bind = pair.indexOf("bindExactPairRequestFacadeIfSafe(device, publicationToken)");
         int claim = pair.indexOf("claimVerifiedPeer(device)", bind);
+        int action = pair.indexOf("commitPairCommand(device, publicationToken)", claim);
         int response = pair.indexOf(
-                "sendGattServerResponse(device, requestId, status, 0, null)", claim);
-        int action = pair.indexOf("handlePairCommand(device, publicationToken)", response);
+                "sendGattServerResponse(device, requestId, status, 0, null)", action);
+        int finish = pair.indexOf("finishPairCommand(device, publicationToken", response);
         assertTrue(pair.contains("BIND_EXACT_REQUEST_FRESH_EPOCH"));
         assertTrue(pair.contains("BIND_SOLE_ANONYMOUS_ALIAS"));
         assertTrue(token >= 0);
         assertTrue(bind > token);
         assertTrue(claim > bind);
-        assertTrue(response > claim);
-        assertTrue(action > response);
+        assertTrue(action > claim);
+        assertTrue(response > action);
+        assertTrue(finish > response);
 
         String write = between(transport,
                 "public void onCharacteristicWriteRequest",
@@ -121,19 +123,18 @@ public final class Ha1206HotUpdateRecoveryContractTest {
         assertFalse(write.contains("pairTransaction.run()"));
     }
 
-    @Test public void rejectionReasonIsLoggedSynchronouslyBeforeTheAttResponse()
+    @Test public void rejectionReasonIsLoggedOnlyAfterTheAttResponse()
             throws Exception {
         String pair = between(transport(),
                 "private void handlePairWriteRequestOnMain",
-                "private int retirePreAdoptionServerAliases");
+                "private void handleSecureReadRequestOnMain");
         int reason = pair.indexOf("String rejection = null;");
-        int log = pair.indexOf("PAIR ATT REJECT PRE-RESPONSE", reason);
         int response = pair.indexOf(
-                "sendGattServerResponse(device, requestId, status, 0, null)", log);
+                "sendGattServerResponse(device, requestId, status, 0, null)", reason);
+        int log = pair.indexOf("PAIR ATT REJECT POST-RESPONSE", response);
         assertTrue(reason >= 0);
-        assertTrue(log > reason);
-        assertTrue(response > log);
-        assertFalse(pair.substring(log, response).contains("main.post"));
+        assertTrue(response > reason);
+        assertTrue(log > response);
     }
 
     @Test public void missingFacadeClearsOldProofsBeforePairSuccessAndImmediateB3()
@@ -170,7 +171,7 @@ public final class Ha1206HotUpdateRecoveryContractTest {
 
         String readyGate = between(transport,
                 "private boolean canAcceptAncsReady",
-                "private void confirmAncsReady");
+                "private IncomingReadyAttach commitAncsReady");
         assertTrue(readyGate.contains("secureAttConfirmed"));
         assertTrue(readyGate.contains("secureAttPublicationToken == publicationToken"));
     }
@@ -183,8 +184,8 @@ public final class Ha1206HotUpdateRecoveryContractTest {
         assertTrue(challenge.contains("peer.linkSecurityChallengeIssued"));
 
         String read = between(transport,
-                "public void onCharacteristicReadRequest",
-                "public void onDescriptorReadRequest");
+                "private void handleSecureReadRequestOnMain",
+                "private void handleSecureWriteRequestOnMain");
         int currentPeer = read.indexOf("!isVerifiedPeer(device)");
         int challengeCall = read.indexOf("issueCurrentLinkSecurityChallenge(device)");
         int statusFive = read.indexOf("STATUS_INSUFFICIENT_AUTHENTICATION", challengeCall);
@@ -196,11 +197,11 @@ public final class Ha1206HotUpdateRecoveryContractTest {
 
         String ready = between(transport,
                 "private boolean canAcceptAncsReady",
-                "private void confirmAncsReady");
+                "private IncomingReadyAttach commitAncsReady");
         assertTrue(ready.contains("secureAttConfirmed"));
         assertTrue(ready.contains("secureAttPublicationToken == publicationToken"));
         assertTrue(ready.contains("isVerifiedPeer(device)"));
-        assertTrue(ready.contains("findCurrentServerPeer(device) != null"));
+        assertTrue(ready.contains("exactServerPeer.device == rawFacade"));
     }
 
     private static String transport() throws Exception {

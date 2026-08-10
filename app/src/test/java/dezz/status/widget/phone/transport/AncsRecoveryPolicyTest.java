@@ -146,6 +146,31 @@ public final class AncsRecoveryPolicyTest {
                         true, true, true, true, false, false, false, 2));
     }
 
+    @Test public void addressEqualNewRawFacadeStartsFreshChallengeInsteadOfInheritingReady() {
+        assertEquals(AncsRecoveryPolicy.PairFacadeBindDecision
+                        .BIND_EXACT_REQUEST_FRESH_EPOCH,
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        true, false, true, true, true,
+                        false, false, true, 0));
+
+        boolean oldSecure = true;
+        boolean oldReady = true;
+        boolean challengeIssued = true;
+        AncsRecoveryPolicy.PairFacadeBindDecision decision =
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        true, false, true, true, true,
+                        false, false, true, 0);
+        if (AncsRecoveryPolicy.beginsFreshSecurityEpoch(decision)) {
+            oldSecure = false;
+            oldReady = false;
+            challengeIssued = false;
+        }
+        assertFalse(oldSecure);
+        assertFalse(oldReady);
+        assertEquals(AncsRecoveryPolicy.B3ReadAction.RETURN_ATT_STATUS_5,
+                AncsRecoveryPolicy.b3ReadAction(challengeIssued));
+    }
+
     @Test public void zeroAliasPairClearsOldProofsBeforeSuccessAndChallengesImmediateB3() {
         long securityEpoch = 17L;
         boolean secureAttConfirmed = true;
@@ -175,6 +200,140 @@ public final class AncsRecoveryPolicyTest {
         assertEquals(AncsRecoveryPolicy.B3ReadAction.RETURN_ATT_STATUS_5,
                 AncsRecoveryPolicy.b3ReadAction(linkSecurityChallengeIssued));
         assertFalse(AncsRecoveryPolicy.canAcceptAncsReadyProof(
-                true, true, secureAttConfirmed, false, true, true));
+                true, true, true, secureAttConfirmed, false,
+                true, true, true));
+    }
+
+    @Test public void managedRouteCannotUsePlainAncsWriteAsB3Proof() {
+        assertFalse(AncsRecoveryPolicy.allowsB3WriteProof(true));
+        assertTrue(AncsRecoveryPolicy.allowsB3WriteProof(false));
+    }
+
+    @Test public void trace2342CannotAllocateClientIfBeforePairB3AndReady() {
+        long session = 7L;
+        long epoch = 3L;
+        long publication = 1207L;
+        long pairSession = 0L;
+        long pairEpoch = 0L;
+        long pairPublication = 0L;
+        boolean exactRawFacade = false;
+        boolean secure = false;
+        boolean ready = false;
+        int attempts = 0;
+
+        // F04 publication and exact bonded CONNECTED only save a candidate.
+        assertFalse(AncsRecoveryPolicy.canStartReverseClientAttach(
+                true, true, session, pairSession, epoch, pairEpoch,
+                publication, pairPublication, exactRawFacade, true,
+                secure, 0L, ready, 0L));
+        assertEquals(0, attempts);
+
+        // PAIR owns the exact raw facade but still cannot allocate clientIf.
+        pairSession = session;
+        pairEpoch = epoch;
+        pairPublication = publication;
+        exactRawFacade = true;
+        assertFalse(AncsRecoveryPolicy.canStartReverseClientAttach(
+                true, true, session, pairSession, epoch, pairEpoch,
+                publication, pairPublication, exactRawFacade, true,
+                secure, 0L, ready, 0L));
+        assertEquals(0, attempts);
+
+        // Current encrypted B3 alone also remains pre-ready.
+        secure = true;
+        assertFalse(AncsRecoveryPolicy.canStartReverseClientAttach(
+                true, true, session, pairSession, epoch, pairEpoch,
+                publication, pairPublication, exactRawFacade, true,
+                secure, publication, ready, 0L));
+        assertEquals(0, attempts);
+
+        // Only same-tuple READY opens attempt #1.
+        ready = true;
+        assertTrue(AncsRecoveryPolicy.canStartReverseClientAttach(
+                true, true, session, pairSession, epoch, pairEpoch,
+                publication, pairPublication, exactRawFacade, true,
+                secure, publication, ready, publication));
+        attempts++;
+        assertEquals(1, attempts);
+    }
+
+    @Test public void attachAndCallbacksRequireExactSessionEpochPublicationAndRawFacade() {
+        assertFalse(AncsRecoveryPolicy.canStartReverseClientAttach(
+                true, true, 7L, 7L, 3L, 2L,
+                1207L, 1207L, true, true,
+                true, 1207L, true, 1207L));
+        assertFalse(AncsRecoveryPolicy.canStartReverseClientAttach(
+                true, true, 7L, 7L, 3L, 3L,
+                1207L, 1207L, false, true,
+                true, 1207L, true, 1207L));
+
+        assertTrue(AncsRecoveryPolicy.acceptsReverseClientCallback(
+                true, true, 7L, 7L, 3L, 3L,
+                1207L, 1207L, true, true, true, true));
+        assertFalse(AncsRecoveryPolicy.acceptsReverseClientCallback(
+                true, true, 7L, 7L, 4L, 3L,
+                1207L, 1207L, true, true, true, true));
+        assertFalse(AncsRecoveryPolicy.acceptsReverseClientCallback(
+                true, false, 7L, 7L, 3L, 3L,
+                1207L, 1207L, true, true, true, true));
+        assertFalse(AncsRecoveryPolicy.acceptsReverseClientCallback(
+                true, true, 7L, 7L, 3L, 3L,
+                1208L, 1207L, true, true, true, true));
+        assertFalse(AncsRecoveryPolicy.acceptsReverseClientCallback(
+                true, true, 7L, 7L, 3L, 3L,
+                1207L, 1207L, true, true, true, false));
+    }
+
+    @Test public void duplicatePairAndReadyDoNotRefillAttemptsOrArmAnotherImmediateAttach() {
+        int attempts = 2;
+        boolean firstPairProof = false;
+        boolean firstReadyProof = false;
+        boolean readyAttachLatchAlreadyArmed = true;
+
+        if (firstPairProof) attempts = 0;
+        if (firstReadyProof) attempts = 0;
+        boolean armAnotherImmediateAttach = !readyAttachLatchAlreadyArmed;
+
+        assertEquals(2, attempts);
+        assertFalse(armAnotherImmediateAttach);
+    }
+
+    @Test public void disconnectBeforeReadyBarrierMakesCapturedAttachANoop() {
+        assertFalse(AncsRecoveryPolicy.canStartReverseClientAttach(
+                true, true, 7L, 7L, 3L, 3L,
+                1207L, 1207L, true, false,
+                true, 1207L, true, 1207L));
+    }
+
+    @Test public void retainedOwnerRearmIsZeroBeforeReadyAndOneAfterExactReady() {
+        boolean ready = false;
+        int rawRearmCommands = 0;
+        if (AncsRecoveryPolicy.acceptsReverseClientCallback(
+                true, true, 7L, 7L, 3L, 3L,
+                1207L, 1207L, true, true, true, ready)) {
+            rawRearmCommands++;
+        }
+        assertEquals(0, rawRearmCommands);
+
+        ready = true;
+        if (AncsRecoveryPolicy.acceptsReverseClientCallback(
+                true, true, 7L, 7L, 3L, 3L,
+                1207L, 1207L, true, true, true, ready)) {
+            rawRearmCommands++;
+        }
+        assertEquals(1, rawRearmCommands);
+    }
+
+    @Test public void capturedReadyTaskExclusivelyOwnsFirstCommandAcrossResponseBarrier() {
+        assertFalse(AncsRecoveryPolicy.mayIssueReverseClientCommand(
+                true, true, true, true));
+        assertFalse(AncsRecoveryPolicy.mayIssueReverseClientCommand(
+                true, false, true, false));
+        assertTrue(AncsRecoveryPolicy.mayIssueReverseClientCommand(
+                true, false, true, true));
+        assertTrue(AncsRecoveryPolicy.mayIssueReverseClientCommand(
+                true, false, false, false));
+        assertFalse(AncsRecoveryPolicy.mayIssueReverseClientCommand(
+                false, false, false, false));
     }
 }

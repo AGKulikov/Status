@@ -148,7 +148,7 @@ public final class Ha1202ColdStartAuthorizationContractTest {
         String transport = transport();
 
         String pair = between(transport,
-                "private void handlePairCommand", "private Boolean markSecureAttConfirmed");
+                "private Boolean commitPairCommand", "private void finishPairCommand");
         assertTrue(pair.contains(
                 "isCurrentDiagnosticServicePublicationToken(publicationToken)"));
 
@@ -159,24 +159,23 @@ public final class Ha1202ColdStartAuthorizationContractTest {
         assertTrue(secure.contains("secureAttPublicationToken = publicationToken;"));
 
         String ready = between(transport,
-                "private boolean canAcceptAncsReady", "private void scheduleSecureClientStart");
+                "private boolean canAcceptAncsReady",
+                "private void scheduleCapturedIncomingAttachAfterReady");
         assertTrue(ready.contains(
                 "isCurrentDiagnosticServicePublicationToken(publicationToken)"));
         assertTrue(ready.contains("secureAttPublicationToken == publicationToken"));
         assertTrue(ready.contains("incomingAncsReadyPublicationToken = publicationToken;"));
 
-        String server = between(transport,
-                "private final BluetoothGattServerCallback gattServerCallback",
-                "private void handleIphonePeripheralConnectionState");
-        int readToken = server.indexOf(
+        String b3 = between(transport,
+                "private void handleSecureReadRequestOnMain",
+                "private void handleSecureWriteRequestOnMain");
+        int readToken = b3.indexOf(
                 "currentDiagnosticServicePublicationToken(characteristic)");
-        int b3Mutation = server.indexOf("issueCurrentLinkSecurityChallenge(device)");
+        int b3Mutation = b3.indexOf("issueCurrentLinkSecurityChallenge(device)");
         assertTrue(readToken >= 0);
         assertTrue(b3Mutation > readToken);
-        assertTrue(server.contains("publicationToken == 0L"));
-        assertTrue(server.contains("canAcceptAncsReady(device, publicationToken)"));
-        assertTrue(server.contains("confirmAncsReady(\n"
-                + "                                        device, publicationToken)"));
+        assertTrue(b3.contains("publicationToken == 0L"));
+        assertTrue(b3.contains("hasCurrentIncomingPairProof(device, publicationToken)"));
 
         String write = between(transport,
                 "public void onCharacteristicWriteRequest",
@@ -192,23 +191,26 @@ public final class Ha1202ColdStartAuthorizationContractTest {
 
         String transaction = between(transport,
                 "private void handlePairWriteRequestOnMain",
-                "private int retirePreAdoptionServerAliases");
+                "private void handleSecureReadRequestOnMain");
         int currentToken = transaction.indexOf(
                 "currentDiagnosticServicePublicationToken(characteristic)");
         int staleGuard = transaction.indexOf("publicationToken == 0L", currentToken);
         int bind = transaction.indexOf(
                 "bindExactPairRequestFacadeIfSafe(device, publicationToken)", staleGuard);
         int claim = transaction.indexOf("claimVerifiedPeer(device)", bind);
-        int response = transaction.indexOf(
-                "sendGattServerResponse(device, requestId, status, 0, null)", claim);
         int acceptedPair = transaction.indexOf(
-                "handlePairCommand(device, publicationToken)", response);
+                "commitPairCommand(device, publicationToken)", claim);
+        int response = transaction.indexOf(
+                "sendGattServerResponse(device, requestId, status, 0, null)", acceptedPair);
+        int finish = transaction.indexOf(
+                "finishPairCommand(device, publicationToken", response);
         assertTrue(currentToken >= 0);
         assertTrue(staleGuard > currentToken);
         assertTrue(bind > staleGuard);
         assertTrue(claim > bind);
-        assertTrue(response > claim);
-        assertTrue(acceptedPair > response);
+        assertTrue(acceptedPair > claim);
+        assertTrue(response > acceptedPair);
+        assertTrue(finish > response);
     }
 
     @Test public void everyManagedDiscoveryEntryRechecksPublicationAndLinkProofs()
@@ -478,7 +480,10 @@ public final class Ha1202ColdStartAuthorizationContractTest {
         String freshEpoch = between(transport,
                 "private void beginFreshIncomingSecurityEpoch",
                 "private boolean resetIncomingSecurityAfterClientLoss");
-        assertTrue(freshEpoch.contains("clearAncsRuntime();"));
+        assertTrue(freshEpoch.contains(
+                "clearAncsRuntimeWithoutClientCommands(emitDiagnosticLogs);"));
+        assertFalse(freshEpoch.contains("closeClientGatt("));
+        assertFalse(freshEpoch.contains("readRemoteRssi("));
 
         String publicationReset = between(transport,
                 "private void invalidateDiagnosticServicePublication",
@@ -555,7 +560,6 @@ public final class Ha1202ColdStartAuthorizationContractTest {
                 + "                        >= RSSI_POISONED_WRAPPER_REPLACEMENT_MAX_ATTEMPTS");
         int replacementIncrement = recovery.indexOf(
                 "poisonedWrapperReplacementAttempt++;");
-        int attachReset = recovery.indexOf("incomingClientAttachAttempt = 0;");
         int boundedReplacement = recovery.indexOf("scheduleIncomingClientAttachRetry(");
         int retainedRearm = recovery.indexOf("awaitIncomingBackgroundOwner(expected");
         assertTrue(exactFacade >= 0);
@@ -563,8 +567,9 @@ public final class Ha1202ColdStartAuthorizationContractTest {
         assertTrue(exactClosedBranch > exactClear);
         assertTrue(replacementBudget > exactClosedBranch);
         assertTrue(replacementIncrement > replacementBudget);
-        assertTrue(attachReset > replacementIncrement);
-        assertTrue(boundedReplacement > attachReset);
+        assertTrue(boundedReplacement > replacementIncrement);
+        assertFalse(recovery.substring(replacementIncrement, boundedReplacement)
+                .contains("incomingClientAttachAttempt = 0;"));
         assertTrue(retainedRearm > boundedReplacement);
 
         int physicalReset = recovery.indexOf(

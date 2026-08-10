@@ -90,15 +90,15 @@ public final class Ha1204LiveClimateAndModernIconContractTest {
 
     @Test public void releaseIdentityIsMonotonicAndInstallCompatible() throws Exception {
         String rootBuild = rootProject("build.gradle");
-        String workflow = project(".github/workflows/verify-ha1206.yml");
-        String manifest = project("release-manifests/HA1206.md");
-        assertTrue(rootBuild.contains("return 'v2.8.2-ha1206'"));
-        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1206'"));
-        assertTrue(workflow.contains("VERSION_CODE: '208021206'"));
+        String workflow = project(".github/workflows/verify-ha1207.yml");
+        String manifest = project("release-manifests/HA1207.md");
+        assertTrue(rootBuild.contains("return 'v2.8.2-ha1207'"));
+        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1207'"));
+        assertTrue(workflow.contains("VERSION_CODE: '208021207'"));
         assertTrue(workflow.contains("Ha1204LiveClimateAndModernIconContractTest"));
         assertTrue(workflow.contains("LiveClimateIconPolicyTest"));
         assertTrue(manifest.contains("Android package remains `ru.natro.statuswidget`"));
-        assertTrue(manifest.contains("208021206"));
+        assertTrue(manifest.contains("208021207"));
         assertTrue(manifest.contains(
                 "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"));
     }

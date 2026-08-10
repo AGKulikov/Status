@@ -133,7 +133,9 @@ public final class Ha1205AncsRecoveryContractTest {
                 "private boolean resetIncomingSecurityAfterClientLoss");
         assertTrue(fresh.contains(
                 "incomingStaleOwnerReplacementEpoch = incomingSecurityEpoch;"));
-        assertTrue(fresh.contains("hasPendingStaleOwnerReplacementForCurrentEpoch()"));
+        assertTrue(fresh.contains("incomingStaleOwnerAwaitingFreshEpoch"));
+        assertTrue(fresh.contains(
+                "clearAncsRuntimeWithoutClientCommands(emitDiagnosticLogs);"));
 
         String replacement = between(transport,
                 "private boolean replaceStaleEstablishedOwnerAfterFreshReady",
@@ -182,8 +184,8 @@ public final class Ha1205AncsRecoveryContractTest {
         String savedCandidate = between(transport,
                 "private void maybeStartIncomingClientAttachAfterServicePublished",
                 "private boolean isVerifiedPeer");
-        assertTrue(savedCandidate.contains("hasPendingStaleOwnerReplacementForCurrentEpoch()"));
-        assertTrue(savedCandidate.contains("replacementConsumedForEpoch("));
+        assertTrue(savedCandidate.contains("zero pre-ready clientIf attempts"));
+        assertFalse(savedCandidate.contains("startSamePeerAttach("));
 
         String connected = between(callback(transport),
                 "newState == BluetoothProfile.STATE_CONNECTED",
@@ -198,7 +200,8 @@ public final class Ha1205AncsRecoveryContractTest {
                 "if (replaceAfterFreshSecurity)",
                 "GattServerPeer connectedFacade");
         assertFalse(status22.contains("incomingFreshReplacementConsumedEpoch = 0L;"));
-        assertTrue(callback(transport).contains("if (callbackGatt != gatt) return;"));
+        assertTrue(callback(transport).contains("if (callbackGatt != gatt) {"));
+        assertTrue(callback(transport).contains("Stale reverse client callback ignored"));
     }
 
     @Test public void freshServerCallbackBeforeStatus22IsCoalescedNotErased()
