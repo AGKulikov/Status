@@ -73,4 +73,108 @@ public final class AncsRecoveryPolicyTest {
         assertFalse(AncsRecoveryPolicy.status22MayUseAlreadyConnectedFacade(
                 true, true, true, false));
     }
+
+    @Test public void preAdoptionAliasRetirementRequiresExactUnownedDisconnect() {
+        assertTrue(AncsRecoveryPolicy.shouldRetirePreAdoptionAliases(
+                true, true, false, false, false));
+        assertFalse(AncsRecoveryPolicy.shouldRetirePreAdoptionAliases(
+                false, true, false, false, false));
+        assertFalse(AncsRecoveryPolicy.shouldRetirePreAdoptionAliases(
+                true, false, false, false, false));
+        assertFalse(AncsRecoveryPolicy.shouldRetirePreAdoptionAliases(
+                true, true, true, false, false));
+        assertFalse(AncsRecoveryPolicy.shouldRetirePreAdoptionAliases(
+                true, true, false, true, false));
+        assertFalse(AncsRecoveryPolicy.shouldRetirePreAdoptionAliases(
+                true, true, false, false, true));
+    }
+
+    @Test public void exactPairMayBindOnlyOneCurrentAnonymousAlias() {
+        assertEquals(
+                AncsRecoveryPolicy.PairFacadeBindDecision.BIND_SOLE_ANONYMOUS_ALIAS,
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        false, true, true, true, false, false, false, 1));
+        assertEquals(
+                AncsRecoveryPolicy.PairFacadeBindDecision.BIND_EXACT_REQUEST_FRESH_EPOCH,
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        false, true, true, true, false, false, false, 0));
+        assertEquals(
+                AncsRecoveryPolicy.PairFacadeBindDecision.ALREADY_CURRENT,
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        true, true, true, true, false, false, true, 0));
+    }
+
+    @Test public void exactPairFacadeBindRejectsEveryAmbiguousOrStaleInput() {
+        assertEquals(AncsRecoveryPolicy.PairFacadeBindDecision.REJECT_PUBLICATION,
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        false, true, false, true, false, false, false, 1));
+        assertEquals(AncsRecoveryPolicy.PairFacadeBindDecision.REJECT_PUBLICATION,
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        true, true, false, true, false, false, false, 1));
+        assertEquals(AncsRecoveryPolicy.PairFacadeBindDecision.REJECT_IDENTITY,
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        false, true, true, false, false, false, false, 1));
+        assertEquals(AncsRecoveryPolicy.PairFacadeBindDecision.REJECT_IDENTITY,
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        true, true, true, false, false, false, false, 1));
+        assertEquals(AncsRecoveryPolicy.PairFacadeBindDecision.REJECT_ROUTE,
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        false, false, true, true, false, false, false, 1));
+        assertEquals(AncsRecoveryPolicy.PairFacadeBindDecision.REJECT_ROUTE,
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        true, false, true, true, false, false, false, 1));
+        assertEquals(AncsRecoveryPolicy.PairFacadeBindDecision.REJECT_VERIFIED_CONFLICT,
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        false, true, true, true, true, false, false, 1));
+        assertEquals(AncsRecoveryPolicy.PairFacadeBindDecision.REJECT_VERIFIED_CONFLICT,
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        true, true, true, true, true, false, false, 1));
+        assertEquals(AncsRecoveryPolicy.PairFacadeBindDecision.REJECT_VERIFIED_CONFLICT,
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        false, true, true, true, false, true, false, 0));
+        assertEquals(AncsRecoveryPolicy.PairFacadeBindDecision.REJECT_VERIFIED_CONFLICT,
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        true, true, true, true, false, true, false, 0));
+        assertEquals(AncsRecoveryPolicy.PairFacadeBindDecision.REJECT_ALREADY_BOUND,
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        false, true, true, true, false, false, true, 1));
+        assertEquals(AncsRecoveryPolicy.PairFacadeBindDecision.REJECT_ANONYMOUS_ALIAS_COUNT,
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        false, true, true, true, false, false, false, 2));
+        assertEquals(AncsRecoveryPolicy.PairFacadeBindDecision.REJECT_ANONYMOUS_ALIAS_COUNT,
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        true, true, true, true, false, false, false, 2));
+    }
+
+    @Test public void zeroAliasPairClearsOldProofsBeforeSuccessAndChallengesImmediateB3() {
+        long securityEpoch = 17L;
+        boolean secureAttConfirmed = true;
+        boolean readyGateOpen = true;
+        boolean linkSecurityChallengeIssued = true;
+        int pairAttStatus = -1;
+
+        AncsRecoveryPolicy.PairFacadeBindDecision decision =
+                AncsRecoveryPolicy.pairFacadeBindDecision(
+                        false, true, true, true, false, false, false, 0);
+        assertEquals(AncsRecoveryPolicy.PairFacadeBindDecision
+                        .BIND_EXACT_REQUEST_FRESH_EPOCH,
+                decision);
+
+        // Production runs this reset synchronously on main before returning PAIR ATT success.
+        if (AncsRecoveryPolicy.beginsFreshSecurityEpoch(decision)) {
+            securityEpoch++;
+            secureAttConfirmed = false;
+            readyGateOpen = false;
+            linkSecurityChallengeIssued = false;
+            pairAttStatus = 0;
+        }
+        assertEquals(18L, securityEpoch);
+        assertFalse(secureAttConfirmed);
+        assertFalse(readyGateOpen);
+        assertEquals(0, pairAttStatus);
+        assertEquals(AncsRecoveryPolicy.B3ReadAction.RETURN_ATT_STATUS_5,
+                AncsRecoveryPolicy.b3ReadAction(linkSecurityChallengeIssued));
+        assertFalse(AncsRecoveryPolicy.canAcceptAncsReadyProof(
+                true, true, secureAttConfirmed, false, true, true));
+    }
 }
