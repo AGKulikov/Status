@@ -58,10 +58,11 @@ public final class Ha1199ReferenceAncsConnectionContractTest {
                 "isCurrentDiagnosticServicePublicationToken(publicationToken)");
         int currentFacade = postPublication.indexOf(
                 "findConnectedServerPeer(candidate) == null");
-        int directAttach = postPublication.indexOf("startSamePeerAttach(false,");
         assertTrue(currentToken >= 0);
         assertTrue(currentFacade > currentToken);
-        assertTrue(directAttach > currentFacade);
+        assertTrue(postPublication.contains("zero pre-ready clientIf attempts"));
+        assertFalse(postPublication.contains("startSamePeerAttach("));
+        assertFalse(postPublication.contains("connectGatt("));
     }
 
     @Test public void helperLeavesPendingAndSystemReconnectOwnedByCoreBluetooth()

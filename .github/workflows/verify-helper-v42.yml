@@ -1,0 +1,60 @@
+name: Verify iPhone Helper v42
+
+on:
+  push:
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v42/**'
+      - '.github/workflows/verify-helper-v42.yml'
+  pull_request:
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v42/**'
+      - '.github/workflows/verify-helper-v42.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-helper:
+    name: Compile Helper v42 without signing
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate project settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v42/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            CODE_SIGNING_ALLOWED=NO \
+            -showBuildSettings >"$RUNNER_TEMP/helper-v42-build-settings.txt"
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper' \
+            "$RUNNER_TEMP/helper-v42-build-settings.txt"
+          grep -q 'MARKETING_VERSION = 42.0' "$RUNNER_TEMP/helper-v42-build-settings.txt"
+          grep -q 'CURRENT_PROJECT_VERSION = 42' "$RUNNER_TEMP/helper-v42-build-settings.txt"
+
+      - name: Compile Helper v42
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v42/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            SYMROOT="$RUNNER_TEMP/KX11ANCSHelperProducts" \
+            OBJROOT="$RUNNER_TEMP/KX11ANCSHelperIntermediates" \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Verify issued-beacon reclaim and preserved contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh ios/KX11-iPhone-ANCS-Helper-v42/verify-v42-contract.sh

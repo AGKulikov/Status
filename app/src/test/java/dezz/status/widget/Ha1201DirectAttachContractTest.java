@@ -21,7 +21,8 @@ public final class Ha1201DirectAttachContractTest {
                 "private boolean isVerifiedPeer");
         assertTrue(candidate.contains("BOND_BONDED"));
         assertTrue(candidate.contains("adoptIncomingClientCandidate"));
-        assertTrue(candidate.contains("startSamePeerAttach(false"));
+        assertFalse(candidate.contains("startSamePeerAttach("));
+        assertFalse(candidate.contains("connectGatt("));
         assertFalse(candidate.contains("secureAttConfirmed = true"));
         assertFalse(candidate.contains("discoverServices("));
 
@@ -42,8 +43,8 @@ public final class Ha1201DirectAttachContractTest {
             throws Exception {
         String transport = transport();
         String ready = between(transport,
-                "private void confirmAncsReady",
-                "private void scheduleSecureClientStart");
+                "private IncomingReadyAttach commitAncsReady",
+                "private void scheduleCapturedIncomingAttachAfterReady");
         assertTrue(ready.contains("canAcceptAncsReady"));
         assertTrue(ready.contains("incomingAncsReadyGateOpen = true;"));
 
@@ -215,7 +216,8 @@ public final class Ha1201DirectAttachContractTest {
         assertTrue(ownership.contains("linkProbeGatt == expected"));
         assertTrue(ownership.contains("linkProbeGeneration == expectedGeneration"));
         assertTrue(ownership.contains("linkProbeSecurityEpoch == expectedSecurityEpoch"));
-        assertTrue(ownership.contains("sameDevice(linkProbeServerDevice, serverDevice)"));
+        assertTrue(ownership.contains("linkProbeServerDevice == serverDevice"));
+        assertFalse(ownership.contains("sameDevice(linkProbeServerDevice, serverDevice)"));
 
         String timeout = between(transport,
                 "private void armServerFacadeHandoffProbeTimeout",
@@ -290,7 +292,9 @@ public final class Ha1201DirectAttachContractTest {
                 "scheduleIncomingEpochClientLivenessProbe(device,", bind);
         assertTrue(begin >= 0);
         assertTrue(bind > begin);
-        assertTrue(liveness > bind);
+        assertTrue(liveness < 0);
+        assertTrue(serverCallback.contains("defers retained-client RSSI proof until "));
+        assertTrue(serverCallback.contains("current PAIR+B3+READY"));
 
         String callback = between(transport,
                 "public void onReadRemoteRssi",
@@ -371,9 +375,12 @@ public final class Ha1201DirectAttachContractTest {
         assertTrue(poison.contains("cancelAmbiguousAclProbe();"));
         assertTrue(poison.contains("closeClientGatt(expected);"));
         assertTrue(poison.contains("poisonedWrapperReplacementAttempt++;"));
-        assertTrue(poison.contains("incomingClientAttachAttempt = 0;"));
+        assertFalse(poison.contains("incomingClientAttachAttempt = 0;"));
         assertTrue(poison.contains("activeClientProvenSecurityEpoch = 0L;"));
         assertTrue(poison.contains("adoptIncomingClientCandidate(exactIncoming,"));
+        assertTrue(poison.contains("scheduleIncomingClientAttachRetry("));
+        assertTrue(poison.indexOf("canStartIncomingClientAttach(")
+                < poison.indexOf("closeClientGatt(expected);"));
         assertTrue(poison.contains("resetIncomingSecurityAfterClientLoss("));
         assertTrue(poison.contains("preserveManagedIncomingPublicationAfterLinkLoss("));
         assertFalse(poison.contains("awaitIncomingBackgroundOwner("));
@@ -457,20 +464,22 @@ public final class Ha1201DirectAttachContractTest {
         String direct = between(transport,
                 "private void startIncomingDirectAttach",
                 "private void scheduleDirectFallback");
-        assertTrue(direct.contains("INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS - 1"));
-        assertTrue(direct.contains("FINAL ATTEMPT RESERVED FOR ANCS-READY"));
+        assertTrue(direct.contains("canStartIncomingClientAttach(pairRawFacade"));
+        assertTrue(direct.indexOf("canStartIncomingClientAttach(pairRawFacade")
+                < direct.indexOf("incomingClientAttachAttempt++;"));
+        assertFalse(direct.contains("INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS - 1"));
 
         String retry = between(transport,
                 "private void scheduleIncomingClientAttachRetry",
                 "private void recoverIncomingClientRole");
-        assertTrue(retry.contains("INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS - 1"));
-        assertTrue(retry.contains("final direct attach зарезервирован"));
+        assertTrue(retry.contains("canStartIncomingClientAttach(device, publicationToken)"));
+        assertFalse(retry.contains("INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS - 1"));
 
         String ready = between(transport,
-                "private void confirmAncsReady",
-                "private void scheduleSecureClientStart");
+                "private IncomingReadyAttach commitAncsReady",
+                "private void scheduleCapturedIncomingAttachAfterReady");
         assertTrue(ready.contains("incomingAncsReadyGateOpen = true;"));
-        assertTrue(ready.contains("scheduleSecureClientStart();"));
+        assertTrue(ready.contains("armIncomingReadyAttachLatch("));
 
         String timeout = between(direct,
                 "connectTimeout = () ->", "main.postDelayed(connectTimeout");
