@@ -1,9 +1,9 @@
-name: Verify HA1210 Pie opportunistic reverse ANCS attach
+name: Verify HA1211 physical-facade Pie opportunistic reverse ANCS attach
 
 on:
   push:
     branches:
-      - 'work/ha1210-opportunistic-ancs'
+      - 'work/ha1211-physical-facade-ab'
     paths:
       - 'app/**'
       - 'build.gradle'
@@ -11,8 +11,8 @@ on:
       - 'gradlew'
       - 'settings.gradle'
       - 'third_party/**'
-      - 'release-manifests/HA1210.md'
-      - '.github/workflows/verify-ha1210.yml'
+      - 'release-manifests/HA1211.md'
+      - '.github/workflows/verify-ha1211.yml'
   pull_request:
     paths:
       - 'app/**'
@@ -21,8 +21,8 @@ on:
       - 'gradlew'
       - 'settings.gradle'
       - 'third_party/**'
-      - 'release-manifests/HA1210.md'
-      - '.github/workflows/verify-ha1210.yml'
+      - 'release-manifests/HA1211.md'
+      - '.github/workflows/verify-ha1211.yml'
   workflow_dispatch:
 
 permissions:
@@ -30,7 +30,7 @@ permissions:
 
 jobs:
   test:
-    name: HA1197-HA1210 contracts and geelyRelease
+    name: HA1197-HA1211 contracts and geelyRelease
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -43,13 +43,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git bundle create "$RUNNER_TEMP/status-ha1210-source.bundle" HEAD
+          git bundle create "$RUNNER_TEMP/status-ha1211-source.bundle" HEAD
 
       - name: Upload exact source snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: ha1210-source-bundle
-          path: ${{ runner.temp }}/status-ha1210-source.bundle
+          name: ha1211-source-bundle
+          path: ${{ runner.temp }}/status-ha1211-source.bundle
           if-no-files-found: error
           retention-days: 7
 
@@ -73,7 +73,7 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Preserved transport, launcher, quiet-start and HA1210 contracts
+      - name: Preserved transport, launcher, quiet-start and HA1211 contracts
         shell: bash
         run: |
           set -euo pipefail
@@ -97,6 +97,7 @@ jobs:
             --tests dezz.status.widget.Ha1208PublicationRecoveryContractTest \
             --tests dezz.status.widget.Ha1209LauncherStartupContractTest \
             --tests dezz.status.widget.Ha1210OpportunisticReverseAttachContractTest \
+            --tests dezz.status.widget.Ha1211PhysicalFacadeAttachContractTest \
             --tests dezz.status.widget.StartupLoadPolicyTest \
             --tests dezz.status.widget.WidgetServiceStarterPolicyTest \
             --tests dezz.status.widget.phone.transport.AncsRecoveryPolicyTest \
@@ -120,8 +121,8 @@ jobs:
         shell: bash
         env:
           ALLOW_UNSIGNED_RELEASE: 'true'
-          VERSION_NAME: 'v2.8.2-ha1210'
-          VERSION_CODE: '208021210'
+          VERSION_NAME: 'v2.8.2-ha1211'
+          VERSION_CODE: '208021211'
         run: |
           set -euo pipefail
           ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
@@ -130,7 +131,7 @@ jobs:
       - name: Upload exact unsigned Android release candidate
         uses: actions/upload-artifact@v4
         with:
-          name: ha1210-unsigned-release
+          name: ha1211-unsigned-release
           path: app/build/outputs/apk/geely/release/*.apk
           if-no-files-found: error
           retention-days: 7
@@ -151,7 +152,7 @@ jobs:
       - name: Upload official Android signing tools
         uses: actions/upload-artifact@v4
         with:
-          name: ha1210-android-build-tools
+          name: ha1211-android-build-tools
           path: ${{ runner.temp }}/android-build-tools-36
           if-no-files-found: error
           retention-days: 1

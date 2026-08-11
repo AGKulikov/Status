@@ -168,7 +168,7 @@ public final class Ha1201DirectAttachContractTest {
                 "private final BroadcastReceiver bondReceiver");
         int captureKind = callback.indexOf(
                 "boolean serverFacadeProbe = linkProbeForServerFacadeHandoff;");
-        int cancel = callback.indexOf("cancelAmbiguousAclProbe();");
+        int cancel = callback.indexOf("cancelAmbiguousAclProbe();", captureKind);
         assertTrue(captureKind >= 0);
         assertTrue(cancel > captureKind);
         assertTrue(callback.contains("long securityEpoch = linkProbeSecurityEpoch;"));
@@ -183,7 +183,7 @@ public final class Ha1201DirectAttachContractTest {
                 "private final BluetoothGattCallback gattCallback");
         int exactEstablished = serverCallback.indexOf(
                 "managedIncomingMode\n"
-                        + "                                && establishedClientOwnsPhysicalLink(device)");
+                        + "                                && (establishedClientOwnsPhysicalLink(device)");
         int verifiedOnly = serverCallback.indexOf("&& isVerifiedPeer(device)");
         assertTrue(exactEstablished >= 0);
         assertTrue(verifiedOnly > exactEstablished);
@@ -486,7 +486,10 @@ public final class Ha1201DirectAttachContractTest {
         String timeout = between(direct,
                 "connectTimeout = () ->", "main.postDelayed(connectTimeout");
         assertTrue(timeout.contains("unregisterNeverEstablishedOpportunisticGatt(expected)"));
-        assertFalse(timeout.contains("resetIncomingSecurityAfterClientLoss"));
+        assertTrue(timeout.contains("serverFacadeLostWhilePending"));
+        assertTrue(timeout.contains("resetIncomingSecurityAfterClientLoss"));
+        assertTrue(timeout.indexOf("unregisterNeverEstablishedOpportunisticGatt(expected)")
+                < timeout.indexOf("resetIncomingSecurityAfterClientLoss"));
         assertFalse(timeout.contains("preserveManagedIncomingPublicationAfterLinkLoss"));
     }
 

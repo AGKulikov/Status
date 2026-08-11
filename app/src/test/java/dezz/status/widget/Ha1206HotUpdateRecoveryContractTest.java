@@ -74,7 +74,7 @@ public final class Ha1206HotUpdateRecoveryContractTest {
         int token = pair.indexOf("currentDiagnosticServicePublicationToken(characteristic)");
         int bind = pair.indexOf("bindExactPairRequestFacadeIfSafe(device, publicationToken)");
         int claim = pair.indexOf("claimVerifiedPeer(device)", bind);
-        int action = pair.indexOf("commitPairCommand(device, publicationToken)", claim);
+        int action = pair.indexOf("commitPairCommand(", claim);
         int response = pair.indexOf(
                 "sendGattServerResponse(device, requestId, status, 0, null)", action);
         int finish = pair.indexOf("finishPairCommand(device, publicationToken", response);

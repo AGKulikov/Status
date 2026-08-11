@@ -104,6 +104,34 @@ public final class AncsRecoveryPolicyTest {
                         true, true, true, true, false, false, true, 0));
     }
 
+    @Test public void ha1211PhysicalFacadeTopologyReplaysAThenBThenPairCFailClosed() {
+        assertEquals(AncsRecoveryPolicy.PhysicalFacadeTopologyDecision
+                        .USE_SOLE_ANONYMOUS,
+                AncsRecoveryPolicy.physicalFacadeTopologyDecision(
+                        1, 1, 0, false));
+        assertEquals(AncsRecoveryPolicy.PhysicalFacadeTopologyDecision
+                        .USE_SOLE_MATCHING,
+                AncsRecoveryPolicy.physicalFacadeTopologyDecision(
+                        1, 0, 1, false));
+        assertEquals(AncsRecoveryPolicy.PhysicalFacadeTopologyDecision
+                        .MERGE_ANONYMOUS_AND_MATCHING,
+                AncsRecoveryPolicy.physicalFacadeTopologyDecision(
+                        2, 1, 1, false));
+        assertEquals(AncsRecoveryPolicy.PhysicalFacadeTopologyDecision
+                        .CREATE_FROM_PAIR_ATT,
+                AncsRecoveryPolicy.physicalFacadeTopologyDecision(
+                        0, 0, 0, false));
+        assertEquals(AncsRecoveryPolicy.PhysicalFacadeTopologyDecision.REJECT,
+                AncsRecoveryPolicy.physicalFacadeTopologyDecision(
+                        3, 1, 1, false));
+        assertEquals(AncsRecoveryPolicy.PhysicalFacadeTopologyDecision.REJECT,
+                AncsRecoveryPolicy.physicalFacadeTopologyDecision(
+                        2, 2, 0, false));
+        assertEquals(AncsRecoveryPolicy.PhysicalFacadeTopologyDecision.REJECT,
+                AncsRecoveryPolicy.physicalFacadeTopologyDecision(
+                        2, 1, 1, true));
+    }
+
     @Test public void exactPairFacadeBindRejectsEveryAmbiguousOrStaleInput() {
         assertEquals(AncsRecoveryPolicy.PairFacadeBindDecision.REJECT_PUBLICATION,
                 AncsRecoveryPolicy.pairFacadeBindDecision(
