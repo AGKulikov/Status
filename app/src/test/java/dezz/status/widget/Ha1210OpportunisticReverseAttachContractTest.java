@@ -245,7 +245,7 @@ public final class Ha1210OpportunisticReverseAttachContractTest {
     }
 
     @Test public void releaseIdentityAndAndroidWorkflowAdvanceTogether() throws Exception {
-        String build = project("build.gradle");
+        String build = rootProject("build.gradle");
         String workflow = project(".github/workflows/verify-ha1210.yml");
         String manifest = project("release-manifests/HA1210.md");
         assertTrue(build.contains("return 'v2.8.2-ha1210'"));
@@ -291,6 +291,19 @@ public final class Ha1210OpportunisticReverseAttachContractTest {
             current = current.getParent();
         }
         throw new IllegalStateException("Project file not found: " + relative);
+    }
+
+    /** Avoids resolving app/build.gradle when Gradle runs unit tests with app/ as cwd. */
+    private static String rootProject(String relative) throws Exception {
+        Path current = Paths.get("").toAbsolutePath();
+        while (current != null) {
+            Path candidate = current.resolve(relative);
+            if (Files.isRegularFile(candidate) && Files.isDirectory(current.resolve("app"))) {
+                return new String(Files.readAllBytes(candidate), StandardCharsets.UTF_8);
+            }
+            current = current.getParent();
+        }
+        throw new IllegalStateException("Root project file not found: " + relative);
     }
 
     private static String between(String source, String start, String end) {
