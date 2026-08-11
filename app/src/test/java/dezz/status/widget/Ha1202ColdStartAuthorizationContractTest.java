@@ -199,7 +199,7 @@ public final class Ha1202ColdStartAuthorizationContractTest {
                 "bindExactPairRequestFacadeIfSafe(device, publicationToken)", staleGuard);
         int claim = transaction.indexOf("claimVerifiedPeer(device)", bind);
         int acceptedPair = transaction.indexOf(
-                "commitPairCommand(device, publicationToken)", claim);
+                "commitPairCommand(", claim);
         int response = transaction.indexOf(
                 "sendGattServerResponse(device, requestId, status, 0, null)", acceptedPair);
         int finish = transaction.indexOf(

@@ -27,6 +27,15 @@ final class AncsRecoveryPolicy {
         REJECT_ANONYMOUS_ALIAS_COUNT
     }
 
+    /** Fail-closed topology for carrying one immutable server transport facade into PAIR. */
+    enum PhysicalFacadeTopologyDecision {
+        CREATE_FROM_PAIR_ATT,
+        USE_SOLE_ANONYMOUS,
+        USE_SOLE_MATCHING,
+        MERGE_ANONYMOUS_AND_MATCHING,
+        REJECT
+    }
+
     enum B3ReadAction {
         RETURN_ATT_STATUS_5,
         CONTINUE_SECURE_PROOF
@@ -177,6 +186,38 @@ final class AncsRecoveryPolicy {
     static boolean beginsFreshSecurityEpoch(PairFacadeBindDecision decision) {
         return decision == PairFacadeBindDecision.BIND_EXACT_REQUEST_FRESH_EPOCH
                 || decision == PairFacadeBindDecision.BIND_SOLE_ANONYMOUS_ALIAS;
+    }
+
+    /**
+     * The field sequence may contain A anonymous plus B bonded before PAIR wrapper C. These are
+     * the only two-record aliases that may coalesce; every foreign or duplicate shape fails
+     * closed before a clientIf budget is spent. A live PAIR ATT request may itself create the new
+     * physical record after a confirmed prior-link DISCONNECTED when ECARX omits CONNECTED.
+     */
+    static PhysicalFacadeTopologyDecision physicalFacadeTopologyDecision(
+            int currentRecordCount, int anonymousRecordCount,
+            int matchingRecordCount, boolean conflictingRecord) {
+        if (conflictingRecord || currentRecordCount < 0
+                || anonymousRecordCount < 0 || matchingRecordCount < 0) {
+            return PhysicalFacadeTopologyDecision.REJECT;
+        }
+        if (currentRecordCount == 0
+                && anonymousRecordCount == 0 && matchingRecordCount == 0) {
+            return PhysicalFacadeTopologyDecision.CREATE_FROM_PAIR_ATT;
+        }
+        if (currentRecordCount == 1 && anonymousRecordCount == 1
+                && matchingRecordCount <= 1) {
+            return PhysicalFacadeTopologyDecision.USE_SOLE_ANONYMOUS;
+        }
+        if (currentRecordCount == 1 && anonymousRecordCount == 0
+                && matchingRecordCount == 1) {
+            return PhysicalFacadeTopologyDecision.USE_SOLE_MATCHING;
+        }
+        if (currentRecordCount == 2 && anonymousRecordCount == 1
+                && matchingRecordCount == 1) {
+            return PhysicalFacadeTopologyDecision.MERGE_ANONYMOUS_AND_MATCHING;
+        }
+        return PhysicalFacadeTopologyDecision.REJECT;
     }
 
     static B3ReadAction b3ReadAction(boolean linkSecurityChallengeIssued) {

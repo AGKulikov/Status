@@ -122,6 +122,8 @@ public final class IphoneAncsTransport {
             UUID.fromString("00002bed-0000-1000-8000-00805f9b34fb");
     private static final String LOG_TAG = "KX11ANCS";
     private static final int GATT_SUCCESS = BluetoothGatt.GATT_SUCCESS;
+    /** Field A/B server callbacks were 15 ms apart; wider windows can join unrelated TCBs. */
+    private static final long ANONYMOUS_BONDED_ALIAS_MAX_DELTA_MS = 250L;
     /** ATT write-not-permitted. On ANCS Notification Source this means iOS has not authorized ANCS. */
     private static final int STATUS_WRITE_NOT_PERMITTED = 3;
     private static final int STATUS_INSUFFICIENT_AUTHENTICATION = 5;
@@ -192,6 +194,11 @@ public final class IphoneAncsTransport {
      * only its client wrapper is unregistered when Android never reports a result.
      */
     private static final long INCOMING_DIRECT_ATTACH_TIMEOUT_MS = 10_000L;
+    /** HA1211 managed-route wire frames fit the default ATT MTU: one opcode + 128-bit Q. */
+    private static final int MANAGED_PROOF_FRAME_BYTES = 17;
+    private static final byte MANAGED_PAIR_OPCODE = 0x50;
+    private static final byte MANAGED_LINK_BOUND_OPCODE = 0x4C;
+    private static final byte MANAGED_ANCS_SUBSCRIBED_OPCODE = 0x41;
     private static final long CANDIDATE_UI_INTERVAL_MS = 500L;
     private static final int MAX_CANDIDATES = 150;
 
@@ -294,6 +301,12 @@ public final class IphoneAncsTransport {
         BATTERY_LEVEL_STATUS
     }
 
+    private enum HelperProofWriteStage {
+        NONE,
+        LINK_BOUND,
+        ANCS_SUBSCRIBED
+    }
+
     private enum BatteryStage {
         NOT_STARTED,
         READ_LEVEL_STATUS,
@@ -369,11 +382,15 @@ public final class IphoneAncsTransport {
     }
 
     /**
-     * One peer observed by this app's GATT-server role. The exact BluetoothDevice delivered by
-     * this callback is reused for the ANCS GATT-client registration on the same ATT link.
+     * One physical peer observed by this app's GATT-server role. Android 9 may later deliver a
+     * different bonded wrapper for PAIR/B3/READY. The first unambiguous server CONNECTED facade
+     * remains the immutable hidden-connect transport target; {@link #device} is the mutable exact
+     * bonded authorization facade and is never allowed to overwrite that physical target.
      */
     private static final class GattServerPeer {
         final long sessionGeneration;
+        final BluetoothDevice physicalLinkFacade;
+        /** Exact current PAIR/B3/READY authorization facade; initially the server facade. */
         BluetoothDevice device;
         long connectedAtElapsedMs;
         long securityEpoch;
@@ -387,6 +404,7 @@ public final class IphoneAncsTransport {
 
         GattServerPeer(long sessionGeneration, BluetoothDevice device) {
             this.sessionGeneration = sessionGeneration;
+            this.physicalLinkFacade = device;
             this.device = device;
         }
     }
@@ -394,19 +412,26 @@ public final class IphoneAncsTransport {
     /** Immutable authorization captured when READY is committed on the main FIFO. */
     private static final class IncomingReadyAttach {
         final GattServerPeer serverPeer;
+        final BluetoothDevice physicalLinkFacade;
         final BluetoothDevice rawFacade;
+        final byte[] pairChallenge;
         final long sessionGeneration;
         final long securityEpoch;
         final long publicationToken;
         final boolean firstReadyProof;
         final boolean attachTaskArmed;
 
-        IncomingReadyAttach(GattServerPeer serverPeer, BluetoothDevice rawFacade,
+        IncomingReadyAttach(GattServerPeer serverPeer,
+                            BluetoothDevice physicalLinkFacade,
+                            BluetoothDevice rawFacade,
+                            byte[] pairChallenge,
                             long sessionGeneration, long securityEpoch,
                             long publicationToken, boolean firstReadyProof,
                             boolean attachTaskArmed) {
             this.serverPeer = serverPeer;
+            this.physicalLinkFacade = physicalLinkFacade;
             this.rawFacade = rawFacade;
+            this.pairChallenge = pairChallenge.clone();
             this.sessionGeneration = sessionGeneration;
             this.securityEpoch = securityEpoch;
             this.publicationToken = publicationToken;
@@ -481,11 +506,16 @@ public final class IphoneAncsTransport {
     private volatile long incomingPairAcceptedSessionGeneration;
     private volatile long incomingPairAcceptedSecurityEpoch;
     private volatile long incomingPairAcceptedPublicationToken;
+    /** Exact 128-bit Q committed atomically with managed PAIR facade C. */
+    private byte[] incomingPairAcceptedChallenge;
     /** One READY may arm exactly one delayed first-attach task for its exact S/E/P/raw tuple. */
     private BluetoothDevice incomingReadyAttachLatchFacade;
+    private BluetoothDevice incomingReadyAttachLatchPhysicalFacade;
+    private GattServerPeer incomingReadyAttachLatchServerPeer;
     private long incomingReadyAttachLatchSessionGeneration;
     private long incomingReadyAttachLatchSecurityEpoch;
     private long incomingReadyAttachLatchPublicationToken;
+    private byte[] incomingReadyAttachLatchChallenge;
     private Runnable incomingReadyAttachTask;
     /** Synchronous capability held only while the captured READY task owns attempt #1. */
     private IncomingReadyAttach activeIncomingFirstAttachAuthorization;
@@ -496,10 +526,15 @@ public final class IphoneAncsTransport {
     /** One-shot status=22 capability is legal only after attempt #1 crossed the READY barrier. */
     private boolean activeIncomingPostReadyReplacementAuthorization;
     /** Lineage of the one post-READY BluetoothGatt wrapper currently allowed to callback. */
-    private BluetoothDevice incomingClientAttemptFacade;
+    private BluetoothDevice incomingClientAttemptTransportFacade;
+    /** Separate exact bonded PAIR/B3/READY owner for that physical transport attempt. */
+    private BluetoothDevice incomingClientAttemptPairFacade;
+    /** Stable peer that owns both facades for that exact attempt. */
+    private GattServerPeer incomingClientAttemptServerPeer;
     private long incomingClientAttemptSessionGeneration;
     private long incomingClientAttemptSecurityEpoch;
     private long incomingClientAttemptPublicationToken;
+    private byte[] incomingClientAttemptChallenge;
     /**
      * True only after Android's F04 database has completed {@code onServiceAdded}. ECARX Android
      * 9 can permanently wedge a clientIf when connectGatt races an unfinished server addService.
@@ -586,14 +621,28 @@ public final class IphoneAncsTransport {
     private long discoveryOperationGeneration;
     private long activeDiscoveryOperationGeneration;
     private long activeDiscoveryClientGeneration;
+    private long activeDiscoverySessionGeneration;
     private long activeDiscoverySecurityEpoch;
     private long activeDiscoveryPublicationToken;
+    private byte[] activeDiscoveryChallenge;
+    private GattServerPeer activeDiscoveryServerPeer;
+    private BluetoothDevice activeDiscoveryPhysicalFacade;
+    private BluetoothDevice activeDiscoveryPairFacade;
+    private long activeDiscoveryDatabaseGeneration;
     /** Lineage retained only while cached services are resumed after a validated callback. */
     private BluetoothGatt acceptedDiscoveryGatt;
     private long acceptedDiscoveryOperationGeneration;
     private long acceptedDiscoveryClientGeneration;
+    private long acceptedDiscoverySessionGeneration;
     private long acceptedDiscoverySecurityEpoch;
     private long acceptedDiscoveryPublicationToken;
+    private byte[] acceptedDiscoveryChallenge;
+    private GattServerPeer acceptedDiscoveryServerPeer;
+    private BluetoothDevice acceptedDiscoveryPhysicalFacade;
+    private BluetoothDevice acceptedDiscoveryPairFacade;
+    private long acceptedDiscoveryDatabaseGeneration;
+    /** Changes only when Service Changed invalidates the accepted F05 database. */
+    private long managedF05DatabaseGeneration;
     private DescriptorStage descriptorStage = DescriptorStage.NONE;
     /** Exact raw CCCD operation; UUID/stage alone cannot disambiguate a late Android callback. */
     private BluetoothGattDescriptor activeDescriptorWrite;
@@ -601,8 +650,46 @@ public final class IphoneAncsTransport {
     private long descriptorWriteOperationGeneration;
     private long activeDescriptorWriteOperationGeneration;
     private long activeDescriptorWriteClientGeneration;
+    private long activeDescriptorWriteSessionGeneration;
     private long activeDescriptorWriteSecurityEpoch;
     private long activeDescriptorWritePublicationToken;
+    private byte[] activeDescriptorWriteChallenge;
+    private GattServerPeer activeDescriptorWriteServerPeer;
+    private BluetoothDevice activeDescriptorWritePhysicalFacade;
+    private BluetoothDevice activeDescriptorWritePairFacade;
+    private long activeDescriptorWriteDatabaseGeneration;
+    /** One serialized F05 proof write slot shared by L/Q and post-CCCD A/Q. */
+    private HelperProofWriteStage activeHelperProofWriteStage =
+            HelperProofWriteStage.NONE;
+    private BluetoothGatt activeHelperProofWriteGatt;
+    private BluetoothGattCharacteristic activeHelperProofWriteCharacteristic;
+    private long helperProofWriteOperationGeneration;
+    private long activeHelperProofWriteOperationGeneration;
+    private long activeHelperProofWriteClientGeneration;
+    private long activeHelperProofWriteSessionGeneration;
+    private long activeHelperProofWriteSecurityEpoch;
+    private long activeHelperProofWritePublicationToken;
+    private byte[] activeHelperProofWriteChallenge;
+    private GattServerPeer activeHelperProofWriteServerPeer;
+    private BluetoothDevice activeHelperProofWritePhysicalFacade;
+    private BluetoothDevice activeHelperProofWritePairFacade;
+    private long activeHelperProofWriteDatabaseGeneration;
+    private long activeHelperProofWriteDiscoveryOperationGeneration;
+    private Runnable helperProofWriteTimeout;
+    /** Exact current F05 L/Q acknowledgement required before any ANCS CCCD. */
+    private boolean helperLinkBoundAcknowledged;
+    private BluetoothGatt helperLinkBoundGatt;
+    private BluetoothGattCharacteristic helperLinkBoundCharacteristic;
+    private byte[] helperLinkBoundChallenge;
+    private GattServerPeer helperLinkBoundServerPeer;
+    private BluetoothDevice helperLinkBoundPhysicalFacade;
+    private BluetoothDevice helperLinkBoundPairFacade;
+    private long helperLinkBoundClientGeneration;
+    private long helperLinkBoundSessionGeneration;
+    private long helperLinkBoundSecurityEpoch;
+    private long helperLinkBoundPublicationToken;
+    private long helperLinkBoundDatabaseGeneration;
+    private long helperLinkBoundDiscoveryOperationGeneration;
     private AdvertiseSettings preparedAdvertiseSettings;
     private AdvertiseData preparedAdvertiseData;
     private AdvertiseData preparedScanResponse;
@@ -917,8 +1004,9 @@ public final class IphoneAncsTransport {
         resetVerifiedPeerSession();
         managedReconnectEnabled = true;
         managedIncomingMode = true;
-        log("HA1210 Pie opportunistic reverse attach enabled · "
-                + "autoConnect=false opportunistic=true · no public fallback");
+        log("HA1211 physical-facade Pie opportunistic reverse attach enabled · "
+                + "separate pair authorization facade · autoConnect=false "
+                + "opportunistic=true · no public fallback");
         managedReconnectAttempt = 0;
         managedSavedPeer = selected;
         boolean dedicatedIdentity = classicAddress != null
@@ -1257,12 +1345,20 @@ public final class IphoneAncsTransport {
             return;
         }
         if (managedIncomingMode && activeClientOpportunistic) {
+            GattServerPeer attemptPeer = incomingClientAttemptServerPeer;
             closeClientGatt(expected);
             clearAncsRuntime();
             incomingDiscoveryStarted = false;
-            state("OPPORTUNISTIC RSSI CHANNEL FAILED · LINK KEPT · BUDGET SPENT");
+            boolean physicalLost = resetRetiredObserverAfterServerFacadeLoss(
+                    attemptPeer, device,
+                    "opportunistic RSSI timeout after server facade loss");
+            state(physicalLost
+                    ? "OPPORTUNISTIC RSSI FAILED · PHYSICAL LINK LOST"
+                    : "OPPORTUNISTIC RSSI CHANNEL FAILED · LINK KEPT · BUDGET SPENT");
             log("Client-only RSSI timeout retired opportunistic observer close-only; inbound "
-                    + "server/proofs/F04 kept, no replacement");
+                    + (physicalLost
+                    ? "server facade absent, logical epoch reset"
+                    : "server/proofs/F04 kept, no replacement"));
             return;
         }
         // close() is the only safe callback-channel barrier. A late RSSI callback from expected
@@ -1327,12 +1423,20 @@ public final class IphoneAncsTransport {
             return;
         }
         if (managedIncomingMode && activeClientOpportunistic) {
+            GattServerPeer attemptPeer = incomingClientAttemptServerPeer;
             closeClientGatt(expected);
             clearAncsRuntime();
             incomingDiscoveryStarted = false;
-            state("OPPORTUNISTIC DESCRIPTOR CHANNEL FAILED · LINK KEPT · BUDGET SPENT");
+            boolean physicalLost = resetRetiredObserverAfterServerFacadeLoss(
+                    attemptPeer, device,
+                    "opportunistic descriptor timeout after server facade loss");
+            state(physicalLost
+                    ? "OPPORTUNISTIC DESCRIPTOR FAILED · PHYSICAL LINK LOST"
+                    : "OPPORTUNISTIC DESCRIPTOR CHANNEL FAILED · LINK KEPT · BUDGET SPENT");
             log("Client-only descriptor timeout retired opportunistic observer close-only; inbound "
-                    + "server/proofs/F04 kept, no replacement");
+                    + (physicalLost
+                    ? "server facade absent, logical epoch reset"
+                    : "server/proofs/F04 kept, no replacement"));
             return;
         }
         closeClientGatt(expected);
@@ -1393,12 +1497,20 @@ public final class IphoneAncsTransport {
             return;
         }
         if (managedIncomingMode && activeClientOpportunistic) {
+            GattServerPeer attemptPeer = incomingClientAttemptServerPeer;
             closeClientGatt(expected);
             clearAncsRuntime();
             incomingDiscoveryStarted = false;
-            state("OPPORTUNISTIC DISCOVERY CHANNEL FAILED · LINK KEPT · BUDGET SPENT");
+            boolean physicalLost = resetRetiredObserverAfterServerFacadeLoss(
+                    attemptPeer, device,
+                    "opportunistic discovery timeout after server facade loss");
+            state(physicalLost
+                    ? "OPPORTUNISTIC DISCOVERY FAILED · PHYSICAL LINK LOST"
+                    : "OPPORTUNISTIC DISCOVERY CHANNEL FAILED · LINK KEPT · BUDGET SPENT");
             log("Client-only discovery timeout retired opportunistic observer close-only; inbound "
-                    + "server/proofs/F04 kept, no replacement");
+                    + (physicalLost
+                    ? "server facade absent, logical epoch reset"
+                    : "server/proofs/F04 kept, no replacement"));
             return;
         }
         closeClientGatt(expected);
@@ -2555,6 +2667,7 @@ public final class IphoneAncsTransport {
     }
 
     private void clearIphonePeripheralRuntime(boolean clearMode) {
+        clearManagedLinkBoundProof();
         cancelHelperTelemetryRecovery();
         if (helperAncsReadyProofRetry != null) {
             main.removeCallbacks(helperAncsReadyProofRetry);
@@ -2606,7 +2719,8 @@ public final class IphoneAncsTransport {
     public boolean isAncsReady() {
         if (!gattReady || !gattClientConnected || gatt == null) return false;
         return !managedIncomingMode
-                || (iphoneHelperTelemetrySubscribed
+                || (hasCurrentManagedLinkBoundProof(gatt)
+                && iphoneHelperTelemetrySubscribed
                 && iphoneHelperValidTelemetryReceived
                 && helperAncsReadyProofAcknowledged);
     }
@@ -2730,7 +2844,8 @@ public final class IphoneAncsTransport {
     }
 
     @Nullable
-    private Boolean commitPairCommand(BluetoothDevice device, long publicationToken) {
+    private Boolean commitPairCommand(BluetoothDevice device, long publicationToken,
+                                      @Nullable byte[] pairChallenge) {
         if (!isCurrentDiagnosticServicePublicationToken(publicationToken)) {
             return null;
         }
@@ -2748,8 +2863,16 @@ public final class IphoneAncsTransport {
                     && incomingPairAcceptedSecurityEpoch == incomingSecurityEpoch
                     && incomingPairAcceptedPublicationToken == publicationToken;
             if (sameAcceptedLink) {
+                if (pairChallenge == null
+                        || !Arrays.equals(incomingPairAcceptedChallenge, pairChallenge)) {
+                    return null;
+                }
                 firstPairProof = false;
             } else {
+                if (pairChallenge == null
+                        || pairChallenge.length != MANAGED_PROOF_FRAME_BYTES - 1) {
+                    return null;
+                }
                 GattServerPeer exactPairPeer = findExactCurrentServerPeer(device);
                 if (exactPairPeer == null || !exactPairPeer.connected) return null;
                 firstPairProof = true;
@@ -2758,6 +2881,7 @@ public final class IphoneAncsTransport {
                 incomingPairAcceptedSessionGeneration = sessionGeneration;
                 incomingPairAcceptedSecurityEpoch = incomingSecurityEpoch;
                 incomingPairAcceptedPublicationToken = publicationToken;
+                incomingPairAcceptedChallenge = pairChallenge.clone();
             }
             if (firstPairProof) incomingClientAttachAttempt = 0;
         }
@@ -2889,6 +3013,9 @@ public final class IphoneAncsTransport {
         if (!canAcceptAncsReady(callbackDevice, publicationToken)) {
             return null;
         }
+        byte[] pairChallenge = incomingPairAcceptedChallenge;
+        if (pairChallenge == null
+                || pairChallenge.length != MANAGED_PROOF_FRAME_BYTES - 1) return null;
         BluetoothDevice exactIncomingDevice = incomingPairAcceptedFacade;
         GattServerPeer serverLink = findExactCurrentServerPeer(exactIncomingDevice);
         if (serverLink == null || !serverLink.connected
@@ -2905,9 +3032,12 @@ public final class IphoneAncsTransport {
         incomingAncsReadyPublicationToken = publicationToken;
         incomingClientCandidate = exactIncomingDevice;
         if (firstReadyProof) incomingClientAttachAttempt = 0;
+        BluetoothDevice physicalLinkFacade = serverLink.physicalLinkFacade;
         boolean attachTaskArmed = armIncomingReadyAttachLatch(
-                exactIncomingDevice, publicationToken);
-        return new IncomingReadyAttach(serverLink, exactIncomingDevice,
+                serverLink, physicalLinkFacade, exactIncomingDevice,
+                pairChallenge, publicationToken);
+        return new IncomingReadyAttach(serverLink, physicalLinkFacade,
+                exactIncomingDevice, pairChallenge,
                 sessionGeneration, incomingSecurityEpoch, publicationToken,
                 firstReadyProof, attachTaskArmed);
     }
@@ -2918,8 +3048,12 @@ public final class IphoneAncsTransport {
         listener.onVerifiedPeerAddress(safeAddress(captured.rawFacade));
         state("ONE REQUIRES_ANCS OWNER · CLIENT ATTACH");
         log("Same-owner ANCS-READY принят после RequiresANCS + B3, без disconnect · "
-                + "exact incoming objectId="
+                + "pairObjectId="
                 + System.identityHashCode(captured.rawFacade)
+                + " physicalObjectId="
+                + System.identityHashCode(captured.physicalLinkFacade)
+                + " sameAddress=" + sameDevice(
+                captured.rawFacade, captured.physicalLinkFacade)
                 + " address=" + safeAddress(captured.rawFacade)
                 + "; proof committed, post-READY clientIf task ещё не выполнялся");
     }
@@ -2953,6 +3087,9 @@ public final class IphoneAncsTransport {
                 || currentPeer == null
                 || !currentPeer.connected
                 || currentPeer.device != captured.rawFacade
+                || currentPeer.physicalLinkFacade != captured.physicalLinkFacade
+                || !Arrays.equals(captured.pairChallenge,
+                incomingPairAcceptedChallenge)
                 || !canStartIncomingClientAttach(
                 captured.rawFacade, captured.publicationToken)) {
             log("Post-READY attach task no-op: session/epoch/publication/raw facade "
@@ -3326,6 +3463,22 @@ public final class IphoneAncsTransport {
                     "exact incoming link missing before direct client attach");
             return;
         }
+        GattServerPeer capturedServerPeer = incomingReadyAttachLatchServerPeer;
+        BluetoothDevice physicalTargetFacade =
+                incomingReadyAttachLatchPhysicalFacade;
+        byte[] pairChallenge = incomingReadyAttachLatchChallenge;
+        if (capturedServerPeer == null || physicalTargetFacade == null
+                || pairChallenge == null
+                || !Arrays.equals(pairChallenge, incomingPairAcceptedChallenge)
+                || capturedServerPeer != serverLink
+                || serverLink.physicalLinkFacade != physicalTargetFacade
+                || findExactPhysicalServerPeer(physicalTargetFacade) != serverLink) {
+            state("OPPORTUNISTIC TARGET AMBIGUOUS · LINK KEPT");
+            log("Physical target отсутствует/неоднозначен после READY; attempt budget "
+                    + "не расходуется · pairObjectId="
+                    + System.identityHashCode(candidate));
+            return;
+        }
         int attemptLimit = INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS;
         if (incomingClientAttachAttempt >= attemptLimit) {
             state("SAME-PEER OPPORTUNISTIC ATTACH · LINK KEPT · BUDGET SPENT");
@@ -3335,13 +3488,17 @@ public final class IphoneAncsTransport {
             return;
         }
 
-        // Always reuse the live callback object, never adapter.getRemoteDevice(savedAddress).
-        BluetoothDevice device = serverLink.device;
-        incomingClientCandidate = device;
+        // The hidden call targets the immutable first server CONNECTED object. PAIR/B3/READY
+        // remain owned by the separate exact bonded facade captured in this same stable record.
+        BluetoothDevice pairFacade = serverLink.device;
+        BluetoothDevice device = physicalTargetFacade;
+        incomingClientCandidate = pairFacade;
         incomingFirstAttachIssuedForCurrentTuple = true;
         incomingOpportunisticAttachAttemptedForCurrentTuple = true;
         incomingClientAttachAttempt++;
         clearAncsRuntime();
+        managedF05DatabaseGeneration++;
+        if (managedF05DatabaseGeneration == 0L) managedF05DatabaseGeneration++;
         incomingDiscoveryStarted = false;
         gattClientConnected = false;
         activeClientProvenSecurityEpoch = 0L;
@@ -3350,10 +3507,13 @@ public final class IphoneAncsTransport {
         activeClientOpportunistic = true;
         activeClientEstablished = false;
         clientConnectInFlight = true;
-        incomingClientAttemptFacade = device;
+        incomingClientAttemptTransportFacade = device;
+        incomingClientAttemptPairFacade = pairFacade;
+        incomingClientAttemptServerPeer = serverLink;
         incomingClientAttemptSessionGeneration = sessionGeneration;
         incomingClientAttemptSecurityEpoch = incomingSecurityEpoch;
         incomingClientAttemptPublicationToken = publicationToken;
+        incomingClientAttemptChallenge = pairChallenge.clone();
         activeClientGeneration = sessionState.begin(
                 AncsSessionStateMachine.Phase.DIRECT_CONNECT);
         long expectedGeneration = activeClientGeneration;
@@ -3362,7 +3522,9 @@ public final class IphoneAncsTransport {
         state("SAME-PEER OPPORTUNISTIC ATTACH #" + incomingClientAttachAttempt);
         log("Pie connectGatt(autoConnect=false, opportunistic=true, TRANSPORT_LE): "
                 + safeName(device) + " " + safeAddress(device)
-                + " · exact bonded incoming objectId=" + System.identityHashCode(device)
+                + " · physicalObjectId=" + System.identityHashCode(device)
+                + " · pairObjectId=" + System.identityHashCode(pairFacade)
+                + " · sameAddress=" + sameDevice(device, pairFacade)
                 + " · serverLinkAgeMs=" + linkAgeMs
                 + " · postReady=true"
                 + " · oneShotFreshReplacement=" + oneShotFreshReplacement
@@ -3399,10 +3561,22 @@ public final class IphoneAncsTransport {
                     + safeAddress(expected.getDevice()));
             boolean exactFreshReplacement = oneShotFreshReplacement
                     && incomingFreshReplacementGatt == expected;
+            GattServerPeer attemptPeer = incomingClientAttemptServerPeer;
+            boolean serverFacadeLostWhilePending = attemptPeer != null
+                    && attemptPeer == incomingPairAcceptedServerPeer
+                    && !attemptPeer.connected;
             unregisterNeverEstablishedOpportunisticGatt(expected);
             clearAncsRuntime();
             incomingDiscoveryStarted = false;
             if (exactFreshReplacement) incomingFreshReplacementGatt = null;
+            if (serverFacadeLostWhilePending) {
+                resetIncomingSecurityAfterClientLoss(expected.getDevice(),
+                        "opportunistic timeout after accepted server facade loss");
+                state("OPPORTUNISTIC TIMEOUT · PHYSICAL LINK LOST · ЖДУ НОВЫЙ LINK");
+                log("Pending handoff не подтвердился; PAIR/B3/READY, bind bit и stale "
+                        + "roleFacadeHandoffPending очищены без disconnect/GATT-server close");
+                return;
+            }
             state(exactFreshReplacement
                     ? "FRESH STATUS=22 OPPORTUNISTIC TIMEOUT · ЖДУ НОВЫЙ LINK"
                     : "OPPORTUNISTIC GATT TIMEOUT · LINK KEPT");
@@ -3624,6 +3798,24 @@ public final class IphoneAncsTransport {
         return true;
     }
 
+    /**
+     * Once the passive wrapper is close-only retired, a missing server facade means no role still
+     * proves the physical link. Clear the logical epoch/bind transcript without issuing any
+     * BluetoothGatt disconnect, reconnect or GATT-server close.
+     */
+    private boolean resetRetiredObserverAfterServerFacadeLoss(
+            @Nullable GattServerPeer attemptPeer,
+            @NonNull BluetoothDevice transportFacade,
+            @NonNull String reason) {
+        if (attemptPeer == null
+                || attemptPeer != incomingPairAcceptedServerPeer
+                || attemptPeer.connected) return false;
+        resetIncomingSecurityAfterClientLoss(transportFacade, reason);
+        log("Retired opportunistic observer had no CONNECTED server facade; "
+                + "PAIR/B3/READY, bind bit and handoff-pending cleared close-only");
+        return true;
+    }
+
     private void cancelClientAttemptCallbacks() {
         if (secureConnectStart != null) main.removeCallbacks(secureConnectStart);
         if (nextClientAttempt != null) main.removeCallbacks(nextClientAttempt);
@@ -3640,32 +3832,55 @@ public final class IphoneAncsTransport {
 
     private GattServerPeer findConnectedServerPeer(BluetoothDevice device) {
         synchronized (gattServerPeers) {
-            for (GattServerPeer peer : gattServerPeers.values()) {
-                if (peer.sessionGeneration == sessionGeneration
-                        && peer.securityEpoch == incomingSecurityEpoch
-                        && peer.connected
-                        && sameDevice(peer.device, device)) {
-                    return peer;
-                }
-            }
+            return findUniqueServerPeerLocked(device, true, true);
         }
-        return null;
     }
 
     /** Current physical link, even if Android released only its server-role facade. */
     private GattServerPeer findCurrentServerPeer(BluetoothDevice device) {
         synchronized (gattServerPeers) {
-            for (GattServerPeer peer : gattServerPeers.values()) {
-                if (peer.sessionGeneration == sessionGeneration
-                        && peer.securityEpoch == incomingSecurityEpoch
-                        && (peer.connected || peer.roleFacadeHandoff
-                        || peer.roleFacadeHandoffPending)
-                        && sameDevice(peer.device, device)) {
-                    return peer;
-                }
-            }
+            return findUniqueServerPeerLocked(device, false, true);
         }
-        return null;
+    }
+
+    /**
+     * Resolves a callback to one stable physical record. Exact physical/authorization object
+     * identity wins; address equality is accepted only when it resolves to one unique record.
+     */
+    @Nullable
+    private GattServerPeer findUniqueServerPeerLocked(
+            @Nullable BluetoothDevice callbackFacade,
+            boolean requireConnected, boolean requireCurrentEpoch) {
+        if (callbackFacade == null) return null;
+        GattServerPeer exact = null;
+        for (GattServerPeer peer : new HashSet<>(gattServerPeers.values())) {
+            if (peer.sessionGeneration != sessionGeneration
+                    || (requireCurrentEpoch
+                    && peer.securityEpoch != incomingSecurityEpoch)
+                    || (requireConnected ? !peer.connected
+                    : (!peer.connected && !peer.roleFacadeHandoff
+                    && !peer.roleFacadeHandoffPending))) continue;
+            if (peer.physicalLinkFacade != callbackFacade
+                    && peer.device != callbackFacade) continue;
+            if (exact != null && exact != peer) return null;
+            exact = peer;
+        }
+        if (exact != null) return exact;
+
+        GattServerPeer addressMatch = null;
+        for (GattServerPeer peer : new HashSet<>(gattServerPeers.values())) {
+            if (peer.sessionGeneration != sessionGeneration
+                    || (requireCurrentEpoch
+                    && peer.securityEpoch != incomingSecurityEpoch)
+                    || (requireConnected ? !peer.connected
+                    : (!peer.connected && !peer.roleFacadeHandoff
+                    && !peer.roleFacadeHandoffPending))) continue;
+            if (!sameDevice(peer.physicalLinkFacade, callbackFacade)
+                    && !sameDevice(peer.device, callbackFacade)) continue;
+            if (addressMatch != null && addressMatch != peer) return null;
+            addressMatch = peer;
+        }
+        return addressMatch;
     }
 
     /** Identity-strict lookup used only for the raw facade authorized by current PAIR. */
@@ -3673,17 +3888,39 @@ public final class IphoneAncsTransport {
     private GattServerPeer findExactCurrentServerPeer(@Nullable BluetoothDevice rawFacade) {
         if (rawFacade == null) return null;
         synchronized (gattServerPeers) {
-            for (GattServerPeer peer : gattServerPeers.values()) {
+            GattServerPeer match = null;
+            for (GattServerPeer peer : new HashSet<>(gattServerPeers.values())) {
                 if (peer.sessionGeneration == sessionGeneration
                         && peer.securityEpoch == incomingSecurityEpoch
                         && peer.device == rawFacade
                         && (peer.connected || peer.roleFacadeHandoff
                         || peer.roleFacadeHandoffPending)) {
-                    return peer;
+                    if (match != null && match != peer) return null;
+                    match = peer;
                 }
             }
+            return match;
         }
-        return null;
+    }
+
+    @Nullable
+    private GattServerPeer findExactPhysicalServerPeer(
+            @Nullable BluetoothDevice physicalFacade) {
+        if (physicalFacade == null) return null;
+        synchronized (gattServerPeers) {
+            GattServerPeer match = null;
+            for (GattServerPeer peer : new HashSet<>(gattServerPeers.values())) {
+                if (peer.sessionGeneration == sessionGeneration
+                        && peer.securityEpoch == incomingSecurityEpoch
+                        && peer.physicalLinkFacade == physicalFacade
+                        && (peer.connected || peer.roleFacadeHandoff
+                        || peer.roleFacadeHandoffPending)) {
+                    if (match != null && match != peer) return null;
+                    match = peer;
+                }
+            }
+            return match;
+        }
     }
 
     private void clearIncomingPairProof() {
@@ -3695,6 +3932,7 @@ public final class IphoneAncsTransport {
         incomingPairAcceptedSessionGeneration = 0L;
         incomingPairAcceptedSecurityEpoch = 0L;
         incomingPairAcceptedPublicationToken = 0L;
+        incomingPairAcceptedChallenge = null;
     }
 
     private void clearIncomingReadyAttachLatch() {
@@ -3704,14 +3942,27 @@ public final class IphoneAncsTransport {
         activeIncomingFirstAttachAuthorization = null;
         activeIncomingPostReadyReplacementAuthorization = false;
         incomingReadyAttachLatchFacade = null;
+        incomingReadyAttachLatchPhysicalFacade = null;
+        incomingReadyAttachLatchServerPeer = null;
         incomingReadyAttachLatchSessionGeneration = 0L;
         incomingReadyAttachLatchSecurityEpoch = 0L;
         incomingReadyAttachLatchPublicationToken = 0L;
+        incomingReadyAttachLatchChallenge = null;
     }
 
     private boolean hasCurrentIncomingReadyAttachLatch(
             @NonNull BluetoothDevice rawFacade, long publicationToken) {
+        GattServerPeer serverPeer = incomingReadyAttachLatchServerPeer;
         return incomingReadyAttachLatchFacade == rawFacade
+                && incomingReadyAttachLatchPhysicalFacade != null
+                && incomingReadyAttachLatchChallenge != null
+                && Arrays.equals(incomingReadyAttachLatchChallenge,
+                incomingPairAcceptedChallenge)
+                && serverPeer != null
+                && serverPeer == incomingPairAcceptedServerPeer
+                && serverPeer.device == rawFacade
+                && serverPeer.physicalLinkFacade
+                == incomingReadyAttachLatchPhysicalFacade
                 && incomingReadyAttachLatchSessionGeneration == sessionGeneration
                 && incomingReadyAttachLatchSecurityEpoch == incomingSecurityEpoch
                 && incomingReadyAttachLatchPublicationToken == publicationToken;
@@ -3719,21 +3970,31 @@ public final class IphoneAncsTransport {
 
     /** Returns false for an idempotent duplicate READY of the already armed/consumed tuple. */
     private boolean armIncomingReadyAttachLatch(
-            @NonNull BluetoothDevice rawFacade, long publicationToken) {
+            @NonNull GattServerPeer serverPeer,
+            @NonNull BluetoothDevice physicalLinkFacade,
+            @NonNull BluetoothDevice rawFacade, @NonNull byte[] pairChallenge,
+            long publicationToken) {
         if (hasCurrentIncomingReadyAttachLatch(rawFacade, publicationToken)) return false;
         clearIncomingReadyAttachLatch();
+        incomingReadyAttachLatchServerPeer = serverPeer;
+        incomingReadyAttachLatchPhysicalFacade = physicalLinkFacade;
         incomingReadyAttachLatchFacade = rawFacade;
         incomingReadyAttachLatchSessionGeneration = sessionGeneration;
         incomingReadyAttachLatchSecurityEpoch = incomingSecurityEpoch;
         incomingReadyAttachLatchPublicationToken = publicationToken;
+        incomingReadyAttachLatchChallenge = pairChallenge.clone();
         return true;
     }
 
     private void clearIncomingClientAttemptLineage() {
-        incomingClientAttemptFacade = null;
+        incomingClientAttemptTransportFacade = null;
+        incomingClientAttemptPairFacade = null;
+        incomingClientAttemptServerPeer = null;
         incomingClientAttemptSessionGeneration = 0L;
         incomingClientAttemptSecurityEpoch = 0L;
         incomingClientAttemptPublicationToken = 0L;
+        incomingClientAttemptChallenge = null;
+        managedF05DatabaseGeneration = 0L;
     }
 
     /** Address equality never transfers the raw PAIR facade to a different framework wrapper. */
@@ -3747,6 +4008,7 @@ public final class IphoneAncsTransport {
         cancelClientAttemptCallbacks();
         clearIncomingPairProof();
         clearIncomingClientAttemptLineage();
+        clearAncsRuntime();
         synchronized (verifiedPeerLock) {
             verifiedPeer = null;
             secureAttConfirmed = false;
@@ -3770,6 +4032,7 @@ public final class IphoneAncsTransport {
         GattServerPeer callbackPeer = callbackDevice == null
                 ? null : findCurrentServerPeer(callbackDevice);
         return rawFacade != null
+                && (!managedIncomingMode || incomingPairAcceptedChallenge != null)
                 && callbackDevice != null
                 && AncsRecoveryPolicy.acceptsInboundAttTranscriptCallback(
                 managedIncomingMode,
@@ -3790,6 +4053,7 @@ public final class IphoneAncsTransport {
 
     private boolean canStartIncomingClientAttach(@Nullable BluetoothDevice rawFacade,
                                                   long publicationToken) {
+        if (managedIncomingMode && incomingPairAcceptedChallenge == null) return false;
         if (incomingReadyAttachTask != null) return false;
         GattServerPeer serverPeer = findExactCurrentServerPeer(rawFacade);
         return AncsRecoveryPolicy.canStartReverseClientAttach(
@@ -3824,9 +4088,23 @@ public final class IphoneAncsTransport {
         if (incomingReadyAttachTask != null) return false;
         long publicationToken = publishedDiagnosticServicePublicationToken;
         BluetoothDevice callbackDevice = callbackGatt.getDevice();
-        BluetoothDevice rawFacade = incomingClientAttemptFacade;
-        boolean currentPairProof = rawFacade != null
-                && rawFacade == incomingPairAcceptedFacade
+        BluetoothDevice transportFacade = incomingClientAttemptTransportFacade;
+        BluetoothDevice pairFacade = incomingClientAttemptPairFacade;
+        GattServerPeer attemptPeer = incomingClientAttemptServerPeer;
+        boolean exactAttemptOwner = transportFacade != null
+                && pairFacade != null
+                && attemptPeer != null
+                && incomingClientAttemptChallenge != null
+                && Arrays.equals(incomingClientAttemptChallenge,
+                incomingPairAcceptedChallenge)
+                && callbackDevice == transportFacade
+                && attemptPeer == incomingPairAcceptedServerPeer
+                && attemptPeer.physicalLinkFacade == transportFacade
+                && attemptPeer.device == pairFacade
+                && findExactPhysicalServerPeer(transportFacade) == attemptPeer
+                && findExactCurrentServerPeer(pairFacade) == attemptPeer;
+        boolean currentPairProof = exactAttemptOwner
+                && pairFacade == incomingPairAcceptedFacade
                 && incomingPairAcceptedSessionGeneration == sessionGeneration
                 && incomingPairAcceptedSecurityEpoch == incomingSecurityEpoch
                 && incomingPairAcceptedPublicationToken == publicationToken;
@@ -3836,7 +4114,7 @@ public final class IphoneAncsTransport {
                 && incomingAncsReadyPublicationToken == publicationToken;
         return AncsRecoveryPolicy.acceptsReverseClientCallback(
                 callbackGatt == gatt,
-                callbackDevice != null && callbackDevice == rawFacade,
+                exactAttemptOwner,
                 sessionGeneration,
                 incomingClientAttemptSessionGeneration,
                 incomingSecurityEpoch,
@@ -3847,6 +4125,32 @@ public final class IphoneAncsTransport {
                 currentPairProof,
                 currentSecureProof,
                 currentReadyProof);
+    }
+
+    private boolean ownsManagedAttemptLineage(
+            @NonNull BluetoothGatt owner, @Nullable byte[] challenge,
+            @Nullable GattServerPeer serverPeer,
+            @Nullable BluetoothDevice physicalFacade,
+            @Nullable BluetoothDevice pairFacade,
+            long capturedSessionGeneration, long capturedSecurityEpoch,
+            long capturedPublicationToken, long capturedClientGeneration) {
+        return ownsCurrentIncomingClientAttempt(owner)
+                && challenge != null
+                && Arrays.equals(challenge, incomingClientAttemptChallenge)
+                && serverPeer != null
+                && serverPeer == incomingClientAttemptServerPeer
+                && physicalFacade != null
+                && physicalFacade == incomingClientAttemptTransportFacade
+                && pairFacade != null
+                && pairFacade == incomingClientAttemptPairFacade
+                && capturedSessionGeneration == sessionGeneration
+                && capturedSessionGeneration == incomingClientAttemptSessionGeneration
+                && capturedSecurityEpoch == incomingSecurityEpoch
+                && capturedSecurityEpoch == incomingClientAttemptSecurityEpoch
+                && capturedPublicationToken == publishedDiagnosticServicePublicationToken
+                && capturedPublicationToken == incomingClientAttemptPublicationToken
+                && capturedClientGeneration == activeClientGeneration
+                && sessionState.isCurrent(capturedClientGeneration);
     }
 
     /**
@@ -3879,6 +4183,15 @@ public final class IphoneAncsTransport {
         IncomingReadyAttach captured = activeIncomingFirstAttachAuthorization;
         return captured != null
                 && captured.rawFacade == rawFacade
+                && captured.serverPeer == incomingReadyAttachLatchServerPeer
+                && captured.serverPeer == incomingPairAcceptedServerPeer
+                && captured.physicalLinkFacade
+                == incomingReadyAttachLatchPhysicalFacade
+                && captured.serverPeer.device == rawFacade
+                && captured.serverPeer.physicalLinkFacade
+                == captured.physicalLinkFacade
+                && Arrays.equals(captured.pairChallenge,
+                incomingPairAcceptedChallenge)
                 && captured.sessionGeneration == sessionGeneration
                 && captured.securityEpoch == incomingSecurityEpoch
                 && captured.publicationToken == publicationToken
@@ -3973,31 +4286,62 @@ public final class IphoneAncsTransport {
         boolean conflictingVerifiedPeer = claimed != null && !sameDevice(claimed, device);
         GattServerPeer soleAnonymousAlias = null;
         GattServerPeer matchingCurrentPeer = null;
+        GattServerPeer redundantMatchingPeer = null;
         int anonymousAliasCount = 0;
+        int currentServerRecordCount = 0;
+        int matchingCurrentPeerCount = 0;
         boolean conflictingCurrentPeer = false;
         boolean currentPeerPresent = false;
         boolean exactCurrentRawFacade = false;
+        AncsRecoveryPolicy.PhysicalFacadeTopologyDecision topologyDecision;
         AncsRecoveryPolicy.PairFacadeBindDecision decision;
         synchronized (gattServerPeers) {
-            for (GattServerPeer peer : gattServerPeers.values()) {
+            for (GattServerPeer peer : new HashSet<>(gattServerPeers.values())) {
                 if (peer.sessionGeneration != sessionGeneration
                         || peer.securityEpoch != incomingSecurityEpoch
                         || (!peer.connected && !peer.roleFacadeHandoff
                         && !peer.roleFacadeHandoffPending)) continue;
-                if (sameDevice(peer.device, device)) {
+                currentServerRecordCount++;
+                boolean matchesAuthorization = sameDevice(peer.device, device);
+                boolean matchesPhysical = sameDevice(
+                        peer.physicalLinkFacade, device);
+                if (matchesAuthorization || matchesPhysical) {
                     currentPeerPresent = true;
-                    matchingCurrentPeer = peer;
+                    matchingCurrentPeerCount++;
+                    if (matchingCurrentPeer != null && matchingCurrentPeer != peer) {
+                        redundantMatchingPeer = peer;
+                    } else {
+                        matchingCurrentPeer = peer;
+                    }
                     if (peer.device == device) exactCurrentRawFacade = true;
                 }
                 if (peer.connected
                         && safeBondState(peer.device) == BluetoothDevice.BOND_NONE) {
                     anonymousAliasCount++;
                     soleAnonymousAlias = peer;
-                } else if (!sameDevice(peer.device, device)) {
+                } else if (!matchesAuthorization && !matchesPhysical) {
                     conflictingCurrentPeer = true;
                 }
             }
-            decision = AncsRecoveryPolicy.pairFacadeBindDecision(
+            if (currentServerRecordCount == 2
+                    && soleAnonymousAlias != null
+                    && matchingCurrentPeer != null
+                    && soleAnonymousAlias != matchingCurrentPeer
+                    && (matchingCurrentPeer.connectedAtElapsedMs
+                    - soleAnonymousAlias.connectedAtElapsedMs < 0L
+                    || matchingCurrentPeer.connectedAtElapsedMs
+                    - soleAnonymousAlias.connectedAtElapsedMs
+                    > ANONYMOUS_BONDED_ALIAS_MAX_DELTA_MS)) {
+                conflictingCurrentPeer = true;
+            }
+            topologyDecision = AncsRecoveryPolicy.physicalFacadeTopologyDecision(
+                    currentServerRecordCount, anonymousAliasCount,
+                    matchingCurrentPeerCount, conflictingCurrentPeer);
+            decision = topologyDecision
+                    == AncsRecoveryPolicy.PhysicalFacadeTopologyDecision.REJECT
+                    ? AncsRecoveryPolicy.PairFacadeBindDecision
+                    .REJECT_ANONYMOUS_ALIAS_COUNT
+                    : AncsRecoveryPolicy.pairFacadeBindDecision(
                     currentPeerPresent,
                     exactCurrentRawFacade,
                     managedIncomingMode,
@@ -4010,27 +4354,56 @@ public final class IphoneAncsTransport {
         }
         boolean freshRequestBind = AncsRecoveryPolicy.beginsFreshSecurityEpoch(decision);
         if (freshRequestBind) {
-            long previousEpoch = incomingSecurityEpoch;
-            long connectedAtElapsedMs = soleAnonymousAlias == null
-                    ? SystemClock.elapsedRealtime()
-                    : soleAnonymousAlias.connectedAtElapsedMs;
+            GattServerPeer peer = soleAnonymousAlias != null
+                    ? soleAnonymousAlias : matchingCurrentPeer;
+            boolean pairRequestIsFirstCurrentAttEvidence =
+                    topologyDecision == AncsRecoveryPolicy
+                            .PhysicalFacadeTopologyDecision.CREATE_FROM_PAIR_ATT;
+            if (peer == null && pairRequestIsFirstCurrentAttEvidence) {
+                peer = new GattServerPeer(sessionGeneration, device);
+                peer.connectedAtElapsedMs = SystemClock.elapsedRealtime();
+            }
+            if (peer == null || currentServerRecordCount > 2
+                    || (!pairRequestIsFirstCurrentAttEvidence && !peer.connected)) {
+                log("PAIR facade coalesce fail-closed: physical server record count="
+                        + currentServerRecordCount);
+                return AncsRecoveryPolicy.PairFacadeBindDecision
+                        .REJECT_ANONYMOUS_ALIAS_COUNT;
+            }
+            // Capture A before beginFresh... clears the authorization transcript. The immutable
+            // target is carried only by this one unambiguous server record.
+            BluetoothDevice physicalLinkFacade = peer.physicalLinkFacade;
+            long connectedAtElapsedMs = peer.connectedAtElapsedMs;
             // Synchronous by contract: ATT success must not reach Helper before stale B3/READY
             // proofs and the old one-shot challenge are invalidated for this request-owned epoch.
             beginFreshIncomingSecurityEpoch(device,
                     "exact current-F04 PAIR request facade recovery", false);
             synchronized (gattServerPeers) {
-                if (soleAnonymousAlias != null
-                        && soleAnonymousAlias.sessionGeneration == sessionGeneration
-                        && soleAnonymousAlias.securityEpoch == previousEpoch) {
-                    soleAnonymousAlias.connected = false;
-                    soleAnonymousAlias.roleFacadeHandoff = false;
-                    soleAnonymousAlias.roleFacadeHandoffPending = false;
-                    soleAnonymousAlias.linkSecurityChallengeIssued = false;
-                    soleAnonymousAlias.telemetrySubscribed = false;
+                if (peer.sessionGeneration != sessionGeneration
+                        || peer.physicalLinkFacade != physicalLinkFacade) {
+                    log("PAIR facade coalesce aborted: captured physical record changed");
+                    return AncsRecoveryPolicy.PairFacadeBindDecision
+                            .REJECT_ANONYMOUS_ALIAS_COUNT;
                 }
-                GattServerPeer peer = gattServerPeers.get(deviceKey(device));
-                if (peer == null || peer.sessionGeneration != sessionGeneration) {
-                    peer = new GattServerPeer(sessionGeneration, device);
+                GattServerPeer redundantPeer = soleAnonymousAlias != null
+                        && matchingCurrentPeer != null
+                        && matchingCurrentPeer != peer
+                        ? matchingCurrentPeer : redundantMatchingPeer;
+                if (redundantPeer != null) {
+                    Iterator<Map.Entry<String, GattServerPeer>> iterator =
+                            gattServerPeers.entrySet().iterator();
+                    while (iterator.hasNext()) {
+                        if (iterator.next().getValue() == redundantPeer) {
+                            iterator.remove();
+                        }
+                    }
+                    redundantPeer.connected = false;
+                    redundantPeer.roleFacadeHandoff = false;
+                    redundantPeer.roleFacadeHandoffPending = false;
+                    redundantPeer.linkSecurityChallengeIssued = false;
+                    redundantPeer.telemetrySubscribed = false;
+                }
+                if (pairRequestIsFirstCurrentAttEvidence) {
                     gattServerPeers.put(deviceKey(device), peer);
                 }
                 peer.device = device;
@@ -4043,6 +4416,14 @@ public final class IphoneAncsTransport {
                 peer.telemetrySubscribed = false;
                 incomingPairRequestFacadeBoundEpoch = incomingSecurityEpoch;
             }
+            log("HA1211 PAIR facade coalesced onto immutable physical link · physicalObjectId="
+                    + System.identityHashCode(physicalLinkFacade)
+                    + " pairObjectId=" + System.identityHashCode(device)
+                    + " sameAddress=" + sameDevice(physicalLinkFacade, device)
+                    + " · A/B heuristic deltaMs="
+                    + (matchingCurrentPeer == null || soleAnonymousAlias == null
+                    ? 0L : matchingCurrentPeer.connectedAtElapsedMs
+                    - soleAnonymousAlias.connectedAtElapsedMs));
         } else if (decision == AncsRecoveryPolicy.PairFacadeBindDecision.ALREADY_CURRENT
                 && matchingCurrentPeer != null && matchingCurrentPeer.device == device) {
             retireCurrentAnonymousAliasesExcept(device);
@@ -4065,6 +4446,8 @@ public final class IphoneAncsTransport {
         Boolean firstPairProof = null;
         long publicationToken = currentDiagnosticServicePublicationToken(characteristic);
         String command = asciiCommand(value);
+        byte[] managedPairChallenge = managedIncomingMode
+                ? managedProofChallenge(value, MANAGED_PAIR_OPCODE) : null;
         if (preparedWrite) {
             status = BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED;
             rejection = "prepared PAIR write is unsupported";
@@ -4074,7 +4457,10 @@ public final class IphoneAncsTransport {
         } else if (!responseNeeded) {
             status = BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED;
             rejection = "PAIR requires a checked ATT write response";
-        } else if (!"PAIR".equals(command)) {
+        } else if (managedIncomingMode && managedPairChallenge == null) {
+            status = BluetoothGatt.GATT_FAILURE;
+            rejection = "managed CONTROL requires exact 17-byte binary P/Q";
+        } else if (!managedIncomingMode && !"PAIR".equals(command)) {
             status = BluetoothGatt.GATT_FAILURE;
             rejection = "CONTROL command is not ASCII PAIR · command=`" + command + "`";
         } else if (publicationToken == 0L) {
@@ -4109,7 +4495,8 @@ public final class IphoneAncsTransport {
         if (status == BluetoothGatt.GATT_SUCCESS) {
             // Keep the ATT-critical section minimal: commit only the exact tuple. Candidate/UI,
             // logs and bonding work run after the checked response below.
-            firstPairProof = commitPairCommand(device, publicationToken);
+            firstPairProof = commitPairCommand(
+                    device, publicationToken, managedPairChallenge);
             if (firstPairProof == null) {
                 status = STATUS_INSUFFICIENT_AUTHORIZATION;
                 rejection = "exact raw PAIR tuple vanished before commit";
@@ -4318,6 +4705,7 @@ public final class IphoneAncsTransport {
     /** A failed first PAIR response invalidates every proof/task derived from that transcript. */
     private void rollbackNonIdempotentPairTranscript() {
         cancelClientAttemptCallbacks();
+        incomingPairRequestFacadeBoundEpoch = 0L;
         clearIncomingPairProof();
         clearIncomingClientAttemptLineage();
         synchronized (verifiedPeerLock) {
@@ -4436,75 +4824,121 @@ public final class IphoneAncsTransport {
                 && establishedClientOwnsPhysicalLink(device);
         boolean pendingHandoff = newState == BluetoothProfile.STATE_DISCONNECTED
                 && (establishedHandoffCandidate || pendingExactClientAttach(device));
-        boolean pairRawFacadeChanged = false;
+        boolean ambiguousCallback = false;
+        boolean acceptedPhysicalRecordDisconnected = false;
+        GattServerPeer callbackPeer = null;
         synchronized (gattServerPeers) {
+            Set<GattServerPeer> records = new HashSet<>(gattServerPeers.values());
+            GattServerPeer exactMatch = null;
+            GattServerPeer addressMatch = null;
+            int exactMatchCount = 0;
+            int addressMatchCount = 0;
+            for (GattServerPeer existing : records) {
+                if (existing.sessionGeneration != sessionGeneration
+                        || existing.securityEpoch != incomingSecurityEpoch) continue;
+                boolean live = existing.connected || existing.roleFacadeHandoff
+                        || existing.roleFacadeHandoffPending;
+                if (!live) continue;
+                if (existing.physicalLinkFacade == device
+                        || existing.device == device) {
+                    exactMatch = existing;
+                    exactMatchCount++;
+                } else if (sameDevice(existing.physicalLinkFacade, device)
+                        || sameDevice(existing.device, device)) {
+                    addressMatch = existing;
+                    addressMatchCount++;
+                }
+            }
+            if (exactMatchCount == 1) {
+                callbackPeer = exactMatch;
+            } else if (exactMatchCount > 1) {
+                ambiguousCallback = true;
+            } else if (addressMatchCount == 1) {
+                callbackPeer = addressMatch;
+            } else if (addressMatchCount > 1) {
+                ambiguousCallback = true;
+            }
+
             boolean anotherFacadeOwnsCurrentLink = false;
-            for (GattServerPeer existing : gattServerPeers.values()) {
+            for (GattServerPeer existing : records) {
                 if (existing.sessionGeneration == sessionGeneration
                         && existing.securityEpoch == incomingSecurityEpoch
-                        && existing.connected) {
+                        && existing.connected && existing != callbackPeer) {
                     anotherFacadeOwnsCurrentLink = true;
                     break;
                 }
             }
-            GattServerPeer peer = gattServerPeers.get(key);
-            if (peer == null || peer.sessionGeneration != sessionGeneration) {
-                peer = new GattServerPeer(sessionGeneration, device);
-                gattServerPeers.put(key, peer);
+            if (callbackPeer == null && !ambiguousCallback
+                    && status == GATT_SUCCESS
+                    && newState == BluetoothProfile.STATE_CONNECTED) {
+                // Before PAIR, A anonymous and B bonded remain distinct records. Only the exact
+                // current-F04 PAIR transaction may merge the safe A+B topology; doing it here
+                // could attach a selected B to an unrelated simultaneous anonymous link A.
+                callbackPeer = new GattServerPeer(sessionGeneration, device);
+                gattServerPeers.put(key, callbackPeer);
             }
-            BluetoothDevice pairFacade = incomingPairAcceptedFacade;
-            boolean acceptedPairOtherFacade = pairFacade != null
-                    && pairFacade != device
-                    && incomingPairAcceptedSessionGeneration == sessionGeneration
-                    && incomingPairAcceptedSecurityEpoch == incomingSecurityEpoch;
-            pairRawFacadeChanged = pairFacade != null
-                    && pairFacade != device
-                    && sameDevice(pairFacade, device)
-                    && incomingPairAcceptedSessionGeneration == sessionGeneration
-                    && incomingPairAcceptedSecurityEpoch == incomingSecurityEpoch;
-            if (!pairRawFacadeChanged) {
-                peer.device = device;
-            }
-            if (status == GATT_SUCCESS && newState == BluetoothProfile.STATE_CONNECTED) {
-                freshConnection = pairRawFacadeChanged
-                        || (!peer.connected
-                        && (!anotherFacadeOwnsCurrentLink || acceptedPairOtherFacade));
-                if (!peer.connected) {
-                    peer.connectedAtElapsedMs = now;
-                    peer.linkSecurityChallengeIssued = false;
+            if (callbackPeer == null) ambiguousCallback = true;
+
+            GattServerPeer peer = callbackPeer;
+            if (!ambiguousCallback && peer != null) {
+                BluetoothDevice pairFacade = incomingPairAcceptedFacade;
+                boolean acceptedPairOtherFacade = pairFacade != null
+                        && pairFacade != device
+                        && incomingPairAcceptedSessionGeneration == sessionGeneration
+                        && incomingPairAcceptedSecurityEpoch == incomingSecurityEpoch;
+                // Before PAIR, a unique selected bonded callback may become B. After PAIR, C is
+                // immutable authorization for the tuple; A/B/D callbacks only update liveness.
+                if (!acceptedPairOtherFacade
+                        && isSelectedBondedIncomingDevice(device)) {
+                    peer.device = device;
                 }
-                peer.connected = true;
-                peer.roleFacadeHandoff = false;
-                peer.roleFacadeHandoffPending = false;
-            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                // Never claim that the server facade is connected after its own callback says
-                // DISCONNECTED. A separately tracked client-role handoff may still own the ACL.
-                peer.connected = false;
-                // Even a CONNECTED clientIf is only a handoff candidate until one bounded,
-                // non-destructive liveness probe succeeds. ECARX may omit the later client loss
-                // callback, so treating wrapper state alone as proof would retain stale B3/READY.
-                peer.roleFacadeHandoff = false;
-                peer.roleFacadeHandoffPending = pendingHandoff;
-                peer.telemetrySubscribed = false;
-                if (!pendingHandoff) {
-                    peer.linkSecurityChallengeIssued = false;
+                if (status == GATT_SUCCESS
+                        && newState == BluetoothProfile.STATE_CONNECTED) {
+                    freshConnection = !peer.connected
+                            && (!anotherFacadeOwnsCurrentLink
+                            || acceptedPairOtherFacade);
+                    if (!peer.connected) {
+                        peer.connectedAtElapsedMs = now;
+                        peer.linkSecurityChallengeIssued = false;
+                    }
+                    peer.connected = true;
+                    peer.roleFacadeHandoff = false;
+                    peer.roleFacadeHandoffPending = false;
+                } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    // Never claim that the server facade is connected after its own callback says
+                    // DISCONNECTED. A separately tracked client-role handoff may still own the ACL.
+                    peer.connected = false;
+                    // Even a CONNECTED clientIf is only a handoff candidate until one bounded,
+                    // non-destructive liveness probe succeeds. ECARX may omit the later client loss
+                    // callback, so treating wrapper state alone as proof would retain stale B3/READY.
+                    peer.roleFacadeHandoff = false;
+                    peer.roleFacadeHandoffPending = pendingHandoff;
+                    peer.telemetrySubscribed = false;
+                    if (!pendingHandoff) {
+                        peer.linkSecurityChallengeIssued = false;
+                    }
+                    acceptedPhysicalRecordDisconnected = managedIncomingMode
+                            && peer == incomingPairAcceptedServerPeer
+                            && !pendingHandoff;
                 }
             }
         }
-        if (pairRawFacadeChanged) {
-            invalidateIncomingTupleForRawFacadeChange(device,
-                    "GATT-server state callback");
-            if (status == GATT_SUCCESS
-                    && newState == BluetoothProfile.STATE_CONNECTED) {
-                // Replacement is explicit and follows complete transcript invalidation. It can
-                // never inherit the address-equal facade's PAIR/B3/READY proof.
-                synchronized (gattServerPeers) {
-                    GattServerPeer peer = gattServerPeers.get(key);
-                    if (peer != null && peer.sessionGeneration == sessionGeneration) {
-                        peer.device = device;
-                    }
-                }
-            }
+        if (ambiguousCallback) {
+            log("GATT-server callback fail-closed: physical/auth facade maps to zero or "
+                    + "multiple current records · objectId="
+                    + System.identityHashCode(device)
+                    + " address=" + safeAddress(device));
+            return false;
+        }
+        if (acceptedPhysicalRecordDisconnected) {
+            resetIncomingSecurityAfterClientLoss(device,
+                    "accepted physical GATT-server record DISCONNECTED");
+            log("HA1211 physical/auth disconnect invalidated PAIR/B3/READY and attempt · "
+                    + "physicalObjectId="
+                    + System.identityHashCode(callbackPeer.physicalLinkFacade)
+                    + " callbackObjectId=" + System.identityHashCode(device)
+                    + " sameAddress="
+                    + sameDevice(callbackPeer.physicalLinkFacade, device));
         }
         if (newState == BluetoothProfile.STATE_DISCONNECTED
                 && !hasServerTelemetrySubscribers()) {
@@ -4522,7 +4956,7 @@ public final class IphoneAncsTransport {
 
     private void bindServerPeerToCurrentSecurityEpoch(@NonNull BluetoothDevice device) {
         synchronized (gattServerPeers) {
-            GattServerPeer peer = gattServerPeers.get(deviceKey(device));
+            GattServerPeer peer = findUniqueServerPeerLocked(device, false, false);
             if (peer == null || peer.sessionGeneration != sessionGeneration) return;
             if (peer.securityEpoch != incomingSecurityEpoch) {
                 peer.securityEpoch = incomingSecurityEpoch;
@@ -4673,8 +5107,12 @@ public final class IphoneAncsTransport {
         if (!managedIncomingMode) return;
         BluetoothDevice device = expected.getDevice();
         if (activeClientOpportunistic && gatt == expected) {
+            GattServerPeer attemptPeer = incomingClientAttemptServerPeer;
             retireOpportunisticObserverWithoutLinkMutation(expected,
                     "established passive observer lost callback/link · " + reason);
+            resetRetiredObserverAfterServerFacadeLoss(attemptPeer, device,
+                    "established opportunistic observer lost after server facade loss · "
+                            + reason);
             return;
         }
         if (replaceAfterFreshSecurity) {
@@ -4784,10 +5222,13 @@ public final class IphoneAncsTransport {
 
     private boolean confirmPendingServerFacadeHandoff(@NonNull BluetoothDevice device) {
         synchronized (gattServerPeers) {
-            for (GattServerPeer peer : gattServerPeers.values()) {
+            for (GattServerPeer peer : new HashSet<>(gattServerPeers.values())) {
                 if (peer.sessionGeneration != sessionGeneration
                         || peer.securityEpoch != incomingSecurityEpoch
-                        || !sameDevice(peer.device, device)) continue;
+                        || (peer.physicalLinkFacade != device
+                        && peer.device != device
+                        && !sameDevice(peer.physicalLinkFacade, device)
+                        && !sameDevice(peer.device, device))) continue;
                 if (peer.roleFacadeHandoff) return true;
                 if (!peer.roleFacadeHandoffPending) continue;
                 peer.roleFacadeHandoffPending = false;
@@ -4813,10 +5254,13 @@ public final class IphoneAncsTransport {
 
     private boolean isServerTelemetrySubscribed(BluetoothDevice device) {
         synchronized (gattServerPeers) {
-            for (GattServerPeer peer : gattServerPeers.values()) {
+            for (GattServerPeer peer : new HashSet<>(gattServerPeers.values())) {
                 if (peer.sessionGeneration == sessionGeneration
                         && peer.connected && peer.telemetrySubscribed
-                        && sameDevice(peer.device, device)) {
+                        && (peer.physicalLinkFacade == device
+                        || peer.device == device
+                        || sameDevice(peer.physicalLinkFacade, device)
+                        || sameDevice(peer.device, device))) {
                     return true;
                 }
             }
@@ -4830,11 +5274,18 @@ public final class IphoneAncsTransport {
      * dropping the peer/CCCD here would silently stop Helper background telemetry wake-ups.
      */
     private boolean exactClientTargetsDevice(BluetoothDevice device) {
+        GattServerPeer attemptPeer = incomingClientAttemptServerPeer;
         return managedIncomingMode
-                && incomingClientCandidate != null
-                && sameDevice(incomingClientCandidate, device)
-                && activeClientTarget != null
-                && sameDevice(activeClientTarget, device)
+                && attemptPeer != null
+                && incomingClientCandidate == attemptPeer.device
+                && incomingClientAttemptPairFacade == attemptPeer.device
+                && activeClientTarget == attemptPeer.physicalLinkFacade
+                && incomingClientAttemptTransportFacade
+                == attemptPeer.physicalLinkFacade
+                && (device == attemptPeer.physicalLinkFacade
+                || device == attemptPeer.device
+                || sameDevice(device, attemptPeer.physicalLinkFacade)
+                || sameDevice(device, attemptPeer.device))
                 && gatt != null;
     }
 
@@ -4858,9 +5309,13 @@ public final class IphoneAncsTransport {
         }
         boolean found = false;
         synchronized (gattServerPeers) {
-            for (GattServerPeer peer : gattServerPeers.values()) {
+            for (GattServerPeer peer : new HashSet<>(gattServerPeers.values())) {
                 if (peer.sessionGeneration != sessionGeneration
-                        || !peer.connected || !sameDevice(peer.device, device)) continue;
+                        || !peer.connected
+                        || (peer.physicalLinkFacade != device
+                        && peer.device != device
+                        && !sameDevice(peer.physicalLinkFacade, device)
+                        && !sameDevice(peer.device, device))) continue;
                 peer.telemetrySubscribed = enabled;
                 found = true;
                 break;
@@ -4949,20 +5404,6 @@ public final class IphoneAncsTransport {
                     + "следующий CONNECTED перенесёт replacement на свой epoch");
             return;
         }
-        BluetoothGatt passiveObserver = gatt;
-        if (passiveObserver != null && activeClientOpportunistic
-                && sameDevice(passiveObserver.getDevice(), device)) {
-            if (!retireOpportunisticObserverWithoutLinkMutation(passiveObserver,
-                    "GATT-server facade DISCONNECTED")) {
-                // Defensive close-only fallback for a lineage already invalidated by the server
-                // callback. Do not issue a physical disconnect from an opportunistic observer.
-                closeClientGatt(passiveObserver);
-            }
-            resetIncomingSecurityAfterClientLoss(device,
-                    "independent GATT-server facade DISCONNECTED proof");
-            state("INCOMING LINK LOST · ЖДУ FRESH F04/PAIR/B3/READY");
-            return;
-        }
         if (establishedClientOwnsPhysicalLink(device)) {
             state("SERVER FACADE LOST · VERIFYING CLIENT HANDOFF");
             log("GATT-server callback released after exact-device client registration: "
@@ -4978,6 +5419,21 @@ public final class IphoneAncsTransport {
             state("SERVER FACADE LOST · ЖДУ DIRECT CLIENT CALLBACK");
             log("Server facade помечен DISCONNECTED; never-established wrapper сохранён "
                     + "только до bounded callback/timeout, proof epoch пока не переносится");
+            return;
+        }
+        BluetoothGatt passiveObserver = gatt;
+        if (passiveObserver != null && activeClientOpportunistic
+                && (passiveObserver.getDevice() == device
+                || sameDevice(passiveObserver.getDevice(), device))) {
+            if (!retireOpportunisticObserverWithoutLinkMutation(passiveObserver,
+                    "GATT-server facade DISCONNECTED")) {
+                // Defensive close-only fallback for a lineage already invalidated by the server
+                // callback. Do not issue a physical disconnect from an opportunistic observer.
+                closeClientGatt(passiveObserver);
+            }
+            resetIncomingSecurityAfterClientLoss(device,
+                    "independent GATT-server facade DISCONNECTED proof");
+            state("INCOMING LINK LOST · ЖДУ FRESH F04/PAIR/B3/READY");
             return;
         }
         cancelClientAttemptCallbacks();
@@ -5062,7 +5518,14 @@ public final class IphoneAncsTransport {
         boolean abandonsDescriptor = ambiguousRawOwner != null
                 && activeDescriptorWriteGatt == ambiguousRawOwner
                 && activeDescriptorWriteOperationGeneration != 0L;
-        if (abandonsDiscovery || abandonsDescriptor) {
+        boolean abandonsHelperProof = ambiguousRawOwner != null
+                && activeHelperProofWriteGatt == ambiguousRawOwner
+                && activeHelperProofWriteOperationGeneration != 0L;
+        boolean abandonsHelperRead = managedIncomingMode
+                && ambiguousRawOwner != null
+                && iphoneHelperTelemetryReadPending;
+        if (abandonsDiscovery || abandonsDescriptor || abandonsHelperProof
+                || abandonsHelperRead) {
             log("F04 publication invalidated with raw callback in flight; closing wrapper "
                     + "before publication/token rollover");
             closeClientGatt(ambiguousRawOwner);
@@ -5075,6 +5538,7 @@ public final class IphoneAncsTransport {
         publishedDiagnosticServicePublicationToken = 0L;
         pendingManagedIncomingPublicationNonce = 0;
         publishedManagedIncomingPublicationNonce = 0;
+        clearManagedLinkBoundProof();
         clearIncomingPairProof();
         clearIncomingClientAttemptLineage();
         secureAttPublicationToken = 0L;
@@ -5293,13 +5757,43 @@ public final class IphoneAncsTransport {
     private long armDiscoveryOperation(@NonNull BluetoothGatt owner,
                                        long clientGeneration,
                                        long publicationToken) {
+        if (managedIncomingMode) {
+            clearManagedLinkBoundProof();
+            cancelHelperTelemetryRecovery();
+            iphoneHelperTelemetrySubscriptionAttempted = false;
+            iphoneHelperTelemetrySubscribed = false;
+            iphoneHelperValidTelemetryReceived = false;
+            helperAncsReadyProofAttempted = false;
+            helperAncsReadyProofPending = false;
+            helperAncsReadyProofAcknowledged = false;
+            if (helperAncsReadyProofRetry != null) {
+                main.removeCallbacks(helperAncsReadyProofRetry);
+                helperAncsReadyProofRetry = null;
+            }
+            notificationSource = null;
+            dataSource = null;
+            controlPoint = null;
+            earlyNotificationSourceFrames.clear();
+            gattReady = false;
+        }
         discoveryOperationGeneration++;
         if (discoveryOperationGeneration == 0L) discoveryOperationGeneration++;
         activeDiscoveryGatt = owner;
         activeDiscoveryOperationGeneration = discoveryOperationGeneration;
         activeDiscoveryClientGeneration = clientGeneration;
+        activeDiscoverySessionGeneration = sessionGeneration;
         activeDiscoverySecurityEpoch = incomingSecurityEpoch;
         activeDiscoveryPublicationToken = publicationToken;
+        activeDiscoveryChallenge = managedIncomingMode && incomingClientAttemptChallenge != null
+                ? incomingClientAttemptChallenge.clone() : null;
+        activeDiscoveryServerPeer = managedIncomingMode
+                ? incomingClientAttemptServerPeer : null;
+        activeDiscoveryPhysicalFacade = managedIncomingMode
+                ? incomingClientAttemptTransportFacade : null;
+        activeDiscoveryPairFacade = managedIncomingMode
+                ? incomingClientAttemptPairFacade : null;
+        activeDiscoveryDatabaseGeneration = managedIncomingMode
+                ? managedF05DatabaseGeneration : 0L;
         clearAcceptedDiscoveryLineage();
         return activeDiscoveryOperationGeneration;
     }
@@ -5311,7 +5805,12 @@ public final class IphoneAncsTransport {
                 || activeDiscoveryOperationGeneration != operationGeneration
                 || activeDiscoveryClientGeneration != activeClientGeneration
                 || !sessionState.isCurrent(activeDiscoveryClientGeneration)) return false;
-        return !managedIncomingMode || (activeDiscoverySecurityEpoch == incomingSecurityEpoch
+        return !managedIncomingMode || (ownsManagedAttemptLineage(
+                owner, activeDiscoveryChallenge, activeDiscoveryServerPeer,
+                activeDiscoveryPhysicalFacade, activeDiscoveryPairFacade,
+                activeDiscoverySessionGeneration, activeDiscoverySecurityEpoch,
+                activeDiscoveryPublicationToken, activeDiscoveryClientGeneration)
+                && activeDiscoveryDatabaseGeneration == managedF05DatabaseGeneration
                 && activeClientProvenSecurityEpoch == activeDiscoverySecurityEpoch
                 && isCurrentDiagnosticServicePublicationToken(
                 activeDiscoveryPublicationToken)
@@ -5323,8 +5822,15 @@ public final class IphoneAncsTransport {
         acceptedDiscoveryGatt = activeDiscoveryGatt;
         acceptedDiscoveryOperationGeneration = activeDiscoveryOperationGeneration;
         acceptedDiscoveryClientGeneration = activeDiscoveryClientGeneration;
+        acceptedDiscoverySessionGeneration = activeDiscoverySessionGeneration;
         acceptedDiscoverySecurityEpoch = activeDiscoverySecurityEpoch;
         acceptedDiscoveryPublicationToken = activeDiscoveryPublicationToken;
+        acceptedDiscoveryChallenge = activeDiscoveryChallenge == null
+                ? null : activeDiscoveryChallenge.clone();
+        acceptedDiscoveryServerPeer = activeDiscoveryServerPeer;
+        acceptedDiscoveryPhysicalFacade = activeDiscoveryPhysicalFacade;
+        acceptedDiscoveryPairFacade = activeDiscoveryPairFacade;
+        acceptedDiscoveryDatabaseGeneration = activeDiscoveryDatabaseGeneration;
         clearActiveDiscoveryLineage();
     }
 
@@ -5334,7 +5840,12 @@ public final class IphoneAncsTransport {
                 || acceptedDiscoveryClientGeneration != activeClientGeneration
                 || !sessionState.isCurrent(acceptedDiscoveryClientGeneration)) return false;
         return !managedIncomingMode
-                || (acceptedDiscoverySecurityEpoch == incomingSecurityEpoch
+                || (ownsManagedAttemptLineage(
+                owner, acceptedDiscoveryChallenge, acceptedDiscoveryServerPeer,
+                acceptedDiscoveryPhysicalFacade, acceptedDiscoveryPairFacade,
+                acceptedDiscoverySessionGeneration, acceptedDiscoverySecurityEpoch,
+                acceptedDiscoveryPublicationToken, acceptedDiscoveryClientGeneration)
+                && acceptedDiscoveryDatabaseGeneration == managedF05DatabaseGeneration
                 && activeClientProvenSecurityEpoch == acceptedDiscoverySecurityEpoch
                 && isCurrentDiagnosticServicePublicationToken(
                 acceptedDiscoveryPublicationToken)
@@ -5347,16 +5858,28 @@ public final class IphoneAncsTransport {
         activeDiscoveryGatt = null;
         activeDiscoveryOperationGeneration = 0L;
         activeDiscoveryClientGeneration = 0L;
+        activeDiscoverySessionGeneration = 0L;
         activeDiscoverySecurityEpoch = 0L;
         activeDiscoveryPublicationToken = 0L;
+        activeDiscoveryChallenge = null;
+        activeDiscoveryServerPeer = null;
+        activeDiscoveryPhysicalFacade = null;
+        activeDiscoveryPairFacade = null;
+        activeDiscoveryDatabaseGeneration = 0L;
     }
 
     private void clearAcceptedDiscoveryLineage() {
         acceptedDiscoveryGatt = null;
         acceptedDiscoveryOperationGeneration = 0L;
         acceptedDiscoveryClientGeneration = 0L;
+        acceptedDiscoverySessionGeneration = 0L;
         acceptedDiscoverySecurityEpoch = 0L;
         acceptedDiscoveryPublicationToken = 0L;
+        acceptedDiscoveryChallenge = null;
+        acceptedDiscoveryServerPeer = null;
+        acceptedDiscoveryPhysicalFacade = null;
+        acceptedDiscoveryPairFacade = null;
+        acceptedDiscoveryDatabaseGeneration = 0L;
     }
 
     private void clearDiscoveryLineage() {
@@ -5387,6 +5910,16 @@ public final class IphoneAncsTransport {
             }
         }
         if (!sessionState.isCurrent(expectedGeneration)) return;
+        if (managedIncomingMode
+                && (activeDescriptorWriteOperationGeneration != 0L
+                || activeHelperProofWriteOperationGeneration != 0L
+                || iphoneHelperTelemetryReadPending
+                || activeRequest != null
+                || batteryReadPendingUuid != null)) {
+            log("discoverServices deferred: managed raw GATT callback "
+                    + "slot is still active");
+            return;
+        }
         if (discoveryPending) {
             log("discoverServices уже выполняется");
             return;
@@ -5405,6 +5938,11 @@ public final class IphoneAncsTransport {
             discoveryPending = false;
             if (activeDiscoveryOperationGeneration == discoveryOperation) {
                 clearActiveDiscoveryLineage();
+            }
+            if (managedIncomingMode) {
+                terminalManagedLinkBindingFailure(callbackGatt,
+                        "initial discovery did not start");
+                return;
             }
             state("DISCOVERY_START_FAILED");
             return;
@@ -5541,6 +6079,7 @@ public final class IphoneAncsTransport {
         return discoveryPending || activeDiscoveryOperationGeneration != 0L
                 || descriptorStage != DescriptorStage.NONE
                 || activeDescriptorWriteOperationGeneration != 0L
+                || activeHelperProofWriteOperationGeneration != 0L
                 || activeRequest != null || iphonePairWritePending
                 || iphoneSecureReadPending || iphoneHelperTelemetryReadPending
                 || helperAncsReadyProofPending || batteryReadPendingUuid != null;
@@ -5638,6 +6177,11 @@ public final class IphoneAncsTransport {
         log("onServicesDiscovered status=" + status);
         if (status != GATT_SUCCESS) {
             clearAcceptedDiscoveryLineage();
+            if (managedIncomingMode) {
+                terminalManagedLinkBindingFailure(callbackGatt,
+                        "accepted discovery status=" + status);
+                return;
+            }
             state("DISCOVERY_FAILED_" + status);
             return;
         }
@@ -5660,8 +6204,10 @@ public final class IphoneAncsTransport {
             if (discoveredTelemetry == null && helper != null) {
                 discoveredTelemetry = helper.getCharacteristic(TELEMETRY_CHARACTERISTIC);
             }
-            UUID previousTelemetryUuid = iphoneTelemetryCharacteristic == null ? null
-                    : iphoneTelemetryCharacteristic.getUuid();
+            BluetoothGattCharacteristic previousTelemetry =
+                    iphoneTelemetryCharacteristic;
+            UUID previousTelemetryUuid = previousTelemetry == null ? null
+                    : previousTelemetry.getUuid();
             UUID discoveredTelemetryUuid = discoveredTelemetry == null ? null
                     : discoveredTelemetry.getUuid();
             if (!Objects.equals(previousTelemetryUuid, discoveredTelemetryUuid)) {
@@ -5675,11 +6221,43 @@ public final class IphoneAncsTransport {
                     : iphoneTelemetryCharacteristic != null
                     ? "bootstrap B4 generation 4" : "legacy TEL2/B3"));
 
+            if (managedIncomingMode) {
+                if (previousTelemetry != null && previousTelemetry != discoveredTelemetry) {
+                    clearManagedLinkBoundProof();
+                    iphoneHelperTelemetrySubscriptionAttempted = false;
+                    iphoneHelperTelemetrySubscribed = false;
+                    log("F05 wrapper identity changed; LINK-BOUND proof invalidated");
+                }
+                boolean exactF05 = relay != null && discoveredTelemetry != null
+                        && TELEMETRY_RELAY_CHARACTERISTIC.equals(
+                        discoveredTelemetry.getUuid())
+                        && acceptedDiscoveryChallenge != null
+                        && Arrays.equals(acceptedDiscoveryChallenge,
+                        incomingClientAttemptChallenge);
+                if (!exactF05) {
+                    terminalManagedLinkBindingFailure(callbackGatt,
+                            "accepted discovery missing exact F05/B4 + Q lineage");
+                    return;
+                }
+                if (!hasCurrentManagedLinkBoundProof(callbackGatt)) {
+                    if (!iphoneHelperTelemetrySubscribed) {
+                        if (!iphoneHelperTelemetrySubscriptionAttempted
+                                && descriptorStage == DescriptorStage.NONE) {
+                            startOptionalHelperTelemetrySubscription(callbackGatt);
+                        }
+                        return;
+                    }
+                    startManagedLinkBoundProof(callbackGatt);
+                    return;
+                }
+            }
+
             // Helper v9+ deliberately makes B4 readable before ANCS authorization. Read one
             // atomic snapshot before touching an encrypted ANCS CCCD: otherwise a pending
             // pairing callback can occupy Android's serialized GATT queue for up to 90 seconds
             // and make battery/network appear absent despite a healthy Helper service.
             if (iphoneTelemetryCharacteristic != null
+                    && !managedIncomingMode
                     && !iphoneHelperInitialReadAttempted && !gattReady) {
                 iphoneHelperInitialReadAttempted = true;
                 iphoneServiceSetupDeferredForHelperRead = true;
@@ -5725,6 +6303,12 @@ public final class IphoneAncsTransport {
             }
             if (descriptorStage != DescriptorStage.NONE) {
                 log("ANCS-подписка уже выполняется: " + descriptorStage);
+                return;
+            }
+            if (managedIncomingMode
+                    && !hasCurrentManagedLinkBoundProof(callbackGatt)) {
+                terminalManagedLinkBindingFailure(callbackGatt,
+                        "ANCS discovered before exact LINK-BOUND Q acknowledgement");
                 return;
             }
             if (iphonePeripheralMode && !iphoneSecureConfirmed) {
@@ -5834,9 +6418,21 @@ public final class IphoneAncsTransport {
         activeDescriptorWrite = descriptor;
         activeDescriptorWriteGatt = owner;
         activeDescriptorWriteClientGeneration = activeClientGeneration;
+        activeDescriptorWriteSessionGeneration = sessionGeneration;
         activeDescriptorWriteSecurityEpoch = incomingSecurityEpoch;
         activeDescriptorWritePublicationToken = managedIncomingMode
                 ? publishedDiagnosticServicePublicationToken : 0L;
+        activeDescriptorWriteChallenge = managedIncomingMode
+                && acceptedDiscoveryChallenge != null
+                ? acceptedDiscoveryChallenge.clone() : null;
+        activeDescriptorWriteServerPeer = managedIncomingMode
+                ? acceptedDiscoveryServerPeer : null;
+        activeDescriptorWritePhysicalFacade = managedIncomingMode
+                ? acceptedDiscoveryPhysicalFacade : null;
+        activeDescriptorWritePairFacade = managedIncomingMode
+                ? acceptedDiscoveryPairFacade : null;
+        activeDescriptorWriteDatabaseGeneration = managedIncomingMode
+                ? acceptedDiscoveryDatabaseGeneration : 0L;
         return activeDescriptorWriteOperationGeneration;
     }
 
@@ -5849,7 +6445,18 @@ public final class IphoneAncsTransport {
                 || activeDescriptorWriteClientGeneration != activeClientGeneration
                 || !sessionState.isCurrent(activeDescriptorWriteClientGeneration)) return false;
         return !managedIncomingMode
-                || (activeDescriptorWriteSecurityEpoch == incomingSecurityEpoch
+                || (ownsManagedAttemptLineage(
+                owner, activeDescriptorWriteChallenge,
+                activeDescriptorWriteServerPeer,
+                activeDescriptorWritePhysicalFacade,
+                activeDescriptorWritePairFacade,
+                activeDescriptorWriteSessionGeneration,
+                activeDescriptorWriteSecurityEpoch,
+                activeDescriptorWritePublicationToken,
+                activeDescriptorWriteClientGeneration)
+                && activeDescriptorWriteDatabaseGeneration
+                == managedF05DatabaseGeneration
+                && ownsAcceptedDiscoveryLineage(owner)
                 && isCurrentDiagnosticServicePublicationToken(
                 activeDescriptorWritePublicationToken)
                 && secureAttPublicationToken == activeDescriptorWritePublicationToken
@@ -5862,15 +6469,31 @@ public final class IphoneAncsTransport {
         activeDescriptorWriteGatt = null;
         activeDescriptorWriteOperationGeneration = 0L;
         activeDescriptorWriteClientGeneration = 0L;
+        activeDescriptorWriteSessionGeneration = 0L;
         activeDescriptorWriteSecurityEpoch = 0L;
         activeDescriptorWritePublicationToken = 0L;
+        activeDescriptorWriteChallenge = null;
+        activeDescriptorWriteServerPeer = null;
+        activeDescriptorWritePhysicalFacade = null;
+        activeDescriptorWritePairFacade = null;
+        activeDescriptorWriteDatabaseGeneration = 0L;
     }
 
     private boolean subscribe(BluetoothGatt callbackGatt,
                               BluetoothGattCharacteristic characteristic,
                               boolean indication) {
+        if (managedIncomingMode
+                && (descriptorStage == DescriptorStage.NOTIFICATION_SOURCE
+                || descriptorStage == DescriptorStage.DATA_SOURCE)
+                && !hasCurrentManagedLinkBoundProof(callbackGatt)) {
+            descriptorStage = DescriptorStage.NONE;
+            terminalManagedLinkBindingFailure(callbackGatt,
+                    "ANCS CCCD attempted without exact LINK-BOUND Q proof");
+            return false;
+        }
         boolean optional = descriptorStage == DescriptorStage.SERVICE_CHANGED;
-        optional = optional || descriptorStage == DescriptorStage.HELPER_TELEMETRY;
+        optional = optional || descriptorStage == DescriptorStage.HELPER_TELEMETRY
+                && !managedIncomingMode;
         String optionalName = descriptorStage == DescriptorStage.HELPER_TELEMETRY
                 ? "Helper TEL3" : "Service Changed";
         boolean local;
@@ -5979,6 +6602,11 @@ public final class IphoneAncsTransport {
             iphoneHelperTelemetrySubscribed = status == GATT_SUCCESS;
             if (status != GATT_SUCCESS) {
                 iphoneHelperTelemetrySubscriptionAttempted = false;
+            }
+            if (managedIncomingMode && status != GATT_SUCCESS) {
+                terminalManagedLinkBindingFailure(callbackGatt,
+                        "mandatory F05/B4 CCCD status=" + status);
+                return;
             }
             log(status == GATT_SUCCESS
                     ? "Helper telemetry notification subscription enabled"
@@ -6158,9 +6786,29 @@ public final class IphoneAncsTransport {
         if (callbackGatt != gatt) return;
         if (!acceptsCurrentManagedIncomingCallback(
                 callbackGatt, "onCharacteristicChanged")) return;
+        UUID uuid = characteristic.getUuid();
+        if (managedIncomingMode
+                && TELEMETRY_RELAY_CHARACTERISTIC.equals(uuid)
+                && (!hasCurrentManagedLinkBoundProof(callbackGatt)
+                || characteristic != helperLinkBoundCharacteristic)) {
+            log("Pre-bind F05/B4 notification quarantined · bytes="
+                    + (callbackValue == null ? 0 : callbackValue.length));
+            return;
+        }
+        if (managedIncomingMode
+                && (AncsProtocol.NOTIFICATION_SOURCE.equals(uuid)
+                || AncsProtocol.DATA_SOURCE.equals(uuid))
+                && (!hasCurrentManagedLinkBoundProof(callbackGatt)
+                || AncsProtocol.NOTIFICATION_SOURCE.equals(uuid)
+                && characteristic != notificationSource
+                || AncsProtocol.DATA_SOURCE.equals(uuid)
+                && characteristic != dataSource)) {
+            log("Pre-bind ANCS notification quarantined · bytes="
+                    + (callbackValue == null ? 0 : callbackValue.length));
+            return;
+        }
         characteristic.setValue(callbackValue);
         byte[] value = callbackValue;
-        UUID uuid = characteristic.getUuid();
         log("onCharacteristicChanged " + shortUuid(uuid)
                 + " bytes=" + AdvertisementParser.hex(value, 80));
         if (BATTERY_LEVEL.equals(uuid) || BATTERY_LEVEL_STATUS.equals(uuid)) {
@@ -6184,6 +6832,33 @@ public final class IphoneAncsTransport {
         }
         if (SERVICE_CHANGED.equals(uuid)) {
             if (helperTelemetryClientEnabled() && !helperBootstrapMode) {
+                if (managedIncomingMode) {
+                    boolean f05RawOperationInFlight =
+                            descriptorStage == DescriptorStage.HELPER_TELEMETRY
+                            && activeDescriptorWriteGatt == callbackGatt
+                            && activeDescriptorWriteOperationGeneration != 0L
+                            || activeHelperProofWriteGatt == callbackGatt
+                            && activeHelperProofWriteOperationGeneration != 0L
+                            || iphoneHelperTelemetryReadPending;
+                    if (f05RawOperationInFlight) {
+                        terminalManagedLinkBindingFailure(callbackGatt,
+                                "Service Changed while old F05 raw callback slot in flight");
+                        return;
+                    }
+                    managedF05DatabaseGeneration++;
+                    if (managedF05DatabaseGeneration == 0L) {
+                        managedF05DatabaseGeneration++;
+                    }
+                    clearManagedLinkBoundProof();
+                    iphoneHelperTelemetrySubscriptionAttempted = false;
+                    iphoneHelperTelemetrySubscribed = false;
+                    iphoneHelperValidTelemetryReceived = false;
+                    helperAncsReadyProofAttempted = false;
+                    helperAncsReadyProofPending = false;
+                    helperAncsReadyProofAcknowledged = false;
+                    log("Service Changed invalidated F05 handles/LINK-BOUND Q · dbGeneration="
+                            + managedF05DatabaseGeneration);
+                }
                 log("Рабочий ANCS GATT получил Service Changed; "
                         + "переоткрываю services на том же owner");
                 restartDiscoveryOnPersistentOwner(callbackGatt, activeClientGeneration,
@@ -6247,6 +6922,277 @@ public final class IphoneAncsTransport {
                 || stage == DescriptorStage.BATTERY_LEVEL_STATUS;
     }
 
+    private long armHelperProofWriteOperation(
+            @NonNull BluetoothGatt owner,
+            @NonNull BluetoothGattCharacteristic characteristic,
+            @NonNull byte[] challenge,
+            @NonNull HelperProofWriteStage stage) {
+        helperProofWriteOperationGeneration++;
+        if (helperProofWriteOperationGeneration == 0L) {
+            helperProofWriteOperationGeneration++;
+        }
+        activeHelperProofWriteStage = stage;
+        activeHelperProofWriteGatt = owner;
+        activeHelperProofWriteCharacteristic = characteristic;
+        activeHelperProofWriteOperationGeneration =
+                helperProofWriteOperationGeneration;
+        activeHelperProofWriteClientGeneration = activeClientGeneration;
+        activeHelperProofWriteSessionGeneration = sessionGeneration;
+        activeHelperProofWriteSecurityEpoch = incomingSecurityEpoch;
+        activeHelperProofWritePublicationToken =
+                publishedDiagnosticServicePublicationToken;
+        activeHelperProofWriteChallenge = challenge.clone();
+        activeHelperProofWriteServerPeer = acceptedDiscoveryServerPeer;
+        activeHelperProofWritePhysicalFacade = acceptedDiscoveryPhysicalFacade;
+        activeHelperProofWritePairFacade = acceptedDiscoveryPairFacade;
+        activeHelperProofWriteDatabaseGeneration =
+                acceptedDiscoveryDatabaseGeneration;
+        activeHelperProofWriteDiscoveryOperationGeneration =
+                acceptedDiscoveryOperationGeneration;
+        return activeHelperProofWriteOperationGeneration;
+    }
+
+    private boolean ownsHelperProofWriteOperation(
+            @NonNull BluetoothGatt owner,
+            @NonNull BluetoothGattCharacteristic characteristic,
+            @NonNull HelperProofWriteStage stage,
+            long operationGeneration) {
+        return managedIncomingMode
+                && operationGeneration != 0L
+                && activeHelperProofWriteOperationGeneration == operationGeneration
+                && activeHelperProofWriteStage == stage
+                && activeHelperProofWriteGatt == owner
+                && activeHelperProofWriteCharacteristic == characteristic
+                && activeHelperProofWriteDiscoveryOperationGeneration
+                == acceptedDiscoveryOperationGeneration
+                && activeHelperProofWriteDatabaseGeneration
+                == managedF05DatabaseGeneration
+                && ownsAcceptedDiscoveryLineage(owner)
+                && ownsManagedAttemptLineage(
+                owner, activeHelperProofWriteChallenge,
+                activeHelperProofWriteServerPeer,
+                activeHelperProofWritePhysicalFacade,
+                activeHelperProofWritePairFacade,
+                activeHelperProofWriteSessionGeneration,
+                activeHelperProofWriteSecurityEpoch,
+                activeHelperProofWritePublicationToken,
+                activeHelperProofWriteClientGeneration);
+    }
+
+    private void clearHelperProofWriteOperation() {
+        if (helperProofWriteTimeout != null) {
+            main.removeCallbacks(helperProofWriteTimeout);
+        }
+        helperProofWriteTimeout = null;
+        activeHelperProofWriteStage = HelperProofWriteStage.NONE;
+        activeHelperProofWriteGatt = null;
+        activeHelperProofWriteCharacteristic = null;
+        activeHelperProofWriteOperationGeneration = 0L;
+        activeHelperProofWriteClientGeneration = 0L;
+        activeHelperProofWriteSessionGeneration = 0L;
+        activeHelperProofWriteSecurityEpoch = 0L;
+        activeHelperProofWritePublicationToken = 0L;
+        activeHelperProofWriteChallenge = null;
+        activeHelperProofWriteServerPeer = null;
+        activeHelperProofWritePhysicalFacade = null;
+        activeHelperProofWritePairFacade = null;
+        activeHelperProofWriteDatabaseGeneration = 0L;
+        activeHelperProofWriteDiscoveryOperationGeneration = 0L;
+    }
+
+    private void clearManagedLinkBoundProof() {
+        clearHelperProofWriteOperation();
+        helperLinkBoundAcknowledged = false;
+        helperLinkBoundGatt = null;
+        helperLinkBoundCharacteristic = null;
+        helperLinkBoundChallenge = null;
+        helperLinkBoundServerPeer = null;
+        helperLinkBoundPhysicalFacade = null;
+        helperLinkBoundPairFacade = null;
+        helperLinkBoundClientGeneration = 0L;
+        helperLinkBoundSessionGeneration = 0L;
+        helperLinkBoundSecurityEpoch = 0L;
+        helperLinkBoundPublicationToken = 0L;
+        helperLinkBoundDatabaseGeneration = 0L;
+        helperLinkBoundDiscoveryOperationGeneration = 0L;
+    }
+
+    private boolean hasCurrentManagedLinkBoundProof(
+            @NonNull BluetoothGatt owner) {
+        return helperLinkBoundAcknowledged
+                && helperLinkBoundGatt == owner
+                && helperLinkBoundCharacteristic != null
+                && helperLinkBoundCharacteristic == iphoneTelemetryCharacteristic
+                && TELEMETRY_RELAY_CHARACTERISTIC.equals(
+                helperLinkBoundCharacteristic.getUuid())
+                && helperLinkBoundDatabaseGeneration == managedF05DatabaseGeneration
+                && helperLinkBoundDiscoveryOperationGeneration
+                == acceptedDiscoveryOperationGeneration
+                && ownsAcceptedDiscoveryLineage(owner)
+                && ownsManagedAttemptLineage(
+                owner, helperLinkBoundChallenge, helperLinkBoundServerPeer,
+                helperLinkBoundPhysicalFacade, helperLinkBoundPairFacade,
+                helperLinkBoundSessionGeneration, helperLinkBoundSecurityEpoch,
+                helperLinkBoundPublicationToken, helperLinkBoundClientGeneration);
+    }
+
+    private void terminalManagedLinkBindingFailure(
+            @NonNull BluetoothGatt expected, @NonNull String reason) {
+        if (!managedIncomingMode || gatt != expected) return;
+        GattServerPeer attemptPeer = incomingClientAttemptServerPeer;
+        BluetoothDevice transportFacade = expected.getDevice();
+        clearManagedLinkBoundProof();
+        if (gatt == expected) {
+            cancelConnectTimeout();
+            cancelClientAttemptCallbacks();
+            closeClientGatt(expected);
+            clearAncsRuntime();
+            incomingDiscoveryStarted = false;
+        }
+        boolean physicalLost = resetRetiredObserverAfterServerFacadeLoss(
+                attemptPeer, transportFacade,
+                "mandatory F05 LINK-BOUND failed after server facade loss · "
+                        + reason);
+        state(physicalLost
+                ? "LINK-BOUND FAILED · PHYSICAL LINK LOST"
+                : "LINK-BOUND FAILED · CLIENT CLOSED · LINK KEPT");
+        log("HA1211 mandatory F05 proof terminal close-only; no retry/public fallback · "
+                + reason);
+    }
+
+    private boolean startManagedLinkBoundProof(
+            @NonNull BluetoothGatt callbackGatt) {
+        if (!managedIncomingMode || callbackGatt != gatt
+                || !ownsAcceptedDiscoveryLineage(callbackGatt)
+                || !iphoneHelperTelemetrySubscribed
+                || hasCurrentManagedLinkBoundProof(callbackGatt)
+                || activeHelperProofWriteStage != HelperProofWriteStage.NONE) {
+            return false;
+        }
+        BluetoothGattCharacteristic telemetry = iphoneTelemetryCharacteristic;
+        byte[] challenge = acceptedDiscoveryChallenge;
+        if (telemetry == null
+                || !TELEMETRY_RELAY_CHARACTERISTIC.equals(telemetry.getUuid())
+                || challenge == null
+                || challenge.length != MANAGED_PROOF_FRAME_BYTES - 1
+                || (telemetry.getProperties()
+                & BluetoothGattCharacteristic.PROPERTY_WRITE) == 0) {
+            terminalManagedLinkBindingFailure(callbackGatt,
+                    "F05/B4 missing exact WRITE_WITH_RESPONSE capability");
+            return false;
+        }
+        telemetry.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+        telemetry.setValue(managedProofFrame(MANAGED_LINK_BOUND_OPCODE, challenge));
+        long operationGeneration = armHelperProofWriteOperation(
+                callbackGatt, telemetry, challenge,
+                HelperProofWriteStage.LINK_BOUND);
+        boolean started;
+        try {
+            started = callbackGatt.writeCharacteristic(telemetry);
+        } catch (RuntimeException failure) {
+            started = false;
+            log("LINK-BOUND Q write exception: " + failure);
+        }
+        if (!started) {
+            if (ownsHelperProofWriteOperation(callbackGatt, telemetry,
+                    HelperProofWriteStage.LINK_BOUND, operationGeneration)) {
+                clearHelperProofWriteOperation();
+            }
+            terminalManagedLinkBindingFailure(callbackGatt,
+                    "LINK-BOUND Q write did not start");
+            return false;
+        }
+        helperProofWriteTimeout = () -> {
+            if (!ownsHelperProofWriteOperation(callbackGatt, telemetry,
+                    HelperProofWriteStage.LINK_BOUND, operationGeneration)) return;
+            clearHelperProofWriteOperation();
+            terminalManagedLinkBindingFailure(callbackGatt,
+                    "LINK-BOUND Q write callback timeout");
+        };
+        main.postDelayed(helperProofWriteTimeout, 4_000L);
+        state("F05 B4 CCCD OK · LINK-BOUND Q");
+        log("HA1211 LINK-BOUND Q write-with-response started · op="
+                + operationGeneration + " · physicalObjectId="
+                + System.identityHashCode(activeHelperProofWritePhysicalFacade)
+                + " · pairObjectId="
+                + System.identityHashCode(activeHelperProofWritePairFacade));
+        return true;
+    }
+
+    private boolean handleManagedHelperProofWriteCallback(
+            @NonNull BluetoothGatt callbackGatt,
+            @NonNull BluetoothGattCharacteristic characteristic,
+            int status) {
+        if (!managedIncomingMode
+                || !TELEMETRY_RELAY_CHARACTERISTIC.equals(characteristic.getUuid())
+                || activeHelperProofWriteStage == HelperProofWriteStage.NONE) {
+            return false;
+        }
+        HelperProofWriteStage stage = activeHelperProofWriteStage;
+        long operationGeneration = activeHelperProofWriteOperationGeneration;
+        if (!ownsHelperProofWriteOperation(
+                callbackGatt, characteristic, stage, operationGeneration)) {
+            log("Late/stale F05 proof write callback quarantined · stage=" + stage
+                    + " op=" + operationGeneration);
+            return true;
+        }
+        if (status != GATT_SUCCESS) {
+            if (stage == HelperProofWriteStage.ANCS_SUBSCRIBED) {
+                helperAncsReadyProofPending = false;
+                helperAncsReadyProofAttempted = false;
+            }
+            clearHelperProofWriteOperation();
+            terminalManagedLinkBindingFailure(callbackGatt,
+                    stage + " Q write status=" + status);
+            return true;
+        }
+        if (stage == HelperProofWriteStage.LINK_BOUND) {
+            BluetoothGattCharacteristic proofCharacteristic =
+                    activeHelperProofWriteCharacteristic;
+            byte[] proofChallenge = activeHelperProofWriteChallenge.clone();
+            GattServerPeer proofPeer = activeHelperProofWriteServerPeer;
+            BluetoothDevice proofPhysical = activeHelperProofWritePhysicalFacade;
+            BluetoothDevice proofPair = activeHelperProofWritePairFacade;
+            long proofClientGeneration = activeHelperProofWriteClientGeneration;
+            long proofSessionGeneration = activeHelperProofWriteSessionGeneration;
+            long proofSecurityEpoch = activeHelperProofWriteSecurityEpoch;
+            long proofPublicationToken = activeHelperProofWritePublicationToken;
+            long proofDatabaseGeneration = activeHelperProofWriteDatabaseGeneration;
+            long proofDiscoveryOperation =
+                    activeHelperProofWriteDiscoveryOperationGeneration;
+            clearHelperProofWriteOperation();
+            helperLinkBoundAcknowledged = true;
+            helperLinkBoundGatt = callbackGatt;
+            helperLinkBoundCharacteristic = proofCharacteristic;
+            helperLinkBoundChallenge = proofChallenge;
+            helperLinkBoundServerPeer = proofPeer;
+            helperLinkBoundPhysicalFacade = proofPhysical;
+            helperLinkBoundPairFacade = proofPair;
+            helperLinkBoundClientGeneration = proofClientGeneration;
+            helperLinkBoundSessionGeneration = proofSessionGeneration;
+            helperLinkBoundSecurityEpoch = proofSecurityEpoch;
+            helperLinkBoundPublicationToken = proofPublicationToken;
+            helperLinkBoundDatabaseGeneration = proofDatabaseGeneration;
+            helperLinkBoundDiscoveryOperationGeneration = proofDiscoveryOperation;
+            log("HA1211 LINK-BOUND Q acknowledged on exact F05 owner · op="
+                    + operationGeneration + " · ANCS discovery continuation allowed");
+            state("LINK-BOUND OK · ANCS ALLOWED");
+            continueDiscoveredServiceSetup(callbackGatt);
+            return true;
+        }
+        helperAncsReadyProofPending = false;
+        helperAncsReadyProofAcknowledged = true;
+        clearHelperProofWriteOperation();
+        if (helperAncsReadyProofRetry != null) {
+            main.removeCallbacks(helperAncsReadyProofRetry);
+            helperAncsReadyProofRetry = null;
+        }
+        log("Helper подтвердил binary ANCS-SUBSCRIBED Q после обеих ANCS CCCD");
+        state("ANCS READY · B4 VERIFIED · ОТПРАВЬТЕ УВЕДОМЛЕНИЕ");
+        finishAncsReadySetup(callbackGatt);
+        return true;
+    }
+
     /**
      * Helper v8 publishes one atomic TEL3 snapshot on B4. Older Helper v7 builds can still notify
      * the split TEL2 frames on B3. Both endpoints share the already-working Android-central ANCS
@@ -6259,6 +7205,11 @@ public final class IphoneAncsTransport {
                 || iphoneHelperTelemetrySubscriptionAttempted
                 || descriptorStage != DescriptorStage.NONE) return false;
         if ((telemetry.getProperties() & BluetoothGattCharacteristic.PROPERTY_NOTIFY) == 0) {
+            if (managedIncomingMode) {
+                terminalManagedLinkBindingFailure(callbackGatt,
+                        "F05/B4 lacks mandatory NOTIFY");
+                return false;
+            }
             log("Helper telemetry endpoint has no NOTIFY; periodic encrypted READ remains active");
             iphoneHelperTelemetrySubscriptionAttempted = true;
             scheduleHelperTelemetryRecovery(callbackGatt, HELPER_TELEMETRY_BUSY_RETRY_MS);
@@ -6270,7 +7221,14 @@ public final class IphoneAncsTransport {
         if (!started) {
             descriptorStage = DescriptorStage.NONE;
             iphoneHelperTelemetrySubscriptionAttempted = false;
-            log("Helper telemetry optional subscription did not start");
+            log(managedIncomingMode
+                    ? "Mandatory F05/B4 subscription did not start"
+                    : "Helper telemetry optional subscription did not start");
+            if (managedIncomingMode) {
+                terminalManagedLinkBindingFailure(callbackGatt,
+                        "mandatory F05/B4 CCCD did not start");
+                return false;
+            }
             scheduleHelperTelemetryRecovery(callbackGatt, HELPER_TELEMETRY_BUSY_RETRY_MS);
         } else {
             state(gattReady ? "ANCS READY · ВКЛЮЧАЮ TEL3" : "GPS-LINK · ВКЛЮЧАЮ TEL3");
@@ -6289,6 +7247,10 @@ public final class IphoneAncsTransport {
     }
 
     private void continueAfterHelperTelemetrySubscription(BluetoothGatt callbackGatt) {
+        if (managedIncomingMode && !hasCurrentManagedLinkBoundProof(callbackGatt)) {
+            startManagedLinkBoundProof(callbackGatt);
+            return;
+        }
         scheduleHelperTelemetryRecovery(callbackGatt, 200L);
         AncsRecoveryPolicy.PostTelemetryAction action =
                 AncsRecoveryPolicy.afterHelperTelemetrySubscription(
@@ -6323,6 +7285,11 @@ public final class IphoneAncsTransport {
     private boolean acceptHelperTelemetryFrame(BluetoothGatt callbackGatt,
                                                @NonNull IphoneHelperTelemetry telemetry,
                                                String source) {
+        if (managedIncomingMode
+                && !hasCurrentManagedLinkBoundProof(callbackGatt)) {
+            log("Pre-bind F05/B4 payload dropped before parse/listener effects");
+            return false;
+        }
         boolean validForReady = telemetry.kind == IphoneHelperTelemetry.Kind.SNAPSHOT
                 && telemetry.batteryLevel != null
                 && !telemetry.networkType.trim().isEmpty();
@@ -6350,12 +7317,7 @@ public final class IphoneAncsTransport {
         if (!managedIncomingMode || !gattReady || helperAncsReadyProofAcknowledged) {
             return false;
         }
-        boolean started = startHelperAncsReadyProof(callbackGatt);
-        if (!started && !helperAncsReadyProofPending) {
-            scheduleHelperAncsReadyProofRetry(callbackGatt,
-                    "valid B4 arrived while GATT queue was busy");
-        }
-        return started;
+        return startHelperAncsReadyProof(callbackGatt);
     }
 
     private void finishAncsReadySetup(BluetoothGatt callbackGatt) {
@@ -6379,44 +7341,66 @@ public final class IphoneAncsTransport {
      */
     private boolean startHelperAncsReadyProof(BluetoothGatt callbackGatt) {
         if (!managedIncomingMode || callbackGatt != gatt || !gattReady
+                || !hasCurrentManagedLinkBoundProof(callbackGatt)
                 || !iphoneHelperTelemetrySubscribed
                 || !iphoneHelperValidTelemetryReceived
                 || helperAncsReadyProofAcknowledged
                 || helperAncsReadyProofAttempted || helperAncsReadyProofPending
+                || activeHelperProofWriteStage != HelperProofWriteStage.NONE
                 || discoveryPending || descriptorStage != DescriptorStage.NONE
                 || activeRequest != null || iphoneHelperTelemetryReadPending
                 || batteryReadPendingUuid != null) return false;
         BluetoothGattCharacteristic telemetry = iphoneTelemetryCharacteristic;
+        byte[] challenge = helperLinkBoundChallenge;
         if (telemetry == null
-                || !TELEMETRY_RELAY_CHARACTERISTIC.equals(telemetry.getUuid())) return false;
+                || !TELEMETRY_RELAY_CHARACTERISTIC.equals(telemetry.getUuid())
+                || challenge == null
+                || challenge.length != MANAGED_PROOF_FRAME_BYTES - 1) return false;
         helperAncsReadyProofAttempted = true;
         if ((telemetry.getProperties() & BluetoothGattCharacteristic.PROPERTY_WRITE) == 0) {
-            log("Helper B4 relay не принимает ANCS-SUBSCRIBED; нужен matched Helper v33");
+            terminalManagedLinkBindingFailure(callbackGatt,
+                    "F05/B4 does not accept binary ANCS-SUBSCRIBED Q");
             return false;
         }
         telemetry.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
-        telemetry.setValue("ANCS-SUBSCRIBED".getBytes(StandardCharsets.UTF_8));
+        telemetry.setValue(managedProofFrame(
+                MANAGED_ANCS_SUBSCRIBED_OPCODE, challenge));
+        long operationGeneration = armHelperProofWriteOperation(
+                callbackGatt, telemetry, challenge,
+                HelperProofWriteStage.ANCS_SUBSCRIBED);
         boolean started;
         try {
             started = callbackGatt.writeCharacteristic(telemetry);
         } catch (RuntimeException failure) {
             started = false;
-            log("ANCS-SUBSCRIBED write exception: " + failure);
+            log("binary ANCS-SUBSCRIBED Q write exception: " + failure);
         }
         helperAncsReadyProofPending = started;
-        if (!started) helperAncsReadyProofAttempted = false;
-        log("ANCS-SUBSCRIBED proof started=" + started
-                + " after both ANCS CCCD + B4 CCCD + valid battery/network payload");
-        if (started) {
-            main.postDelayed(() -> {
-                if (callbackGatt != gatt || !helperAncsReadyProofPending) return;
-                helperAncsReadyProofPending = false;
-                helperAncsReadyProofAttempted = false;
-                log("ANCS-SUBSCRIBED callback timeout; повторяю proof на живом owner");
-                scheduleHelperAncsReadyProofRetry(callbackGatt, "write callback timeout");
-            }, 4_000L);
+        if (!started) {
+            helperAncsReadyProofAttempted = false;
+            if (ownsHelperProofWriteOperation(callbackGatt, telemetry,
+                    HelperProofWriteStage.ANCS_SUBSCRIBED,
+                    operationGeneration)) {
+                clearHelperProofWriteOperation();
+            }
+            terminalManagedLinkBindingFailure(callbackGatt,
+                    "binary ANCS-SUBSCRIBED Q write did not start");
+            return false;
         }
-        return started;
+        log("binary ANCS-SUBSCRIBED Q proof started=" + started
+                + " after both ANCS CCCD + B4 CCCD + valid battery/network payload");
+        helperProofWriteTimeout = () -> {
+            if (!ownsHelperProofWriteOperation(callbackGatt, telemetry,
+                    HelperProofWriteStage.ANCS_SUBSCRIBED,
+                    operationGeneration)) return;
+            helperAncsReadyProofPending = false;
+            helperAncsReadyProofAttempted = false;
+            clearHelperProofWriteOperation();
+            terminalManagedLinkBindingFailure(callbackGatt,
+                    "binary ANCS-SUBSCRIBED Q write callback timeout");
+        };
+        main.postDelayed(helperProofWriteTimeout, 4_000L);
+        return true;
     }
 
     private void scheduleHelperAncsReadyProofRetry(BluetoothGatt expectedGatt, String reason) {
@@ -6444,15 +7428,20 @@ public final class IphoneAncsTransport {
      */
     private void scheduleHelperTelemetryRecovery(BluetoothGatt expectedGatt, long delayMs) {
         if (!helperTelemetryClientEnabled() || expectedGatt == null || expectedGatt != gatt
-                || !gattClientConnected) return;
+                || !gattClientConnected
+                || managedIncomingMode
+                && !hasCurrentManagedLinkBoundProof(expectedGatt)) return;
         if (helperTelemetryPoll != null) main.removeCallbacks(helperTelemetryPoll);
         helperTelemetryPoll = () -> {
             helperTelemetryPoll = null;
             if (!helperTelemetryClientEnabled()
-                    || expectedGatt != gatt || !gattClientConnected) return;
+                    || expectedGatt != gatt || !gattClientConnected
+                    || managedIncomingMode
+                    && !hasCurrentManagedLinkBoundProof(expectedGatt)) return;
 
             BluetoothGattCharacteristic endpoint = helperTelemetryEndpoint();
             boolean busy = discoveryPending || descriptorStage != DescriptorStage.NONE
+                    || activeHelperProofWriteOperationGeneration != 0L
                     || activeRequest != null || batteryReadPendingUuid != null
                     || iphoneHelperTelemetryReadPending;
             if (endpoint == null) {
@@ -6486,6 +7475,9 @@ public final class IphoneAncsTransport {
     private boolean startHelperTelemetryRead(BluetoothGatt callbackGatt) {
         BluetoothGattCharacteristic telemetry = iphoneTelemetryCharacteristic;
         if (callbackGatt != gatt || telemetry == null || iphoneHelperTelemetryReadPending
+                || managedIncomingMode
+                && !hasCurrentManagedLinkBoundProof(callbackGatt)
+                || activeHelperProofWriteOperationGeneration != 0L
                 || discoveryPending || descriptorStage != DescriptorStage.NONE
                 || activeRequest != null || batteryReadPendingUuid != null
                 || (telemetry.getProperties()
@@ -6528,6 +7520,11 @@ public final class IphoneAncsTransport {
             iphoneHelperTelemetryReadPending = false;
             boolean resumeServiceSetup = iphoneServiceSetupDeferredForHelperRead;
             iphoneServiceSetupDeferredForHelperRead = false;
+            if (managedIncomingMode) {
+                terminalManagedLinkBindingFailure(expectedGatt,
+                        "post-bind F05/B4 read callback timeout");
+                return;
+            }
             log("Helper B4 read callback timeout; ANCS remains active");
             if (resumeServiceSetup) {
                 continueDiscoveredServiceSetup(expectedGatt);
@@ -6588,6 +7585,7 @@ public final class IphoneAncsTransport {
         if (!gattClientConnected || callbackGatt == null || activeRequest != null
                 || !requests.isEmpty() || batteryReadPendingUuid != null
                 || iphoneHelperTelemetryReadPending
+                || activeHelperProofWriteOperationGeneration != 0L
                 || descriptorStage != DescriptorStage.NONE) {
             return;
         }
@@ -7090,13 +8088,23 @@ public final class IphoneAncsTransport {
         boolean abandonsDescriptor = ambiguousRawOwner != null
                 && activeDescriptorWriteGatt == ambiguousRawOwner
                 && activeDescriptorWriteOperationGeneration != 0L;
-        if (allowClientWrapperClose && (abandonsDiscovery || abandonsDescriptor)) {
+        boolean abandonsHelperProof = ambiguousRawOwner != null
+                && activeHelperProofWriteGatt == ambiguousRawOwner
+                && activeHelperProofWriteOperationGeneration != 0L;
+        boolean abandonsHelperRead = managedIncomingMode
+                && ambiguousRawOwner != null
+                && iphoneHelperTelemetryReadPending;
+        if (allowClientWrapperClose && (abandonsDiscovery || abandonsDescriptor
+                || abandonsHelperProof || abandonsHelperRead)) {
             log("Raw GATT callback slot abandoned by runtime/epoch reset; closing wrapper "
                     + "before any successor · discovery=" + abandonsDiscovery
-                    + " descriptor=" + abandonsDescriptor);
+                    + " descriptor=" + abandonsDescriptor
+                    + " helperProof=" + abandonsHelperProof
+                    + " helperRead=" + abandonsHelperRead);
             closeClientGatt(ambiguousRawOwner);
         } else if (!allowClientWrapperClose && emitDiagnosticLogs
-                && (abandonsDiscovery || abandonsDescriptor)) {
+                && (abandonsDiscovery || abandonsDescriptor
+                || abandonsHelperProof || abandonsHelperRead)) {
             log("Pre-READY epoch quarantined stale raw callback lineage; client wrapper close "
                     + "deferred until captured READY");
         }
@@ -7109,6 +8117,7 @@ public final class IphoneAncsTransport {
         cancelDiscoveryTimeout();
         cancelDescriptorWriteTimeout();
         clearDescriptorWriteOperation();
+        clearManagedLinkBoundProof();
         cancelHelperTelemetryRecovery();
         if (helperAncsReadyProofRetry != null) {
             main.removeCallbacks(helperAncsReadyProofRetry);
@@ -7151,7 +8160,8 @@ public final class IphoneAncsTransport {
         gattReady = false;
         discoveryPending = false;
         clearDiscoveryLineage();
-        return allowClientWrapperClose && (abandonsDiscovery || abandonsDescriptor);
+        return allowClientWrapperClose && (abandonsDiscovery || abandonsDescriptor
+                || abandonsHelperProof || abandonsHelperRead);
     }
 
     private void cancelConnectTimeout() {
@@ -7194,6 +8204,13 @@ public final class IphoneAncsTransport {
             if (expectedStage == DescriptorStage.HELPER_TELEMETRY) {
                 iphoneHelperTelemetrySubscribed = false;
                 iphoneHelperTelemetrySubscriptionAttempted = false;
+                if (managedIncomingMode) {
+                    log("Mandatory F05/B4 CCCD callback timeout poisoned the raw "
+                            + "descriptor channel");
+                    terminalManagedLinkBindingFailure(expectedGatt,
+                            "mandatory F05/B4 CCCD callback timeout");
+                    return;
+                }
                 log("Helper telemetry optional CCCD callback timeout poisoned the raw "
                         + "descriptor channel; replacing wrapper before any successor");
                 poisonMandatoryDescriptorChannelAndRecover(expectedGatt,
@@ -7301,6 +8318,7 @@ public final class IphoneAncsTransport {
             descriptorStage = DescriptorStage.NONE;
         }
         if (gatt == callbackGatt) {
+            clearManagedLinkBoundProof();
             if (linkProbeGatt == callbackGatt) cancelAmbiguousAclProbe();
             clearRssiProbePoisonAfterGattClosed(callbackGatt);
             gatt = null;
@@ -7947,6 +8965,23 @@ public final class IphoneAncsTransport {
                 .toUpperCase(Locale.US);
     }
 
+    @Nullable
+    private static byte[] managedProofChallenge(@Nullable byte[] value, byte opcode) {
+        if (value == null || value.length != MANAGED_PROOF_FRAME_BYTES
+                || value[0] != opcode) return null;
+        return Arrays.copyOfRange(value, 1, value.length);
+    }
+
+    private static byte[] managedProofFrame(byte opcode, @NonNull byte[] challenge) {
+        if (challenge.length != MANAGED_PROOF_FRAME_BYTES - 1) {
+            throw new IllegalArgumentException("managed proof challenge must be 16 bytes");
+        }
+        byte[] frame = new byte[MANAGED_PROOF_FRAME_BYTES];
+        frame[0] = opcode;
+        System.arraycopy(challenge, 0, frame, 1, challenge.length);
+        return frame;
+    }
+
     private final BluetoothGattServerCallback gattServerCallback =
             new BluetoothGattServerCallback() {
                 @Override
@@ -8028,10 +9063,22 @@ public final class IphoneAncsTransport {
                                         + "current PAIR+B3+READY");
                             }
                         }
+                        GattServerPeer diagnosticPeer =
+                                findCurrentServerPeer(device);
+                        BluetoothDevice diagnosticPhysical = diagnosticPeer == null
+                                ? device : diagnosticPeer.physicalLinkFacade;
+                        BluetoothDevice diagnosticPair = diagnosticPeer == null
+                                ? device : diagnosticPeer.device;
                         log("GATT SERVER LINK: session=" + sessionGeneration
                                 + " securityEpoch=" + incomingSecurityEpoch
                                 + " peer=" + safeAddress(device)
                                 + " objectId=" + System.identityHashCode(device)
+                                + " physicalObjectId="
+                                + System.identityHashCode(diagnosticPhysical)
+                                + " pairObjectId="
+                                + System.identityHashCode(diagnosticPair)
+                                + " sameAddress="
+                                + sameDevice(diagnosticPhysical, diagnosticPair)
                                 + " status=" + status + " newState=" + newState
                                 + " type=" + typeLabel(safeType(device))
                                 + " bond=" + bondLabel(safeBondState(device)));
@@ -8055,7 +9102,8 @@ public final class IphoneAncsTransport {
                             }
                         } else if (newState == BluetoothProfile.STATE_DISCONNECTED
                                 && managedIncomingMode
-                                && establishedClientOwnsPhysicalLink(device)) {
+                                && (establishedClientOwnsPhysicalLink(device)
+                                || pendingExactClientAttach(device))) {
                             // Client attach can complete before Helper writes PAIR. Liveness of
                             // that exact candidate is a transport question and must be checked
                             // independently from the still-closed ownership/security gates.
@@ -8450,7 +9498,12 @@ public final class IphoneAncsTransport {
                 log("onConnectionStateChange status=" + status
                         + " newState=" + newState
                         + " device=" + safeAddress(callbackGatt.getDevice())
-                        + " objectId=" + System.identityHashCode(callbackGatt.getDevice())
+                        + " physicalObjectId="
+                        + System.identityHashCode(callbackGatt.getDevice())
+                        + " pairObjectId="
+                        + System.identityHashCode(incomingClientAttemptPairFacade)
+                        + " sameAddress=" + sameDevice(
+                        callbackGatt.getDevice(), incomingClientAttemptPairFacade)
                         + " autoConnect=" + activeClientAutoConnect
                         + " opportunistic=" + activeClientOpportunistic
                         + " transport=TRANSPORT_LE");
@@ -8471,15 +9524,26 @@ public final class IphoneAncsTransport {
                             // A failed opportunistic registration is terminal for this exact tuple.
                             // Unregister close-only and wait for a fresh inbound security epoch.
                             boolean passiveAttempt = activeClientOpportunistic;
+                            GattServerPeer attemptPeer = incomingClientAttemptServerPeer;
                             clientConnectInFlight = false;
                             closeClientGatt(callbackGatt);
                             clearAncsRuntime();
                             incomingDiscoveryStarted = false;
                             if (passiveAttempt) {
                                 if (freshReplacementAttempt) incomingFreshReplacementGatt = null;
-                                state("OPPORTUNISTIC ATTACH FAILED · LINK KEPT · BUDGET SPENT");
+                                boolean physicalLost =
+                                        resetRetiredObserverAfterServerFacadeLoss(
+                                        attemptPeer, callbackGatt.getDevice(),
+                                        "opportunistic status=" + status
+                                                + " after server facade loss");
+                                state(physicalLost
+                                        ? "OPPORTUNISTIC FAILED · PHYSICAL LINK LOST"
+                                        : "OPPORTUNISTIC ATTACH FAILED · LINK KEPT · "
+                                        + "BUDGET SPENT");
                                 log("Exact opportunistic wrapper closed-only; inbound server/proofs/F04 "
-                                        + "kept, no public fallback/retry · status=" + status);
+                                        + (physicalLost ? "logical epoch reset"
+                                        : "kept")
+                                        + ", no public fallback/retry · status=" + status);
                                 return;
                             }
                             if (findConnectedServerPeer(callbackGatt.getDevice()) == null) {
@@ -8568,15 +9632,26 @@ public final class IphoneAncsTransport {
                                     "established same-peer GATT disconnected", false);
                         } else {
                             boolean passiveAttempt = activeClientOpportunistic;
+                            GattServerPeer attemptPeer = incomingClientAttemptServerPeer;
                             clientConnectInFlight = false;
                             closeClientGatt(callbackGatt);
                             clearAncsRuntime();
                             incomingDiscoveryStarted = false;
                             if (passiveAttempt) {
                                 if (freshReplacementAttempt) incomingFreshReplacementGatt = null;
-                                state("OPPORTUNISTIC DISCONNECTED · LINK KEPT · BUDGET SPENT");
+                                boolean physicalLost =
+                                        resetRetiredObserverAfterServerFacadeLoss(
+                                        attemptPeer, callbackGatt.getDevice(),
+                                        "opportunistic client DISCONNECTED after server "
+                                                + "facade loss");
+                                state(physicalLost
+                                        ? "OPPORTUNISTIC DISCONNECTED · PHYSICAL LINK LOST"
+                                        : "OPPORTUNISTIC DISCONNECTED · LINK KEPT · "
+                                        + "BUDGET SPENT");
                                 log("Exact opportunistic wrapper closed-only; inbound server/proofs/F04 "
-                                        + "kept, no public fallback/retry");
+                                        + (physicalLost ? "logical epoch reset"
+                                        : "kept")
+                                        + ", no public fallback/retry");
                                 return;
                             }
                             if (findConnectedServerPeer(callbackGatt.getDevice()) == null) {
@@ -8638,30 +9713,8 @@ public final class IphoneAncsTransport {
                         callbackGatt, "onCharacteristicWrite")) return;
                 log("onCharacteristicWrite " + shortUuid(characteristic.getUuid())
                         + " status=" + status);
-                if (TELEMETRY_RELAY_CHARACTERISTIC.equals(characteristic.getUuid())
-                        && helperAncsReadyProofPending) {
-                    helperAncsReadyProofPending = false;
-                    if (status == GATT_SUCCESS) {
-                        helperAncsReadyProofAcknowledged = true;
-                        if (helperAncsReadyProofRetry != null) {
-                            main.removeCallbacks(helperAncsReadyProofRetry);
-                            helperAncsReadyProofRetry = null;
-                        }
-                        log("Helper подтвердил ANCS-SUBSCRIBED после реального B4; "
-                                + "reverse route полностью готов");
-                        state("ANCS READY · B4 VERIFIED · ОТПРАВЬТЕ УВЕДОМЛЕНИЕ");
-                        finishAncsReadySetup(callbackGatt);
-                    } else {
-                        helperAncsReadyProofAttempted = false;
-                        log("Helper отклонил ANCS-SUBSCRIBED status=" + status
-                                + "; повторяю на живом owner");
-                        scheduleHelperAncsReadyProofRetry(callbackGatt,
-                                "write status=" + status);
-                        prepareBatteryBootstrap(callbackGatt);
-                        sendNextRequest();
-                    }
-                    return;
-                }
+                if (handleManagedHelperProofWriteCallback(
+                        callbackGatt, characteristic, status)) return;
                 if (iphonePeripheralMode
                         && CONTROL_CHARACTERISTIC.equals(characteristic.getUuid())) {
                     iphonePairWritePending = false;
@@ -8692,6 +9745,19 @@ public final class IphoneAncsTransport {
                 if (!acceptsCurrentManagedIncomingCallback(
                         callbackGatt, "onCharacteristicRead")) return;
                 UUID uuid = characteristic.getUuid();
+                if (managedIncomingMode
+                        && TELEMETRY_RELAY_CHARACTERISTIC.equals(uuid)
+                        && (!hasCurrentManagedLinkBoundProof(callbackGatt)
+                        || characteristic != helperLinkBoundCharacteristic)) {
+                    if (iphoneHelperTelemetryReadPending) {
+                        cancelHelperTelemetryReadTimeout();
+                        iphoneHelperTelemetryReadPending = false;
+                        iphoneServiceSetupDeferredForHelperRead = false;
+                    }
+                    log("Pre-bind F05/B4 read callback quarantined; zero parse/listener/UI "
+                            + "side effects");
+                    return;
+                }
                 if ((TELEMETRY_CHARACTERISTIC.equals(uuid)
                         || TELEMETRY_RELAY_CHARACTERISTIC.equals(uuid))
                         && iphoneHelperTelemetryReadPending) {
@@ -8768,6 +9834,16 @@ public final class IphoneAncsTransport {
         public void onReadRemoteRssi(BluetoothGatt callbackGatt, int rssi, int status) {
             dispatchGattCallback(() -> {
                 if (callbackGatt != linkProbeGatt) return;
+                if (managedIncomingMode
+                        && !ownsCurrentIncomingClientAttempt(callbackGatt)) {
+                    if (linkProbeDiscardResult) {
+                        finishDiscardedRawProbeAndStartQueuedEpoch(
+                                "RSSI callback rejected: physical/pair S/E/P tuple is stale");
+                    } else {
+                        cancelAmbiguousAclProbe();
+                    }
+                    return;
+                }
                 long generation = linkProbeGeneration;
                 boolean serverFacadeProbe = linkProbeForServerFacadeHandoff;
                 boolean incomingEpochProbe = linkProbeForIncomingSecurityEpoch;

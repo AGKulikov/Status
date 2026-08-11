@@ -18,7 +18,7 @@ public final class Ha1210OpportunisticReverseAttachContractTest {
             throws Exception {
         String transport = transport();
         assertTrue(transport.contains(
-                "HA1210 Pie opportunistic reverse attach enabled"));
+                "HA1211 physical-facade Pie opportunistic reverse attach enabled"));
 
         String attach = between(transport,
                 "private void startIncomingDirectAttach",
@@ -99,7 +99,7 @@ public final class Ha1210OpportunisticReverseAttachContractTest {
 
         String passiveFailure = between(transport,
                 "private boolean retireOpportunisticObserverWithoutLinkMutation",
-                "private void cancelClientAttemptCallbacks");
+                "private boolean resetRetiredObserverAfterServerFacadeLoss");
         assertTrue(passiveFailure.contains("closeClientGatt(expected);"));
         assertTrue(passiveFailure.contains("PAIR/B3/READY proofs and F04 publication kept"));
         assertFalse(passiveFailure.contains("resetIncomingSecurityAfterClientLoss("));
@@ -246,15 +246,15 @@ public final class Ha1210OpportunisticReverseAttachContractTest {
 
     @Test public void releaseIdentityAndAndroidWorkflowAdvanceTogether() throws Exception {
         String build = rootProject("build.gradle");
-        String workflow = project(".github/workflows/verify-ha1210.yml");
-        String manifest = project("release-manifests/HA1210.md");
-        assertTrue(build.contains("return 'v2.8.2-ha1210'"));
-        assertTrue(workflow.contains("work/ha1210-opportunistic-ancs"));
-        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1210'"));
-        assertTrue(workflow.contains("VERSION_CODE: '208021210'"));
+        String workflow = project(".github/workflows/verify-ha1211.yml");
+        String manifest = project("release-manifests/HA1211.md");
+        assertTrue(build.contains("return 'v2.8.2-ha1211'"));
+        assertTrue(workflow.contains("work/ha1211-physical-facade-ab"));
+        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1211'"));
+        assertTrue(workflow.contains("VERSION_CODE: '208021211'"));
         assertTrue(workflow.contains("Ha1210OpportunisticReverseAttachContractTest"));
-        assertTrue(manifest.contains("v2.8.2-ha1210"));
-        assertTrue(manifest.contains("208021210"));
+        assertTrue(manifest.contains("v2.8.2-ha1211"));
+        assertTrue(manifest.contains("208021211"));
         assertTrue(manifest.contains("autoConnect=false"));
         assertTrue(manifest.contains("opportunistic=true"));
     }

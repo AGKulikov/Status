@@ -74,7 +74,7 @@ public final class Ha1207PostReadyAttachContractTest {
                 "private void handlePairWriteRequestOnMain",
                 "private void handleSecureReadRequestOnMain");
         int pairRequireResponse = pair.indexOf("!responseNeeded");
-        int pairCommit = pair.indexOf("commitPairCommand(device, publicationToken)");
+        int pairCommit = pair.indexOf("commitPairCommand(");
         int pairResponse = pair.indexOf(
                 "sendGattServerResponse(device, requestId, status, 0, null)", pairCommit);
         int pairFinish = pair.indexOf("finishPairCommand(device, publicationToken", pairResponse);
@@ -242,9 +242,11 @@ public final class Ha1207PostReadyAttachContractTest {
         String record = between(transport,
                 "private boolean recordGattServerPeer",
                 "private void bindServerPeerToCurrentSecurityEpoch");
-        assertTrue(record.contains("pairRawFacadeChanged"));
-        assertTrue(record.contains("invalidateIncomingTupleForRawFacadeChange(device"));
+        assertFalse(record.contains("pairRawFacadeChanged"));
+        assertFalse(record.contains("invalidateIncomingTupleForRawFacadeChange(device"));
         assertTrue(record.contains("acceptedPairOtherFacade"));
+        assertTrue(record.contains("acceptedPhysicalRecordDisconnected"));
+        assertTrue(record.contains("resetIncomingSecurityAfterClientLoss(device,"));
 
         String callback = between(transport,
                 "private final BluetoothGattCallback gattCallback",
