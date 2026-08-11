@@ -63,7 +63,7 @@ public final class Ha1202ColdStartAuthorizationContractTest {
         int hardGuard = direct.indexOf(
                 "if (!isCurrentDiagnosticServicePublicationToken(publicationToken))");
         int spendAttempt = direct.indexOf("incomingClientAttachAttempt++;");
-        int connectGatt = direct.indexOf("device.connectGatt(context, false, gattCallback");
+        int connectGatt = direct.indexOf("connectGattOpportunisticOnPie(device)");
         assertTrue(hardGuard >= 0);
         assertTrue(spendAttempt > hardGuard);
         assertTrue(connectGatt > spendAttempt);
@@ -482,7 +482,12 @@ public final class Ha1202ColdStartAuthorizationContractTest {
                 "private boolean resetIncomingSecurityAfterClientLoss");
         assertTrue(freshEpoch.contains(
                 "clearAncsRuntimeWithoutClientCommands(emitDiagnosticLogs);"));
-        assertFalse(freshEpoch.contains("closeClientGatt("));
+        assertTrue(freshEpoch.contains("if (staleOpportunisticObserver != null "
+                + "&& activeClientOpportunistic)"));
+        assertTrue(occurrences(freshEpoch, "closeClientGatt(") == 1);
+        assertTrue(freshEpoch.contains(
+                "closeClientGatt(staleOpportunisticObserver);"));
+        assertFalse(freshEpoch.contains("disconnect("));
         assertFalse(freshEpoch.contains("readRemoteRssi("));
 
         String publicationReset = between(transport,

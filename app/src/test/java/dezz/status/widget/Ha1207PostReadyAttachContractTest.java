@@ -30,7 +30,12 @@ public final class Ha1207PostReadyAttachContractTest {
                 "private boolean resetIncomingSecurityAfterClientLoss");
         assertTrue(fresh.contains(
                 "clearAncsRuntimeWithoutClientCommands(emitDiagnosticLogs);"));
-        assertFalse(fresh.contains("closeClientGatt("));
+        assertTrue(fresh.contains("if (staleOpportunisticObserver != null "
+                + "&& activeClientOpportunistic)"));
+        assertTrue(fresh.contains("closeClientGatt(staleOpportunisticObserver);"));
+        assertTrue(fresh.indexOf("closeClientGatt(")
+                == fresh.lastIndexOf("closeClientGatt("));
+        assertFalse(fresh.contains("disconnect("));
         assertFalse(fresh.contains("startSamePeerAttach("));
         assertFalse(fresh.contains("readRemoteRssi("));
         assertFalse(fresh.contains("scheduleIncomingEpochClientLivenessProbe("));
@@ -363,7 +368,7 @@ public final class Ha1207PostReadyAttachContractTest {
         int commandPolicy = direct.indexOf(
                 "AncsRecoveryPolicy.mayIssueReverseClientCommand(");
         int issued = direct.indexOf("incomingFirstAttachIssuedForCurrentTuple = true;");
-        int rawConnect = direct.indexOf("device.connectGatt(");
+        int rawConnect = direct.indexOf("connectGattOpportunisticOnPie(device)");
         assertTrue(commandPolicy >= 0);
         assertTrue(direct.contains("!incomingFirstAttachIssuedForCurrentTuple"));
         assertTrue(direct.contains("ownsCapturedFirstAttachAuthorization("));
@@ -373,8 +378,8 @@ public final class Ha1207PostReadyAttachContractTest {
         String retry = between(transport,
                 "private void scheduleIncomingClientAttachRetry",
                 "private void recoverIncomingClientRole");
-        assertTrue(retry.contains("incomingReadyAttachTask != null"));
-        assertTrue(retry.contains("!incomingFirstAttachIssuedForCurrentTuple"));
+        assertTrue(retry.contains("Same-tuple clientIf retry запрещён"));
+        assertFalse(retry.contains("startSamePeerAttach("));
 
         String rearmGate = between(transport,
                 "private boolean canIssueManagedIncomingRearm",

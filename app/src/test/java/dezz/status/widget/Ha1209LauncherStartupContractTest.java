@@ -234,17 +234,17 @@ public final class Ha1209LauncherStartupContractTest {
 
     @Test public void releaseIdentityAndWorkflowAdvanceTogether() throws Exception {
         String build = rootProject("build.gradle");
-        String workflow = project(".github/workflows/verify-ha1209.yml");
-        String manifest = project("release-manifests/HA1209.md");
-        assertTrue(build.contains("return 'v2.8.2-ha1209'"));
-        assertTrue(workflow.contains("work/ha1209-launcher-first-frame"));
-        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1209'"));
-        assertTrue(workflow.contains("VERSION_CODE: '208021209'"));
+        String workflow = project(".github/workflows/verify-ha1210.yml");
+        String manifest = project("release-manifests/HA1210.md");
+        assertTrue(build.contains("return 'v2.8.2-ha1210'"));
+        assertTrue(workflow.contains("work/ha1210-opportunistic-ancs"));
+        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1210'"));
+        assertTrue(workflow.contains("VERSION_CODE: '208021210'"));
         assertTrue(workflow.contains("Ha1209LauncherStartupContractTest"));
         assertTrue(workflow.contains("StartupLoadPolicyTest"));
         assertTrue(workflow.contains("LauncherActionsPanelEditorContractTest"));
         assertTrue(manifest.contains("ru.natro.statuswidget"));
-        assertTrue(manifest.contains("208021209"));
+        assertTrue(manifest.contains("208021210"));
         assertTrue(manifest.contains("stable `GattServerPeer`"));
     }
 

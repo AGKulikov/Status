@@ -32,6 +32,17 @@ final class AncsRecoveryPolicy {
         CONTINUE_SECURE_PROOF
     }
 
+    /** One exact post-READY tuple may allocate one non-holding opportunistic registration. */
+    enum ReverseClientOpenAction {
+        OPPORTUNISTIC,
+        STOP
+    }
+
+    enum GattCallbackDispatchAction {
+        INLINE,
+        POST_TO_TRANSPORT_LOOPER
+    }
+
     private AncsRecoveryPolicy() {
     }
 
@@ -304,5 +315,31 @@ final class AncsRecoveryPolicy {
         return currentTuple
                 && !readyResponseBarrierPending
                 && (!firstAttachAttempt || capturedFirstAttachAuthorization);
+    }
+
+    /**
+     * Chooses the only legal allocation path for an exact captured PAIR/B3/READY tuple. Failure
+     * cannot fall through to a public open: that would turn this opportunistic observer into another
+     * physical-link owner and can tear down the still-working inbound server link on Android 9.
+     */
+    static ReverseClientOpenAction reverseClientOpenAction(
+            boolean currentTuple,
+            boolean capturedPostReadyAuthorization,
+            boolean opportunisticAttempted) {
+        if (!currentTuple || !capturedPostReadyAuthorization) {
+            return ReverseClientOpenAction.STOP;
+        }
+        if (!opportunisticAttempted) {
+            return ReverseClientOpenAction.OPPORTUNISTIC;
+        }
+        return ReverseClientOpenAction.STOP;
+    }
+
+    /** A framework callback already delivered on the transport looper must beat its timeout. */
+    static GattCallbackDispatchAction gattCallbackDispatchAction(
+            boolean callbackAlreadyOnTransportLooper) {
+        return callbackAlreadyOnTransportLooper
+                ? GattCallbackDispatchAction.INLINE
+                : GattCallbackDispatchAction.POST_TO_TRANSPORT_LOOPER;
     }
 }

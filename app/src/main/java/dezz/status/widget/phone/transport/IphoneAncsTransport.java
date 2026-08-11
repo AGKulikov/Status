@@ -32,6 +32,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelUuid;
@@ -41,6 +42,8 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
@@ -179,14 +182,14 @@ public final class IphoneAncsTransport {
     private static final long ANCS_SECOND_CCCD_DELAY_MS = 150L;
     private static final long SECURE_TO_CLIENT_CONNECT_DELAY_MS = 400L;
     private static final long DIRECT_FALLBACK_DELAY_MS = 500L;
-    private static final int INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS = 3;
+    /** One exact PAIR/B3/READY tuple gets one opportunistic allocation, never three opens. */
+    private static final int INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS = 1;
     /** At most one poisoned client wrapper may be replaced before a full handshake succeeds. */
     private static final int RSSI_POISONED_WRAPPER_REPLACEMENT_MAX_ATTEMPTS = 1;
-    private static final long INCOMING_CLIENT_ATTACH_RETRY_MS = 1_500L;
     /**
-     * A direct virtual open against an already-connected incoming peer must produce a callback
+     * An opportunistic attach against the exact live incoming peer must produce a callback
      * promptly. Unlike a cold {@code autoConnect=true} registration, this attempt is bounded and
-     * only its client wrapper is replaced when Android never reports a result.
+     * only its client wrapper is unregistered when Android never reports a result.
      */
     private static final long INCOMING_DIRECT_ATTACH_TIMEOUT_MS = 10_000L;
     private static final long CANDIDATE_UI_INTERVAL_MS = 500L;
@@ -450,9 +453,11 @@ public final class IphoneAncsTransport {
     private long incomingPairRequestFacadeBoundEpoch;
     private boolean clientConnectInFlight;
     private boolean activeClientAutoConnect;
+    /** True only for the Pie hidden overload carrying opportunistic=true. */
+    private boolean activeClientOpportunistic;
     private boolean backgroundAttachAttempted;
     private boolean directFallbackAttempted;
-    /** Bounded direct virtual opens tried before one durable incoming-route owner is obtained. */
+    /** Exact-tuple opportunistic allocations consumed before an incoming observer is obtained. */
     private int incomingClientAttachAttempt;
     private int poisonedWrapperReplacementAttempt;
     /** Closed status=22 clientIf retained only as a transfer identity until fresh F04 is ready. */
@@ -486,6 +491,8 @@ public final class IphoneAncsTransport {
     private IncomingReadyAttach activeIncomingFirstAttachAuthorization;
     /** Durable per-tuple bit; attempt counters may reset after full ANCS success, this may not. */
     private boolean incomingFirstAttachIssuedForCurrentTuple;
+    /** Capability budgets are reset only with the exact PAIR raw-facade tuple. */
+    private boolean incomingOpportunisticAttachAttemptedForCurrentTuple;
     /** One-shot status=22 capability is legal only after attempt #1 crossed the READY barrier. */
     private boolean activeIncomingPostReadyReplacementAuthorization;
     /** Lineage of the one post-READY BluetoothGatt wrapper currently allowed to callback. */
@@ -910,6 +917,8 @@ public final class IphoneAncsTransport {
         resetVerifiedPeerSession();
         managedReconnectEnabled = true;
         managedIncomingMode = true;
+        log("HA1210 Pie opportunistic reverse attach enabled · "
+                + "autoConnect=false opportunistic=true · no public fallback");
         managedReconnectAttempt = 0;
         managedSavedPeer = selected;
         boolean dedicatedIdentity = classicAddress != null
@@ -999,6 +1008,7 @@ public final class IphoneAncsTransport {
         iphoneConnectStarted = true;
         activeClientTarget = target;
         activeClientAutoConnect = true;
+        activeClientOpportunistic = false;
         activeClientEstablished = false;
         clientConnectInFlight = true;
         activeClientGeneration = sessionState.begin(
@@ -1246,6 +1256,15 @@ public final class IphoneAncsTransport {
                     + "captured READY");
             return;
         }
+        if (managedIncomingMode && activeClientOpportunistic) {
+            closeClientGatt(expected);
+            clearAncsRuntime();
+            incomingDiscoveryStarted = false;
+            state("OPPORTUNISTIC RSSI CHANNEL FAILED · LINK KEPT · BUDGET SPENT");
+            log("Client-only RSSI timeout retired opportunistic observer close-only; inbound "
+                    + "server/proofs/F04 kept, no replacement");
+            return;
+        }
         // close() is the only safe callback-channel barrier. A late RSSI callback from expected
         // then fails callbackGatt == gatt after a replacement object is installed.
         closeClientGatt(expected);
@@ -1307,6 +1326,15 @@ public final class IphoneAncsTransport {
                     + "until captured READY");
             return;
         }
+        if (managedIncomingMode && activeClientOpportunistic) {
+            closeClientGatt(expected);
+            clearAncsRuntime();
+            incomingDiscoveryStarted = false;
+            state("OPPORTUNISTIC DESCRIPTOR CHANNEL FAILED · LINK KEPT · BUDGET SPENT");
+            log("Client-only descriptor timeout retired opportunistic observer close-only; inbound "
+                    + "server/proofs/F04 kept, no replacement");
+            return;
+        }
         closeClientGatt(expected);
         clearAncsRuntime();
         incomingDiscoveryStarted = false;
@@ -1362,6 +1390,15 @@ public final class IphoneAncsTransport {
                 incomingPairAcceptedFacade, expectedPublicationToken)) {
             log("Pre-READY discovery timeout quarantined logically; close/retry deferred "
                     + "until captured READY");
+            return;
+        }
+        if (managedIncomingMode && activeClientOpportunistic) {
+            closeClientGatt(expected);
+            clearAncsRuntime();
+            incomingDiscoveryStarted = false;
+            state("OPPORTUNISTIC DISCOVERY CHANNEL FAILED · LINK KEPT · BUDGET SPENT");
+            log("Client-only discovery timeout retired opportunistic observer close-only; inbound "
+                    + "server/proofs/F04 kept, no replacement");
             return;
         }
         closeClientGatt(expected);
@@ -1802,6 +1839,11 @@ public final class IphoneAncsTransport {
     private void awaitPersistentGattReconnect(@NonNull BluetoothGatt expected,
                                               long expectedGeneration,
                                               @NonNull String reason) {
+        if (managedIncomingMode && activeClientOpportunistic) {
+            log("Opportunistic reverse clientIf остаётся non-holding: persistent connect() rearm "
+                    + "запрещён · " + reason);
+            return;
+        }
         if (!canIssueManagedIncomingRearm(expected)) {
             log("Persistent reconnect quarantined until the exact post-READY tuple owns it · "
                     + reason);
@@ -1834,6 +1876,11 @@ public final class IphoneAncsTransport {
                                          long expectedGeneration,
                                          @NonNull String reason,
                                          boolean immediate) {
+        if (managedIncomingMode && activeClientOpportunistic) {
+            log("Opportunistic reverse clientIf не может вызвать BluetoothGatt.connect() · "
+                    + reason);
+            return;
+        }
         if (closing || gatt != expected || !clientConnectInFlight
                 || !sessionState.is(expectedGeneration,
                 AncsSessionStateMachine.Phase.BACKGROUND_CONNECT)) return;
@@ -2258,6 +2305,7 @@ public final class IphoneAncsTransport {
         iphoneConnectStarted = true;
         activeClientTarget = device;
         activeClientAutoConnect = false;
+        activeClientOpportunistic = false;
         activeClientEstablished = false;
         clientConnectInFlight = true;
         activeClientGeneration = sessionState.begin(
@@ -2394,12 +2442,16 @@ public final class IphoneAncsTransport {
         incomingAncsReadyPublicationToken = 0L;
         incomingDiscoveryStarted = false;
         BluetoothGatt old = gatt;
+        boolean passiveOpportunisticOwner = activeClientOpportunistic;
         gatt = null;
+        activeClientOpportunistic = false;
         if (old != null) {
             clearRssiProbePoisonAfterGattClosed(old);
-            try {
-                old.disconnect();
-            } catch (RuntimeException ignored) {
+            if (!passiveOpportunisticOwner) {
+                try {
+                    old.disconnect();
+                } catch (RuntimeException ignored) {
+                }
             }
             try {
                 old.close();
@@ -2462,6 +2514,7 @@ public final class IphoneAncsTransport {
         }
         activeClientTarget = null;
         activeClientAutoConnect = false;
+        activeClientOpportunistic = false;
         activeClientEstablished = false;
         activeClientProvenSecurityEpoch = 0L;
         backgroundAttachAttempted = false;
@@ -3129,6 +3182,7 @@ public final class IphoneAncsTransport {
         gattClientConnected = false;
         activeClientTarget = device;
         activeClientAutoConnect = autoConnect;
+        activeClientOpportunistic = false;
         activeClientEstablished = false;
         clientConnectInFlight = true;
         activeClientGeneration = sessionState.begin(autoConnect
@@ -3198,9 +3252,11 @@ public final class IphoneAncsTransport {
     }
 
     /**
-     * Creates a clientIf directly on the exact bonded facade of the live incoming connection.
-     * This mirrors the direct virtual-open used by production dual-role BLE implementations:
-     * the registration may happen before application authorization, but discovery cannot.
+     * Attempts an exact-live-link-gated, non-holding attach through Pie's opportunistic GATT
+     * overload. The hidden call is made only after the checked READY response barrier and uses
+     * {@code autoConnect=false, opportunistic=true}: AOSP otherwise takes the background path
+     * before applying the opportunistic flag. The native TCB can still vanish between the Java
+     * live-link check and queued GATT_Connect, so the one-call/no-fallback budget remains required.
      */
     private void startIncomingDirectAttach(@NonNull String reason,
                                            boolean oneShotFreshReplacement) {
@@ -3231,8 +3287,18 @@ public final class IphoneAncsTransport {
                     + "first clientIf allocation");
             return;
         }
+        AncsRecoveryPolicy.ReverseClientOpenAction openAction =
+                AncsRecoveryPolicy.reverseClientOpenAction(
+                        true,
+                        firstAttachAuthorized,
+                        incomingOpportunisticAttachAttemptedForCurrentTuple);
+        if (openAction != AncsRecoveryPolicy.ReverseClientOpenAction.OPPORTUNISTIC) {
+            log("Post-READY opportunistic attach budget spent; no public/direct fallback · "
+                    + reason);
+            return;
+        }
         if (clientConnectInFlight || gattClientConnected || gatt != null) {
-            log("Incoming direct clientIf уже активен; дубль пропущен · " + reason);
+            log("Incoming opportunistic clientIf уже активен; дубль пропущен · " + reason);
             return;
         }
         if (!oneShotFreshReplacement && hasPendingStaleOwnerReplacementForCurrentEpoch()) {
@@ -3260,13 +3326,12 @@ public final class IphoneAncsTransport {
                     "exact incoming link missing before direct client attach");
             return;
         }
-        int attemptLimit = oneShotFreshReplacement ? 1
-                : INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS;
+        int attemptLimit = INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS;
         if (incomingClientAttachAttempt >= attemptLimit) {
-            state("SAME-PEER DIRECT ATTACH · LINK KEPT · RETRIES EXHAUSTED");
-            log("Post-READY direct clientIf не attached после "
+            state("SAME-PEER OPPORTUNISTIC ATTACH · LINK KEPT · BUDGET SPENT");
+            log("Post-READY opportunistic clientIf не attached после "
                     + incomingClientAttachAttempt
-                    + " попыток; GATT server/reconnect anchor остаётся опубликован");
+                    + " попытки; GATT server/reconnect anchor остаётся опубликован");
             return;
         }
 
@@ -3274,6 +3339,7 @@ public final class IphoneAncsTransport {
         BluetoothDevice device = serverLink.device;
         incomingClientCandidate = device;
         incomingFirstAttachIssuedForCurrentTuple = true;
+        incomingOpportunisticAttachAttemptedForCurrentTuple = true;
         incomingClientAttachAttempt++;
         clearAncsRuntime();
         incomingDiscoveryStarted = false;
@@ -3281,6 +3347,7 @@ public final class IphoneAncsTransport {
         activeClientProvenSecurityEpoch = 0L;
         activeClientTarget = device;
         activeClientAutoConnect = false;
+        activeClientOpportunistic = true;
         activeClientEstablished = false;
         clientConnectInFlight = true;
         incomingClientAttemptFacade = device;
@@ -3292,79 +3359,116 @@ public final class IphoneAncsTransport {
         long expectedGeneration = activeClientGeneration;
         long linkAgeMs = Math.max(0L, SystemClock.elapsedRealtime()
                 - serverLink.connectedAtElapsedMs);
-        state("SAME-PEER DIRECT ATTACH #" + incomingClientAttachAttempt);
-        log("connectGatt(autoConnect=false, TRANSPORT_LE): "
+        state("SAME-PEER OPPORTUNISTIC ATTACH #" + incomingClientAttachAttempt);
+        log("Pie connectGatt(autoConnect=false, opportunistic=true, TRANSPORT_LE): "
                 + safeName(device) + " " + safeAddress(device)
                 + " · exact bonded incoming objectId=" + System.identityHashCode(device)
                 + " · serverLinkAgeMs=" + linkAgeMs
                 + " · postReady=true"
                 + " · oneShotFreshReplacement=" + oneShotFreshReplacement
                 + " · " + reason);
-        try {
-            BluetoothGatt created = device.connectGatt(context, false, gattCallback,
-                    BluetoothDevice.TRANSPORT_LE);
-            gatt = created;
-            if (created == null) {
-                clientConnectInFlight = false;
-                activeClientTarget = null;
-                clearIncomingClientAttemptLineage();
-                state("SAME-PEER DIRECT ATTACH RETURNED NULL");
-                if (oneShotFreshReplacement) {
-                    state("FRESH STATUS=22 ATTACH FAILED · ЖДУ НОВЫЙ LINK");
-                    log("One-shot fresh direct attach returned null; retry в том же epoch запрещён");
-                } else {
-                    scheduleIncomingClientAttachRetry("direct connectGatt returned null");
-                }
-                return;
-            }
-            BluetoothGatt expected = created;
-            if (oneShotFreshReplacement) incomingFreshReplacementGatt = expected;
-            connectTimeout = () -> {
-                if (!ownsCurrentIncomingClientAttempt(expected)
-                        || !clientConnectInFlight
-                        || activeClientEstablished
-                        || !sessionState.is(expectedGeneration,
-                        AncsSessionStateMachine.Phase.DIRECT_CONNECT)) return;
-                log("Первичный direct clientIf не дал callback за "
-                        + INCOMING_DIRECT_ATTACH_TIMEOUT_MS
-                        + " ms; закрываю только never-established wrapper · target="
-                        + safeAddress(expected.getDevice()));
-                boolean exactFreshReplacement = oneShotFreshReplacement
-                        && incomingFreshReplacementGatt == expected;
-                closeClientGatt(expected);
-                clearAncsRuntime();
-                incomingDiscoveryStarted = false;
-                if (exactFreshReplacement) {
-                    incomingFreshReplacementGatt = null;
-                    state("FRESH STATUS=22 ATTACH TIMEOUT · ЖДУ НОВЫЙ LINK");
-                    log("One-shot fresh direct attach timeout; duplicate retry в securityEpoch="
-                            + incomingSecurityEpoch + " запрещён");
-                    return;
-                }
-                if (findConnectedServerPeer(expected.getDevice()) == null) {
-                    resetIncomingSecurityAfterClientLoss(expected.getDevice(),
-                            "never-established timeout after server facade loss");
-                    preserveManagedIncomingPublicationAfterLinkLoss(
-                            "direct attach timeout after server facade loss");
-                } else {
-                    scheduleIncomingClientAttachRetry("direct attach callback timeout");
-                }
-            };
-            main.postDelayed(connectTimeout, INCOMING_DIRECT_ATTACH_TIMEOUT_MS);
-        } catch (RuntimeException failure) {
+        BluetoothGatt created = connectGattOpportunisticOnPie(device);
+        gatt = created;
+        if (created == null) {
             clientConnectInFlight = false;
             activeClientTarget = null;
-            gatt = null;
+            activeClientAutoConnect = false;
+            activeClientOpportunistic = false;
             clearIncomingClientAttemptLineage();
-            state("SAME-PEER DIRECT ATTACH EXCEPTION");
-            log("Direct connectGatt exception: " + failure);
+            state("OPPORTUNISTIC GATT UNAVAILABLE · LINK KEPT");
             if (oneShotFreshReplacement) {
-                state("FRESH STATUS=22 ATTACH EXCEPTION · ЖДУ НОВЫЙ LINK");
-                log("One-shot fresh direct attach exception; retry в том же epoch запрещён");
-            } else {
-                scheduleIncomingClientAttachRetry("direct connectGatt exception");
+                incomingFreshReplacementGatt = null;
+                state("FRESH STATUS=22 OPPORTUNISTIC ATTACH FAILED · ЖДУ НОВЫЙ LINK");
             }
+            log("Hidden opportunistic clientIf не выделен; public/direct fallback запрещён, "
+                    + "текущий inbound GATT server/link сохранён");
+            return;
         }
+        BluetoothGatt expected = created;
+        if (oneShotFreshReplacement) incomingFreshReplacementGatt = expected;
+        connectTimeout = () -> {
+            if (!ownsCurrentIncomingClientAttempt(expected)
+                    || !clientConnectInFlight
+                    || activeClientEstablished
+                    || !activeClientOpportunistic
+                    || !sessionState.is(expectedGeneration,
+                    AncsSessionStateMachine.Phase.DIRECT_CONNECT)) return;
+            log("Opportunistic clientIf не дал callback за "
+                    + INCOMING_DIRECT_ATTACH_TIMEOUT_MS
+                    + " ms; unregister close-only exact never-established wrapper · target="
+                    + safeAddress(expected.getDevice()));
+            boolean exactFreshReplacement = oneShotFreshReplacement
+                    && incomingFreshReplacementGatt == expected;
+            unregisterNeverEstablishedOpportunisticGatt(expected);
+            clearAncsRuntime();
+            incomingDiscoveryStarted = false;
+            if (exactFreshReplacement) incomingFreshReplacementGatt = null;
+            state(exactFreshReplacement
+                    ? "FRESH STATUS=22 OPPORTUNISTIC TIMEOUT · ЖДУ НОВЫЙ LINK"
+                    : "OPPORTUNISTIC GATT TIMEOUT · LINK KEPT");
+            log("Same-tuple retry/public fallback запрещены; physical inbound link и F04 "
+                    + "publication не закрывались");
+        };
+        main.postDelayed(connectTimeout, INCOMING_DIRECT_ATTACH_TIMEOUT_MS);
+    }
+
+    /**
+     * Android 9 light-greylist overload. Reflection keeps compilation on the public SDK; exact
+     * Pie gating prevents accidental hidden-API use on later releases with different policy.
+     */
+    @Nullable
+    private BluetoothGatt connectGattOpportunisticOnPie(@NonNull BluetoothDevice device) {
+        if (Build.VERSION.SDK_INT != Build.VERSION_CODES.P) {
+            log("Opportunistic connectGatt недоступен: требуется API 28, current="
+                    + Build.VERSION.SDK_INT);
+            return null;
+        }
+        try {
+            Method method = BluetoothDevice.class.getMethod(
+                    "connectGatt",
+                    Context.class,
+                    boolean.class,
+                    BluetoothGattCallback.class,
+                    int.class,
+                    boolean.class,
+                    int.class,
+                    Handler.class);
+            Object result = method.invoke(
+                    device,
+                    context,
+                    false,
+                    gattCallback,
+                    BluetoothDevice.TRANSPORT_LE,
+                    true,
+                    BluetoothDevice.PHY_LE_1M_MASK,
+                    main);
+            if (result == null) {
+                log("Pie opportunistic connectGatt returned null");
+                return null;
+            }
+            if (!(result instanceof BluetoothGatt)) {
+                log("Pie opportunistic connectGatt returned unexpected type="
+                        + result.getClass().getName());
+                return null;
+            }
+            return (BluetoothGatt) result;
+        } catch (InvocationTargetException failure) {
+            Throwable cause = failure.getTargetException();
+            log("Pie opportunistic connectGatt target failure="
+                    + (cause == null ? "unknown" : cause.getClass().getSimpleName()));
+        } catch (ReflectiveOperationException | RuntimeException failure) {
+            log("Pie opportunistic connectGatt unavailable="
+                    + failure.getClass().getSimpleName());
+        }
+        return null;
+    }
+
+    /** Close-only unregister; never calls disconnect and never touches the inbound GATT server. */
+    private void unregisterNeverEstablishedOpportunisticGatt(
+            @NonNull BluetoothGatt expected) {
+        if (gatt != expected || activeClientEstablished || !activeClientOpportunistic
+                || !ownsCurrentIncomingClientAttempt(expected)) return;
+        closeClientGatt(expected);
     }
 
     private void scheduleDirectFallback(String reason) {
@@ -3379,73 +3483,16 @@ public final class IphoneAncsTransport {
                 + DIRECT_FALLBACK_DELAY_MS + " ms · " + reason);
     }
 
-    /** Replaces only a never-established direct client wrapper, with a bounded attempt count. */
+    /**
+     * Terminal compatibility sink for older recovery callers. HA1210 never allocates a second
+     * wrapper for the same tuple; a fresh incoming link must create a fresh PAIR/B3/READY epoch.
+     */
     private void scheduleIncomingClientAttachRetry(@NonNull String reason) {
-        if (closing || !managedReconnectEnabled || !managedIncomingMode
-                || nextClientAttempt != null) return;
-        if (incomingReadyAttachTask != null
-                || !incomingFirstAttachIssuedForCurrentTuple) {
-            log("Bounded retry rejected: captured READY task exclusively owns attempt #1 · "
-                    + reason);
-            return;
-        }
-        if (AncsRecoveryPolicy.replacementConsumedForEpoch(
-                incomingFreshReplacementConsumedEpoch, incomingSecurityEpoch)) {
-            log("Bounded retry запрещён: one-shot status=22 replacement уже consumed · "
-                    + reason);
-            return;
-        }
-        BluetoothDevice device = incomingPairAcceptedFacade;
-        long publicationToken = publishedDiagnosticServicePublicationToken;
-        GattServerPeer serverPeer = findExactCurrentServerPeer(device);
-        if (!canStartIncomingClientAttach(device, publicationToken)) {
-            log("Bounded retry запрещён до exact current PAIR+B3+READY tuple · " + reason);
-            return;
-        }
-        if (device == null || serverPeer == null || !serverPeer.connected
-                || incomingClientCandidate != device) {
-            preserveManagedIncomingPublicationAfterLinkLoss(
-                    "client attach failed after physical link loss · " + reason);
-            return;
-        }
-        int attemptLimit = INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS;
-        if (incomingClientAttachAttempt >= attemptLimit) {
-            state("SAME-PEER DIRECT ATTACH · LINK KEPT · RETRIES EXHAUSTED");
-            log("Post-READY direct clientIf не attached после "
-                    + incomingClientAttachAttempt
-                    + " попыток; Geely_ANCS server/link остаются активны · " + reason);
-            return;
-        }
-        int nextAttempt = incomingClientAttachAttempt + 1;
-        long delay = INCOMING_CLIENT_ATTACH_RETRY_MS * incomingClientAttachAttempt;
-        long expectedSession = sessionGeneration;
-        long expectedEpoch = incomingSecurityEpoch;
-        long expectedPublicationToken = publicationToken;
-        BluetoothDevice expectedRawFacade = device;
-        GattServerPeer expectedServerPeer = serverPeer;
-        nextClientAttempt = () -> {
-            nextClientAttempt = null;
-            if (closing || !managedIncomingMode) return;
-            GattServerPeer currentPeer = findExactCurrentServerPeer(expectedRawFacade);
-            if (sessionGeneration != expectedSession
-                    || incomingSecurityEpoch != expectedEpoch
-                    || publishedDiagnosticServicePublicationToken
-                    != expectedPublicationToken
-                    || incomingClientCandidate != expectedRawFacade
-                    || currentPeer != expectedServerPeer
-                    || currentPeer == null || !currentPeer.connected
-                    || !canStartIncomingClientAttach(
-                    expectedRawFacade, expectedPublicationToken)) {
-                log("Post-READY retry no-op: captured session/epoch/publication/raw facade stale");
-                return;
-            }
-            startSamePeerAttach(false, "direct client attach #" + nextAttempt
-                    + " after " + reason);
-        };
-        state("SAME-PEER DIRECT ATTACH · RETRY #" + nextAttempt + " · LINK KEPT");
-        main.postDelayed(nextClientAttempt, delay);
-        log("Direct client attach retry #" + nextAttempt + " через " + delay
-                + " ms; GATT server не закрывается · " + reason);
+        if (closing || !managedReconnectEnabled || !managedIncomingMode) return;
+        state("OPPORTUNISTIC ATTACH · LINK KEPT · ЖДУ FRESH READY");
+        log("Same-tuple clientIf retry запрещён; open budget="
+                + incomingClientAttachAttempt + "/" + INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS
+                + ", public/direct fallback отсутствует · " + reason);
     }
 
     /**
@@ -3455,6 +3502,12 @@ public final class IphoneAncsTransport {
     private void recoverIncomingClientRole(@NonNull String reason) {
         if (closing || !managedIncomingMode) return;
         BluetoothGatt owner = gatt;
+        if (owner != null && activeClientOpportunistic
+                && (!gattClientConnected || !activeClientEstablished)) {
+            retireOpportunisticObserverWithoutLinkMutation(owner,
+                    "passive owner callback/link loss · " + reason);
+            return;
+        }
         if (owner != null && !canIssueManagedIncomingRearm(owner)) {
             log("Managed reverse recovery quarantined: retained wrapper cannot close/rearm "
                     + "before exact current PAIR+B3+READY attempt tuple · " + reason);
@@ -3504,6 +3557,11 @@ public final class IphoneAncsTransport {
                                               @NonNull String reason) {
         if (closing || !managedIncomingMode || gatt != expected
                 || !sessionState.isCurrent(expectedGeneration)) return;
+        if (activeClientOpportunistic) {
+            retireOpportunisticObserverWithoutLinkMutation(expected,
+                    "passive owner cannot enter background rearm · " + reason);
+            return;
+        }
         if (!canIssueManagedIncomingRearm(expected)) {
             log("Managed reverse owner remains inert: rearm/close/retry/RSSI/discovery wait "
                     + "for exact current PAIR+B3+READY tuple · " + reason);
@@ -3543,6 +3601,27 @@ public final class IphoneAncsTransport {
         log("Повторно вооружаю тот же Android GATT owner; close/connectGatt не вызываются · "
                 + reason);
         rearmPersistentGattOwner(expected, expectedGeneration, reason, true);
+    }
+
+    /**
+     * A failed opportunistic observer is unregistered close-only and is never explicitly rearmed
+     * by this app; the next iPhone-Central link establishes a fresh F04/PAIR/B3/READY epoch.
+     */
+    private boolean retireOpportunisticObserverWithoutLinkMutation(
+            @NonNull BluetoothGatt expected, @NonNull String reason) {
+        if (!managedIncomingMode || gatt != expected || !activeClientOpportunistic
+                || !ownsCurrentIncomingClientAttempt(expected)) return false;
+        BluetoothDevice device = expected.getDevice();
+        cancelConnectTimeout();
+        cancelClientAttemptCallbacks();
+        closeClientGatt(expected);
+        clearAncsRuntime();
+        incomingDiscoveryStarted = false;
+        state("OPPORTUNISTIC OWNER RETIRED · LINK KEPT · BUDGET SPENT");
+        log("Exact opportunistic wrapper unregistered close-only; inbound server peer, "
+                + "PAIR/B3/READY proofs and F04 publication kept; disconnect/GATT-server close "
+                + "не вызывались · peer=" + safeAddress(device) + " · " + reason);
+        return true;
     }
 
     private void cancelClientAttemptCallbacks() {
@@ -3610,6 +3689,7 @@ public final class IphoneAncsTransport {
     private void clearIncomingPairProof() {
         clearIncomingReadyAttachLatch();
         incomingFirstAttachIssuedForCurrentTuple = false;
+        incomingOpportunisticAttachAttemptedForCurrentTuple = false;
         incomingPairAcceptedFacade = null;
         incomingPairAcceptedServerPeer = null;
         incomingPairAcceptedSessionGeneration = 0L;
@@ -4461,6 +4541,17 @@ public final class IphoneAncsTransport {
                                                  @NonNull String reason,
                                                  boolean emitDiagnosticLogs) {
         if (!managedIncomingMode) return;
+        BluetoothGatt staleOpportunisticObserver = gatt;
+        if (staleOpportunisticObserver != null && activeClientOpportunistic) {
+            // An opportunistic wrapper is authorized for exactly one S/E/P/raw tuple. It cannot inherit
+            // the fresh server epoch and must not block that epoch's one post-READY allocation.
+            cancelConnectTimeout();
+            closeClientGatt(staleOpportunisticObserver);
+            if (emitDiagnosticLogs) {
+                log("Fresh incoming epoch close-only retired prior opportunistic wrapper; "
+                        + "BluetoothGatt.disconnect/GATT-server close not issued");
+            }
+        }
         // Keep one raw controller operation serialized: a read already submitted to Bluetooth
         // cannot be physically cancelled. Mark it discard-only, then queue the current-epoch read
         // after its callback/timeout instead of issuing a competing read.
@@ -4527,6 +4618,11 @@ public final class IphoneAncsTransport {
     private boolean resetIncomingSecurityAfterClientLoss(@NonNull BluetoothDevice device,
                                                           @NonNull String reason) {
         if (!managedIncomingMode) return false;
+        BluetoothGatt failedOpportunisticObserver = gatt;
+        if (failedOpportunisticObserver != null && activeClientOpportunistic) {
+            cancelConnectTimeout();
+            closeClientGatt(failedOpportunisticObserver);
+        }
         cancelAmbiguousAclProbe();
         clearIncomingStaleOwnerTransfer();
         incomingSecurityEpoch++;
@@ -4576,6 +4672,11 @@ public final class IphoneAncsTransport {
             boolean replaceAfterFreshSecurity) {
         if (!managedIncomingMode) return;
         BluetoothDevice device = expected.getDevice();
+        if (activeClientOpportunistic && gatt == expected) {
+            retireOpportunisticObserverWithoutLinkMutation(expected,
+                    "established passive observer lost callback/link · " + reason);
+            return;
+        }
         if (replaceAfterFreshSecurity) {
             // Any old/new-epoch RSSI callback is now discard-only. It must never reach the
             // generic recovery path and revive this retired wrapper with BluetoothGatt.connect().
@@ -4848,6 +4949,20 @@ public final class IphoneAncsTransport {
                     + "следующий CONNECTED перенесёт replacement на свой epoch");
             return;
         }
+        BluetoothGatt passiveObserver = gatt;
+        if (passiveObserver != null && activeClientOpportunistic
+                && sameDevice(passiveObserver.getDevice(), device)) {
+            if (!retireOpportunisticObserverWithoutLinkMutation(passiveObserver,
+                    "GATT-server facade DISCONNECTED")) {
+                // Defensive close-only fallback for a lineage already invalidated by the server
+                // callback. Do not issue a physical disconnect from an opportunistic observer.
+                closeClientGatt(passiveObserver);
+            }
+            resetIncomingSecurityAfterClientLoss(device,
+                    "independent GATT-server facade DISCONNECTED proof");
+            state("INCOMING LINK LOST · ЖДУ FRESH F04/PAIR/B3/READY");
+            return;
+        }
         if (establishedClientOwnsPhysicalLink(device)) {
             state("SERVER FACADE LOST · VERIFYING CLIENT HANDOFF");
             log("GATT-server callback released after exact-device client registration: "
@@ -4873,15 +4988,19 @@ public final class IphoneAncsTransport {
                 + "; pending same-peer client attach остановлен");
         if (activeClientTarget != null && sameDevice(activeClientTarget, device)) {
             BluetoothGatt current = gatt;
+            boolean passiveOpportunisticOwner = activeClientOpportunistic;
             gatt = null;
+            activeClientOpportunistic = false;
             gattClientConnected = false;
             clientConnectInFlight = false;
             activeClientTarget = null;
             clearAncsRuntime();
             if (current != null) {
-                try {
-                    current.disconnect();
-                } catch (RuntimeException ignored) {
+                if (!passiveOpportunisticOwner) {
+                    try {
+                        current.disconnect();
+                    } catch (RuntimeException ignored) {
+                    }
                 }
                 try {
                     current.close();
@@ -4906,6 +5025,7 @@ public final class IphoneAncsTransport {
         clientConnectInFlight = false;
         activeClientTarget = null;
         activeClientAutoConnect = false;
+        activeClientOpportunistic = false;
         activeClientEstablished = false;
         if (oldClient != null) {
             try {
@@ -7188,6 +7308,7 @@ public final class IphoneAncsTransport {
             clientConnectInFlight = false;
             activeClientTarget = null;
             activeClientAutoConnect = false;
+            activeClientOpportunistic = false;
             activeClientEstablished = false;
             activeClientProvenSecurityEpoch = 0L;
             incomingDiscoveryStarted = false;
@@ -7342,11 +7463,15 @@ public final class IphoneAncsTransport {
         clientConnectInFlight = false;
         activeClientTarget = null;
         BluetoothGatt previous = gatt;
+        boolean passiveOpportunisticOwner = activeClientOpportunistic;
         gatt = null;
+        activeClientOpportunistic = false;
         if (previous != null) {
-            try {
-                previous.disconnect();
-            } catch (RuntimeException ignored) {
+            if (!passiveOpportunisticOwner) {
+                try {
+                    previous.disconnect();
+                } catch (RuntimeException ignored) {
+                }
             }
             try {
                 previous.close();
@@ -7391,11 +7516,15 @@ public final class IphoneAncsTransport {
         clientConnectInFlight = false;
         activeClientTarget = null;
         BluetoothGatt previous = gatt;
+        boolean passiveOpportunisticOwner = activeClientOpportunistic;
         gatt = null;
+        activeClientOpportunistic = false;
         if (previous != null) {
-            try {
-                previous.disconnect();
-            } catch (RuntimeException ignored) {
+            if (!passiveOpportunisticOwner) {
+                try {
+                    previous.disconnect();
+                } catch (RuntimeException ignored) {
+                }
             }
             try {
                 previous.close();
@@ -8255,13 +8384,31 @@ public final class IphoneAncsTransport {
         }
     }
 
+    /**
+     * Pie's hidden overload delivers every shared client callback through {@code main}. Running
+     * those callbacks inline preserves Handler FIFO against an already queued operation timeout;
+     * legacy Binder-thread callbacks still get exactly one hop onto the transport looper.
+     */
+    private void dispatchGattCallback(@NonNull Runnable callback) {
+        AncsRecoveryPolicy.GattCallbackDispatchAction dispatchAction =
+                AncsRecoveryPolicy.gattCallbackDispatchAction(
+                        Looper.myLooper() == main.getLooper());
+        if (dispatchAction == AncsRecoveryPolicy.GattCallbackDispatchAction.INLINE) {
+            callback.run();
+        } else {
+            main.post(callback);
+        }
+    }
+
     private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override
         public void onConnectionStateChange(BluetoothGatt callbackGatt,
                                             int status, int newState) {
-            // A busy diagnostic UI must not let the bounded timeout overtake a callback
-            // that the Bluetooth stack has already delivered.
-            main.post(() -> {
+            // The HA1210 hidden overload already dispatches on `main`. Re-posting that callback
+            // can place its state commit behind the previously queued 10-second timeout even when
+            // Fluoride delivered CONNECTED first. Dispatch inline on main; only foreign-loop
+            // legacy callbacks are serialized through the handler.
+            Runnable dispatch = () -> {
                 if (callbackGatt != gatt) {
                     if (managedIncomingMode) {
                         if (!canIssueManagedIncomingTupleCommand()) {
@@ -8305,6 +8452,7 @@ public final class IphoneAncsTransport {
                         + " device=" + safeAddress(callbackGatt.getDevice())
                         + " objectId=" + System.identityHashCode(callbackGatt.getDevice())
                         + " autoConnect=" + activeClientAutoConnect
+                        + " opportunistic=" + activeClientOpportunistic
                         + " transport=TRANSPORT_LE");
                 if (iphonePeripheralMode) {
                     handleIphonePeripheralConnectionState(callbackGatt, status, newState);
@@ -8320,19 +8468,18 @@ public final class IphoneAncsTransport {
                     gattClientConnected = false;
                     if (managedIncomingMode) {
                         if (!activeClientEstablished) {
-                            // Before the first CONNECTED callback there is no durable clientIf to
-                            // re-arm. Close only this wrapper and repeat the same direct virtual
-                            // open with the exact bonded incoming facade.
+                            // A failed opportunistic registration is terminal for this exact tuple.
+                            // Unregister close-only and wait for a fresh inbound security epoch.
+                            boolean passiveAttempt = activeClientOpportunistic;
                             clientConnectInFlight = false;
                             closeClientGatt(callbackGatt);
                             clearAncsRuntime();
                             incomingDiscoveryStarted = false;
-                            if (freshReplacementAttempt) {
-                                incomingFreshReplacementGatt = null;
-                                state("FRESH STATUS=22 ATTACH FAILED · ЖДУ НОВЫЙ LINK");
-                                log("One-shot exact-facade attach status=" + status
-                                        + "; retry в securityEpoch="
-                                        + incomingSecurityEpoch + " запрещён");
+                            if (passiveAttempt) {
+                                if (freshReplacementAttempt) incomingFreshReplacementGatt = null;
+                                state("OPPORTUNISTIC ATTACH FAILED · LINK KEPT · BUDGET SPENT");
+                                log("Exact opportunistic wrapper closed-only; inbound server/proofs/F04 "
+                                        + "kept, no public fallback/retry · status=" + status);
                                 return;
                             }
                             if (findConnectedServerPeer(callbackGatt.getDevice()) == null) {
@@ -8347,8 +8494,8 @@ public final class IphoneAncsTransport {
                                         "initial direct attach status=" + status);
                             }
                         } else {
-                            // Only a clientIf that has reached CONNECTED is durable. Re-arm that
-                            // same object indefinitely after later radio loss/status 133.
+                            // The opportunistic branch retires close-only inside this helper;
+                            // non-opportunistic legacy routes may retain/re-arm their owner.
                             recoverEstablishedIncomingClientAfterCallbackLoss(callbackGatt,
                                     "established same-peer GATT status=" + status,
                                     status == STATUS_GATT_CONN_TERMINATE_LOCAL_HOST);
@@ -8420,16 +8567,16 @@ public final class IphoneAncsTransport {
                             recoverEstablishedIncomingClientAfterCallbackLoss(callbackGatt,
                                     "established same-peer GATT disconnected", false);
                         } else {
+                            boolean passiveAttempt = activeClientOpportunistic;
                             clientConnectInFlight = false;
                             closeClientGatt(callbackGatt);
                             clearAncsRuntime();
                             incomingDiscoveryStarted = false;
-                            if (freshReplacementAttempt) {
-                                incomingFreshReplacementGatt = null;
-                                state("FRESH STATUS=22 ATTACH DISCONNECTED · ЖДУ НОВЫЙ LINK");
-                                log("One-shot exact-facade attach disconnected до CONNECTED; "
-                                        + "retry в securityEpoch=" + incomingSecurityEpoch
-                                        + " запрещён");
+                            if (passiveAttempt) {
+                                if (freshReplacementAttempt) incomingFreshReplacementGatt = null;
+                                state("OPPORTUNISTIC DISCONNECTED · LINK KEPT · BUDGET SPENT");
+                                log("Exact opportunistic wrapper closed-only; inbound server/proofs/F04 "
+                                        + "kept, no public fallback/retry");
                                 return;
                             }
                             if (findConnectedServerPeer(callbackGatt.getDevice()) == null) {
@@ -8455,18 +8602,21 @@ public final class IphoneAncsTransport {
                         state("V6 ATTEMPTS EXHAUSTED");
                     }
                 }
-            });
+            };
+            dispatchGattCallback(dispatch);
         }
 
         @Override
         public void onServicesDiscovered(BluetoothGatt callbackGatt, int status) {
-            main.post(() -> handleServicesDiscoveredCallback(callbackGatt, status));
+            dispatchGattCallback(
+                    () -> handleServicesDiscoveredCallback(callbackGatt, status));
         }
 
         @Override
         public void onDescriptorWrite(BluetoothGatt callbackGatt,
                                       BluetoothGattDescriptor descriptor, int status) {
-            main.post(() -> handleDescriptorWrite(callbackGatt, descriptor, status));
+            dispatchGattCallback(
+                    () -> handleDescriptorWrite(callbackGatt, descriptor, status));
         }
 
         @Override
@@ -8474,7 +8624,7 @@ public final class IphoneAncsTransport {
                                             BluetoothGattCharacteristic characteristic) {
             byte[] copy = characteristic.getValue() == null
                     ? null : characteristic.getValue().clone();
-            main.post(() -> handleCharacteristicChanged(
+            dispatchGattCallback(() -> handleCharacteristicChanged(
                     callbackGatt, characteristic, copy));
         }
 
@@ -8482,7 +8632,7 @@ public final class IphoneAncsTransport {
         public void onCharacteristicWrite(BluetoothGatt callbackGatt,
                                           BluetoothGattCharacteristic characteristic,
                                           int status) {
-            main.post(() -> {
+            dispatchGattCallback(() -> {
                 if (callbackGatt != gatt) return;
                 if (!acceptsCurrentManagedIncomingCallback(
                         callbackGatt, "onCharacteristicWrite")) return;
@@ -8537,7 +8687,7 @@ public final class IphoneAncsTransport {
                                          int status) {
             byte[] copy = characteristic.getValue() == null
                     ? null : characteristic.getValue().clone();
-            main.post(() -> {
+            dispatchGattCallback(() -> {
                 if (callbackGatt != gatt) return;
                 if (!acceptsCurrentManagedIncomingCallback(
                         callbackGatt, "onCharacteristicRead")) return;
@@ -8616,7 +8766,7 @@ public final class IphoneAncsTransport {
 
         @Override
         public void onReadRemoteRssi(BluetoothGatt callbackGatt, int rssi, int status) {
-            main.post(() -> {
+            dispatchGattCallback(() -> {
                 if (callbackGatt != linkProbeGatt) return;
                 long generation = linkProbeGeneration;
                 boolean serverFacadeProbe = linkProbeForServerFacadeHandoff;

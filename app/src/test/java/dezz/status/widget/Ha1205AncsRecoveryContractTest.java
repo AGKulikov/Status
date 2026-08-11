@@ -165,21 +165,20 @@ public final class Ha1205AncsRecoveryContractTest {
         String nullFailure = between(direct,
                 "if (created == null)", "BluetoothGatt expected = created;");
         assertTrue(nullFailure.contains("if (oneShotFreshReplacement)"));
-        assertTrue(nullFailure.contains("retry в том же epoch запрещён"));
-        assertFalse(between(nullFailure,
-                "if (oneShotFreshReplacement)", "} else {")
-                .contains("scheduleIncomingClientAttachRetry("));
+        assertTrue(nullFailure.contains("public/direct fallback запрещён"));
+        assertFalse(nullFailure.contains("scheduleIncomingClientAttachRetry("));
 
         String timeout = between(direct,
                 "connectTimeout = () ->", "main.postDelayed(connectTimeout");
         assertTrue(timeout.contains("exactFreshReplacement"));
-        assertTrue(timeout.contains("return;"));
+        assertTrue(timeout.contains("unregisterNeverEstablishedOpportunisticGatt(expected)"));
+        assertFalse(timeout.contains("scheduleIncomingClientAttachRetry("));
 
         String retry = between(transport,
                 "private void scheduleIncomingClientAttachRetry",
                 "private void recoverIncomingClientRole");
-        assertTrue(retry.contains("replacementConsumedForEpoch("));
-        assertTrue(retry.contains("return;"));
+        assertTrue(retry.contains("Same-tuple clientIf retry запрещён"));
+        assertFalse(retry.contains("startSamePeerAttach("));
 
         String savedCandidate = between(transport,
                 "private void maybeStartIncomingClientAttachAfterServicePublished",
