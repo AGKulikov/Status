@@ -89,18 +89,15 @@ public final class IphoneAncsTransport {
     /** Dedicated Helper telemetry endpoint on the current verified GATT-server connection. */
     private static final UUID TELEMETRY_CHARACTERISTIC =
             UUID.fromString("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f04");
-    /**
-     * Stable scan beacon for the iPhone-Central route. The actual Android GATT namespace is
-     * rotated and announced in manufacturer/service data, so an iOS cache from a previous
-     * Android process can never poison the next characteristic discovery.
-     */
+    /** Stable scan beacon for the iPhone-Central route; F04 itself never rotates. */
     private static final UUID MANAGED_INCOMING_BEACON_SERVICE =
             UUID.fromString("d2d9e4bf-47f1-4e44-a8bb-a932fd5affff");
     private static final int MANAGED_INCOMING_MANUFACTURER_ID = 0xFFFF;
-    private static final int MANAGED_INCOMING_NAMESPACE_PROTOCOL = 1;
     private static final String MANAGED_INCOMING_NAMESPACE_PREFS =
             "iphone_ancs_dynamic_namespace";
     private static final String MANAGED_INCOMING_NAMESPACE_GENERATION = "generation";
+    /** Durable UInt24 lineage committed only after exact-current F04 onServiceAdded SUCCESS. */
+    private static final String MANAGED_INCOMING_PUBLICATION_NONCE = "publication_nonce";
     /**
      * iPhone-owned telemetry relay discovered by Android on the already-working ANCS owner.
      * Generation 5 is intentionally separate from Android's generation-4 bootstrap database:
@@ -600,6 +597,12 @@ public final class IphoneAncsTransport {
     private AdvertiseSettings preparedAdvertiseSettings;
     private AdvertiseData preparedAdvertiseData;
     private AdvertiseData preparedScanResponse;
+    /** Exact callback object registered for the current publication/nonce tuple. */
+    private PublicationAdvertiseCallback activeAdvertiseCallback;
+    /** Candidate is derived before addService but remains invalid until the success callback. */
+    private int pendingManagedIncomingPublicationNonce;
+    /** Exact nonce encoded in the currently advertised manufacturer frame, or zero. */
+    private int publishedManagedIncomingPublicationNonce;
 
     private BluetoothGattCharacteristic notificationSource;
     private BluetoothGattCharacteristic dataSource;
@@ -1997,27 +2000,10 @@ public final class IphoneAncsTransport {
         // only uses the beacon as a link anchor and never discovers this Android service, so
         // rotating UUIDs cannot improve cache correctness and only creates reconnect deadlocks.
         useStaticDiagnosticNamespace();
-        byte[] namespaceFrame = managedIncomingNamespaceFrame();
-
-        preparedAdvertiseSettings = new AdvertiseSettings.Builder()
-                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
-                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
-                .setConnectable(true)
-                .setTimeout(0)
-                .build();
-        preparedAdvertiseData = new AdvertiseData.Builder()
-                .setIncludeTxPowerLevel(false)
-                .addServiceUuid(new ParcelUuid(MANAGED_INCOMING_BEACON_SERVICE))
-                .addManufacturerData(MANAGED_INCOMING_MANUFACTURER_ID, namespaceFrame)
-                .build();
-        // A service-data logical name is independent from BluetoothAdapter#getName(). It is
-        // intentionally not setIncludeDeviceName(true), because that would expose the Classic
-        // adapter name and make the two logical transports look like one connection again.
-        preparedScanResponse = new AdvertiseData.Builder()
-                .addServiceData(new ParcelUuid(MANAGED_INCOMING_BEACON_SERVICE),
-                        appendBytes(namespaceFrame,
-                                LOCAL_LOGICAL_NAME.getBytes(StandardCharsets.UTF_8)))
-                .build();
+        // HA1208 deliberately builds no ADV bytes yet. A candidate nonce is derived immediately
+        // before addService, but only the exact-current SUCCESS callback may commit it and build
+        // an observable advertisement. A failed/stale callback can therefore expose no token.
+        clearPreparedAdvertising();
         solicitationAdvertising = false;
         advertisingDesired = true;
         state(LOCAL_LOGICAL_NAME + " · STARTING");
@@ -2029,6 +2015,85 @@ public final class IphoneAncsTransport {
                 + "; системное имя Classic-адаптера не меняется");
         openGattServer();
         return gattServer != null;
+    }
+
+    /** Derives a retry-stable candidate without advancing the durable publication lineage. */
+    private boolean preparePendingManagedIncomingPublicationNonce() {
+        if (!managedIncomingMode || !advertisingDesired) return false;
+        SharedPreferences preferences = context.getSharedPreferences(
+                MANAGED_INCOMING_NAMESPACE_PREFS, Context.MODE_PRIVATE);
+        int persisted = preferences.getInt(MANAGED_INCOMING_PUBLICATION_NONCE, 0);
+        pendingManagedIncomingPublicationNonce =
+                ManagedIncomingPublicationPolicy.nextPublicationNonce(persisted);
+        publishedManagedIncomingPublicationNonce = 0;
+        log("F04 publication nonce candidate="
+                + String.format(Locale.US, "%06X", pendingManagedIncomingPublicationNonce)
+                + " persisted=" + String.format(Locale.US, "%06X", persisted)
+                + "; commit deferred until exact onServiceAdded SUCCESS");
+        return true;
+    }
+
+    /**
+     * Crash-consistent commit barrier. Advertising is forbidden if durable persistence fails,
+     * because reusing an uncommitted incarnation after process death would be false recovery
+     * proof for Helper.
+     */
+    private boolean commitManagedIncomingPublicationNonce(
+            @NonNull BluetoothGattService service, long publicationToken) {
+        int candidate = pendingManagedIncomingPublicationNonce;
+        if (!managedIncomingMode || service != pendingDiagnosticServicePublication
+                || publicationToken == 0L
+                || publicationToken != pendingDiagnosticServicePublicationToken
+                || publicationToken != serverDiagnosticServicePublicationToken
+                || !ManagedIncomingPublicationPolicy.isValidPublicationNonce(candidate)) {
+            log("F04 publication nonce commit rejected: stale callback lineage"
+                    + " · token=" + publicationToken
+                    + " candidate=" + String.format(Locale.US, "%06X", candidate));
+            return false;
+        }
+        SharedPreferences preferences = context.getSharedPreferences(
+                MANAGED_INCOMING_NAMESPACE_PREFS, Context.MODE_PRIVATE);
+        boolean committed = preferences.edit()
+                .putInt(MANAGED_INCOMING_PUBLICATION_NONCE, candidate)
+                .commit();
+        if (!committed) {
+            log("F04 publication nonce durable commit failed; advertising aborted · candidate="
+                    + String.format(Locale.US, "%06X", candidate));
+            return false;
+        }
+        publishedManagedIncomingPublicationNonce = candidate;
+        pendingManagedIncomingPublicationNonce = 0;
+        log("F04 publication nonce committed="
+                + String.format(Locale.US, "%06X", candidate)
+                + " for internalToken=" + publicationToken);
+        return true;
+    }
+
+    /** Builds the exact-budget v2 ADV plus a v1 scan-response fallback after durable commit. */
+    private void prepareManagedIncomingAdvertising(int publicationNonce) {
+        byte[] publicationFrame = ManagedIncomingPublicationPolicy.publicationNonceFrame(
+                serverDiagnosticGeneration, publicationNonce);
+        byte[] legacyNamespaceFrame = ManagedIncomingPublicationPolicy.legacyNamespaceFrame(
+                serverDiagnosticGeneration);
+        preparedAdvertiseSettings = new AdvertiseSettings.Builder()
+                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
+                .setConnectable(true)
+                .setTimeout(0)
+                .build();
+        // Flags (3) + 128-bit service AD (18) + manufacturer AD/company/frame (10) = 31 bytes.
+        preparedAdvertiseData = new AdvertiseData.Builder()
+                .setIncludeTxPowerLevel(false)
+                .addServiceUuid(new ParcelUuid(MANAGED_INCOMING_BEACON_SERVICE))
+                .addManufacturerData(MANAGED_INCOMING_MANUFACTURER_ID, publicationFrame)
+                .build();
+        // Service-data logical name is independent from BluetoothAdapter#getName(). The legacy
+        // v1 prefix lets Helper v42 recover generation 2F04 when it ignores manufacturer v2.
+        preparedScanResponse = new AdvertiseData.Builder()
+                .addServiceData(new ParcelUuid(MANAGED_INCOMING_BEACON_SERVICE),
+                        appendBytes(legacyNamespaceFrame,
+                                LOCAL_LOGICAL_NAME.getBytes(StandardCharsets.UTF_8)))
+                .build();
     }
 
     /** Allocates one persistent namespace per Android GATT-server publication. */
@@ -2063,11 +2128,8 @@ public final class IphoneAncsTransport {
     }
 
     private byte[] managedIncomingNamespaceFrame() {
-        return new byte[]{
-                (byte) MANAGED_INCOMING_NAMESPACE_PROTOCOL,
-                (byte) ((serverDiagnosticGeneration >>> 8) & 0xFF),
-                (byte) (serverDiagnosticGeneration & 0xFF)
-        };
+        return ManagedIncomingPublicationPolicy.legacyNamespaceFrame(
+                serverDiagnosticGeneration);
     }
 
     private static byte[] appendBytes(byte[] first, byte[] second) {
@@ -2083,6 +2145,13 @@ public final class IphoneAncsTransport {
         stopAdvertising();
         disconnect();
         resetVerifiedPeerSession();
+        // This public diagnostic route is not a continuation of a previous managed reverse
+        // publication. A stale mode flag must not replace its prepared F04 advertisement with
+        // the HA1208 managed beacon in onServiceAdded.
+        managedReconnectEnabled = false;
+        managedIncomingMode = false;
+        managedSavedPeer = null;
+        managedResolvedPeer = null;
         useStaticDiagnosticNamespace();
         advertiser = adapter.getBluetoothLeAdvertiser();
         if (advertiser == null) {
@@ -2117,16 +2186,18 @@ public final class IphoneAncsTransport {
     }
 
     public void stopAdvertising() {
+        PublicationAdvertiseCallback callback = activeAdvertiseCallback;
+        activeAdvertiseCallback = null;
         boolean shouldStopFramework =
-                advertising || advertisingPending || advertisingDesired;
+                callback != null || advertising || advertisingPending || advertisingDesired;
         advertisingDesired = false;
         advertising = false;
         advertisingPending = false;
         solicitationAdvertising = false;
         clearPreparedAdvertising();
-        if (shouldStopFramework && advertiser != null) {
+        if (shouldStopFramework && callback != null) {
             try {
-                advertiser.stopAdvertising(advertiseCallback);
+                callback.ownerAdvertiser.stopAdvertising(callback);
             } catch (RuntimeException failure) {
                 log("stopAdvertising exception: " + failure);
             }
@@ -4811,6 +4882,8 @@ public final class IphoneAncsTransport {
         state(LOCAL_LOGICAL_NAME + " · ADVERTISING · ЖДУ RECONNECT");
         log("Обычный разрыв: GATT server, реклама и namespace "
                 + String.format(Locale.US, "%04X", serverDiagnosticGeneration)
+                + " publication=" + String.format(Locale.US, "%06X",
+                publishedManagedIncomingPublicationNonce)
                 + " сохранены; новый Central link пройдёт PAIR/B3 заново · " + reason);
     }
 
@@ -4844,6 +4917,8 @@ public final class IphoneAncsTransport {
         publishedDiagnosticServicePublication = null;
         pendingDiagnosticServicePublicationToken = 0L;
         publishedDiagnosticServicePublicationToken = 0L;
+        pendingManagedIncomingPublicationNonce = 0;
+        publishedManagedIncomingPublicationNonce = 0;
         clearIncomingPairProof();
         clearIncomingClientAttemptLineage();
         secureAttPublicationToken = 0L;
@@ -4882,8 +4957,19 @@ public final class IphoneAncsTransport {
             gattServer = null;
         }
         if (gattServer == null) {
-            state("GATT_SERVER_UNAVAILABLE");
             log("openGattServer вернул null");
+            scheduleManagedIncomingPublicationRestartIfNeeded(
+                    "openGattServer returned null");
+            state("GATT_SERVER_UNAVAILABLE");
+            return;
+        }
+        if (managedIncomingMode && !preparePendingManagedIncomingPublicationNonce()) {
+            advertisingDesired = false;
+            clearPreparedAdvertising();
+            closeGattServer();
+            scheduleManagedIncomingPublicationRestartIfNeeded(
+                    "F04 publication nonce prepare failed");
+            state("F04_PUBLICATION_NONCE_PREPARE_FAILED");
             return;
         }
         BluetoothGattService service = new BluetoothGattService(
@@ -4934,10 +5020,12 @@ public final class IphoneAncsTransport {
                 + " TELEMETRY_CCCD=" + telemetryDescriptorAdded);
         if (!informationAdded || !controlAdded || !secureAdded || !telemetryAdded
                 || !telemetryDescriptorAdded) {
-            state("GATT_CHARACTERISTIC_ADD_FAILED");
             advertisingDesired = false;
             clearPreparedAdvertising();
             closeGattServer();
+            scheduleManagedIncomingPublicationRestartIfNeeded(
+                    "GATT characteristic add failed");
+            state("GATT_CHARACTERISTIC_ADD_FAILED");
             return;
         }
         pendingDiagnosticServicePublication = service;
@@ -4945,10 +5033,12 @@ public final class IphoneAncsTransport {
         boolean accepted = gattServer.addService(service);
         log("GATT server открыт; add diagnostic service=" + accepted);
         if (!accepted) {
-            state("GATT_SERVICE_ADD_START_FAILED");
             advertisingDesired = false;
             clearPreparedAdvertising();
             closeGattServer();
+            scheduleManagedIncomingPublicationRestartIfNeeded(
+                    "GATT addService start failed");
+            state("GATT_SERVICE_ADD_START_FAILED");
         } else {
             state("ЖДУ ДОБАВЛЕНИЯ GATT SERVICE");
         }
@@ -4962,20 +5052,49 @@ public final class IphoneAncsTransport {
             log("Запуск рекламы отменён: состояние уже изменилось");
             return;
         }
+        long publicationToken = publishedDiagnosticServicePublicationToken;
+        int publicationNonce = publishedManagedIncomingPublicationNonce;
+        if (!isCurrentDiagnosticServicePublicationToken(publicationToken)
+                || managedIncomingMode
+                && !ManagedIncomingPublicationPolicy.isValidPublicationNonce(
+                publicationNonce)) {
+            advertisingDesired = false;
+            log("Запуск рекламы отменён: stale F04 publication/nonce · token="
+                    + publicationToken + " nonce="
+                    + String.format(Locale.US, "%06X", publicationNonce));
+            clearPreparedAdvertising();
+            closeGattServer();
+            scheduleManagedIncomingPublicationRestartIfNeeded(
+                    "stale F04 publication/nonce before advertising");
+            return;
+        }
+        BluetoothLeAdvertiser ownerAdvertiser = advertiser;
+        PublicationAdvertiseCallback callback = new PublicationAdvertiseCallback(
+                ownerAdvertiser, publicationToken, publicationNonce);
+        activeAdvertiseCallback = callback;
         advertisingPending = true;
         try {
-            advertiser.startAdvertising(preparedAdvertiseSettings, preparedAdvertiseData,
-                    preparedScanResponse, advertiseCallback);
+            ownerAdvertiser.startAdvertising(preparedAdvertiseSettings, preparedAdvertiseData,
+                    preparedScanResponse, callback);
             state(solicitationAdvertising
                     ? "SOLICITATION REQUESTED · ЗАПУСК РЕКЛАМЫ"
                     : "ЗАПУСК DIAGNOSTIC-РЕКЛАМЫ");
         } catch (RuntimeException failure) {
             advertisingPending = false;
             advertisingDesired = false;
-            state("ADVERTISE_EXCEPTION");
             log("startAdvertising exception: " + failure);
             clearPreparedAdvertising();
             closeGattServer();
+            scheduleManagedIncomingPublicationRestartIfNeeded(
+                    "startAdvertising exception");
+            state("ADVERTISE_EXCEPTION");
+        }
+    }
+
+    /** Arms the reverse-route restart before generic retry-state routing can consume it. */
+    private void scheduleManagedIncomingPublicationRestartIfNeeded(@NonNull String reason) {
+        if (managedReconnectEnabled && managedIncomingMode && managedSavedPeer != null) {
+            scheduleManagedIncomingRestart(reason);
         }
     }
 
@@ -4986,6 +5105,17 @@ public final class IphoneAncsTransport {
     }
 
     private void closeGattServer() {
+        PublicationAdvertiseCallback callback = activeAdvertiseCallback;
+        activeAdvertiseCallback = null;
+        if (callback != null) {
+            try {
+                callback.ownerAdvertiser.stopAdvertising(callback);
+            } catch (RuntimeException failure) {
+                log("closeGattServer stopAdvertising exception: " + failure);
+            }
+        }
+        advertising = false;
+        advertisingPending = false;
         invalidateDiagnosticServicePublication();
         cancelServerTelemetryWakePoll();
         serverTelemetryCharacteristic = null;
@@ -7495,56 +7625,124 @@ public final class IphoneAncsTransport {
         }
     };
 
-    private final AdvertiseCallback advertiseCallback = new AdvertiseCallback() {
+    /** Per-start callback; identity is part of the publication ownership tuple. */
+    private final class PublicationAdvertiseCallback extends AdvertiseCallback {
+        private final BluetoothLeAdvertiser ownerAdvertiser;
+        private final long publicationToken;
+        private final int publicationNonce;
+        /** The framework start outcome is terminal; duplicate delivery is observation-only. */
+        private boolean startOutcomeHandled;
+
+        PublicationAdvertiseCallback(@NonNull BluetoothLeAdvertiser ownerAdvertiser,
+                                     long publicationToken, int publicationNonce) {
+            this.ownerAdvertiser = ownerAdvertiser;
+            this.publicationToken = publicationToken;
+            this.publicationNonce = publicationNonce;
+        }
+
         @Override
         public void onStartSuccess(AdvertiseSettings settingsInEffect) {
-            main.post(() -> {
-                advertisingPending = false;
-                if (!advertisingDesired) {
-                    if (advertiser != null) {
-                        try {
-                            advertiser.stopAdvertising(advertiseCallback);
-                        } catch (RuntimeException ignored) {
-                        }
-                    }
-                    advertising = false;
-                    log("Поздний onStartSuccess остановлен: реклама уже была отменена");
-                    return;
-                }
-                advertising = true;
-                state(solicitationAdvertising
-                        ? "ANCS SOLICITATION REQUESTED"
-                        : managedReconnectEnabled
-                        ? LOCAL_LOGICAL_NAME + " · ADVERTISING"
-                        : "DIAGNOSTIC ADV ACTIVE");
-                log("onStartSuccess mode=" + settingsInEffect.getMode()
-                        + " tx=" + settingsInEffect.getTxPowerLevel()
-                        + " connectable=" + settingsInEffect.isConnectable());
-                if (solicitationAdvertising) {
-                    log("Callback подтверждает запуск рекламы, но не AD type 0x15. "
-                            + "Проверьте эфир вторым BLE-сканером");
-                }
-            });
+            main.post(() -> handleAdvertiseStartSuccess(this, settingsInEffect));
         }
 
         @Override
         public void onStartFailure(int errorCode) {
-            main.post(() -> {
-                advertising = false;
-                advertisingPending = false;
-                advertisingDesired = false;
-                solicitationAdvertising = false;
-                state("ADVERTISE_FAILED_" + errorCode);
-                log("onStartFailure " + errorCode + ": " + advertiseError(errorCode));
-                clearPreparedAdvertising();
-                closeGattServer();
-                if (managedReconnectEnabled && !scanning
-                        && !clientConnectInFlight && !gattClientConnected) {
-                    scheduleManagedReconnect("advertising failed " + errorCode);
-                }
-            });
+            main.post(() -> handleAdvertiseStartFailure(this, errorCode));
         }
-    };
+    }
+
+    private ManagedIncomingPublicationPolicy.AdvertisingCallbackAction
+    advertiseCallbackAction(PublicationAdvertiseCallback callback, boolean success) {
+        return ManagedIncomingPublicationPolicy.advertisingCallbackAction(
+                activeAdvertiseCallback == callback,
+                callback.publicationToken,
+                callback.publicationNonce,
+                publishedDiagnosticServicePublicationToken,
+                publishedManagedIncomingPublicationNonce,
+                callback.startOutcomeHandled,
+                success);
+    }
+
+    private void handleAdvertiseStartSuccess(PublicationAdvertiseCallback callback,
+                                             AdvertiseSettings settingsInEffect) {
+        ManagedIncomingPublicationPolicy.AdvertisingCallbackAction action =
+                advertiseCallbackAction(callback, true);
+        if (action == ManagedIncomingPublicationPolicy.AdvertisingCallbackAction.OBSERVE_STALE) {
+            // Callback-scoped stop retires only the old start; it cannot stop a newer callback.
+            try {
+                callback.ownerAdvertiser.stopAdvertising(callback);
+            } catch (RuntimeException ignored) {
+            }
+            log("Stale advertise onStartSuccess observed/stopped without current mutation"
+                    + " · token=" + callback.publicationToken
+                    + " nonce=" + String.format(Locale.US, "%06X",
+                    callback.publicationNonce));
+            return;
+        }
+        if (action
+                == ManagedIncomingPublicationPolicy.AdvertisingCallbackAction.IGNORE_DUPLICATE) {
+            log("Duplicate current advertise onStartSuccess ignored · token="
+                    + callback.publicationToken);
+            return;
+        }
+        callback.startOutcomeHandled = true;
+        advertisingPending = false;
+        advertising = true;
+        state(solicitationAdvertising
+                ? "ANCS SOLICITATION REQUESTED"
+                : managedReconnectEnabled
+                ? LOCAL_LOGICAL_NAME + " · ADVERTISING"
+                : "DIAGNOSTIC ADV ACTIVE");
+        log("onStartSuccess mode=" + settingsInEffect.getMode()
+                + " tx=" + settingsInEffect.getTxPowerLevel()
+                + " connectable=" + settingsInEffect.isConnectable()
+                + " token=" + callback.publicationToken
+                + " nonce=" + String.format(Locale.US, "%06X",
+                callback.publicationNonce));
+        if (solicitationAdvertising) {
+            log("Callback подтверждает запуск рекламы, но не AD type 0x15. "
+                    + "Проверьте эфир вторым BLE-сканером");
+        }
+    }
+
+    private void handleAdvertiseStartFailure(PublicationAdvertiseCallback callback,
+                                             int errorCode) {
+        ManagedIncomingPublicationPolicy.AdvertisingCallbackAction action =
+                advertiseCallbackAction(callback, false);
+        if (action == ManagedIncomingPublicationPolicy.AdvertisingCallbackAction.OBSERVE_STALE) {
+            log("Stale advertise onStartFailure observed without current mutation"
+                    + " · token=" + callback.publicationToken
+                    + " nonce=" + String.format(Locale.US, "%06X",
+                    callback.publicationNonce)
+                    + " error=" + errorCode);
+            return;
+        }
+        if (action
+                == ManagedIncomingPublicationPolicy.AdvertisingCallbackAction.IGNORE_DUPLICATE) {
+            log("Duplicate current advertise onStartFailure ignored · token="
+                    + callback.publicationToken + " error=" + errorCode);
+            return;
+        }
+        callback.startOutcomeHandled = true;
+        activeAdvertiseCallback = null;
+        advertising = false;
+        advertisingPending = false;
+        advertisingDesired = false;
+        solicitationAdvertising = false;
+        log("onStartFailure " + errorCode + ": " + advertiseError(errorCode)
+                + " · current token=" + callback.publicationToken
+                + " nonce=" + String.format(Locale.US, "%06X",
+                callback.publicationNonce));
+        clearPreparedAdvertising();
+        closeGattServer();
+        scheduleManagedIncomingPublicationRestartIfNeeded(
+                "advertising failed " + errorCode);
+        state("ADVERTISE_FAILED_" + errorCode);
+        if (!managedIncomingMode && managedReconnectEnabled && !scanning
+                && !clientConnectInFlight && !gattClientConnected) {
+            scheduleManagedReconnect("advertising failed " + errorCode);
+        }
+    }
 
     private boolean sendGattServerResponse(BluetoothDevice device, int requestId,
                                            int status, int offset, byte[] value) {
@@ -7602,12 +7800,38 @@ public final class IphoneAncsTransport {
                             return;
                         }
                         if (status != GATT_SUCCESS) {
-                            invalidateDiagnosticServicePublication();
                             advertisingDesired = false;
-                            state("GATT_SERVICE_ADD_FAILED_" + status);
                             clearPreparedAdvertising();
                             closeGattServer();
+                            scheduleManagedIncomingPublicationRestartIfNeeded(
+                                    "onServiceAdded failed " + status);
+                            state("GATT_SERVICE_ADD_FAILED_" + status);
                             return;
+                        }
+                        if (managedIncomingMode) {
+                            if (!commitManagedIncomingPublicationNonce(service, pendingToken)) {
+                                advertisingDesired = false;
+                                clearPreparedAdvertising();
+                                closeGattServer();
+                                scheduleManagedIncomingPublicationRestartIfNeeded(
+                                        "F04 publication nonce commit failed");
+                                state("F04_PUBLICATION_NONCE_COMMIT_FAILED");
+                                return;
+                            }
+                            try {
+                                prepareManagedIncomingAdvertising(
+                                        publishedManagedIncomingPublicationNonce);
+                            } catch (RuntimeException failure) {
+                                advertisingDesired = false;
+                                log("Committed F04 publication could not build beacon: "
+                                        + failure);
+                                clearPreparedAdvertising();
+                                closeGattServer();
+                                scheduleManagedIncomingPublicationRestartIfNeeded(
+                                        "F04 publication beacon build failed");
+                                state("F04_PUBLICATION_BEACON_BUILD_FAILED");
+                                return;
+                            }
                         }
                         publishedDiagnosticServicePublication = service;
                         publishedDiagnosticServicePublicationToken = pendingToken;

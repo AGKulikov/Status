@@ -1,0 +1,29 @@
+KX11 ANCS Helper v43
+Bundle ID: ru.natro.kx11ancshelper
+Build: 43
+Marketing version: 43.0
+Matched Android build: Status Widget v2.8.2-ha1208
+
+Changes from v42:
+
+- understands HA1208 manufacturer protocol 2 with fixed F04 plus a separate monotonic UInt24
+  publication nonce; legacy protocol 1 remains connect-only and never destructive proof;
+- arms missing-didConnect observation after every actual RequiresANCS connect, including the
+  explicit manual path reproduced at 07:01:41 in the 2026-08-11 trace;
+- binds proof to exact owner object, attempt token, terminal/invalidation generations, root token
+  and publication nonce;
+- allows one consume-before-cancel, one terminal boundary and one same-owner RequiresANCS reopen;
+  the reopen inherits the spent root and cannot form a cancel loop;
+- persists automatic `(owner, nonce)` adoption as one durable fail-closed record, while keeping a
+  later explicit manual root and a genuine post-green radio-loss episode independent;
+- treats nonce duplicates as idempotent, accepts strict forward/wrap order and rejects delayed
+  rollback frames; newer publication evidence atomically invalidates old grace and rebinds the
+  same actual request without resetting its root budget;
+- keeps exact F04 system-table proof as a parallel physical-link signal, but never as a substitute
+  for current-process protocol-2 publication authority;
+- stops duplicate recovery scan on matching didConnect and swallows queued retained-owner scan
+  callbacks so discovery/PAIR/B3 cannot be reset;
+- preserves restoration claim #1 but synchronously retires legacy claim #2 when its replacement
+  becomes an actual request; the publication root is the only destructive owner of that request;
+- preserves all Helper v42/v41 handshake, restoration, B4, Service Changed, power-gating,
+  identity, restoration-ID and pairing contracts.

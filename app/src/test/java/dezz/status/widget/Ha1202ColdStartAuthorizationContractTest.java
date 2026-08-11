@@ -90,7 +90,7 @@ public final class Ha1202ColdStartAuthorizationContractTest {
         assertTrue(close.contains("invalidateDiagnosticServicePublication();"));
         String failure = between(callback, "if (status != GATT_SUCCESS)",
                 "serverDiagnosticServicePublished = true;");
-        assertTrue(failure.contains("invalidateDiagnosticServicePublication();"));
+        assertTrue(failure.contains("closeGattServer();"));
     }
 
     @Test public void missingAncsKeepsCurrentOwnerAndWaitsForServiceChanged() throws Exception {
