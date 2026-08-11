@@ -24,6 +24,7 @@ import androidx.core.content.ContextCompat;
 import dezz.status.widget.ClimatePanelSettingsActivity;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.R;
+import dezz.status.widget.StartupWorkCoordinator;
 
 /** Long-lived owner of the compact/reserved climate panel independent from the main widget. */
 public final class ClimatePanelService extends Service {
@@ -42,6 +43,7 @@ public final class ClimatePanelService extends Service {
     @Nullable private ClimatePanelOverlayController controller;
     @Nullable private Preferences preferences;
     private boolean explicitRestore;
+    private boolean runtimeInitialized;
 
     /** Start or keep the panel service alive using its persisted settings. */
     public static void start(@NonNull Context context) {
@@ -87,6 +89,11 @@ public final class ClimatePanelService extends Service {
         // Android allows only a few seconds after startForegroundService(). Do this before
         // constructing the ECARX integration or attempting privileged shell discovery.
         startForeground(NOTIFICATION_ID, createNotification());
+    }
+
+    private void initializeRuntime() {
+        if (runtimeInitialized) return;
+        runtimeInitialized = true;
         preferences = new Preferences(this);
         updateRuntimeStatus("starting", "Запуск климатической панели");
         controller = new ClimatePanelOverlayController(this, preferences, (status, detail) -> {
@@ -102,6 +109,13 @@ public final class ClimatePanelService extends Service {
         String action = intent == null ? ACTION_APPLY : intent.getAction();
         dezz.status.widget.diagnostics.ActionRecorder.recordServiceIntent(
                 getClass().getName(), action, startId);
+        if (intent == null
+                && StartupWorkCoordinator.shouldDeferAutomaticStickyRestart(this)) {
+            StartupWorkCoordinator.ensureClimateScheduled(this);
+            finishStop();
+            return START_NOT_STICKY;
+        }
+        initializeRuntime();
         if (ACTION_RESTORE.equals(action)
                 || preferences == null
                 || !preferences.climatePanelEnabled.get()) {

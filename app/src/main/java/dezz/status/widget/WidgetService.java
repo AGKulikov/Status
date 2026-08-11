@@ -237,6 +237,9 @@ public class WidgetService extends Service {
     private static final long GNSS_LOCATION_INTERVAL_MS = 2_000L;
     private static final long DATETIME_UPDATE_INTERVAL_MS = 60_000L;
     private static final long SYSTEM_CONDITION_REFRESH_INTERVAL_MS = 60_000L;
+    /** One connector/vendor startup per main-loop slice; never one boot-time burst. */
+    private static final long INITIAL_INTEGRATION_STAGE_MS = 400L;
+    private static final long INITIAL_HUD_AFTER_DRIVER_MS = 1_000L;
     /** Cadence for advancing the media progress bar while a track is actively playing. 250ms
      *  is fast enough to look smooth on a thin bar and slow enough to not show up in profilers. */
     // One repaint per second is visually sufficient for a compact status-row progress line and
@@ -289,7 +292,15 @@ public class WidgetService extends Service {
     private final Object automationUiLock = new Object();
     private final Map<String, Set<String>> pendingAutomationUi = new LinkedHashMap<>();
     private boolean automationUiRefreshScheduled;
+    private boolean automaticLifecycleQuiet;
+    private int automaticLifecycleResumeGeneration;
     private final Runnable automationUiRefresh = () -> {
+        if (automaticSurfaceRefreshSuppressed()) {
+            synchronized (automationUiLock) {
+                automationUiRefreshScheduled = false;
+            }
+            return;
+        }
         Map<String, Set<String>> changed = new LinkedHashMap<>();
         synchronized (automationUiLock) {
             for (Map.Entry<String, Set<String>> entry : pendingAutomationUi.entrySet()) {
@@ -322,7 +333,9 @@ public class WidgetService extends Service {
                 && prefs != null && prefs.driverPanelEnabled.get()) {
             DriverPanelService.apply(this);
         }
-        if (changed.containsKey(AutomationContract.SCOPE_HUD)) {
+        if (changed.containsKey(AutomationContract.SCOPE_HUD)
+                && (prefs.hudPanelAutostart.get()
+                || HudPresentationService.isRunning(this))) {
             HudPresentationService.notifyAutomationChanged(this);
         }
         // Popup windows have an independent WindowManager lifecycle. A failed/retrying status-row
@@ -482,9 +495,16 @@ public class WidgetService extends Service {
      * re-read Keystore credentials on USER_UNLOCKED.
      */
     private boolean integrationsStarted;
+    private boolean runtimeInitialized;
     private boolean integrationStartupScheduled;
     private boolean initialIntegrationStartupInProgress;
+    /** One settings replay retained while the staged boot/unlock controller lane is busy. */
+    private boolean integrationReconfigurePending;
+    private boolean credentialRefreshPending;
+    private boolean credentialRefreshScheduled;
+    private int initialIntegrationStage;
     private final Runnable integrationStartup = this::runInitialIntegrationStartup;
+    private final Runnable initialIntegrationStageRunner = this::runNextInitialIntegrationStage;
     private final Choreographer.FrameCallback integrationStartupFrame = frameTimeNanos ->
             // Frame callbacks run before traversal. Posting once more lets traversal draw the
             // attached status row before connector JSON/Keystore work begins on the main Looper.
@@ -816,6 +836,13 @@ public class WidgetService extends Service {
         createNotificationChannel();
         startForeground(NOTIFICATION_ID, createNotification());
 
+    }
+
+    /** Constructs the controller graph only after the exact non-sticky/quiet admission point. */
+    private void initializeRuntime() {
+        if (runtimeInitialized || destroyed) return;
+        runtimeInitialized = true;
+
         prefs = new Preferences(this);
         automationStates = new AutomationStateStore(this);
         connectorValues = new ConnectorValueRegistry();
@@ -932,8 +959,21 @@ public class WidgetService extends Service {
                 CarIntegrations.get(this),
                 targets -> {
                     // Initial startup performs one consolidated render after all providers and
-                    // scenarios are configured. Do not enqueue a second popup/layout pass.
-                    if (initialIntegrationStartupInProgress) return;
+                    // scenarios are configured. Credential-only refresh follows the same rule:
+                    // collect changed scopes, then perform one bounded surface pass afterwards.
+                    if (automaticSurfaceRefreshSuppressed()) {
+                        synchronized (automationUiLock) {
+                            for (String target : targets) {
+                                int divider = target.indexOf('|');
+                                if (divider <= 0 || divider >= target.length() - 1) continue;
+                                pendingAutomationUi.computeIfAbsent(
+                                        target.substring(0, divider),
+                                        ignored -> new HashSet<>())
+                                        .add(target.substring(divider + 1));
+                            }
+                        }
+                        return;
+                    }
                     mainHandler.post(() -> {
                         if (destroyed) return;
                         if (binding != null) renderHomeAssistantBricks();
@@ -949,7 +989,10 @@ public class WidgetService extends Service {
                                 DriverPanelService.apply(this);
                             }
                             if (target.startsWith(AutomationContract.SCOPE_HUD + "|")) {
-                                HudPresentationService.notifyAutomationChanged(this);
+                                if (prefs.hudPanelAutostart.get()
+                                        || HudPresentationService.isRunning(this)) {
+                                    HudPresentationService.notifyAutomationChanged(this);
+                                }
                             }
                         }
                         if (binding != null) {
@@ -1005,15 +1048,76 @@ public class WidgetService extends Service {
 
     /** Starts the long-lived integrations once, after the first attached status frame was drawn. */
     private void runInitialIntegrationStartup() {
-        integrationStartupScheduled = false;
-        if (destroyed || integrationsStarted) return;
-        integrationsStarted = true;
+        if (destroyed || integrationsStarted || initialIntegrationStartupInProgress) return;
+        integrationStartupScheduled = true;
         initialIntegrationStartupInProgress = true;
-        try {
-            reconfigureIntegrationControllers();
-        } finally {
-            initialIntegrationStartupInProgress = false;
+        initialIntegrationStage = 0;
+        mainHandler.removeCallbacks(initialIntegrationStageRunner);
+        mainHandler.post(initialIntegrationStageRunner);
+    }
+
+    private void runNextInitialIntegrationStage() {
+        if (destroyed || !initialIntegrationStartupInProgress) return;
+        switch (initialIntegrationStage) {
+            case 0:
+                // Bind selected-phone presence before the phone transport can publish a state.
+                runIntegrationStep("phone presence", () -> {
+                    if (phonePresenceExporter != null) phonePresenceExporter.reconfigure();
+                    if (phoneAncsPresenceExporter != null) {
+                        phoneAncsPresenceExporter.reconfigure();
+                    }
+                });
+                break;
+            case 1:
+                runIntegrationStep("phone", () -> {
+                    if (phoneController != null) phoneController.reconfigure();
+                });
+                break;
+            case 2:
+                runIntegrationStep("car telemetry", () -> {
+                    if (carTelemetryExporter != null) carTelemetryExporter.reconfigure();
+                });
+                break;
+            case 3:
+                runIntegrationStep("MQTT", () -> {
+                    if (mqttController != null) mqttController.reconfigure();
+                });
+                break;
+            case 4:
+                runIntegrationStep("Home Assistant", () -> {
+                    if (haApiController != null) haApiController.reconfigure();
+                });
+                break;
+            case 5:
+                runIntegrationStep("Sprut.hub", () -> {
+                    if (sprutController != null) sprutController.reconfigure();
+                });
+                break;
+            case 6:
+                runIntegrationStep("visual scenarios", () -> {
+                    if (scenarioController != null) scenarioController.reconfigure();
+                });
+                break;
+            case 7:
+                runIntegrationStep("intent scenarios", () -> {
+                    if (intentScenarioController != null) {
+                        intentScenarioController.reconfigure();
+                    }
+                });
+                break;
+            default:
+                finishInitialIntegrationStartup();
+                return;
         }
+        initialIntegrationStage++;
+        mainHandler.postDelayed(initialIntegrationStageRunner,
+                INITIAL_INTEGRATION_STAGE_MS);
+    }
+
+    private void finishInitialIntegrationStartup() {
+        initialIntegrationStartupInProgress = false;
+        integrationStartupScheduled = false;
+        integrationsStarted = true;
         if (binding != null) {
             runIntegrationStep("initial status-row projection", () -> {
                 renderHomeAssistantBricks();
@@ -1025,7 +1129,19 @@ public class WidgetService extends Service {
         // driver rail once after that consolidated evaluation so boot-time visibility/action
         // overrides are already reflected in its very first stable configuration.
         if (prefs.driverPanelEnabled.get()) DriverPanelService.apply(this);
-        if (prefs.hudPanelEnabled.get()) HudPresentationService.notifyAutomationChanged(this);
+        if (prefs.hudPanelEnabled.get() && prefs.hudPanelAutostart.get()) {
+            mainHandler.postDelayed(() -> {
+                if (!destroyed && prefs != null && prefs.hudPanelEnabled.get()) {
+                    HudPresentationService.notifyAutomationChanged(this);
+                }
+            }, INITIAL_HUD_AFTER_DRIVER_MS);
+        }
+        synchronized (automationUiLock) {
+            // Driver/HUD are reconciled exactly once above from the final startup state.
+            pendingAutomationUi.remove(AutomationContract.SCOPE_DRIVER);
+            pendingAutomationUi.remove(AutomationContract.SCOPE_HUD);
+        }
+        schedulePendingAutomationUiRefresh();
         mainHandler.removeCallbacks(automationFreshnessTick);
         mainHandler.postDelayed(automationFreshnessTick, 30_000L);
         mainHandler.removeCallbacks(systemConditionRefresh);
@@ -1033,6 +1149,13 @@ public class WidgetService extends Service {
         mainHandler.postDelayed(systemConditionRefresh,
                 SYSTEM_CONDITION_REFRESH_INTERVAL_MS
                         - (now % SYSTEM_CONDITION_REFRESH_INTERVAL_MS));
+        if (credentialRefreshPending) {
+            credentialRefreshPending = false;
+            mainHandler.postDelayed(this::reconfigureCredentialBackedIntegrationsAfterUnlock,
+                    INITIAL_INTEGRATION_STAGE_MS);
+        } else {
+            schedulePendingIntegrationReconfigure();
+        }
     }
 
     private void scheduleInitialIntegrationStartupAfterFrame() {
@@ -1128,6 +1251,17 @@ public class WidgetService extends Service {
     public int onStartCommand(@Nullable Intent intent, int flags, int startId) {
         dezz.status.widget.diagnostics.ActionRecorder.recordServiceIntent(
                 getClass().getName(), intent == null ? null : intent.getAction(), startId);
+        if (!runtimeInitialized) {
+            if (intent == null
+                    && StartupWorkCoordinator.shouldDeferAutomaticStickyRestart(this)) {
+                StartupWorkCoordinator.ensureIntegrationHostScheduled(this);
+                stopForeground(true);
+                stopSelf(startId);
+                return START_NOT_STICKY;
+            }
+            initializeRuntime();
+        }
+        if (!runtimeInitialized || prefs == null) return START_NOT_STICKY;
         if (!destroyed && prefs != null
                 && ((prefs.widgetEnabled.get() && binding == null
                 && !overlayAttachRetryScheduled
@@ -1474,6 +1608,142 @@ public class WidgetService extends Service {
         }
     }
 
+    /**
+     * QuickBoot can preserve this integration host while WindowManager/HUD processes are
+     * recreated. Reconcile automatic surfaces after the quiet lane without reconnecting any
+     * transport or replaying the full controller graph.
+     */
+    public void reconcileAutomaticLifecycleSurfaces() {
+        if (destroyed || prefs == null) return;
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(this::reconcileAutomaticLifecycleSurfaces);
+            return;
+        }
+        if (prefs.widgetEnabled.get() && binding != null) {
+            // QuickBoot can invalidate the remote WindowManager/SurfaceFlinger owner while the
+            // local ViewRoot still reports attached. One controlled lifecycle transaction is more
+            // reliable than trusting that process-local flag and is isolated after the quiet lane.
+            detachStatusSurfaceRuntime("automatic lifecycle surface revalidation");
+        }
+        ensureEnabledRuntime();
+        if (initialIntegrationStartupInProgress || !integrationsStarted) return;
+        if (prefs.driverPanelEnabled.get()) {
+            runIntegrationStep("automatic Driver surface reconcile",
+                    () -> DriverPanelService.apply(this));
+        }
+        if (prefs.hudPanelEnabled.get() && prefs.hudPanelAutostart.get()) {
+            mainHandler.postDelayed(() -> {
+                if (!destroyed && prefs != null && prefs.hudPanelEnabled.get()
+                        && prefs.hudPanelAutostart.get()) {
+                    runIntegrationStep("automatic HUD surface reconcile",
+                            () -> HudPresentationService.reconcileAutomaticLifecycle(this));
+                }
+            }, INITIAL_HUD_AFTER_DRIVER_MS);
+        }
+        schedulePendingAutomationUiRefresh();
+        resumeAutomaticLifecycleIntegrationsAfterQuiet();
+    }
+
+    /**
+     * QuickBoot may preserve this process while every radio/vendor service underneath it flaps.
+     * Park only reconnecting transports immediately; the FGS notification and cached UI remain.
+     */
+    public void enterAutomaticLifecycleQuiet() {
+        mainHandler.post(this::enterAutomaticLifecycleQuietOnMain);
+    }
+
+    private void enterAutomaticLifecycleQuietOnMain() {
+        if (destroyed || !runtimeInitialized) return;
+        if (automaticLifecycleQuiet) return;
+        automaticLifecycleQuiet = true;
+        automaticLifecycleResumeGeneration++;
+        runIntegrationStep("quiet phone", () -> {
+            if (phoneController != null) phoneController.stop();
+        });
+        runIntegrationStep("quiet MQTT", () -> {
+            if (mqttController != null) mqttController.pauseForAutomaticLifecycle();
+        });
+        runIntegrationStep("quiet Home Assistant", () -> {
+            if (haApiController != null) haApiController.pauseForAutomaticLifecycle();
+        });
+        runIntegrationStep("quiet Sprut.hub", () -> {
+            if (sprutController != null) sprutController.pauseForAutomaticLifecycle();
+        });
+    }
+
+    public void resumeAutomaticLifecycleIntegrationsAfterQuiet() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(this::resumeAutomaticLifecycleIntegrationsAfterQuiet);
+            return;
+        }
+        if (!automaticLifecycleQuiet || destroyed) return;
+        automaticLifecycleQuiet = false;
+        int generation = ++automaticLifecycleResumeGeneration;
+        Runnable[] stages = new Runnable[] {
+                () -> { if (phoneController != null) phoneController.reconfigure(); },
+                () -> { if (mqttController != null) mqttController.reconfigure(); },
+                () -> { if (haApiController != null) haApiController.reconfigure(); },
+                () -> { if (sprutController != null) sprutController.reconfigure(); }
+        };
+        for (int index = 0; index < stages.length; index++) {
+            final int stage = index;
+            mainHandler.postDelayed(() -> {
+                if (destroyed || automaticLifecycleQuiet
+                        || generation != automaticLifecycleResumeGeneration) return;
+                runIntegrationStep("automatic lifecycle resume " + stage, stages[stage]);
+                if (stage == stages.length - 1) schedulePendingAutomationUiRefresh();
+            }, (stage + 1L) * INITIAL_INTEGRATION_STAGE_MS);
+        }
+    }
+
+    /**
+     * Re-opens only Keystore-backed transports after USER_UNLOCKED.
+     *
+     * <p>Driver/HUD/Climate and status-window geometry belong to the already coalesced boot
+     * generation and must not be rebuilt merely because credentials became readable.</p>
+     */
+    public void reconfigureCredentialBackedIntegrationsAfterUnlock() {
+        if (destroyed || prefs == null) return;
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(this::reconfigureCredentialBackedIntegrationsAfterUnlock);
+            return;
+        }
+        if (initialIntegrationStartupInProgress) {
+            credentialRefreshPending = true;
+            return;
+        }
+        if (!integrationsStarted) {
+            runInitialIntegrationStartup();
+            return;
+        }
+        if (automaticLifecycleQuiet) {
+            // The staged lifecycle resume includes every Keystore-backed transport and Phone;
+            // do not schedule a second overlapping MQTT/HA/Sprut pass for the same unlock edge.
+            resumeAutomaticLifecycleIntegrationsAfterQuiet();
+            return;
+        }
+        if (credentialRefreshScheduled) return;
+        credentialRefreshScheduled = true;
+        runIntegrationStep("MQTT unlock", () -> {
+            if (mqttController != null) mqttController.reconfigure();
+        });
+        mainHandler.postDelayed(() -> {
+            if (destroyed) return;
+            runIntegrationStep("Home Assistant unlock", () -> {
+                if (haApiController != null) haApiController.reconfigure();
+            });
+            mainHandler.postDelayed(() -> {
+                if (destroyed) return;
+                runIntegrationStep("Sprut.hub unlock", () -> {
+                    if (sprutController != null) sprutController.reconfigure();
+                });
+                credentialRefreshScheduled = false;
+                schedulePendingIntegrationReconfigure();
+                schedulePendingAutomationUiRefresh();
+            }, INITIAL_INTEGRATION_STAGE_MS);
+        }, INITIAL_INTEGRATION_STAGE_MS);
+    }
+
     /** Queues a fresh direct handshake for the explicit test button in Phone settings. */
     public boolean reconnectPhoneForDiagnostics() {
         PhoneConnectorController controller = phoneController;
@@ -1483,6 +1753,11 @@ public class WidgetService extends Service {
     @SuppressLint("MissingPermission")
     private void applyPreferences(boolean reconfigureIntegrations) {
         if (destroyed || prefs == null) return;
+        if (reconfigureIntegrations
+                && (initialIntegrationStartupInProgress || credentialRefreshScheduled)) {
+            integrationReconfigurePending = true;
+            reconfigureIntegrations = false;
+        }
         if (prefs.phonePopupNotificationsEnabled.get()) {
             ensurePhoneNotificationPopupConfigured();
         }
@@ -2303,7 +2578,12 @@ public class WidgetService extends Service {
         if (previousAncsReady != phoneAncsReady && prefs.driverPanelEnabled.get()) {
             // ANCS-gated information rows are structural: rebuilding only on the actual profile
             // transition lets controls reclaim the row's height and avoids polling the rail.
-            DriverPanelService.apply(this);
+            if (automaticSurfaceRefreshSuppressed()) {
+                onAutomationStateChanged(AutomationContract.SCOPE_DRIVER,
+                        "builtin.phone_ancs_ready");
+            } else {
+                DriverPanelService.apply(this);
+            }
         }
         schedulePopupRefresh();
     }
@@ -3179,7 +3459,29 @@ public class WidgetService extends Service {
         }
         synchronized (automationUiLock) {
             pendingAutomationUi.computeIfAbsent(scope, ignored -> new HashSet<>()).add(id);
-            if (automationUiRefreshScheduled) return;
+        }
+        schedulePendingAutomationUiRefresh();
+    }
+
+    private boolean automaticSurfaceRefreshSuppressed() {
+        return initialIntegrationStartupInProgress || credentialRefreshScheduled
+                || automaticLifecycleQuiet
+                || StartupWorkCoordinator.shouldDeferAutomaticStickyRestart(this);
+    }
+
+    private void schedulePendingIntegrationReconfigure() {
+        if (!integrationReconfigurePending || automaticSurfaceRefreshSuppressed()
+                || destroyed) return;
+        integrationReconfigurePending = false;
+        mainHandler.postDelayed(() -> {
+            if (!destroyed) applyPreferences(true);
+        }, INITIAL_INTEGRATION_STAGE_MS);
+    }
+
+    private void schedulePendingAutomationUiRefresh() {
+        synchronized (automationUiLock) {
+            if (pendingAutomationUi.isEmpty() || automationUiRefreshScheduled
+                    || automaticSurfaceRefreshSuppressed()) return;
             automationUiRefreshScheduled = true;
         }
         // One rendered frame per connector burst instead of rebuilding the row once per entity.
@@ -5058,6 +5360,11 @@ public class WidgetService extends Service {
     public void onDestroy() {
         destroyed = true;
         instance = null;
+        if (!runtimeInitialized) {
+            stopForeground(true);
+            super.onDestroy();
+            return;
+        }
         integrationStartupScheduled = false;
         try {
             Choreographer.getInstance().removeFrameCallback(integrationStartupFrame);

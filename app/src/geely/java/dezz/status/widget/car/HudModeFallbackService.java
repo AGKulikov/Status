@@ -23,6 +23,7 @@ import com.ecarx.xui.adaptapi.ECarXCarProxy;
 import java.util.Locale;
 
 import dezz.status.widget.HudPanelSettingsActivity;
+import dezz.status.widget.StartupWorkCoordinator;
 import ecarx.car.ECarXCar;
 import ecarx.car.hardware.ECarXCarPropertyValue;
 import ecarx.car.hardware.annotation.ApiResult;
@@ -181,12 +182,19 @@ public final class HudModeFallbackService extends Service
         super.onCreate();
         createChannel();
         startForeground(NOTIFICATION_ID, notification("Резервный режим запускается…"));
-        thread = new HandlerThread("stock-hud-mode-fallback");
-        thread.start();
-        worker = new Handler(thread.getLooper());
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent == null
+                && StartupWorkCoordinator.shouldDeferAutomaticStickyRestart(this)) {
+            // This optional fallback owns a second ECARX proxy. Its lifecycle receiver already
+            // holds the persisted opt-in and schedules one +32 s restore, so a sticky resurrection
+            // must stay lightweight and must not race SystemServer or the primary car owner.
+            stopForeground(true);
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
+        ensureWorker();
         String action = intent == null ? ACTION_START : intent.getAction();
         String reason = intent == null ? "sticky-restart"
                 : intent.getStringExtra(EXTRA_REASON);
@@ -212,6 +220,14 @@ public final class HudModeFallbackService extends Service
                     true, CONNECT_SETTLE_MS);
         });
         return START_STICKY;
+    }
+
+    private void ensureWorker() {
+        if (worker != null || destroyed) return;
+        HandlerThread created = new HandlerThread("stock-hud-mode-fallback");
+        created.start();
+        thread = created;
+        worker = new Handler(created.getLooper());
     }
 
     @Nullable @Override public IBinder onBind(Intent intent) {

@@ -471,6 +471,8 @@ public final class IphoneAncsTransport {
     private BluetoothDevice incomingClientCandidate;
     /** Exact raw B2 callback facade whose PAIR was accepted for this one F04 epoch. */
     private volatile BluetoothDevice incomingPairAcceptedFacade;
+    /** Stable server-link record; Android 9 may wrap the same link in a new device per ATT call. */
+    private GattServerPeer incomingPairAcceptedServerPeer;
     private volatile long incomingPairAcceptedSessionGeneration;
     private volatile long incomingPairAcceptedSecurityEpoch;
     private volatile long incomingPairAcceptedPublicationToken;
@@ -2684,19 +2686,26 @@ public final class IphoneAncsTransport {
         }
         boolean firstPairProof = !managedIncomingMode;
         if (managedIncomingMode && isSelectedBondedIncomingDevice(device)) {
-            GattServerPeer exactPairPeer = findExactCurrentServerPeer(device);
-            if (exactPairPeer == null || !exactPairPeer.connected) {
-                return null;
+            GattServerPeer currentPeer = findCurrentServerPeer(device);
+            boolean sameAcceptedLink = currentPeer != null
+                    && currentPeer == incomingPairAcceptedServerPeer
+                    && incomingPairAcceptedFacade != null
+                    && currentPeer.device == incomingPairAcceptedFacade
+                    && incomingPairAcceptedSessionGeneration == sessionGeneration
+                    && incomingPairAcceptedSecurityEpoch == incomingSecurityEpoch
+                    && incomingPairAcceptedPublicationToken == publicationToken;
+            if (sameAcceptedLink) {
+                firstPairProof = false;
+            } else {
+                GattServerPeer exactPairPeer = findExactCurrentServerPeer(device);
+                if (exactPairPeer == null || !exactPairPeer.connected) return null;
+                firstPairProof = true;
+                incomingPairAcceptedFacade = device;
+                incomingPairAcceptedServerPeer = exactPairPeer;
+                incomingPairAcceptedSessionGeneration = sessionGeneration;
+                incomingPairAcceptedSecurityEpoch = incomingSecurityEpoch;
+                incomingPairAcceptedPublicationToken = publicationToken;
             }
-            firstPairProof = incomingPairAcceptedFacade == null
-                    || incomingPairAcceptedSessionGeneration != sessionGeneration
-                    || incomingPairAcceptedSecurityEpoch != incomingSecurityEpoch
-                    || incomingPairAcceptedPublicationToken != publicationToken
-                    || incomingPairAcceptedFacade != device;
-            incomingPairAcceptedFacade = device;
-            incomingPairAcceptedSessionGeneration = sessionGeneration;
-            incomingPairAcceptedSecurityEpoch = incomingSecurityEpoch;
-            incomingPairAcceptedPublicationToken = publicationToken;
             if (firstPairProof) incomingClientAttachAttempt = 0;
         }
         return Boolean.valueOf(firstPairProof);
@@ -2705,16 +2714,22 @@ public final class IphoneAncsTransport {
     /** UI, logging, bonding and candidate adoption happen only after PAIR ATT success is sent. */
     private void finishPairCommand(BluetoothDevice device, long publicationToken,
                                    boolean firstPairProof) {
-        if (managedIncomingMode && isSelectedBondedIncomingDevice(device)) {
-            adoptIncomingClientCandidate(device, "PAIR on exact incoming link; candidate only");
+        BluetoothDevice transcriptFacade = managedIncomingMode
+                ? incomingPairAcceptedFacade : device;
+        if (managedIncomingMode && transcriptFacade != null
+                && isSelectedBondedIncomingDevice(transcriptFacade)) {
+            adoptIncomingClientCandidate(transcriptFacade,
+                    "PAIR on stable incoming link record; candidate only");
         }
         state("VERIFIED PEER · CURRENT LINK CHALLENGE");
         log((firstPairProof ? "PAIR принят" : "Duplicate PAIR принят idempotently")
-                + ". VERIFIED PEER: " + safeName(device)
-                + " " + safeAddress(device)
-                + " objectId=" + System.identityHashCode(device)
-                + " type=" + typeLabel(safeType(device))
-                + " bond=" + bondLabel(safeBondState(device)));
+                + ". VERIFIED PEER: " + safeName(transcriptFacade)
+                + " " + safeAddress(transcriptFacade)
+                + " objectId=" + System.identityHashCode(transcriptFacade)
+                + " callbackObjectId=" + System.identityHashCode(device)
+                + " serverPeerId=" + System.identityHashCode(incomingPairAcceptedServerPeer)
+                + " type=" + typeLabel(safeType(transcriptFacade))
+                + " bond=" + bondLabel(safeBondState(transcriptFacade)));
         if (safeBondState(device) == BluetoothDevice.BOND_BONDED) {
             log("PAIR: общий Classic/LE peer уже BOND_BONDED; первая B3 READ запросит "
                     + "security именно текущего LE link. clientIf attempts=0 до "
@@ -3596,6 +3611,7 @@ public final class IphoneAncsTransport {
         clearIncomingReadyAttachLatch();
         incomingFirstAttachIssuedForCurrentTuple = false;
         incomingPairAcceptedFacade = null;
+        incomingPairAcceptedServerPeer = null;
         incomingPairAcceptedSessionGeneration = 0L;
         incomingPairAcceptedSecurityEpoch = 0L;
         incomingPairAcceptedPublicationToken = 0L;
@@ -3670,14 +3686,26 @@ public final class IphoneAncsTransport {
     private boolean hasCurrentIncomingPairProof(@Nullable BluetoothDevice callbackDevice,
                                                 long publicationToken) {
         BluetoothDevice rawFacade = incomingPairAcceptedFacade;
+        GattServerPeer acceptedPeer = incomingPairAcceptedServerPeer;
+        GattServerPeer callbackPeer = callbackDevice == null
+                ? null : findCurrentServerPeer(callbackDevice);
         return rawFacade != null
                 && callbackDevice != null
-                && rawFacade == callbackDevice
-                && incomingPairAcceptedSessionGeneration == sessionGeneration
-                && incomingPairAcceptedSecurityEpoch == incomingSecurityEpoch
-                && incomingPairAcceptedPublicationToken == publicationToken
-                && isCurrentDiagnosticServicePublicationToken(publicationToken)
-                && findExactCurrentServerPeer(rawFacade) != null;
+                && AncsRecoveryPolicy.acceptsInboundAttTranscriptCallback(
+                managedIncomingMode,
+                isSelectedBondedIncomingDevice(callbackDevice),
+                acceptedPeer != null,
+                callbackPeer == acceptedPeer,
+                acceptedPeer != null
+                        && acceptedPeer.device == rawFacade
+                        && findExactCurrentServerPeer(rawFacade) == acceptedPeer,
+                sessionGeneration,
+                incomingPairAcceptedSessionGeneration,
+                incomingSecurityEpoch,
+                incomingPairAcceptedSecurityEpoch,
+                publicationToken,
+                incomingPairAcceptedPublicationToken,
+                isCurrentDiagnosticServicePublicationToken(publicationToken));
     }
 
     private boolean canStartIncomingClientAttach(@Nullable BluetoothDevice rawFacade,
@@ -3979,6 +4007,9 @@ public final class IphoneAncsTransport {
             AncsRecoveryPolicy.PairFacadeBindDecision facadeDecision =
                     !managedIncomingMode && findCurrentServerPeer(device) != null
                     ? AncsRecoveryPolicy.PairFacadeBindDecision.ALREADY_CURRENT
+                    : managedIncomingMode
+                    && hasCurrentIncomingPairProof(device, publicationToken)
+                    ? AncsRecoveryPolicy.PairFacadeBindDecision.ALREADY_CURRENT
                     : bindExactPairRequestFacadeIfSafe(device, publicationToken);
             if (facadeDecision
                     != AncsRecoveryPolicy.PairFacadeBindDecision.ALREADY_CURRENT
@@ -4275,6 +4306,7 @@ public final class IphoneAncsTransport {
      * code 12 before this callback and the application can never break that stale-key loop.
      */
     private boolean issueCurrentLinkSecurityChallenge(BluetoothDevice device) {
+        GattServerPeer acceptedPeer = incomingPairAcceptedServerPeer;
         synchronized (gattServerPeers) {
             for (GattServerPeer peer : gattServerPeers.values()) {
                 if (peer.sessionGeneration != sessionGeneration
@@ -4282,7 +4314,9 @@ public final class IphoneAncsTransport {
                         || (!peer.connected && !peer.roleFacadeHandoff
                         && !peer.roleFacadeHandoffPending)) continue;
                 if (managedIncomingMode) {
-                    if (device != incomingPairAcceptedFacade || peer.device != device) continue;
+                    if (acceptedPeer == null || peer != acceptedPeer
+                            || peer.device != incomingPairAcceptedFacade
+                            || !sameDevice(peer.device, device)) continue;
                 } else if (!sameDevice(peer.device, device)) {
                     continue;
                 }
@@ -4298,12 +4332,14 @@ public final class IphoneAncsTransport {
     }
 
     private void resetCurrentLinkSecurityChallenge(BluetoothDevice device) {
+        GattServerPeer acceptedPeer = incomingPairAcceptedServerPeer;
         synchronized (gattServerPeers) {
             for (GattServerPeer peer : gattServerPeers.values()) {
                 if (peer.sessionGeneration == sessionGeneration
                         && peer.securityEpoch == incomingSecurityEpoch
+                        && peer == acceptedPeer
                         && peer.device == incomingPairAcceptedFacade
-                        && peer.device == device) {
+                        && sameDevice(peer.device, device)) {
                     peer.linkSecurityChallengeIssued = false;
                     return;
                 }
@@ -8721,6 +8757,20 @@ public final class IphoneAncsTransport {
                     ? " · системный bond завершён без BOND_BONDED"
                     : ""));
             updateCandidate(device, -127, false, "", "bond event");
+            if (state == BluetoothDevice.BOND_NONE && managedIncomingMode) {
+                GattServerPeer acceptedPeer = incomingPairAcceptedServerPeer;
+                if (acceptedPeer != null
+                        && findCurrentServerPeer(device) == acceptedPeer) {
+                    // The stable server record makes Binder wrapper churn safe, but it must not
+                    // let a transcript survive actual identity loss. A later BOND_BONDED event
+                    // can only save a candidate; it cannot resurrect this PAIR/B3/READY epoch.
+                    beginFreshIncomingSecurityEpoch(device,
+                            "selected incoming peer lost BOND_BONDED identity", true);
+                    bindServerPeerToCurrentSecurityEpoch(device);
+                    log("BOND_NONE invalidated stable PAIR/B3/READY transcript; "
+                            + "fresh PAIR and status-5/encrypted B3 required");
+                }
+            }
             if (state == BluetoothDevice.BOND_BONDING) {
                 leBondAttemptObserved = true;
                 scheduleBondTimeout(device);

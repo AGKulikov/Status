@@ -24,8 +24,6 @@ import android.util.Log;
 
 import dezz.status.widget.climate.ClimatePanelService;
 import dezz.status.widget.climate.ScreenReservationStateStore;
-import dezz.status.widget.driver.DriverPanelService;
-import dezz.status.widget.hud.HudPresentationService;
 import dezz.status.widget.launcher.MediaAutoResumeController;
 
 public class BootReceiver extends BroadcastReceiver {
@@ -41,18 +39,53 @@ public class BootReceiver extends BroadcastReceiver {
                 "BROADCAST_RECEIVED",
                 dezz.status.widget.diagnostics.ActionRecorder.object(
                         "receiver", getClass().getName(), "action", action));
+        if (StartupWorkCoordinator.isPhaseIntent(intent)) {
+            int phase = StartupWorkCoordinator.phase(intent);
+            long generation = StartupWorkCoordinator.generation(intent);
+            if (StartupWorkCoordinator.deferPhaseIfNeeded(context, phase, generation)) return;
+            boolean completed = false;
+            try {
+                if (phase == StartupWorkCoordinator.PHASE_INTEGRATION_HOST) {
+                    StartupWorkCoordinator.openInitializationBarrierForHost(
+                            context, generation);
+                    StatusWidgetApplication.ensureUnlockedRuntimeInitialized(context);
+                    boolean credentialRefresh =
+                            StartupWorkCoordinator.hasCredentialRefreshPending(
+                                    context, generation);
+                    boolean surfaceReconcile =
+                            StartupWorkCoordinator.hasSurfaceReconcilePending(
+                                    context, generation);
+                    completed = restoreStatusWidget(
+                            context, credentialRefresh, surfaceReconcile);
+                    if (completed) {
+                        StartupWorkCoordinator.acknowledgeHostRequests(context, generation,
+                                credentialRefresh, surfaceReconcile);
+                    }
+                } else if (phase == StartupWorkCoordinator.PHASE_CLIMATE) {
+                    completed = restoreClimateSafely(context);
+                } else if (phase == StartupWorkCoordinator.PHASE_MEDIA_PLAN) {
+                    MediaAutoResumeController.scheduleAfterBoot(context);
+                    completed = true;
+                }
+            } catch (RuntimeException failure) {
+                Log.e(TAG, "Startup phase " + phase + " failed", failure);
+            }
+            if (completed) {
+                StartupWorkCoordinator.markPhaseCompleted(context, phase, generation);
+            } else {
+                StartupWorkCoordinator.retryPhase(context, phase, generation, 2_000L);
+            }
+            return;
+        }
         if (WidgetServiceStarter.ACTION_RETRY.equals(action)) {
             WidgetServiceStarter.retryFromAlarm(context,
                     intent.getIntExtra(WidgetServiceStarter.EXTRA_RETRY_ATTEMPT, -1));
             return;
         }
         if (Intent.ACTION_USER_UNLOCKED.equals(action)) {
-            // Keystore-backed MQTT credentials can become readable only after unlock on some
-            // OEM ROMs. This reconfigure is independent from status-window attachment.
-            restoreStatusWidget(context, true);
-            restoreDriverPanelSafely(context);
-            restoreHudSafely(context);
-            restoreClimateSafely(context);
+            // Unlock opens only the Keystore-dependent connector gate. It must not rebuild the
+            // Driver, HUD and Climate windows that the same boot token already restored.
+            StartupWorkCoordinator.scheduleForLifecycle(context, action);
             return;
         }
         if (Intent.ACTION_BOOT_COMPLETED.equals(action)
@@ -62,58 +95,46 @@ public class BootReceiver extends BroadcastReceiver {
             Log.d(TAG, "System lifecycle event, restoring enabled services: "
                     + action);
 
-            // Freeze the pre-shutdown player before freshly started OEM sessions can publish a
-            // temporary PAUSED state. Package replacement must never start music.
+            // LOCKED_BOOT/BOOT/QUICKBOOT often arrive close together on ECARX. Merge them into
+            // one quiet, alarm-backed lane instead of launching four foreground services and
+            // every radio/vendor integration from the receiver's main Looper at once.
             if (!Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
-                MediaAutoResumeController.scheduleAfterBoot(context);
+                MediaAutoResumeController.captureBootHistorySnapshot(context, action);
             }
-            // Restore independently. A transient OEM rejection of the climate foreground service
-            // must never prevent the status row from being started (or vice versa).
-            restoreStatusWidget(context, false);
-            restoreDriverPanelSafely(context);
-            restoreHudSafely(context);
-            restoreClimateSafely(context);
+            if (Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(action)
+                    || Intent.ACTION_BOOT_COMPLETED.equals(action)
+                    || ACTION_QUICKBOOT_POWERON.equals(action)) {
+                WidgetService survivingHost = WidgetService.getInstance();
+                if (survivingHost != null) survivingHost.enterAutomaticLifecycleQuiet();
+            }
+            StartupWorkCoordinator.scheduleForLifecycle(context, action);
         }
     }
 
-    private static void restoreDriverPanelSafely(Context context) {
-        try {
-            Preferences prefs = new Preferences(context);
-            if (prefs.driverPanelEnabled.get()) {
-                Log.i(TAG, "Restoring driver panel before climate reservation");
-                DriverPanelService.apply(context);
-            }
-        } catch (RuntimeException failure) {
-            Log.e(TAG, "Could not restore driver panel", failure);
-        }
-    }
-
-    private static void restoreHudSafely(Context context) {
-        try {
-            Preferences prefs = new Preferences(context);
-            if (prefs.hudPanelEnabled.get() && prefs.hudPanelAutostart.get()) {
-                Log.i(TAG, "Restoring external HUD presentation");
-                HudPresentationService.apply(context);
-            }
-        } catch (RuntimeException failure) {
-            Log.e(TAG, "Could not restore HUD presentation", failure);
-        }
-    }
-
-    private static void restoreStatusWidget(Context context, boolean forceReconfigure) {
+    private static boolean restoreStatusWidget(Context context, boolean forceReconfigure,
+                                               boolean reconcileSurfaces) {
         try {
             WidgetService current = WidgetService.getInstance();
             if (current != null) {
-                if (forceReconfigure) current.applyPreferences();
-                return;
+                if (forceReconfigure) {
+                    current.reconfigureCredentialBackedIntegrationsAfterUnlock();
+                }
+                if (reconcileSurfaces) current.reconcileAutomaticLifecycleSurfaces();
+                current.resumeAutomaticLifecycleIntegrationsAfterQuiet();
+                return true;
             }
+            // A fresh host applies current credentials and reconstructs its automatic surfaces
+            // during its own staged initialization. Its bounded starter retry owns transient FGS
+            // rejection, so these request flags can be acknowledged once the attempt is accepted.
             WidgetServiceStarter.startIfNeededWithRetry(context);
+            return true;
         } catch (RuntimeException failure) {
             Log.e(TAG, "Could not restore status widget", failure);
+            return false;
         }
     }
 
-    private static void restoreClimateSafely(Context context) {
+    private static boolean restoreClimateSafely(Context context) {
         try {
             Preferences prefs = new Preferences(context);
             // The permanent climate panel has its own lifecycle and does not depend on the main
@@ -123,8 +144,10 @@ public class BootReceiver extends BroadcastReceiver {
                 Log.i(TAG, "Restoring permanent climate panel");
                 ClimatePanelService.apply(context);
             }
+            return true;
         } catch (RuntimeException failure) {
             Log.e(TAG, "Could not restore permanent climate panel", failure);
+            return false;
         }
     }
 

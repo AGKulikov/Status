@@ -116,6 +116,17 @@ public final class LauncherGlobalElementProxyView extends View {
         return value != null && value.isShown() && value.getWidth() > 0 && value.getHeight() > 0;
     }
 
+    /** Drops style/gesture ownership when a rebuilt panel reuses the same stable element ID. */
+    public void onSourceRebound() {
+        View current = sourceView();
+        if (styledSource == null || styledSource == current) return;
+        cancelForwardedGesture();
+        restoreOriginalStyles();
+        marqueeStates.clear();
+        lastVisualSignature = Long.MIN_VALUE;
+        invalidate();
+    }
+
     @Override
     protected void onDraw(@NonNull Canvas canvas) {
         View value = sourceView();
@@ -230,8 +241,16 @@ public final class LauncherGlobalElementProxyView extends View {
 
     @Override
     protected void onDetachedFromWindow() {
-        cancelForwardedGesture();
+        dispose();
         super.onDetachedFromWindow();
+    }
+
+    /** Releases every source-side style and gesture owned by this proxy before it is discarded. */
+    public void dispose() {
+        cancelForwardedGesture();
+        restoreOriginalStyles();
+        marqueeStates.clear();
+        lastVisualSignature = Long.MIN_VALUE;
     }
 
     @Override

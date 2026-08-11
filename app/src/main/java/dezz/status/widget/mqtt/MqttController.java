@@ -145,6 +145,12 @@ public final class MqttController implements MqttClient.Listener {
         stopLocked();
     }
 
+    /** Stops only the live transport; this controller remains reusable after the boot quiet lane. */
+    public synchronized void pauseForAutomaticLifecycle() {
+        signature = "";
+        stopLocked();
+    }
+
     public static boolean isConnected() { return lastConnected; }
     public static String connectionDetail() { return lastConnectionDetail; }
 

@@ -39,8 +39,11 @@ public final class LauncherActionsPanelEditorContractTest {
         assertTrue(launcher.contains("requestsAnyHomeEditor(intent)"));
         assertTrue(launcher.contains("activateGlobalElements()"));
         assertTrue(launcher.contains("private void applyRequestedHomeEditor"));
-        assertTrue(launcher.contains("if (!requestsAnyHomeEditor(intent)) return;\n"
-                + "        setEditMode(true);"));
+        assertTrue(launcher.contains("setActionsContentEditMode(true);"));
+        assertTrue(launcher.contains("setMediaContentEditMode(true);"));
+        assertTrue(launcher.contains("setNavigationContentEditMode(true);"));
+        assertTrue(launcher.contains("editorOwnsPanel ? 1f : 0f"));
+        assertTrue(launcher.contains("setContentTouchBlocked(!editorOwnsPanel)"));
         assertTrue(launcher.contains("actionsGridConfigStore.save(actionsGridConfig)"));
         assertTrue(launcher.contains("preferences.launcherActionsVisible.get()"));
     }

@@ -6,6 +6,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
 import android.hardware.display.DisplayManager;
@@ -25,6 +26,7 @@ import androidx.core.content.ContextCompat;
 import dezz.status.widget.HudPanelSettingsActivity;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.R;
+import dezz.status.widget.StartupWorkCoordinator;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
 
@@ -39,6 +41,8 @@ public final class HudPresentationService extends Service
             "ru.natro.statuswidget.internal.STOP_HUD_PANEL";
     public static final String ACTION_DATA_CHANGED =
             "ru.natro.statuswidget.internal.HUD_DATA_CHANGED";
+    public static final String ACTION_LIFECYCLE_RECONCILE =
+            "ru.natro.statuswidget.internal.HUD_LIFECYCLE_RECONCILE";
     private static final String EXTRA_CONFIG_JSON =
             "ru.natro.statuswidget.internal.HUD_CONFIG_JSON";
 
@@ -48,6 +52,8 @@ public final class HudPresentationService extends Service
     /** Stay well below Android's process-wide Binder transaction limit. */
     private static final int MAX_COMMAND_CONFIG_CHARS = 240_000;
     private static final long SYSTEM_SURFACE_RETRY_MS = 60_000L;
+    private static final long ISOLATED_STICKY_SETTLE_MS = 2_000L;
+    private static final long PROCESS_CREATED_ELAPSED = SystemClock.elapsedRealtime();
     @Nullable private static volatile HudPresentationService instance;
     @NonNull private static volatile String runtimeDetail = "HUD не запущен";
 
@@ -61,6 +67,7 @@ public final class HudPresentationService extends Service
     private HudPresentation presentation;
     private HudSystemSurfaceWindow systemSurfaceWindow;
     private long systemSurfaceRetryAfter;
+    private boolean runtimeInitialized;
     @Nullable private String shownUniqueId;
     @Nullable private Boolean requestedStockHudCarHidden;
 
@@ -104,6 +111,40 @@ public final class HudPresentationService extends Service
         }
     }
 
+    /** Rebuilds only HUD surfaces after QuickBoot; a cold service start already builds them. */
+    public static void reconcileAutomaticLifecycle(@NonNull Context context) {
+        Context app = applicationContext(context);
+        Preferences prefs = new Preferences(app);
+        if (!prefs.hudPanelEnabled.get() || !prefs.hudPanelAutostart.get()) return;
+        if (isRunning(app)) {
+            sendCommand(app, ACTION_LIFECYCLE_RECONCILE, null);
+        } else {
+            apply(app);
+        }
+    }
+
+    public static boolean isRunning() {
+        return instance != null;
+    }
+
+    /** Cross-process liveness check used by the main status process without cold-starting HUD. */
+    public static boolean isRunning(@NonNull Context context) {
+        if (instance != null) return true;
+        ActivityManager manager = context.getSystemService(ActivityManager.class);
+        if (manager == null) return false;
+        try {
+            for (ActivityManager.RunningServiceInfo info
+                    : manager.getRunningServices(Integer.MAX_VALUE)) {
+                if (info.service != null
+                        && HudPresentationService.class.getName().equals(
+                        info.service.getClassName())) return true;
+            }
+        } catch (RuntimeException failure) {
+            Log.w(TAG, "Could not query HUD process liveness", failure);
+        }
+        return false;
+    }
+
     @NonNull public static String runtimeDetail() { return runtimeDetail; }
     @NonNull public static String runtimeDetail(@NonNull Context context) {
         return instance != null ? runtimeDetail : HudRuntimeStatusStore.read(context);
@@ -126,11 +167,16 @@ public final class HudPresentationService extends Service
     public void onCreate() {
         super.onCreate();
         instance = this;
+        createNotificationChannel();
+        startForeground(NOTIFICATION_ID, notification("Подключение к HUD…"));
+    }
+
+    private void initializeRuntime() {
+        if (runtimeInitialized) return;
+        runtimeInitialized = true;
         preferences = new Preferences(this);
         store = new HudPanelStore(preferences);
         config = store.load();
-        createNotificationChannel();
-        startForeground(NOTIFICATION_ID, notification("Подключение к HUD…"));
         displayManager = getSystemService(DisplayManager.class);
         if (displayManager != null) {
             try { displayManager.registerDisplayListener(this, main); }
@@ -160,8 +206,39 @@ public final class HudPresentationService extends Service
             stopSelf();
             return START_NOT_STICKY;
         }
+        if (intent == null
+                && StartupWorkCoordinator.shouldDeferAutomaticStickyRestart(this)) {
+            stopForeground(true);
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
+        if (intent == null) {
+            long localSettle = ISOLATED_STICKY_SETTLE_MS
+                    - (SystemClock.elapsedRealtime() - PROCESS_CREATED_ELAPSED);
+            if (localSettle > 0L) {
+                main.postDelayed(() -> {
+                    if (instance != this) return;
+                    if (StartupWorkCoordinator.shouldDeferAutomaticStickyRestart(this)) {
+                        stopForeground(true);
+                        stopSelf(startId);
+                        return;
+                    }
+                    initializeRuntime();
+                    reloadAndReconcile(true);
+                }, localSettle);
+                return START_STICKY;
+            }
+        }
+        initializeRuntime();
         boolean commandHasConfig = applyCommandConfig(intent);
-        if (ACTION_DATA_CHANGED.equals(action)) {
+        if (ACTION_LIFECYCLE_RECONCILE.equals(action)) {
+            // WindowManager/SurfaceFlinger can recreate their state while the :hud process and
+            // Java references survive QuickBoot. Drop only visual owners and reselect the exact
+            // display; data/connectors remain alive.
+            dismissPresentation("automatic lifecycle reconcile");
+            systemSurfaceRetryAfter = 0L;
+            reloadAndReconcile(true);
+        } else if (ACTION_DATA_CHANGED.equals(action)) {
             if (data != null) data.refreshCrossProcessState();
             invalidateHudSurfaces();
         } else {

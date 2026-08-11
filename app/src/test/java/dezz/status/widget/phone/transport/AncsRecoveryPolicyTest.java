@@ -209,6 +209,50 @@ public final class AncsRecoveryPolicyTest {
         assertTrue(AncsRecoveryPolicy.allowsB3WriteProof(false));
     }
 
+    @Test public void inboundAttWrapperMayChangeOnlyWithinOneStablePairTranscript() {
+        assertTrue(AncsRecoveryPolicy.acceptsInboundAttTranscriptCallback(
+                true, true, true, true, true,
+                7L, 7L, 3L, 3L, 1209L, 1209L, true));
+
+        // A later Binder wrapper is safe only because it maps to the same stable server record.
+        assertFalse(AncsRecoveryPolicy.acceptsInboundAttTranscriptCallback(
+                true, true, true, false, true,
+                7L, 7L, 3L, 3L, 1209L, 1209L, true));
+        assertFalse(AncsRecoveryPolicy.acceptsInboundAttTranscriptCallback(
+                true, false, true, true, true,
+                7L, 7L, 3L, 3L, 1209L, 1209L, true));
+        assertFalse(AncsRecoveryPolicy.acceptsInboundAttTranscriptCallback(
+                true, true, true, true, true,
+                7L, 7L, 4L, 3L, 1209L, 1209L, true));
+        assertFalse(AncsRecoveryPolicy.acceptsInboundAttTranscriptCallback(
+                true, true, true, true, true,
+                7L, 7L, 3L, 3L, 1210L, 1209L, true));
+        assertFalse(AncsRecoveryPolicy.acceptsInboundAttTranscriptCallback(
+                true, true, true, true, false,
+                7L, 7L, 3L, 3L, 1209L, 1209L, true));
+        assertFalse(AncsRecoveryPolicy.acceptsInboundAttTranscriptCallback(
+                false, true, true, true, true,
+                7L, 7L, 3L, 3L, 1209L, 1209L, true));
+        assertFalse(AncsRecoveryPolicy.acceptsInboundAttTranscriptCallback(
+                true, true, false, true, true,
+                7L, 7L, 3L, 3L, 1209L, 1209L, true));
+        assertFalse(AncsRecoveryPolicy.acceptsInboundAttTranscriptCallback(
+                true, true, true, true, true,
+                0L, 0L, 3L, 3L, 1209L, 1209L, true));
+        assertFalse(AncsRecoveryPolicy.acceptsInboundAttTranscriptCallback(
+                true, true, true, true, true,
+                7L, 6L, 3L, 3L, 1209L, 1209L, true));
+        assertFalse(AncsRecoveryPolicy.acceptsInboundAttTranscriptCallback(
+                true, true, true, true, true,
+                7L, 7L, 0L, 0L, 1209L, 1209L, true));
+        assertFalse(AncsRecoveryPolicy.acceptsInboundAttTranscriptCallback(
+                true, true, true, true, true,
+                7L, 7L, 3L, 3L, 0L, 0L, true));
+        assertFalse(AncsRecoveryPolicy.acceptsInboundAttTranscriptCallback(
+                true, true, true, true, true,
+                7L, 7L, 3L, 3L, 1209L, 1209L, false));
+    }
+
     @Test public void trace2342CannotAllocateClientIfBeforePairB3AndReady() {
         long session = 7L;
         long epoch = 3L;
@@ -282,6 +326,12 @@ public final class AncsRecoveryPolicyTest {
         assertFalse(AncsRecoveryPolicy.acceptsReverseClientCallback(
                 true, true, 7L, 7L, 3L, 3L,
                 1207L, 1207L, true, true, true, false));
+        assertFalse(AncsRecoveryPolicy.acceptsReverseClientCallback(
+                true, true, 7L, 7L, 3L, 3L,
+                1207L, 1207L, true, false, true, true));
+        assertFalse(AncsRecoveryPolicy.acceptsReverseClientCallback(
+                true, true, 7L, 7L, 3L, 3L,
+                1207L, 1207L, true, true, false, true));
     }
 
     @Test public void duplicatePairAndReadyDoNotRefillAttemptsOrArmAnotherImmediateAttach() {

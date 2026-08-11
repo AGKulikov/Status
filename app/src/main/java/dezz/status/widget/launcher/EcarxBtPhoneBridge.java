@@ -47,7 +47,7 @@ public final class EcarxBtPhoneBridge {
         if (isSelectedHome(app)) assertFloatingUiWithRetries(app);
     }
 
-    static boolean isSelectedHome(@NonNull Context context) {
+    public static boolean isSelectedHome(@NonNull Context context) {
         try {
             ResolveInfo resolved = context.getPackageManager().resolveActivity(
                     new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),

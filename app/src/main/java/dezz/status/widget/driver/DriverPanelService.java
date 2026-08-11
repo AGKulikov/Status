@@ -24,6 +24,7 @@ import androidx.core.content.ContextCompat;
 import dezz.status.widget.DriverPanelSettingsActivity;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.R;
+import dezz.status.widget.StartupWorkCoordinator;
 import dezz.status.widget.climate.StockHvacPopupClient;
 
 /** Foreground owner of the driver rail so it survives app switches and process pressure. */
@@ -52,6 +53,7 @@ public final class DriverPanelService extends Service {
 
     @Nullable private DriverPanelOverlayController controller;
     @Nullable private Preferences preferences;
+    private boolean runtimeInitialized;
 
     public static void apply(@NonNull Context context) {
         start(context, ACTION_APPLY);
@@ -87,6 +89,10 @@ public final class DriverPanelService extends Service {
 
     public static void onNavigationBarStatus(@NonNull Context context, boolean hidden) {
         navigationHidden = hidden;
+        if (StartupWorkCoordinator.shouldDeferAutomaticStickyRestart(context)) {
+            StartupWorkCoordinator.ensureIntegrationHostScheduled(context);
+            return;
+        }
         DriverPanelService current = instance;
         if (current != null && current.controller != null) {
             boolean refreshed = current.controller.setNavigationHidden(hidden);
@@ -114,6 +120,11 @@ public final class DriverPanelService extends Service {
         instance = this;
         createNotificationChannel();
         startForeground(NOTIFICATION_ID, createNotification());
+    }
+
+    private void initializeRuntime() {
+        if (runtimeInitialized) return;
+        runtimeInitialized = true;
         preferences = new Preferences(this);
         controller = new DriverPanelOverlayController(this, preferences, (status, detail) -> {
             runtimeStatus = status;
@@ -128,6 +139,17 @@ public final class DriverPanelService extends Service {
         String action = intent == null ? ACTION_APPLY : intent.getAction();
         dezz.status.widget.diagnostics.ActionRecorder.recordServiceIntent(
                 getClass().getName(), action, startId);
+        if (ACTION_STOP.equals(action)) {
+            stopSelfSafely();
+            return START_NOT_STICKY;
+        }
+        if (intent == null
+                && StartupWorkCoordinator.shouldDeferAutomaticStickyRestart(this)) {
+            StartupWorkCoordinator.ensureIntegrationHostScheduled(this);
+            stopSelfSafely();
+            return START_NOT_STICKY;
+        }
+        initializeRuntime();
         if (ACTION_STOCK_CLIMATE.equals(action)) {
             triggerStockClimate(this);
             if (preferences != null && preferences.driverPanelEnabled.get()) {
@@ -136,8 +158,7 @@ public final class DriverPanelService extends Service {
             stopSelfSafely();
             return START_NOT_STICKY;
         }
-        if (ACTION_STOP.equals(action)
-                || preferences == null
+        if (preferences == null
                 || !preferences.driverPanelEnabled.get()) {
             runtimeStatus = "stopped";
             runtimeDetail = "Панель водителя выключена";

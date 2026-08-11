@@ -19,9 +19,12 @@ package dezz.status.widget;
 
 import android.app.Activity;
 import android.app.Application;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -48,15 +51,46 @@ public class StatusWidgetApplication extends Application {
     public static final String CRASH_FILE = "last_crash.txt";
     /** A HUD renderer failure is diagnostic only and must not masquerade as a main-process crash. */
     public static final String HUD_CRASH_FILE = "last_hud_crash.txt";
+    private boolean hudProcess;
+    private boolean unlockedRuntimeInitialized;
 
     @Override
     public void onCreate() {
         super.onCreate();
-        boolean hudProcess = AppProcessPolicy.isHudProcess();
+        hudProcess = AppProcessPolicy.isHudProcess();
+        // LOCKED_BOOT exists only to record the quiet boundary. Avoid preference migrations,
+        // recorder recovery, privileged shell discovery and vendor status-bar calls while OEM
+        // packages are still starting; BOOT/USER_UNLOCKED completes this idempotently.
+        DiagnosticJournal.initialize(this, false);
+        installCrashHandler(hudProcess);
+        // The main process is the sole coordinator writer. MODE_MULTI_PROCESS is read-through
+        // compatibility for :hud, not a transactional cross-process state machine.
+        if (!hudProcess) StartupWorkCoordinator.primeEarlyBootQuiet(this);
+        if (!StartupWorkCoordinator.isUserUnlocked(this)) return;
+        long initializationDelay = StartupWorkCoordinator.startupInitializationDelayMillis(this);
+        if (hudProcess) {
+            // :hud is a read-only coordinator participant. A local settle prevents Preferences,
+            // display and vendor setup from racing a high-uptime QuickBoot before the main-process
+            // lifecycle broadcast establishes its shared generation.
+            initializationDelay = Math.max(initializationDelay,
+                    StartupLoadPolicy.MAIN_PROCESS_SETTLE_MS);
+        }
+        if (initializationDelay > 0L) {
+            new Handler(Looper.getMainLooper()).postDelayed(
+                    this::ensureUnlockedRuntimeInitialized, initializationDelay + 50L);
+            return;
+        }
+        ensureUnlockedRuntimeInitialized();
+    }
+
+    public synchronized void ensureUnlockedRuntimeInitialized() {
+        if (unlockedRuntimeInitialized || !StartupWorkCoordinator.isUserUnlocked(this)
+                || StartupWorkCoordinator.remainingQuietMillis(this) > 0L
+                || StartupWorkCoordinator.isStartupInitializationBlocked(this)) return;
+        unlockedRuntimeInitialized = true;
         Preferences preferences = new Preferences(this);
         DiagnosticJournal.initialize(this,
                 !hudProcess && preferences.debugModeEnabled.get());
-        installCrashHandler(hudProcess);
         if (hudProcess) {
             // HUD owns ImageReader, SurfaceFlinger and external-display callbacks in a dedicated
             // process. Do not duplicate the status-row bootstrap, recorder overlay or lifecycle
@@ -72,6 +106,13 @@ public class StatusWidgetApplication extends Application {
             ActionRecorderOverlayService.show(this);
         }
         EcarxSystemStatusBarPolicy.applyStored(this);
+    }
+
+    public static void ensureUnlockedRuntimeInitialized(@NonNull Context context) {
+        Context app = context.getApplicationContext();
+        if (app instanceof StatusWidgetApplication) {
+            ((StatusWidgetApplication) app).ensureUnlockedRuntimeInitialized();
+        }
     }
 
     private void installCrashHandler(boolean hudProcess) {
