@@ -31,7 +31,8 @@ public final class SettingsHubRuntimeContractTest {
                 + "            android:exported=\"false\""));
         assertTrue(hub.contains("AppRuntimeBootstrap.run(this, preferences)"));
         assertTrue(main.contains("AppRuntimeBootstrap.run(this, prefs)"));
-        assertTrue(bootstrap.contains("startForegroundService("));
+        assertTrue(bootstrap.contains("WidgetServiceStarter.startIfNeeded(appContext)"));
+        assertTrue(bootstrap.contains("automaticReconcileDelayMillis"));
         assertTrue(bootstrap.contains("ClimatePanelService.apply("));
         assertTrue(bootstrap.contains("maybeShowCrashReport(activity)"));
         assertTrue(bootstrap.contains("tryAutoGrant(activity.getApplicationContext()"));

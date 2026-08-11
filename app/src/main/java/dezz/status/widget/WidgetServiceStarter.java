@@ -27,7 +27,12 @@ public final class WidgetServiceStarter {
      * USER_UNLOCKED or the next HOME start will retry safely.
      */
     public static boolean startIfNeeded(@NonNull Context context) {
-        return attemptStart(applicationContext(context), -1);
+        return attemptStart(applicationContext(context), -1, false);
+    }
+
+    /** Automatic HOME/boot entry respects HUD autostart instead of waking a manual-only HUD. */
+    public static boolean startIfNeededAutomatically(@NonNull Context context) {
+        return attemptStart(applicationContext(context), -1, true);
     }
 
     /**
@@ -38,7 +43,7 @@ public final class WidgetServiceStarter {
     public static boolean startIfNeededWithRetry(@NonNull Context context) {
         Context app = applicationContext(context);
         cancelPendingRetry(app);
-        return attemptStart(app, 0);
+        return attemptStart(app, 0, true);
     }
 
     static boolean retryFromAlarm(@NonNull Context context, int retryAttempt) {
@@ -48,22 +53,47 @@ public final class WidgetServiceStarter {
             cancelPendingRetry(app);
             return false;
         }
-        return attemptStart(app, retryAttempt);
+        return attemptStart(app, retryAttempt, true);
     }
 
-    private static boolean attemptStart(@NonNull Context app, int retryAttempt) {
+    private static boolean attemptStart(@NonNull Context app, int retryAttempt,
+                                        boolean automaticLifecycle) {
         try {
             if (WidgetService.isRunning()) {
                 cancelPendingRetry(app);
                 return true;
             }
+            // HOME, Settings and the isolated HUD process can all race the boot receiver. Before
+            // parsing Preferences or constructing the foreground-service graph, honor the one
+            // device-protected quiet boundary and coalesce every caller onto the same alarm.
+            if (StartupWorkCoordinator.remainingQuietMillis(app) > 0L
+                    || StartupWorkCoordinator.isStartupInitializationBlocked(app)) {
+                if (!AppProcessPolicy.isHudProcess()) {
+                    StartupWorkCoordinator.ensureIntegrationHostScheduled(app);
+                }
+                Log.i(TAG, "Integration host deferred until the boot quiet window closes");
+                return false;
+            }
+            if (!StartupWorkCoordinator.isUserUnlocked(app)) {
+                if (!AppProcessPolicy.isHudProcess()) {
+                    StartupWorkCoordinator.ensureIntegrationHostScheduled(app);
+                }
+                Log.i(TAG, "Integration host deferred until USER_UNLOCKED");
+                return false;
+            }
             Preferences preferences = new Preferences(app);
-            if (!requiresIntegrationHost(preferences)) {
+            boolean integrationHostRequired = automaticLifecycle
+                    ? requiresAutomaticIntegrationHost(preferences)
+                    : requiresIntegrationHost(preferences);
+            boolean headlessHostRequired = automaticLifecycle
+                    ? requiresAutomaticHeadlessHost(preferences)
+                    : requiresHeadlessHost(preferences);
+            if (!integrationHostRequired) {
                 cancelPendingRetry(app);
                 return false;
             }
             if (!Permissions.allPermissionsGranted(app)
-                    && !requiresHeadlessHost(preferences)) {
+                    && !headlessHostRequired) {
                 Log.w(TAG, "Status overlay remains enabled; waiting for permissions/unlock");
                 cancelPendingRetry(app);
                 return false;
@@ -99,6 +129,48 @@ public final class WidgetServiceStarter {
                 preferences.mqttEnabled.get(),
                 preferences.sprutEnabled.get(),
                 preferences.haApiEnabled.get());
+    }
+
+    static boolean requiresAutomaticIntegrationHost(@NonNull Preferences preferences) {
+        return requiresAutomaticIntegrationHost(
+                preferences.widgetEnabled.get(),
+                preferences.driverPanelEnabled.get(),
+                preferences.hudPanelEnabled.get(),
+                preferences.hudPanelAutostart.get(),
+                preferences.phoneConnectorEnabled.get(),
+                preferences.mqttEnabled.get(),
+                preferences.sprutEnabled.get(),
+                preferences.haApiEnabled.get());
+    }
+
+    static boolean requiresAutomaticHeadlessHost(@NonNull Preferences preferences) {
+        return requiresAutomaticHeadlessHost(
+                preferences.driverPanelEnabled.get(),
+                preferences.hudPanelEnabled.get(),
+                preferences.hudPanelAutostart.get(),
+                preferences.phoneConnectorEnabled.get(),
+                preferences.mqttEnabled.get(),
+                preferences.sprutEnabled.get(),
+                preferences.haApiEnabled.get());
+    }
+
+    static boolean requiresAutomaticIntegrationHost(
+            boolean widgetEnabled, boolean driverPanelEnabled,
+            boolean hudPanelEnabled, boolean hudPanelAutostart,
+            boolean phoneConnectorEnabled, boolean mqttEnabled,
+            boolean sprutEnabled, boolean haApiEnabled) {
+        return widgetEnabled || requiresAutomaticHeadlessHost(
+                driverPanelEnabled, hudPanelEnabled, hudPanelAutostart,
+                phoneConnectorEnabled, mqttEnabled, sprutEnabled, haApiEnabled);
+    }
+
+    static boolean requiresAutomaticHeadlessHost(
+            boolean driverPanelEnabled, boolean hudPanelEnabled,
+            boolean hudPanelAutostart, boolean phoneConnectorEnabled,
+            boolean mqttEnabled, boolean sprutEnabled, boolean haApiEnabled) {
+        return requiresHeadlessHost(driverPanelEnabled,
+                hudPanelEnabled && hudPanelAutostart, phoneConnectorEnabled,
+                mqttEnabled, sprutEnabled, haApiEnabled);
     }
 
     static boolean requiresIntegrationHost(boolean widgetEnabled,

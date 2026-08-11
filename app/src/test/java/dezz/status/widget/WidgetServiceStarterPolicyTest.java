@@ -53,4 +53,16 @@ public final class WidgetServiceStarterPolicyTest {
         assertFalse(WidgetServiceStarter.requiresIntegrationHost(
                 false, false, false, false, false, false, false));
     }
+
+    @Test
+    public void manualOnlyHudDoesNotWakeTheAutomaticBootHost() {
+        assertFalse(WidgetServiceStarter.requiresAutomaticHeadlessHost(
+                false, true, false, false, false, false, false));
+        assertFalse(WidgetServiceStarter.requiresAutomaticIntegrationHost(
+                false, false, true, false, false, false, false, false));
+        assertTrue(WidgetServiceStarter.requiresAutomaticIntegrationHost(
+                false, false, true, true, false, false, false, false));
+        // Explicit/manual runtime semantics remain unchanged.
+        assertTrue(WidgetServiceStarter.requiresHeadlessHost(false, true, false));
+    }
 }

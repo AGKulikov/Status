@@ -186,6 +186,14 @@ public final class HaApiController implements HaWebSocketConnector.Listener {
         if (activeInstance == this) activeInstance = null;
     }
 
+    /** Parks sockets/retries without disposing the reusable HTTP/WebSocket executors. */
+    public synchronized void pauseForAutomaticLifecycle() {
+        signature = "";
+        stopTransport();
+        markAllStale();
+        if (activeInstance == this) activeInstance = null;
+    }
+
     @NonNull
     public synchronized CompletableFuture<HaEntityCatalog> refreshCatalog() {
         if (!connector.isOnline()) return failed(new IOException("Home Assistant is not online"));

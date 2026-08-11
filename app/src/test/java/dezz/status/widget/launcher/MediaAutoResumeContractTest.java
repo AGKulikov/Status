@@ -55,6 +55,31 @@ public final class MediaAutoResumeContractTest {
     }
 
     @Test
+    public void lifecycleSnapshotIsFrozenBeforeTheDelayedRelativeMediaLane()
+            throws IOException {
+        String boot = source("dezz/status/widget/BootReceiver.java");
+        String controller = source(
+                "dezz/status/widget/launcher/MediaAutoResumeController.java");
+
+        assertTrue(boot.contains("captureBootHistorySnapshot(context, action)"));
+        assertTrue(boot.contains("StartupWorkCoordinator.PHASE_MEDIA_PLAN"));
+        assertTrue(controller.contains("MediaPlaybackHistoryStore.read(app)"));
+        assertTrue(controller.contains("KEY_CAPTURE_HISTORY_PACKAGE"));
+        assertTrue(controller.contains("KEY_CAPTURE_HISTORY_WAS_PLAYING"));
+        assertTrue(controller.contains("KEY_PLAN_ANCHOR_ELAPSED"));
+        assertTrue(controller.contains("planAnchorElapsed + Math.max"));
+        assertTrue(controller.contains(
+                "targetElapsed - SystemClock.elapsedRealtime()"));
+        assertTrue(controller.contains(
+                "state.getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE) != bootToken"));
+
+        int capture = controller.indexOf("public static long captureBootHistorySnapshot");
+        int delayed = controller.indexOf("public static void scheduleAfterBoot");
+        assertTrue(capture >= 0 && delayed > capture);
+        assertFalse(controller.substring(capture, delayed).contains("new Preferences"));
+    }
+
+    @Test
     public void historyIsCapturedFromEveryMediaIngressWithoutPerSecondWrites()
             throws IOException {
         String history = source(

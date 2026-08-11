@@ -153,8 +153,22 @@ public final class Ha1207PostReadyAttachContractTest {
         String pairCommit = between(transport,
                 "private Boolean commitPairCommand",
                 "private void finishPairCommand");
-        assertTrue(pairCommit.contains("incomingPairAcceptedFacade != device"));
+        assertTrue(pairCommit.contains("currentPeer == incomingPairAcceptedServerPeer"));
+        assertTrue(pairCommit.contains("currentPeer.device == incomingPairAcceptedFacade"));
+        assertTrue(pairCommit.contains(
+                "incomingPairAcceptedSessionGeneration == sessionGeneration"));
+        assertTrue(pairCommit.contains(
+                "incomingPairAcceptedSecurityEpoch == incomingSecurityEpoch"));
+        assertTrue(pairCommit.contains(
+                "incomingPairAcceptedPublicationToken == publicationToken"));
+        assertTrue(pairCommit.contains("incomingPairAcceptedServerPeer = exactPairPeer;"));
         assertTrue(pairCommit.contains("if (firstPairProof) incomingClientAttachAttempt = 0;"));
+
+        String clearPair = between(transport,
+                "private void clearIncomingPairProof",
+                "private void clearIncomingReadyAttachLatch");
+        assertTrue(clearPair.contains("incomingPairAcceptedFacade = null;"));
+        assertTrue(clearPair.contains("incomingPairAcceptedServerPeer = null;"));
 
         String latch = between(transport,
                 "private boolean armIncomingReadyAttachLatch",
@@ -180,13 +194,34 @@ public final class Ha1207PostReadyAttachContractTest {
         assertTrue(pairRollback.contains("cancelClientAttemptCallbacks();"));
     }
 
-    @Test public void rawFacadeAndCallbackLineageAreIdentityStrict() throws Exception {
+    @Test public void inboundAttUsesStablePeerButClientCallbackLineageStaysIdentityStrict()
+            throws Exception {
         String transport = transport();
         String pairProof = between(transport,
                 "private boolean hasCurrentIncomingPairProof",
                 "private boolean canStartIncomingClientAttach");
-        assertTrue(pairProof.contains("rawFacade == callbackDevice"));
-        assertFalse(pairProof.contains("sameDevice(rawFacade, callbackDevice)"));
+        assertTrue(pairProof.contains("acceptsInboundAttTranscriptCallback("));
+        assertTrue(pairProof.contains("callbackPeer == acceptedPeer"));
+        assertTrue(pairProof.contains("isSelectedBondedIncomingDevice(callbackDevice)"));
+        assertTrue(pairProof.contains("acceptedPeer.device == rawFacade"));
+        assertFalse(pairProof.contains("rawFacade == callbackDevice"));
+
+        String challenge = between(transport,
+                "private boolean issueCurrentLinkSecurityChallenge",
+                "private void resetCurrentLinkSecurityChallenge");
+        assertTrue(challenge.contains("peer != acceptedPeer"));
+        assertTrue(challenge.contains("sameDevice(peer.device, device)"));
+        assertFalse(challenge.contains("device == incomingPairAcceptedFacade"));
+
+        String bond = between(transport,
+                "private final BroadcastReceiver bondReceiver",
+                "private static String pairingVariantLabel");
+        assertTrue(bond.contains("state == BluetoothDevice.BOND_NONE && managedIncomingMode"));
+        assertTrue(bond.contains("findCurrentServerPeer(device) == acceptedPeer"));
+        assertTrue(bond.contains("beginFreshIncomingSecurityEpoch(device"));
+        assertTrue(bond.indexOf("beginFreshIncomingSecurityEpoch(device")
+                < bond.indexOf("bindServerPeerToCurrentSecurityEpoch(device)"));
+        assertTrue(bond.contains("fresh PAIR and status-5/encrypted B3 required"));
 
         String binding = between(transport,
                 "private AncsRecoveryPolicy.PairFacadeBindDecision "

@@ -237,6 +237,25 @@ public final class SprutHubController {
         updateState(State.DISABLED, "stopped");
     }
 
+    /** Parks the live RPC session but keeps the scheduler reusable for the post-boot resume. */
+    public void pauseForAutomaticLifecycle() {
+        synchronized (lock) {
+            stopped = true;
+            signature = "";
+            generation++;
+            closeClientLocked();
+            releaseLocks();
+            sessionSynced = false;
+            lastSynced = false;
+            reconnectAttempt = 0;
+            values.markConnectorStale(ConnectorType.SPRUTHUB,
+                    SourceBinding.DEFAULT_CONNECTOR_ID);
+            markBoundStatesStale();
+            if (activeInstance == this) activeInstance = null;
+        }
+        updateState(State.DISABLED, "automatic lifecycle quiet");
+    }
+
     /** Forces a new authoritative accessory snapshot on the current authenticated session. */
     @NonNull
     public CompletableFuture<SprutCatalog> refreshCatalog() {

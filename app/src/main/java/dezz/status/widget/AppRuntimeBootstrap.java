@@ -16,7 +16,6 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -50,7 +49,7 @@ public final class AppRuntimeBootstrap {
     public static void run(@NonNull AppCompatActivity activity,
                            @NonNull Preferences preferences) {
         reconcileServices(activity, preferences);
-
+        if (StartupWorkCoordinator.automaticReconcileDelayMillis(activity) > 0L) return;
         maybeShowCrashReport(activity);
         tryAutoGrant(activity.getApplicationContext(), preferences);
     }
@@ -69,7 +68,22 @@ public final class AppRuntimeBootstrap {
                 WidgetServiceStarter.requiresIntegrationHost(preferences);
         boolean headlessHostRequired =
                 WidgetServiceStarter.requiresHeadlessHost(preferences);
+        boolean bootQuiet = StartupWorkCoordinator.automaticReconcileDelayMillis(appContext)
+                > 0L || StartupWorkCoordinator.isStartupInitializationBlocked(appContext);
         WidgetService runningHost = WidgetService.getInstance();
+        if (bootQuiet) {
+            if (integrationHostRequired) {
+                StartupWorkCoordinator.ensureIntegrationHostScheduled(appContext);
+            }
+            // A Settings/HOME activity can be restored while SystemServer is still starting OEM
+            // packages. Do not let that UI path bypass the boot lane with WindowManager/vendor
+            // work; the coordinator restores Climate after the shared host phase.
+            if (preferences.climatePanelEnabled.get()
+                    || new ScreenReservationStateStore(appContext).hasManagedReservation()) {
+                StartupWorkCoordinator.ensureClimateScheduled(appContext);
+            }
+            return;
+        }
         if (integrationHostRequired) {
             if (runningHost != null) {
                 // In particular, wake live smart-home/scenario state when the driver rail is
@@ -77,12 +91,7 @@ public final class AppRuntimeBootstrap {
                 runningHost.ensureEnabledRuntime();
             } else if (headlessHostRequired
                     || Permissions.allPermissionsGranted(appContext)) {
-                try {
-                    ContextCompat.startForegroundService(appContext,
-                            new Intent(appContext, WidgetService.class));
-                } catch (RuntimeException error) {
-                    Log.w(TAG, "Could not start widget/driver integration host", error);
-                }
+                WidgetServiceStarter.startIfNeeded(appContext);
             }
         }
 

@@ -179,6 +179,40 @@ final class AncsRecoveryPolicy {
         return !managedIncomingMode;
     }
 
+    /**
+     * Fluoride may allocate a new {@code BluetoothDevice} Java wrapper for each inbound ATT
+     * request.  The wrapper is therefore not the server-link identity.  A B3/READY callback may
+     * continue the PAIR transcript only when it resolves to the very same stable server-peer
+     * record and every security/publication coordinate is still current.  The raw PAIR facade
+     * remains identity-strict for the later app-owned client role.
+     */
+    static boolean acceptsInboundAttTranscriptCallback(
+            boolean managedIncomingMode,
+            boolean selectedBondedCallback,
+            boolean acceptedPeerPresent,
+            boolean callbackMapsToAcceptedPeer,
+            boolean acceptedPeerOwnsRawPairFacade,
+            long currentSession,
+            long acceptedSession,
+            long currentEpoch,
+            long acceptedEpoch,
+            long currentPublicationToken,
+            long acceptedPublicationToken,
+            boolean currentF04Publication) {
+        return managedIncomingMode
+                && selectedBondedCallback
+                && acceptedPeerPresent
+                && callbackMapsToAcceptedPeer
+                && acceptedPeerOwnsRawPairFacade
+                && currentSession != 0L
+                && acceptedSession == currentSession
+                && currentEpoch != 0L
+                && acceptedEpoch == currentEpoch
+                && currentPublicationToken != 0L
+                && acceptedPublicationToken == currentPublicationToken
+                && currentF04Publication;
+    }
+
     static boolean canAcceptAncsReadyProof(
             boolean managedIncomingMode,
             boolean currentF04Publication,

@@ -17,6 +17,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import dezz.status.widget.Preferences;
+import dezz.status.widget.StartupWorkCoordinator;
 
 /**
  * Captures the pre-boot media target and schedules a bounded, idempotent MEDIA_PLAY retry.
@@ -32,53 +33,137 @@ public final class MediaAutoResumeController {
     public static final String EXTRA_ATTEMPT = "attempt";
 
     private static final String TAG = "MediaAutoResume";
+    private static final String ACTION_QUICKBOOT_POWERON =
+            "android.intent.action.QUICKBOOT_POWERON";
     private static final String PREFS = "launcher_media_auto_resume_state";
+    private static final String KEY_CAPTURE_TOKEN = "captureToken";
+    private static final String KEY_CAPTURE_ELAPSED = "captureElapsed";
+    private static final String KEY_PLAN_ANCHOR_ELAPSED = "planAnchorElapsed";
+    private static final String KEY_CAPTURE_ACTION = "captureAction";
+    private static final String KEY_CAPTURE_BOOT_COUNT = "captureBootCount";
+    private static final String KEY_CAPTURE_HISTORY_PACKAGE = "captureHistoryPackage";
+    private static final String KEY_CAPTURE_HISTORY_WAS_PLAYING = "captureHistoryWasPlaying";
     private static final String KEY_BOOT_TOKEN = "bootToken";
     private static final String KEY_TARGET_PACKAGE = "targetPackage";
     private static final String KEY_COMPLETED = "completed";
     private static final int REQUEST_CODE = 0x4D41;
     private static final int MAX_ATTEMPTS = 6;
+    private static final long CAPTURE_BURST_COALESCE_MS = 120_000L;
     private static final long[] RETRY_DELAYS_MS = {
             2_000L, 5_000L, 10_000L, 15_000L, 20_000L
     };
 
     private MediaAutoResumeController() {}
 
-    /** Called only for real boot actions, never for an application update. */
+    /**
+     * Freezes only the tiny device-protected playback edge at the lifecycle boundary. No launcher
+     * Preferences migration, PackageManager query or media command is allowed here. LOCKED_BOOT
+     * and BOOT_COMPLETED for one kernel boot share the first snapshot; a later ECARX QuickBoot
+     * receives a new synthetic token even when {@code BOOT_COUNT} did not change.
+     */
+    public static long captureBootHistorySnapshot(@NonNull Context context,
+                                                  @NonNull String action) {
+        Context app = applicationContext(context);
+        SharedPreferences state = state(app);
+        long now = SystemClock.elapsedRealtime();
+        int bootCount = currentBootCount(app);
+        long previousElapsed = state.getLong(KEY_CAPTURE_ELAPSED, Long.MIN_VALUE);
+        int previousBootCount = state.getInt(KEY_CAPTURE_BOOT_COUNT, Integer.MIN_VALUE);
+        String previousAction = state.getString(KEY_CAPTURE_ACTION, "");
+        long delta = previousElapsed == Long.MIN_VALUE ? Long.MAX_VALUE : now - previousElapsed;
+        boolean sameKnownBootCount = bootCount >= 0 && bootCount == previousBootCount;
+        boolean differentKnownBootCount = bootCount >= 0 && previousBootCount >= 0
+                && bootCount != previousBootCount;
+        boolean sameStandardBoot = sameKnownBootCount
+                && isStandardBootAction(previousAction) && isStandardBootAction(action);
+        boolean sameLifecycleBurst = delta >= 0L && delta <= CAPTURE_BURST_COALESCE_MS;
+        long previousToken = state.getLong(KEY_CAPTURE_TOKEN, 0L);
+        boolean previousPlanConsumed = previousToken != 0L
+                && state.getLong(KEY_BOOT_TOKEN, Long.MIN_VALUE) == previousToken;
+        boolean duplicateUnconsumedQuickSequence = !differentKnownBootCount
+                && !previousPlanConsumed && sameLifecycleBurst
+                && (Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(previousAction)
+                || ACTION_QUICKBOOT_POWERON.equals(previousAction))
+                && (Intent.ACTION_BOOT_COMPLETED.equals(action)
+                || ACTION_QUICKBOOT_POWERON.equals(action));
+        // BOOT -> QUICK is always a new ECARX lifecycle even with the same kernel BOOT_COUNT.
+        // QUICK -> QUICK is coalesced only until its media plan has consumed the frozen token.
+        if (previousToken != 0L && !differentKnownBootCount
+                && (sameStandardBoot || duplicateUnconsumedQuickSequence)) {
+            if (!Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(action)) {
+                // Preserve the first pre-OEM snapshot, but define the user delay from the later
+                // usable BOOT/QuickBoot boundary rather than from a potentially minute-old
+                // LOCKED_BOOT event.
+                state.edit().putLong(KEY_PLAN_ANCHOR_ELAPSED, now)
+                        .putString(KEY_CAPTURE_ACTION, action).commit();
+            }
+            return previousToken;
+        }
+
+        MediaPlaybackHistoryStore.Snapshot history = MediaPlaybackHistoryStore.read(app);
+        long captureToken = previousToken == Long.MAX_VALUE ? 1L : previousToken + 1L;
+        state.edit()
+                .putLong(KEY_CAPTURE_TOKEN, captureToken)
+                .putLong(KEY_CAPTURE_ELAPSED, now)
+                .putLong(KEY_PLAN_ANCHOR_ELAPSED, now)
+                .putString(KEY_CAPTURE_ACTION, action)
+                .putInt(KEY_CAPTURE_BOOT_COUNT, bootCount)
+                .putString(KEY_CAPTURE_HISTORY_PACKAGE, history.packageName)
+                .putBoolean(KEY_CAPTURE_HISTORY_WAS_PLAYING, history.wasPlaying)
+                .putBoolean(KEY_COMPLETED, false)
+                .commit();
+        // A queued retry from the previous standard/QuickBoot lifecycle must never cross the new
+        // capture boundary. The token check is the second, callback-time barrier.
+        cancelAlarm(app);
+        Log.i(TAG, "Frozen media history for lifecycle token=" + captureToken
+                + " package=" + history.packageName + " playing=" + history.wasPlaying);
+        return captureToken;
+    }
+
+    /** Called from the delayed media lane, never directly on the boot receiver boundary. */
     public static void scheduleAfterBoot(@NonNull Context context) {
         Context app = applicationContext(context);
+        SharedPreferences state = state(app);
+        long captureToken = state.getLong(KEY_CAPTURE_TOKEN, 0L);
+        if (captureToken == 0L) {
+            captureToken = captureBootHistorySnapshot(app, Intent.ACTION_BOOT_COMPLETED);
+            state = state(app);
+        }
+        if (state.getLong(KEY_BOOT_TOKEN, Long.MIN_VALUE) == captureToken) {
+            return;
+        }
         Preferences preferences = new Preferences(app);
         if (!preferences.launcherMediaAutoResumeEnabled.get()) {
             cancel(app);
             return;
         }
-        MediaPlaybackHistoryStore.Snapshot history = MediaPlaybackHistoryStore.read(app);
+        String frozenHistoryPackage = state.getString(KEY_CAPTURE_HISTORY_PACKAGE, "");
+        boolean frozenHistoryWasPlaying = state.getBoolean(
+                KEY_CAPTURE_HISTORY_WAS_PLAYING, false);
         boolean fixedPlayer = preferences.launcherMediaFixedPlayerEnabled.get();
         String fixedPackage = preferences.launcherMediaFixedPlayerPackage.get();
         if (!MediaPlaybackTargetPolicy.shouldAutoResume(fixedPlayer, fixedPackage,
-                history.packageName, history.wasPlaying)) {
+                frozenHistoryPackage, frozenHistoryWasPlaying)) {
             Log.i(TAG, "Auto-resume skipped: there is no eligible target player");
             cancel(app);
             return;
         }
         String target = MediaPlaybackTargetPolicy.resolve(fixedPlayer, fixedPackage,
-                history.packageName);
-
-        long bootToken = currentBootToken(app);
-        SharedPreferences state = state(app);
-        if (state.getLong(KEY_BOOT_TOKEN, Long.MIN_VALUE) == bootToken) {
-            // LOCKED_BOOT_COMPLETED and BOOT_COMPLETED commonly arrive for the same boot.
-            return;
-        }
+                frozenHistoryPackage);
         state.edit()
-                .putLong(KEY_BOOT_TOKEN, bootToken)
+                .putLong(KEY_BOOT_TOKEN, captureToken)
                 .putString(KEY_TARGET_PACKAGE, target)
                 .putBoolean(KEY_COMPLETED, false)
                 .commit();
         int delaySeconds = clamp(preferences.launcherMediaAutoResumeDelaySeconds.get(), 0, 60);
-        schedule(app, bootToken, 0, delaySeconds * 1_000L);
+        long planAnchorElapsed = state.getLong(
+                KEY_PLAN_ANCHOR_ELAPSED, SystemClock.elapsedRealtime());
+        long targetElapsed = planAnchorElapsed + Math.max(delaySeconds * 1_000L,
+                StartupWorkCoordinator.mediaAutoResumeMinimumDelayMillis());
+        long delayMillis = Math.max(0L, targetElapsed - SystemClock.elapsedRealtime());
+        schedule(app, captureToken, 0, delayMillis);
         Log.i(TAG, "Scheduled auto-resume for " + target
-                + " after " + delaySeconds + " s");
+                + " after " + (delayMillis / 1_000L) + " s");
     }
 
     static void execute(@NonNull Context context, long bootToken, int attempt) {
@@ -86,7 +171,7 @@ public final class MediaAutoResumeController {
         SharedPreferences state = state(app);
         if (state.getBoolean(KEY_COMPLETED, false)
                 || state.getLong(KEY_BOOT_TOKEN, Long.MIN_VALUE) != bootToken
-                || currentBootToken(app) != bootToken) {
+                || state.getLong(KEY_CAPTURE_TOKEN, Long.MIN_VALUE) != bootToken) {
             return;
         }
         Preferences preferences = new Preferences(app);
@@ -164,13 +249,17 @@ public final class MediaAutoResumeController {
         pending.cancel();
     }
 
-    private static long currentBootToken(@NonNull Context context) {
+    private static int currentBootCount(@NonNull Context context) {
         try {
             return Settings.Global.getInt(context.getContentResolver(), Settings.Global.BOOT_COUNT);
-        } catch (Settings.SettingNotFoundException | SecurityException ignored) {
-            // Millisecond boot epoch is stable for one boot, including LOCKED/normal boot events.
-            return (System.currentTimeMillis() - SystemClock.elapsedRealtime()) / 60_000L;
+        } catch (Settings.SettingNotFoundException | RuntimeException ignored) {
+            return -1;
         }
+    }
+
+    private static boolean isStandardBootAction(@NonNull String action) {
+        return Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(action)
+                || Intent.ACTION_BOOT_COMPLETED.equals(action);
     }
 
     @NonNull

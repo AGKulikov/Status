@@ -1,0 +1,92 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+package dezz.status.widget;
+
+import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+/** Executable truth table for the coalesced, low-contention boot lane. */
+public final class StartupLoadPolicyTest {
+    @Test public void lockedBootRecordsQuietButStartsNoHeavySurface() {
+        assertEquals(12_000L, StartupLoadPolicy.quietWindowMillis(
+                StartupLoadPolicy.Trigger.LOCKED_BOOT));
+        assertFalse(StartupLoadPolicy.schedulesIntegrationHost(
+                StartupLoadPolicy.Trigger.LOCKED_BOOT));
+        assertFalse(StartupLoadPolicy.schedulesClimate(
+                StartupLoadPolicy.Trigger.LOCKED_BOOT));
+    }
+
+    @Test public void normalAndQuickBootUseOneStagedHostThenClimateLane() {
+        for (StartupLoadPolicy.Trigger trigger : new StartupLoadPolicy.Trigger[]{
+                StartupLoadPolicy.Trigger.BOOT_COMPLETED,
+                StartupLoadPolicy.Trigger.QUICK_BOOT}) {
+            assertEquals(10_000L, StartupLoadPolicy.quietWindowMillis(trigger));
+            assertTrue(StartupLoadPolicy.schedulesIntegrationHost(trigger));
+            assertTrue(StartupLoadPolicy.schedulesClimate(trigger));
+        }
+        assertEquals(10_000L, StartupLoadPolicy.CLIMATE_AFTER_HOST_MS);
+        assertTrue(StartupLoadPolicy.schedulesMediaPlan(
+                StartupLoadPolicy.Trigger.BOOT_COMPLETED));
+        assertTrue(StartupLoadPolicy.schedulesMediaPlan(
+                StartupLoadPolicy.Trigger.QUICK_BOOT));
+    }
+
+    @Test public void unlockRefreshesCredentialsWithoutReplayingVisualSurfaces() {
+        StartupLoadPolicy.Trigger unlock = StartupLoadPolicy.Trigger.USER_UNLOCKED;
+        assertTrue(StartupLoadPolicy.opensCredentialGate(unlock));
+        assertTrue(StartupLoadPolicy.schedulesIntegrationHost(unlock));
+        assertFalse(StartupLoadPolicy.schedulesClimate(unlock));
+        assertEquals(3_000L, StartupLoadPolicy.quietWindowMillis(unlock));
+    }
+
+    @Test public void packageReplacementIsBoundedButNeverTreatedAsLockedBoot() {
+        StartupLoadPolicy.Trigger replacement = StartupLoadPolicy.Trigger.PACKAGE_REPLACED;
+        assertEquals(2_000L, StartupLoadPolicy.quietWindowMillis(replacement));
+        assertTrue(StartupLoadPolicy.schedulesIntegrationHost(replacement));
+        assertTrue(StartupLoadPolicy.schedulesClimate(replacement));
+        assertFalse(StartupLoadPolicy.opensCredentialGate(replacement));
+    }
+
+    @Test public void staleOrCorruptDeadlinesCannotFreezeStartup() {
+        long now = 1_000_000L;
+        assertEquals(4_000L,
+                StartupLoadPolicy.remainingQuietMillis(now, now + 4_000L));
+        assertEquals(0L,
+                StartupLoadPolicy.remainingQuietMillis(now, now - 1L));
+        assertEquals(0L, StartupLoadPolicy.remainingQuietMillis(
+                now, now + StartupLoadPolicy.MAX_VALID_QUIET_MS + 1L));
+    }
+
+    @Test public void vendorFallbackAndMediaCannotJoinTheBootBurst() {
+        assertTrue(StartupLoadPolicy.LAUNCHER_PANELS_AFTER_HOST_MS > 0L);
+        assertTrue(StartupLoadPolicy.LAUNCHER_RUNTIME_AFTER_HOST_MS
+                > StartupLoadPolicy.LAUNCHER_PANELS_AFTER_HOST_MS);
+        assertTrue(StartupLoadPolicy.CLIMATE_AFTER_HOST_MS
+                > StartupLoadPolicy.LAUNCHER_RUNTIME_AFTER_HOST_MS);
+        assertTrue(StartupLoadPolicy.MEDIA_AUTO_RESUME_MIN_MS
+                > StartupLoadPolicy.CLIMATE_AFTER_HOST_MS);
+        assertTrue(StartupLoadPolicy.HUD_FALLBACK_DELAY_MS
+                > StartupLoadPolicy.MEDIA_AUTO_RESUME_MIN_MS);
+    }
+
+    @Test public void earlyHomeAndBootGenerationCannotBypassTheQuietLane() {
+        assertEquals(12_000L, StartupLoadPolicy.earlyBootQuietMillis(0L));
+        assertEquals(1L, StartupLoadPolicy.earlyBootQuietMillis(11_999L));
+        assertEquals(0L, StartupLoadPolicy.earlyBootQuietMillis(12_000L));
+        assertTrue(StartupLoadPolicy.isNewBootGeneration(41, 40));
+        assertFalse(StartupLoadPolicy.isNewBootGeneration(41, 41));
+        assertFalse(StartupLoadPolicy.isNewBootGeneration(-1, 41));
+    }
+
+    @Test public void phaseLaneDeadlinesUseMonotonicBoundedDurations() {
+        long now = 250_000L;
+        assertEquals(26_000L,
+                StartupLoadPolicy.remainingStartupLaneMillis(now, now + 26_000L));
+        assertEquals(0L,
+                StartupLoadPolicy.remainingStartupLaneMillis(now, now - 1L));
+        assertEquals(0L, StartupLoadPolicy.remainingStartupLaneMillis(now,
+                now + StartupLoadPolicy.MAX_VALID_STARTUP_LANE_MS + 1L));
+    }
+}
