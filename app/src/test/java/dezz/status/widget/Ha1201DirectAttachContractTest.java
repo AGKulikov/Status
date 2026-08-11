@@ -13,7 +13,7 @@ import org.junit.Test;
 
 /** Release gate for direct incoming-link adoption and the independent ANCS discovery gates. */
 public final class Ha1201DirectAttachContractTest {
-    @Test public void exactBondedIncomingFacadeGetsOneBoundedDirectVirtualOpen()
+    @Test public void exactBondedIncomingFacadeGetsOneBoundedOpportunisticOpen()
             throws Exception {
         String transport = transport();
         String candidate = between(transport,
@@ -31,11 +31,12 @@ public final class Ha1201DirectAttachContractTest {
                 "private void scheduleDirectFallback");
         assertTrue(direct.contains("incomingClientCandidate"));
         assertTrue(direct.contains("serverLink.device"));
-        assertTrue(direct.contains(
-                "device.connectGatt(context, false, gattCallback"));
+        assertTrue(direct.contains("connectGattOpportunisticOnPie(device)"));
+        assertTrue(direct.contains("activeClientOpportunistic = true;"));
         assertTrue(direct.contains("INCOMING_DIRECT_ATTACH_TIMEOUT_MS"));
         assertTrue(direct.contains("closeClientGatt(expected);"));
-        assertTrue(direct.contains("scheduleIncomingClientAttachRetry"));
+        assertFalse(direct.contains("device.connectGatt("));
+        assertFalse(direct.contains("scheduleIncomingClientAttachRetry"));
         assertFalse(direct.contains("rearmPersistentGattOwner"));
     }
 
@@ -472,7 +473,8 @@ public final class Ha1201DirectAttachContractTest {
         String retry = between(transport,
                 "private void scheduleIncomingClientAttachRetry",
                 "private void recoverIncomingClientRole");
-        assertTrue(retry.contains("canStartIncomingClientAttach(device, publicationToken)"));
+        assertTrue(retry.contains("Same-tuple clientIf retry запрещён"));
+        assertFalse(retry.contains("startSamePeerAttach("));
         assertFalse(retry.contains("INCOMING_CLIENT_ATTACH_MAX_ATTEMPTS - 1"));
 
         String ready = between(transport,
@@ -483,9 +485,9 @@ public final class Ha1201DirectAttachContractTest {
 
         String timeout = between(direct,
                 "connectTimeout = () ->", "main.postDelayed(connectTimeout");
-        assertTrue(timeout.contains("findConnectedServerPeer(expected.getDevice())"));
-        assertTrue(timeout.contains("resetIncomingSecurityAfterClientLoss"));
-        assertTrue(timeout.contains("preserveManagedIncomingPublicationAfterLinkLoss"));
+        assertTrue(timeout.contains("unregisterNeverEstablishedOpportunisticGatt(expected)"));
+        assertFalse(timeout.contains("resetIncomingSecurityAfterClientLoss"));
+        assertFalse(timeout.contains("preserveManagedIncomingPublicationAfterLinkLoss"));
     }
 
     private static String transport() throws Exception {

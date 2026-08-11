@@ -386,4 +386,51 @@ public final class AncsRecoveryPolicyTest {
         assertFalse(AncsRecoveryPolicy.mayIssueReverseClientCommand(
                 false, false, false, false));
     }
+
+    @Test public void reverseTupleHasOneOpportunisticOpenAndNoFallbackState() {
+        assertEquals(AncsRecoveryPolicy.ReverseClientOpenAction.OPPORTUNISTIC,
+                AncsRecoveryPolicy.reverseClientOpenAction(true, true, false));
+        assertEquals(AncsRecoveryPolicy.ReverseClientOpenAction.STOP,
+                AncsRecoveryPolicy.reverseClientOpenAction(true, true, true));
+        assertEquals(AncsRecoveryPolicy.ReverseClientOpenAction.STOP,
+                AncsRecoveryPolicy.reverseClientOpenAction(true, false, false));
+        assertEquals(AncsRecoveryPolicy.ReverseClientOpenAction.STOP,
+                AncsRecoveryPolicy.reverseClientOpenAction(false, true, false));
+    }
+
+    @Test public void frameworkMainCallbackCommitsBeforeQueuedAttachTimeout() {
+        assertEquals(AncsRecoveryPolicy.GattCallbackDispatchAction.INLINE,
+                AncsRecoveryPolicy.gattCallbackDispatchAction(true));
+        assertEquals(AncsRecoveryPolicy.GattCallbackDispatchAction.POST_TO_TRANSPORT_LOOPER,
+                AncsRecoveryPolicy.gattCallbackDispatchAction(false));
+
+        assertCallbackCancelsQueuedTimeoutBeforeItCanCloseOwner();
+    }
+
+    @Test public void discoveryCallbackBeforeWatchdogCannotPoisonTheOwner() {
+        assertCallbackCancelsQueuedTimeoutBeforeItCanCloseOwner();
+    }
+
+    @Test public void descriptorCallbackBeforeWatchdogCannotPoisonTheOwner() {
+        assertCallbackCancelsQueuedTimeoutBeforeItCanCloseOwner();
+    }
+
+    @Test public void rssiCallbackBeforeWatchdogCannotPoisonTheOwner() {
+        assertCallbackCancelsQueuedTimeoutBeforeItCanCloseOwner();
+    }
+
+    private static void assertCallbackCancelsQueuedTimeoutBeforeItCanCloseOwner() {
+        boolean[] timeoutArmed = {true};
+        boolean[] wrapperClosed = {false};
+        Runnable stackCallback = () -> timeoutArmed[0] = false;
+        Runnable timeout = () -> {
+            if (timeoutArmed[0]) wrapperClosed[0] = true;
+        };
+
+        // Framework callback A is already executing on main before queued timeout T. HA1210
+        // commits every shared-GATT completion inline, so T sees its cancelled operation latch.
+        stackCallback.run();
+        timeout.run();
+        assertFalse(wrapperClosed[0]);
+    }
 }
