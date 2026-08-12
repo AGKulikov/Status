@@ -27,7 +27,7 @@ public final class Ha1208PublicationRecoveryContractTest {
         assertTrue(workflow.contains("VERSION_CODE: '208021214'"));
         assertTrue(workflow.contains("ha1214-startup-source-bundle"));
         assertTrue(workflow.contains("ha1214-startup-unsigned-release"));
-        assertTrue(workflow.contains("ha1213-android-build-tools"));
+        assertTrue(workflow.contains("ha1214-android-build-tools"));
     }
 
     private static String project(String relative) throws Exception {
