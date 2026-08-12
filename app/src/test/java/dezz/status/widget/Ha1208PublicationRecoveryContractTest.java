@@ -16,17 +16,17 @@ public final class Ha1208PublicationRecoveryContractTest {
     @Test public void releaseIdentityAdvancesWithoutChangingInstallationIdentity()
             throws Exception {
         String build = rootProject("build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1213'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1214'"));
         String manifest = project("app/src/main/AndroidManifest.xml");
         assertFalse(manifest.contains("package=\""));
         String app = project("app/build.gradle");
         assertTrue(app.contains("applicationId \"ru.natro.statuswidget\""));
-        String workflow = project(".github/workflows/verify-ha1213.yml");
-        assertTrue(workflow.contains("name: Verify HA1213 balanced startup candidate"));
-        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1213'"));
-        assertTrue(workflow.contains("VERSION_CODE: '208021213'"));
-        assertTrue(workflow.contains("ha1213-startup-source-bundle"));
-        assertTrue(workflow.contains("ha1213-startup-unsigned-release"));
+        String workflow = project(".github/workflows/verify-ha1214.yml");
+        assertTrue(workflow.contains("name: Verify HA1214 immediate cooperative startup candidate"));
+        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1214'"));
+        assertTrue(workflow.contains("VERSION_CODE: '208021214'"));
+        assertTrue(workflow.contains("ha1214-startup-source-bundle"));
+        assertTrue(workflow.contains("ha1214-startup-unsigned-release"));
         assertTrue(workflow.contains("ha1213-android-build-tools"));
     }
 

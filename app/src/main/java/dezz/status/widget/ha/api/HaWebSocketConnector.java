@@ -48,7 +48,15 @@ public final class HaWebSocketConnector {
     private final OkHttpClient http;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
             runnable -> {
-                Thread thread = new Thread(runnable, "ha-websocket-reconnect");
+                Thread thread = new Thread(() -> {
+                    try {
+                        android.os.Process.setThreadPriority(
+                                android.os.Process.THREAD_PRIORITY_BACKGROUND);
+                    } catch (RuntimeException ignored) {
+                        // Reconnect must continue even if an OEM denies priority adjustment.
+                    }
+                    runnable.run();
+                }, "ha-websocket-reconnect");
                 thread.setDaemon(true);
                 return thread;
             });

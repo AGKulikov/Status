@@ -146,6 +146,13 @@ public class StatusWidgetApplication extends Application {
             main.postDelayed(unlockedRuntimeRetry, delay + 50L);
             return;
         }
+        WidgetService host = WidgetService.getInstance();
+        if (host != null && !host.isIntegrationRuntimeReadyForApplication()) {
+            // The process diagnostics/privileged ECARX policy is not needed for the row. Avoid an
+            // independent timer colliding with the serialized controller lane.
+            main.postDelayed(unlockedRuntimeRetry, 1_000L);
+            return;
+        }
         ensureUnlockedRuntimeInitialized();
         if (unlockedRuntimeInitialized) StartupPerformanceTrace.mark("application_runtime_ready");
     }

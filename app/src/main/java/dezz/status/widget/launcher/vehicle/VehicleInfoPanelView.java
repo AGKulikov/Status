@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarTelemetryDescriptor;
@@ -64,7 +65,8 @@ public final class VehicleInfoPanelView extends FrameLayout {
     private static final String TURN_LEFT_ID = "IBcm.turn_signal_left";
     private static final String TURN_RIGHT_ID = "IBcm.turn_signal_right";
 
-    private final CarIntegration integration;
+    private final Supplier<CarIntegration> integrationSupplier;
+    @Nullable private CarIntegration integration;
     private final VehicleInfoPanelConfigStore configStore;
     private final Map<String, CarTelemetryDescriptor> catalog = new LinkedHashMap<>();
     private final Map<String, CarIntegration.TelemetryValue> latest = new LinkedHashMap<>();
@@ -106,8 +108,16 @@ public final class VehicleInfoPanelView extends FrameLayout {
 
     public VehicleInfoPanelView(@NonNull Context context, @NonNull CarIntegration integration,
                                 @NonNull VehicleInfoPanelConfigStore configStore) {
-        super(context);
+        this(context, () -> integration, configStore);
         this.integration = integration;
+    }
+
+    /** Keeps vendor binding outside constructor-time HOME inflation. */
+    public VehicleInfoPanelView(@NonNull Context context,
+                                @NonNull Supplier<CarIntegration> integrationSupplier,
+                                @NonNull VehicleInfoPanelConfigStore configStore) {
+        super(context);
+        this.integrationSupplier = integrationSupplier;
         this.configStore = configStore;
         config = configStore.load();
         setClipChildren(false);
@@ -118,6 +128,7 @@ public final class VehicleInfoPanelView extends FrameLayout {
     /** Begin catalog discovery and live updates. Safe to call repeatedly from onStart/onResume. */
     public void start() {
         if (started) return;
+        requireIntegration();
         started = true;
         // Never reuse values from the previous ignition/screen session. Every enabled metric is
         // seeded again by the connector, so HOME cannot briefly present an old gear, fuel level
@@ -140,7 +151,7 @@ public final class VehicleInfoPanelView extends FrameLayout {
         if (!started) return;
         started = false;
         catalogGeneration++;
-        integration.unsubscribeTelemetry(telemetryListener);
+        if (integration != null) integration.unsubscribeTelemetry(telemetryListener);
         unregisterNavigationReceiver();
         removeCallbacks(staleTick);
     }
@@ -200,8 +211,9 @@ public final class VehicleInfoPanelView extends FrameLayout {
     }
 
     private void requestCatalog() {
+        CarIntegration current = requireIntegration();
         final int generation = ++catalogGeneration;
-        integration.requestTelemetryCatalog(values -> {
+        current.requestTelemetryCatalog(values -> {
             if (generation != catalogGeneration) return;
             ArrayList<CarTelemetryDescriptor> complete = new ArrayList<>(values);
             complete.addAll(derivedCatalog());
@@ -218,9 +230,22 @@ public final class VehicleInfoPanelView extends FrameLayout {
     }
 
     private void subscribeEnabledMetrics() {
-        integration.unsubscribeTelemetry(telemetryListener);
+        CarIntegration current = requireIntegration();
+        current.unsubscribeTelemetry(telemetryListener);
         Set<String> ids = subscriptionMetricIds();
-        if (started && !ids.isEmpty()) integration.subscribeTelemetry(ids, telemetryListener);
+        if (started && !ids.isEmpty()) current.subscribeTelemetry(ids, telemetryListener);
+    }
+
+    @NonNull
+    private CarIntegration requireIntegration() {
+        CarIntegration current = integration;
+        if (current != null) return current;
+        current = integrationSupplier.get();
+        if (current == null) {
+            throw new IllegalStateException("Car integration supplier returned null");
+        }
+        integration = current;
+        return current;
     }
 
     @NonNull

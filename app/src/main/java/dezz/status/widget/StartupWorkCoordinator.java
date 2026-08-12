@@ -215,10 +215,16 @@ public final class StartupWorkCoordinator {
     }
 
     static long launcherPanelDelayMillis(@NonNull Context context, long normalDelayMillis) {
-        return Math.max(Math.max(normalDelayMillis, remainingDeadline(context,
-                        KEY_LAUNCHER_PANELS_NOT_BEFORE_ELAPSED,
-                        StartupLoadPolicy.MAX_VALID_STARTUP_LANE_MS, true)),
-                remainingHostHandoffMillis(context));
+        // Panel inflation is visual work and already runs after HOME's first draw, one panel per
+        // frame. Tying it to the integration-host deadline made a healthy HOME look blank for
+        // 4.5-10 seconds. Vendor/controllers remain behind launcherRuntimeDelayMillis().
+        return Math.max(0L, normalDelayMillis);
+    }
+
+    /** True while controller/vendor work must remain parked behind the exact host generation. */
+    static boolean shouldParkAutomaticRuntime(@NonNull Context context) {
+        return remainingQuietMillis(context) > 0L
+                || isStartupInitializationBlocked(context);
     }
 
     static long launcherRuntimeDelayMillis(@NonNull Context context) {
@@ -458,8 +464,7 @@ public final class StartupWorkCoordinator {
     private static void writeSharedLaneDeadlines(@NonNull SharedPreferences.Editor edit,
                                                  long quietUntil) {
         edit.putLong(KEY_QUIET_UNTIL_ELAPSED, quietUntil)
-                .putLong(KEY_LAUNCHER_PANELS_NOT_BEFORE_ELAPSED,
-                        quietUntil + StartupLoadPolicy.LAUNCHER_PANELS_AFTER_HOST_MS)
+                .remove(KEY_LAUNCHER_PANELS_NOT_BEFORE_ELAPSED)
                 .putLong(KEY_LAUNCHER_RUNTIME_NOT_BEFORE_ELAPSED,
                         quietUntil + StartupLoadPolicy.LAUNCHER_RUNTIME_AFTER_HOST_MS)
                 .putLong(KEY_AUTOMATIC_RECONCILE_NOT_BEFORE_ELAPSED,
@@ -470,7 +475,7 @@ public final class StartupWorkCoordinator {
     private static void writeProcessSettleDeadlines(@NonNull SharedPreferences.Editor edit,
                                                     long quietUntil) {
         edit.putLong(KEY_QUIET_UNTIL_ELAPSED, quietUntil)
-                .putLong(KEY_LAUNCHER_PANELS_NOT_BEFORE_ELAPSED, quietUntil)
+                .remove(KEY_LAUNCHER_PANELS_NOT_BEFORE_ELAPSED)
                 .putLong(KEY_LAUNCHER_RUNTIME_NOT_BEFORE_ELAPSED,
                         quietUntil + StartupLoadPolicy.PROCESS_SETTLE_RUNTIME_AFTER_MS)
                 .putLong(KEY_AUTOMATIC_RECONCILE_NOT_BEFORE_ELAPSED,

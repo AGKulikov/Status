@@ -48,7 +48,8 @@ public final class Ha1213BalancedStartupContractTest {
         int add = attach.indexOf("windowManager.addView(attachmentRoot, params)");
         int deferred = attach.indexOf("scheduleInitialIntegrationStartupAfterFrame()");
         assertTrue(add >= 0 && deferred > add);
-        assertTrue(attach.contains("INITIAL_OVERLAY_FADE_DURATION_MS + 250L"));
+        assertTrue(attach.contains(
+                "INITIAL_OVERLAY_FADE_DURATION_MS + INITIAL_OVERLAY_FALLBACK_GRACE_MS"));
         String afterFrame = between(service, "private final class DeferredIntegrationStart",
                 "/** Re-evaluates TTL/stale rules");
         assertTrue(afterFrame.contains("overlay_fully_visible"));
@@ -72,6 +73,8 @@ public final class Ha1213BalancedStartupContractTest {
         String barrier = between(service, "private void runCachedStateFreshnessBarrier()",
                 "private void clearRetainedPhonePopupStateForStartup(long");
         assertTrue(barrier.contains("startupStateWorker.execute"));
+        assertTrue(barrier.contains("startupStateBarrierInFlight = true"));
+        assertTrue(barrier.contains("startupStateBarrierInFlight = false"));
         assertTrue(barrier.contains("haConfigs.loadMain(loadedMainJson)"));
         assertTrue(barrier.contains("configuredMainBricksJson = immutableMainJson"));
         assertTrue(barrier.contains("automationStates.markAllStaleIf"));
@@ -96,7 +99,7 @@ public final class Ha1213BalancedStartupContractTest {
     @Test public void bootDeadlineIsAdaptiveAndVisibleHomeKeepsDurableAlarmFallback()
             throws Exception {
         String policy = javaSource("StartupLoadPolicy.java");
-        assertTrue(policy.contains("COLD_BOOT_SURFACE_TARGET_ELAPSED_MS = 4_500L"));
+        assertTrue(policy.contains("COLD_BOOT_RUNTIME_TARGET_ELAPSED_MS = 4_500L"));
         assertTrue(policy.contains("BOOT_EVENT_SETTLE_MS = 1_000L"));
         assertTrue(policy.contains("QUICK_BOOT_QUIET_MS = 1_500L"));
         assertFalse(policy.contains("LOCKED_BOOT_QUIET_MS = 12_000L"));
@@ -152,9 +155,9 @@ public final class Ha1213BalancedStartupContractTest {
         String service = javaSource("WidgetService.java");
         String next = between(service, "private void runNextInitialIntegrationStage()",
                 "private void runCachedStateFreshnessBarrier()");
-        assertTrue(next.contains("if (automaticLifecycleQuiet)"));
+        assertTrue(next.contains("if (automaticRuntimeParked || automaticLifecycleQuiet)"));
         assertTrue(next.contains("removeCallbacks(initialIntegrationStageRunner)"));
-        String enter = between(service, "private void enterAutomaticLifecycleQuietOnMain()",
+        String enter = between(service, "private void enterAutomaticLifecycleQuietOnMain(",
                 "public void resumeAutomaticLifecycleIntegrationsAfterQuiet()");
         assertTrue(enter.contains("cancelDeferredIntegrationStart()"));
         assertTrue(enter.contains("removeCallbacks(initialIntegrationStageRunner)"));
@@ -163,6 +166,7 @@ public final class Ha1213BalancedStartupContractTest {
                 "/**\n     * Re-opens only Keystore-backed transports");
         assertTrue(resume.contains("if (initialIntegrationStartupInProgress)"));
         assertTrue(resume.contains("initialIntegrationStage = 1"));
+        assertTrue(resume.contains("if (!startupStateBarrierInFlight)"));
         assertTrue(resume.contains("mainHandler.post(initialIntegrationStageRunner)"));
     }
 
@@ -209,7 +213,7 @@ public final class Ha1213BalancedStartupContractTest {
         assertTrue(start.contains("launcherFirstDrawCompleted"));
         assertTrue(start.contains("registerNavigationReceiver()"));
         assertTrue(start.contains("globalElementRefresh"));
-        assertTrue(start.contains("startIfNeededAutomatically"));
+        assertTrue(start.contains("startVisibleSurfaceImmediatelyAutomatically"));
 
         String onStart = between(launcher, "protected void onStart()",
                 "protected void onStop()");
@@ -259,14 +263,14 @@ public final class Ha1213BalancedStartupContractTest {
                 "private void finishAutomaticSurfaceReconcileIfReady()");
         assertTrue(reconcile.contains("automaticSurfaceReconcilePending = true"));
         assertTrue(reconcile.indexOf("createOverlayView()")
-                < reconcile.indexOf("resumeAutomaticLifecycleIntegrationsAfterQuiet()"));
-        assertTrue(reconcile.contains("if (binding != null) return"));
+                < reconcile.lastIndexOf("resumeAutomaticLifecycleIntegrationsAfterQuiet()"));
+        assertTrue(reconcile.contains("automaticHostReleaseAfterVisible = true"));
         String restore = between(receiver, "private static boolean restoreStatusWidget(",
                 "private static boolean restoreClimateSafely(");
         assertTrue(restore.contains("if (reconcileSurfaces)"));
         assertTrue(restore.contains("} else {\n                    current.resumeAutomaticLifecycle"));
 
-        String enter = between(service, "private void enterAutomaticLifecycleQuietOnMain()",
+        String enter = between(service, "private void enterAutomaticLifecycleQuietOnMain(",
                 "public void resumeAutomaticLifecycleIntegrationsAfterQuiet()");
         assertTrue(enter.indexOf("automaticLifecycleQuiet = true")
                 < enter.indexOf("mainHandler.post(automaticLifecycleQuietTeardown)"));

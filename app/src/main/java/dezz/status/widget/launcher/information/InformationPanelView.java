@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import dezz.status.widget.Fonts;
 import dezz.status.widget.BrickType;
@@ -83,7 +84,8 @@ public final class InformationPanelView extends FrameLayout {
     private static final long SERVICE_RETRY_MS = 500L;
     private static final long DEFAULT_CAR_STALE_MS = 15_000L;
 
-    private final CarIntegration carIntegration;
+    private final Supplier<CarIntegration> carIntegrationSupplier;
+    @Nullable private CarIntegration carIntegration;
     private final InformationPanelConfigStore store;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Map<String, CarTelemetryDescriptor> vehicleCatalog = new LinkedHashMap<>();
@@ -127,8 +129,16 @@ public final class InformationPanelView extends FrameLayout {
     public InformationPanelView(@NonNull Context context,
                                 @NonNull CarIntegration carIntegration,
                                 @NonNull InformationPanelConfigStore store) {
-        super(context);
+        this(context, () -> carIntegration, store);
         this.carIntegration = carIntegration;
+    }
+
+    /** Keeps the vehicle connector dormant while HOME builds its first visual frame. */
+    public InformationPanelView(@NonNull Context context,
+                                @NonNull Supplier<CarIntegration> carIntegrationSupplier,
+                                @NonNull InformationPanelConfigStore store) {
+        super(context);
+        this.carIntegrationSupplier = carIntegrationSupplier;
         this.store = store;
         config = store.load();
         setClipChildren(false);
@@ -140,6 +150,7 @@ public final class InformationPanelView extends FrameLayout {
 
     public void start() {
         if (started) return;
+        requireCarIntegration();
         started = true;
         vehicleValues.clear();
         connectorValues.clear();
@@ -156,7 +167,7 @@ public final class InformationPanelView extends FrameLayout {
         started = false;
         catalogGeneration++;
         handler.removeCallbacks(tick);
-        carIntegration.unsubscribeTelemetry(vehicleListener);
+        if (carIntegration != null) carIntegration.unsubscribeTelemetry(vehicleListener);
         disconnectConnectorService();
         vehicleValues.clear();
         connectorValues.clear();
@@ -237,8 +248,9 @@ public final class InformationPanelView extends FrameLayout {
     }
 
     private void requestVehicleCatalog() {
+        CarIntegration current = requireCarIntegration();
         final int generation = ++catalogGeneration;
-        carIntegration.requestTelemetryCatalog(values -> {
+        current.requestTelemetryCatalog(values -> {
             if (generation != catalogGeneration) return;
             vehicleCatalog.clear();
             for (CarTelemetryDescriptor value : values) vehicleCatalog.put(value.id, value);
@@ -247,11 +259,24 @@ public final class InformationPanelView extends FrameLayout {
     }
 
     private void subscribeVehicleValues() {
+        requireCarIntegration();
         carIntegration.unsubscribeTelemetry(vehicleListener);
         Set<String> ids = requestedVehicleIds();
         if (started && !ids.isEmpty()) {
             carIntegration.subscribeTelemetry(ids, vehicleListener);
         }
+    }
+
+    @NonNull
+    private CarIntegration requireCarIntegration() {
+        CarIntegration current = carIntegration;
+        if (current != null) return current;
+        current = carIntegrationSupplier.get();
+        if (current == null) {
+            throw new IllegalStateException("Car integration supplier returned null");
+        }
+        carIntegration = current;
+        return current;
     }
 
     @NonNull

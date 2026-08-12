@@ -68,7 +68,15 @@ public final class SprutHubRpcClient implements Closeable {
     private final OkHttpClient http;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(
             runnable -> {
-                Thread thread = new Thread(runnable, "spruthub-rpc-timeouts");
+                Thread thread = new Thread(() -> {
+                    try {
+                        android.os.Process.setThreadPriority(
+                                android.os.Process.THREAD_PRIORITY_BACKGROUND);
+                    } catch (RuntimeException ignored) {
+                        // Timeout handling must survive an OEM priority-policy failure.
+                    }
+                    runnable.run();
+                }, "spruthub-rpc-timeouts");
                 thread.setDaemon(true);
                 return thread;
             });

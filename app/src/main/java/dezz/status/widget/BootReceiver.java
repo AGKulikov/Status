@@ -79,13 +79,16 @@ public class BootReceiver extends BroadcastReceiver {
         }
         if (WidgetServiceStarter.ACTION_RETRY.equals(action)) {
             WidgetServiceStarter.retryFromAlarm(context,
-                    intent.getIntExtra(WidgetServiceStarter.EXTRA_RETRY_ATTEMPT, -1));
+                    intent.getIntExtra(WidgetServiceStarter.EXTRA_RETRY_ATTEMPT, -1),
+                    intent.getBooleanExtra(
+                            WidgetServiceStarter.EXTRA_VISUAL_SURFACE_ONLY, false));
             return;
         }
         if (Intent.ACTION_USER_UNLOCKED.equals(action)) {
             // Unlock opens only the Keystore-dependent connector gate. It must not rebuild the
             // Driver, HUD and Climate windows that the same boot token already restored.
             StartupWorkCoordinator.scheduleForLifecycle(context, action);
+            WidgetServiceStarter.startVisibleSurfaceImmediatelyWithRetry(context);
             return;
         }
         if (Intent.ACTION_BOOT_COMPLETED.equals(action)
@@ -105,9 +108,19 @@ public class BootReceiver extends BroadcastReceiver {
                     || Intent.ACTION_BOOT_COMPLETED.equals(action)
                     || ACTION_QUICKBOOT_POWERON.equals(action)) {
                 WidgetService survivingHost = WidgetService.getInstance();
-                if (survivingHost != null) survivingHost.enterAutomaticLifecycleQuiet();
+                if (survivingHost != null) {
+                    survivingHost.enterAutomaticLifecycleQuiet(
+                            ACTION_QUICKBOOT_POWERON.equals(action));
+                }
             }
             StartupWorkCoordinator.scheduleForLifecycle(context, action);
+            // BOOT_COMPLETED/QuickBoot may show the lightweight cached row immediately. The exact
+            // generation above still owns every controller, ECARX and headless surface.
+            if (Intent.ACTION_BOOT_COMPLETED.equals(action)
+                    || ACTION_QUICKBOOT_POWERON.equals(action)
+                    || Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
+                WidgetServiceStarter.startVisibleSurfaceImmediatelyWithRetry(context);
+            }
         }
     }
 

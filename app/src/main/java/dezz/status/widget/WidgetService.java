@@ -223,8 +223,9 @@ public class WidgetService extends Service {
 
     /** Cross-fade duration for the entire overlay (show/hide / per-app hide). */
     private static final int OVERLAY_FADE_DURATION_MS = 500;
-    /** Cold attach becomes readable quickly; later hide/show transitions keep the calmer 500 ms. */
-    private static final int INITIAL_OVERLAY_FADE_DURATION_MS = 220;
+    /** Cold attach is a near-immediate reveal; later hide/show keeps the calmer 500 ms. */
+    private static final int INITIAL_OVERLAY_FADE_DURATION_MS = 90;
+    private static final int INITIAL_OVERLAY_FALLBACK_GRACE_MS = 160;
     private static final long OVERLAY_ATTACH_RETRY_MS = 1_500L;
     private static final long MAX_OVERLAY_ATTACH_RETRY_MS = 30_000L;
     /**
@@ -245,6 +246,8 @@ public class WidgetService extends Service {
     private static final long SYSTEM_CONDITION_REFRESH_INTERVAL_MS = 60_000L;
     /** One connector/vendor startup per main-loop slice; never one boot-time burst. */
     private static final long INITIAL_INTEGRATION_STAGE_MS = 650L;
+    /** QuickBoot teardown is cooperative too; it must not become a reverse startup burst. */
+    private static final long AUTOMATIC_QUIET_TEARDOWN_SLICE_MS = 180L;
     /** A one-off vendor/Binder rejection is retried without turning startup into a tight loop. */
     private static final int MAX_INITIAL_INTEGRATION_STAGE_RETRIES = 2;
     private static final long INITIAL_HUD_AFTER_DRIVER_MS = 1_000L;
@@ -298,6 +301,10 @@ public class WidgetService extends Service {
     private static final long TEMPORARY_SCENARIO_HOST_MAX_MS = 16_000L;
     private final ArrayDeque<Intent> pendingIntentScenarioCommands = new ArrayDeque<>();
     private boolean temporaryScenarioHeadlessHost;
+    private final Runnable explicitScenarioRuntimeOverrideRecheck = () ->
+            reconcileExplicitScenarioRuntimeOverride(false);
+    private final Runnable explicitScenarioRuntimeOverrideExpiry = () ->
+            reconcileExplicitScenarioRuntimeOverride(true);
     private final Runnable temporaryScenarioHostRecheck = () ->
             reconcileTemporaryScenarioHeadlessHost(false);
     private final Runnable temporaryScenarioHostExpiry = () ->
@@ -318,24 +325,56 @@ public class WidgetService extends Service {
     private final Object automationUiLock = new Object();
     private final Map<String, Set<String>> pendingAutomationUi = new LinkedHashMap<>();
     private boolean automationUiRefreshScheduled;
+    /** Fresh visual-only host is admitted, but controller/vendor work still belongs to host phase. */
+    private boolean automaticRuntimeParked;
+    /** Bounded authenticated command may use runtime without opening the automatic host barrier. */
+    private boolean explicitScenarioRuntimeOverride;
     private boolean automaticLifecycleQuiet;
     private boolean automaticSurfaceReconcilePending;
+    /** Only a process surviving QuickBoot needs an immediate WindowManager revalidation. */
+    private boolean automaticSurfaceRevalidationRequired;
+    /** Exact host phase was accepted; resume waits only for its current replacement root. */
+    private boolean automaticHostReleaseAfterVisible;
     private int automaticLifecycleResumeGeneration;
+    private int automaticLifecycleTeardownStage;
     private volatile boolean destroyed;
-    private final Runnable automaticLifecycleQuietTeardown = () -> {
+    private final Runnable automaticLifecycleQuietTeardown =
+            this::runNextAutomaticLifecycleQuietTeardown;
+
+    private void runNextAutomaticLifecycleQuietTeardown() {
         if (destroyed || !automaticLifecycleQuiet) return;
-        runIntegrationStep("quiet phone", () -> {
-            if (phoneController != null) phoneController.stop();
-        });
-        runIntegrationStep("quiet MQTT", () -> {
-            if (mqttController != null) mqttController.pauseForAutomaticLifecycle();
-        });
-        runIntegrationStep("quiet Home Assistant", () -> {
-            if (haApiController != null) haApiController.pauseForAutomaticLifecycle();
-        });
-        runIntegrationStep("quiet Sprut.hub", () -> {
-            if (sprutController != null) sprutController.pauseForAutomaticLifecycle();
-        });
+        switch (automaticLifecycleTeardownStage++) {
+            case 0:
+                runIntegrationStep("quiet phone", () -> {
+                    if (phoneController != null) phoneController.stop();
+                });
+                break;
+            case 1:
+                runIntegrationStep("quiet MQTT", () -> {
+                    if (mqttController != null) mqttController.pauseForAutomaticLifecycle();
+                });
+                break;
+            case 2:
+                runIntegrationStep("quiet Home Assistant", () -> {
+                    if (haApiController != null) haApiController.pauseForAutomaticLifecycle();
+                });
+                break;
+            case 3:
+                runIntegrationStep("quiet Sprut.hub", () -> {
+                    if (sprutController != null) sprutController.pauseForAutomaticLifecycle();
+                });
+                break;
+            default:
+                return;
+        }
+        mainHandler.postDelayed(automaticLifecycleQuietTeardown,
+                AUTOMATIC_QUIET_TEARDOWN_SLICE_MS);
+    }
+    private final Runnable automaticVisualSurfaceRevalidation = () -> {
+        if (destroyed || !automaticSurfaceRevalidationRequired || prefs == null) return;
+        automaticSurfaceRevalidationRequired = false;
+        if (!prefs.widgetEnabled.get() || !Permissions.allPermissionsGranted(this)) return;
+        revalidateStatusOverlayWindowOnly("immediate QuickBoot surface revalidation");
     };
     private final Runnable automationUiRefresh = () -> {
         if (automaticSurfaceRefreshSuppressed()) {
@@ -561,6 +600,8 @@ public class WidgetService extends Service {
     private boolean credentialRefreshScheduled;
     private int initialIntegrationStage;
     private int initialIntegrationStageRetryCount;
+    /** Stage zero owns persistence until its worker result is committed on the main thread. */
+    private boolean startupStateBarrierInFlight;
     private final Runnable initialIntegrationStageRunner = this::runNextInitialIntegrationStage;
     @Nullable private DeferredIntegrationStart deferredIntegrationStart;
 
@@ -591,14 +632,33 @@ public class WidgetService extends Service {
             }
             StartupPerformanceTrace.mark("overlay_fully_visible");
             StatusWidgetApplication.notifyFirstUsefulSurface(WidgetService.this);
-            boolean resumedQuietLane = automaticLifecycleQuiet;
-            if (resumedQuietLane) {
+            // The surface and controller lanes are independent. A fresh status row is allowed to
+            // draw during boot, but its fully-visible callback must never open the persisted host
+            // generation by itself.
+            if (!explicitScenarioRuntimeOverride
+                    && StartupWorkCoordinator.shouldParkAutomaticRuntime(WidgetService.this)) {
+                automaticRuntimeParked = true;
+                StartupWorkCoordinator.ensureIntegrationHostScheduled(WidgetService.this);
+            }
+            boolean releasedParkedRuntime = false;
+            if (automaticHostReleaseAfterVisible
+                    && !StartupWorkCoordinator.shouldParkAutomaticRuntime(WidgetService.this)) {
+                releasedParkedRuntime = automaticRuntimeParked || automaticLifecycleQuiet;
+                automaticHostReleaseAfterVisible = false;
                 resumeAutomaticLifecycleIntegrationsAfterQuiet();
-            } else if (!integrationsStarted && !initialIntegrationStartupInProgress) {
+            }
+            boolean runtimeParked = automaticRuntimeParked || automaticLifecycleQuiet;
+            if (!runtimeParked && !integrationsStarted
+                    && !initialIntegrationStartupInProgress) {
                 runInitialIntegrationStartup();
             }
-            if (integrationsStarted && binding != null) applyPreferences(false);
-            if (!resumedQuietLane) finishAutomaticSurfaceReconcileIfReady();
+            if (!runtimeParked && integrationsStarted && binding != null) {
+                applyPreferences(false);
+            }
+            if (!runtimeParked && !automaticHostReleaseAfterVisible
+                    && !releasedParkedRuntime) {
+                finishAutomaticSurfaceReconcileIfReady();
+            }
         }
     }
     /** Re-evaluates TTL/stale rules even when no new packet arrives. */
@@ -940,7 +1000,9 @@ public class WidgetService extends Service {
         runtimeInitialized = true;
         startupStateOwnerToken = STARTUP_STATE_OWNER.incrementAndGet();
 
-        prefs = new Preferences(this);
+        // The early visual host reads geometry immediately but runs upgrade migrations inside the
+        // background-priority state barrier at the delayed runtime phase.
+        prefs = new Preferences(this, !automaticRuntimeParked);
         automationStates = new AutomationStateStore(this);
         // Cached values may be rendered in the first frame, but never as current. The persisted
         // mark-all-stale pass is intentionally delayed until after that frame.
@@ -974,7 +1036,9 @@ public class WidgetService extends Service {
             // No visual frame exists in headless mode, so the same serialized controller lane can
             // begin immediately. It still creates and starts at most one integration per stage.
             StatusWidgetApplication.notifyFirstUsefulSurface(this);
-            runInitialIntegrationStartup();
+            if (!automaticRuntimeParked && !automaticLifecycleQuiet) {
+                runInitialIntegrationStartup();
+            }
         } else {
             stopSelf();
         }
@@ -1202,7 +1266,8 @@ public class WidgetService extends Service {
 
     /** Starts the long-lived integrations once, after the first attached status frame was drawn. */
     private void runInitialIntegrationStartup() {
-        if (destroyed || integrationsStarted || initialIntegrationStartupInProgress) return;
+        if (destroyed || automaticRuntimeParked || automaticLifecycleQuiet
+                || integrationsStarted || initialIntegrationStartupInProgress) return;
         integrationStartupScheduled = true;
         initialIntegrationStartupInProgress = true;
         initialIntegrationStage = 0;
@@ -1213,7 +1278,7 @@ public class WidgetService extends Service {
 
     private void runNextInitialIntegrationStage() {
         if (destroyed || !initialIntegrationStartupInProgress) return;
-        if (automaticLifecycleQuiet) {
+        if (automaticRuntimeParked || automaticLifecycleQuiet) {
             // Keep the exact stage parked. The host-phase generation will resume it; no polling
             // and no transport/vendor construction is allowed inside the QuickBoot quiet lane.
             mainHandler.removeCallbacks(initialIntegrationStageRunner);
@@ -1306,6 +1371,7 @@ public class WidgetService extends Service {
     private void runCachedStateFreshnessBarrier() {
         // Reserve the next state before dispatch so settings callbacks cannot start a parallel
         // lane while the worker owns the retained JSON document.
+        startupStateBarrierInFlight = true;
         initialIntegrationStage = 1;
         final long ownerToken = startupStateOwnerToken;
         try {
@@ -1315,6 +1381,7 @@ public class WidgetService extends Service {
                 try {
                     // Both documents can be large after long use. Parse/rewrite them at Android's
                     // background priority while the already-attached shell remains responsive.
+                    prefs.completeDeferredStartupMigrations();
                     loadedMainJson = prefs.haMainBricksJson.get();
                     loadedMainBricks = haConfigs.loadMain(loadedMainJson);
                     if (!automationStates.markAllStaleIf(
@@ -1329,16 +1396,18 @@ public class WidgetService extends Service {
                         new ArrayList<>(loadedMainBricks));
                 String immutableMainJson = loadedMainJson;
                 mainHandler.post(() -> {
+                    startupStateBarrierInFlight = false;
                     if (destroyed || !initialIntegrationStartupInProgress) return;
                     configuredMainBricks = immutableMainBricks;
                     configuredMainBricksJson = immutableMainJson;
                     StartupPerformanceTrace.mark("cached_state_ready");
-                    if (automaticLifecycleQuiet) return;
+                    if (automaticRuntimeParked || automaticLifecycleQuiet) return;
                     mainHandler.postDelayed(initialIntegrationStageRunner,
                             INITIAL_INTEGRATION_STAGE_MS);
                 });
             });
         } catch (RuntimeException rejected) {
+            startupStateBarrierInFlight = false;
             Log.e(TAG, "Could not schedule cached-state freshness barrier", rejected);
             mainHandler.postDelayed(initialIntegrationStageRunner,
                     INITIAL_INTEGRATION_STAGE_MS);
@@ -1379,6 +1448,9 @@ public class WidgetService extends Service {
         integrationStartupScheduled = false;
         integrationsStarted = true;
         StartupPerformanceTrace.mark("integrations_ready");
+        // Diagnostics/privileged ECARX policy is nonvisual. Keep it out of every connector stage
+        // instead of letting an independent 1.5-second timer collide with Phone/Car/MQTT startup.
+        StatusWidgetApplication.resumeSurfaceOwnedInitialization(this);
         // A constructor failure in stage 8 must not strand a still-valid explicit command. The
         // on-demand retry remains serialized on the service main looper and executes at most once.
         drainPendingIntentScenarioCommands();
@@ -1425,7 +1497,7 @@ public class WidgetService extends Service {
 
     private void scheduleInitialIntegrationStartupAfterFrame() {
         if (destroyed || binding == null || !overlayAttached) return;
-        if (integrationsStarted && !automaticLifecycleQuiet
+        if (integrationsStarted && !automaticRuntimeParked && !automaticLifecycleQuiet
                 && !automaticSurfaceReconcilePending) return;
         View root = binding.getRoot();
         int generation = overlayAttachGeneration;
@@ -1565,17 +1637,46 @@ public class WidgetService extends Service {
         // is allowed to keep a temporary headless host even when overlay AppOps are unavailable.
         if (explicitScenarioCommand) enqueueIntentScenarioCommand(intent);
         if (!runtimeInitialized) {
-            if (intent == null
-                    && StartupWorkCoordinator.shouldDeferAutomaticStickyRestart(this)) {
+            boolean deferredStickyRestart = intent == null
+                    && StartupWorkCoordinator.shouldDeferAutomaticStickyRestart(this);
+            boolean stickyVisualSurface = deferredStickyRestart
+                    && StartupWorkCoordinator.isUserUnlocked(this)
+                    && WidgetServiceStarter.canStartVisualSurfaceWhileRuntimeParked(
+                    Preferences.isStatusWidgetEnabledForVisualBootstrap(this),
+                    Permissions.allPermissionsGranted(this));
+            if (deferredStickyRestart && !stickyVisualSurface) {
                 StartupWorkCoordinator.ensureIntegrationHostScheduled(this);
                 stopForeground(true);
                 stopSelf(startId);
                 return START_NOT_STICKY;
             }
+            boolean visualSurfaceOnly = intent != null
+                    && WidgetServiceStarter.ACTION_START_VISIBLE_SURFACE.equals(
+                    intent.getAction());
+            automaticRuntimeParked = (visualSurfaceOnly || stickyVisualSurface)
+                    && StartupWorkCoordinator.shouldParkAutomaticRuntime(this);
+            if (automaticRuntimeParked) {
+                StartupWorkCoordinator.ensureIntegrationHostScheduled(this);
+                StartupPerformanceTrace.mark("integration_runtime_parked");
+            }
             initializeRuntime();
         }
         if (!runtimeInitialized || prefs == null) return START_NOT_STICKY;
         if (explicitScenarioCommand) {
+            // Explicit, authenticated user work is not an automatic boot reconnect. It may open
+            // the runtime lane for its original bounded command deadline.
+            explicitScenarioRuntimeOverride = true;
+            mainHandler.removeCallbacks(explicitScenarioRuntimeOverrideRecheck);
+            mainHandler.removeCallbacks(explicitScenarioRuntimeOverrideExpiry);
+            mainHandler.postDelayed(explicitScenarioRuntimeOverrideExpiry,
+                    TEMPORARY_SCENARIO_HOST_MAX_MS);
+            automaticHostReleaseAfterVisible = false;
+            mainHandler.removeCallbacks(automaticLifecycleQuietTeardown);
+            if (automaticRuntimeParked || automaticLifecycleQuiet) {
+                // Reuse the serialized reconnect lane. The command controller retries against its
+                // absolute 15-second deadline while MQTT/HA/Sprut become authoritative again.
+                resumeAutomaticLifecycleIntegrationsAfterQuiet();
+            }
             armTemporaryScenarioHeadlessHostIfNeeded(
                     Permissions.allPermissionsGranted(this));
         }
@@ -1590,9 +1691,9 @@ public class WidgetService extends Service {
         if (explicitScenarioCommand) {
             if (integrationsStarted) {
                 drainPendingIntentScenarioCommands();
-            } else if (binding == null && !initialIntegrationStartupInProgress) {
-                // A rejected/missing overlay must not hold an explicit physical command behind
-                // WindowManager retries. This is user work, not automatic boot-time work.
+            } else if (!initialIntegrationStartupInProgress) {
+                // A visible or rejected overlay must not hold an explicit physical command behind
+                // WindowManager/host retries. This is bounded user work, not automatic boot work.
                 runInitialIntegrationStartup();
             }
         }
@@ -1643,7 +1744,32 @@ public class WidgetService extends Service {
                     command.getStringExtra(ScenarioTriggerReceiver.EXTRA_RULE_FINGERPRINT),
                     command.getLongExtra(ScenarioTriggerReceiver.EXTRA_DEADLINE_ELAPSED, 0L));
         }
+        reconcileExplicitScenarioRuntimeOverride(false);
         reconcileTemporaryScenarioHeadlessHost(false);
+    }
+
+    /**
+     * Keeps the bounded runtime override until the accepted physical command has either completed
+     * or reached its original monotonic deadline. Draining the service queue is not completion:
+     * IntentScenarioController may still be waiting for a connector snapshot or acknowledgement.
+     */
+    private void reconcileExplicitScenarioRuntimeOverride(boolean force) {
+        mainHandler.removeCallbacks(explicitScenarioRuntimeOverrideRecheck);
+        if (!explicitScenarioRuntimeOverride || destroyed) return;
+        boolean executionPending = !pendingIntentScenarioCommands.isEmpty()
+                || (intentScenarioController != null
+                && intentScenarioController.hasPendingExecutions());
+        if (!force && executionPending) {
+            mainHandler.postDelayed(explicitScenarioRuntimeOverrideRecheck,
+                    TEMPORARY_SCENARIO_HOST_RECHECK_MS);
+            return;
+        }
+        explicitScenarioRuntimeOverride = false;
+        mainHandler.removeCallbacks(explicitScenarioRuntimeOverrideExpiry);
+        if (StartupWorkCoordinator.shouldParkAutomaticRuntime(this)) {
+            automaticRuntimeParked = true;
+            StartupWorkCoordinator.ensureIntegrationHostScheduled(this);
+        }
     }
 
     private void reconcileTemporaryScenarioHeadlessHost(boolean force) {
@@ -1657,6 +1783,7 @@ public class WidgetService extends Service {
             return;
         }
         temporaryScenarioHeadlessHost = false;
+        reconcileExplicitScenarioRuntimeOverride(force);
         pendingIntentScenarioCommands.clear();
         mainHandler.removeCallbacks(temporaryScenarioHostExpiry);
         boolean persistentSurfaceHost = prefs.widgetEnabled.get()
@@ -1791,7 +1918,7 @@ public class WidgetService extends Service {
         mainHandler.removeCallbacks(overlayAttachRetry);
         overlayAttachRetryScheduled = false;
         overlayAttachAttempts = 0;
-        if (integrationsStarted && !automaticLifecycleQuiet) {
+        if (integrationsStarted && !automaticRuntimeParked && !automaticLifecycleQuiet) {
             // A later user-driven reattach reuses the live graph and needs its listeners now.
             applyPreferences(false);
         }
@@ -1807,18 +1934,18 @@ public class WidgetService extends Service {
                 .withEndAction(() -> completeInitialOverlayVisibility(
                         attachmentGeneration, attachmentRoot, false))
                 .start();
-        if (integrationsStarted && !automaticLifecycleQuiet) {
+        if (integrationsStarted && !automaticRuntimeParked && !automaticLifecycleQuiet) {
             // Dynamic headless -> status-row attach reuses the already-running connectors, but
             // popup windows still need to be recreated for the newly enabled status surface.
             applyPopupPreferencesSafely();
         }
-        if (!integrationsStarted || automaticLifecycleQuiet
+        if (!integrationsStarted || automaticRuntimeParked || automaticLifecycleQuiet
                 || automaticSurfaceReconcilePending) {
             // OEM animators have occasionally missed an end callback after a SurfaceFlinger
             // restart. This bounded idempotent fallback preserves headless/connectivity startup.
             mainHandler.postDelayed(() -> completeInitialOverlayVisibility(
                             attachmentGeneration, attachmentRoot, true),
-                    INITIAL_OVERLAY_FADE_DURATION_MS + 250L);
+                    INITIAL_OVERLAY_FADE_DURATION_MS + INITIAL_OVERLAY_FALLBACK_GRACE_MS);
         }
     }
 
@@ -1831,7 +1958,7 @@ public class WidgetService extends Service {
         }
         if (root.getAlpha() < 0.999f || overlayVisibleGeneration == generation) return;
         overlayVisibleGeneration = generation;
-        if (!integrationsStarted || automaticLifecycleQuiet
+        if (!integrationsStarted || automaticRuntimeParked || automaticLifecycleQuiet
                 || automaticSurfaceReconcilePending) {
             scheduleInitialIntegrationStartupAfterFrame();
         }
@@ -1903,6 +2030,26 @@ public class WidgetService extends Service {
         } finally {
             overlayAttached = false;
         }
+    }
+
+    /**
+     * Replaces only the WindowManager root after SurfaceFlinger/QuickBoot ownership changes.
+     * Location, connectivity, media and vehicle subscriptions stay intact; tearing those down
+     * here would both create an early Binder burst and require a second full runtime startup.
+     */
+    private void revalidateStatusOverlayWindowOnly(@NonNull String reason) {
+        mainHandler.removeCallbacks(overlayAttachRetry);
+        overlayAttachRetryScheduled = false;
+        overlayAttachAttempts = 0;
+        if (binding != null) {
+            binding.getRoot().animate().cancel();
+            binding.overlayContainer.setLayoutTransition(null);
+        }
+        pendingBufferedTransitions = 0;
+        removeStatusOverlaySafely(reason);
+        binding = null;
+        params = null;
+        createOverlayView();
     }
 
     /**
@@ -2010,7 +2157,7 @@ public class WidgetService extends Service {
      */
     void ensureEnabledRuntime() {
         if (destroyed || prefs == null) return;
-        if (automaticLifecycleQuiet) return;
+        if (automaticRuntimeParked || automaticLifecycleQuiet) return;
         if (WidgetServiceStarter.requiresHeadlessHost(prefs)
                 && !integrationsStarted) {
             runInitialIntegrationStartup();
@@ -2019,6 +2166,21 @@ public class WidgetService extends Service {
                 && Permissions.allPermissionsGranted(this)) {
             createOverlayView();
         }
+    }
+
+    /**
+     * Idempotent visual-only wake used by HOME/boot while controller work may still be parked.
+     * It deliberately does not call applyPreferences or construct a headless runtime graph.
+     */
+    void ensureAutomaticVisualSurface() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(this::ensureAutomaticVisualSurface);
+            return;
+        }
+        if (destroyed || prefs == null || !prefs.widgetEnabled.get()
+                || binding != null || overlayAttachRetryScheduled
+                || !Permissions.allPermissionsGranted(this)) return;
+        createOverlayView();
     }
 
     /**
@@ -2033,28 +2195,48 @@ public class WidgetService extends Service {
             return;
         }
         automaticSurfaceReconcilePending = true;
-        if (prefs.widgetEnabled.get() && binding != null) {
-            // QuickBoot can invalidate the remote WindowManager/SurfaceFlinger owner while the
-            // local ViewRoot still reports attached. One controlled lifecycle transaction is more
-            // reliable than trusting that process-local flag and is isolated after the quiet lane.
-            detachStatusSurfaceRuntime("automatic lifecycle surface revalidation");
+        if (automaticSurfaceRevalidationRequired && prefs.widgetEnabled.get()) {
+            automaticSurfaceRevalidationRequired = false;
+            revalidateStatusOverlayWindowOnly("deferred QuickBoot surface revalidation");
         }
         boolean waitsForVisibleSurface = prefs.widgetEnabled.get()
                 && Permissions.allPermissionsGranted(this);
         if (waitsForVisibleSurface) {
-            createOverlayView();
-            // completeInitialOverlayVisibility -> Choreographer -> Handler owns the resume. This
-            // keeps every parked transport/vendor stage behind the replacement root's real frame.
-            if (binding != null) return;
+            // Persist the accepted host handoff before addView: a synchronous OEM WindowManager
+            // rejection may clear binding, but a later bounded retry must still release this
+            // exact parked runtime after its real frame.
+            automaticHostReleaseAfterVisible = true;
+            if (binding == null) createOverlayView();
+            boolean surfaceReady = binding != null && overlayAttached
+                    && overlayVisibleGeneration == overlayAttachGeneration
+                    && binding.getRoot().getAlpha() >= 0.999f;
+            if (binding != null && !surfaceReady) {
+                // This flag is minted only by an accepted host-generation callback. The visible
+                // callback may therefore release the parked graph, but can never open the host
+                // barrier on its own.
+                automaticHostReleaseAfterVisible = true;
+                scheduleInitialIntegrationStartupAfterFrame();
+                return;
+            }
+            if (surfaceReady) {
+                boolean releasedParkedRuntime = automaticRuntimeParked
+                        || automaticLifecycleQuiet;
+                automaticHostReleaseAfterVisible = false;
+                resumeAutomaticLifecycleIntegrationsAfterQuiet();
+                if (!releasedParkedRuntime) finishAutomaticSurfaceReconcileIfReady();
+                return;
+            }
             if (!WidgetServiceStarter.requiresHeadlessHost(prefs)) return;
+            automaticHostReleaseAfterVisible = false;
         }
-        boolean resumedQuietLane = automaticLifecycleQuiet;
+        boolean releasedParkedRuntime = automaticRuntimeParked || automaticLifecycleQuiet;
         resumeAutomaticLifecycleIntegrationsAfterQuiet();
-        if (!resumedQuietLane) finishAutomaticSurfaceReconcileIfReady();
+        if (!releasedParkedRuntime) finishAutomaticSurfaceReconcileIfReady();
     }
 
     private void finishAutomaticSurfaceReconcileIfReady() {
-        if (!automaticSurfaceReconcilePending || automaticLifecycleQuiet
+        if (!automaticSurfaceReconcilePending || automaticRuntimeParked
+                || automaticLifecycleQuiet
                 || initialIntegrationStartupInProgress || !integrationsStarted) return;
         automaticSurfaceReconcilePending = false;
         if (prefs.driverPanelEnabled.get()) {
@@ -2078,23 +2260,37 @@ public class WidgetService extends Service {
      * Park only reconnecting transports immediately; the FGS notification and cached UI remain.
      */
     public void enterAutomaticLifecycleQuiet() {
+        enterAutomaticLifecycleQuiet(false);
+    }
+
+    public void enterAutomaticLifecycleQuiet(boolean revalidateVisualSurfaceImmediately) {
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            enterAutomaticLifecycleQuietOnMain();
+            enterAutomaticLifecycleQuietOnMain(revalidateVisualSurfaceImmediately);
         } else {
-            mainHandler.post(this::enterAutomaticLifecycleQuietOnMain);
+            mainHandler.post(() -> enterAutomaticLifecycleQuietOnMain(
+                    revalidateVisualSurfaceImmediately));
         }
     }
 
-    private void enterAutomaticLifecycleQuietOnMain() {
+    private void enterAutomaticLifecycleQuietOnMain(
+            boolean revalidateVisualSurfaceImmediately) {
         if (destroyed || !runtimeInitialized) return;
-        if (automaticLifecycleQuiet) return;
-        automaticLifecycleQuiet = true;
-        automaticLifecycleResumeGeneration++;
-        mainHandler.removeCallbacks(initialIntegrationStageRunner);
-        cancelDeferredIntegrationStart();
+        if (!automaticLifecycleQuiet) {
+            automaticLifecycleQuiet = true;
+            automaticLifecycleResumeGeneration++;
+            mainHandler.removeCallbacks(initialIntegrationStageRunner);
+            cancelDeferredIntegrationStart();
+            automaticHostReleaseAfterVisible = false;
+        }
+        if (revalidateVisualSurfaceImmediately && binding != null) {
+            automaticSurfaceRevalidationRequired = true;
+            mainHandler.removeCallbacks(automaticVisualSurfaceRevalidation);
+            mainHandler.post(automaticVisualSurfaceRevalidation);
+        }
         // The BroadcastReceiver-visible fence above is synchronous. Socket/Binder teardown is
         // deliberately posted so QuickBoot's main-thread broadcast can return immediately.
         mainHandler.removeCallbacks(automaticLifecycleQuietTeardown);
+        automaticLifecycleTeardownStage = 0;
         mainHandler.post(automaticLifecycleQuietTeardown);
     }
 
@@ -2103,9 +2299,14 @@ public class WidgetService extends Service {
             mainHandler.post(this::resumeAutomaticLifecycleIntegrationsAfterQuiet);
             return;
         }
-        if (!automaticLifecycleQuiet || destroyed) return;
+        if (destroyed || (!explicitScenarioRuntimeOverride
+                && StartupWorkCoordinator.shouldParkAutomaticRuntime(this))) return;
+        boolean hadParkedRuntime = automaticRuntimeParked || automaticLifecycleQuiet;
+        if (!hadParkedRuntime) return;
         mainHandler.removeCallbacks(automaticLifecycleQuietTeardown);
+        automaticRuntimeParked = false;
         automaticLifecycleQuiet = false;
+        automaticHostReleaseAfterVisible = false;
         int generation = ++automaticLifecycleResumeGeneration;
         if (initialIntegrationStartupInProgress) {
             // Stage zero is a one-time persistence barrier. Every later partially-started graph is
@@ -2113,7 +2314,9 @@ public class WidgetService extends Service {
             if (initialIntegrationStage > 1) initialIntegrationStage = 1;
             initialIntegrationStageRetryCount = 0;
             mainHandler.removeCallbacks(initialIntegrationStageRunner);
-            mainHandler.post(initialIntegrationStageRunner);
+            // Stage zero's background persistence barrier owns progression until its result is
+            // committed. Its completion callback will resume this exact lane once quiet opens.
+            if (!startupStateBarrierInFlight) mainHandler.post(initialIntegrationStageRunner);
             return;
         }
         if (!integrationsStarted) {
@@ -2130,7 +2333,7 @@ public class WidgetService extends Service {
         for (int index = 0; index < stages.length; index++) {
             final int stage = index;
             mainHandler.postDelayed(() -> {
-                if (destroyed || automaticLifecycleQuiet
+                if (destroyed || automaticRuntimeParked || automaticLifecycleQuiet
                         || generation != automaticLifecycleResumeGeneration) return;
                 runIntegrationStep("automatic lifecycle resume " + stage, stages[stage]);
                 if (stage == stages.length - 1) {
@@ -2161,7 +2364,7 @@ public class WidgetService extends Service {
             runInitialIntegrationStartup();
             return;
         }
-        if (automaticLifecycleQuiet) {
+        if (automaticRuntimeParked || automaticLifecycleQuiet) {
             // The staged lifecycle resume includes every Keystore-backed transport and Phone;
             // do not schedule a second overlapping MQTT/HA/Sprut pass for the same unlock edge.
             credentialRefreshPending = true;
@@ -3946,7 +4149,7 @@ public class WidgetService extends Service {
 
     private boolean automaticSurfaceRefreshSuppressed() {
         return initialIntegrationStartupInProgress || credentialRefreshScheduled
-                || automaticLifecycleQuiet
+                || automaticRuntimeParked || automaticLifecycleQuiet
                 || StartupWorkCoordinator.shouldDeferAutomaticStickyRestart(this);
     }
 
@@ -5964,6 +6167,10 @@ public class WidgetService extends Service {
 
     public static boolean isRunning() {
         return instance != null;
+    }
+
+    boolean isIntegrationRuntimeReadyForApplication() {
+        return !destroyed && integrationsStarted;
     }
 
     /** Current live ANCS subscription, used by driver rows that explicitly opt into this gate. */

@@ -16,7 +16,10 @@ public final class WidgetServiceStarter {
     private static final long[] RETRY_DELAYS_MS = {2_000L, 5_000L, 15_000L};
     static final String ACTION_RETRY =
             "dezz.status.widget.action.RETRY_WIDGET_SERVICE_START";
+    static final String ACTION_START_VISIBLE_SURFACE =
+            "dezz.status.widget.action.START_VISIBLE_STATUS_SURFACE";
     static final String EXTRA_RETRY_ATTEMPT = "retry_attempt";
+    static final String EXTRA_VISUAL_SURFACE_ONLY = "visual_surface_only";
     private static final int RETRY_REQUEST_CODE = 0x5749;
 
     private WidgetServiceStarter() {}
@@ -27,12 +30,28 @@ public final class WidgetServiceStarter {
      * USER_UNLOCKED or the next HOME start will retry safely.
      */
     public static boolean startIfNeeded(@NonNull Context context) {
-        return attemptStart(applicationContext(context), -1, false);
+        return attemptStart(applicationContext(context), -1, false, false);
     }
 
     /** Automatic HOME/boot entry respects HUD autostart instead of waking a manual-only HUD. */
     public static boolean startIfNeededAutomatically(@NonNull Context context) {
-        return attemptStart(applicationContext(context), -1, true);
+        return attemptStart(applicationContext(context), -1, true, false);
+    }
+
+    /**
+     * Shows the enabled status row immediately while the boot coordinator keeps every headless
+     * connector/vendor graph parked. This bypass never starts a headless-only host.
+     */
+    public static boolean startVisibleSurfaceImmediatelyAutomatically(
+            @NonNull Context context) {
+        return attemptStart(applicationContext(context), -1, true, true);
+    }
+
+    /** Boot/QuickBoot variant retaining the existing bounded OEM FGS retry. */
+    static boolean startVisibleSurfaceImmediatelyWithRetry(@NonNull Context context) {
+        Context app = applicationContext(context);
+        cancelPendingRetry(app);
+        return attemptStart(app, 0, true, true);
     }
 
     /**
@@ -43,36 +62,44 @@ public final class WidgetServiceStarter {
     public static boolean startIfNeededWithRetry(@NonNull Context context) {
         Context app = applicationContext(context);
         cancelPendingRetry(app);
-        return attemptStart(app, 0, true);
+        return attemptStart(app, 0, true, false);
     }
 
-    static boolean retryFromAlarm(@NonNull Context context, int retryAttempt) {
+    static boolean retryFromAlarm(@NonNull Context context, int retryAttempt,
+                                  boolean visualSurfaceOnly) {
         Context app = applicationContext(context);
         if (retryAttempt < 1 || retryAttempt > RETRY_DELAYS_MS.length) {
             Log.w(TAG, "Ignored invalid status overlay retry " + retryAttempt);
             cancelPendingRetry(app);
             return false;
         }
-        return attemptStart(app, retryAttempt, true);
+        return attemptStart(app, retryAttempt, true, visualSurfaceOnly);
     }
 
     private static boolean attemptStart(@NonNull Context app, int retryAttempt,
-                                        boolean automaticLifecycle) {
+                                        boolean automaticLifecycle,
+                                        boolean allowVisualSurfaceDuringQuiet) {
         try {
             if (WidgetService.isRunning()) {
+                if (allowVisualSurfaceDuringQuiet) {
+                    WidgetService current = WidgetService.getInstance();
+                    if (current != null) current.ensureAutomaticVisualSurface();
+                }
                 cancelPendingRetry(app);
                 return true;
             }
             // HOME, Settings and the isolated HUD process can all race the boot receiver. Before
             // parsing Preferences or constructing the foreground-service graph, honor the one
             // device-protected quiet boundary and coalesce every caller onto the same alarm.
-            if (StartupWorkCoordinator.remainingQuietMillis(app) > 0L
-                    || StartupWorkCoordinator.isStartupInitializationBlocked(app)) {
+            boolean runtimeParked = StartupWorkCoordinator.shouldParkAutomaticRuntime(app);
+            if (runtimeParked) {
                 if (!AppProcessPolicy.isHudProcess()) {
                     StartupWorkCoordinator.ensureIntegrationHostScheduled(app);
                 }
-                Log.i(TAG, "Integration host deferred until the boot quiet window closes");
-                return false;
+                if (!allowVisualSurfaceDuringQuiet) {
+                    Log.i(TAG, "Integration host deferred until the boot quiet window closes");
+                    return false;
+                }
             }
             if (!StartupWorkCoordinator.isUserUnlocked(app)) {
                 if (!AppProcessPolicy.isHudProcess()) {
@@ -80,6 +107,21 @@ public final class WidgetServiceStarter {
                 }
                 Log.i(TAG, "Integration host deferred until USER_UNLOCKED");
                 return false;
+            }
+            if (runtimeParked && allowVisualSurfaceDuringQuiet) {
+                // Do not run Preferences migrations twice in the receiver and service. This
+                // direct-boot bit is the entire early admission contract; headless features stay
+                // behind the exact host generation.
+                if (!canStartVisualSurfaceWhileRuntimeParked(
+                        Preferences.isStatusWidgetEnabledForVisualBootstrap(app),
+                        Permissions.allPermissionsGranted(app))) {
+                    cancelPendingRetry(app);
+                    return false;
+                }
+                app.startForegroundService(new Intent(app, WidgetService.class)
+                        .setAction(ACTION_START_VISIBLE_SURFACE));
+                cancelPendingRetry(app);
+                return true;
             }
             Preferences preferences = new Preferences(app);
             boolean integrationHostRequired = automaticLifecycle
@@ -98,14 +140,16 @@ public final class WidgetServiceStarter {
                 cancelPendingRetry(app);
                 return false;
             }
-            app.startForegroundService(new Intent(app, WidgetService.class));
+            Intent service = new Intent(app, WidgetService.class);
+            if (allowVisualSurfaceDuringQuiet) service.setAction(ACTION_START_VISIBLE_SURFACE);
+            app.startForegroundService(service);
             cancelPendingRetry(app);
             return true;
         } catch (RuntimeException failure) {
             // OEM builds can reject a foreground-service start briefly while the display/user is
             // still becoming ready. Keep the preference intact so a later lifecycle event retries.
             Log.e(TAG, "Could not start status overlay yet", failure);
-            scheduleRetry(app, retryAttempt);
+            scheduleRetry(app, retryAttempt, allowVisualSurfaceDuringQuiet);
             return false;
         }
     }
@@ -119,6 +163,11 @@ public final class WidgetServiceStarter {
                 preferences.mqttEnabled.get(),
                 preferences.sprutEnabled.get(),
                 preferences.haApiEnabled.get());
+    }
+
+    static boolean canStartVisualSurfaceWhileRuntimeParked(boolean widgetEnabled,
+                                                            boolean overlayPermissions) {
+        return widgetEnabled && overlayPermissions;
     }
 
     static boolean requiresHeadlessHost(@NonNull Preferences preferences) {
@@ -210,7 +259,8 @@ public final class WidgetServiceStarter {
                 || mqttEnabled || sprutEnabled || haApiEnabled;
     }
 
-    private static void scheduleRetry(@NonNull Context app, int retryAttempt) {
+    private static void scheduleRetry(@NonNull Context app, int retryAttempt,
+                                      boolean visualSurfaceOnly) {
         // Plain HOME calls use -1 and deliberately do not create a background alarm.
         if (retryAttempt < 0) return;
         if (retryAttempt >= RETRY_DELAYS_MS.length) {
@@ -221,7 +271,8 @@ public final class WidgetServiceStarter {
         int nextAttempt = retryAttempt + 1;
         Intent retry = new Intent(app, BootReceiver.class)
                 .setAction(ACTION_RETRY)
-                .putExtra(EXTRA_RETRY_ATTEMPT, nextAttempt);
+                .putExtra(EXTRA_RETRY_ATTEMPT, nextAttempt)
+                .putExtra(EXTRA_VISUAL_SURFACE_ONLY, visualSurfaceOnly);
         PendingIntent pending = PendingIntent.getBroadcast(app, RETRY_REQUEST_CODE, retry,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         AlarmManager alarms = app.getSystemService(AlarmManager.class);

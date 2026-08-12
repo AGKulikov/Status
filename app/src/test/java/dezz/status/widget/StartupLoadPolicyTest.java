@@ -63,9 +63,8 @@ public final class StartupLoadPolicyTest {
     }
 
     @Test public void vendorFallbackAndMediaCannotJoinTheBootBurst() {
-        assertTrue(StartupLoadPolicy.LAUNCHER_PANELS_AFTER_HOST_MS > 0L);
-        assertTrue(StartupLoadPolicy.LAUNCHER_RUNTIME_AFTER_HOST_MS
-                > StartupLoadPolicy.LAUNCHER_PANELS_AFTER_HOST_MS);
+        assertEquals(4_500L, StartupLoadPolicy.COLD_BOOT_RUNTIME_TARGET_ELAPSED_MS);
+        assertTrue(StartupLoadPolicy.LAUNCHER_RUNTIME_AFTER_HOST_MS > 0L);
         assertTrue(StartupLoadPolicy.CLIMATE_AFTER_HOST_MS
                 > StartupLoadPolicy.LAUNCHER_RUNTIME_AFTER_HOST_MS);
         assertTrue(StartupLoadPolicy.MEDIA_AUTO_RESUME_MIN_MS
@@ -74,7 +73,7 @@ public final class StartupLoadPolicyTest {
                 > StartupLoadPolicy.MEDIA_AUTO_RESUME_MIN_MS);
     }
 
-    @Test public void earlyHomeAndBootGenerationCannotBypassTheQuietLane() {
+    @Test public void earlyHomeAndBootGenerationCannotBypassTheRuntimeQuietLane() {
         assertEquals(4_500L, StartupLoadPolicy.earlyBootQuietMillis(0L));
         assertEquals(1L, StartupLoadPolicy.earlyBootQuietMillis(4_499L));
         assertEquals(0L, StartupLoadPolicy.earlyBootQuietMillis(4_500L));
@@ -96,10 +95,7 @@ public final class StartupLoadPolicyTest {
 
     @Test public void visibleSurfacesLeadButHeavyLanesRemainSeparated() {
         assertEquals(400L, StartupLoadPolicy.MAIN_PROCESS_SETTLE_MS);
-        assertEquals(750L, StartupLoadPolicy.LAUNCHER_PANELS_AFTER_HOST_MS);
         assertEquals(2_500L, StartupLoadPolicy.LAUNCHER_RUNTIME_AFTER_HOST_MS);
-        assertTrue(StartupLoadPolicy.LAUNCHER_RUNTIME_AFTER_HOST_MS
-                > StartupLoadPolicy.LAUNCHER_PANELS_AFTER_HOST_MS);
         assertTrue(StartupLoadPolicy.CLIMATE_AFTER_HOST_MS
                 > StartupLoadPolicy.LAUNCHER_RUNTIME_AFTER_HOST_MS);
     }

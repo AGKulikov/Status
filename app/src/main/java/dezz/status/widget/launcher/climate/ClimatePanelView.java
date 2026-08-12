@@ -33,6 +33,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import dezz.status.widget.R;
 import dezz.status.widget.car.CarControlCommand;
@@ -57,7 +58,8 @@ public final class ClimatePanelView extends FrameLayout {
     private static final long STATE_FRESH_MS = 75_000L;
     /** Longer than the integration deadline; still releases UI if a Binder call never returns. */
     private static final long COMMAND_WATCHDOG_MS = 7_000L;
-    private final CarIntegration integration;
+    private final Supplier<CarIntegration> integrationSupplier;
+    @Nullable private CarIntegration integration;
     private final ClimatePanelConfigStore configStore;
     private final Map<String, CarControlDescriptor> catalog = new LinkedHashMap<>();
     private final Map<String, CarControlState> states = new LinkedHashMap<>();
@@ -105,8 +107,16 @@ public final class ClimatePanelView extends FrameLayout {
 
     public ClimatePanelView(@NonNull Context context, @NonNull CarIntegration integration,
                             @NonNull ClimatePanelConfigStore configStore) {
-        super(context);
+        this(context, () -> integration, configStore);
         this.integration = integration;
+    }
+
+    /** Keeps ECARX construction out of HOME inflation; the supplier is first used by start(). */
+    public ClimatePanelView(@NonNull Context context,
+                            @NonNull Supplier<CarIntegration> integrationSupplier,
+                            @NonNull ClimatePanelConfigStore configStore) {
+        super(context);
+        this.integrationSupplier = integrationSupplier;
         this.configStore = configStore;
         this.config = configStore.load();
         setClipChildren(false);
@@ -152,6 +162,7 @@ public final class ClimatePanelView extends FrameLayout {
             subscribeVisibleControls();
             return;
         }
+        requireIntegration();
         started = true;
         catalogRetryAttempts = 0;
         // Keep a recently confirmed value while the fresh ECARX read is entering its worker.
@@ -200,7 +211,7 @@ public final class ClimatePanelView extends FrameLayout {
         started = false;
         catalogGeneration++;
         catalogRefreshPending = false;
-        integration.unsubscribeControlStates(stateListener);
+        if (integration != null) integration.unsubscribeControlStates(stateListener);
         for (Runnable timeout : pendingTimeouts.values()) removeCallbacks(timeout);
         pendingTimeouts.clear();
         pending.clear();
@@ -444,9 +455,10 @@ public final class ClimatePanelView extends FrameLayout {
 
     private void subscribeVisibleControls() {
         if (!started) return;
+        CarIntegration current = requireIntegration();
         Set<String> ids = visibleControlIds();
-        if (ids.isEmpty()) integration.unsubscribeControlStates(stateListener);
-        else integration.subscribeControlStates(ids, stateListener);
+        if (ids.isEmpty()) current.unsubscribeControlStates(stateListener);
+        else current.subscribeControlStates(ids, stateListener);
     }
 
     @NonNull
@@ -592,7 +604,7 @@ public final class ClimatePanelView extends FrameLayout {
         pendingTimeouts.put(bindingId, timeout);
         postDelayed(timeout, COMMAND_WATCHDOG_MS);
         applyState(bindingId);
-        integration.executeControl(new CarControlCommand(commandId, operation, value),
+        requireIntegration().executeControl(new CarControlCommand(commandId, operation, value),
                 (success, message) -> {
                     Long current = pending.get(bindingId);
                     if (current == null || current.longValue() != token) return;
@@ -605,6 +617,18 @@ public final class ClimatePanelView extends FrameLayout {
                                 ? "Команда не выполнена" : message, Toast.LENGTH_LONG).show();
                     }
                 });
+    }
+
+    @NonNull
+    private CarIntegration requireIntegration() {
+        CarIntegration current = integration;
+        if (current != null) return current;
+        current = integrationSupplier.get();
+        if (current == null) {
+            throw new IllegalStateException("Car integration supplier returned null");
+        }
+        integration = current;
+        return current;
     }
 
     private void applyState(@NonNull String id) {

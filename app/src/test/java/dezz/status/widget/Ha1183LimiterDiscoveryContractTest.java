@@ -47,7 +47,7 @@ public final class Ha1183LimiterDiscoveryContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1183() throws Exception {
-        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1213'"));
+        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1214'"));
         assertTrue(project("release-manifests/HA1183.md").contains("208021183"));
     }
 
