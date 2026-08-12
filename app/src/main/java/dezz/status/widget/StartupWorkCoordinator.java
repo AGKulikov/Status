@@ -81,7 +81,7 @@ public final class StartupWorkCoordinator {
         long earlyBootQuiet = StartupLoadPolicy.earlyBootQuietMillis(now);
         boolean existingStartupBarrier = startupBarrierActive(state, now);
         long quiet = Math.max(earlyBootQuiet,
-                newBoot ? StartupLoadPolicy.BOOT_COMPLETED_QUIET_MS : 0L);
+                newBoot ? StartupLoadPolicy.MAIN_PROCESS_SETTLE_MS : 0L);
         boolean fullBootLane = newBoot || earlyBootQuiet > 0L || existingStartupBarrier;
         if (quiet <= 0L && !existingStartupBarrier) {
             quiet = StartupLoadPolicy.MAIN_PROCESS_SETTLE_MS;
@@ -125,13 +125,18 @@ public final class StartupWorkCoordinator {
         long currentUntil = validFutureDeadline(state, KEY_QUIET_UNTIL_ELAPSED, now,
                 StartupLoadPolicy.MAX_VALID_QUIET_MS);
         if (newBoot) currentUntil = 0L;
-        long quietUntil = Math.max(currentUntil,
-                now + StartupLoadPolicy.quietWindowMillis(trigger));
+        boolean coalescingActiveBootLane = !newBoot
+                && startupBarrierActive(state, now)
+                && StartupLoadPolicy.isBootLifecycle(trigger);
+        long quietUntil = coalescingActiveBootLane ? Math.max(now, currentUntil)
+                : Math.max(currentUntil,
+                now + StartupLoadPolicy.quietWindowMillis(trigger, now));
         long generation = nextGeneration(state);
         boolean retainedCredentialRefresh = state.getBoolean(
                 KEY_UNLOCK_REFRESH_PENDING, false);
         boolean retainedClimate = state.getBoolean(KEY_CLIMATE_PHASE_PENDING, false);
         boolean retainedMedia = state.getBoolean(KEY_MEDIA_PHASE_PENDING, false);
+        boolean retainedHost = state.getBoolean(KEY_HOST_PHASE_PENDING, false);
         boolean retainedSurfaceReconcile = state.getBoolean(
                 KEY_SURFACE_RECONCILE_PENDING, false);
         boolean scheduleHost = StartupLoadPolicy.schedulesIntegrationHost(trigger);
@@ -164,9 +169,19 @@ public final class StartupWorkCoordinator {
             edit.putBoolean(KEY_SURFACE_RECONCILE_PENDING, true)
                     .putLong(KEY_SURFACE_RECONCILE_GENERATION, generation);
         }
-        long hostNotBefore = quietUntil;
-        long climateNotBefore = quietUntil + StartupLoadPolicy.CLIMATE_AFTER_HOST_MS;
-        long mediaNotBefore = Math.max(quietUntil,
+        long hostNotBefore = coalescingActiveBootLane && retainedHost
+                ? retainedPhaseNotBefore(state, KEY_HOST_NOT_BEFORE_ELAPSED, now)
+                : quietUntil;
+        long climateNotBefore = coalescingActiveBootLane && retainedClimate
+                ? retainedPhaseNotBefore(state, KEY_CLIMATE_NOT_BEFORE_ELAPSED, now)
+                : quietUntil + StartupLoadPolicy.CLIMATE_AFTER_HOST_MS;
+        boolean retainedMediaOnly = retainedMedia
+                && (!StartupLoadPolicy.schedulesMediaPlan(trigger)
+                || coalescingActiveBootLane);
+        long retainedMediaNotBefore = retainedMediaOnly
+                ? retainedPhaseNotBefore(state, KEY_MEDIA_NOT_BEFORE_ELAPSED, now) : 0L;
+        long mediaNotBefore = retainedMediaNotBefore > 0L
+                ? retainedMediaNotBefore : Math.max(quietUntil,
                 now + StartupLoadPolicy.MEDIA_AUTO_RESUME_MIN_MS);
         if (scheduleHost) writePhase(edit, PHASE_INTEGRATION_HOST, generation, hostNotBefore);
         if (scheduleClimate) writePhase(edit, PHASE_CLIMATE, generation, climateNotBefore);
@@ -212,6 +227,50 @@ public final class StartupWorkCoordinator {
                 remainingHostHandoffMillis(context));
     }
 
+    /**
+     * Exact in-process handoff for a visible HOME. AlarmManager remains the durable owner when HOME
+     * is hidden or the process dies, while this deadline prevents an inexact alarm from leaving a
+     * foreground launcher blank for several extra seconds.
+     *
+     * @return milliseconds until the current host phase is due, or {@code -1} when none is pending.
+     */
+    static long pendingIntegrationHostDelayMillis(@NonNull Context context) {
+        SharedPreferences state = state(applicationContext(context));
+        if (!state.getBoolean(KEY_HOST_PHASE_PENDING, false)) return -1L;
+        long now = SystemClock.elapsedRealtime();
+        return Math.max(
+                StartupLoadPolicy.remainingQuietMillis(now,
+                        state.getLong(KEY_QUIET_UNTIL_ELAPSED, 0L)),
+                StartupLoadPolicy.remainingStartupLaneMillis(now,
+                        state.getLong(KEY_HOST_NOT_BEFORE_ELAPSED, 0L)));
+    }
+
+    /** Dispatches only an exact, unlocked, already-due host generation. */
+    static boolean dispatchPendingIntegrationHostIfDue(@NonNull Context context) {
+        Context app = applicationContext(context);
+        SharedPreferences state = state(app);
+        if (!state.getBoolean(KEY_HOST_PHASE_PENDING, false) || !isUserUnlocked(app)) {
+            return false;
+        }
+        long generation = state.getLong(KEY_HOST_PHASE_GENERATION, Long.MIN_VALUE);
+        if (generation == Long.MIN_VALUE || pendingIntegrationHostDelayMillis(app) != 0L) {
+            return false;
+        }
+        Intent phase = new Intent(app, BootReceiver.class)
+                .setAction(ACTION_RUN_PHASE)
+                .putExtra(EXTRA_PHASE, PHASE_INTEGRATION_HOST)
+                .putExtra(EXTRA_GENERATION, generation);
+        try {
+            app.sendBroadcast(phase);
+            Log.i(TAG, "Visible HOME dispatched due host generation=" + generation);
+            return true;
+        } catch (RuntimeException failure) {
+            // The durable AlarmManager copy is still pending and remains the fallback owner.
+            Log.w(TAG, "Visible HOME could not dispatch the due host phase", failure);
+            return false;
+        }
+    }
+
     /** Automatic Settings/runtime reconciliation must not jump ahead of the surface lanes. */
     static long automaticReconcileDelayMillis(@NonNull Context context) {
         return Math.max(remainingQuietMillis(context), remainingDeadline(context,
@@ -224,6 +283,14 @@ public final class StartupWorkCoordinator {
         long now = SystemClock.elapsedRealtime();
         long notBefore = now + remainingQuietMillis(app);
         ensurePhaseScheduled(app, PHASE_INTEGRATION_HOST, notBefore);
+    }
+
+    /** Durable no-draw HOME fallback; never starts a foreground service in the outgoing frame. */
+    static void ensureIntegrationHostScheduledAfter(@NonNull Context context, long delayMillis) {
+        Context app = applicationContext(context);
+        long now = SystemClock.elapsedRealtime();
+        long requestedDelay = Math.max(remainingQuietMillis(app), Math.max(1L, delayMillis));
+        ensurePhaseScheduled(app, PHASE_INTEGRATION_HOST, now + requestedDelay);
     }
 
     public static void ensureClimateScheduled(@NonNull Context context) {
@@ -417,6 +484,13 @@ public final class StartupWorkCoordinator {
     private static long remainingHostHandoffMillis(@NonNull Context context) {
         SharedPreferences state = state(applicationContext(context));
         if (!state.getBoolean(KEY_HOST_PHASE_PENDING, false)) return 0L;
+        long generation = state.getLong(KEY_HOST_PHASE_GENERATION, Long.MIN_VALUE);
+        boolean pendingCredentialRefresh = state.getBoolean(KEY_UNLOCK_REFRESH_PENDING, false)
+                && state.getLong(KEY_UNLOCK_REFRESH_GENERATION, Long.MIN_VALUE) == generation;
+        boolean pendingSurfaceReconcile = state.getBoolean(KEY_SURFACE_RECONCILE_PENDING, false)
+                && state.getLong(KEY_SURFACE_RECONCILE_GENERATION, Long.MIN_VALUE) == generation;
+        if (WidgetService.isRunning()
+                && !pendingCredentialRefresh && !pendingSurfaceReconcile) return 0L;
         long now = SystemClock.elapsedRealtime();
         long notBefore = state.getLong(KEY_HOST_NOT_BEFORE_ELAPSED, 0L);
         if (notBefore <= 0L || now > notBefore + StartupLoadPolicy.HOST_HANDOFF_GRACE_MS) {
@@ -479,6 +553,14 @@ public final class StartupWorkCoordinator {
                                             @NonNull String key, long now, long maximum) {
         long until = state.getLong(key, 0L);
         return validRemaining(now, until, maximum) > 0L ? until : 0L;
+    }
+
+    /** Retains a pending lane without letting an expired/corrupt absolute value delay it again. */
+    private static long retainedPhaseNotBefore(@NonNull SharedPreferences state,
+                                               @NonNull String key, long now) {
+        long future = validFutureDeadline(state, key, now,
+                StartupLoadPolicy.MAX_VALID_STARTUP_LANE_MS);
+        return future > 0L ? future : now;
     }
 
     private static long validRemaining(long now, long until, long maximum) {

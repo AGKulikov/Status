@@ -97,6 +97,22 @@ public class MainActivity extends AppCompatActivity {
 
         binding = ActivityMainBinding.inflate(this.getLayoutInflater());
         setContentView(binding.getRoot());
+        View root = binding.getRoot();
+        root.getViewTreeObserver().addOnDrawListener(
+                new android.view.ViewTreeObserver.OnDrawListener() {
+                    private boolean recorded;
+
+                    @Override public void onDraw() {
+                        if (recorded) return;
+                        recorded = true;
+                        root.post(() -> {
+                            if (root.getViewTreeObserver().isAlive()) {
+                                root.getViewTreeObserver().removeOnDrawListener(this);
+                            }
+                            StatusWidgetApplication.notifyFirstUsefulSurface(MainActivity.this);
+                        });
+                    }
+                });
 
         applyWindowInsets();
         // This editor owns its live status-overlay inset calculation below. Only normalize its

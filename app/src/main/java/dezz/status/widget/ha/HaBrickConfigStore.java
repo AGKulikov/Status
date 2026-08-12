@@ -25,10 +25,16 @@ public final class HaBrickConfigStore {
 
     @NonNull
     public List<HaBrickConfig> loadMain() {
+        return loadMain(prefs.haMainBricksJson.get());
+    }
+
+    /** Parses an immutable preference snapshot so a worker result can be generation-checked. */
+    @NonNull
+    public List<HaBrickConfig> loadMain(@NonNull String rawJson) {
         ArrayList<HaBrickConfig> result = new ArrayList<>();
         Set<String> ids = new HashSet<>();
         try {
-            JSONArray array = new JSONArray(prefs.haMainBricksJson.get());
+            JSONArray array = new JSONArray(rawJson);
             for (int i = 0; i < array.length(); i++) {
                 JSONObject object = array.optJSONObject(i);
                 if (object == null) continue;

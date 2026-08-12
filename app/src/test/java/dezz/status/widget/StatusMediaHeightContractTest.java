@@ -24,8 +24,11 @@ public final class StatusMediaHeightContractTest {
         int end = source.indexOf("private void prepareOverlayGeometryBeforeAttach()", start);
         String create = source.substring(start, end);
 
+        int capture = create.indexOf("final View attachmentRoot = binding.getRoot();");
         int normalize = create.indexOf("prepareOverlayGeometryBeforeAttach();");
-        int attach = create.indexOf("windowManager.addView(binding.getRoot(), params)");
+        int attach = create.indexOf("windowManager.addView(attachmentRoot, params)");
+        assertTrue(capture >= 0);
+        assertTrue(normalize > capture);
         assertTrue(normalize >= 0);
         assertTrue(attach > normalize);
 

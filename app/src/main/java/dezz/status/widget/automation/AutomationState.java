@@ -75,6 +75,14 @@ public final class AutomationState {
         return staleAfterMillis > 0 && updatedAt > 0 && nowMillis - updatedAt >= staleAfterMillis;
     }
 
+    /** Session-local projection used before the persisted restart barrier finishes its worker. */
+    @NonNull
+    public AutomationState asStale() {
+        if (!present || !fresh) return this;
+        return new AutomationState(true, text, color, icon, backgroundColor,
+                actionEnabled, visible, false, source, updatedAt, expiresAt);
+    }
+
     /**
      * Applies an in-memory local-scenario presentation layer without changing connector state.
      * Presence, freshness, timestamps and source remain owned by the connector, so hiding a

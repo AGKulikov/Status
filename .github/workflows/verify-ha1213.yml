@@ -1,0 +1,230 @@
+name: Verify HA1213 balanced startup candidate
+
+on:
+  push:
+    branches: ['work/ha1213-startup-first-frame']
+    paths:
+      - 'app/**'
+      - 'build.gradle'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - 'gradlew'
+      - 'settings.gradle'
+      - 'docs/ancs-v2-wire-vectors.json'
+      - 'ios/KX11-iPhone-ANCS-Helper-v47/**'
+      - 'third_party/**'
+      - 'release-manifests/HA1213.md'
+      - '.github/workflows/verify-ha1213.yml'
+  pull_request:
+    branches: ['work/ha1212-ancs-v2']
+    paths:
+      - 'app/**'
+      - 'build.gradle'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - 'gradlew'
+      - 'settings.gradle'
+      - 'docs/ancs-v2-wire-vectors.json'
+      - 'ios/KX11-iPhone-ANCS-Helper-v47/**'
+      - 'third_party/**'
+      - 'release-manifests/HA1213.md'
+      - '.github/workflows/verify-ha1213.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ha1213-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERSION_NAME: 'v2.8.2-ha1213'
+  VERSION_CODE: '208021213'
+
+jobs:
+  test-and-build:
+    name: Full geely suite, first-frame contracts and exact unsigned release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Record exact source identity
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --short)"
+          SOURCE_TREE=$(git rev-parse HEAD^{tree})
+          echo "tree=$SOURCE_TREE" >> "$GITHUB_OUTPUT"
+          git bundle create "$RUNNER_TEMP/status-ha1213-source.bundle" HEAD
+          echo "bundle_sha=$(sha256sum "$RUNNER_TEMP/status-ha1213-source.bundle" \
+            | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          HELPER_TREE=$(git rev-parse HEAD:ios/KX11-iPhone-ANCS-Helper-v47)
+          test "$HELPER_TREE" = 'bb8f34fd659485b090b53db760cc3c5afc446b7a'
+          echo "helper_tree=$HELPER_TREE" >> "$GITHUB_OUTPUT"
+
+      - name: Verify unchanged Helper v47 portable contract
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          bash ios/KX11-iPhone-ANCS-Helper-v47/verify-v47-contract.sh
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v2
+
+      - name: Install Android SDK 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +o pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
+          set -o pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Verify release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F "return 'v2.8.2-ha1213'" build.gradle
+          test "$VERSION_CODE" = '208021213'
+
+      - name: Run complete geelyDebug unit suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          # The full suite includes StartupLoadPolicyTest, Ha1209LauncherStartupContractTest,
+          # Ha1213BalancedStartupContractTest, AutomationStateFreshnessTest,
+          # LauncherActionsPanelEditorContractTest and LiveClimateIconPolicyTest.
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
+            clean testGeelyDebugUnitTest
+
+      - name: Compile exact unsigned geelyRelease APK
+        shell: bash
+        env:
+          ALLOW_UNSIGNED_RELEASE: 'true'
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
+            assembleGeelyRelease
+          APK="app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}-release.apk"
+          test -f "$APK"
+          OUT="$RUNNER_TEMP/Status-Widget-v2.8.2-ha1213-unsigned.apk"
+          cp "$APK" "$OUT"
+          unzip -Z1 "$OUT" | grep -Fx 'resources.arsc'
+          test "$(unzip -Z1 "$OUT" | grep -c '^res/')" -gt 500
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump resources "$OUT" >/dev/null
+          BADGING=$("$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$OUT")
+          echo "$BADGING" | grep -F "package: name='ru.natro.statuswidget'"
+          echo "$BADGING" | grep -F "versionCode='208021213'"
+          echo "$BADGING" | grep -F "versionName='v2.8.2-ha1213'"
+          echo "$BADGING" | grep -F "sdkVersion:'28'"
+          echo "$BADGING" | grep -F "targetSdkVersion:'28'"
+          if echo "$BADGING" | grep -Fq 'application-debuggable'; then
+            echo 'Release candidate must not be debuggable' >&2
+            exit 1
+          fi
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$OUT" >/dev/null
+          if "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify "$OUT"; then
+            echo 'Release handoff unexpectedly contains a signature' >&2
+            exit 1
+          fi
+          OUT_SHA=$(sha256sum "$OUT" | awk '{print $1}')
+          printf '%s  %s\n' "$OUT_SHA" "$(basename "$OUT")" \
+            > "$RUNNER_TEMP/ha1213-unsigned.sha256"
+          test -z "$(git status --short --untracked-files=no)"
+
+      - name: Write exact-byte candidate manifest
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          SOURCE_TREE: ${{ steps.source.outputs.tree }}
+          SOURCE_BUNDLE_SHA: ${{ steps.source.outputs.bundle_sha }}
+          HELPER_TREE: ${{ steps.source.outputs.helper_tree }}
+        run: |
+          set -euo pipefail
+          APK="$RUNNER_TEMP/Status-Widget-v2.8.2-ha1213-unsigned.apk"
+          APK_SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+          jq -n \
+            --arg sourceSha "$GITHUB_SHA" \
+            --arg sourceTree "$SOURCE_TREE" \
+            --arg sourceBundleSha256 "$SOURCE_BUNDLE_SHA" \
+            --arg helperTree "$HELPER_TREE" \
+            --arg packageName 'ru.natro.statuswidget' \
+            --arg versionName "$VERSION_NAME" \
+            --arg requiredSigningCertificateSha256 \
+              '6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75' \
+            --arg runId "$GITHUB_RUN_ID" \
+            --arg runAttempt "$GITHUB_RUN_ATTEMPT" \
+            --arg eventName "$GITHUB_EVENT_NAME" \
+            --arg ref "$GITHUB_REF" \
+            --arg unsignedSha256 "$APK_SHA" \
+            '{sourceSha: $sourceSha, sourceTree: $sourceTree,
+              sourceBundleSha256: $sourceBundleSha256, helperTree: $helperTree,
+              package: $packageName, versionName: $versionName, versionCode: 208021213,
+              minSdk: 28, targetSdk: 28, unsigned: true,
+              requiredSigningCertificateSha256: $requiredSigningCertificateSha256,
+              runId: $runId, runAttempt: $runAttempt,
+              eventName: $eventName, ref: $ref,
+              unsignedApkSha256: $unsignedSha256}' \
+            > "$RUNNER_TEMP/ha1213-candidate.json"
+
+      - name: Upload exact source snapshot
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ha1213-startup-source-bundle
+          path: ${{ runner.temp }}/status-ha1213-source.bundle
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload exact unsigned Android candidate
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ha1213-startup-unsigned-release
+          path: |
+            ${{ runner.temp }}/Status-Widget-v2.8.2-ha1213-unsigned.apk
+            ${{ runner.temp }}/ha1213-unsigned.sha256
+            ${{ runner.temp }}/ha1213-candidate.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Pack official Android signing tools
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOOLS="$RUNNER_TEMP/android-build-tools-36"
+          mkdir -p "$TOOLS/lib" "$TOOLS/lib64"
+          cp "$ANDROID_HOME/build-tools/36.0.0/apksigner" "$TOOLS/"
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" "$TOOLS/lib/"
+          cp "$ANDROID_HOME/build-tools/36.0.0/zipalign" "$TOOLS/"
+          cp "$ANDROID_HOME/build-tools/36.0.0/aapt" "$TOOLS/"
+          cp "$ANDROID_HOME/build-tools/36.0.0/aapt2" "$TOOLS/"
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib64/libc++.so" "$TOOLS/lib64/"
+
+      - name: Upload official Android signing tools
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ha1213-android-build-tools
+          path: ${{ runner.temp }}/android-build-tools-36
+          if-no-files-found: error
+          retention-days: 1

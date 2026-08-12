@@ -14,6 +14,7 @@ import org.json.JSONArray;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 import dezz.status.widget.AppProcessPolicy;
 
@@ -24,8 +25,12 @@ import dezz.status.widget.AppProcessPolicy;
 public final class AutomationStateStore {
     private static final String PREF_SUFFIX = "_automation_state_v1";
     private static final String KEY_PREFIX = "state|";
+    /** Serializes whole-file demotion with fresh writes from a replacement service instance. */
+    private static final Object PERSISTENCE_LOCK = new Object();
 
     private final SharedPreferences prefs;
+    /** True between visual-shell creation and the persisted boot-session freshness barrier. */
+    private boolean sessionFreshnessBarrierPending;
     /** Derived local UI layer. Never persisted: it must be recomputed from fresh connector data. */
     private final Map<String, JSONObject> scenarioOverrides = new LinkedHashMap<>();
 
@@ -48,7 +53,13 @@ public final class AutomationStateStore {
                 base = AutomationState.missing();
             }
         }
+        if (sessionFreshnessBarrierPending) base = base.asStale();
         return base.withLocalOverrides(scenarioOverrides.get(storageKey));
+    }
+
+    /** Makes cached values render stale immediately, before the later full preference rewrite. */
+    public synchronized void beginSessionFreshnessBarrier() {
+        sessionFreshnessBarrierPending = true;
     }
 
     /** Visibility with a caller-defined default. Scenario overrides have priority over retained
@@ -123,6 +134,25 @@ public final class AutomationStateStore {
     @NonNull
     public synchronized AutomationState apply(String scope, String id, @NonNull JSONObject patch)
             throws JSONException {
+        synchronized (PERSISTENCE_LOCK) {
+            return applyLocked(scope, id, patch);
+        }
+    }
+
+    /** Ownership-checked write used by bounded startup cleanup from a replaceable worker. */
+    public synchronized boolean applyIf(@NonNull BooleanSupplier stillOwner,
+                                        String scope, String id,
+                                        @NonNull JSONObject patch) throws JSONException {
+        synchronized (PERSISTENCE_LOCK) {
+            if (!stillOwner.getAsBoolean()) return false;
+            applyLocked(scope, id, patch);
+            return true;
+        }
+    }
+
+    @NonNull
+    private AutomationState applyLocked(String scope, String id, @NonNull JSONObject patch)
+            throws JSONException {
         validatePatch(patch);
         String storageKey = key(scope, id);
         if (patch.optBoolean("clear", false)) {
@@ -171,8 +201,11 @@ public final class AutomationStateStore {
     }
 
     public synchronized void clearAll() {
-        prefs.edit().clear().commit();
-        scenarioOverrides.clear();
+        synchronized (PERSISTENCE_LOCK) {
+            prefs.edit().clear().commit();
+            sessionFreshnessBarrierPending = false;
+            scenarioOverrides.clear();
+        }
     }
 
     /**
@@ -215,37 +248,54 @@ public final class AutomationStateStore {
 
     /** Keeps the last value for display but forces the renderer to use its per-brick stale style. */
     public synchronized void markStale(String scope, String id) {
-        String storageKey = key(scope, id);
-        String previous = prefs.getString(storageKey, null);
-        if (previous == null) return;
-        try {
-            JSONObject state = new JSONObject(previous);
-            state.put("fresh", false);
-            prefs.edit().putString(storageKey, state.toString()).apply();
-        } catch (JSONException ignored) {
-            prefs.edit().remove(storageKey).apply();
+        synchronized (PERSISTENCE_LOCK) {
+            String storageKey = key(scope, id);
+            String previous = prefs.getString(storageKey, null);
+            if (previous == null) return;
+            try {
+                JSONObject state = new JSONObject(previous);
+                state.put("fresh", false);
+                prefs.edit().putString(storageKey, state.toString()).apply();
+            } catch (JSONException ignored) {
+                prefs.edit().remove(storageKey).apply();
+            }
         }
     }
 
     /** Boot/session barrier: no disk-cached network value is current until its connector syncs. */
     public synchronized void markAllStale() {
-        SharedPreferences.Editor editor = prefs.edit();
-        for (Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
-            if (!entry.getKey().startsWith(KEY_PREFIX) || !(entry.getValue() instanceof String)) {
-                continue;
+        markAllStaleIf(() -> true);
+    }
+
+    /**
+     * Ownership-aware session barrier. A stopped service may finish parsing after its replacement
+     * starts; the shared write lock plus the final owner check prevents that old pass from
+     * demoting a value published by the replacement session.
+     */
+    public synchronized boolean markAllStaleIf(@NonNull BooleanSupplier stillOwner) {
+        synchronized (PERSISTENCE_LOCK) {
+            if (!stillOwner.getAsBoolean()) return false;
+            SharedPreferences.Editor editor = prefs.edit();
+            int checked = 0;
+            for (Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
+                if ((checked++ & 31) == 0 && !stillOwner.getAsBoolean()) return false;
+                if (!entry.getKey().startsWith(KEY_PREFIX)
+                        || !(entry.getValue() instanceof String)) continue;
+                try {
+                    JSONObject state = new JSONObject((String) entry.getValue());
+                    state.put("fresh", false);
+                    editor.putString(entry.getKey(), state.toString());
+                } catch (JSONException ignored) {
+                    editor.remove(entry.getKey());
+                }
             }
-            try {
-                JSONObject state = new JSONObject((String) entry.getValue());
-                state.put("fresh", false);
-                editor.putString(entry.getKey(), state.toString());
-            } catch (JSONException ignored) {
-                editor.remove(entry.getKey());
-            }
+            if (!stillOwner.getAsBoolean()) return false;
+            // SharedPreferences memory changes synchronously. Disk persistence may remain async;
+            // every replacement process establishes the same guarded barrier before connectors.
+            editor.apply();
+            sessionFreshnessBarrierPending = false;
+            return true;
         }
-        // The in-memory SharedPreferences snapshot changes immediately with apply(). Persisting a
-        // boot-session freshness barrier does not need to block the UI thread on an fsync; every
-        // new process establishes the same barrier again before accepting connector snapshots.
-        editor.apply();
     }
 
     /** Snapshot for an explicitly addressed local integration helper; never contains config. */

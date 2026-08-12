@@ -2,6 +2,7 @@ name: Verify HA1212 ANCS transport v2 candidate
 
 on:
   push:
+    branches: ['work/ha1212-ancs-v2']
     paths:
       - 'app/**'
       - 'docs/ANCS_V2_REFERENCE_ARCHITECTURE.md'
@@ -14,6 +15,7 @@ on:
       - 'release-manifests/HA1212.md'
       - '.github/workflows/verify-ha1212.yml'
   pull_request:
+    branches: ['work/ha1211-physical-facade-ab']
     paths:
       - 'app/**'
       - 'docs/ANCS_V2_REFERENCE_ARCHITECTURE.md'

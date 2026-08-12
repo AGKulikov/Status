@@ -155,8 +155,8 @@ public final class LauncherActivity extends AppCompatActivity {
     private static final long APP_CATALOG_REFRESH_MS = 10L * 60L * 1_000L;
     /** Gives the foreground WidgetService a chance to attach the status row before HOME work. */
     private static final long PANEL_INITIALIZATION_GRACE_MS = 200L;
-    /** At most one optional panel is inflated in a display frame. */
-    private static final long PANEL_INITIALIZATION_STAGE_MS = 16L;
+    /** At most one optional panel is inflated every two display frames. */
+    private static final long PANEL_INITIALIZATION_STAGE_MS = 32L;
     /** Separates PackageManager/vendor/media bursts inside the post-boot launcher lane. */
     private static final long DEFERRED_LAUNCHER_STAGE_MS = 300L;
     private final Map<String, LauncherElementFrame> panels = new LinkedHashMap<>();
@@ -190,7 +190,8 @@ public final class LauncherActivity extends AppCompatActivity {
         @Override public void run() {
             if (!activityStarted || isFinishing() || isDestroyed()) return;
             syncGlobalElements();
-            syncLauncherBackdrops();
+            if (initialBackdropsSynchronized) syncLauncherBackdrops();
+            else scheduleInitialLauncherBackdrops();
             syncLauncherHorizontalGroups();
             refreshGlobalElementVisibility();
             navigationUiHandler.postDelayed(this, GLOBAL_ELEMENT_REFRESH_MS);
@@ -231,6 +232,8 @@ public final class LauncherActivity extends AppCompatActivity {
     private boolean panelsInitialized;
     private boolean globalElementsActivated;
     private boolean initialBackdropsSynchronized;
+    private boolean initialBackdropLoadInFlight;
+    private int initialBackdropLoadGeneration;
     private boolean panelsInitializing;
     private boolean panelInitializationAllowed;
     private int panelInitializationStage;
@@ -353,8 +356,26 @@ public final class LauncherActivity extends AppCompatActivity {
             navigationUiHandler.postDelayed(this, SAFE_AREA_REFRESH_MS);
         }
     };
+    private final Runnable visibleIntegrationHostHandoff = new Runnable() {
+        @Override public void run() {
+            if (!activityStarted || !launcherFirstDrawCompleted
+                    || isFinishing() || isDestroyed()) return;
+            long delay = StartupWorkCoordinator.pendingIntegrationHostDelayMillis(
+                    LauncherActivity.this);
+            if (delay < 0L) return;
+            if (delay > 0L) {
+                navigationUiHandler.postDelayed(this, delay);
+                return;
+            }
+            StartupWorkCoordinator.dispatchPendingIntegrationHostIfDue(
+                    LauncherActivity.this);
+        }
+    };
+    private boolean launcherFirstDrawCompleted;
     private final Runnable allowPanelInitialization = new Runnable() {
         @Override public void run() {
+            if (!activityStarted || !launcherFirstDrawCompleted
+                    || isFinishing() || isDestroyed()) return;
             long delay = StartupWorkCoordinator.launcherPanelDelayMillis(
                     LauncherActivity.this, 0L);
             if (delay > 0L) {
@@ -463,6 +484,23 @@ public final class LauncherActivity extends AppCompatActivity {
         configureWindow();
         View root = buildRoot();
         setContentView(root);
+        root.getViewTreeObserver().addOnDrawListener(new android.view.ViewTreeObserver.OnDrawListener() {
+            private boolean recorded;
+            @Override public void onDraw() {
+                if (recorded) return;
+                recorded = true;
+                launcherFirstDrawCompleted = true;
+                StartupPerformanceTrace.mark("launcher_first_draw");
+                StatusWidgetApplication.notifyFirstUsefulSurface(LauncherActivity.this);
+                root.post(() -> {
+                    if (root.getViewTreeObserver().isAlive()) {
+                        root.getViewTreeObserver().removeOnDrawListener(this);
+                    }
+                    startDeferredHomeWorkAfterFirstDraw();
+                    scheduleInitialLauncherBackdrops();
+                });
+            }
+        });
         root.setOnApplyWindowInsetsListener((view, insets) -> {
             systemLeftInset = Math.max(0, insets.getSystemWindowInsetLeft());
             systemTopInset = Math.max(0, insets.getSystemWindowInsetTop());
@@ -476,11 +514,10 @@ public final class LauncherActivity extends AppCompatActivity {
         workspace.addOnLayoutChangeListener((view, left, top, right, bottom,
                 oldLeft, oldTop, oldRight, oldBottom) -> {
             if (right <= left || bottom <= top) return;
-            // The user's decorative HOME surface is the first real launcher content. Attach it
-            // as soon as workspace geometry exists, before the deliberately staged live sources.
+            // Large custom backdrop JSON belongs to the post-draw background lane. Wallpaper plus
+            // the empty workspace are already a complete first HOME frame.
             if (!initialBackdropsSynchronized) {
-                syncLauncherBackdrops();
-                initialBackdropsSynchronized = true;
+                scheduleInitialLauncherBackdrops();
             }
             if (panelInitializationAllowed && !panelsInitialized && !panelsInitializing) {
                 initializePanels();
@@ -578,7 +615,10 @@ public final class LauncherActivity extends AppCompatActivity {
         if (!panelsInitialized) {
             navigationUiHandler.removeCallbacks(allowPanelInitialization);
             navigationUiHandler.removeCallbacks(panelInitializationStep);
-            if (!panelInitializationAllowed) {
+            if (!launcherFirstDrawCompleted) {
+                // The first-draw callback arms this lane. An expired boot deadline must never let
+                // optional Material panels inflate ahead of HOME's first traversal.
+            } else if (!panelInitializationAllowed) {
                 navigationUiHandler.postDelayed(allowPanelInitialization,
                         StartupWorkCoordinator.launcherPanelDelayMillis(
                                 this, PANEL_INITIALIZATION_GRACE_MS));
@@ -588,20 +628,27 @@ public final class LauncherActivity extends AppCompatActivity {
                 initializePanels();
             }
         }
-        registerNavigationReceiver();
-        registerAllAppsUninstallReceiver();
-        WidgetServiceStarter.startIfNeededAutomatically(this);
+        if (launcherFirstDrawCompleted) {
+            navigationUiHandler.post(this::startDeferredHomeWorkAfterFirstDraw);
+        }
         scheduleDeferredLauncherRuntimeStart();
         navigationUiHandler.removeCallbacks(safeAreaRefresh);
         navigationUiHandler.post(safeAreaRefresh);
-        navigationUiHandler.removeCallbacks(globalElementRefresh);
-        navigationUiHandler.post(globalElementRefresh);
         if (panelsInitialized) refreshFavorites();
     }
 
     @Override
     protected void onStop() {
         activityStarted = false;
+        // If HOME lost foreground before its first traversal (or between onDraw and its posted
+        // handoff), leave only a delayed AlarmManager owner. This does no controller/vendor work
+        // while the next application is taking focus and is idempotent with the normal draw path.
+        if (!WidgetService.isRunning() && preferences != null
+                && WidgetServiceStarter.requiresAutomaticIntegrationHost(preferences)
+                && StartupWorkCoordinator.pendingIntegrationHostDelayMillis(this) < 0L) {
+            StartupWorkCoordinator.ensureIntegrationHostScheduledAfter(this,
+                    StartupLoadPolicy.COLD_BOOT_SURFACE_TARGET_ELAPSED_MS);
+        }
         // Never inflate optional panels behind another foreground application.
         navigationUiHandler.removeCallbacks(allowPanelInitialization);
         navigationUiHandler.removeCallbacks(panelInitializationStep);
@@ -609,6 +656,9 @@ public final class LauncherActivity extends AppCompatActivity {
         navigationUiHandler.removeCallbacks(ensureSmartHomeValueSubscription);
         navigationUiHandler.removeCallbacks(safeAreaRefresh);
         navigationUiHandler.removeCallbacks(globalElementRefresh);
+        navigationUiHandler.removeCallbacks(visibleIntegrationHostHandoff);
+        initialBackdropLoadGeneration++;
+        initialBackdropLoadInFlight = false;
         navigationUiHandler.removeCallbacks(deferredLauncherRuntimeStart);
         navigationUiHandler.removeCallbacks(deferredLauncherRuntimeStep);
         deferredLauncherRuntimeStarted = false;
@@ -636,6 +686,35 @@ public final class LauncherActivity extends AppCompatActivity {
         navigationUiHandler.removeCallbacks(deferredLauncherRuntimeStep);
         long delay = StartupWorkCoordinator.launcherRuntimeDelayMillis(this);
         navigationUiHandler.postDelayed(deferredLauncherRuntimeStart, delay);
+    }
+
+    private void scheduleVisibleIntegrationHostHandoff() {
+        navigationUiHandler.removeCallbacks(visibleIntegrationHostHandoff);
+        if (!activityStarted || !launcherFirstDrawCompleted) return;
+        long delay = StartupWorkCoordinator.pendingIntegrationHostDelayMillis(this);
+        if (delay >= 0L) {
+            navigationUiHandler.postDelayed(visibleIntegrationHostHandoff, delay);
+        }
+    }
+
+    /** Keeps foreground-service Binder work behind HOME's first useful traversal. */
+    private void startDeferredHomeWorkAfterFirstDraw() {
+        if (!activityStarted || !launcherFirstDrawCompleted
+                || isFinishing() || isDestroyed()) return;
+        registerNavigationReceiver();
+        registerAllAppsUninstallReceiver();
+        navigationUiHandler.removeCallbacks(globalElementRefresh);
+        navigationUiHandler.post(globalElementRefresh);
+        WidgetServiceStarter.startIfNeededAutomatically(this);
+        if (!panelsInitialized && !panelInitializationAllowed) {
+            navigationUiHandler.removeCallbacks(allowPanelInitialization);
+            navigationUiHandler.postDelayed(allowPanelInitialization,
+                    StartupWorkCoordinator.launcherPanelDelayMillis(
+                            this, PANEL_INITIALIZATION_GRACE_MS));
+        }
+        // A running QuickBoot survivor still owns credential/surface reconciliation. Pending
+        // generation state, not WidgetService.isRunning(), decides whether this handoff is needed.
+        scheduleVisibleIntegrationHostHandoff();
     }
 
     private boolean launcherRuntimeStageReached(int completedStages) {
@@ -1089,12 +1168,51 @@ public final class LauncherActivity extends AppCompatActivity {
             globalElementLayoutStore.load(workspace.getWidth(), workspace.getHeight());
             globalElementsActivated = true;
         }
-        syncLauncherBackdrops();
+        if (initialBackdropsSynchronized) syncLauncherBackdrops();
+        else scheduleInitialLauncherBackdrops();
         syncGlobalElements();
         syncLauncherHorizontalGroups();
         suppressSourcePanels();
         refreshGlobalElementVisibility();
         appliedGlobalElementsJson = preferences.launcherGlobalElementsJson.get();
+    }
+
+    /** Parses the potentially 1 MiB decorative document off the first-frame/main-thread lane. */
+    private void scheduleInitialLauncherBackdrops() {
+        if (initialBackdropsSynchronized || initialBackdropLoadInFlight
+                || !launcherFirstDrawCompleted || !activityStarted
+                || workspace == null || backdropStore == null
+                || workspace.getWidth() <= 0 || workspace.getHeight() <= 0
+                || launcherWorker.isShutdown()) return;
+        initialBackdropLoadInFlight = true;
+        final int generation = ++initialBackdropLoadGeneration;
+        final int width = workspace.getWidth();
+        final int height = workspace.getHeight();
+        final String raw = preferences.launcherBackdropsJson.get();
+        try {
+            launcherWorker.execute(() -> {
+                LauncherBackdropStore loaded = new LauncherBackdropStore(preferences);
+                loaded.load(width, height);
+                loaded.all(); // Materialize defensive copies away from the UI lane.
+                navigationUiHandler.post(() -> {
+                    if (generation != initialBackdropLoadGeneration) return;
+                    initialBackdropLoadInFlight = false;
+                    if (!activityStarted || isFinishing() || isDestroyed()) return;
+                    if (!Objects.equals(raw, preferences.launcherBackdropsJson.get())) {
+                        scheduleInitialLauncherBackdrops();
+                        return;
+                    }
+                    backdropStore = loaded;
+                    appliedLauncherBackdropsJson = raw;
+                    initialBackdropsSynchronized = true;
+                    syncLauncherBackdrops();
+                    StartupPerformanceTrace.mark("launcher_backdrops_ready");
+                });
+            });
+        } catch (RuntimeException rejected) {
+            initialBackdropLoadInFlight = false;
+            Log.w(TAG, "Could not schedule launcher backdrop parsing", rejected);
+        }
     }
 
     /** Keeps every decorative HOME surface below all live widgets and panel sources. */
