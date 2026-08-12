@@ -329,10 +329,16 @@ public final class PhoneConnectorController {
                 signature = next.signature();
                 config = next;
                 IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
-                if (runtime != null) runtime.requestMode(v2Mode(next.bleRole));
                 Handler current = worker;
                 long token = generation;
-                if (current != null) current.post(() -> publishSnapshot(token));
+                if (current != null) current.post(() -> runIfCurrent(token, () -> {
+                    // Helper telemetry is generation-scoped even though the outer controller is
+                    // intentionally retained across an A/B role switch.
+                    clearHelperTelemetry();
+                    refreshBatteryValues();
+                    if (runtime != null) runtime.requestMode(v2Mode(next.bleRole));
+                    publishSnapshot(token);
+                }));
                 PhoneConnectionJournal.append("controller",
                         "v2 role switch retained controller generation=" + token);
                 return;
@@ -1260,6 +1266,12 @@ public final class PhoneConnectorController {
         boolean activePhase = status.switchPhase ==
                 dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Phase.ACTIVE;
         v2SwitchInProgress = !activePhase;
+        if (!activePhase) {
+            // FREEZING is the generation boundary. Clear before any successor route can publish
+            // so a prior Helper sample cannot survive switch, retry, link-loss, or FAILED.
+            clearHelperTelemetry();
+            refreshBatteryValues();
+        }
         if (!activePhase && ancsReady) {
             resetAncsSession(token, "switching_"
                     + status.switchPhase.name().toLowerCase(Locale.ROOT));
@@ -1304,8 +1316,12 @@ public final class PhoneConnectorController {
             reconnectAttempt = 0;
             scheduleStableAncsReadyReset(token);
             cancelSmsFallbackNotifications();
-        } else if (hadSession && !linkActive) {
-            resetAncsSession(token, lifecycle.name().toLowerCase(Locale.ROOT));
+        } else if (!linkActive) {
+            clearHelperTelemetry();
+            refreshBatteryValues();
+            if (hadSession) {
+                resetAncsSession(token, lifecycle.name().toLowerCase(Locale.ROOT));
+            }
         }
         ancsStatus = lifecycle.name().toLowerCase(Locale.ROOT);
         updateMessageAvailability();

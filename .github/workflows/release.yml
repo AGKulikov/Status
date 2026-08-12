@@ -76,8 +76,7 @@ jobs:
         # Never package a release from stale incremental outputs. A previous local HA1147
         # artifact retained dex files but omitted resources.arsc and every res/ entry.
         ./gradlew --no-daemon --no-configuration-cache clean
-        ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
-          testGeelyDebugUnitTest \
+        ./gradlew --no-daemon --no-configuration-cache --max-workers=1 testGeelyDebugUnitTest \
           --tests 'dezz.status.widget.phone.transport.v2.*' \
           --tests 'dezz.status.widget.phone.transport.switching.*' \
           --tests dezz.status.widget.phone.PhoneConnectorSettingsContractTest \
@@ -103,8 +102,8 @@ jobs:
         "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$APK"
         # Force verification from API 24 so apksigner checks the embedded v2 block as well
         # as the v3 block used by the Android 9 KX11 package installer.
-        "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify \
-          --verbose --print-certs --min-sdk-version 24 "$APK" | tee /tmp/apk-certs.txt
+        "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs \
+          --min-sdk-version 24 "$APK" | tee /tmp/apk-certs.txt
         grep -F "Verified using v2 scheme (APK Signature Scheme v2): true" /tmp/apk-certs.txt
         grep -F "Verified using v3 scheme (APK Signature Scheme v3): true" /tmp/apk-certs.txt
         grep -qi "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75" /tmp/apk-certs.txt

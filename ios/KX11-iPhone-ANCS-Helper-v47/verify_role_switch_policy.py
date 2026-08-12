@@ -651,12 +651,49 @@ def verify_repeated_same_role_recovery():
     assert p.state.active == Role.B and p.state.active_generation == 220
 
 
+def verify_repeated_failed_retry_fences_old_generation():
+    p = Policy(Role.A)
+    p.request(Role.B, 1_000, 100, 10)
+    p.ingress_without_owner(1, 1, Role.A, 1_001)
+    p.terminal(1, 1, Role.A, 1_002)
+    p.owners(1, 1, Role.A, 0, 1_003)
+    p.drain_due(1, 1, Role.A, p.state.drain_deadline)
+    p.begin(1, 2, Role.B)
+    p.target_failed(1, 2, Role.B)
+    assert p.state.phase == Phase.FAILED
+
+    for index in range(2):
+        old_epoch = p.state.epoch
+        old_generation = p.state.target_generation
+        assert old_generation is not None
+        next_generation = max(
+            value for value in (
+                p.state.active_generation,
+                p.state.source_generation,
+                p.state.target_generation,
+            ) if value is not None
+        ) + 1
+        result = p.restore(
+            Role.B, Role.B, old_epoch + 1, old_generation, next_generation,
+            2_000 + index * 1_000, 100, 10, local_only=True,
+        )
+        assert result.effects == ["freezeSourceIngress", "armStopTimeout"]
+        assert p.state.epoch == old_epoch + 1
+        assert p.target_failed(old_epoch, old_generation, Role.B).outcome == "staleCallback"
+        assert p.ingress_freeze_failed(old_epoch, old_generation, Role.B).outcome == "staleCallback"
+        assert p.ingress_freeze_failed(
+            p.state.epoch, old_generation, Role.B
+        ).effects == ["failClosed"]
+        assert p.state.phase == Phase.FAILED
+
+
 def main():
     verify_swift_surface()
     verify_shared_vectors()
     verify_20_each_direction_and_negatives()
     verify_repeated_same_role_recovery()
-    print("PASS: shared ble-role-switch/v2 vectors + 40 switches + 20 same-role recoveries + stale/timeout/conflict/retry/remote-C")
+    verify_repeated_failed_retry_fences_old_generation()
+    print("PASS: shared ble-role-switch/v2 vectors + 40 switches + 20 same-role recoveries + 2 failed retries + stale/timeout/conflict/retry/remote-C")
 
 
 if __name__ == "__main__":

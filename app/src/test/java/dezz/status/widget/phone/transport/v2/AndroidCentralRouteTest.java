@@ -77,7 +77,7 @@ public final class AndroidCentralRouteTest {
         assertNotEquals(oldOwner, state.expected.ownerId);
     }
 
-    @Test public void parserIsArmedBeforeNotificationThenDataSourceThenReady() {
+    @Test public void authenticatedControlThenTelemetryThenParserAndAncsBecomeReady() {
         AndroidCentralRoute.State state = startSelected(new BleRouteEpoch(14L, 1L));
         state = AndroidCentralRoute.startupQuietElapsed(state, state.expected, true).state;
         state = AndroidCentralRoute.connected(state, state.expected, true).state;
@@ -92,10 +92,24 @@ public final class AndroidCentralRouteTest {
                         state, state.expected, GattResultV2.SUCCESS);
         state = control.state;
 
+        assertEquals(AndroidCentralRoute.Phase.SUBSCRIBING_TELEMETRY, state.phase);
+        assertTrue(hasEffect(control, BleRouteEffect.Type.SUBSCRIBE_TELEMETRY));
+        assertFalse(AndroidCentralRoute.acceptsTelemetry(state, state.expected));
+        BleRouteToken telemetryToken = state.expected;
+        BleRouteTransition<AndroidCentralRoute.State> telemetry =
+                AndroidCentralRoute.telemetrySubscribed(
+                        state, telemetryToken, GattResultV2.SUCCESS);
+        state = telemetry.state;
+
         assertEquals(AndroidCentralRoute.Phase.SUBSCRIBING_NOTIFICATION_SOURCE, state.phase);
-        assertTrue(indexOf(control, BleRouteEffect.Type.ARM_ANCS_PARSER)
-                < indexOf(control, BleRouteEffect.Type.SUBSCRIBE_ANCS_NOTIFICATION_SOURCE));
+        assertTrue(indexOf(telemetry, BleRouteEffect.Type.ARM_ANCS_PARSER)
+                < indexOf(telemetry, BleRouteEffect.Type.SUBSCRIBE_ANCS_NOTIFICATION_SOURCE));
         assertFalse(hasEffect(proof, BleRouteEffect.Type.SUBSCRIBE_TELEMETRY));
+        assertTrue(AndroidCentralRoute.acceptsTelemetry(state, telemetryToken));
+        assertFalse(AndroidCentralRoute.acceptsTelemetry(state,
+                new BleRouteToken(IphoneBleMode.ANDROID_CENTRAL,
+                        new BleRouteEpoch(99L, 1L), telemetryToken.ownerId,
+                        telemetryToken.operationId)));
 
         state = AndroidCentralRoute.notificationSourceSubscribed(
                 state, state.expected, GattResultV2.SUCCESS).state;
@@ -103,6 +117,31 @@ public final class AndroidCentralRouteTest {
         state = AndroidCentralRoute.dataSourceSubscribed(
                 state, state.expected, GattResultV2.SUCCESS).state;
         assertTrue(state.isReady());
+        assertTrue(AndroidCentralRoute.acceptsTelemetry(state, telemetryToken));
+    }
+
+    @Test public void telemetryCccdFailureIsSerializedOptionalAndStaleCannotAdvanceRoute() {
+        AndroidCentralRoute.State state = startSelected(new BleRouteEpoch(14L, 2L));
+        state = AndroidCentralRoute.startupQuietElapsed(state, state.expected, true).state;
+        state = AndroidCentralRoute.connected(state, state.expected, true).state;
+        state = AndroidCentralRoute.servicesDiscovered(state, state.expected, complete()).state;
+        state = AndroidCentralRoute.peerProof(
+                state, state.expected, helperProof(HELPER), GattResultV2.SUCCESS).state;
+        BleRouteToken controlToken = state.expected;
+        state = AndroidCentralRoute.routeControlSubscribed(
+                state, controlToken, GattResultV2.SUCCESS).state;
+        BleRouteToken telemetryToken = state.expected;
+
+        assertFalse(AndroidCentralRoute.telemetrySubscribed(
+                state, controlToken, GattResultV2.SUCCESS).accepted);
+        BleRouteTransition<AndroidCentralRoute.State> denied =
+                AndroidCentralRoute.telemetrySubscribed(
+                        state, telemetryToken, GattResultV2.AUTHORIZATION_DENIED);
+        assertEquals(AndroidCentralRoute.Phase.SUBSCRIBING_NOTIFICATION_SOURCE,
+                denied.state.phase);
+        assertTrue(hasEffect(denied,
+                BleRouteEffect.Type.SUBSCRIBE_ANCS_NOTIFICATION_SOURCE));
+        assertTrue(hasEffect(denied, BleRouteEffect.Type.REPORT_ERROR));
     }
 
     @Test public void hotUpdateLateCallbackCannotAdvanceNewEpoch() {
@@ -189,6 +228,8 @@ public final class AndroidCentralRouteTest {
                 GattResultV2.SUCCESS).state;
         state = AndroidCentralRoute.routeControlSubscribed(
                 state, state.expected, GattResultV2.SUCCESS).state;
+        state = AndroidCentralRoute.telemetrySubscribed(
+                state, state.expected, GattResultV2.SUCCESS).state;
         assertEquals(AndroidCentralRoute.Phase.WAIT_ANCS, state.phase);
         assertEquals(owner, state.activeOwnerId);
 
@@ -201,6 +242,31 @@ public final class AndroidCentralRouteTest {
         assertEquals(AndroidCentralRoute.Phase.RETRY_DRAINING,
                 AndroidCentralRoute.serviceChanged(
                         indication.state, proofToken).state.phase);
+    }
+
+    @Test public void absentAncsAndTelemetryFailureStillWaitsForServiceChanged() {
+        AndroidCentralRoute.State state = startSelected(new BleRouteEpoch(19L, 3L));
+        state = AndroidCentralRoute.startupQuietElapsed(state, state.expected, true).state;
+        state = AndroidCentralRoute.connected(state, state.expected, true).state;
+        IphoneGattInventoryV2 noAncs = new IphoneGattInventoryV2(
+                true, true, true, true, true,
+                false, false, false, false, true);
+        state = AndroidCentralRoute.servicesDiscovered(state, state.expected, noAncs).state;
+        state = AndroidCentralRoute.serviceChangedSubscribed(
+                state, state.expected, GattResultV2.SUCCESS).state;
+        state = AndroidCentralRoute.peerProof(
+                state, state.expected, helperProof(HELPER), GattResultV2.SUCCESS).state;
+        state = AndroidCentralRoute.routeControlSubscribed(
+                state, state.expected, GattResultV2.SUCCESS).state;
+
+        BleRouteTransition<AndroidCentralRoute.State> telemetryFailure =
+                AndroidCentralRoute.telemetrySubscribed(
+                        state, state.expected, GattResultV2.TRANSIENT_FAILURE);
+        assertEquals(AndroidCentralRoute.Phase.WAIT_ANCS, telemetryFailure.state.phase);
+        assertTrue(hasEffect(telemetryFailure, BleRouteEffect.Type.REPORT_DOWN));
+        assertTrue(hasEffect(telemetryFailure, BleRouteEffect.Type.REPORT_ERROR));
+        assertFalse(hasEffect(telemetryFailure,
+                BleRouteEffect.Type.SUBSCRIBE_ANCS_NOTIFICATION_SOURCE));
     }
 
     @Test public void immediateSwitchWhileClientRegistrationUnknownFailsClosed() {
@@ -224,8 +290,10 @@ public final class AndroidCentralRouteTest {
                 state, state.expected, noAncsNoServiceChanged).state;
         state = AndroidCentralRoute.peerProof(
                 state, state.expected, helperProof(HELPER), GattResultV2.SUCCESS).state;
+        state = AndroidCentralRoute.routeControlSubscribed(
+                state, state.expected, GattResultV2.SUCCESS).state;
         BleRouteTransition<AndroidCentralRoute.State> blocked =
-                AndroidCentralRoute.routeControlSubscribed(
+                AndroidCentralRoute.telemetrySubscribed(
                         state, state.expected, GattResultV2.SUCCESS);
         assertEquals(AndroidCentralRoute.Phase.NEEDS_FRESH_LINK, blocked.state.phase);
         assertTrue(hasEffect(blocked, BleRouteEffect.Type.REPORT_DOWN));

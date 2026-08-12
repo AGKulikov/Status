@@ -70,9 +70,22 @@ The route has two acquisition modes, both bounded and explicit:
 * an explicit bootstrap may scan for the fixed helper service, but may connect only after the
   result is attributable to the selected bond.  Device names are never identity evidence.
 
+On Android 9 the public identity resolver requires the callback facade address to equal the
+unique selected system-bond address.  The encrypted `H` installation UUID and exactly one active
+owner are additional continuity gates; they never replace that equality because the UUID is not
+a secret and public APIs expose neither the iPhone IRK nor an RPA-to-bond mapping.  Thus an
+unresolvable private/RPA facade fails closed in both bootstrap and daily recovery with an
+actionable diagnostic to reselect or restore the existing selected system bond without deleting
+the pair; a rotating facade requires vendor-provided direct identity mapping.  Neither a name
+match nor an arbitrary bonded peer may be promoted to the selected owner.
+
 No Android advertiser, GATT server, hidden API, adapter toggle, bond removal, or hidden cache
 refresh belongs to this route.  Helper telemetry is optional and cannot delay or own ANCS
-recovery.
+recovery.  Android serializes the v47 telemetry notification CCCD after the mandatory
+route-control indication CCCD and before ANCS subscription readiness.  A missing or rejected
+optional telemetry CCCD is reported but does not block ANCS.  Telemetry frames are accepted only
+from the successfully subscribed exact characteristic, owner epoch, and active route generation;
+freezing or losing the link clears the subscription fence and all late frames are ignored.
 
 Android 9 has an additional ownership hazard which the adapter must model explicitly.
 `BluetoothDevice.connectGatt()` asks the Bluetooth process to register a client asynchronously,
@@ -93,6 +106,13 @@ proof, and writes the optional 8-byte telemetry frame with response on that same
 Android consumes iPhone ANCS through its one exact reverse-client observer; ANCS payloads are not
 proxied through a private Helper characteristic.  This follows the same
 peripheral-ANCS-client topology demonstrated by Nordic and BTstack.
+
+The first inbound Route-B callback is not an owner merely because it is bonded.  Before binding
+it, Android consumes `selectedSystemBondAddress` and requires a single exact match in the system
+bond set plus direct callback-address equality.  The later `H` write must arrive through the
+encryption-required characteristic from exactly one active GATT-server facade and must match the
+already anchored installation UUID, when present.  Zero/duplicate selected bonds, another bonded
+peer, a mismatched UUID, and an unresolvable RPA are all explicit fail-closed states.
 
 Android 9 does not expose the native connection handle from its GATT-server callback as a public
 GATT-client owner.  Therefore any ECARX-specific client observation mechanism is isolated behind

@@ -42,6 +42,8 @@ import dezz.status.widget.phone.transport.v2.IphoneBleMode;
 import dezz.status.widget.phone.transport.v2.IphoneBlePeerProof;
 import dezz.status.widget.phone.transport.v2.IphoneBleProtocolV2;
 import dezz.status.widget.phone.transport.v2.IphoneGattInventoryV2;
+import dezz.status.widget.phone.transport.v2.IphoneTelemetryProtocolV2;
+import dezz.status.widget.phone.transport.v2.IphoneTelemetryV2;
 import dezz.status.widget.phone.transport.v2.IphoneTransportErrorV2;
 import dezz.status.widget.phone.transport.v2.IphoneTransportLifecycle;
 import dezz.status.widget.phone.transport.v2.IphoneTransportSessionListenerV2;
@@ -53,6 +55,7 @@ import dezz.status.widget.phone.transport.v2.IphoneSwitchTransportV2;
 import dezz.status.widget.phone.transport.v2.GattResultV2;
 import dezz.status.widget.phone.transport.v2.MonotonicSessionCursorV2;
 import dezz.status.widget.phone.transport.v2.IphoneRoleControlV2;
+import dezz.status.widget.phone.transport.v2.SelectedBondIdentityResolverV2;
 import dezz.status.widget.phone.transport.switching.BleRoleSwitchCoordinator.ControlTransmit;
 import dezz.status.widget.phone.transport.switching.BleRoleSwitchCoordinator.Owner;
 import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.ControlFrame;
@@ -86,6 +89,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         DISCOVER,
         READ_PEER_PROOF,
         SUBSCRIBE_ROUTE_CONTROL,
+        SUBSCRIBE_TELEMETRY,
         SUBSCRIBE_SERVICE_CHANGED,
         SUBSCRIBE_NOTIFICATION_SOURCE,
         SUBSCRIBE_DATA_SOURCE,
@@ -132,7 +136,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private static final class GattOwner {
         final BleRouteToken ownerToken;
         final BluetoothDevice device;
-        final boolean selectedBondAttributed;
+        final SelectedBondIdentityResolverV2.Candidate bondAttribution;
         BluetoothGatt gatt;
         boolean callbackObserved;
         boolean connected;
@@ -141,10 +145,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         boolean quarantinedBeforeRegistration;
 
         GattOwner(BleRouteToken ownerToken, BluetoothDevice device,
-                  boolean selectedBondAttributed) {
+                  SelectedBondIdentityResolverV2.Candidate bondAttribution) {
             this.ownerToken = ownerToken;
             this.device = device;
-            this.selectedBondAttributed = selectedBondAttributed;
+            this.bondAttribution = bondAttribution;
         }
     }
 
@@ -196,6 +200,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
 
     private final Context context;
     private final Handler main;
+    private final BluetoothManager manager;
     private final BluetoothAdapter adapter;
     private final SelectedBondAttributionV2 bondAttribution;
     private final AncsConsumerCoreV2 ancs = new AncsConsumerCoreV2();
@@ -213,9 +218,11 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private boolean scanRunning;
     private ScanAttempt scanAttempt;
     private BluetoothDevice matchedBootstrapDevice;
-    private boolean matchedBootstrapAttributed;
+    private SelectedBondIdentityResolverV2.Candidate matchedBootstrapAttribution;
     private volatile GattOwner owner;
     private PendingGattOperation pendingGatt;
+    private BluetoothGattCharacteristic telemetryCharacteristic;
+    private BleRouteToken telemetrySubscriptionToken;
     private AncsSessionTokenV2 ancsSession;
     private final MonotonicSessionCursorV2 ancsSessionCursor =
             new MonotonicSessionCursorV2();
@@ -237,7 +244,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private boolean closed;
 
     public AndroidCentralTransportV2(Context context) {
-        this(context, SelectedBondAttributionV2.STRICT_PUBLIC_ADDRESS);
+        this(context, SelectedBondAttributionV2.STRICT_PUBLIC_API);
     }
 
     public AndroidCentralTransportV2(Context context,
@@ -245,7 +252,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         this.context = Objects.requireNonNull(context, "context").getApplicationContext();
         this.bondAttribution = Objects.requireNonNull(bondAttribution, "bondAttribution");
         this.main = new Handler(Looper.getMainLooper());
-        BluetoothManager manager =
+        this.manager =
                 (BluetoothManager) this.context.getSystemService(Context.BLUETOOTH_SERVICE);
         this.adapter = manager == null ? null : manager.getAdapter();
     }
@@ -369,6 +376,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 ingressFrozen = true;
                 cancelAllTimers();
                 stopBootstrapScanForFreeze();
+                clearTelemetrySubscription();
                 closeAncsSession();
                 if (owner != null && owner.connected
                         && state != null && state.isReady()) {
@@ -498,6 +506,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         this.listener = newListener;
         this.startRequest = request;
         this.ingressFrozen = false;
+        clearTelemetrySubscription();
         this.lastInboundCloseRequest = null;
         this.lastOutboundControl = null;
         this.radioOffTerminalEpoch = null;
@@ -546,6 +555,11 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                         IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE,
                         IphoneBleProtocolV2.CONTROL_CHARACTERISTIC, true);
                 break;
+            case SUBSCRIBE_TELEMETRY:
+                subscribe(effect.token, RawOperation.SUBSCRIBE_TELEMETRY,
+                        IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE,
+                        IphoneBleProtocolV2.TELEMETRY_CHARACTERISTIC, false);
+                break;
             case SUBSCRIBE_GATT_SERVICE_CHANGED:
                 subscribe(effect.token, RawOperation.SUBSCRIBE_SERVICE_CHANGED,
                         GENERIC_ATTRIBUTE_SERVICE, SERVICE_CHANGED, true);
@@ -562,6 +576,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 beginAncsSession(effect.token);
                 break;
             case RESET_SESSION_STATE:
+                clearTelemetrySubscription();
                 closeAncsSession();
                 if (pendingGatt == null
                         || pendingGatt.type != RawOperation.WRITE_ROUTE_CONTROL) {
@@ -592,7 +607,6 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 reportError(IphoneTransportErrorV2.Kind.GATT, effect.detail, true);
                 break;
             case REPORT_DOWN:
-            case SUBSCRIBE_TELEMETRY:
             case OPEN_GATT_SERVER:
             case ADD_V2_SERVER_SERVICE:
             case CLOSE_GATT_SERVER:
@@ -672,7 +686,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
         retireScanAttempt(attempt);
         matchedBootstrapDevice = null;
-        matchedBootstrapAttributed = false;
+        matchedBootstrapAttribution = null;
     }
 
     private void connectSelectedBond(BleRouteToken token) {
@@ -690,43 +704,48 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             postConnected(token, false);
             return;
         }
-        boolean attributed = bondAttribution.isSelectedBond(
-                selected, startRequest.selectedSystemBondAddress);
-        if (!attributed) {
+        SelectedBondIdentityResolverV2.Candidate attribution = bondAttribution.begin(
+                selected, startRequest.selectedSystemBondAddress,
+                selectedSystemBondMatchCount(startRequest.selectedSystemBondAddress),
+                startRequest.helperInstallationId);
+        if (!attribution.mayProceedToEncryptedProof()) {
             reportError(IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
-                    "selected target is not the exact bonded device", false);
+                    "selected-bond attribution failed: " + attribution.detail, false);
             postConnected(token, false);
             return;
         }
-        createGattOwner(token, selected, true, true);
+        createGattOwner(token, selected, true, attribution);
     }
 
     private void connectMatchedBootstrap(BleRouteToken token) {
         if (ingressFrozen) {
             matchedBootstrapDevice = null;
-            matchedBootstrapAttributed = false;
+            matchedBootstrapAttribution = null;
             return;
         }
         BluetoothDevice device = matchedBootstrapDevice;
-        boolean attributed = matchedBootstrapAttributed;
+        SelectedBondIdentityResolverV2.Candidate attribution =
+                matchedBootstrapAttribution;
         matchedBootstrapDevice = null;
-        matchedBootstrapAttributed = false;
-        if (device == null || !attributed) {
+        matchedBootstrapAttribution = null;
+        if (device == null || attribution == null
+                || !attribution.mayProceedToEncryptedProof()) {
             postConnected(token, false);
             return;
         }
-        createGattOwner(token, device, false, true);
+        createGattOwner(token, device, false, attribution);
     }
 
     private void createGattOwner(BleRouteToken token, BluetoothDevice device,
-                                 boolean autoConnect, boolean attributed) {
+                                 boolean autoConnect,
+                                 SelectedBondIdentityResolverV2.Candidate attribution) {
         if (ingressFrozen) return;
         if (owner != null) {
             reportError(IphoneTransportErrorV2.Kind.GATT,
                     "second BluetoothGatt wrapper forbidden", false);
             return;
         }
-        GattOwner candidate = new GattOwner(token, device, attributed);
+        GattOwner candidate = new GattOwner(token, device, attribution);
         owner = candidate;
         acquireProcessGateAndConnect(candidate, autoConnect);
     }
@@ -840,6 +859,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             return;
         }
         owner = null;
+        clearTelemetrySubscription();
         failPendingRouteControl();
         try {
             if (closing.gatt != null) closing.gatt.close();
@@ -1014,11 +1034,12 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
 
     private void postSubscription(BleRouteToken token, RawOperation operation,
                                   GattResultV2 result) {
-        dispatchMain(() -> completeSubscription(token, operation, result));
+        dispatchMain(() -> completeSubscription(token, operation, result, null));
     }
 
     private void completeSubscription(BleRouteToken token, RawOperation operation,
-                                      GattResultV2 result) {
+                                      GattResultV2 result,
+                                      BluetoothGattCharacteristic characteristic) {
         AndroidCentralRoute.State current = state;
         if (current == null) return;
         switch (operation) {
@@ -1027,6 +1048,16 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 break;
             case SUBSCRIBE_ROUTE_CONTROL:
                 apply(AndroidCentralRoute.routeControlSubscribed(current, token, result));
+                break;
+            case SUBSCRIBE_TELEMETRY:
+                BleRouteTransition<AndroidCentralRoute.State> telemetry =
+                        AndroidCentralRoute.telemetrySubscribed(current, token, result);
+                if (telemetry.accepted && result == GattResultV2.SUCCESS
+                        && characteristic != null) {
+                    telemetryCharacteristic = characteristic;
+                    telemetrySubscriptionToken = token;
+                }
+                apply(telemetry);
                 break;
             case SUBSCRIBE_NOTIFICATION_SOURCE:
                 apply(AndroidCentralRoute.notificationSourceSubscribed(current, token, result));
@@ -1062,6 +1093,11 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
         // A raw write remains in the Android FIFO until its callback. C/A retries rather than
         // overlapping it after ingress freeze.
+    }
+
+    private void clearTelemetrySubscription() {
+        telemetryCharacteristic = null;
+        telemetrySubscriptionToken = null;
     }
 
     private void beginHelperIdentityCommit(
@@ -1362,15 +1398,25 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         IphoneBleControlProtocolV2.Frame frame = IphoneBleControlProtocolV2.decode(value);
         if (frame == null || frame.type != IphoneBleControlProtocolV2.Type.PEER_PROOF
                 || frame.mode != IphoneBleMode.ANDROID_CENTRAL || owner == null
-                || !owner.selectedBondAttributed
                 || owner.device.getBondState() != BluetoothDevice.BOND_BONDED) {
             return null;
         }
         UUID installation = IphoneBleControlProtocolV2.installationUuid(frame);
         if (installation == null) return null;
+        SelectedBondIdentityResolverV2.Decision attribution = bondAttribution.complete(
+                owner.bondAttribution, installation.toString(),
+                selectedSystemBondMatchCount(
+                        owner.bondAttribution.selectedSystemBondAddress),
+                activeBondedOwnerMatchCount(owner.device, BluetoothProfile.GATT),
+                true /* successful read of the Helper's encryption-required H attribute */);
+        if (!attribution.proven) {
+            reportError(IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
+                    "selected-bond attribution failed: " + attribution.detail, false);
+            return null;
+        }
         return new IphoneBlePeerProof(IphoneBleProtocolV2.VERSION,
                 IphoneBleMode.ANDROID_CENTRAL,
-                BlePeerRole.IPHONE_HELPER_PERIPHERAL, installation.toString(),
+                BlePeerRole.IPHONE_HELPER_PERIPHERAL, attribution.helperInstallationId,
                 frame.telemetrySupported(), frame.ancsSupported(), true);
     }
 
@@ -1469,6 +1515,48 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         return adapter != null && adapter.isEnabled();
     }
 
+    /** Exact count is evidence: zero and non-unique selected bond records both fail closed. */
+    private int selectedSystemBondMatchCount(String selectedAddress) {
+        if (adapter == null || selectedAddress == null) return 0;
+        try {
+            java.util.Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+            if (bonded == null) return 0;
+            int matches = 0;
+            for (BluetoothDevice device : bonded) {
+                if (device != null && device.getBondState() == BluetoothDevice.BOND_BONDED
+                        && samePublicAddress(device.getAddress(), selectedAddress)) {
+                    matches++;
+                }
+            }
+            return matches;
+        } catch (RuntimeException unavailable) {
+            return 0;
+        }
+    }
+
+    /** Counts only the exact active facade; a different bonded peer never satisfies this gate. */
+    private int activeBondedOwnerMatchCount(BluetoothDevice facade, int profile) {
+        if (manager == null || facade == null || facade.getAddress() == null) return 0;
+        try {
+            List<BluetoothDevice> active = manager.getConnectedDevices(profile);
+            if (active == null) return 0;
+            int matches = 0;
+            for (BluetoothDevice device : active) {
+                if (device != null && device.getBondState() == BluetoothDevice.BOND_BONDED
+                        && samePublicAddress(device.getAddress(), facade.getAddress())) {
+                    matches++;
+                }
+            }
+            return matches;
+        } catch (RuntimeException unavailable) {
+            return 0;
+        }
+    }
+
+    private static boolean samePublicAddress(String left, String right) {
+        return left != null && right != null && left.equalsIgnoreCase(right);
+    }
+
     private void publishStatus() {
         if (listener != null && state != null) listener.onStatus(toStatus(state));
     }
@@ -1494,6 +1582,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             case NEEDS_FRESH_LINK: return IphoneTransportLifecycle.FAILED;
             case WAIT_AUTHORIZATION: return IphoneTransportLifecycle.AUTHENTICATING;
             case SUBSCRIBING_ROUTE_CONTROL: return IphoneTransportLifecycle.SUBSCRIBING;
+            case SUBSCRIBING_TELEMETRY: return IphoneTransportLifecycle.SUBSCRIBING;
             case SUBSCRIBING_NOTIFICATION_SOURCE:
             case SUBSCRIBING_DATA_SOURCE: return IphoneTransportLifecycle.SUBSCRIBING;
             case READY: return IphoneTransportLifecycle.READY;
@@ -1564,19 +1653,37 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                         new ParcelUuid(IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE))) {
             return;
         }
-        boolean attributed = bondAttribution.isSelectedBond(
-                result.getDevice(), state.selectedSystemBondAddress);
+        SelectedBondIdentityResolverV2.Candidate attribution = bondAttribution.begin(
+                result.getDevice(), state.selectedSystemBondAddress,
+                selectedSystemBondMatchCount(state.selectedSystemBondAddress),
+                state.helperInstallationId);
+        if (!attribution.mayProceedToEncryptedProof()) {
+            if (attribution.failure
+                    == SelectedBondIdentityResolverV2.Failure
+                            .ROTATED_ADDRESS_BOOTSTRAP_UNPROVABLE
+                    || attribution.failure
+                    == SelectedBondIdentityResolverV2.Failure
+                            .ROTATED_ADDRESS_PUBLIC_IDENTITY_UNPROVABLE
+                    || attribution.failure
+                    == SelectedBondIdentityResolverV2.Failure.SELECTED_BOND_MISSING
+                    || attribution.failure
+                    == SelectedBondIdentityResolverV2.Failure.SELECTED_BOND_AMBIGUOUS) {
+                reportError(IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
+                        "selected-bond attribution failed: " + attribution.detail, false);
+            }
+            return;
+        }
         IphoneBleAdvertisement advertisement = new IphoneBleAdvertisement(
                 IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE,
                 IphoneBleProtocolV2.VERSION, BlePeerRole.IPHONE_HELPER_PERIPHERAL,
-                true, attributed);
+                true, true);
         matchedBootstrapDevice = result.getDevice();
-        matchedBootstrapAttributed = attributed;
+        matchedBootstrapAttribution = attribution;
         BleRouteTransition<AndroidCentralRoute.State> transition =
                 AndroidCentralRoute.advertisement(state, attempt.token, advertisement);
         if (!transition.accepted) {
             matchedBootstrapDevice = null;
-            matchedBootstrapAttributed = false;
+            matchedBootstrapAttribution = null;
             return;
         }
         apply(transition);
@@ -1728,12 +1835,13 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         if (owner == null || owner.gatt != callbackGatt || pending == null
                 || pending.descriptor != descriptor) return;
         if (pending.type != RawOperation.SUBSCRIBE_ROUTE_CONTROL
+                && pending.type != RawOperation.SUBSCRIBE_TELEMETRY
                 && pending.type != RawOperation.SUBSCRIBE_SERVICE_CHANGED
                 && pending.type != RawOperation.SUBSCRIBE_NOTIFICATION_SOURCE
                 && pending.type != RawOperation.SUBSCRIBE_DATA_SOURCE) return;
         pendingGatt = null;
         completeSubscription(pending.routeToken, pending.type,
-                GattResultV2.fromAndroidStatus(status));
+                GattResultV2.fromAndroidStatus(status), pending.characteristic);
     }
 
     private void handleCharacteristicWrite(BluetoothGatt callbackGatt,
@@ -1779,9 +1887,32 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         } else if (AncsProtocol.DATA_SOURCE.equals(uuid) && ancsSession != null) {
             if (ingressFrozen) return;
             applyAncsEffects(ancs.dataSource(ancsSession, value));
+        } else if (IphoneBleProtocolV2.TELEMETRY_CHARACTERISTIC.equals(uuid)) {
+            handleTelemetryChanged(characteristic, value);
         } else if (IphoneBleProtocolV2.CONTROL_CHARACTERISTIC.equals(uuid)) {
             handleInboundRoleControl(value);
         }
+    }
+
+    private void handleTelemetryChanged(BluetoothGattCharacteristic characteristic,
+                                        byte[] value) {
+        AndroidCentralRoute.State current = state;
+        GattOwner exactOwner = owner;
+        BleRouteToken exactSubscription = telemetrySubscriptionToken;
+        if (ingressFrozen || current == null || exactOwner == null
+                || characteristic != telemetryCharacteristic
+                || exactSubscription == null
+                || !exactSubscription.sameOwner(exactOwner.ownerToken)
+                || !AndroidCentralRoute.acceptsTelemetry(current, exactSubscription)) {
+            return;
+        }
+        IphoneTelemetryV2 telemetry = IphoneTelemetryProtocolV2.decode(value);
+        if (telemetry == null) {
+            reportError(IphoneTransportErrorV2.Kind.PROTOCOL,
+                    "malformed Route-A telemetry frame", true);
+            return;
+        }
+        if (listener != null) listener.onTelemetry(telemetry);
     }
 
     private void handleInboundRoleControl(byte[] value) {

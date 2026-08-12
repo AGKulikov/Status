@@ -245,6 +245,27 @@ def verify_persistence_and_upgrade_replays() -> None:
     assert persist < constructor_end
     assert "throw PersistenceError.invalidLegacyRole" in runtime
 
+    # The visible FAILED retry is an actual write-ahead transition. It allocates a fresh epoch
+    # and generation, reclaims the attributable namespace, and refuses to guess contradictory
+    # ownership. Route-local terminal exhaustion is escalated to the same top-level drain.
+    retry = runtime[runtime.index("public func retryFailedSwitch()"):
+                    runtime.index("private func handle(", runtime.index("public func retryFailedSwitch()"))]
+    ambiguous = retry.index("case .contradictoryRemoteEvidence")
+    retry_transition = retry.index("let nextEpoch = failed.epoch.next()")
+    clear_failure = retry.index("self.runtimeFailure = nil")
+    assert ambiguous < retry_transition < clear_failure
+    assert "let nextGeneration = maximumGeneration.next()" in retry
+    assert "policy.restoreDrainFromRemoteIntent" in retry
+    assert "policy.restoreDrainLocalOnly" in retry
+    assert "policy.restoreDrain(" in retry
+    assert "Закройте и снова откройте Helper" not in retry
+
+    route_failed = runtime[runtime.index("case .routeFailed(let role"):
+                           runtime.index("private func handleFrozenRadioLoss")]
+    assert "policy.state.phase == .active" in route_failed
+    assert "recoverAttachedActiveOwner" in route_failed
+    assert "recoverReleasedActiveOwner" in route_failed
+
 
 def verify_callback_inversions() -> None:
     m = load_policy_model()

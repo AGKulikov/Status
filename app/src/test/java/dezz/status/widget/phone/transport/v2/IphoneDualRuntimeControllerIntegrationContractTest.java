@@ -63,6 +63,40 @@ public final class IphoneDualRuntimeControllerIntegrationContractTest {
         assertFalse(source.contains("BluetoothGattCallback"));
     }
 
+    @Test public void helperTelemetryCannotCrossSwitchOrRouteGeneration() throws Exception {
+        String source = controller();
+        String roleOnly = between(source,
+                "if (running && config != null\n                    && config.bleRole",
+                "stopLocked(next.enabled");
+        assertTrue(roleOnly.contains("clearHelperTelemetry()"));
+        assertTrue(roleOnly.indexOf("clearHelperTelemetry()")
+                < roleOnly.indexOf("runtime.requestMode"));
+
+        String dual = between(source,
+                "private void applyV2DualStatus",
+                "private void applyV2RouteStatus");
+        assertTrue(dual.contains("if (!activePhase)"));
+        assertTrue(dual.contains("clearHelperTelemetry()"));
+
+        String route = between(source,
+                "private void applyV2RouteStatus",
+                "private void dispatchAncsTransport");
+        assertTrue(route.contains("else if (!linkActive)"));
+        assertTrue(route.contains("clearHelperTelemetry()"));
+    }
+
+    @Test public void eachAdapterBeginsAncsCoreExactlyOncePerSession() throws Exception {
+        for (String relative : new String[]{
+                "app/src/main/java/dezz/status/widget/phone/transport/v2/android/"
+                        + "AndroidCentralTransportV2.java",
+                "app/src/main/java/dezz/status/widget/phone/transport/v2/android/"
+                        + "AndroidPeripheralTransportV2.java"
+        }) {
+            String adapter = text(relative);
+            assertTrue(count(adapter, "ancs.begin(ancsSession);") == 1);
+        }
+    }
+
     @Test public void radioBoundaryRetainsRuntimeAndNamesAreNotPublished() throws Exception {
         String source = controller();
         String radio = between(source,
@@ -113,5 +147,15 @@ public final class IphoneDualRuntimeControllerIntegrationContractTest {
             throw new AssertionError("missing source range: " + start + " -> " + end);
         }
         return source.substring(from, to);
+    }
+
+    private static int count(String source, String needle) {
+        int count = 0;
+        int at = 0;
+        while ((at = source.indexOf(needle, at)) >= 0) {
+            count++;
+            at += needle.length();
+        }
+        return count;
     }
 }

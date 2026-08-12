@@ -55,6 +55,7 @@ import dezz.status.widget.phone.transport.v2.IphoneTransportStopReason;
 import dezz.status.widget.phone.transport.v2.IphoneTransportV2;
 import dezz.status.widget.phone.transport.v2.IphoneSwitchTransportV2;
 import dezz.status.widget.phone.transport.v2.MonotonicSessionCursorV2;
+import dezz.status.widget.phone.transport.v2.SelectedBondIdentityResolverV2;
 import dezz.status.widget.phone.transport.switching.BleRoleSwitchCoordinator.ControlTransmit;
 import dezz.status.widget.phone.transport.switching.BleRoleSwitchCoordinator.Owner;
 import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.ControlFrame;
@@ -254,6 +255,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
     private final BluetoothManager manager;
     private final BluetoothAdapter adapter;
     private final ReverseGattObserverV2 reverseObserver;
+    private final SelectedBondAttributionV2 bondAttribution;
     private final UUID androidInstallationId;
     private final AncsConsumerCoreV2 ancs = new AncsConsumerCoreV2();
     private final MonotonicSessionCursorV2 ancsSessionCursor =
@@ -278,6 +280,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
     private BleRouteToken advertisingToken;
     private AdvertisingAttempt advertisingAttempt;
     private BluetoothDevice inboundPhysicalFacade;
+    private SelectedBondIdentityResolverV2.Candidate inboundBondAttribution;
     private BleRouteToken inboundOwnerToken;
     private BleRouteToken reverseGattOwnerToken;
     private boolean controlIndicationsEnabled;
@@ -308,10 +311,18 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
 
     public AndroidPeripheralTransportV2(Context context, UUID androidInstallationId,
                                         ReverseGattObserverV2 reverseObserver) {
+        this(context, androidInstallationId, reverseObserver,
+                SelectedBondAttributionV2.STRICT_PUBLIC_API);
+    }
+
+    public AndroidPeripheralTransportV2(Context context, UUID androidInstallationId,
+                                        ReverseGattObserverV2 reverseObserver,
+                                        SelectedBondAttributionV2 bondAttribution) {
         this.context = Objects.requireNonNull(context, "context").getApplicationContext();
         this.androidInstallationId = Objects.requireNonNull(
                 androidInstallationId, "androidInstallationId");
         this.reverseObserver = Objects.requireNonNull(reverseObserver, "reverseObserver");
+        this.bondAttribution = Objects.requireNonNull(bondAttribution, "bondAttribution");
         this.main = new Handler(Looper.getMainLooper());
         this.manager = (BluetoothManager) this.context.getSystemService(
                 Context.BLUETOOTH_SERVICE);
@@ -563,6 +574,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
         this.listener = newListener;
         this.startRequest = request;
         this.ingressFrozen = false;
+        this.inboundBondAttribution = null;
         this.lastInboundCloseRequest = null;
         this.lastOutboundControl = null;
         this.radioOffTerminalEpoch = null;
@@ -903,7 +915,18 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
                 cancelForeignConnection(device);
                 return;
             }
+            SelectedBondIdentityResolverV2.Candidate attribution = bondAttribution.begin(
+                    device, state.selectedSystemBondAddress,
+                    selectedSystemBondMatchCount(state.selectedSystemBondAddress),
+                    state.helperInstallationId);
+            if (!attribution.mayProceedToEncryptedProof()) {
+                cancelForeignConnection(device);
+                reportError(IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
+                        "selected-bond attribution failed: " + attribution.detail, false);
+                return;
+            }
             inboundPhysicalFacade = device;
+            inboundBondAttribution = attribution;
             controlIndicationsEnabled = false;
             BleRouteTransition<AndroidPeripheralRoute.State> transition =
                     AndroidPeripheralRoute.inboundConnected(state, state.serverOwner);
@@ -911,6 +934,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
                 inboundOwnerToken = transition.state.inboundOwner;
             } else {
                 inboundPhysicalFacade = null;
+                inboundBondAttribution = null;
                 cancelForeignConnection(device);
             }
             apply(transition);
@@ -919,6 +943,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
         if (newState != BluetoothProfile.STATE_DISCONNECTED
                 || inboundPhysicalFacade != device) return;
         inboundPhysicalFacade = null;
+        inboundBondAttribution = null;
         BleRouteToken terminalToken = inboundOwnerToken;
         inboundOwnerToken = null;
         controlIndicationsEnabled = false;
@@ -1106,11 +1131,26 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
             return;
         }
         UUID helperId = IphoneBleControlProtocolV2.installationUuid(frame);
-        boolean encryptedBondOwner = helperId != null
+        SelectedBondIdentityResolverV2.Decision attribution = helperId == null
+                ? null : bondAttribution.complete(
+                        inboundBondAttribution, helperId.toString(),
+                        selectedSystemBondMatchCount(state.selectedSystemBondAddress),
+                        activeBondedOwnerMatchCount(device, BluetoothProfile.GATT_SERVER),
+                        true /* local H write characteristic requires encryption */);
+        boolean encryptedBondOwner = attribution != null && attribution.proven
                 && device.getBondState() == BluetoothDevice.BOND_BONDED;
+        if (helperId != null && !encryptedBondOwner) {
+            reportError(IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
+                    "selected-bond attribution failed: "
+                            + (attribution == null
+                                ? "encrypted H attribution unavailable" : attribution.detail),
+                    false);
+        }
         IphoneBlePeerProof proof = helperId == null ? null : new IphoneBlePeerProof(
                 IphoneBleProtocolV2.VERSION, IphoneBleMode.ANDROID_PERIPHERAL,
-                BlePeerRole.IPHONE_HELPER_CENTRAL, helperId.toString(),
+                BlePeerRole.IPHONE_HELPER_CENTRAL,
+                attribution == null ? helperId.toString()
+                        : attribution.helperInstallationId,
                 frame.telemetrySupported(), frame.ancsSupported(), encryptedBondOwner);
         BleRouteToken proofToken = state.expected;
         AndroidPeripheralRoute.State before = state;
@@ -1235,6 +1275,8 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
 
     private boolean ownsInbound(BluetoothDevice device) {
         return device != null && device == inboundPhysicalFacade
+                && inboundBondAttribution != null
+                && inboundBondAttribution.mayProceedToEncryptedProof()
                 && state != null && state.inboundOwner != null && server != null;
     }
 
@@ -1783,6 +1825,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
         if (inboundOwnerToken == null || !inboundOwnerToken.sameOwner(token)) return;
         if (inboundPhysicalFacade == null) {
             inboundOwnerToken = null;
+            inboundBondAttribution = null;
             maybeFinishDeferredServerClose();
             maybeCompleteTeardown();
             return;
@@ -1823,6 +1866,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
         if (inboundPhysicalFacade == null || radioResetProven) {
             inboundPhysicalFacade = null;
             inboundOwnerToken = null;
+            inboundBondAttribution = null;
             finishServerClose();
         }
     }
@@ -1867,6 +1911,7 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
         }
         inboundPhysicalFacade = null;
         inboundOwnerToken = null;
+        inboundBondAttribution = null;
         controlIndicationsEnabled = false;
         pendingControlIndication = null;
         failPendingControlTransmit(ControlTransmitResult.TERMINAL_FAILURE);
@@ -2121,6 +2166,48 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
 
     private boolean radioEnabled() {
         return adapter != null && adapter.isEnabled();
+    }
+
+    /** Exact count is evidence: zero and non-unique selected bond records both fail closed. */
+    private int selectedSystemBondMatchCount(String selectedAddress) {
+        if (adapter == null || selectedAddress == null) return 0;
+        try {
+            java.util.Set<BluetoothDevice> bonded = adapter.getBondedDevices();
+            if (bonded == null) return 0;
+            int matches = 0;
+            for (BluetoothDevice device : bonded) {
+                if (device != null && device.getBondState() == BluetoothDevice.BOND_BONDED
+                        && samePublicAddress(device.getAddress(), selectedAddress)) {
+                    matches++;
+                }
+            }
+            return matches;
+        } catch (RuntimeException unavailable) {
+            return 0;
+        }
+    }
+
+    /** Counts only the exact active facade; a different bonded peer never satisfies this gate. */
+    private int activeBondedOwnerMatchCount(BluetoothDevice facade, int profile) {
+        if (manager == null || facade == null || facade.getAddress() == null) return 0;
+        try {
+            List<BluetoothDevice> active = manager.getConnectedDevices(profile);
+            if (active == null) return 0;
+            int matches = 0;
+            for (BluetoothDevice device : active) {
+                if (device != null && device.getBondState() == BluetoothDevice.BOND_BONDED
+                        && samePublicAddress(device.getAddress(), facade.getAddress())) {
+                    matches++;
+                }
+            }
+            return matches;
+        } catch (RuntimeException unavailable) {
+            return 0;
+        }
+    }
+
+    private static boolean samePublicAddress(String left, String right) {
+        return left != null && right != null && left.equalsIgnoreCase(right);
     }
 
     private void publishStatus() {

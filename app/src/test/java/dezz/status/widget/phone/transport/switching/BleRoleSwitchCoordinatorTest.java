@@ -853,6 +853,94 @@ public final class BleRoleSwitchCoordinatorTest {
     }
 
     @Test
+    public void explicitFailedRetryAllocatesFreshEpochAndFencesEveryPriorFailureCallback() {
+        FakePort port = new FakePort();
+        BleRoleSwitchCoordinator coordinator = active(port, new FakeGuard());
+        coordinator.requestSwitch(
+                HELPER_CENTRAL_ANDROID_PERIPHERAL,
+                REQUEST_AT,
+                STOP_TIMEOUT,
+                DRAIN_DURATION,
+                token(90)
+        );
+        Owner originalSource = coordinator.sourceOwner();
+        coordinator.onIngressFrozen(originalSource, REQUEST_AT + 1L);
+        coordinator.onRemoteCloseAck(
+                originalSource,
+                HELPER_CENTRAL_ANDROID_PERIPHERAL,
+                token(90).bytes(),
+                REQUEST_AT + 2L
+        );
+        coordinator.onLocalTerminal(originalSource, REQUEST_AT + 3L);
+        coordinator.onLocalOwnerCount(originalSource, 0, REQUEST_AT + 4L);
+        coordinator.onDrainDeadline(originalSource, coordinator.state().drainDeadlineMillis());
+        Owner failedTarget = coordinator.targetOwner();
+        coordinator.beginTargetStart(failedTarget);
+        coordinator.onTargetStartFailed(failedTarget);
+        assertEquals(FAILED, coordinator.state().phase());
+
+        Sequence failedEpoch = coordinator.state().epoch();
+        port.clear();
+        assertEquals(APPLIED, coordinator.retryFailed(
+                2_000L, STOP_TIMEOUT, DRAIN_DURATION, token(91)));
+        assertEquals(FREEZING, coordinator.state().phase());
+        assertEquals(failedEpoch.next(), coordinator.state().epoch());
+        assertEquals(failedTarget.role(), coordinator.sourceOwner().role());
+        assertEquals(failedTarget.generation(), coordinator.sourceOwner().generation());
+        assertLog(port, "persist:FREEZING", "freeze", "armStop:2100");
+
+        assertEquals(STALE_CALLBACK, coordinator.onTargetActive(failedTarget));
+        assertEquals(STALE_CALLBACK,
+                coordinator.onIngressFreezeFailed(failedTarget));
+        assertEquals(FREEZING, coordinator.state().phase());
+
+        Owner firstRetrySource = coordinator.sourceOwner();
+        coordinator.onIngressFreezeFailed(firstRetrySource);
+        assertEquals(FAILED, coordinator.state().phase());
+        Sequence firstRetryEpoch = coordinator.state().epoch();
+        assertEquals(APPLIED, coordinator.retryFailed(
+                3_000L, STOP_TIMEOUT, DRAIN_DURATION, token(92)));
+        assertEquals(firstRetryEpoch.next(), coordinator.state().epoch());
+        assertEquals(STALE_CALLBACK,
+                coordinator.onIngressFreezeFailed(firstRetrySource));
+        assertEquals(FREEZING, coordinator.state().phase());
+    }
+
+    @Test
+    public void contradictoryFailedEvidenceCannotBeRetriedOrDispatchCleanup() {
+        FakePort port = new FakePort();
+        BleRoleSwitchCoordinator coordinator = active(port, new FakeGuard());
+        coordinator.requestSwitch(
+                HELPER_CENTRAL_ANDROID_PERIPHERAL,
+                REQUEST_AT,
+                STOP_TIMEOUT,
+                DRAIN_DURATION,
+                token(93)
+        );
+        Owner source = coordinator.sourceOwner();
+        coordinator.onIngressFrozen(source, REQUEST_AT + 1L);
+        coordinator.onRemoteCloseAck(
+                source,
+                HELPER_CENTRAL_ANDROID_PERIPHERAL,
+                token(93).bytes(),
+                REQUEST_AT + 2L
+        );
+        coordinator.onLocalOwnerCount(source, 0, REQUEST_AT + 3L);
+        coordinator.onLocalOwnerCount(source, 1, REQUEST_AT + 4L);
+        assertEquals(FAILED, coordinator.state().phase());
+        assertEquals(Failure.CONTRADICTORY_LOCAL_OWNER_EVIDENCE,
+                coordinator.state().failure());
+        assertFalse(coordinator.canRetryFailed());
+
+        port.clear();
+        assertEquals(Outcome.REJECTED_TERMINAL, coordinator.retryFailed(
+                4_000L, STOP_TIMEOUT, DRAIN_DURATION, token(94)));
+        assertTrue(port.log.isEmpty());
+        assertEquals(FAILED, coordinator.state().phase());
+        assertEquals(source.generation(), coordinator.sourceOwner().generation());
+    }
+
+    @Test
     public void restorationRejectsReusedProcessNonce() {
         FakePort port = new FakePort();
         BleRoleSwitchCoordinator coordinator = active(port, new FakeGuard());

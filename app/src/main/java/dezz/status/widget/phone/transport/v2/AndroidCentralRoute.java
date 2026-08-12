@@ -36,6 +36,7 @@ public final class AndroidCentralRoute {
         SUBSCRIBING_SERVICE_CHANGED,
         VERIFYING_PEER,
         SUBSCRIBING_ROUTE_CONTROL,
+        SUBSCRIBING_TELEMETRY,
         SUBSCRIBING_NOTIFICATION_SOURCE,
         SUBSCRIBING_DATA_SOURCE,
         WAIT_AUTHORIZATION,
@@ -286,6 +287,27 @@ public final class AndroidCentralRoute {
         if (result != GattResultV2.SUCCESS) {
             return gattFailure(state, token, result, AuthorizationStep.ROUTE_CONTROL_CCCD);
         }
+        return beginTelemetrySubscription(state, token);
+    }
+
+    public static BleRouteTransition<State> telemetrySubscribed(
+            State state, BleRouteToken token, GattResultV2 result) {
+        if (!expects(state, Phase.SUBSCRIBING_TELEMETRY, token)) {
+            return BleRouteTransition.ignored(state);
+        }
+        if (result != GattResultV2.SUCCESS) {
+            BleRouteTransition<State> next = afterTelemetrySubscription(state, token);
+            if (!next.accepted) return next;
+            List<BleRouteEffect> effects = new ArrayList<>(next.effects);
+            effects.add(op(BleRouteEffect.Type.REPORT_ERROR, token,
+                    "optional Route-A telemetry CCCD unavailable: " + result));
+            return new BleRouteTransition<>(next.state, effects, true);
+        }
+        return afterTelemetrySubscription(state, token);
+    }
+
+    private static BleRouteTransition<State> afterTelemetrySubscription(
+            State state, BleRouteToken token) {
         if (!state.ancsAvailable) {
             if (!state.serviceChangedArmed) {
                 State blocked = copy(state, Phase.NEEDS_FRESH_LINK, null, token.ownerId,
@@ -293,7 +315,7 @@ public final class AndroidCentralRoute {
                         "ANCS absent and Service Changed unavailable; fresh link required");
                 return BleRouteTransition.accepted(blocked,
                         op(BleRouteEffect.Type.CANCEL_DEADLINE, token,
-                                "control subscribed"),
+                                "telemetry subscribed"),
                         op(BleRouteEffect.Type.REPORT_DOWN, token,
                                 "ANCS absent without Service Changed; explicit fresh link required"));
             }
@@ -301,11 +323,31 @@ public final class AndroidCentralRoute {
                     state.nextOwnerId, state.consecutiveFailures,
                     "control ready; wait for Service Changed/ANCS");
             return BleRouteTransition.accepted(waiting,
-                    op(BleRouteEffect.Type.CANCEL_DEADLINE, token, "control subscribed"),
+                    op(BleRouteEffect.Type.CANCEL_DEADLINE, token, "telemetry subscribed"),
                     op(BleRouteEffect.Type.REPORT_DOWN, token,
                             "ANCS not published; no polling and no owner replacement"));
         }
         return beginNotificationSubscription(state, token);
+    }
+
+    /** Accepts telemetry only after the exact encrypted H/control/CCCD sequence is complete. */
+    public static boolean acceptsTelemetry(State state, BleRouteToken ownerCallback) {
+        if (state == null || ownerCallback == null
+                || ownerCallback.mode != IphoneBleMode.ANDROID_CENTRAL
+                || !state.epoch.equals(ownerCallback.epoch)
+                || state.activeOwnerId != ownerCallback.ownerId) {
+            return false;
+        }
+        if (state.phase == Phase.SUBSCRIBING_NOTIFICATION_SOURCE
+                || state.phase == Phase.SUBSCRIBING_DATA_SOURCE
+                || state.phase == Phase.WAIT_ANCS
+                || state.phase == Phase.NEEDS_FRESH_LINK
+                || state.phase == Phase.READY) {
+            return true;
+        }
+        return state.phase == Phase.WAIT_AUTHORIZATION
+                && (state.authorizationStep == AuthorizationStep.NOTIFICATION_SOURCE_CCCD
+                    || state.authorizationStep == AuthorizationStep.DATA_SOURCE_CCCD);
     }
 
     /** One exact Service Changed indication schedules one serialized same-owner rediscovery. */
@@ -683,12 +725,24 @@ public final class AndroidCentralRoute {
                 "route control ready; begin ANCS subscriptions");
         return BleRouteTransition.accepted(next,
                 op(BleRouteEffect.Type.CANCEL_DEADLINE, completed,
-                        "route control subscribed"),
+                        "telemetry subscribed"),
                 op(BleRouteEffect.Type.ARM_ANCS_PARSER, subscribe,
                         "reset/arm parser before Notification Source CCCD"),
                 op(BleRouteEffect.Type.SUBSCRIBE_ANCS_NOTIFICATION_SOURCE, subscribe,
                         "mandatory ANCS Notification Source CCCD"),
                 BleRouteEffect.deadline(subscribe, CCCD_TIMEOUT_MS));
+    }
+
+    private static BleRouteTransition<State> beginTelemetrySubscription(
+            State state, BleRouteToken completed) {
+        BleRouteToken subscribe = nextOperation(completed);
+        if (subscribe == null) return counterExhausted(state, completed, "operation");
+        State next = copy(state, Phase.SUBSCRIBING_TELEMETRY, subscribe,
+                completed.ownerId, state.nextOwnerId, state.consecutiveFailures,
+                "route control ready; subscribe exact Helper telemetry");
+        return step(next, completed, subscribe, BleRouteEffect.Type.SUBSCRIBE_TELEMETRY,
+                CCCD_TIMEOUT_MS,
+                "fixed eight-byte telemetry notification CCCD on authenticated owner");
     }
 
     private static BleRouteTransition<State> gattFailure(State state, BleRouteToken token,
@@ -891,6 +945,7 @@ public final class AndroidCentralRoute {
                 || phase == Phase.SUBSCRIBING_SERVICE_CHANGED
                 || phase == Phase.VERIFYING_PEER
                 || phase == Phase.SUBSCRIBING_ROUTE_CONTROL
+                || phase == Phase.SUBSCRIBING_TELEMETRY
                 || phase == Phase.SUBSCRIBING_NOTIFICATION_SOURCE
                 || phase == Phase.SUBSCRIBING_DATA_SOURCE || phase == Phase.WAIT_ANCS
                 || phase == Phase.NEEDS_FRESH_LINK
@@ -903,6 +958,7 @@ public final class AndroidCentralRoute {
         return phase == Phase.DISCOVERING || phase == Phase.SUBSCRIBING_SERVICE_CHANGED
                 || phase == Phase.VERIFYING_PEER
                 || phase == Phase.SUBSCRIBING_ROUTE_CONTROL
+                || phase == Phase.SUBSCRIBING_TELEMETRY
                 || phase == Phase.SUBSCRIBING_NOTIFICATION_SOURCE
                 || phase == Phase.SUBSCRIBING_DATA_SOURCE;
     }

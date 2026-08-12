@@ -288,8 +288,80 @@ public final class HelperSwitchRuntimeCoordinator {
     public func retryFailedSwitch() {
         queue.async { [weak self] in
             guard let self else { return }
-            self.bootDetail = "Fail-closed состояние сохранено. Закройте и снова откройте Helper — восстановление начнётся только через полный drain."
-            self.publishSnapshot()
+            guard self.policy.state.phase == .failed else {
+                self.publishSnapshot()
+                return
+            }
+            let failed = self.policy.state
+            switch failed.failure {
+            case .contradictoryRemoteEvidence,
+                 .contradictoryLocalOwnerEvidence,
+                 .impossibleLocalOwnerCount:
+                self.bootDetail = "Неоднозначный владелец остаётся fail-closed; автоматический выбор namespace запрещён"
+                self.publishSnapshot()
+                return
+            default:
+                break
+            }
+
+            let targetMayExist = failed.failure == .targetStartFailed
+            guard let drainRole = targetMayExist ? failed.targetRole : failed.sourceRole,
+                  let drainGeneration = targetMayExist
+                    ? failed.targetGeneration : failed.sourceGeneration else {
+                self.bootDetail = "FAILED не содержит точного владельца для безопасного retry"
+                self.publishSnapshot()
+                return
+            }
+            let maximumGeneration = [
+                failed.activeGeneration, failed.sourceGeneration, failed.targetGeneration
+            ].compactMap { $0 }.max(by: { Self.sequenceLessThan($0, $1) }) ?? drainGeneration
+            let nextEpoch = failed.epoch.next()
+            let nextGeneration = maximumGeneration.next()
+            let retryOrigin: Origin = targetMayExist ? .localOnlyRestore : (self.origin ?? .localOnlyRestore)
+            let retryToken = retryOrigin == .remote
+                ? (self.switchToken ?? Self.randomToken()) : Self.randomToken()
+
+            self.runtimeFailure = nil
+            self.routeReady = false
+            self.releasedSource = nil
+            self.pendingTransmit = nil
+            self.bootDetail = "Явный retry: новый epoch, точный owner-zero и полный drain"
+            self.reduce(nextOrigin: retryOrigin, nextToken: retryToken) { policy in
+                switch retryOrigin {
+                case .remote:
+                    return policy.restoreDrainFromRemoteIntent(
+                        sourceRole: drainRole,
+                        desiredRole: failed.desiredRole ?? drainRole,
+                        epoch: nextEpoch,
+                        sourceGeneration: drainGeneration,
+                        targetGeneration: nextGeneration,
+                        nowMs: Self.nowMs(),
+                        stopTimeoutMs: Self.stopTimeoutMs,
+                        drainDurationMs: Self.drainDurationMs
+                    )
+                case .localOnlyRestore, .legacyMigration:
+                    return policy.restoreDrainLocalOnly(
+                        role: drainRole,
+                        epoch: nextEpoch,
+                        sourceGeneration: drainGeneration,
+                        targetGeneration: nextGeneration,
+                        nowMs: Self.nowMs(),
+                        stopTimeoutMs: Self.stopTimeoutMs,
+                        drainDurationMs: Self.drainDurationMs
+                    )
+                case .local:
+                    return policy.restoreDrain(
+                        sourceRole: drainRole,
+                        desiredRole: failed.desiredRole ?? drainRole,
+                        epoch: nextEpoch,
+                        sourceGeneration: drainGeneration,
+                        targetGeneration: nextGeneration,
+                        nowMs: Self.nowMs(),
+                        stopTimeoutMs: Self.stopTimeoutMs,
+                        drainDurationMs: Self.drainDurationMs
+                    )
+                }
+            }
         }
     }
 
@@ -509,6 +581,22 @@ public final class HelperSwitchRuntimeCoordinator {
                         epoch: policy.state.epoch,
                         targetGeneration: generation,
                         targetRole: target
+                    )
+                }
+            } else if policy.state.phase == .active,
+                      policy.state.activeRole == role,
+                      policy.state.activeGeneration == generation {
+                if role == .helperPeripheralAndroidCentral {
+                    recoverAttachedActiveOwner(
+                        role: role,
+                        generation: generation,
+                        reason: "Route-local retry exhausted: \(reason)"
+                    )
+                } else {
+                    recoverReleasedActiveOwner(
+                        role: role,
+                        generation: generation,
+                        reason: "Route-local retry exhausted: \(reason)"
                     )
                 }
             } else {

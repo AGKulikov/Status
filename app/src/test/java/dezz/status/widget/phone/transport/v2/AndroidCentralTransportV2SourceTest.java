@@ -90,17 +90,47 @@ public final class AndroidCentralTransportV2SourceTest {
         String selected = between(source,
                 "private void connectSelectedBond",
                 "private void connectMatchedBootstrap");
-        assertTrue(selected.contains("createGattOwner(token, selected, true, true)"));
+        assertTrue(selected.contains(
+                "createGattOwner(token, selected, true, attribution)"));
         String bootstrap = between(source,
                 "private void connectMatchedBootstrap",
                 "private void createGattOwner");
-        assertTrue(bootstrap.contains("createGattOwner(token, device, false, true)"));
+        assertTrue(bootstrap.contains(
+                "createGattOwner(token, device, false, attribution)"));
 
         String reassert = between(source,
                 "private void reassertSameGatt",
                 "private void closeGattOwner");
         assertTrue(reassert.contains("owner.gatt.connect()"));
         assertFalse(reassert.contains("connectGatt("));
+    }
+
+    @Test public void selectedBondAttributionNeverGuessesRotatedFacade() throws Exception {
+        String source = source();
+        String selected = between(source,
+                "private void connectSelectedBond",
+                "private void connectMatchedBootstrap");
+        assertTrue(selected.contains("startRequest.selectedSystemBondAddress"));
+        assertTrue(selected.contains("selectedSystemBondMatchCount("));
+        assertTrue(selected.contains("bondAttribution.begin("));
+
+        String scan = between(source,
+                "private void handleScanResult",
+                "private final BluetoothGattCallback gattCallback");
+        assertTrue(scan.contains("state.selectedSystemBondAddress"));
+        assertTrue(scan.contains("state.helperInstallationId"));
+        assertTrue(scan.contains("ROTATED_ADDRESS_BOOTSTRAP_UNPROVABLE"));
+        assertTrue(scan.contains("ROTATED_ADDRESS_PUBLIC_IDENTITY_UNPROVABLE"));
+        assertTrue(scan.contains("PEER_PROOF_REJECTED"));
+
+        String proof = between(source,
+                "private IphoneBlePeerProof decodePeerProof",
+                "private void maybeCompleteTeardown");
+        assertTrue(proof.contains("bondAttribution.complete("));
+        assertTrue(proof.contains("BluetoothProfile.GATT"));
+        assertTrue(proof.contains("selectedSystemBondMatchCount("));
+        assertTrue(proof.contains("activeBondedOwnerMatchCount("));
+        assertTrue(proof.contains("if (!attribution.proven)"));
     }
 
     @Test public void controlOwnershipUsesIndicationsBeforeAncs() throws Exception {
@@ -118,6 +148,40 @@ public final class AndroidCentralTransportV2SourceTest {
         assertTrue(inventory.contains("routeControl != null && writable(routeControl)"));
         assertTrue(inventory.contains("routeControl != null && indicatable(routeControl)"));
         assertFalse(inventory.contains("routeControl != null && notifiable(routeControl)"));
+    }
+
+    @Test public void telemetryUsesSerializedCccdExactCharacteristicAndSharedDecoder()
+            throws Exception {
+        String source = source();
+        String execute = between(source,
+                "private void execute(BleRouteEffect effect)",
+                "private void startBootstrapScan");
+        assertTrue(execute.contains("case SUBSCRIBE_TELEMETRY:"));
+        assertTrue(execute.contains(
+                "IphoneBleProtocolV2.TELEMETRY_CHARACTERISTIC, false"));
+
+        String descriptor = between(source,
+                "private void handleDescriptorWrite",
+                "private void handleCharacteristicWrite");
+        assertTrue(descriptor.contains("RawOperation.SUBSCRIBE_TELEMETRY"));
+        assertTrue(descriptor.contains("pending.characteristic"));
+
+        String changed = between(source,
+                "private void handleTelemetryChanged",
+                "private void handleInboundRoleControl");
+        assertTrue(changed.contains("characteristic != telemetryCharacteristic"));
+        assertTrue(changed.contains(
+                "!exactSubscription.sameOwner(exactOwner.ownerToken)"));
+        assertTrue(changed.contains(
+                "AndroidCentralRoute.acceptsTelemetry(current, exactSubscription)"));
+        assertTrue(changed.contains("IphoneTelemetryProtocolV2.decode(value)"));
+        assertTrue(changed.contains("listener.onTelemetry(telemetry)"));
+
+        String freeze = between(source, "@Override public void freezeIngress",
+                "@Override public void transmitControl");
+        assertTrue(freeze.contains("clearTelemetrySubscription()"));
+        String reset = between(source, "case RESET_SESSION_STATE:", "case ARM_DEADLINE:");
+        assertTrue(reset.contains("clearTelemetrySubscription()"));
     }
 
     @Test public void adapterHasNoNameMatchHiddenCacheRefreshOrTopologyFallback()

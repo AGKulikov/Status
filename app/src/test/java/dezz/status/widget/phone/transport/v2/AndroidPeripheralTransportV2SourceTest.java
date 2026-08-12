@@ -62,6 +62,29 @@ public final class AndroidPeripheralTransportV2SourceTest {
         assertTrue(dispatcher.contains("callbackBody.run()"));
     }
 
+    @Test public void firstInboundMustProveExactSelectedSystemBondBeforeOwnership()
+            throws Exception {
+        String source = source();
+        String inbound = between(source, "private void handleInboundConnection",
+                "private void cancelForeignConnection");
+        assertTrue(inbound.contains("state.selectedSystemBondAddress"));
+        assertTrue(inbound.contains("selectedSystemBondMatchCount("));
+        assertTrue(inbound.contains("bondAttribution.begin("));
+        assertTrue(inbound.contains("attribution.mayProceedToEncryptedProof()"));
+        assertTrue(inbound.indexOf("bondAttribution.begin(")
+                < inbound.indexOf("inboundPhysicalFacade = device"));
+        assertTrue(inbound.contains("cancelForeignConnection(device)"));
+        assertTrue(inbound.contains("PEER_PROOF_REJECTED"));
+
+        String proof = between(source, "private void handleInboundPeerProof",
+                "private void commitAcceptedPeerProof");
+        assertTrue(proof.contains("bondAttribution.complete("));
+        assertTrue(proof.contains("BluetoothProfile.GATT_SERVER"));
+        assertTrue(proof.contains("selectedSystemBondMatchCount("));
+        assertTrue(proof.contains("activeBondedOwnerMatchCount("));
+        assertTrue(proof.contains("attribution.proven"));
+    }
+
     @Test public void freezeFencesPublicationAndProvesRemoteAbsenceWithoutLocalOwnerCount()
             throws Exception {
         String source = source();

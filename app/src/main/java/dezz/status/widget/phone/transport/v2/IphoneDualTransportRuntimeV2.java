@@ -323,9 +323,26 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
 
     private void requestSameModeRecoveryOnSerialized() {
         assertOnSerializedExecutor();
-        if (closed || coordinator == null || coordinator.state().phase() != Phase.ACTIVE) return;
-        Outcome outcome = coordinator.requestSameRoleRestart(
-                now(), stopTimeoutMillis, drainDurationMillis, newWireToken());
+        if (closed || coordinator == null) return;
+        Outcome outcome;
+        if (coordinator.state().phase() == Phase.FAILED) {
+            if (!coordinator.canRetryFailed()) {
+                publishDualStatus("same-mode recovery: " + Outcome.REJECTED_TERMINAL);
+                return;
+            }
+            // Keep an attributable source slot attached: retryFailed() emits a fresh-epoch
+            // freeze and freezeSourceIngress() must drain that exact framework owner when it is
+            // still present. A failed target was already detached by failBoundTarget(), so that
+            // case naturally constructs a restoration-only drain adapter instead.
+            cancelAllRuntimeTimers();
+            outcome = coordinator.retryFailed(
+                    now(), stopTimeoutMillis, drainDurationMillis, newWireToken());
+        } else if (coordinator.state().phase() == Phase.ACTIVE) {
+            outcome = coordinator.requestSameRoleRestart(
+                    now(), stopTimeoutMillis, drainDurationMillis, newWireToken());
+        } else {
+            return;
+        }
         publishDualStatus("same-mode recovery: " + outcome);
     }
 
@@ -557,6 +574,13 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
                         || status.lifecycle == IphoneTransportLifecycle.STOPPED)
                         && coordinator != null && coordinator.state().phase() == Phase.STARTING) {
                     failBoundTarget(bound);
+                } else if ((status.lifecycle == IphoneTransportLifecycle.FAILED
+                        || status.lifecycle == IphoneTransportLifecycle.STOPPED)
+                        && coordinator != null && coordinator.state().phase() == Phase.ACTIVE) {
+                    // Route-local fresh-owner retries are bounded. Their terminal status is an
+                    // exact top-level recovery signal, never a reason to strand ACTIVE over a
+                    // dead adapter or spin another owner inside the same route epoch.
+                    requestSameModeRecoveryOnSerialized();
                 }
                 listener.onStatus(status);
                 publishDualStatus(status.detail);

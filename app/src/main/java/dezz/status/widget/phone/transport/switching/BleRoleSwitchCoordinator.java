@@ -531,6 +531,15 @@ public final class BleRoleSwitchCoordinator {
         return codec.encode(snapshot(state, wireToken, origin));
     }
 
+    /** True only when FAILED has one attributable namespace that may be safely reclaimed. */
+    public boolean canRetryFailed() {
+        assertSerialized();
+        return state.phase() == Phase.FAILED
+                && state.failure() != Failure.CONTRADICTORY_REMOTE_EVIDENCE
+                && state.failure() != Failure.CONTRADICTORY_LOCAL_OWNER_EVIDENCE
+                && state.failure() != Failure.IMPOSSIBLE_LOCAL_OWNER_COUNT;
+    }
+
     public Outcome requestSwitch(
             Role desiredRole,
             long nowMillis,
@@ -579,6 +588,94 @@ public final class BleRoleSwitchCoordinator {
                 reduction.outcome() == Outcome.APPLIED
                         ? BleRoleSwitchOrigin.LOCAL_ONLY_RESTORE : origin
         );
+    }
+
+    /**
+     * Explicitly retries an attributable failed transaction through a fresh teardown epoch.
+     *
+     * <p>A failed target may already own framework resources, so that exact target becomes the
+     * new drain source and the retry is local-only.  Other attributable failures re-enter the
+     * persisted transaction from its exact source.  Evidence that says the owner itself is
+     * contradictory or unprovable remains terminal; retrying it would guess which namespace is
+     * safe to start.</p>
+     */
+    public Outcome retryFailed(
+            long nowMillis,
+            long stopTimeoutMillis,
+            long drainDurationMillis,
+            WireSwitchToken newWireToken
+    ) {
+        assertSerialized();
+        Objects.requireNonNull(newWireToken, "newWireToken");
+        if (state.phase() != Phase.FAILED) {
+            return state.phase() == Phase.CLOSED
+                    ? Outcome.REJECTED_TERMINAL : Outcome.COALESCED;
+        }
+        if (!canRetryFailed()) {
+            return Outcome.REJECTED_TERMINAL;
+        }
+
+        boolean targetOwnerMayExist = state.failure() == Failure.TARGET_START_FAILED;
+        Role drainRole = targetOwnerMayExist ? state.targetRole() : state.sourceRole();
+        Sequence drainGeneration = targetOwnerMayExist
+                ? state.targetGeneration() : state.sourceGeneration();
+        Sequence nextEpoch = state.epoch().next();
+        Sequence nextGeneration = maximumGeneration(state).next();
+        Reduction retry;
+        BleRoleSwitchOrigin retryOrigin;
+        WireSwitchToken retryToken;
+        if (targetOwnerMayExist) {
+            retry = reducer.restoreDrainLocalOnly(
+                    drainRole,
+                    nextEpoch,
+                    drainGeneration,
+                    nextGeneration,
+                    nowMillis,
+                    stopTimeoutMillis,
+                    drainDurationMillis
+            );
+            retryOrigin = BleRoleSwitchOrigin.LOCAL_ONLY_RESTORE;
+            retryToken = newWireToken;
+        } else if (origin == BleRoleSwitchOrigin.REMOTE) {
+            retry = reducer.restoreDrainFromRemoteIntent(
+                    drainRole,
+                    state.desiredRole(),
+                    nextEpoch,
+                    drainGeneration,
+                    nextGeneration,
+                    nowMillis,
+                    stopTimeoutMillis,
+                    drainDurationMillis
+            );
+            retryOrigin = origin;
+            retryToken = wireToken;
+        } else if (origin == BleRoleSwitchOrigin.LOCAL_ONLY_RESTORE) {
+            retry = reducer.restoreDrainLocalOnly(
+                    drainRole,
+                    nextEpoch,
+                    drainGeneration,
+                    nextGeneration,
+                    nowMillis,
+                    stopTimeoutMillis,
+                    drainDurationMillis
+            );
+            retryOrigin = BleRoleSwitchOrigin.LOCAL_ONLY_RESTORE;
+            retryToken = newWireToken;
+        } else {
+            retry = reducer.restoreDrain(
+                    drainRole,
+                    state.desiredRole(),
+                    nextEpoch,
+                    drainGeneration,
+                    nextGeneration,
+                    nowMillis,
+                    stopTimeoutMillis,
+                    drainDurationMillis
+            );
+            retryOrigin = BleRoleSwitchOrigin.LOCAL;
+            retryToken = newWireToken;
+        }
+        return commit(retry, retryToken, retryOrigin);
     }
 
     /**
@@ -1051,6 +1148,23 @@ public final class BleRoleSwitchCoordinator {
         if (snapshot.targetGeneration() != null
                 && snapshot.targetGeneration().compareTo(maximum) > 0) {
             maximum = snapshot.targetGeneration();
+        }
+        return maximum;
+    }
+
+    private static Sequence maximumGeneration(State state) {
+        Sequence maximum = Sequence.zero();
+        if (state.activeGeneration() != null
+                && state.activeGeneration().compareTo(maximum) > 0) {
+            maximum = state.activeGeneration();
+        }
+        if (state.sourceGeneration() != null
+                && state.sourceGeneration().compareTo(maximum) > 0) {
+            maximum = state.sourceGeneration();
+        }
+        if (state.targetGeneration() != null
+                && state.targetGeneration().compareTo(maximum) > 0) {
+            maximum = state.targetGeneration();
         }
         return maximum;
     }

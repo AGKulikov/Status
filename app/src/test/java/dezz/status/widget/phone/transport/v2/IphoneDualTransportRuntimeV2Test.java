@@ -115,6 +115,113 @@ public final class IphoneDualTransportRuntimeV2Test {
         assertEquals(ACTIVE, fixture.listener.lastDual.switchPhase);
     }
 
+    @Test public void exhaustedRouteStatusEscalatesToFreshTopLevelEpochAndFullDrain() {
+        Fixture fixture = new Fixture(false, "");
+        fixture.start(IphoneBleMode.ANDROID_CENTRAL);
+        fixture.scheduler.advanceBy(10L);
+        FakeTransport exhausted = fixture.factory.created.get(1);
+        BleRouteEpoch failedEpoch = exhausted.startRequest.epoch;
+
+        exhausted.deliverFailedStatus("route-local fresh-owner budget exhausted");
+        fixture.scheduler.drain();
+
+        assertEquals(1, exhausted.stopCount);
+        assertTrue(exhausted.terminalDelivered);
+        assertEquals(2, fixture.factory.created.size());
+        exhausted.deliverFailedStatus("stale failed generation replay");
+        fixture.scheduler.drain();
+        assertEquals(2, fixture.factory.created.size());
+
+        fixture.scheduler.advanceBy(10L);
+        assertEquals(3, fixture.factory.created.size());
+        FakeTransport replacement = fixture.factory.created.get(2);
+        assertFalse(failedEpoch.equals(replacement.startRequest.epoch));
+        assertEquals(exhausted.mode(), replacement.mode());
+        assertEquals(ACTIVE, fixture.listener.lastDual.switchPhase);
+    }
+
+    @Test public void explicitRetryFromFailedTargetUsesFreshRestorationEpoch() {
+        Fixture fixture = new Fixture(false, "");
+        fixture.start(IphoneBleMode.ANDROID_CENTRAL);
+        fixture.scheduler.advanceBy(10L);
+        FakeTransport source = fixture.factory.created.get(1);
+        source.remoteControl = false;
+        source.ownerCount = 0;
+        fixture.factory.failNextStart = true;
+
+        fixture.runtime.requestMode(IphoneBleMode.ANDROID_PERIPHERAL);
+        fixture.scheduler.drain();
+        fixture.scheduler.advanceBy(10L);
+        FakeTransport failedTarget = fixture.factory.created.get(2);
+        assertEquals(FAILED, fixture.listener.lastDual.switchPhase);
+        BleRouteEpoch failedEpoch = failedTarget.startRequest.epoch;
+
+        fixture.runtime.requestSameModeRecovery();
+        fixture.scheduler.drain();
+        assertEquals(4, fixture.factory.created.size());
+        assertTrue(fixture.factory.created.get(3).preparedRestoration);
+        assertEquals(1, failedTarget.closeCount);
+        failedTarget.deliverFailedStatus("stale FAILED target callback");
+        fixture.scheduler.drain();
+        assertEquals(4, fixture.factory.created.size());
+
+        fixture.scheduler.advanceBy(10L);
+        assertEquals(5, fixture.factory.created.size());
+        FakeTransport replacement = fixture.factory.created.get(4);
+        assertFalse(failedEpoch.equals(replacement.startRequest.epoch));
+        assertEquals(IphoneBleMode.ANDROID_PERIPHERAL, replacement.mode());
+        assertEquals(ACTIVE, fixture.listener.lastDual.switchPhase);
+    }
+
+    @Test public void explicitRetryDrainsStillAttachedFailedSourceInsteadOfReplacingIt() {
+        Fixture fixture = new Fixture(false, "");
+        fixture.start(IphoneBleMode.ANDROID_CENTRAL);
+        fixture.scheduler.advanceBy(10L);
+        FakeTransport source = fixture.factory.created.get(1);
+        source.freezeResultOverride = IphoneSwitchTransportV2.FreezeResult.FAILED;
+
+        fixture.runtime.requestMode(IphoneBleMode.ANDROID_PERIPHERAL);
+        fixture.scheduler.drain();
+        assertEquals(FAILED, fixture.listener.lastDual.switchPhase);
+        assertEquals(1, source.freezeCount);
+        assertEquals(0, source.closeCount);
+
+        source.freezeResultOverride =
+                IphoneSwitchTransportV2.FreezeResult.FROZEN_NO_REMOTE_OWNER;
+        source.ownerCount = 0;
+        fixture.runtime.requestSameModeRecovery();
+        fixture.scheduler.drain();
+
+        assertEquals(2, source.freezeCount);
+        assertEquals(2, fixture.factory.created.size());
+        assertEquals(1, source.stopCount);
+        fixture.scheduler.advanceBy(10L);
+        assertEquals(3, fixture.factory.created.size());
+        assertEquals(IphoneBleMode.ANDROID_PERIPHERAL,
+                fixture.factory.created.get(2).mode());
+        assertEquals(ACTIVE, fixture.listener.lastDual.switchPhase);
+    }
+
+    @Test public void explicitRetryKeepsAmbiguousFailedOwnerFailClosedAndAttached() {
+        Fixture fixture = new Fixture(false, "");
+        fixture.start(IphoneBleMode.ANDROID_CENTRAL);
+        fixture.scheduler.advanceBy(10L);
+        FakeTransport ambiguous = fixture.factory.created.get(1);
+        ambiguous.forcedOwnerCount = 2;
+
+        fixture.runtime.requestSameModeRecovery();
+        fixture.scheduler.drain();
+        assertEquals(FAILED, fixture.listener.lastDual.switchPhase);
+        assertEquals(0, ambiguous.closeCount);
+        assertEquals(2, fixture.factory.created.size());
+
+        fixture.runtime.requestSameModeRecovery();
+        fixture.scheduler.drain();
+        assertEquals(FAILED, fixture.listener.lastDual.switchPhase);
+        assertEquals(0, ambiguous.closeCount);
+        assertEquals(2, fixture.factory.created.size());
+    }
+
     @Test public void presentCorruptSnapshotFailsClosedAndStartsNothing() {
         Fixture fixture = new Fixture(true, "not-a-BRS2-snapshot");
         fixture.start(IphoneBleMode.ANDROID_CENTRAL);
@@ -374,6 +481,7 @@ public final class IphoneDualTransportRuntimeV2Test {
             implements IphoneDualTransportRuntimeV2.TransportFactory {
         final FakeScheduler scheduler;
         final List<FakeTransport> created = new ArrayList<>();
+        boolean failNextStart;
 
         FakeFactory(FakeScheduler scheduler) { this.scheduler = scheduler; }
 
@@ -381,6 +489,8 @@ public final class IphoneDualTransportRuntimeV2Test {
                 IphoneBleMode mode, java.util.UUID androidInstallationId) {
             assertNotNull(androidInstallationId);
             FakeTransport transport = new FakeTransport(mode, scheduler);
+            transport.failOnStart = failNextStart;
+            failNextStart = false;
             created.add(transport);
             return transport;
         }
@@ -401,6 +511,10 @@ public final class IphoneDualTransportRuntimeV2Test {
         int closeCount;
         boolean terminalDelivered;
         boolean identityAccepted;
+        boolean failOnStart;
+        Integer forcedOwnerCount;
+        FreezeResult freezeResultOverride;
+        int freezeCount;
         ControlTransmit lastTransmit;
 
         FakeTransport(IphoneBleMode mode, FakeScheduler scheduler) {
@@ -421,9 +535,11 @@ public final class IphoneDualTransportRuntimeV2Test {
             startCount++;
             ownerCount = 1;
             scheduler.execute(() -> listener.onStatus(new IphoneTransportStatusV2(
-                    mode, request.epoch, IphoneTransportLifecycle.READY,
+                    mode, request.epoch,
+                    failOnStart ? IphoneTransportLifecycle.FAILED
+                            : IphoneTransportLifecycle.READY,
                     request.selectedSystemBondAddress, request.helperInstallationId,
-                    "ready", 0)));
+                    failOnStart ? "start failed" : "ready", 0)));
         }
         @Override public void stop(BleRouteEpoch epoch, IphoneTransportStopReason reason) {
             ownerCount = 0;
@@ -440,7 +556,9 @@ public final class IphoneDualTransportRuntimeV2Test {
             scheduler.execute(() -> completion.onPrepared(source, true));
         }
         @Override public void freezeIngress(Owner source, FreezeCompletion completion) {
-            FreezeResult result = remoteControl && ownerCount > 0
+            freezeCount++;
+            FreezeResult result = freezeResultOverride != null
+                    ? freezeResultOverride : remoteControl && ownerCount > 0
                     ? FreezeResult.FROZEN_WITH_REMOTE_CONTROL
                     : FreezeResult.FROZEN_NO_REMOTE_OWNER;
             scheduler.execute(() -> completion.onFrozen(source, result));
@@ -463,7 +581,9 @@ public final class IphoneDualTransportRuntimeV2Test {
                 else listener.onLocalTerminal(mode, startRequest.epoch);
             });
         }
-        @Override public int appOwnedOwnerCount(Owner source) { return ownerCount; }
+        @Override public int appOwnedOwnerCount(Owner source) {
+            return forcedOwnerCount == null ? ownerCount : forcedOwnerCount;
+        }
 
         void deliverControl(IphoneRoleControlV2 control) {
             scheduler.execute(() -> listener.onRoleControl(control));
@@ -480,6 +600,15 @@ public final class IphoneDualTransportRuntimeV2Test {
                 terminalDelivered = true;
                 listener.onLocalTerminal(mode, startRequest.epoch);
             });
+        }
+
+        void deliverFailedStatus(String detail) {
+            IphoneTransportSessionListenerV2 exact = listener;
+            IphoneTransportStartRequest request = startRequest;
+            scheduler.execute(() -> exact.onStatus(new IphoneTransportStatusV2(
+                    mode, request.epoch, IphoneTransportLifecycle.FAILED,
+                    request.selectedSystemBondAddress, request.helperInstallationId,
+                    detail, 0)));
         }
     }
 
