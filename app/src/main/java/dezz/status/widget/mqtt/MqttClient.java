@@ -98,7 +98,15 @@ public final class MqttClient {
         if (running) return;
         running = true;
         final long generation = ++lifecycleGeneration;
-        Thread next = new Thread(() -> runLoop(generation), "status-widget-mqtt");
+        Thread next = new Thread(() -> {
+            try {
+                android.os.Process.setThreadPriority(
+                        android.os.Process.THREAD_PRIORITY_BACKGROUND);
+            } catch (RuntimeException ignored) {
+                // An OEM priority failure must not prevent the connector from starting.
+            }
+            runLoop(generation);
+        }, "status-widget-mqtt");
         next.setDaemon(true);
         worker = next;
         next.start();

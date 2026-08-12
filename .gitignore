@@ -6,4 +6,6 @@ local.properties
 deliverables/
 .DS_Store
 **/.DS_Store
+**/__pycache__/
+*.py[cod]
 /docs/README.md

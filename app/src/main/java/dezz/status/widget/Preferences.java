@@ -457,6 +457,7 @@ public class Preferences {
     }
 
     private final SharedPreferences prefs;
+    private volatile boolean startupMigrationsComplete;
     private final Context appContext;
 
     // Global widget settings.
@@ -994,13 +995,38 @@ public class Preferences {
     }
 
     public Preferences(Context context) {
+        this(context, true);
+    }
+
+    /** Visual-only service bootstrap may defer migrations to its background runtime barrier. */
+    Preferences(Context context, boolean runStartupMigrations) {
         appContext = context.getApplicationContext();
         final Context deviceContext = context.getApplicationContext().createDeviceProtectedStorageContext();
         prefs = deviceContext.getSharedPreferences(context.getPackageName() + "_preferences",
                 AppProcessPolicy.preferenceMode());
+        if (runStartupMigrations) completeDeferredStartupMigrations();
+    }
+
+    synchronized void completeDeferredStartupMigrations() {
+        if (startupMigrationsComplete) return;
         migrateLegacyPrefsIfNeeded();
         migrateUnifiedDriverPanelIfNeeded();
         migrateUnifiedLauncherSettingsIfNeeded();
+        startupMigrationsComplete = true;
+    }
+
+    /**
+     * Tiny device-protected admission probe for the boot receiver/first HOME frame.
+     *
+     * <p>Constructing {@link Preferences} also runs idempotent migrations. The visual-only start
+     * path needs just this one bit and lets {@link WidgetService} own those migrations after it has
+     * already satisfied Android's foreground-service deadline.</p>
+     */
+    static boolean isStatusWidgetEnabledForVisualBootstrap(@NonNull Context context) {
+        Context app = context.getApplicationContext();
+        Context device = app.createDeviceProtectedStorageContext();
+        return device.getSharedPreferences(context.getPackageName() + "_preferences",
+                AppProcessPolicy.preferenceMode()).getBoolean("enabled", false);
     }
 
     @NonNull

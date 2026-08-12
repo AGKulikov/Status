@@ -14,8 +14,11 @@ import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.function.Supplier;
+
 import dezz.status.widget.Preferences;
 import dezz.status.widget.BrickType;
+import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.launcher.information.InformationPanelConfig;
@@ -30,16 +33,34 @@ public final class InformationShortcutView extends FrameLayout {
     public static final String CONNECTOR_TARGET = "info:connector";
 
     private final InformationPanelView content;
+    private final boolean automaticLifecycle;
 
     public InformationShortcutView(@NonNull Context context,
                                    @NonNull Preferences preferences,
                                    @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        this(context, preferences, shortcut, () -> CarIntegrations.get(context), true);
+    }
+
+    /** LauncherActivity supplies its gated connector and owns start/stop with runtime stage 2. */
+    public InformationShortcutView(@NonNull Context context,
+                                   @NonNull Preferences preferences,
+                                   @NonNull LauncherShortcutStore.Shortcut shortcut,
+                                   @NonNull Supplier<CarIntegration> carIntegrationSupplier) {
+        this(context, preferences, shortcut, carIntegrationSupplier, false);
+    }
+
+    private InformationShortcutView(@NonNull Context context,
+                                    @NonNull Preferences preferences,
+                                    @NonNull LauncherShortcutStore.Shortcut shortcut,
+                                    @NonNull Supplier<CarIntegration> carIntegrationSupplier,
+                                    boolean automaticLifecycle) {
         super(context);
+        this.automaticLifecycle = automaticLifecycle;
         setClickable(false);
         setLongClickable(false);
         setFocusable(false);
         InformationPanelConfig config = config(shortcut);
-        content = new InformationPanelView(context, CarIntegrations.get(context),
+        content = new InformationPanelView(context, carIntegrationSupplier,
                 new InformationPanelConfigStore(preferences));
         content.setPhysicalPixelMetrics(true);
         content.setConfig(config);
@@ -52,13 +73,22 @@ public final class InformationShortcutView extends FrameLayout {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        content.start();
+        if (automaticLifecycle) content.start();
     }
 
     @Override
     protected void onDetachedFromWindow() {
         content.stop();
         super.onDetachedFromWindow();
+    }
+
+    /** Manual lifecycle used by HOME so attach itself remains presentation-only. */
+    public void start() {
+        content.start();
+    }
+
+    public void stop() {
+        content.stop();
     }
 
     @NonNull

@@ -111,7 +111,9 @@ public class PhoneWidgetServiceIntegrationContractTest {
         assertTrue(boot.contains("WidgetServiceStarter.retryFromAlarm(context"));
         assertTrue(starter.contains(
                 "RETRY_DELAYS_MS = {2_000L, 5_000L, 15_000L}"));
-        assertTrue(starter.contains("scheduleRetry(app, retryAttempt)"));
+        assertTrue(starter.contains(
+                "scheduleRetry(app, retryAttempt, allowVisualSurfaceDuringQuiet)"));
+        assertTrue(starter.contains("EXTRA_VISUAL_SURFACE_ONLY"));
 
         int serviceEntry = manifest.indexOf("android:name=\".WidgetService\"");
         int serviceEnd = manifest.indexOf("/>", serviceEntry);

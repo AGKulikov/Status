@@ -141,7 +141,15 @@ public final class PhoneAppIconStore {
             .readTimeout(12, TimeUnit.SECONDS)
             .build();
     private final ExecutorService worker = Executors.newSingleThreadExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "phone-app-icons");
+        Thread thread = new Thread(() -> {
+            try {
+                android.os.Process.setThreadPriority(
+                        android.os.Process.THREAD_PRIORITY_BACKGROUND);
+            } catch (RuntimeException ignored) {
+                // Icon downloads remain best-effort when an OEM rejects priority changes.
+            }
+            runnable.run();
+        }, "phone-app-icons");
         thread.setDaemon(true);
         return thread;
     });

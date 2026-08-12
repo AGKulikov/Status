@@ -17,7 +17,7 @@ final class StartupLoadPolicy {
      * broadcast happens to arrive last. This keeps the first useful surface out of SystemServer's
      * initial burst without adding another fixed ten seconds on a slow ECARX boot.
      */
-    static final long COLD_BOOT_SURFACE_TARGET_ELAPSED_MS = 4_500L;
+    static final long COLD_BOOT_RUNTIME_TARGET_ELAPSED_MS = 4_500L;
     /** Coalesces a late BOOT_COMPLETED edge without penalising an already-settled system. */
     static final long BOOT_EVENT_SETTLE_MS = 1_000L;
     /** QuickBoot keeps kernel uptime, so it needs its own short relative settle window. */
@@ -28,7 +28,6 @@ final class StartupLoadPolicy {
     static final long USER_UNLOCKED_QUIET_MS = 750L;
     static final long PACKAGE_REPLACED_QUIET_MS = 750L;
     /** Host stages finish first; Driver/HUD, Climate, media and fallback occupy separate lanes. */
-    static final long LAUNCHER_PANELS_AFTER_HOST_MS = 750L;
     static final long LAUNCHER_RUNTIME_AFTER_HOST_MS = 2_500L;
     static final long CLIMATE_AFTER_HOST_MS = 7_500L;
     static final long MEDIA_AUTO_RESUME_MIN_MS = 26_000L;
@@ -107,9 +106,9 @@ final class StartupLoadPolicy {
 
     static long earlyBootQuietMillis(long elapsedRealtimeMillis) {
         if (elapsedRealtimeMillis < 0L
-                || elapsedRealtimeMillis >= COLD_BOOT_SURFACE_TARGET_ELAPSED_MS) {
+                || elapsedRealtimeMillis >= COLD_BOOT_RUNTIME_TARGET_ELAPSED_MS) {
             return 0L;
         }
-        return COLD_BOOT_SURFACE_TARGET_ELAPSED_MS - elapsedRealtimeMillis;
+        return COLD_BOOT_RUNTIME_TARGET_ELAPSED_MS - elapsedRealtimeMillis;
     }
 }

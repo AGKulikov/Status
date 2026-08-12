@@ -207,7 +207,7 @@ public final class Ha1209LauncherStartupContractTest {
         assertTrue(starter.contains("requiresAutomaticIntegrationHost"));
         assertTrue(starter.contains("hudPanelEnabled && hudPanelAutostart"));
         assertTrue(javaSource("LauncherActivity.java")
-                .contains("WidgetServiceStarter.startIfNeededAutomatically(this)"));
+                .contains("WidgetServiceStarter.startVisibleSurfaceImmediatelyAutomatically(this)"));
     }
 
     @Test public void stickyServicesCannotConstructHeavyGraphsBeforeAdmission()
@@ -250,16 +250,16 @@ public final class Ha1209LauncherStartupContractTest {
 
     @Test public void releaseIdentityAndWorkflowAdvanceTogether() throws Exception {
         String build = rootProject("build.gradle");
-        String workflow = project(".github/workflows/verify-ha1213.yml");
-        String manifest = project("release-manifests/HA1213.md");
-        assertTrue(build.contains("return 'v2.8.2-ha1213'"));
-        assertTrue(workflow.contains("name: Verify HA1213 balanced startup candidate"));
-        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1213'"));
-        assertTrue(workflow.contains("VERSION_CODE: '208021213'"));
+        String workflow = project(".github/workflows/verify-ha1214.yml");
+        String manifest = project("release-manifests/HA1214.md");
+        assertTrue(build.contains("return 'v2.8.2-ha1214'"));
+        assertTrue(workflow.contains("name: Verify HA1214 immediate cooperative startup candidate"));
+        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1214'"));
+        assertTrue(workflow.contains("VERSION_CODE: '208021214'"));
         assertTrue(workflow.contains("StartupLoadPolicyTest"));
         assertTrue(workflow.contains("LauncherActionsPanelEditorContractTest"));
         assertTrue(manifest.contains("ru.natro.statuswidget"));
-        assertTrue(manifest.contains("208021213"));
+        assertTrue(manifest.contains("208021214"));
     }
 
     private static String javaSource(String relative) throws Exception {

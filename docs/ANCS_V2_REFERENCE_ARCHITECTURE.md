@@ -81,7 +81,7 @@ match nor an arbitrary bonded peer may be promoted to the selected owner.
 
 No Android advertiser, GATT server, hidden API, adapter toggle, bond removal, or hidden cache
 refresh belongs to this route.  Helper telemetry is optional and cannot delay or own ANCS
-recovery.  Android serializes the v47 telemetry notification CCCD after the mandatory
+recovery.  Android serializes the v48 telemetry notification CCCD after the mandatory
 route-control indication CCCD and before ANCS subscription readiness.  A missing or rejected
 optional telemetry CCCD is reported but does not block ANCS.  Telemetry frames are accepted only
 from the successfully subscribed exact characteristic, owner epoch, and active route generation;

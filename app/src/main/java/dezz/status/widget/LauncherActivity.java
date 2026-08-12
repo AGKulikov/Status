@@ -294,9 +294,10 @@ public final class LauncherActivity extends AppCompatActivity {
     @Nullable private PanelGridLayout shortcutGrid;
     @Nullable private PanelContentEditOverlay actionsContentEditOverlay;
     @Nullable private LauncherActionsGridConfig actionsGridConfig;
-    private CarIntegration carIntegration;
+    @Nullable private CarIntegration carIntegration;
     private final Map<String, CarControlState> carControlStates = new HashMap<>();
     private final Map<String, ShortcutTileBinding> carShortcutBindings = new HashMap<>();
+    private final List<InformationShortcutView> informationShortcutViews = new ArrayList<>();
     private final Map<String, ShortcutTileBinding> smartHomeShortcutBindings = new HashMap<>();
     private Map<String, IntentActionRule> smartHomeRules = Collections.emptyMap();
     private final Map<String, ConnectorValue> smartHomeValueIndex = new HashMap<>();
@@ -427,6 +428,9 @@ public final class LauncherActivity extends AppCompatActivity {
                     reconcileMediaController();
                     break;
                 case 2:
+                    // This is the first automatic CarIntegration entry point: the shared startup
+                    // gate has opened and the two lighter HOME runtime stages have already yielded.
+                    requireLauncherCarIntegration();
                     resubscribeCarControls();
                     if (climatePanel != null && preferences.launcherClimateVisible.get()
                             && hasClimatePanelContent()) climatePanel.start();
@@ -439,6 +443,7 @@ public final class LauncherActivity extends AppCompatActivity {
                             && informationPanel.hasConfiguredItems()) {
                         informationPanel.start();
                     }
+                    reconcileInformationShortcutRuntime();
                     break;
                 case 3:
                     navigationUiHandler.removeCallbacks(ensureSmartHomeValueSubscription);
@@ -647,7 +652,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 && WidgetServiceStarter.requiresAutomaticIntegrationHost(preferences)
                 && StartupWorkCoordinator.pendingIntegrationHostDelayMillis(this) < 0L) {
             StartupWorkCoordinator.ensureIntegrationHostScheduledAfter(this,
-                    StartupLoadPolicy.COLD_BOOT_SURFACE_TARGET_ELAPSED_MS);
+                    StartupLoadPolicy.COLD_BOOT_RUNTIME_TARGET_ELAPSED_MS);
         }
         // Never inflate optional panels behind another foreground application.
         navigationUiHandler.removeCallbacks(allowPanelInitialization);
@@ -673,6 +678,7 @@ public final class LauncherActivity extends AppCompatActivity {
         if (climatePanel != null) climatePanel.stop();
         if (vehicleInfoPanel != null) vehicleInfoPanel.stop();
         if (informationPanel != null) informationPanel.stop();
+        for (InformationShortcutView shortcut : informationShortcutViews) shortcut.stop();
         if (carIntegration != null) carIntegration.unsubscribeControlStates(carStateListener);
         if (mediaController != null) mediaController.stop();
         releaseNavigationGraphics();
@@ -705,7 +711,7 @@ public final class LauncherActivity extends AppCompatActivity {
         registerAllAppsUninstallReceiver();
         navigationUiHandler.removeCallbacks(globalElementRefresh);
         navigationUiHandler.post(globalElementRefresh);
-        WidgetServiceStarter.startIfNeededAutomatically(this);
+        WidgetServiceStarter.startVisibleSurfaceImmediatelyAutomatically(this);
         if (!panelsInitialized && !panelInitializationAllowed) {
             navigationUiHandler.removeCallbacks(allowPanelInitialization);
             navigationUiHandler.postDelayed(allowPanelInitialization,
@@ -2775,7 +2781,6 @@ public final class LauncherActivity extends AppCompatActivity {
         }
         panelsInitializing = true;
         try {
-            if (carIntegration == null) carIntegration = CarIntegrations.get(this);
             layoutStore.load(workspace.getWidth(), workspace.getHeight());
             migrateLegacyNavigationPanel();
         } catch (RuntimeException failure) {
@@ -2965,7 +2970,7 @@ public final class LauncherActivity extends AppCompatActivity {
 
     @NonNull
     private View buildVehicleInfoPanel() {
-        vehicleInfoPanel = new VehicleInfoPanelView(this, carIntegration,
+        vehicleInfoPanel = new VehicleInfoPanelView(this, this::requireLauncherCarIntegration,
                 vehicleInfoConfigStore);
         vehicleInfoPanel.setContentVisibilityListener(contentVisible ->
                 setPanelVisibility(LauncherLayoutStore.VEHICLE_INFO,
@@ -2976,7 +2981,7 @@ public final class LauncherActivity extends AppCompatActivity {
 
     @NonNull
     private View buildInformationPanel() {
-        informationPanel = new InformationPanelView(this, carIntegration,
+        informationPanel = new InformationPanelView(this, this::requireLauncherCarIntegration,
                 informationConfigStore);
         informationPanel.setContentListener(hasItems ->
                 setPanelVisibility(LauncherLayoutStore.INFORMATION,
@@ -3397,7 +3402,7 @@ public final class LauncherActivity extends AppCompatActivity {
 
     @NonNull
     private View buildClimatePanel() {
-        climatePanel = new ClimatePanelView(this, carIntegration,
+        climatePanel = new ClimatePanelView(this, this::requireLauncherCarIntegration,
                 new ClimatePanelConfigStore(preferences));
         return climatePanel;
     }
@@ -3405,6 +3410,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private void refreshShortcutGrid() {
         if (shortcutGrid == null || shortcutStore == null) return;
         shortcutGrid.removeAllViews();
+        informationShortcutViews.clear();
         carShortcutBindings.clear();
         smartHomeShortcutBindings.clear();
         smartHomeRules = loadSmartHomeRules();
@@ -3450,6 +3456,7 @@ public final class LauncherActivity extends AppCompatActivity {
         appliedActionsGridJson = preferences.launcherActionsGridJson.get();
         appliedActionsColumns = gridConfig.columns;
         resubscribeCarControls();
+        reconcileInformationShortcutRuntime();
         applySmartHomeStates();
     }
 
@@ -3574,7 +3581,10 @@ public final class LauncherActivity extends AppCompatActivity {
             card.setLongClickable(false);
             card.setFocusable(false);
             card.setCardElevation(0);
-            card.addView(new InformationShortcutView(this, preferences, shortcut),
+            InformationShortcutView information = new InformationShortcutView(this,
+                    preferences, shortcut, this::requireLauncherCarIntegration);
+            informationShortcutViews.add(information);
+            card.addView(information,
                     new MaterialCardView.LayoutParams(matchWidth(), matchHeight()));
             return card;
         }
@@ -3735,13 +3745,30 @@ public final class LauncherActivity extends AppCompatActivity {
     private void executeCarControl(@NonNull LauncherShortcutStore.Shortcut shortcut,
                                    @NonNull CarControlCommand command) {
         if (!pendingCarControls.add(shortcut.target)) return;
-        carIntegration.executeControl(command, (success, message) -> {
+        requireLauncherCarIntegration().executeControl(command, (success, message) -> {
             pendingCarControls.remove(shortcut.target);
             if (!success) {
                 Toast.makeText(this, message == null ? "Команда не выполнена" : message,
                         Toast.LENGTH_LONG).show();
             }
         });
+    }
+
+    /** Resolves ECARX only after the automatic runtime gate, or from an explicit car command. */
+    @NonNull
+    private CarIntegration requireLauncherCarIntegration() {
+        CarIntegration current = carIntegration;
+        if (current != null) return current;
+        current = CarIntegrations.get(this);
+        carIntegration = current;
+        return current;
+    }
+
+    private void reconcileInformationShortcutRuntime() {
+        boolean start = activityStarted && launcherRuntimeStageReached(3);
+        for (InformationShortcutView shortcut : informationShortcutViews) {
+            if (start) shortcut.start(); else shortcut.stop();
+        }
     }
 
     private void resubscribeCarControls() {

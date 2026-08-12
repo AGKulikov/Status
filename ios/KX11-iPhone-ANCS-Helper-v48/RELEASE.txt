@@ -1,0 +1,45 @@
+KX11 ANCS Helper v48 — transport-v2 candidate
+Bundle ID: ru.natro.kx11ancshelper
+Build: 48
+Marketing version: 48.0
+Paired runtime: matching Android transport-v2 source checkpoint
+Status: source/replay accepted; hosted Xcode build and physical-device matrix remain release gates
+
+Implemented:
+
+- v47 STARTING/XPC recovery: local-operational and exact-peer readiness are separate, manager /
+  publication / target-start watchdogs are generation-fenced, and missing callbacks become a
+  bounded visible failure with safe retry rather than an indefinitely disabled selector;
+- Route B reports failure only after its manager/peripheral wrapper is released; Route A republishes
+  its local GATT database after a Core Bluetooth reset while telemetry stays exact-peer gated;
+
+- clean Route A (iPhone Peripheral / Android Central) and Route B
+  (iPhone Central / Android Peripheral) coordinators with one top-level owner;
+- UUID-only F201/F202 discovery, mutual installation-ID H proof, encrypted write+indicate CONTROL,
+  fixed 20-byte H/C/A and fixed 8-byte CRC telemetry;
+- durable BRS2 confirmed-quiescence switching: persisted freeze, exact C/A commitment, local
+  terminal, explicit owner-zero, drain and fresh target generation;
+- same-role loss recovery, stale callback fencing, bounded fail-closed deadlines, corrupt/CLOSED
+  dual-namespace drain and v46 selected-role migration;
+- production battery, power, network and lock telemetry routed only to exact ACTIVE generation;
+- no protocol local name/address fallback, no automatic pair deletion and no cache-clear workflow.
+
+Verified in the portable suite:
+
+- all shared wire fixtures and strict negative frames;
+- canonical switch vectors, 40 bidirectional switches and 20 same-role recoveries;
+- timeout, stale, conflict, retry, duplicate C, client-first close, radio-loss and restoration
+  callback inversions;
+- v48 Xcode file membership, plist/background modes, workflow artifact contract and package file
+  allowlist.
+
+Not yet claimed:
+
+- physical-device reconnect stability;
+- a completed macOS/Xcode build in this Linux workspace;
+- immunity from iOS user force-quit, Bluetooth/pairing policy, background scheduling or another
+  system UI's historical display cache.
+
+Install over v46 or v47 with the same bundle ID and existing pair. Do not combine v48 with a legacy
+Android wire implementation. Do not label this candidate stable until the README field matrix and
+hosted unsigned xcodebuild have passed.

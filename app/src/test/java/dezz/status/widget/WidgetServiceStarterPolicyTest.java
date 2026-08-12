@@ -65,4 +65,12 @@ public final class WidgetServiceStarterPolicyTest {
         // Explicit/manual runtime semantics remain unchanged.
         assertTrue(WidgetServiceStarter.requiresHeadlessHost(false, true, false));
     }
+
+    @Test
+    public void runtimeQuietBypassAdmitsOnlyAnEnabledPermittedVisualSurface() {
+        assertTrue(WidgetServiceStarter.canStartVisualSurfaceWhileRuntimeParked(true, true));
+        assertFalse(WidgetServiceStarter.canStartVisualSurfaceWhileRuntimeParked(false, true));
+        assertFalse(WidgetServiceStarter.canStartVisualSurfaceWhileRuntimeParked(true, false));
+        assertFalse(WidgetServiceStarter.canStartVisualSurfaceWhileRuntimeParked(false, false));
+    }
 }
