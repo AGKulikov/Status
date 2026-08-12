@@ -13,9 +13,16 @@ import java.nio.file.Paths;
 import org.junit.Test;
 
 public final class PieReverseGattObserverV2SourceTest {
-    private static final Path SOURCE = Paths.get(
+    private static final Path SOURCE = sourcePath(
             "app/src/main/java/dezz/status/widget/phone/transport/v2/android/"
                     + "PieReverseGattObserverV2.java");
+
+    private static Path sourcePath(String relative) {
+        Path root = Paths.get(System.getProperty("user.dir"));
+        Path direct = root.resolve(relative);
+        if (Files.exists(direct) || root.getParent() == null) return direct;
+        return root.getParent().resolve(relative);
+    }
 
     @Test public void hiddenPieSignatureIsIsolatedOneShotAndHasNoPublicFallback()
             throws Exception {

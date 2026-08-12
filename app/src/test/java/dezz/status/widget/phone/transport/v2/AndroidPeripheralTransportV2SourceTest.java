@@ -13,9 +13,16 @@ import org.junit.Test;
 
 /** Source contract for Route B on host builds that do not provide android.jar. */
 public final class AndroidPeripheralTransportV2SourceTest {
-    private static final Path SOURCE = Paths.get(
+    private static final Path SOURCE = sourcePath(
             "app/src/main/java/dezz/status/widget/phone/transport/v2/android/"
                     + "AndroidPeripheralTransportV2.java");
+
+    private static Path sourcePath(String relative) {
+        Path root = Paths.get(System.getProperty("user.dir"));
+        Path direct = root.resolve(relative);
+        if (Files.exists(direct) || root.getParent() == null) return direct;
+        return root.getParent().resolve(relative);
+    }
 
     @Test public void publishesUuidOnlyEncryptedWriteAndIndicateControlService()
             throws Exception {

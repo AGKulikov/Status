@@ -58,6 +58,7 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -765,7 +766,7 @@ public final class BleRoleSwitchReducerTest {
 
     @Test
     public void crossLanguageTransitionFixtureCoversCanonicalSafetyCases() throws Exception {
-        Path fixture = Path.of(
+        Path fixture = sourcePath(
                 "app/src/main/java/dezz/status/widget/phone/transport/switching/"
                         + "ble-role-switch-transition-vectors.json"
         );
@@ -785,6 +786,13 @@ public final class BleRoleSwitchReducerTest {
                 "\"duplicate_exact_remote_c_while_a_in_flight_coalesces\""));
         assertTrue(json.contains("\"starting_restore_is_same_role_local_only\""));
         assertTrue(json.contains("\"restoration_is_drain_only\""));
+    }
+
+    private static Path sourcePath(String relative) {
+        Path root = Paths.get(System.getProperty("user.dir"));
+        Path direct = root.resolve(relative);
+        if (Files.exists(direct) || root.getParent() == null) return direct;
+        return root.getParent().resolve(relative);
     }
 
     private Reduction requested() {
