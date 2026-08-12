@@ -109,7 +109,7 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         onlyWhenLocked = switchView("Показывать только когда телефон заблокирован",
                 prefs.phoneNotificationsOnlyWhenLocked.get());
         destinations.addView(onlyWhenLocked, topMargin(8));
-        destinations.addView(label("Состояние блокировки передаёт KX11 ANCS Helper v21."),
+        destinations.addView(label("Состояние блокировки передаёт KX11 ANCS Helper v47."),
                 topMargin(4));
         page.addView(destinations, topMargin(16));
 

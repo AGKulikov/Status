@@ -11,41 +11,8 @@ import java.nio.file.Paths;
 
 import org.junit.Test;
 
-/** Release barriers for the HA1155 single-link Helper/ANCS transport. */
+/** Retained driver-control and popup-rendering coverage. */
 public final class Ha1155SingleLinkTelemetryContractTest {
-    @Test public void fixedHelperFrameHasCrcAndAtomicSnapshot() throws Exception {
-        String parser = source("phone/IphoneHelperTelemetry.java");
-        assertTrue(parser.contains("BINARY_LENGTH = 8"));
-        assertTrue(parser.contains("BINARY_MAGIC = 0xA5"));
-        assertTrue(parser.contains("crc8(payload, BINARY_LENGTH - 1)"));
-        assertTrue(parser.contains("Kind.SNAPSHOT, level, externalPower"));
-    }
-
-    @Test public void initialHelperReadPrecedesEveryAncsSubscription() throws Exception {
-        String transport = source("phone/transport/IphoneAncsTransport.java");
-        String services = between(transport, "private void handleServices",
-                "private void subscribeServiceChangedIfAvailable");
-        int initialRead = services.indexOf("Helper B4 initial snapshot started");
-        int ancsSubscribe = services.indexOf("descriptorStage = DescriptorStage.NOTIFICATION_SOURCE");
-        assertTrue(initialRead >= 0);
-        assertTrue(ancsSubscribe > initialRead);
-        assertTrue(transport.contains("iphoneServiceSetupDeferredForHelperRead"));
-        assertTrue(transport.contains("handleServices(callbackGatt, GATT_SUCCESS)"));
-        assertTrue(transport.contains("battery=\" + telemetry.batteryLevel"));
-        assertTrue(transport.contains("externalPower=\" + telemetry.externalPower"));
-        assertTrue(transport.contains("network=\" + (telemetry.networkType.isEmpty()"));
-    }
-
-    @Test public void establishedGattOwnerIsNeverClosedByWatchdog() throws Exception {
-        String transport = source("phone/transport/IphoneAncsTransport.java");
-        String wait = between(transport, "private void awaitPersistentGattReconnect",
-                "private boolean startSavedPeerScan");
-        assertTrue(wait.contains("expected.connect()"));
-        assertTrue(wait.contains("PERSISTENT_RECONNECT_WATCHDOG_MS"));
-        assertFalse(wait.contains("closeClientGatt(expected)"));
-        assertFalse(wait.contains("previous.close()"));
-    }
-
     @Test public void driverControlInsetsAreInsideNaturalHeightButtons() throws Exception {
         String overlay = source("driver/DriverPanelOverlayController.java");
         String settings = source("DriverPanelSettingsActivity.java");

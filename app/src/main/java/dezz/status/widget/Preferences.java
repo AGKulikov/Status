@@ -48,7 +48,16 @@ public class Preferences {
                     "mqttPassword", "sprutPassword", "sprutClientId", "haAccessToken",
                     // The paired phone is installation-specific and must not be copied into a
                     // settings backup restored on another head unit.
-                    "phoneDeviceAddress", "phoneAncsDeviceAddress",
+                    "phoneDeviceAddress",
+                    // Legacy reverse-route cache may remain in an upgraded SharedPreferences
+                    // file. It is never read by v2 and remains non-exportable until Android
+                    // eventually compacts the preference file.
+                    "phoneAncsDeviceAddress",
+                    // ANCS v2 role ownership and installation proofs are local protocol state.
+                    // Copying any of them to another head unit could replay a stale drain or
+                    // impersonate the installation identity used by the paired Helper.
+                    "phoneBleV2SwitchSnapshot", "phoneBleV2HelperInstallationId",
+                    "phoneBleV2AndroidInstallationId",
                     // Contains both the full bearer action and fixed-endpoint token. Layout
                     // presets are routinely shared, so rules must remain device-local too.
                     "intentActionRulesJson")));
@@ -741,19 +750,63 @@ public class Preferences {
             "phoneConnectorEnabled", false);
     public final Str phoneDeviceAddress = new Str(this, "phoneDeviceAddress", "");
     /**
-     * Verified incoming LE identity for the opt-in iPhone-central route. It is initially copied
-     * from the selected Classic phone, then updated only after PAIR plus encrypted SECURE. The
-     * original iPhone-peripheral route always starts from {@link #phoneDeviceAddress}, so a
-     * private address learned here can never redirect or break that route.
-     */
-    public final Str phoneAncsDeviceAddress = new Str(this,
-            "phoneAncsDeviceAddress", "");
-    /**
      * BLE role of the iPhone. Zero preserves the HA1161 route (iPhone peripheral/KX11 central);
      * one enables the opt-in reverse route (iPhone central/KX11 peripheral). Classic profiles
      * never read this preference.
      */
     public final Int phoneBleRole = new Int(this, "phoneBleRole", 0);
+
+    private static final String PHONE_BLE_V2_SWITCH_SNAPSHOT_KEY =
+            "phoneBleV2SwitchSnapshot";
+    private static final String PHONE_BLE_V2_HELPER_INSTALLATION_ID_KEY =
+            "phoneBleV2HelperInstallationId";
+    private static final String PHONE_BLE_V2_ANDROID_INSTALLATION_ID_KEY =
+            "phoneBleV2AndroidInstallationId";
+
+    /**
+     * Returns the write-ahead snapshot owned by the ANCS v2 role-switch coordinator.
+     *
+     * <p>This value is deliberately not exposed through a regular {@link Str}: transition code
+     * must never replace synchronous durability with {@link SharedPreferences.Editor#apply()}.
+     * A process can be killed immediately after any BLE callback during an APK replacement.</p>
+     */
+    @NonNull
+    public String phoneBleV2SwitchSnapshot() {
+        return prefs.getString(PHONE_BLE_V2_SWITCH_SNAPSHOT_KEY, "");
+    }
+
+    /** Distinguishes a first v2 migration from a present-but-empty/torn fail-closed snapshot. */
+    public boolean hasPhoneBleV2SwitchSnapshot() {
+        return prefs.contains(PHONE_BLE_V2_SWITCH_SNAPSHOT_KEY);
+    }
+
+    /** Persists coordinator state before the corresponding BLE effect is allowed to run. */
+    public boolean commitPhoneBleV2SwitchSnapshot(@NonNull String encodedSnapshot) {
+        return prefs.edit().putString(PHONE_BLE_V2_SWITCH_SNAPSHOT_KEY,
+                encodedSnapshot).commit();
+    }
+
+    /** Stable Helper installation identity learned only after the encrypted exact-owner H proof. */
+    @NonNull
+    public String phoneBleV2HelperInstallationId() {
+        return prefs.getString(PHONE_BLE_V2_HELPER_INSTALLATION_ID_KEY, "");
+    }
+
+    public boolean commitPhoneBleV2HelperInstallationId(@NonNull String installationId) {
+        return prefs.edit().putString(PHONE_BLE_V2_HELPER_INSTALLATION_ID_KEY,
+                installationId).commit();
+    }
+
+    /** Stable random Android endpoint identity sent in H; generated once per installation. */
+    @NonNull
+    public String phoneBleV2AndroidInstallationId() {
+        return prefs.getString(PHONE_BLE_V2_ANDROID_INSTALLATION_ID_KEY, "");
+    }
+
+    public boolean commitPhoneBleV2AndroidInstallationId(@NonNull String installationId) {
+        return prefs.edit().putString(PHONE_BLE_V2_ANDROID_INSTALLATION_ID_KEY,
+                installationId).commit();
+    }
     public final Bool phoneNotificationsEnabled = new Bool(this,
             "phoneNotificationsEnabled", true);
     public final Bool phoneMessagesEnabled = new Bool(this,

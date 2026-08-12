@@ -13,27 +13,14 @@ import java.nio.file.Paths;
 
 /** KX11 regression barriers for HA1153. */
 public final class Ha1153Kx11RegressionContractTest {
-    @Test public void helperTelemetryUsesTheAlreadyWorkingAndroidCentralRoute()
-            throws Exception {
-        String transport = source("phone/transport/IphoneAncsTransport.java");
-        assertTrue(transport.contains("HELPER_TELEMETRY"));
-        assertTrue(transport.contains("BluetoothGattCharacteristic.PROPERTY_NOTIFY"));
-        assertTrue(transport.contains("startOptionalHelperTelemetrySubscription"));
-        assertTrue(transport.contains(
-                "acceptHelperTelemetryFrame(callbackGatt, telemetry, \"notification\")"));
-        assertTrue(transport.contains("iphoneHelperValidTelemetryReceived = true"));
-        assertTrue(transport.contains("iphoneHelperTelemetrySubscribed"));
-        assertTrue(transport.contains("listener.onHelperTelemetry(telemetry)"));
-    }
-
     @Test public void directPercentageWinsWhileChargeStateRemainsHelperOnly()
             throws Exception {
         String controller = source("phone/PhoneConnectorController.java");
         String refresh = between(controller, "private void refreshBatteryValues()",
-                "private void clearBasData()");
+                "private void clearHfpData()");
         assertTrue(refresh.contains("PhoneBatteryLevelPolicy.resolve("));
         assertTrue(refresh.contains("genericBatteryKnown, genericBatteryLevel"));
-        assertTrue(refresh.contains("basBatteryKnown, basBatteryLevel"));
+        assertTrue(refresh.contains("hfpBatteryKnown, hfpBatteryLevel"));
         assertTrue(refresh.contains("helperPowerUpdatedAtElapsed > 0L ? helperBatteryLevel"));
         assertTrue(refresh.contains("batteryChargingSource = \"iphone_helper\""));
         assertTrue(controller.contains("Integer effectiveBatteryLevel = batteryLevel;"));

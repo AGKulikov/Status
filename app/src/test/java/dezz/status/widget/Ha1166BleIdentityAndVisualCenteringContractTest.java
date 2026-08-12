@@ -48,43 +48,6 @@ public final class Ha1166BleIdentityAndVisualCenteringContractTest {
         assertFalse(host.contains("int contentTop = getPaddingTop()"));
     }
 
-    @Test public void reverseRouteNeverPreclaimsAStoredPrivateAddress()
-            throws Exception {
-        String transport = source("phone/transport/IphoneAncsTransport.java");
-        String incoming = between(transport, "public boolean acceptIphoneCentral",
-                "private boolean scheduleColdBackgroundAttach");
-        String restart = between(transport, "private void scheduleManagedIncomingRestart",
-                "private static boolean requiresControllerRetry");
-        String writes = between(transport, "public void onCharacteristicWriteRequest",
-                "private void handleIphonePeripheralConnectionState");
-
-        assertTrue(incoming.contains("текущий incoming peer будет подтверждён заново"));
-        assertFalse(incoming.contains("claimVerifiedPeer(managedResolvedPeer)"));
-        assertFalse(restart.contains("claimVerifiedPeer(resolvedPeer)"));
-        assertTrue(writes.contains("claimVerifiedPeer(device)"));
-        assertTrue(transport.contains("managedResolvedPeer = device"));
-        assertTrue(transport.contains("handleSecureAttSuccess"));
-    }
-
-    @Test public void helper14UsesCurrentUnfilteredGattGenerationAndBackoff()
-            throws Exception {
-        String helper = project("ios/KX11-iPhone-ANCS-Helper-v14/"
-                + "KX11ANCSHelper/ViewController.swift");
-
-        assertTrue(helper.contains("KX11 ANCS HELPER v14"));
-        assertTrue(helper.contains("peripheral.discoverCharacteristics(nil, for: service)"));
-        assertTrue(helper.contains("activeService === service"));
-        assertTrue(helper.contains("$0 === service"));
-        assertTrue(helper.contains("[1, 2, 5, 10, 20, 30]"));
-        assertTrue(helper.contains("centralErrorDescription"));
-    }
-
-    @Test public void releaseIdentityIsHa1166() throws Exception {
-        String build = project("build.gradle");
-        if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1196'"));
-    }
-
     private static String source(String relative) throws Exception {
         return project("app/src/main/java/dezz/status/widget/" + relative);
     }

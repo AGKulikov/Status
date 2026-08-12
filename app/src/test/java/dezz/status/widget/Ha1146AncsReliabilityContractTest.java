@@ -11,58 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-/** Regression barriers for the serialized, restart-safe ANCS transport introduced in HA1146. */
+/** Retained phone-data persistence coverage from the HA1146 regression set. */
 public final class Ha1146AncsReliabilityContractTest {
-    @Test public void gpsStyleColdStartAndReconnectRetainExactlyOneGattOwner()
-            throws Exception {
-        String transport = source("phone/transport/IphoneAncsTransport.java");
-        String connect = between(transport, "public boolean connectSavedIphone",
-                "public void requestSavedPeerReconnect");
-        String callback = between(transport,
-                "private void handleIphonePeripheralConnectionState",
-                "private final BluetoothGattCallback gattCallback");
-        String persistentWait = between(transport, "private void awaitPersistentGattReconnect",
-                "private boolean startSavedPeerScan");
-
-        assertTrue(connect.contains("return scheduleColdBackgroundAttach(device,"));
-        assertTrue(connect.contains("startManagedBackgroundAttach"));
-        assertTrue(connect.contains("connectGatt(context, true, gattCallback"));
-        assertTrue(connect.contains("BluetoothDevice.TRANSPORT_LE"));
-        assertFalse(connect.contains("main.postDelayed(connectTimeout"));
-        assertTrue(callback.contains("boolean establishedOwner = activeClientEstablished"));
-        assertTrue(callback.contains("awaitPersistentGattReconnect(callbackGatt"));
-        assertTrue(persistentWait.contains("if (closing || gatt != expected"));
-        assertTrue(persistentWait.contains("rearmPersistentGattOwner"));
-        assertTrue(persistentWait.contains("expected.connect()"));
-        assertFalse(persistentWait.contains("closeClientGatt(expected)"));
-    }
-
-    @Test public void ambiguousAclLossProbesBeforeDestroyingAHealthyAncsLink()
-            throws Exception {
-        String controller = source("phone/PhoneConnectorController.java");
-        String transport = source("phone/transport/IphoneAncsTransport.java");
-
-        assertTrue(controller.contains("transport == BluetoothDevice.TRANSPORT_LE"));
-        assertTrue(controller.contains(
-                "current.requestSavedPeerReconnect(detail, confirmedLeLoss)"));
-        assertTrue(transport.contains("expected.readRemoteRssi()"));
-        assertTrue(transport.contains("GATT liveness probe OK"));
-        assertTrue(transport.contains("cancelAmbiguousAclProbe()"));
-        assertTrue(transport.contains("restartDiscoveryOnPersistentOwner"));
-    }
-
-    @Test public void mandatoryAncsQueueCannotBeKilledByOptionalBatteryOperations()
-            throws Exception {
-        String transport = source("phone/transport/IphoneAncsTransport.java");
-        String controller = source("phone/PhoneConnectorController.java");
-
-        assertTrue(transport.contains("Сначала включаю обязательную Notification Source"));
-        assertTrue(transport.contains("ANCS_DESCRIPTOR_WRITE_TIMEOUT_MS = 90_000L"));
-        assertTrue(transport.contains("optional operation skipped, ANCS stays READY"));
-        assertFalse(transport.contains("state(\"BAS OPERATION TIMEOUT"));
-        assertFalse(controller.contains("state.contains(\"BAS OPERATION TIMEOUT\")"));
-    }
-
     @Test public void onlyNonPowerTelemetrySurvivesARecoveryWindow() throws Exception {
         String controller = source("phone/PhoneConnectorController.java");
         String store = source("phone/PhoneTelemetryStore.java");
@@ -88,13 +38,5 @@ public final class Ha1146AncsReliabilityContractTest {
                 .resolve(relative);
         Path file = Files.isRegularFile(root) ? root : app;
         return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
-    }
-
-    private static String between(String source, String start, String end) {
-        int from = source.indexOf(start);
-        int to = source.indexOf(end, from + Math.max(1, start.length()));
-        assertTrue("Missing section start: " + start, from >= 0);
-        assertTrue("Missing section end: " + end, to > from);
-        return source.substring(from, to);
     }
 }

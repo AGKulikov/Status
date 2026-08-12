@@ -1,0 +1,85 @@
+name: Verify iPhone Helper v47 · ANCS v2 clean-room
+
+on:
+  push:
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v47/**'
+      - 'docs/ancs-v2-wire-vectors.json'
+      - 'app/src/main/java/dezz/status/widget/phone/transport/switching/ble-role-switch-transition-vectors.json'
+      - '.github/workflows/verify-helper-v47.yml'
+  pull_request:
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v47/**'
+      - 'docs/ancs-v2-wire-vectors.json'
+      - 'app/src/main/java/dezz/status/widget/phone/transport/switching/ble-role-switch-transition-vectors.json'
+      - '.github/workflows/verify-helper-v47.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-helper-v47:
+    name: Compile and replay Helper v47 without signing
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Replay shared wire/switch/restoration contracts
+        shell: bash
+        run: ios/KX11-iPhone-ANCS-Helper-v47/verify-v47-contract.sh
+
+      - name: Validate project settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v47/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            CODE_SIGNING_ALLOWED=NO \
+            -showBuildSettings >"$RUNNER_TEMP/helper-v47-build-settings.txt"
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper' \
+            "$RUNNER_TEMP/helper-v47-build-settings.txt"
+          grep -q 'MARKETING_VERSION = 47.0' "$RUNNER_TEMP/helper-v47-build-settings.txt"
+          grep -q 'CURRENT_PROJECT_VERSION = 47' "$RUNNER_TEMP/helper-v47-build-settings.txt"
+
+      - name: Compile Helper v47
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v47/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            SYMROOT="$RUNNER_TEMP/KX11ANCSHelperV47Products" \
+            OBJROOT="$RUNNER_TEMP/KX11ANCSHelperV47Intermediates" \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Verify unsigned product
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/KX11ANCSHelperV47Products/Debug-iphonesimulator/KX11ANCSHelper.app"
+          test -d "$app"
+          test -f "$app/KX11ANCSHelper"
+          test -f ios/KX11-iPhone-ANCS-Helper-v47/README.md
+          test -f ios/KX11-iPhone-ANCS-Helper-v47/RELEASE.txt
+          test -x ios/KX11-iPhone-ANCS-Helper-v47/verify-v47-contract.sh
+
+      - name: Upload unsigned app and exact clean-room source
+        uses: actions/upload-artifact@v4
+        with:
+          name: KX11-ANCS-Helper-v47-unsigned-simulator
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/KX11ANCSHelperV47Products/Debug-iphonesimulator/KX11ANCSHelper.app
+            ios/KX11-iPhone-ANCS-Helper-v47
+            docs/ancs-v2-wire-vectors.json
+            app/src/main/java/dezz/status/widget/phone/transport/switching/ble-role-switch-transition-vectors.json

@@ -54,13 +54,11 @@ public final class Ha1161CarPlayQualityContractTest {
         assertFalse(editor.contains("editOverlay.setModel(new LayoutModel(), null)"));
     }
 
-    @Test public void artworkAndBothConnectionJournalsHavePersistentRecoveryState()
+    @Test public void artworkAndAndroidConnectionJournalHavePersistentRecoveryState()
             throws Exception {
         String media = source("launcher/media/MediaPanelView.java");
         String androidJournal = source("phone/PhoneConnectionJournal.java");
         String settings = source("PhoneConnectorSettingsActivity.java");
-        String ios = project("ios/KX11-iPhone-ANCS-Helper-v10/KX11ANCSHelper/"
-                + "ViewController.swift");
         assertTrue(media.contains("rejectedArtworkFingerprint"));
         assertTrue(media.contains("keep that fingerprint hidden"));
         assertTrue(androidJournal.contains("MAX_LINES = 600"));
@@ -69,15 +67,6 @@ public final class Ha1161CarPlayQualityContractTest {
         assertTrue(androidJournal.contains("RAW_PROTOCOL_FIELD"));
         assertTrue(settings.contains("Экспортировать журнал"));
         assertTrue(settings.contains("connectionJournalScroll"));
-        assertTrue(ios.contains("maximumLogLines = 600"));
-        assertTrue(ios.contains("Поделиться журналом"));
-        assertTrue(ios.contains("B4 snapshot"));
-        assertTrue(ios.contains("B4 notify backpressure"));
-    }
-
-    @Test public void releaseIdentityIsHa1161() throws Exception {
-        String build = project("build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1196'"));
     }
 
     private static String source(String relative) throws Exception {

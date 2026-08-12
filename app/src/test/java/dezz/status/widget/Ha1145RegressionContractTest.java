@@ -60,18 +60,6 @@ public final class Ha1145RegressionContractTest {
         assertFalse(scenarios.contains("Укажите ID ресурса"));
     }
 
-    @Test public void ancsRecoveryNeverCyclesTheSharedCarBluetoothAdapter()
-            throws Exception {
-        String controller = source("phone/PhoneConnectorController.java");
-        String transport = source("phone/transport/IphoneAncsTransport.java");
-
-        assertFalse(controller.contains("adapter.disable()"));
-        assertFalse(controller.contains("adapter.enable()"));
-        assertFalse(controller.contains("startAdapterRecovery("));
-        assertTrue(transport.contains("awaitPersistentGattReconnect("));
-        assertTrue(transport.contains("restartDiscoveryOnPersistentOwner("));
-    }
-
     @Test public void smartHomeNamesAndBluetoothFollowOneRenderedColour() throws Exception {
         String popup = source("popup/PopupOverlayController.java");
         String preview = source("VisualBrickEditorActivity.java");

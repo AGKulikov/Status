@@ -131,7 +131,6 @@ public class PhoneWidgetServiceIntegrationContractTest {
         assertTrue(source.contains("renderPhoneStatusBricks()"));
         assertTrue(source.contains("PhoneStatusBarPolicy.parseIds("));
         assertTrue(source.contains("PhoneStatusBarPolicy.display("));
-        assertFalse(source.contains("new IphoneAncsTransport"));
     }
 
     @Test

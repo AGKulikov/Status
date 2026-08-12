@@ -44,44 +44,6 @@ public final class Ha1167CurrentLinkAndRenderingContractTest {
         assertTrue(settings.contains("cell.addExactlyCentered(icon, iconSize"));
     }
 
-    @Test public void reverseRouteChallengesSecurityInsideTheCurrentGattCallback()
-            throws Exception {
-        String transport = source("phone/transport/IphoneAncsTransport.java");
-        String server = between(transport, "private void openGattServer()",
-                "private void closeGattServer()");
-        String reads = between(transport, "public void onCharacteristicReadRequest",
-                "public void onCharacteristicWriteRequest");
-
-        assertTrue(server.contains("BluetoothGattCharacteristic.PERMISSION_READ"));
-        assertTrue(server.contains("BluetoothGattCharacteristic.PERMISSION_WRITE"));
-        assertFalse(server.contains("PERMISSION_READ_ENCRYPTED"));
-        assertFalse(server.contains("PERMISSION_WRITE_ENCRYPTED"));
-        assertTrue(reads.contains("issueCurrentLinkSecurityChallenge(device)"));
-        assertTrue(reads.contains("STATUS_INSUFFICIENT_AUTHENTICATION"));
-        assertTrue(reads.contains("isVerifiedPeer(device)"));
-        assertTrue(transport.contains("linkSecurityChallengeIssued = false"));
-        assertTrue(transport.contains("current-link challenge confirmed"));
-    }
-
-    @Test public void helper15RetriesOneCurrentLinkChallengeAndBoundsFailures()
-            throws Exception {
-        String helper = project("ios/KX11-iPhone-ANCS-Helper-v15/"
-                + "KX11ANCSHelper/ViewController.swift");
-
-        assertTrue(helper.contains("KX11 ANCS HELPER v15"));
-        assertTrue(helper.contains("B3 current-link challenge получен"));
-        assertTrue(helper.contains("centralSecureReadAttempt >= 5"));
-        assertTrue(helper.contains("current-link security did not advance"));
-        assertTrue(helper.contains("peripheral.discoverCharacteristics(nil, for: service)"));
-        assertTrue(helper.contains("CBConnectPeripheralOptionRequiresANCS: true"));
-    }
-
-    @Test public void releaseIdentityIsHa1167() throws Exception {
-        String build = project("build.gradle");
-        if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1196'"));
-    }
-
     private static String source(String relative) throws Exception {
         return project("app/src/main/java/dezz/status/widget/" + relative);
     }

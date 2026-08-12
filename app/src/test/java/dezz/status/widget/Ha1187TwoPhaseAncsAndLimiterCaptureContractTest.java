@@ -11,63 +11,8 @@ import java.nio.file.Paths;
 
 import org.junit.Test;
 
-/** HA1187-era car barriers plus the superseding HA1194 single-owner ANCS contract. */
+/** Retained car-runtime coverage for the subscribed-but-never-polled integer catalog. */
 public final class Ha1187TwoPhaseAncsAndLimiterCaptureContractTest {
-    @Test public void androidKeepsTrustOnTheOriginalRequiresAncsOwner()
-            throws Exception {
-        String transport = project(
-                "app/src/main/java/dezz/status/widget/phone/transport/IphoneAncsTransport.java");
-        String secure = between(transport,
-                "private void handleSecureAttSuccess",
-                "private void scheduleSecureClientStart");
-        String disconnect = between(transport,
-                "private void handleVerifiedServerLinkDisconnected",
-                "private static String deviceKey");
-        String serverConnection = between(transport,
-                "public void onConnectionStateChange(BluetoothDevice device,",
-                "public void onCharacteristicReadRequest");
-
-        assertFalse(transport.contains("ANCS-HANDOFF"));
-        assertFalse(transport.contains("awaitingAncsHandoffReconnect"));
-        assertTrue(secure.contains("REQUIRES_ANCS LINK SECURE · ЖДУ HELPER READY"));
-        assertTrue(secure.contains("ANCS-READY принят без disconnect"));
-        assertTrue(disconnect.contains("preserveManagedIncomingPublicationAfterLinkLoss"));
-        assertTrue(disconnect.contains("GATT server, реклама и namespace"));
-        assertTrue(serverConnection.contains("Единственный RequiresANCS Central link"));
-        assertFalse(serverConnection.contains("requestBond(device)"));
-    }
-
-    @Test public void rotatingAnonymousCallbacksCannotStartPrematureBonding() throws Exception {
-        String transport = project(
-                "app/src/main/java/dezz/status/widget/phone/transport/IphoneAncsTransport.java");
-        String connection = between(transport,
-                "public void onConnectionStateChange(BluetoothDevice device,",
-                "public void onCharacteristicReadRequest");
-        String challenge = between(transport,
-                "private boolean issueCurrentLinkSecurityChallenge",
-                "private void recordGattServerPeer");
-
-        assertFalse(connection.contains("requestBond(device)"));
-        assertFalse(transport.contains("incomingPrePairBondRequested"));
-        assertTrue(challenge.contains("peer.linkSecurityChallengeIssued"));
-        assertTrue(challenge.contains("peer.linkSecurityChallengeIssued = true"));
-    }
-
-    @Test public void helperUsesPlainBootstrapThenRequiresAncsWithoutCustomDiscovery()
-            throws Exception {
-        String helper = project("ios/KX11-iPhone-ANCS-Helper-v26/"
-                + "KX11ANCSHelper/ViewController.swift");
-
-        assertTrue(helper.contains("enum CentralLinkPhase"));
-        assertTrue(helper.contains("case bootstrap"));
-        assertTrue(helper.contains("case requiresAncs"));
-        assertTrue(helper.contains("Data(\"ANCS-HANDOFF\".utf8)"));
-        assertTrue(helper.contains("CBConnectPeripheralOptionRequiresANCS: requiresAncs"));
-        assertTrue(helper.contains("centralLinkPhase == .requiresAncs"));
-        assertTrue(helper.contains("custom F04 discovery intentionally skipped"));
-        assertFalse(helper.contains("CBConnectPeripheralOptionRequiresANCS: true"));
-    }
-
     @Test public void runtimeIntegerCatalogIsSubscribedButNeverHealthPolled()
             throws Exception {
         String fallback = project(
@@ -85,10 +30,6 @@ public final class Ha1187TwoPhaseAncsAndLimiterCaptureContractTest {
         assertTrue(fallback.contains("ids.addAll(typedRecorderDiscoveryIds)"));
         assertFalse(healthRead.contains("typedRecorderDiscoveryIds"));
         assertFalse(healthRead.contains("activeRecorderIds"));
-    }
-
-    @Test public void releaseIdentityAdvancesToHa1187() throws Exception {
-        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1196'"));
     }
 
     private static String project(String relative) throws Exception {

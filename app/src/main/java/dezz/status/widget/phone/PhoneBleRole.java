@@ -8,15 +8,14 @@ package dezz.status.widget.phone;
 /**
  * Persistent BLE role selected for the iPhone side of the phone connector.
  *
- * <p>The default deliberately remains {@link #IPHONE_PERIPHERAL}: it is the production route
- * used through HA1161, where Android initiates the connection. The alternate route makes KX11
- * advertise {@code Geely_ANCS}; iPhone Helper then initiates the link as a central. Classic
- * Bluetooth profiles are independent from this value.</p>
+ * <p>The v2 implementation keeps both canonical topologies behind one confirmed-quiescence
+ * switch coordinator.  Discovery is UUID-only in both directions: neither endpoint broadcasts a
+ * synthetic BLE local name. Classic Bluetooth profiles are independent from this value.</p>
  */
 public final class PhoneBleRole {
-    /** Current/legacy route: iPhone peripheral, KX11 central. */
+    /** iPhone Helper peripheral, KX11 public GATT central/client. */
     public static final int IPHONE_PERIPHERAL = 0;
-    /** Alternate route: iPhone central, KX11 peripheral. */
+    /** iPhone Helper central, KX11 GATT peripheral/server plus isolated reverse ANCS observer. */
     public static final int IPHONE_CENTRAL = 1;
 
     private PhoneBleRole() {

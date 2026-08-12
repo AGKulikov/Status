@@ -13,41 +13,6 @@ import org.junit.Test;
 
 /** HA1189 regressions derived from the latest Android 9/v26 in-car traces. */
 public final class Ha1189AnonymousHandoffAndBinaryLimiterContractTest {
-    @Test public void clientAttachUsesExactIncomingBluetoothDevice() throws Exception {
-        String transport = project(
-                "app/src/main/java/dezz/status/widget/phone/transport/IphoneAncsTransport.java");
-        String ready = between(transport,
-                "private boolean canAcceptAncsReady",
-                "private void scheduleSecureClientStart");
-        String attach = between(transport,
-                "private void startSamePeerAttach",
-                "private void scheduleDirectFallback");
-        String lookup = between(transport,
-                "private GattServerPeer findConnectedServerPeer",
-                "private boolean issueCurrentLinkSecurityChallenge");
-
-        assertTrue(ready.contains("BluetoothDevice exactIncomingDevice = serverLink.device"));
-        assertTrue(ready.contains("verifiedPeer = exactIncomingDevice"));
-        assertTrue(attach.contains("BluetoothDevice device = serverLink.device"));
-        assertTrue(attach.contains("EXACT SAME VERIFIED BluetoothDevice"));
-        assertTrue(lookup.contains("sameDevice(peer.device, device)"));
-        assertFalse(transport.contains("clientIdentity"));
-        assertFalse(transport.contains("bindAnonymousHandoffClientIdentity"));
-    }
-
-    @Test public void helperKeepsRequiresAncsOwnerWhenB4IsAbsent() throws Exception {
-        String helper = project("ios/KX11-iPhone-ANCS-Helper-v27/"
-                + "KX11ANCSHelper/ViewController.swift");
-        String optionalRelay = between(helper,
-                "private func observeOptionalCentralTelemetryRelay",
-                "private func cancelCentralConnectTimeout");
-
-        assertTrue(helper.contains("KX11 ANCS HELPER v27"));
-        assertTrue(helper.contains("ANCS OWNER АКТИВЕН · B4 OPTIONAL"));
-        assertTrue(optionalRelay.contains("сохраняю без reset"));
-        assertFalse(optionalRelay.contains("resetCentralLink"));
-    }
-
     @Test public void limiterRecorderPreservesReadOnlyByteArrayChanges() throws Exception {
         String fallback = project(
                 "app/src/geely/java/dezz/status/widget/car/EcarxSignalFallback.java");
@@ -66,10 +31,6 @@ public final class Ha1189AnonymousHandoffAndBinaryLimiterContractTest {
         assertTrue(integration.contains("\"write_enabled\", false"));
     }
 
-    @Test public void releaseIdentityAdvancesToHa1189() throws Exception {
-        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1196'"));
-    }
-
     private static String project(String relative) throws Exception {
         Path current = Paths.get("").toAbsolutePath();
         for (int depth = 0; depth < 8 && current != null;
@@ -83,11 +44,4 @@ public final class Ha1189AnonymousHandoffAndBinaryLimiterContractTest {
         throw new IllegalStateException("Project file not found: " + relative);
     }
 
-    private static String between(String source, String start, String end) {
-        int from = source.indexOf(start);
-        int to = source.indexOf(end, from + Math.max(1, start.length()));
-        assertTrue("Missing section start: " + start, from >= 0);
-        assertTrue("Missing section end: " + end, to > from);
-        return source.substring(from, to);
-    }
 }

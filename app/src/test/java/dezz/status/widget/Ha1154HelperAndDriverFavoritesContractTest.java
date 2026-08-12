@@ -11,30 +11,8 @@ import java.nio.file.Paths;
 
 import org.junit.Test;
 
-/** Release barriers for atomic Helper telemetry and driver-favorite climate controls. */
+/** Retained driver-favorite climate and layout coverage. */
 public final class Ha1154HelperAndDriverFavoritesContractTest {
-    @Test public void helperTelemetryHasDedicatedNotifyAndReadRecovery() throws Exception {
-        String transport = source("phone/transport/IphoneAncsTransport.java");
-        assertTrue(transport.contains("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f04"));
-        assertTrue(transport.contains("PROPERTY_NOTIFY"));
-        assertTrue(transport.contains("PROPERTY_READ"));
-        assertTrue(transport.contains("startHelperTelemetryRead"));
-        assertTrue(transport.contains("scheduleHelperTelemetryRecovery"));
-        assertTrue(transport.contains(
-                "acceptHelperTelemetryFrame(callbackGatt, telemetry, \"notification\")"));
-        assertTrue(transport.contains("callbackGatt, telemetry, \"atomic read\")"));
-    }
-
-    @Test public void atomicSnapshotUpdatesPowerAndNetworkTogether() throws Exception {
-        String parser = source("phone/IphoneHelperTelemetry.java");
-        String controller = source("phone/PhoneConnectorController.java");
-        assertTrue(parser.contains("TEL3;60;1;C;6;44"));
-        assertTrue(parser.contains("Kind.SNAPSHOT"));
-        assertTrue(controller.contains("telemetry.kind == IphoneHelperTelemetry.Kind.SNAPSHOT"));
-        assertTrue(controller.contains("helperBatteryLevel = telemetry.batteryLevel"));
-        assertTrue(controller.contains("helperNetworkType = telemetry.networkType"));
-    }
-
     @Test public void driverFavoritesExposeBothThreeLevelOrders() throws Exception {
         String picker = source("launcher/ShortcutActionPicker.java");
         assertTrue(picker.contains("Цикл уровней 0 → 1 → 2 → 3"));

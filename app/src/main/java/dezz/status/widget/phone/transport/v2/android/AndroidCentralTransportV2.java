@@ -1,0 +1,1837 @@
+/*
+ * Copyright © 2025-2026 Dezz (https://github.com/DezzK)
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+package dezz.status.widget.phone.transport.v2.android;
+
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
+import android.bluetooth.BluetoothGattService;
+import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothProfile;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
+import android.bluetooth.le.ScanRecord;
+import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
+import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.ParcelUuid;
+
+import dezz.status.widget.phone.transport.AncsProtocol;
+import dezz.status.widget.phone.transport.v2.AncsConsumerCoreV2;
+import dezz.status.widget.phone.transport.v2.AncsConsumerEffectV2;
+import dezz.status.widget.phone.transport.v2.AncsRequestTokenV2;
+import dezz.status.widget.phone.transport.v2.AncsSessionTokenV2;
+import dezz.status.widget.phone.transport.v2.AndroidCentralRoute;
+import dezz.status.widget.phone.transport.v2.BlePeerRole;
+import dezz.status.widget.phone.transport.v2.BleRouteEffect;
+import dezz.status.widget.phone.transport.v2.BleRouteEpoch;
+import dezz.status.widget.phone.transport.v2.BleRouteToken;
+import dezz.status.widget.phone.transport.v2.BleRouteTransition;
+import dezz.status.widget.phone.transport.v2.ExactCallbackAttemptFenceV2;
+import dezz.status.widget.phone.transport.v2.IphoneBleAdvertisement;
+import dezz.status.widget.phone.transport.v2.IphoneBleControlProtocolV2;
+import dezz.status.widget.phone.transport.v2.IphoneBleMode;
+import dezz.status.widget.phone.transport.v2.IphoneBlePeerProof;
+import dezz.status.widget.phone.transport.v2.IphoneBleProtocolV2;
+import dezz.status.widget.phone.transport.v2.IphoneGattInventoryV2;
+import dezz.status.widget.phone.transport.v2.IphoneTransportErrorV2;
+import dezz.status.widget.phone.transport.v2.IphoneTransportLifecycle;
+import dezz.status.widget.phone.transport.v2.IphoneTransportSessionListenerV2;
+import dezz.status.widget.phone.transport.v2.IphoneTransportStartRequest;
+import dezz.status.widget.phone.transport.v2.IphoneTransportStatusV2;
+import dezz.status.widget.phone.transport.v2.IphoneTransportStopReason;
+import dezz.status.widget.phone.transport.v2.IphoneTransportV2;
+import dezz.status.widget.phone.transport.v2.IphoneSwitchTransportV2;
+import dezz.status.widget.phone.transport.v2.GattResultV2;
+import dezz.status.widget.phone.transport.v2.MonotonicSessionCursorV2;
+import dezz.status.widget.phone.transport.v2.IphoneRoleControlV2;
+import dezz.status.widget.phone.transport.switching.BleRoleSwitchCoordinator.ControlTransmit;
+import dezz.status.widget.phone.transport.switching.BleRoleSwitchCoordinator.Owner;
+import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.ControlFrame;
+import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.ControlTransmitResult;
+import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Role;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+
+/**
+ * Android framework adapter for Route A (Helper Peripheral / Android Central).
+ *
+ * <p>All public calls, framework callbacks, reducer inputs, GATT operations, and listener calls
+ * are serialized on the main looper.  There is at most one {@link BluetoothGatt} wrapper.  A
+ * silent asynchronous client registration is retained and reasserted on that same wrapper; this
+ * adapter never closes it and creates a second wrapper while registration is unprovable.</p>
+ */
+public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 {
+    private static final long CONTROL_RETRY_DELAY_MS = 150L;
+    private static final long IDENTITY_COMMIT_TIMEOUT_MS = 5_000L;
+    private static final UUID GENERIC_ATTRIBUTE_SERVICE =
+            UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
+    private static final UUID SERVICE_CHANGED =
+            UUID.fromString("00002a05-0000-1000-8000-00805f9b34fb");
+
+    private enum RawOperation {
+        DISCOVER,
+        READ_PEER_PROOF,
+        SUBSCRIBE_ROUTE_CONTROL,
+        SUBSCRIBE_SERVICE_CHANGED,
+        SUBSCRIBE_NOTIFICATION_SOURCE,
+        SUBSCRIBE_DATA_SOURCE,
+        WRITE_CONTROL_POINT,
+        WRITE_ROUTE_CONTROL
+    }
+
+    private static final class PendingGattOperation {
+        final RawOperation type;
+        final BleRouteToken routeToken;
+        final AncsRequestTokenV2 ancsRequest;
+        final BluetoothGattCharacteristic characteristic;
+        final BluetoothGattDescriptor descriptor;
+        final ControlTransmit controlTransmit;
+        final ControlCompletion controlCompletion;
+
+        PendingGattOperation(RawOperation type, BleRouteToken routeToken,
+                             AncsRequestTokenV2 ancsRequest,
+                             BluetoothGattCharacteristic characteristic,
+                             BluetoothGattDescriptor descriptor) {
+            this.type = type;
+            this.routeToken = routeToken;
+            this.ancsRequest = ancsRequest;
+            this.characteristic = characteristic;
+            this.descriptor = descriptor;
+            this.controlTransmit = null;
+            this.controlCompletion = null;
+        }
+
+        PendingGattOperation(ControlTransmit controlTransmit,
+                             ControlCompletion controlCompletion,
+                             BluetoothGattCharacteristic characteristic) {
+            this.type = RawOperation.WRITE_ROUTE_CONTROL;
+            this.routeToken = null;
+            this.ancsRequest = null;
+            this.characteristic = characteristic;
+            this.descriptor = null;
+            this.controlTransmit = Objects.requireNonNull(controlTransmit, "controlTransmit");
+            this.controlCompletion = Objects.requireNonNull(controlCompletion,
+                    "controlCompletion");
+        }
+    }
+
+    private static final class GattOwner {
+        final BleRouteToken ownerToken;
+        final BluetoothDevice device;
+        final boolean selectedBondAttributed;
+        BluetoothGatt gatt;
+        boolean callbackObserved;
+        boolean connected;
+        boolean closing;
+        boolean waitingForProcessGate;
+        boolean quarantinedBeforeRegistration;
+
+        GattOwner(BleRouteToken ownerToken, BluetoothDevice device,
+                  boolean selectedBondAttributed) {
+            this.ownerToken = ownerToken;
+            this.device = device;
+            this.selectedBondAttributed = selectedBondAttributed;
+        }
+    }
+
+    private static final class PendingHelperIdentity {
+        final BleRouteToken token;
+        final IphoneBlePeerProof proof;
+        final BleRouteTransition<AndroidCentralRoute.State> acceptedTransition;
+        final IphoneTransportSessionListenerV2 sessionListener;
+        Runnable deadline;
+
+        PendingHelperIdentity(
+                BleRouteToken token,
+                IphoneBlePeerProof proof,
+                BleRouteTransition<AndroidCentralRoute.State> acceptedTransition,
+                IphoneTransportSessionListenerV2 sessionListener) {
+            this.token = token;
+            this.proof = proof;
+            this.acceptedTransition = acceptedTransition;
+            this.sessionListener = sessionListener;
+        }
+    }
+
+    /** One immutable scan callback identity per explicit-bootstrap owner generation. */
+    private final class ScanAttempt extends ScanCallback {
+        final BleRouteToken token;
+        final BluetoothLeScanner exactScanner;
+        boolean retired;
+
+        ScanAttempt(BleRouteToken token, BluetoothLeScanner exactScanner) {
+            this.token = token;
+            this.exactScanner = exactScanner;
+        }
+
+        @Override public void onScanResult(int callbackType, ScanResult result) {
+            dispatchMain(() -> handleScanResult(this, result));
+        }
+
+        @Override public void onBatchScanResults(List<ScanResult> results) {
+            if (results == null) return;
+            for (ScanResult result : results) {
+                dispatchMain(() -> handleScanResult(this, result));
+            }
+        }
+
+        @Override public void onScanFailed(int errorCode) {
+            dispatchMain(() -> handleScanFailure(this, errorCode));
+        }
+    }
+
+    private final Context context;
+    private final Handler main;
+    private final BluetoothAdapter adapter;
+    private final SelectedBondAttributionV2 bondAttribution;
+    private final AncsConsumerCoreV2 ancs = new AncsConsumerCoreV2();
+    private final Map<BleRouteToken, Runnable> routeTimers = new HashMap<>();
+    private final Map<AncsRequestTokenV2, Runnable> requestTimers = new HashMap<>();
+    private final Map<ControlTransmit, Runnable> controlRetryTimers = new HashMap<>();
+    private final ExactCallbackAttemptFenceV2<ScanAttempt> scanAttemptFence =
+            new ExactCallbackAttemptFenceV2<>();
+
+    private volatile AndroidCentralRoute.State state;
+    private volatile IphoneTransportSessionListenerV2 listener;
+    private IphoneTransportStartRequest startRequest;
+    private BluetoothLeScanner scanner;
+    private BleRouteToken scanToken;
+    private boolean scanRunning;
+    private ScanAttempt scanAttempt;
+    private BluetoothDevice matchedBootstrapDevice;
+    private boolean matchedBootstrapAttributed;
+    private volatile GattOwner owner;
+    private PendingGattOperation pendingGatt;
+    private AncsSessionTokenV2 ancsSession;
+    private final MonotonicSessionCursorV2 ancsSessionCursor =
+            new MonotonicSessionCursorV2();
+    private Runnable replayQuietTimer;
+    private long replayQuietGeneration;
+    private boolean ingressFrozen;
+    private IphoneRoleControlV2 lastInboundCloseRequest;
+    private IphoneRoleControlV2 lastOutboundControl;
+    private Owner restorationOwner;
+    private RestorationDrainCompletion restorationCompletion;
+    private boolean restorationTerminalReported;
+    private BleRouteEpoch radioOffTerminalEpoch;
+    private boolean radioResetProven;
+    private BleRouteEpoch deferredStopTerminalEpoch;
+    private final Object processGateDrainWaiter = new Object();
+    private final Object restorationGateWaiter = new Object();
+    private boolean processGateDrainRetained;
+    private PendingHelperIdentity pendingHelperIdentity;
+    private boolean closed;
+
+    public AndroidCentralTransportV2(Context context) {
+        this(context, SelectedBondAttributionV2.STRICT_PUBLIC_ADDRESS);
+    }
+
+    public AndroidCentralTransportV2(Context context,
+                                     SelectedBondAttributionV2 bondAttribution) {
+        this.context = Objects.requireNonNull(context, "context").getApplicationContext();
+        this.bondAttribution = Objects.requireNonNull(bondAttribution, "bondAttribution");
+        this.main = new Handler(Looper.getMainLooper());
+        BluetoothManager manager =
+                (BluetoothManager) this.context.getSystemService(Context.BLUETOOTH_SERVICE);
+        this.adapter = manager == null ? null : manager.getAdapter();
+    }
+
+    @Override public IphoneBleMode mode() {
+        return IphoneBleMode.ANDROID_CENTRAL;
+    }
+
+    @Override public void start(IphoneTransportStartRequest request,
+                                IphoneTransportSessionListenerV2 listener) {
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(listener, "listener");
+        main.post(() -> startOnMain(request, listener));
+    }
+
+    @Override public void stop(BleRouteEpoch epoch, IphoneTransportStopReason reason) {
+        Objects.requireNonNull(epoch, "epoch");
+        Objects.requireNonNull(reason, "reason");
+        main.post(() -> {
+            stopOnMain(epoch, reason);
+        });
+    }
+
+    /** Radio-off is terminal for this activation; radio-on must call start with a fresh epoch. */
+    @Override public void radioOff(BleRouteEpoch epoch) {
+        Objects.requireNonNull(epoch, "epoch");
+        main.post(() -> {
+            radioResetProven = true;
+            ingressFrozen = true;
+            cancelAllTimers();
+            stopBootstrapScanForFreeze();
+            ProcessGattRegistrationGateV2.radioReset();
+            if (state != null && state.epoch.equals(epoch)) {
+                BleRouteTransition<AndroidCentralRoute.State> transition =
+                        AndroidCentralRoute.radioOff(state, epoch);
+                if (transition.accepted) {
+                    radioOffTerminalEpoch = epoch;
+                    apply(transition);
+                } else {
+                    deferredStopTerminalEpoch = epoch;
+                }
+            }
+            if (owner != null) finishGattClose();
+            maybeCompleteTeardown();
+        });
+    }
+
+    /** Called only from an explicit bond/authorization state change observation. */
+    public void authorizationChanged(BleRouteEpoch epoch) {
+        Objects.requireNonNull(epoch, "epoch");
+        main.post(() -> {
+            if (state != null && state.epoch.equals(epoch) && state.expected != null) {
+                apply(AndroidCentralRoute.authorizationChanged(state, state.expected));
+            }
+        });
+    }
+
+    @Override public IphoneTransportStatusV2 status() {
+        AndroidCentralRoute.State snapshot = state;
+        if (snapshot == null) return null;
+        return toStatus(snapshot);
+    }
+
+    @Override public void close() {
+        main.post(() -> {
+            closed = true;
+            ProcessGattRegistrationGateV2.cancelWaiter(restorationGateWaiter);
+            ProcessGattRegistrationGateV2.cancelWaiter(processGateDrainWaiter);
+            processGateDrainRetained = false;
+            if (state != null) {
+                stopOnMain(state.epoch, IphoneTransportStopReason.APP_SHUTDOWN);
+            } else {
+                cancelAllTimers();
+            }
+        });
+    }
+
+    /** Number consumed by the role-switch coordinator's independent localOwnersZero gate. */
+    public int appOwnedGattCount() {
+        return owner == null && !ProcessGattRegistrationGateV2.isHeld() ? 0 : 1;
+    }
+
+    @Override public void prepareRestorationDrain(
+            Owner source, RestorationDrainCompletion completion) {
+        Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(completion, "completion");
+        main.post(() -> {
+            boolean success = source.role() == Role.HELPER_PERIPHERAL_ANDROID_CENTRAL
+                    && state == null && owner == null && !scanRunning
+                    && restorationOwner == null && !closed;
+            if (success) {
+                restorationOwner = source;
+                restorationCompletion = completion;
+                restorationTerminalReported = false;
+                ingressFrozen = true;
+                ProcessGattRegistrationGateV2.whenFreeForDrain(
+                        restorationGateWaiter,
+                        () -> dispatchMain(() -> completeRestorationPrepared(
+                                source, completion)));
+                return;
+            }
+            main.post(() -> completion.onPrepared(source, success));
+        });
+    }
+
+    private void completeRestorationPrepared(
+            Owner source, RestorationDrainCompletion completion) {
+        if (!source.equals(restorationOwner) || restorationCompletion != completion
+                || closed) return;
+        if (!ProcessGattRegistrationGateV2.ownsDrainReservation(
+                restorationGateWaiter)) return;
+        main.post(() -> completion.onPrepared(source, true));
+    }
+
+    @Override public void freezeIngress(Owner source, FreezeCompletion completion) {
+        Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(completion, "completion");
+        main.post(() -> {
+            FreezeResult result = FreezeResult.FAILED;
+            if (ownsSwitchSource(source)) {
+                ingressFrozen = true;
+                cancelAllTimers();
+                stopBootstrapScanForFreeze();
+                closeAncsSession();
+                if (owner != null && owner.connected
+                        && state != null && state.isReady()) {
+                    result = FreezeResult.FROZEN_WITH_REMOTE_CONTROL;
+                } else if (owner == null && !scanRunning) {
+                    result = FreezeResult.FROZEN_NO_REMOTE_OWNER;
+                }
+            }
+            FreezeResult exactResult = result;
+            main.post(() -> completion.onFrozen(source, exactResult));
+        });
+    }
+
+    @Override public void transmitControl(ControlTransmit transmit,
+                                          ControlCompletion completion) {
+        Objects.requireNonNull(transmit, "transmit");
+        Objects.requireNonNull(completion, "completion");
+        main.post(() -> transmitControlOnMain(transmit, completion));
+    }
+
+    @Override public void scheduleControlRetry(ControlTransmit transmit,
+                                               RetryDue callback) {
+        Objects.requireNonNull(transmit, "transmit");
+        Objects.requireNonNull(callback, "callback");
+        main.post(() -> {
+            cancelControlRetryOnMain(transmit);
+            long now = android.os.SystemClock.elapsedRealtime();
+            long remaining = Math.max(0L, transmit.stopDeadlineMillis() - now);
+            long delay = Math.min(CONTROL_RETRY_DELAY_MS, remaining);
+            Runnable due = () -> {
+                controlRetryTimers.remove(transmit);
+                callback.onDue(transmit);
+            };
+            controlRetryTimers.put(transmit, due);
+            main.postDelayed(due, delay);
+        });
+    }
+
+    @Override public void cancelControlRetry(ControlTransmit transmit) {
+        Objects.requireNonNull(transmit, "transmit");
+        main.post(() -> cancelControlRetryOnMain(transmit));
+    }
+
+    @Override public void beginConfirmedModeSwitchStop(Owner source) {
+        Objects.requireNonNull(source, "source");
+        main.post(() -> {
+            if (source.equals(restorationOwner) && restorationCompletion != null) {
+                if (!restorationTerminalReported && owner == null && !scanRunning) {
+                    restorationTerminalReported = true;
+                    RestorationDrainCompletion exact = restorationCompletion;
+                    main.post(() -> exact.onLocalTerminal(source));
+                }
+                return;
+            }
+            if (ownsSwitchSource(source) && state != null) {
+                stopOnMain(state.epoch, IphoneTransportStopReason.MODE_SWITCH);
+                maybeCompleteTeardown();
+            }
+        });
+    }
+
+    @Override public int appOwnedOwnerCount(Owner source) {
+        return ownsSwitchSource(source) ? appOwnedGattCount() : 1;
+    }
+
+    private void stopOnMain(BleRouteEpoch epoch, IphoneTransportStopReason reason) {
+        if (state == null || !state.epoch.equals(epoch)) return;
+        BleRouteTransition<AndroidCentralRoute.State> transition =
+                AndroidCentralRoute.stop(state, epoch, reason.name());
+        apply(transition);
+        if (!transition.accepted
+                || transition.state.phase != AndroidCentralRoute.Phase.FAILED) return;
+
+        // CONNECTING/WAIT_* may still have private clientIf==0. Keep the exact wrapper and the
+        // process lease quarantined until its first callback proves close() can unregister it.
+        deferredStopTerminalEpoch = epoch;
+        cancelAllTimers();
+        GattOwner exact = owner;
+        if (exact == null) {
+            maybeCompleteTeardown();
+            return;
+        }
+        if (exact.waitingForProcessGate
+                && !ProcessGattRegistrationGateV2.owns(exact)) {
+            ProcessGattRegistrationGateV2.cancelWaiter(exact);
+            owner = null;
+            maybeCompleteTeardown();
+            return;
+        }
+        exact.closing = true;
+        if (!exact.callbackObserved) exact.quarantinedBeforeRegistration = true;
+        if (exact.callbackObserved) retireRegisteredGattOwner(exact);
+    }
+
+    private void startOnMain(IphoneTransportStartRequest request,
+                             IphoneTransportSessionListenerV2 newListener) {
+        assertMain();
+        if (closed) {
+            newListener.onError(new IphoneTransportErrorV2(mode(), request.epoch,
+                    IphoneTransportErrorV2.Kind.TEARDOWN,
+                    "transport instance is closed", false));
+            return;
+        }
+        if (restorationOwner != null) {
+            newListener.onError(new IphoneTransportErrorV2(mode(), request.epoch,
+                    IphoneTransportErrorV2.Kind.TEARDOWN,
+                    "restoration drain owns this adapter instance", false));
+            return;
+        }
+        if (processGateDrainRetained) {
+            newListener.onError(new IphoneTransportErrorV2(mode(), request.epoch,
+                    IphoneTransportErrorV2.Kind.TEARDOWN,
+                    "terminal drain adapter must be disposed before a fresh activation", false));
+            return;
+        }
+        boolean reusableTerminal = state == null
+                || state.phase == AndroidCentralRoute.Phase.STOPPED
+                || ((state.phase == AndroidCentralRoute.Phase.FAILED
+                        || state.phase == AndroidCentralRoute.Phase.WAIT_RADIO)
+                    && owner == null && !scanRunning);
+        if (!reusableTerminal) {
+            newListener.onError(new IphoneTransportErrorV2(mode(), request.epoch,
+                    IphoneTransportErrorV2.Kind.PROTOCOL,
+                    "start rejected while another route epoch owns the adapter", false));
+            return;
+        }
+        this.listener = newListener;
+        this.startRequest = request;
+        this.ingressFrozen = false;
+        this.lastInboundCloseRequest = null;
+        this.lastOutboundControl = null;
+        this.radioOffTerminalEpoch = null;
+        this.radioResetProven = false;
+        this.deferredStopTerminalEpoch = null;
+        cancelHelperIdentityCommit();
+        apply(AndroidCentralRoute.start(request));
+    }
+
+    private void apply(BleRouteTransition<AndroidCentralRoute.State> transition) {
+        assertMain();
+        if (transition == null || !transition.accepted) return;
+        state = transition.state;
+        publishStatus();
+        for (BleRouteEffect effect : transition.effects) execute(effect);
+    }
+
+    private void execute(BleRouteEffect effect) {
+        switch (effect.type) {
+            case START_SCAN:
+                startBootstrapScan(effect.token);
+                break;
+            case STOP_SCAN:
+                stopBootstrapScan(effect.token);
+                break;
+            case CONNECT_SELECTED_BOND:
+                connectSelectedBond(effect.token);
+                break;
+            case CONNECT_GATT:
+                connectMatchedBootstrap(effect.token);
+                break;
+            case REASSERT_SAME_GATT:
+                reassertSameGatt(effect.token);
+                break;
+            case CLOSE_GATT:
+                closeGattOwner(effect.token, effect.detail);
+                break;
+            case DISCOVER_SERVICES:
+                discoverServices(effect.token);
+                break;
+            case READ_PEER_PROOF:
+                readPeerProof(effect.token);
+                break;
+            case SUBSCRIBE_ROUTE_CONTROL:
+                subscribe(effect.token, RawOperation.SUBSCRIBE_ROUTE_CONTROL,
+                        IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE,
+                        IphoneBleProtocolV2.CONTROL_CHARACTERISTIC, true);
+                break;
+            case SUBSCRIBE_GATT_SERVICE_CHANGED:
+                subscribe(effect.token, RawOperation.SUBSCRIBE_SERVICE_CHANGED,
+                        GENERIC_ATTRIBUTE_SERVICE, SERVICE_CHANGED, true);
+                break;
+            case SUBSCRIBE_ANCS_NOTIFICATION_SOURCE:
+                subscribe(effect.token, RawOperation.SUBSCRIBE_NOTIFICATION_SOURCE,
+                        AncsProtocol.SERVICE, AncsProtocol.NOTIFICATION_SOURCE, false);
+                break;
+            case SUBSCRIBE_ANCS_DATA_SOURCE:
+                subscribe(effect.token, RawOperation.SUBSCRIBE_DATA_SOURCE,
+                        AncsProtocol.SERVICE, AncsProtocol.DATA_SOURCE, false);
+                break;
+            case ARM_ANCS_PARSER:
+                beginAncsSession(effect.token);
+                break;
+            case RESET_SESSION_STATE:
+                closeAncsSession();
+                if (pendingGatt == null
+                        || pendingGatt.type != RawOperation.WRITE_ROUTE_CONTROL) {
+                    pendingGatt = null;
+                }
+                break;
+            case ARM_DEADLINE:
+            case ARM_RETRY:
+                armRouteTimer(effect.token, effect.delayMillis);
+                break;
+            case CANCEL_DEADLINE:
+                cancelRouteTimer(effect.token);
+                break;
+            case REPORT_READY:
+                if (ancsSession != null) {
+                    applyAncsEffects(ancs.subscriptionsReady(ancsSession));
+                }
+                break;
+            case REPORT_HELPER_ID_LEARNED:
+                if (listener != null) listener.onHelperInstallationIdLearned(effect.detail);
+                break;
+            case REPORT_LOCAL_TERMINAL:
+                if (listener != null && state != null) {
+                    listener.onLocalTerminal(mode(), state.epoch);
+                }
+                break;
+            case REPORT_ERROR:
+                reportError(IphoneTransportErrorV2.Kind.GATT, effect.detail, true);
+                break;
+            case REPORT_DOWN:
+            case SUBSCRIBE_TELEMETRY:
+            case OPEN_GATT_SERVER:
+            case ADD_V2_SERVER_SERVICE:
+            case CLOSE_GATT_SERVER:
+            case START_ADVERTISING:
+            case STOP_ADVERTISING:
+            case BIND_INBOUND_PEER:
+            case DISCONNECT_INBOUND_PEER:
+            case OBSERVE_REVERSE_CLIENT:
+            case CLOSE_REVERSE_CLIENT:
+            case DISCOVER_ANCS:
+                // Not a Route-A framework operation.
+                break;
+        }
+    }
+
+    private void startBootstrapScan(BleRouteToken token) {
+        if (ingressFrozen || !currentEpoch(token) || adapter == null
+                || !adapter.isEnabled() || scanRunning) {
+            postRouteDeadline(token);
+            return;
+        }
+        BluetoothLeScanner exactScanner = adapter.getBluetoothLeScanner();
+        if (exactScanner == null) {
+            postRouteDeadline(token);
+            return;
+        }
+        List<ScanFilter> filters = new ArrayList<>();
+        filters.add(new ScanFilter.Builder()
+                .setServiceUuid(new ParcelUuid(IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE))
+                .build());
+        ScanSettings settings = new ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .build();
+        ScanAttempt attempt = new ScanAttempt(token, exactScanner);
+        if (!scanAttemptFence.begin(attempt)) {
+            postRouteDeadline(token);
+            return;
+        }
+        scanner = exactScanner;
+        scanToken = token;
+        scanAttempt = attempt;
+        scanRunning = true;
+        try {
+            exactScanner.startScan(filters, settings, attempt);
+        } catch (RuntimeException error) {
+            if (scanAttempt == attempt) {
+                retireScanAttempt(attempt);
+                reportError(IphoneTransportErrorV2.Kind.GATT,
+                        "bootstrap scan start failed: " + error.getClass().getSimpleName(), true);
+                postRouteDeadline(token);
+            }
+        }
+    }
+
+    private void stopBootstrapScan(BleRouteToken token) {
+        if (!scanRunning || scanToken == null) {
+            maybeCompleteTeardown();
+            return;
+        }
+        if (!scanToken.sameOwner(token)) return;
+        ScanAttempt attempt = scanAttempt;
+        try {
+            if (attempt != null) attempt.exactScanner.stopScan(attempt);
+        } catch (RuntimeException ignored) {
+            // The exact scan owner is invalidated below even if the radio changed concurrently.
+        }
+        retireScanAttempt(attempt);
+        maybeCompleteTeardown();
+    }
+
+    private void stopBootstrapScanForFreeze() {
+        ScanAttempt attempt = scanAttempt;
+        try {
+            if (attempt != null) attempt.exactScanner.stopScan(attempt);
+        } catch (RuntimeException ignored) {
+            // The frozen generation will reject every late callback.
+        }
+        retireScanAttempt(attempt);
+        matchedBootstrapDevice = null;
+        matchedBootstrapAttributed = false;
+    }
+
+    private void connectSelectedBond(BleRouteToken token) {
+        if (ingressFrozen || !currentEpoch(token) || startRequest == null || adapter == null
+                || !adapter.isEnabled()) {
+            postConnected(token, false);
+            return;
+        }
+        BluetoothDevice selected;
+        try {
+            selected = adapter.getRemoteDevice(startRequest.selectedSystemBondAddress);
+        } catch (RuntimeException error) {
+            reportError(IphoneTransportErrorV2.Kind.GATT,
+                    "invalid selected system bond address", false);
+            postConnected(token, false);
+            return;
+        }
+        boolean attributed = bondAttribution.isSelectedBond(
+                selected, startRequest.selectedSystemBondAddress);
+        if (!attributed) {
+            reportError(IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
+                    "selected target is not the exact bonded device", false);
+            postConnected(token, false);
+            return;
+        }
+        createGattOwner(token, selected, true, true);
+    }
+
+    private void connectMatchedBootstrap(BleRouteToken token) {
+        if (ingressFrozen) {
+            matchedBootstrapDevice = null;
+            matchedBootstrapAttributed = false;
+            return;
+        }
+        BluetoothDevice device = matchedBootstrapDevice;
+        boolean attributed = matchedBootstrapAttributed;
+        matchedBootstrapDevice = null;
+        matchedBootstrapAttributed = false;
+        if (device == null || !attributed) {
+            postConnected(token, false);
+            return;
+        }
+        createGattOwner(token, device, false, true);
+    }
+
+    private void createGattOwner(BleRouteToken token, BluetoothDevice device,
+                                 boolean autoConnect, boolean attributed) {
+        if (ingressFrozen) return;
+        if (owner != null) {
+            reportError(IphoneTransportErrorV2.Kind.GATT,
+                    "second BluetoothGatt wrapper forbidden", false);
+            return;
+        }
+        GattOwner candidate = new GattOwner(token, device, attributed);
+        owner = candidate;
+        acquireProcessGateAndConnect(candidate, autoConnect);
+    }
+
+    private void acquireProcessGateAndConnect(GattOwner candidate, boolean autoConnect) {
+        if (owner != candidate) return;
+        if (ingressFrozen || closed || !currentEpoch(candidate.ownerToken)) {
+            cancelWaitingGattOwner(candidate);
+            return;
+        }
+        if (adapter == null || !adapter.isEnabled()) {
+            cancelWaitingGattOwner(candidate);
+            postConnected(candidate.ownerToken, false);
+            return;
+        }
+        if (!ProcessGattRegistrationGateV2.tryAcquire(candidate)) {
+            candidate.waitingForProcessGate = true;
+            ProcessGattRegistrationGateV2.whenFree(candidate,
+                    () -> dispatchMain(
+                            () -> acquireProcessGateAndConnect(candidate, autoConnect)));
+            return;
+        }
+        candidate.waitingForProcessGate = false;
+        try {
+            candidate.gatt = candidate.device.connectGatt(
+                    context, autoConnect, gattCallback, BluetoothDevice.TRANSPORT_LE);
+        } catch (RuntimeException error) {
+            owner = null;
+            ProcessGattRegistrationGateV2.release(candidate);
+            reportError(IphoneTransportErrorV2.Kind.GATT,
+                    "connectGatt rejected: " + error.getClass().getSimpleName(), true);
+            postConnected(candidate.ownerToken, false);
+            return;
+        }
+        if (candidate.gatt == null) {
+            owner = null;
+            ProcessGattRegistrationGateV2.release(candidate);
+            postConnected(candidate.ownerToken, false);
+        }
+    }
+
+    private void cancelWaitingGattOwner(GattOwner candidate) {
+        if (candidate == null || owner != candidate || !candidate.waitingForProcessGate) return;
+        ProcessGattRegistrationGateV2.cancelWaiter(candidate);
+        candidate.waitingForProcessGate = false;
+        owner = null;
+        maybeCompleteTeardown();
+    }
+
+    private void reassertSameGatt(BleRouteToken token) {
+        if (!owns(token) || owner.gatt == null || owner.closing) return;
+        try {
+            if (!owner.gatt.connect()) {
+                reportError(IphoneTransportErrorV2.Kind.GATT,
+                        "same BluetoothGatt.connect() reassert returned false", true);
+            }
+        } catch (RuntimeException error) {
+            reportError(IphoneTransportErrorV2.Kind.GATT,
+                    "same-owner reassert failed: " + error.getClass().getSimpleName(), true);
+        }
+    }
+
+    private void closeGattOwner(BleRouteToken token, String reason) {
+        if (owner == null) {
+            dispatchMain(this::maybeCompleteTeardown);
+            return;
+        }
+        if (!owner.ownerToken.sameOwner(token)) return;
+        if (owner.waitingForProcessGate
+                && !ProcessGattRegistrationGateV2.owns(owner)) {
+            cancelWaitingGattOwner(owner);
+            return;
+        }
+        if (!owner.callbackObserved && !radioResetProven
+                && adapter != null && adapter.isEnabled()) {
+            owner.closing = true;
+            owner.quarantinedBeforeRegistration = true;
+            failPendingRouteControl();
+            closeAncsSession();
+            reportError(IphoneTransportErrorV2.Kind.TEARDOWN,
+                    "OWNER_UNPROVABLE retained; close/new-wrapper churn forbidden", false);
+            return;
+        }
+        owner.closing = true;
+        failPendingRouteControl();
+        closeAncsSession();
+        if (radioResetProven) {
+            finishGattClose();
+            return;
+        }
+        retireRegisteredGattOwner(owner);
+    }
+
+    private void retireRegisteredGattOwner(GattOwner exact) {
+        if (owner != exact) return;
+        if (exact.connected && exact.gatt != null && adapter != null && adapter.isEnabled()) {
+            try {
+                exact.gatt.disconnect();
+                return;
+            } catch (RuntimeException ignored) {
+                // Close the now-invalid Java wrapper below.
+            }
+        }
+        finishGattClose();
+    }
+
+    private void finishGattClose() {
+        GattOwner closing = owner;
+        if (closing == null) {
+            dispatchMain(this::maybeCompleteTeardown);
+            return;
+        }
+        owner = null;
+        failPendingRouteControl();
+        try {
+            if (closing.gatt != null) closing.gatt.close();
+        } catch (RuntimeException ignored) {
+            // The Java owner is terminal; switch coordinator still performs an owner-count gate.
+        }
+        ProcessGattRegistrationGateV2.cancelWaiter(closing);
+        ProcessGattRegistrationGateV2.release(closing);
+        dispatchMain(this::maybeCompleteTeardown);
+    }
+
+    private void failPendingRouteControl() {
+        PendingGattOperation pending = pendingGatt;
+        pendingGatt = null;
+        if (pending != null && pending.type == RawOperation.WRITE_ROUTE_CONTROL
+                && pending.controlTransmit != null && pending.controlCompletion != null) {
+            completeControlTransmit(pending.controlTransmit, pending.controlCompletion,
+                    ControlTransmitResult.TERMINAL_FAILURE,
+                    roleControl(pending.controlTransmit));
+        }
+    }
+
+    private void discoverServices(BleRouteToken token) {
+        if (!readyForGattOperation(token) || pendingGatt != null) {
+            postServices(token, null);
+            return;
+        }
+        pendingGatt = new PendingGattOperation(
+                RawOperation.DISCOVER, token, null, null, null);
+        boolean started;
+        try {
+            started = owner.gatt.discoverServices();
+        } catch (RuntimeException error) {
+            started = false;
+        }
+        if (!started) {
+            pendingGatt = null;
+            postServices(token, null);
+        }
+    }
+
+    private void readPeerProof(BleRouteToken token) {
+        if (!readyForGattOperation(token) || pendingGatt != null) {
+            postPeerProof(token, null);
+            return;
+        }
+        BluetoothGattCharacteristic characteristic = characteristic(
+                IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE,
+                IphoneBleProtocolV2.PEER_PROOF_CHARACTERISTIC);
+        if (characteristic == null) {
+            postPeerProof(token, null);
+            return;
+        }
+        pendingGatt = new PendingGattOperation(
+                RawOperation.READ_PEER_PROOF, token, null, characteristic, null);
+        boolean started;
+        try {
+            started = owner.gatt.readCharacteristic(characteristic);
+        } catch (RuntimeException error) {
+            started = false;
+        }
+        if (!started) {
+            pendingGatt = null;
+            postPeerProof(token, null);
+        }
+    }
+
+    private void subscribe(BleRouteToken token, RawOperation operation,
+                           UUID serviceUuid, UUID characteristicUuid, boolean indication) {
+        if (!readyForGattOperation(token) || pendingGatt != null) {
+            postSubscription(token, operation, GattResultV2.TRANSIENT_FAILURE);
+            return;
+        }
+        BluetoothGattCharacteristic characteristic = characteristic(serviceUuid,
+                characteristicUuid);
+        BluetoothGattDescriptor descriptor = characteristic == null ? null
+                : characteristic.getDescriptor(AncsProtocol.CLIENT_CONFIGURATION);
+        if (characteristic == null || descriptor == null) {
+            postSubscription(token, operation, GattResultV2.TRANSIENT_FAILURE);
+            return;
+        }
+        boolean notificationSet;
+        try {
+            notificationSet = owner.gatt.setCharacteristicNotification(characteristic, true);
+        } catch (RuntimeException error) {
+            notificationSet = false;
+        }
+        if (!notificationSet) {
+            postSubscription(token, operation, GattResultV2.TRANSIENT_FAILURE);
+            return;
+        }
+        descriptor.setValue(indication
+                ? BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+                : BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+        pendingGatt = new PendingGattOperation(operation, token, null,
+                characteristic, descriptor);
+        boolean started;
+        try {
+            started = owner.gatt.writeDescriptor(descriptor);
+        } catch (RuntimeException error) {
+            started = false;
+        }
+        if (!started) {
+            pendingGatt = null;
+            postSubscription(token, operation, GattResultV2.TRANSIENT_FAILURE);
+        }
+    }
+
+    private void armRouteTimer(BleRouteToken token, long delayMillis) {
+        cancelRouteTimer(token);
+        Runnable timer = () -> {
+            routeTimers.remove(token);
+            AndroidCentralRoute.State current = state;
+            if (current == null || current.expected == null
+                    || !current.expected.equals(token)) return;
+            switch (current.phase) {
+                case STARTUP_QUIET:
+                    apply(AndroidCentralRoute.startupQuietElapsed(
+                            current, token, radioEnabled()));
+                    break;
+                case WAIT_REASSERT:
+                    apply(AndroidCentralRoute.sameOwnerReassertElapsed(current, token));
+                    break;
+                case RETRY_WAIT:
+                    apply(AndroidCentralRoute.retryElapsed(current, token, radioEnabled()));
+                    break;
+                default:
+                    apply(AndroidCentralRoute.deadline(current, token));
+                    break;
+            }
+        };
+        routeTimers.put(token, timer);
+        main.postDelayed(timer, delayMillis);
+    }
+
+    private void cancelRouteTimer(BleRouteToken token) {
+        Runnable timer = routeTimers.remove(token);
+        if (timer != null) main.removeCallbacks(timer);
+    }
+
+    private void postRouteDeadline(BleRouteToken token) {
+        dispatchMain(() -> {
+            AndroidCentralRoute.State current = state;
+            if (current != null) apply(AndroidCentralRoute.deadline(current, token));
+        });
+    }
+
+    private void postConnected(BleRouteToken token, boolean success) {
+        dispatchMain(() -> {
+            AndroidCentralRoute.State current = state;
+            if (current != null) apply(AndroidCentralRoute.connected(current, token, success));
+        });
+    }
+
+    private void postServices(BleRouteToken token, IphoneGattInventoryV2 inventory) {
+        dispatchMain(() -> {
+            AndroidCentralRoute.State current = state;
+            if (current != null) {
+                apply(AndroidCentralRoute.servicesDiscovered(current, token, inventory));
+            }
+        });
+    }
+
+    private void postPeerProof(BleRouteToken token, IphoneBlePeerProof proof) {
+        dispatchMain(() -> {
+            AndroidCentralRoute.State current = state;
+            if (current != null) apply(AndroidCentralRoute.peerProof(
+                    current, token, proof, proof == null
+                            ? GattResultV2.TRANSIENT_FAILURE : GattResultV2.SUCCESS));
+        });
+    }
+
+    private void postSubscription(BleRouteToken token, RawOperation operation,
+                                  GattResultV2 result) {
+        dispatchMain(() -> completeSubscription(token, operation, result));
+    }
+
+    private void completeSubscription(BleRouteToken token, RawOperation operation,
+                                      GattResultV2 result) {
+        AndroidCentralRoute.State current = state;
+        if (current == null) return;
+        switch (operation) {
+            case SUBSCRIBE_SERVICE_CHANGED:
+                apply(AndroidCentralRoute.serviceChangedSubscribed(current, token, result));
+                break;
+            case SUBSCRIBE_ROUTE_CONTROL:
+                apply(AndroidCentralRoute.routeControlSubscribed(current, token, result));
+                break;
+            case SUBSCRIBE_NOTIFICATION_SOURCE:
+                apply(AndroidCentralRoute.notificationSourceSubscribed(current, token, result));
+                break;
+            case SUBSCRIBE_DATA_SOURCE:
+                apply(AndroidCentralRoute.dataSourceSubscribed(current, token, result));
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void beginAncsSession(BleRouteToken token) {
+        closeAncsSession();
+        long sessionId;
+        try {
+            sessionId = ancsSessionCursor.next();
+        } catch (IllegalStateException exhausted) {
+            reportError(IphoneTransportErrorV2.Kind.PROTOCOL,
+                    exhausted.getMessage(), false);
+            poisonCurrentAncsOwner(exhausted.getMessage());
+            return;
+        }
+        ancsSession = new AncsSessionTokenV2(token.epoch, token.ownerId, sessionId);
+        ancs.begin(ancsSession);
+    }
+
+    private void closeAncsSession() {
+        cancelHelperIdentityCommit();
+        if (ancsSession != null) {
+            applyAncsEffects(ancs.close(ancsSession));
+            ancsSession = null;
+        }
+        // A raw write remains in the Android FIFO until its callback. C/A retries rather than
+        // overlapping it after ingress freeze.
+    }
+
+    private void beginHelperIdentityCommit(
+            BleRouteToken token,
+            IphoneBlePeerProof proof,
+            BleRouteTransition<AndroidCentralRoute.State> acceptedTransition) {
+        if (pendingHelperIdentity != null || listener == null) {
+            AndroidCentralRoute.State current = state;
+            if (current != null) {
+                apply(AndroidCentralRoute.peerProof(
+                        current, token, null, GattResultV2.SUCCESS));
+            }
+            return;
+        }
+        cancelRouteTimer(token);
+        IphoneTransportSessionListenerV2 exactListener = listener;
+        PendingHelperIdentity gate = new PendingHelperIdentity(
+                token, proof, acceptedTransition, exactListener);
+        gate.deadline = () -> finishHelperIdentityCommit(gate, false);
+        pendingHelperIdentity = gate;
+        main.postDelayed(gate.deadline, IDENTITY_COMMIT_TIMEOUT_MS);
+        try {
+            exactListener.offerHelperInstallationId(
+                    proof.peerId,
+                    accepted -> dispatchMain(
+                            () -> finishHelperIdentityCommit(gate, accepted)));
+        } catch (RuntimeException rejected) {
+            finishHelperIdentityCommit(gate, false);
+        }
+    }
+
+    private void finishHelperIdentityCommit(PendingHelperIdentity gate, boolean accepted) {
+        if (pendingHelperIdentity != gate) return;
+        pendingHelperIdentity = null;
+        if (gate.deadline != null) main.removeCallbacks(gate.deadline);
+        AndroidCentralRoute.State current = state;
+        if (current == null || listener != gate.sessionListener || ingressFrozen
+                || current.expected == null || !current.expected.equals(gate.token)) {
+            return;
+        }
+        if (accepted) {
+            apply(gate.acceptedTransition);
+        } else {
+            apply(AndroidCentralRoute.peerProof(
+                    current, gate.token, null, GattResultV2.SUCCESS));
+        }
+    }
+
+    private void cancelHelperIdentityCommit() {
+        PendingHelperIdentity gate = pendingHelperIdentity;
+        pendingHelperIdentity = null;
+        if (gate != null && gate.deadline != null) main.removeCallbacks(gate.deadline);
+    }
+
+    private void applyAncsEffects(List<AncsConsumerEffectV2> effects) {
+        if (effects == null) return;
+        for (AncsConsumerEffectV2 effect : effects) {
+            switch (effect.type) {
+                case WRITE_CONTROL_POINT:
+                    writeControlPoint(effect.request, effect.value);
+                    break;
+                case ARM_REQUEST_DEADLINE:
+                    armRequestDeadline(effect.request);
+                    break;
+                case CANCEL_REQUEST_DEADLINE:
+                    cancelRequestDeadline(effect.request);
+                    break;
+                case ARM_REPLAY_QUIET:
+                    armReplayQuiet(effect.generation);
+                    break;
+                case CANCEL_REPLAY_QUIET:
+                    cancelReplayQuiet();
+                    break;
+                case NOTIFICATION_EVENT:
+                    if (listener != null) listener.onNotificationEvent(effect.event);
+                    break;
+                case NOTIFICATION:
+                    if (listener != null) listener.onNotification(effect.notification);
+                    break;
+                case APP_NAME:
+                    if (listener != null) listener.onAppName(effect.appName);
+                    break;
+                case TERMINATE_SESSION:
+                    reportError(IphoneTransportErrorV2.Kind.PROTOCOL, effect.detail, true);
+                    poisonCurrentAncsOwner(effect.detail);
+                    break;
+                case MALFORMED_SOURCE:
+                case QUEUE_DROPPED:
+                    reportError(IphoneTransportErrorV2.Kind.PROTOCOL, effect.detail, true);
+                    break;
+                case REPLAY_CHECKPOINT:
+                case REPLAY_SUMMARY:
+                    // Kept in the shared core for a journal adapter; not a user-visible error.
+                    break;
+            }
+        }
+    }
+
+    private void writeControlPoint(AncsRequestTokenV2 request, byte[] value) {
+        if (request == null || ancsSession == null || !request.session.equals(ancsSession)
+                || owner == null || owner.gatt == null || pendingGatt != null
+                || ingressFrozen || state == null
+                || state.phase != AndroidCentralRoute.Phase.READY) {
+            if (request != null) {
+                applyAncsEffects(ancs.controlPointWriteResult(request, false));
+            }
+            return;
+        }
+        BluetoothGattCharacteristic control = characteristic(
+                AncsProtocol.SERVICE, AncsProtocol.CONTROL_POINT);
+        if (control == null) {
+            applyAncsEffects(ancs.controlPointWriteResult(request, false));
+            return;
+        }
+        control.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+        control.setValue(value);
+        pendingGatt = new PendingGattOperation(RawOperation.WRITE_CONTROL_POINT,
+                null, request, control, null);
+        boolean started;
+        try {
+            started = owner.gatt.writeCharacteristic(control);
+        } catch (RuntimeException error) {
+            started = false;
+        }
+        if (!started) {
+            pendingGatt = null;
+            applyAncsEffects(ancs.controlPointWriteResult(request, false));
+        }
+    }
+
+    private void transmitControlOnMain(ControlTransmit transmit,
+                                       ControlCompletion completion) {
+        if (!ownsSwitchSource(transmit.owner()) || !ingressFrozen
+                || owner == null || owner.gatt == null || !owner.connected) {
+            completeControlTransmit(transmit, completion,
+                    ControlTransmitResult.TERMINAL_FAILURE, null);
+            return;
+        }
+        if (pendingGatt != null) {
+            completeControlTransmit(transmit, completion,
+                    ControlTransmitResult.RETRYABLE_FAILURE, null);
+            return;
+        }
+        BluetoothGattCharacteristic control = characteristic(
+                IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE,
+                IphoneBleProtocolV2.CONTROL_CHARACTERISTIC);
+        if (control == null || (control.getProperties()
+                & BluetoothGattCharacteristic.PROPERTY_WRITE) == 0) {
+            completeControlTransmit(transmit, completion,
+                    ControlTransmitResult.TERMINAL_FAILURE, null);
+            return;
+        }
+        IphoneRoleControlV2 roleControl = roleControl(transmit);
+        if (roleControl == null) {
+            completeControlTransmit(transmit, completion,
+                    ControlTransmitResult.TERMINAL_FAILURE, null);
+            return;
+        }
+        byte[] frame = roleControl.type == IphoneRoleControlV2.Type.CLOSE_REQUEST
+                ? IphoneBleControlProtocolV2.encodeRoleClose(
+                        roleControl.targetMode, roleControl.switchToken())
+                : IphoneBleControlProtocolV2.encodeRoleCloseAck(
+                        roleControl.targetMode, roleControl.switchToken());
+        control.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+        control.setValue(frame);
+        pendingGatt = new PendingGattOperation(transmit, completion, control);
+        boolean started;
+        try {
+            started = owner.gatt.writeCharacteristic(control);
+        } catch (RuntimeException error) {
+            started = false;
+        }
+        if (!started) {
+            pendingGatt = null;
+            completeControlTransmit(transmit, completion,
+                    ControlTransmitResult.RETRYABLE_FAILURE, roleControl);
+        } else {
+            lastOutboundControl = roleControl;
+        }
+    }
+
+    private void completeControlTransmit(ControlTransmit transmit,
+                                         ControlCompletion completion,
+                                         ControlTransmitResult result,
+                                         IphoneRoleControlV2 roleControl) {
+        main.post(() -> {
+            if (roleControl != null && listener != null) {
+                listener.onRoleControlWriteResult(
+                        roleControl, result == ControlTransmitResult.ACCEPTED);
+            }
+            completion.onComplete(transmit, result);
+        });
+    }
+
+    private void cancelControlRetryOnMain(ControlTransmit transmit) {
+        Runnable timer = controlRetryTimers.remove(transmit);
+        if (timer != null) main.removeCallbacks(timer);
+    }
+
+    private IphoneRoleControlV2 roleControl(ControlTransmit transmit) {
+        IphoneBleMode target;
+        if (transmit.desiredRole()
+                == Role.HELPER_CENTRAL_ANDROID_PERIPHERAL) {
+            target = IphoneBleMode.ANDROID_PERIPHERAL;
+        } else if (transmit.desiredRole()
+                == Role.HELPER_PERIPHERAL_ANDROID_CENTRAL) {
+            target = IphoneBleMode.ANDROID_CENTRAL;
+        } else {
+            return null;
+        }
+        IphoneRoleControlV2.Type type = transmit.frame() == ControlFrame.CLOSE_REQUEST
+                ? IphoneRoleControlV2.Type.CLOSE_REQUEST
+                : IphoneRoleControlV2.Type.CLOSE_ACK;
+        return new IphoneRoleControlV2(
+                type, target, transmit.wireToken().bytes());
+    }
+
+    private void armRequestDeadline(AncsRequestTokenV2 request) {
+        cancelRequestDeadline(request);
+        Runnable timer = () -> {
+            requestTimers.remove(request);
+            applyAncsEffects(ancs.requestDeadline(request));
+        };
+        requestTimers.put(request, timer);
+        main.postDelayed(timer, AncsConsumerCoreV2.REQUEST_TIMEOUT_MS);
+    }
+
+    private void cancelRequestDeadline(AncsRequestTokenV2 request) {
+        Runnable timer = requestTimers.remove(request);
+        if (timer != null) main.removeCallbacks(timer);
+    }
+
+    private void armReplayQuiet(long generation) {
+        cancelReplayQuiet();
+        replayQuietGeneration = generation;
+        replayQuietTimer = () -> {
+            replayQuietTimer = null;
+            if (ancsSession != null) {
+                applyAncsEffects(ancs.replayQuiet(ancsSession, generation));
+            }
+        };
+        main.postDelayed(replayQuietTimer, AncsConsumerCoreV2.REPLAY_QUIET_MS);
+    }
+
+    private void cancelReplayQuiet() {
+        if (replayQuietTimer != null) main.removeCallbacks(replayQuietTimer);
+        replayQuietTimer = null;
+        replayQuietGeneration = 0L;
+    }
+
+    private void poisonCurrentAncsOwner(String reason) {
+        AndroidCentralRoute.State current = state;
+        if (current == null || owner == null) return;
+        apply(AndroidCentralRoute.linkLost(current, owner.ownerToken,
+                "terminal ANCS stream: " + reason));
+    }
+
+    private BluetoothGattCharacteristic characteristic(UUID serviceUuid,
+                                                        UUID characteristicUuid) {
+        if (owner == null || owner.gatt == null) return null;
+        BluetoothGattService service = owner.gatt.getService(serviceUuid);
+        return service == null ? null : service.getCharacteristic(characteristicUuid);
+    }
+
+    private IphoneGattInventoryV2 inventory(BluetoothGatt gatt) {
+        BluetoothGattService helper = gatt.getService(
+                IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE);
+        BluetoothGattCharacteristic proof = helper == null ? null
+                : helper.getCharacteristic(IphoneBleProtocolV2.PEER_PROOF_CHARACTERISTIC);
+        BluetoothGattCharacteristic telemetry = helper == null ? null
+                : helper.getCharacteristic(IphoneBleProtocolV2.TELEMETRY_CHARACTERISTIC);
+        BluetoothGattCharacteristic routeControl = helper == null ? null
+                : helper.getCharacteristic(IphoneBleProtocolV2.CONTROL_CHARACTERISTIC);
+        BluetoothGattService ancsService = gatt.getService(AncsProtocol.SERVICE);
+        BluetoothGattCharacteristic notificationSource = ancsService == null ? null
+                : ancsService.getCharacteristic(AncsProtocol.NOTIFICATION_SOURCE);
+        BluetoothGattCharacteristic controlPoint = ancsService == null ? null
+                : ancsService.getCharacteristic(AncsProtocol.CONTROL_POINT);
+        BluetoothGattCharacteristic dataSource = ancsService == null ? null
+                : ancsService.getCharacteristic(AncsProtocol.DATA_SOURCE);
+        BluetoothGattService generic = gatt.getService(GENERIC_ATTRIBUTE_SERVICE);
+        BluetoothGattCharacteristic serviceChanged = generic == null ? null
+                : generic.getCharacteristic(SERVICE_CHANGED);
+        return new IphoneGattInventoryV2(
+                helper != null,
+                proof != null && readable(proof),
+                telemetry != null && notifiable(telemetry),
+                routeControl != null && writable(routeControl),
+                routeControl != null && indicatable(routeControl),
+                ancsService != null,
+                notificationSource != null && notifiable(notificationSource),
+                controlPoint != null && writable(controlPoint),
+                dataSource != null && notifiable(dataSource),
+                serviceChanged != null && indicatable(serviceChanged));
+    }
+
+    private IphoneBlePeerProof decodePeerProof(byte[] value) {
+        IphoneBleControlProtocolV2.Frame frame = IphoneBleControlProtocolV2.decode(value);
+        if (frame == null || frame.type != IphoneBleControlProtocolV2.Type.PEER_PROOF
+                || frame.mode != IphoneBleMode.ANDROID_CENTRAL || owner == null
+                || !owner.selectedBondAttributed
+                || owner.device.getBondState() != BluetoothDevice.BOND_BONDED) {
+            return null;
+        }
+        UUID installation = IphoneBleControlProtocolV2.installationUuid(frame);
+        if (installation == null) return null;
+        return new IphoneBlePeerProof(IphoneBleProtocolV2.VERSION,
+                IphoneBleMode.ANDROID_CENTRAL,
+                BlePeerRole.IPHONE_HELPER_PERIPHERAL, installation.toString(),
+                frame.telemetrySupported(), frame.ancsSupported(), true);
+    }
+
+    private void maybeCompleteTeardown() {
+        boolean ownsDrain = ProcessGattRegistrationGateV2.ownsDrainReservation(
+                processGateDrainWaiter);
+        if (processGateDrainRetained) return;
+        if (scanRunning || owner != null || state == null) {
+            if (ownsDrain) {
+                ProcessGattRegistrationGateV2.releaseDrainReservation(
+                        processGateDrainWaiter);
+            }
+            return;
+        }
+        if (!ownsDrain) {
+            ProcessGattRegistrationGateV2.whenFreeForDrain(processGateDrainWaiter,
+                    () -> dispatchMain(this::maybeCompleteTeardown));
+            return;
+        }
+        if (radioOffTerminalEpoch != null && state.phase == AndroidCentralRoute.Phase.WAIT_RADIO) {
+            BleRouteEpoch exact = radioOffTerminalEpoch;
+            radioOffTerminalEpoch = null;
+            if (listener != null) listener.onLocalTerminal(mode(), exact);
+            retainOrReleaseProcessDrain();
+            return;
+        }
+        if (deferredStopTerminalEpoch != null) {
+            BleRouteEpoch exact = deferredStopTerminalEpoch;
+            deferredStopTerminalEpoch = null;
+            if (listener != null) listener.onLocalTerminal(mode(), exact);
+            retainOrReleaseProcessDrain();
+            return;
+        }
+        if (state.expected == null) {
+            ProcessGattRegistrationGateV2.releaseDrainReservation(processGateDrainWaiter);
+            return;
+        }
+        if (state.phase == AndroidCentralRoute.Phase.RETRY_DRAINING) {
+            ProcessGattRegistrationGateV2.releaseDrainReservation(processGateDrainWaiter);
+            apply(AndroidCentralRoute.attemptTeardownComplete(state, state.expected));
+        } else if (state.phase == AndroidCentralRoute.Phase.STOPPING) {
+            apply(AndroidCentralRoute.localTeardownComplete(state, state.expected));
+            retainOrReleaseProcessDrain();
+        } else {
+            ProcessGattRegistrationGateV2.releaseDrainReservation(processGateDrainWaiter);
+        }
+    }
+
+    /** Keep zero-owner proof across the coordinator callback until this source slot is disposed. */
+    private void retainOrReleaseProcessDrain() {
+        if (closed) {
+            ProcessGattRegistrationGateV2.releaseDrainReservation(processGateDrainWaiter);
+        } else {
+            processGateDrainRetained = true;
+        }
+    }
+
+    private void cancelAllTimers() {
+        cancelHelperIdentityCommit();
+        if (owner != null && owner.waitingForProcessGate
+                && !ProcessGattRegistrationGateV2.owns(owner)) {
+            cancelWaitingGattOwner(owner);
+        }
+        for (Runnable timer : routeTimers.values()) main.removeCallbacks(timer);
+        routeTimers.clear();
+        for (Runnable timer : requestTimers.values()) main.removeCallbacks(timer);
+        requestTimers.clear();
+        for (Runnable timer : controlRetryTimers.values()) main.removeCallbacks(timer);
+        controlRetryTimers.clear();
+        cancelReplayQuiet();
+    }
+
+    private boolean readyForGattOperation(BleRouteToken token) {
+        return !ingressFrozen && owns(token) && owner.gatt != null && owner.connected;
+    }
+
+    private boolean owns(BleRouteToken token) {
+        return token != null && owner != null && owner.ownerToken.sameOwner(token)
+                && currentEpoch(token);
+    }
+
+    private boolean currentEpoch(BleRouteToken token) {
+        return token != null && token.mode == mode() && state != null
+                && state.epoch.equals(token.epoch);
+    }
+
+    private boolean ownsSwitchSource(Owner source) {
+        if (source != null && source.equals(restorationOwner)) return true;
+        return source != null && state != null
+                && source.role() == Role.HELPER_PERIPHERAL_ANDROID_CENTRAL
+                && state.epoch.processNonce == source.processNonce()
+                && state.epoch.sequence.equals(source.generation().asBigInteger());
+    }
+
+    private boolean radioEnabled() {
+        return adapter != null && adapter.isEnabled();
+    }
+
+    private void publishStatus() {
+        if (listener != null && state != null) listener.onStatus(toStatus(state));
+    }
+
+    private IphoneTransportStatusV2 toStatus(AndroidCentralRoute.State route) {
+        return new IphoneTransportStatusV2(mode(), route.epoch, lifecycle(route.phase),
+                route.selectedSystemBondAddress, route.helperInstallationId,
+                route.detail, route.consecutiveFailures);
+    }
+
+    private static IphoneTransportLifecycle lifecycle(AndroidCentralRoute.Phase phase) {
+        switch (phase) {
+            case WAIT_RADIO: return IphoneTransportLifecycle.WAIT_RADIO;
+            case STARTUP_QUIET:
+            case SCANNING: return IphoneTransportLifecycle.STARTING;
+            case CONNECTING:
+            case WAIT_REASSERT:
+            case WAIT_SYSTEM_CONNECTION: return IphoneTransportLifecycle.CONNECTING;
+            case DISCOVERING:
+            case SUBSCRIBING_SERVICE_CHANGED:
+            case VERIFYING_PEER:
+            case WAIT_ANCS: return IphoneTransportLifecycle.AUTHENTICATING;
+            case NEEDS_FRESH_LINK: return IphoneTransportLifecycle.FAILED;
+            case WAIT_AUTHORIZATION: return IphoneTransportLifecycle.AUTHENTICATING;
+            case SUBSCRIBING_ROUTE_CONTROL: return IphoneTransportLifecycle.SUBSCRIBING;
+            case SUBSCRIBING_NOTIFICATION_SOURCE:
+            case SUBSCRIBING_DATA_SOURCE: return IphoneTransportLifecycle.SUBSCRIBING;
+            case READY: return IphoneTransportLifecycle.READY;
+            case RETRY_DRAINING:
+            case RETRY_WAIT: return IphoneTransportLifecycle.RETRY_WAIT;
+            case STOPPING: return IphoneTransportLifecycle.STOPPING;
+            case STOPPED: return IphoneTransportLifecycle.STOPPED;
+            case FAILED: return IphoneTransportLifecycle.FAILED;
+            default: throw new AssertionError(phase);
+        }
+    }
+
+    private void reportError(IphoneTransportErrorV2.Kind kind, String detail,
+                             boolean retryable) {
+        if (listener == null || state == null) return;
+        listener.onError(new IphoneTransportErrorV2(
+                mode(), state.epoch, kind, detail, retryable));
+    }
+
+    private void assertMain() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            throw new IllegalStateException("Route-A adapter must run on main FIFO");
+        }
+    }
+
+    /** Avoids placing callback body behind a deadline already queued on the main looper. */
+    private void dispatchMain(Runnable callbackBody) {
+        if (Looper.myLooper() == main.getLooper()) {
+            callbackBody.run();
+        } else {
+            main.post(callbackBody);
+        }
+    }
+
+    private boolean isCurrentScanAttempt(ScanAttempt attempt) {
+        return attempt != null && !attempt.retired && scanAttempt == attempt
+                && scanAttemptFence.owns(attempt)
+                && scanner == attempt.exactScanner && scanRunning
+                && scanToken != null && scanToken.equals(attempt.token)
+                && currentEpoch(attempt.token);
+    }
+
+    private void retireScanAttempt(ScanAttempt attempt) {
+        if (attempt != null) attempt.retired = true;
+        scanAttemptFence.retire(attempt);
+        if (scanAttempt == attempt) scanAttempt = null;
+        scanRunning = false;
+        scanToken = null;
+        scanner = null;
+    }
+
+    private void handleScanFailure(ScanAttempt attempt, int errorCode) {
+        if (!isCurrentScanAttempt(attempt)) return;
+        BleRouteToken token = attempt.token;
+        retireScanAttempt(attempt);
+        reportError(IphoneTransportErrorV2.Kind.GATT,
+                "bootstrap scan failed: " + errorCode, true);
+        postRouteDeadline(token);
+        maybeCompleteTeardown();
+    }
+
+    private void handleScanResult(ScanAttempt attempt, ScanResult result) {
+        if (ingressFrozen || !isCurrentScanAttempt(attempt)
+                || result == null || state == null) return;
+        ScanRecord record = result.getScanRecord();
+        if (record == null || record.getServiceUuids() == null
+                || !record.getServiceUuids().contains(
+                        new ParcelUuid(IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE))) {
+            return;
+        }
+        boolean attributed = bondAttribution.isSelectedBond(
+                result.getDevice(), state.selectedSystemBondAddress);
+        IphoneBleAdvertisement advertisement = new IphoneBleAdvertisement(
+                IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE,
+                IphoneBleProtocolV2.VERSION, BlePeerRole.IPHONE_HELPER_PERIPHERAL,
+                true, attributed);
+        matchedBootstrapDevice = result.getDevice();
+        matchedBootstrapAttributed = attributed;
+        BleRouteTransition<AndroidCentralRoute.State> transition =
+                AndroidCentralRoute.advertisement(state, attempt.token, advertisement);
+        if (!transition.accepted) {
+            matchedBootstrapDevice = null;
+            matchedBootstrapAttributed = false;
+            return;
+        }
+        apply(transition);
+    }
+
+    private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
+        @Override public void onConnectionStateChange(BluetoothGatt gatt, int status,
+                                                       int newState) {
+            dispatchMain(() -> handleConnectionState(gatt, status, newState));
+        }
+
+        @Override public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+            dispatchMain(() -> handleServicesDiscovered(gatt, status));
+        }
+
+        @Override public void onCharacteristicRead(BluetoothGatt gatt,
+                                                    BluetoothGattCharacteristic characteristic,
+                                                    int status) {
+            byte[] value = characteristic == null || characteristic.getValue() == null
+                    ? null : characteristic.getValue().clone();
+            dispatchMain(() -> handleCharacteristicRead(gatt, characteristic, value, status));
+        }
+
+        @Override public void onCharacteristicRead(BluetoothGatt gatt,
+                                                    BluetoothGattCharacteristic characteristic,
+                                                    byte[] value, int status) {
+            byte[] exactValue = value == null ? null : value.clone();
+            dispatchMain(() -> handleCharacteristicRead(
+                    gatt, characteristic, exactValue, status));
+        }
+
+        @Override public void onDescriptorWrite(BluetoothGatt gatt,
+                                                 BluetoothGattDescriptor descriptor,
+                                                 int status) {
+            dispatchMain(() -> handleDescriptorWrite(gatt, descriptor, status));
+        }
+
+        @Override public void onCharacteristicWrite(BluetoothGatt gatt,
+                                                     BluetoothGattCharacteristic characteristic,
+                                                     int status) {
+            dispatchMain(() -> handleCharacteristicWrite(gatt, characteristic, status));
+        }
+
+        @Override public void onCharacteristicChanged(BluetoothGatt gatt,
+                                                       BluetoothGattCharacteristic characteristic) {
+            byte[] value = characteristic == null || characteristic.getValue() == null
+                    ? null : characteristic.getValue().clone();
+            dispatchMain(() -> handleCharacteristicChanged(gatt, characteristic, value));
+        }
+
+        @Override public void onCharacteristicChanged(BluetoothGatt gatt,
+                                                       BluetoothGattCharacteristic characteristic,
+                                                       byte[] value) {
+            byte[] exactValue = value == null ? null : value.clone();
+            dispatchMain(() -> handleCharacteristicChanged(
+                    gatt, characteristic, exactValue));
+        }
+    };
+
+    private void handleConnectionState(BluetoothGatt callbackGatt, int status, int newState) {
+        if (owner == null || owner.gatt != callbackGatt) return;
+        GattOwner exact = owner;
+        owner.callbackObserved = true;
+        owner.connected = newState == BluetoothProfile.STATE_CONNECTED;
+        if (!ProcessGattRegistrationGateV2.owns(exact)) {
+            // A process-wide radio reset already proved the old registration terminal.
+            owner = null;
+            try {
+                callbackGatt.close();
+            } catch (RuntimeException ignored) {
+                // The reset fence, not this late callback, is terminal evidence.
+            }
+            maybeCompleteTeardown();
+            return;
+        }
+        if (owner.closing) {
+            if (owner.quarantinedBeforeRegistration
+                    || newState == BluetoothProfile.STATE_DISCONNECTED) {
+                finishGattClose();
+            } else {
+                retireRegisteredGattOwner(exact);
+            }
+            return;
+        }
+        if (ingressFrozen) return;
+        AndroidCentralRoute.State current = state;
+        if (current == null) return;
+        if (newState == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
+            apply(AndroidCentralRoute.connected(current, owner.ownerToken, true));
+        } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+            if (current.phase == AndroidCentralRoute.Phase.CONNECTING
+                    || current.phase == AndroidCentralRoute.Phase.WAIT_REASSERT
+                    || current.phase == AndroidCentralRoute.Phase.WAIT_SYSTEM_CONNECTION) {
+                apply(AndroidCentralRoute.connected(current, owner.ownerToken, false));
+            } else {
+                apply(AndroidCentralRoute.linkLost(current, owner.ownerToken,
+                        "status=" + status));
+            }
+        }
+    }
+
+    private void handleServicesDiscovered(BluetoothGatt callbackGatt, int status) {
+        if (ingressFrozen) return;
+        PendingGattOperation pending = pendingGatt;
+        if (owner == null || owner.gatt != callbackGatt || pending == null
+                || pending.type != RawOperation.DISCOVER) return;
+        pendingGatt = null;
+        IphoneGattInventoryV2 discovered = status == BluetoothGatt.GATT_SUCCESS
+                ? inventory(callbackGatt) : null;
+        AndroidCentralRoute.State current = state;
+        if (current != null) {
+            apply(AndroidCentralRoute.servicesDiscovered(
+                    current, pending.routeToken, discovered));
+        }
+    }
+
+    private void handleCharacteristicRead(BluetoothGatt callbackGatt,
+                                          BluetoothGattCharacteristic characteristic,
+                                          byte[] value, int status) {
+        if (ingressFrozen) return;
+        PendingGattOperation pending = pendingGatt;
+        if (owner == null || owner.gatt != callbackGatt || pending == null
+                || pending.type != RawOperation.READ_PEER_PROOF
+                || pending.characteristic != characteristic) return;
+        pendingGatt = null;
+        GattResultV2 result = GattResultV2.fromAndroidStatus(status);
+        IphoneBlePeerProof proof = result == GattResultV2.SUCCESS
+                ? decodePeerProof(value) : null;
+        AndroidCentralRoute.State current = state;
+        if (current != null) {
+            BleRouteTransition<AndroidCentralRoute.State> transition =
+                    AndroidCentralRoute.peerProof(
+                            current, pending.routeToken, proof, result);
+            boolean newlyLearned = transition.accepted && proof != null
+                    && current.helperInstallationId.isEmpty()
+                    && !transition.state.helperInstallationId.isEmpty();
+            if (newlyLearned) {
+                beginHelperIdentityCommit(pending.routeToken, proof, transition);
+            } else {
+                apply(transition);
+            }
+        }
+    }
+
+    private void handleDescriptorWrite(BluetoothGatt callbackGatt,
+                                       BluetoothGattDescriptor descriptor, int status) {
+        if (ingressFrozen) return;
+        PendingGattOperation pending = pendingGatt;
+        if (owner == null || owner.gatt != callbackGatt || pending == null
+                || pending.descriptor != descriptor) return;
+        if (pending.type != RawOperation.SUBSCRIBE_ROUTE_CONTROL
+                && pending.type != RawOperation.SUBSCRIBE_SERVICE_CHANGED
+                && pending.type != RawOperation.SUBSCRIBE_NOTIFICATION_SOURCE
+                && pending.type != RawOperation.SUBSCRIBE_DATA_SOURCE) return;
+        pendingGatt = null;
+        completeSubscription(pending.routeToken, pending.type,
+                GattResultV2.fromAndroidStatus(status));
+    }
+
+    private void handleCharacteristicWrite(BluetoothGatt callbackGatt,
+                                            BluetoothGattCharacteristic characteristic,
+                                            int status) {
+        PendingGattOperation pending = pendingGatt;
+        if (owner == null || owner.gatt != callbackGatt || pending == null
+                || pending.characteristic != characteristic) return;
+        if (ingressFrozen && pending.type != RawOperation.WRITE_ROUTE_CONTROL) {
+            if (pending.type == RawOperation.WRITE_CONTROL_POINT) pendingGatt = null;
+            return;
+        }
+        pendingGatt = null;
+        if (pending.type == RawOperation.WRITE_CONTROL_POINT) {
+            applyAncsEffects(ancs.controlPointWriteResult(
+                    pending.ancsRequest, status == BluetoothGatt.GATT_SUCCESS));
+        } else if (pending.type == RawOperation.WRITE_ROUTE_CONTROL) {
+            IphoneRoleControlV2 control = roleControl(pending.controlTransmit);
+            completeControlTransmit(pending.controlTransmit, pending.controlCompletion,
+                    status == BluetoothGatt.GATT_SUCCESS
+                            ? ControlTransmitResult.ACCEPTED
+                            : owner.connected
+                                ? ControlTransmitResult.RETRYABLE_FAILURE
+                                : ControlTransmitResult.TERMINAL_FAILURE,
+                    control);
+        }
+    }
+
+    private void handleCharacteristicChanged(BluetoothGatt callbackGatt,
+                                              BluetoothGattCharacteristic characteristic,
+                                              byte[] value) {
+        if (owner == null || owner.gatt != callbackGatt || characteristic == null
+                || state == null) return;
+        UUID uuid = characteristic.getUuid();
+        if (SERVICE_CHANGED.equals(uuid)) {
+            if (ingressFrozen) return;
+            pendingGatt = null;
+            apply(AndroidCentralRoute.serviceChanged(state, owner.ownerToken));
+        } else if (AncsProtocol.NOTIFICATION_SOURCE.equals(uuid) && ancsSession != null) {
+            if (ingressFrozen) return;
+            applyAncsEffects(ancs.notificationSource(
+                    ancsSession, value, android.os.SystemClock.elapsedRealtime()));
+        } else if (AncsProtocol.DATA_SOURCE.equals(uuid) && ancsSession != null) {
+            if (ingressFrozen) return;
+            applyAncsEffects(ancs.dataSource(ancsSession, value));
+        } else if (IphoneBleProtocolV2.CONTROL_CHARACTERISTIC.equals(uuid)) {
+            handleInboundRoleControl(value);
+        }
+    }
+
+    private void handleInboundRoleControl(byte[] value) {
+        IphoneBleControlProtocolV2.Frame frame =
+                IphoneBleControlProtocolV2.decode(value);
+        if (frame == null || frame.type == IphoneBleControlProtocolV2.Type.PEER_PROOF
+                || frame.mode != IphoneBleMode.ANDROID_PERIPHERAL
+                || listener == null) return;
+        IphoneRoleControlV2.Type type =
+                frame.type == IphoneBleControlProtocolV2.Type.ROLE_CLOSE
+                        ? IphoneRoleControlV2.Type.CLOSE_REQUEST
+                        : IphoneRoleControlV2.Type.CLOSE_ACK;
+        IphoneRoleControlV2 control = new IphoneRoleControlV2(
+                type, frame.mode, frame.payload());
+        if (ingressFrozen && !acceptsFrozenControl(control)) return;
+        if (control.type == IphoneRoleControlV2.Type.CLOSE_REQUEST
+                && lastInboundCloseRequest == null) {
+            lastInboundCloseRequest = control;
+        }
+        listener.onRoleControl(control);
+    }
+
+    private boolean acceptsFrozenControl(IphoneRoleControlV2 control) {
+        if (control.type == IphoneRoleControlV2.Type.CLOSE_REQUEST) {
+            return lastInboundCloseRequest != null
+                    && lastInboundCloseRequest.sameTransaction(control);
+        }
+        return lastOutboundControl != null
+                && lastOutboundControl.type == IphoneRoleControlV2.Type.CLOSE_REQUEST
+                && lastOutboundControl.sameTransaction(control);
+    }
+
+    private static boolean readable(BluetoothGattCharacteristic characteristic) {
+        return (characteristic.getProperties()
+                & BluetoothGattCharacteristic.PROPERTY_READ) != 0;
+    }
+
+    private static boolean writable(BluetoothGattCharacteristic characteristic) {
+        return (characteristic.getProperties()
+                & (BluetoothGattCharacteristic.PROPERTY_WRITE
+                    | BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE)) != 0;
+    }
+
+    private static boolean notifiable(BluetoothGattCharacteristic characteristic) {
+        return (characteristic.getProperties()
+                & BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0;
+    }
+
+    private static boolean indicatable(BluetoothGattCharacteristic characteristic) {
+        return (characteristic.getProperties()
+                & BluetoothGattCharacteristic.PROPERTY_INDICATE) != 0;
+    }
+}

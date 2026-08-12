@@ -11,24 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-/** Regression contract: charging and network generation are live helper-only fields. */
+/** Retained presentation coverage for fresh phone network and charging values. */
 public final class Ha1150HelperTelemetryContractTest {
-    @Test public void controllerNeverPublishesRetainedOrHfpNetworkTypeAndCharging() throws Exception {
-        String source = source("phone/PhoneConnectorController.java");
-        assertTrue(source.contains("batteryChargingSource = \"iphone_helper\""));
-        assertTrue(source.contains("String effectiveNetworkType = helperNetworkUpdatedAtElapsed"));
-        assertTrue(source.contains("Boolean effectiveCharging = batteryCharging;"));
-        assertTrue(source.contains("String savedNetworkType = \"\";"));
-        assertTrue(source.contains("Boolean savedCharging = null;"));
-        assertFalse(source.contains("batteryChargingSource = \"hfp_vendor\""));
-        assertFalse(source.contains("batteryChargingSource = \"android_metadata\""));
-        assertFalse(source.contains("retainedCharging ? retained.batteryCharging"));
-        assertFalse(source.contains("retainedNetworkType ? retained.networkType"));
-        assertTrue(source.contains("boolean transportNeeded()"));
-        assertTrue(source.contains("return enabled;"));
-        assertTrue(source.contains("boolean ancsNeeded()"));
-    }
-
     @Test public void bothNetworkPresentationsAndChargingBoltUseFreshResources() throws Exception {
         String widget = source("WidgetService.java");
         String prefs = source("Preferences.java");
