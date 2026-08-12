@@ -152,15 +152,15 @@ public final class HelperTelemetrySource {
             $0 == CTRadioAccessTechnologyWCDMA ||
                 $0 == CTRadioAccessTechnologyHSDPA ||
                 $0 == CTRadioAccessTechnologyHSUPA ||
-                $0 == CTRadioAccessTechnologyCDMA1xEVDORev0 ||
-                $0 == CTRadioAccessTechnologyCDMA1xEVDORevA ||
-                $0 == CTRadioAccessTechnologyCDMA1xEVDORevB ||
-                $0 == CTRadioAccessTechnologyeHRPD
+                $0 == "CTRadioAccessTechnologyCDMA1xEVDORev0" ||
+                $0 == "CTRadioAccessTechnologyCDMA1xEVDORevA" ||
+                $0 == "CTRadioAccessTechnologyCDMA1xEVDORevB" ||
+                $0 == "CTRadioAccessTechnologyeHRPD"
         }) { return .cellular3G }
         if technologies.contains(where: {
             $0 == CTRadioAccessTechnologyGPRS ||
                 $0 == CTRadioAccessTechnologyEdge ||
-                $0 == CTRadioAccessTechnologyCDMA1x
+                $0 == "CTRadioAccessTechnologyCDMA1x"
         }) { return .cellular2G }
         return .unknown
     }
