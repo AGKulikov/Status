@@ -321,6 +321,7 @@ public class WidgetService extends Service {
     private boolean automaticLifecycleQuiet;
     private boolean automaticSurfaceReconcilePending;
     private int automaticLifecycleResumeGeneration;
+    private volatile boolean destroyed;
     private final Runnable automaticLifecycleQuietTeardown = () -> {
         if (destroyed || !automaticLifecycleQuiet) return;
         runIntegrationStep("quiet phone", () -> {
@@ -389,7 +390,6 @@ public class WidgetService extends Service {
         // status row. HA1048 did that for every packet even when no status brick had changed.
         if (affectsStatusRow) applyBrickVisibility(currentBrickSet());
     };
-    private volatile boolean destroyed;
     private final AtomicBoolean crossSourceRuleRefreshScheduled = new AtomicBoolean();
     private final ConnectorValueRegistry.Listener crossSourceRuleListener =
             changedValues -> scheduleCrossSourceRuleRefresh();

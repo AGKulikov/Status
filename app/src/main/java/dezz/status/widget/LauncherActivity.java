@@ -491,7 +491,7 @@ public final class LauncherActivity extends AppCompatActivity {
                 recorded = true;
                 launcherFirstDrawCompleted = true;
                 StartupPerformanceTrace.mark("launcher_first_draw");
-                StatusWidgetApplication.notifyFirstUsefulSurface(this);
+                StatusWidgetApplication.notifyFirstUsefulSurface(LauncherActivity.this);
                 root.post(() -> {
                     if (root.getViewTreeObserver().isAlive()) {
                         root.getViewTreeObserver().removeOnDrawListener(this);
