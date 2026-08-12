@@ -55,6 +55,7 @@ import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Role;
 import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Sequence;
 import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.State;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -769,7 +770,7 @@ public final class BleRoleSwitchReducerTest {
                         + "ble-role-switch-transition-vectors.json"
         );
         assertTrue(Files.isRegularFile(fixture));
-        String json = Files.readString(fixture);
+        String json = new String(Files.readAllBytes(fixture), StandardCharsets.UTF_8);
         assertTrue(json.contains("\"schema\": \"ble-role-switch/v2\""));
         assertTrue(json.contains("\"confirmed_ack_happy_path\""));
         assertTrue(json.contains("\"radio_loss_requires_separate_zero_owner_proof\""));

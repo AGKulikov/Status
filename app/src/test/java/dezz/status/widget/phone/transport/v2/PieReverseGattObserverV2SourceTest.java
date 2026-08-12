@@ -71,7 +71,7 @@ public final class PieReverseGattObserverV2SourceTest {
     }
 
     private static String source() throws Exception {
-        return Files.readString(SOURCE, StandardCharsets.UTF_8);
+        return new String(Files.readAllBytes(SOURCE), StandardCharsets.UTF_8);
     }
 
     private static int count(String value, String needle) {

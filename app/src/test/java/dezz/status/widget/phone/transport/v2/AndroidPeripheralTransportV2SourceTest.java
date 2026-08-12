@@ -280,7 +280,7 @@ public final class AndroidPeripheralTransportV2SourceTest {
     }
 
     private static String source() throws Exception {
-        return Files.readString(SOURCE, StandardCharsets.UTF_8);
+        return new String(Files.readAllBytes(SOURCE), StandardCharsets.UTF_8);
     }
 
     private static String between(String value, String start, String end) {

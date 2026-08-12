@@ -103,7 +103,7 @@ public final class IphoneDualRuntimeControllerIntegrationContractTest {
         if (!Files.exists(path) && root.getParent() != null) {
             path = root.getParent().resolve(relative);
         }
-        return Files.readString(path, StandardCharsets.UTF_8);
+        return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
     }
 
     private static String between(String source, String start, String end) {
