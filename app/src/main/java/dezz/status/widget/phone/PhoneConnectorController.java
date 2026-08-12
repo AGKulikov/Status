@@ -386,7 +386,6 @@ public final class PhoneConnectorController {
                         "ручное чистое переподключение без сброса пары");
                 String configuredAddress = config == null ? "" : config.deviceAddress;
                 closeAncsTransport();
-                cancelGattReconnect();
                 cancelStockConnectionRequest();
                 gattConnected = false;
                 persistCurrentTelemetry();
@@ -1085,7 +1084,6 @@ public final class PhoneConnectorController {
     private void ensureGatt(long token) {
         if (!isCurrent(token) || selectedDevice == null
                 || stockConnectionRequestInProgress) return;
-        cancelGattReconnect();
         Config current = config;
         if (current == null) return;
         if (!current.transportNeeded()) {

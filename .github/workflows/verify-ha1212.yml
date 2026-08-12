@@ -83,7 +83,7 @@ jobs:
           test ! -e app/src/main/java/dezz/status/widget/phone/transport/AncsRecoveryPolicy.java
           test ! -e app/src/main/java/dezz/status/widget/phone/transport/ManagedIncomingPublicationPolicy.java
           test ! -e app/src/main/java/dezz/status/widget/phone/transport/publicgatt
-          if rg -n \
+          if grep -REn \
             'IphoneAncsTransport|refreshGattCache|iPhone_ANCS|Geely_ANCS|phoneAncsDeviceAddress' \
             app/src/main/java/dezz/status/widget/phone/PhoneConnectorController.java \
             app/src/main/java/dezz/status/widget/PhoneConnectorSettingsActivity.java \
