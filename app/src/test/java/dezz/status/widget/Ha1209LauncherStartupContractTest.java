@@ -44,9 +44,19 @@ public final class Ha1209LauncherStartupContractTest {
         String launcher = javaSource("LauncherActivity.java");
         String layout = between(launcher, "workspace.addOnLayoutChangeListener",
                 "// HA1048 inflated");
-        assertTrue(layout.indexOf("syncLauncherBackdrops();") >= 0);
-        assertTrue(layout.indexOf("syncLauncherBackdrops();")
+        assertTrue(layout.indexOf("scheduleInitialLauncherBackdrops();") >= 0);
+        assertFalse(layout.contains("syncLauncherBackdrops();"));
+        assertTrue(layout.indexOf("scheduleInitialLauncherBackdrops();")
                 < layout.indexOf("initializePanels();"));
+
+        String backdropLoad = between(launcher,
+                "private void scheduleInitialLauncherBackdrops()",
+                "/** Keeps every decorative HOME surface");
+        assertTrue(backdropLoad.contains("launcherWorker.execute"));
+        assertTrue(backdropLoad.contains("loaded.load(width, height)"));
+        assertTrue(backdropLoad.contains("launcherFirstDrawCompleted"));
+        assertTrue(backdropLoad.indexOf("navigationUiHandler.post")
+                < backdropLoad.indexOf("syncLauncherBackdrops();"));
 
         String favorites = between(launcher, "private void refreshFavorites()",
                 "private void launchApp");
@@ -112,6 +122,30 @@ public final class Ha1209LauncherStartupContractTest {
         assertTrue(fallback.contains("ACTION_QUICKBOOT_POWERON"));
         assertTrue(fallback.contains("KEY_NOT_BEFORE"));
         assertTrue(fallback.contains("StartupWorkCoordinator.hudFallbackDelayMillis()"));
+    }
+
+    @Test public void visibleHomeUsesExactHostHandoffButHiddenHomeKeepsAlarmOwnership()
+            throws Exception {
+        String launcher = javaSource("LauncherActivity.java");
+        String handoff = between(launcher,
+                "private final Runnable visibleIntegrationHostHandoff",
+                "private final Runnable allowPanelInitialization");
+        assertTrue(handoff.contains("pendingIntegrationHostDelayMillis"));
+        assertTrue(handoff.contains("dispatchPendingIntegrationHostIfDue"));
+        String stop = between(launcher, "protected void onStop()",
+                "private void scheduleDeferredLauncherRuntimeStart");
+        assertTrue(stop.contains("removeCallbacks(visibleIntegrationHostHandoff)"));
+
+        String coordinator = javaSource("StartupWorkCoordinator.java");
+        String dispatch = between(coordinator,
+                "static boolean dispatchPendingIntegrationHostIfDue",
+                "/** Automatic Settings/runtime reconciliation");
+        assertTrue(dispatch.contains("KEY_HOST_PHASE_PENDING"));
+        assertTrue(dispatch.contains("KEY_HOST_PHASE_GENERATION"));
+        assertTrue(dispatch.contains("isUserUnlocked(app)"));
+        assertTrue(dispatch.contains("new Intent(app, BootReceiver.class)"));
+        assertTrue(dispatch.contains("app.sendBroadcast(phase)"));
+        assertTrue(dispatch.contains("durable AlarmManager copy is still pending"));
     }
 
     @Test public void connectorsUnlockAndQuickBootSurfacesStaySerialized() throws Exception {
@@ -216,16 +250,16 @@ public final class Ha1209LauncherStartupContractTest {
 
     @Test public void releaseIdentityAndWorkflowAdvanceTogether() throws Exception {
         String build = rootProject("build.gradle");
-        String workflow = project(".github/workflows/verify-ha1212.yml");
-        String manifest = project("release-manifests/HA1212.md");
-        assertTrue(build.contains("return 'v2.8.2-ha1212'"));
-        assertTrue(workflow.contains("name: Verify HA1212 ANCS transport v2 candidate"));
-        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1212'"));
-        assertTrue(workflow.contains("VERSION_CODE: '208021212'"));
+        String workflow = project(".github/workflows/verify-ha1213.yml");
+        String manifest = project("release-manifests/HA1213.md");
+        assertTrue(build.contains("return 'v2.8.2-ha1213'"));
+        assertTrue(workflow.contains("name: Verify HA1213 balanced startup candidate"));
+        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1213'"));
+        assertTrue(workflow.contains("VERSION_CODE: '208021213'"));
         assertTrue(workflow.contains("StartupLoadPolicyTest"));
         assertTrue(workflow.contains("LauncherActionsPanelEditorContractTest"));
         assertTrue(manifest.contains("ru.natro.statuswidget"));
-        assertTrue(manifest.contains("208021212"));
+        assertTrue(manifest.contains("208021213"));
     }
 
     private static String javaSource(String relative) throws Exception {

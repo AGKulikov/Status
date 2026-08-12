@@ -51,13 +51,20 @@ public class StatusWidgetApplication extends Application {
     public static final String CRASH_FILE = "last_crash.txt";
     /** A HUD renderer failure is diagnostic only and must not masquerade as a main-process crash. */
     public static final String HUD_CRASH_FILE = "last_hud_crash.txt";
+    /** Keeps diagnostics/vendor policy out of the surface and FGS first-frame burst. */
+    private static final long SURFACE_RUNTIME_GRACE_MS = 1_500L;
+    private final Handler main = new Handler(Looper.getMainLooper());
     private boolean hudProcess;
     private boolean unlockedRuntimeInitialized;
+    private boolean firstUsefulSurfaceSeen;
+    private long firstUsefulSurfaceElapsed;
+    private final Runnable unlockedRuntimeRetry = this::attemptSurfaceOwnedInitialization;
 
     @Override
     public void onCreate() {
         super.onCreate();
         hudProcess = AppProcessPolicy.isHudProcess();
+        StartupPerformanceTrace.beginProcess(AppProcessPolicy.currentProcessLabel());
         // LOCKED_BOOT exists only to record the quiet boundary. Avoid preference migrations,
         // recorder recovery, privileged shell discovery and vendor status-bar calls while OEM
         // packages are still starting; BOOT/USER_UNLOCKED completes this idempotently.
@@ -67,20 +74,9 @@ public class StatusWidgetApplication extends Application {
         // compatibility for :hud, not a transactional cross-process state machine.
         if (!hudProcess) StartupWorkCoordinator.primeEarlyBootQuiet(this);
         if (!StartupWorkCoordinator.isUserUnlocked(this)) return;
-        long initializationDelay = StartupWorkCoordinator.startupInitializationDelayMillis(this);
-        if (hudProcess) {
-            // :hud is a read-only coordinator participant. A local settle prevents Preferences,
-            // display and vendor setup from racing a high-uptime QuickBoot before the main-process
-            // lifecycle broadcast establishes its shared generation.
-            initializationDelay = Math.max(initializationDelay,
-                    StartupLoadPolicy.MAIN_PROCESS_SETTLE_MS);
-        }
-        if (initializationDelay > 0L) {
-            new Handler(Looper.getMainLooper()).postDelayed(
-                    this::ensureUnlockedRuntimeInitialized, initializationDelay + 50L);
-            return;
-        }
-        ensureUnlockedRuntimeInitialized();
+        // Full diagnostics and the ECARX status-bar Binder are surface work. Launcher/settings
+        // notify after their first traversal; a headless exact host notifies after startForeground.
+        // A timer here could overtake Choreographer on a slow boot and jank another app's startup.
     }
 
     public synchronized void ensureUnlockedRuntimeInitialized() {
@@ -113,6 +109,45 @@ public class StatusWidgetApplication extends Application {
         if (app instanceof StatusWidgetApplication) {
             ((StatusWidgetApplication) app).ensureUnlockedRuntimeInitialized();
         }
+    }
+
+    /** Begins non-essential process facilities only after a useful app surface already rendered. */
+    public static void notifyFirstUsefulSurface(@NonNull Context context) {
+        Context app = context.getApplicationContext();
+        if (app instanceof StatusWidgetApplication) {
+            StatusWidgetApplication application = (StatusWidgetApplication) app;
+            application.main.post(() -> {
+                if (!application.firstUsefulSurfaceSeen) {
+                    application.firstUsefulSurfaceSeen = true;
+                    application.firstUsefulSurfaceElapsed = android.os.SystemClock.elapsedRealtime();
+                }
+                application.attemptSurfaceOwnedInitialization();
+            });
+        }
+    }
+
+    /** Rechecks a previously rendered surface after the exact persisted host barrier opens. */
+    public static void resumeSurfaceOwnedInitialization(@NonNull Context context) {
+        Context app = context.getApplicationContext();
+        if (app instanceof StatusWidgetApplication) {
+            StatusWidgetApplication application = (StatusWidgetApplication) app;
+            application.main.post(application::attemptSurfaceOwnedInitialization);
+        }
+    }
+
+    private void attemptSurfaceOwnedInitialization() {
+        main.removeCallbacks(unlockedRuntimeRetry);
+        if (!firstUsefulSurfaceSeen || unlockedRuntimeInitialized) return;
+        long surfaceDelay = Math.max(0L, firstUsefulSurfaceElapsed
+                + SURFACE_RUNTIME_GRACE_MS - android.os.SystemClock.elapsedRealtime());
+        long coordinatorDelay = StartupWorkCoordinator.startupInitializationDelayMillis(this);
+        long delay = Math.max(surfaceDelay, coordinatorDelay);
+        if (delay > 0L) {
+            main.postDelayed(unlockedRuntimeRetry, delay + 50L);
+            return;
+        }
+        ensureUnlockedRuntimeInitialized();
+        if (unlockedRuntimeInitialized) StartupPerformanceTrace.mark("application_runtime_ready");
     }
 
     private void installCrashHandler(boolean hudProcess) {

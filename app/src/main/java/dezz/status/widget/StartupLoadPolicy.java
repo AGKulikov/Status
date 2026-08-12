@@ -12,19 +12,25 @@ final class StartupLoadPolicy {
         OTHER
     }
 
-    /** Covers HOME/Application starts which race ahead of BOOT_COMPLETED on Android 9. */
-    static final long EARLY_BOOT_QUIET_UNTIL_ELAPSED_MS = 12_000L;
-    /** Gives a high-uptime QuickBoot broadcast time to arrive before a cold main process works. */
-    static final long MAIN_PROCESS_SETTLE_MS = 2_000L;
-    static final long PROCESS_SETTLE_RUNTIME_AFTER_MS = 1_000L;
-    static final long LOCKED_BOOT_QUIET_MS = 12_000L;
-    static final long BOOT_COMPLETED_QUIET_MS = 10_000L;
-    static final long USER_UNLOCKED_QUIET_MS = 3_000L;
-    static final long PACKAGE_REPLACED_QUIET_MS = 2_000L;
+    /**
+     * Cold HOME gets a bounded quiet period measured from kernel start, not from whichever boot
+     * broadcast happens to arrive last. This keeps the first useful surface out of SystemServer's
+     * initial burst without adding another fixed ten seconds on a slow ECARX boot.
+     */
+    static final long COLD_BOOT_SURFACE_TARGET_ELAPSED_MS = 4_500L;
+    /** Coalesces a late BOOT_COMPLETED edge without penalising an already-settled system. */
+    static final long BOOT_EVENT_SETTLE_MS = 1_000L;
+    /** QuickBoot keeps kernel uptime, so it needs its own short relative settle window. */
+    static final long QUICK_BOOT_QUIET_MS = 1_500L;
+    /** Normal process recovery should be perceptible as a restart, not as a blank two-second UI. */
+    static final long MAIN_PROCESS_SETTLE_MS = 400L;
+    static final long PROCESS_SETTLE_RUNTIME_AFTER_MS = 750L;
+    static final long USER_UNLOCKED_QUIET_MS = 750L;
+    static final long PACKAGE_REPLACED_QUIET_MS = 750L;
     /** Host stages finish first; Driver/HUD, Climate, media and fallback occupy separate lanes. */
-    static final long LAUNCHER_PANELS_AFTER_HOST_MS = 4_500L;
-    static final long LAUNCHER_RUNTIME_AFTER_HOST_MS = 6_500L;
-    static final long CLIMATE_AFTER_HOST_MS = 10_000L;
+    static final long LAUNCHER_PANELS_AFTER_HOST_MS = 750L;
+    static final long LAUNCHER_RUNTIME_AFTER_HOST_MS = 2_500L;
+    static final long CLIMATE_AFTER_HOST_MS = 7_500L;
     static final long MEDIA_AUTO_RESUME_MIN_MS = 26_000L;
     static final long HUD_FALLBACK_DELAY_MS = 32_000L;
     static final long MAX_VALID_QUIET_MS = 45_000L;
@@ -33,13 +39,14 @@ final class StartupLoadPolicy {
 
     private StartupLoadPolicy() {}
 
-    static long quietWindowMillis(Trigger trigger) {
+    static long quietWindowMillis(Trigger trigger, long elapsedRealtimeMillis) {
         switch (trigger) {
             case LOCKED_BOOT:
-                return LOCKED_BOOT_QUIET_MS;
             case BOOT_COMPLETED:
+                return Math.max(BOOT_EVENT_SETTLE_MS,
+                        earlyBootQuietMillis(elapsedRealtimeMillis));
             case QUICK_BOOT:
-                return BOOT_COMPLETED_QUIET_MS;
+                return QUICK_BOOT_QUIET_MS;
             case USER_UNLOCKED:
                 return USER_UNLOCKED_QUIET_MS;
             case PACKAGE_REPLACED:
@@ -49,11 +56,22 @@ final class StartupLoadPolicy {
         }
     }
 
+    /** Convenience overload retained for pure policy callers that model a kernel-start event. */
+    static long quietWindowMillis(Trigger trigger) {
+        return quietWindowMillis(trigger, 0L);
+    }
+
     static boolean schedulesIntegrationHost(Trigger trigger) {
         return trigger == Trigger.BOOT_COMPLETED
                 || trigger == Trigger.QUICK_BOOT
                 || trigger == Trigger.USER_UNLOCKED
                 || trigger == Trigger.PACKAGE_REPLACED;
+    }
+
+    static boolean isBootLifecycle(Trigger trigger) {
+        return trigger == Trigger.LOCKED_BOOT
+                || trigger == Trigger.BOOT_COMPLETED
+                || trigger == Trigger.QUICK_BOOT;
     }
 
     static boolean schedulesClimate(Trigger trigger) {
@@ -89,9 +107,9 @@ final class StartupLoadPolicy {
 
     static long earlyBootQuietMillis(long elapsedRealtimeMillis) {
         if (elapsedRealtimeMillis < 0L
-                || elapsedRealtimeMillis >= EARLY_BOOT_QUIET_UNTIL_ELAPSED_MS) {
+                || elapsedRealtimeMillis >= COLD_BOOT_SURFACE_TARGET_ELAPSED_MS) {
             return 0L;
         }
-        return EARLY_BOOT_QUIET_UNTIL_ELAPSED_MS - elapsedRealtimeMillis;
+        return COLD_BOOT_SURFACE_TARGET_ELAPSED_MS - elapsedRealtimeMillis;
     }
 }

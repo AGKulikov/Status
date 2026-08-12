@@ -46,9 +46,9 @@ public class BootReceiver extends BroadcastReceiver {
             boolean completed = false;
             try {
                 if (phase == StartupWorkCoordinator.PHASE_INTEGRATION_HOST) {
+                    StartupPerformanceTrace.mark("host_phase_received");
                     StartupWorkCoordinator.openInitializationBarrierForHost(
                             context, generation);
-                    StatusWidgetApplication.ensureUnlockedRuntimeInitialized(context);
                     boolean credentialRefresh =
                             StartupWorkCoordinator.hasCredentialRefreshPending(
                                     context, generation);
@@ -119,14 +119,26 @@ public class BootReceiver extends BroadcastReceiver {
                 if (forceReconfigure) {
                     current.reconfigureCredentialBackedIntegrationsAfterUnlock();
                 }
-                if (reconcileSurfaces) current.reconcileAutomaticLifecycleSurfaces();
-                current.resumeAutomaticLifecycleIntegrationsAfterQuiet();
+                if (reconcileSurfaces) {
+                    current.reconcileAutomaticLifecycleSurfaces();
+                } else {
+                    current.resumeAutomaticLifecycleIntegrationsAfterQuiet();
+                }
+                // The foreground host is already promoted, so deferred Application diagnostics
+                // can safely resume after its exact startup barrier opened.
+                StatusWidgetApplication.resumeSurfaceOwnedInitialization(context);
                 return true;
             }
             // A fresh host applies current credentials and reconstructs its automatic surfaces
             // during its own staged initialization. Its bounded starter retry owns transient FGS
             // rejection, so these request flags can be acknowledged once the attempt is accepted.
-            WidgetServiceStarter.startIfNeededWithRetry(context);
+            boolean startAccepted = WidgetServiceStarter.startIfNeededWithRetry(context);
+            // A newly accepted FGS owns the next notification only after onCreate/startForeground.
+            // If no host is required, let an already-rendered Launcher/Settings surface complete
+            // its deferred diagnostics without waiting for a service that will never exist.
+            if (!startAccepted) {
+                StatusWidgetApplication.resumeSurfaceOwnedInitialization(context);
+            }
             return true;
         } catch (RuntimeException failure) {
             Log.e(TAG, "Could not restore status widget", failure);

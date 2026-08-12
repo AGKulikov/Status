@@ -65,7 +65,7 @@ public final class Ha1178MediaTuningAndTrunkContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1178() throws Exception {
-        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1212'"));
+        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1213'"));
     }
 
     private static String source(String relative) throws Exception {

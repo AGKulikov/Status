@@ -128,6 +128,11 @@ public final class IntentScenarioController {
         enabledById = Collections.emptyMap();
     }
 
+    /** Main-thread diagnostic used to release a temporary explicit-command foreground host. */
+    public boolean hasPendingExecutions() {
+        return !destroyed && !executions.isEmpty();
+    }
+
     /**
      * A package-scoped implicit Intent or an explicit component is accepted. Unscoped broadcasts
      * are deliberately ignored because any installed application could otherwise discover and

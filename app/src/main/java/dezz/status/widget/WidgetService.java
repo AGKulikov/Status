@@ -100,8 +100,12 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
@@ -219,6 +223,8 @@ public class WidgetService extends Service {
 
     /** Cross-fade duration for the entire overlay (show/hide / per-app hide). */
     private static final int OVERLAY_FADE_DURATION_MS = 500;
+    /** Cold attach becomes readable quickly; later hide/show transitions keep the calmer 500 ms. */
+    private static final int INITIAL_OVERLAY_FADE_DURATION_MS = 220;
     private static final long OVERLAY_ATTACH_RETRY_MS = 1_500L;
     private static final long MAX_OVERLAY_ATTACH_RETRY_MS = 30_000L;
     /**
@@ -238,7 +244,9 @@ public class WidgetService extends Service {
     private static final long DATETIME_UPDATE_INTERVAL_MS = 60_000L;
     private static final long SYSTEM_CONDITION_REFRESH_INTERVAL_MS = 60_000L;
     /** One connector/vendor startup per main-loop slice; never one boot-time burst. */
-    private static final long INITIAL_INTEGRATION_STAGE_MS = 400L;
+    private static final long INITIAL_INTEGRATION_STAGE_MS = 650L;
+    /** A one-off vendor/Binder rejection is retried without turning startup into a tight loop. */
+    private static final int MAX_INITIAL_INTEGRATION_STAGE_RETRIES = 2;
     private static final long INITIAL_HUD_AFTER_DRIVER_MS = 1_000L;
     /** Cadence for advancing the media progress bar while a track is actively playing. 250ms
      *  is fast enough to look smooth on a thin bar and slow enough to not show up in profilers. */
@@ -271,12 +279,29 @@ public class WidgetService extends Service {
     private static final long GNSSSHARE_SATELLITE_STATUS_TIMEOUT_MS = 30_000L;
 
     private static WidgetService instance;
+    /** Process-wide ownership fence for retained-state workers across service replacement. */
+    private static final AtomicLong STARTUP_STATE_OWNER = new AtomicLong();
 
     private Preferences prefs;
+    private long startupStateOwnerToken;
     private AutomationStateStore automationStates;
     private ConnectorValueRegistry connectorValues;
     private LocalScenarioController scenarioController;
     private IntentScenarioController intentScenarioController;
+    /**
+     * Cold explicit commands may reach the foreground service while the post-visible controller
+     * lane is still warming up. Retain only a small in-process queue: every entry keeps the
+     * receiver-time monotonic deadline and is revalidated by IntentScenarioController before use.
+     */
+    private static final int MAX_PENDING_INTENT_SCENARIO_COMMANDS = 16;
+    private static final long TEMPORARY_SCENARIO_HOST_RECHECK_MS = 1_000L;
+    private static final long TEMPORARY_SCENARIO_HOST_MAX_MS = 16_000L;
+    private final ArrayDeque<Intent> pendingIntentScenarioCommands = new ArrayDeque<>();
+    private boolean temporaryScenarioHeadlessHost;
+    private final Runnable temporaryScenarioHostRecheck = () ->
+            reconcileTemporaryScenarioHeadlessHost(false);
+    private final Runnable temporaryScenarioHostExpiry = () ->
+            reconcileTemporaryScenarioHeadlessHost(true);
     private ConnectorActionDispatcher actionDispatcher;
     private HaBrickConfigStore haConfigs;
     private HaApiController haApiController;
@@ -289,11 +314,28 @@ public class WidgetService extends Service {
     private PopupOverlayManager popupOverlay;
     /** Parsed only when settings change; connector packets must never reparse the JSON document. */
     private List<HaBrickConfig> configuredMainBricks = Collections.emptyList();
+    @Nullable private String configuredMainBricksJson;
     private final Object automationUiLock = new Object();
     private final Map<String, Set<String>> pendingAutomationUi = new LinkedHashMap<>();
     private boolean automationUiRefreshScheduled;
     private boolean automaticLifecycleQuiet;
+    private boolean automaticSurfaceReconcilePending;
     private int automaticLifecycleResumeGeneration;
+    private final Runnable automaticLifecycleQuietTeardown = () -> {
+        if (destroyed || !automaticLifecycleQuiet) return;
+        runIntegrationStep("quiet phone", () -> {
+            if (phoneController != null) phoneController.stop();
+        });
+        runIntegrationStep("quiet MQTT", () -> {
+            if (mqttController != null) mqttController.pauseForAutomaticLifecycle();
+        });
+        runIntegrationStep("quiet Home Assistant", () -> {
+            if (haApiController != null) haApiController.pauseForAutomaticLifecycle();
+        });
+        runIntegrationStep("quiet Sprut.hub", () -> {
+            if (sprutController != null) sprutController.pauseForAutomaticLifecycle();
+        });
+    };
     private final Runnable automationUiRefresh = () -> {
         if (automaticSurfaceRefreshSuppressed()) {
             synchronized (automationUiLock) {
@@ -455,6 +497,9 @@ public class WidgetService extends Service {
     private OverlayStatusWidgetBinding binding;
     private int overlayAttachAttempts;
     private boolean overlayAttachRetryScheduled;
+    /** Invalidates animator/frame/fallback callbacks retained by an older WindowManager root. */
+    private int overlayAttachGeneration;
+    private int overlayVisibleGeneration = -1;
     private final Runnable overlayAttachRetry = () -> {
         overlayAttachRetryScheduled = false;
         if (destroyed || binding != null || !prefs.widgetEnabled.get()) return;
@@ -489,6 +534,18 @@ public class WidgetService extends Service {
     private int bluetoothTrackingGeneration;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    /** Large retained-state JSON is rewritten off the UI lane at Android background priority. */
+    private final ExecutorService startupStateWorker = Executors.newSingleThreadExecutor(task -> {
+        Thread thread = new Thread(() -> {
+            try {
+                android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND);
+            } catch (RuntimeException ignored) {
+            }
+            task.run();
+        }, "status-startup-state");
+        thread.setDaemon(true);
+        return thread;
+    });
     /**
      * Connector startup is deliberately independent from the status-window binding. WindowManager
      * can transiently reject addView during boot while an already-running connector still needs to
@@ -503,12 +560,47 @@ public class WidgetService extends Service {
     private boolean credentialRefreshPending;
     private boolean credentialRefreshScheduled;
     private int initialIntegrationStage;
-    private final Runnable integrationStartup = this::runInitialIntegrationStartup;
+    private int initialIntegrationStageRetryCount;
     private final Runnable initialIntegrationStageRunner = this::runNextInitialIntegrationStage;
-    private final Choreographer.FrameCallback integrationStartupFrame = frameTimeNanos ->
+    @Nullable private DeferredIntegrationStart deferredIntegrationStart;
+
+    /** One attachment-owned Choreographer callback; stale roots cannot borrow a newer token. */
+    private final class DeferredIntegrationStart
+            implements Choreographer.FrameCallback, Runnable {
+        final int attachmentGeneration;
+        @NonNull final View root;
+
+        DeferredIntegrationStart(int attachmentGeneration, @NonNull View root) {
+            this.attachmentGeneration = attachmentGeneration;
+            this.root = root;
+        }
+
+        @Override public void doFrame(long frameTimeNanos) {
             // Frame callbacks run before traversal. Posting once more lets traversal draw the
-            // attached status row before connector JSON/Keystore work begins on the main Looper.
-            mainHandler.post(integrationStartup);
+            // fully opaque status row before connector JSON/Keystore work begins.
+            mainHandler.post(this);
+        }
+
+        @Override public void run() {
+            if (deferredIntegrationStart != this) return;
+            deferredIntegrationStart = null;
+            if (!isCurrentOverlayAttachment(attachmentGeneration, root)
+                    || root.getAlpha() < 0.999f) {
+                integrationStartupScheduled = false;
+                return;
+            }
+            StartupPerformanceTrace.mark("overlay_fully_visible");
+            StatusWidgetApplication.notifyFirstUsefulSurface(WidgetService.this);
+            boolean resumedQuietLane = automaticLifecycleQuiet;
+            if (resumedQuietLane) {
+                resumeAutomaticLifecycleIntegrationsAfterQuiet();
+            } else if (!integrationsStarted && !initialIntegrationStartupInProgress) {
+                runInitialIntegrationStartup();
+            }
+            if (integrationsStarted && binding != null) applyPreferences(false);
+            if (!resumedQuietLane) finishAutomaticSurfaceReconcileIfReady();
+        }
+    }
     /** Re-evaluates TTL/stale rules even when no new packet arrives. */
     private final Runnable automationFreshnessTick = new Runnable() {
         @Override public void run() {
@@ -835,28 +927,61 @@ public class WidgetService extends Service {
         // preferences and connector constructors parse potentially large cached catalogs.
         createNotificationChannel();
         startForeground(NOTIFICATION_ID, createNotification());
+        StartupPerformanceTrace.mark("widget_foreground_promoted");
 
     }
 
-    /** Constructs the controller graph only after the exact non-sticky/quiet admission point. */
+    /**
+     * Builds only the visual shell after admission. Network, Bluetooth and ECARX objects are
+     * created later in independent post-visible stages so the status row never waits for them.
+     */
     private void initializeRuntime() {
         if (runtimeInitialized || destroyed) return;
         runtimeInitialized = true;
+        startupStateOwnerToken = STARTUP_STATE_OWNER.incrementAndGet();
 
         prefs = new Preferences(this);
         automationStates = new AutomationStateStore(this);
+        // Cached values may be rendered in the first frame, but never as current. The persisted
+        // mark-all-stale pass is intentionally delayed until after that frame.
+        automationStates.beginSessionFreshnessBarrier();
         connectorValues = new ConnectorValueRegistry();
         connectorValues.addListener(crossSourceRuleListener);
         connectorValues.addListener(phoneStatusListener);
-        // A value persisted before ignition-off is useful context, but it is not authoritative
-        // after a new process starts. Each connector promotes only values returned by its fresh
-        // startup snapshot/retained replay, preventing a missed offline change from looking live.
-        automationStates.markAllStale();
-        // A popup notification is intentionally ephemeral. Never resurrect its retained visible
-        // state after ignition-off or process death.
-        clearPhonePopupNotification();
         haConfigs = new HaBrickConfigStore(prefs);
-        configuredMainBricks = haConfigs.loadMain();
+
+        boolean overlayRuntimeAvailable = Permissions.allPermissionsGranted(this);
+        boolean headlessHostRequired = WidgetServiceStarter.requiresHeadlessHost(prefs)
+                || !pendingIntentScenarioCommands.isEmpty();
+        armTemporaryScenarioHeadlessHostIfNeeded(overlayRuntimeAvailable);
+        if (!overlayRuntimeAvailable && !headlessHostRequired) {
+            // Locked boot and a few OEM AppOps implementations can report a temporary denial.
+            // Never turn that transient state into a permanent user preference and never pull
+            // the settings activity over HOME without an explicit user action.
+            Log.w(TAG, "Overlay permissions are not available yet; keeping widget enabled");
+            stopSelf();
+            return;
+        }
+
+        instance = this;
+        touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
+        timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
+        windowManager = getSystemService(WindowManager.class);
+
+        if (prefs.widgetEnabled.get() && overlayRuntimeAvailable) {
+            createOverlayView();
+        } else if (headlessHostRequired) {
+            // No visual frame exists in headless mode, so the same serialized controller lane can
+            // begin immediately. It still creates and starts at most one integration per stage.
+            StatusWidgetApplication.notifyFirstUsefulSurface(this);
+            runInitialIntegrationStartup();
+        } else {
+            stopSelf();
+        }
+    }
+
+    private void ensureMqttRuntimeGraph() {
+        if (mqttController != null) return;
         mqttController = new MqttController(this, prefs, automationStates, connectorValues,
                 new MqttController.StateListener() {
                     @Override public void onStateChanged(String scope, String id) {
@@ -868,7 +993,24 @@ public class WidgetService extends Service {
                                 + ": " + detail);
                     }
                 });
-        sprutController = new SprutHubController(this, prefs, automationStates, connectorValues,
+    }
+
+    private void ensureSprutRuntimeGraph() {
+        if (sprutController != null && phonePresenceExporter != null
+                && phoneAncsPresenceExporter != null) return;
+        if (sprutController != null || phonePresenceExporter != null
+                || phoneAncsPresenceExporter != null) {
+            // Heal a constructor failure from an earlier attempt as one bundle; no callback may
+            // observe a controller without both exact-device presence projections.
+            if (phonePresenceExporter != null) phonePresenceExporter.stop();
+            if (phoneAncsPresenceExporter != null) phoneAncsPresenceExporter.stop();
+            if (sprutController != null) sprutController.stop();
+            sprutController = null;
+            phonePresenceExporter = null;
+            phoneAncsPresenceExporter = null;
+        }
+        SprutHubController nextController = new SprutHubController(
+                this, prefs, automationStates, connectorValues,
                 new SprutHubController.Listener() {
                     @Override public void onStateChanged(@NonNull String scope,
                                                          @NonNull String id) {
@@ -917,11 +1059,30 @@ public class WidgetService extends Service {
                         }
                     }
                 });
-        phonePresenceExporter = new PhoneSprutPresenceExporter(
-                prefs, sprutController, mainHandler);
-        phoneAncsPresenceExporter = new PhoneSprutPresenceExporter(
-                prefs, sprutController, mainHandler,
-                PhoneSprutPresenceExporter.Signal.ANCS);
+        PhoneSprutPresenceExporter nextPresence = null;
+        PhoneSprutPresenceExporter nextAncsPresence = null;
+        try {
+            nextPresence = new PhoneSprutPresenceExporter(
+                    prefs, nextController, mainHandler);
+            nextAncsPresence = new PhoneSprutPresenceExporter(
+                    prefs, nextController, mainHandler,
+                    PhoneSprutPresenceExporter.Signal.ANCS);
+            // Publish the complete bundle last.
+            sprutController = nextController;
+            phonePresenceExporter = nextPresence;
+            phoneAncsPresenceExporter = nextAncsPresence;
+        } catch (RuntimeException failure) {
+            try { if (nextAncsPresence != null) nextAncsPresence.stop(); }
+            catch (RuntimeException ignored) { }
+            try { if (nextPresence != null) nextPresence.stop(); }
+            catch (RuntimeException ignored) { }
+            try { nextController.stop(); } catch (RuntimeException ignored) { }
+            throw failure;
+        }
+    }
+
+    private void ensurePhoneRuntimeGraph() {
+        if (phoneController != null) return;
         phoneController = new PhoneConnectorController(this, prefs, connectorValues,
                 new PhoneConnectorController.PresenceSink() {
                     @Override public void onPhoneConnectionChanged(boolean connected) {
@@ -934,8 +1095,29 @@ public class WidgetService extends Service {
                         if (exporter != null) exporter.onPhoneConnectionChanged(connected);
                     }
                 });
-        carTelemetryExporter = new CarTelemetryExporter(prefs, CarIntegrations.get(this),
-                sprutController, mainHandler);
+    }
+
+    private void ensureCarRuntimeGraph() {
+        if (carTelemetryExporter != null) return;
+        ensureSprutRuntimeGraph();
+        CarIntegration car = CarIntegrations.get(this);
+        CarTelemetryExporter nextExporter = new CarTelemetryExporter(
+                prefs, car, sprutController, mainHandler);
+        try {
+            // Re-evaluate placeholders when the asynchronous vendor capability answer arrives.
+            car.setAvailabilityChangedListener(() -> {
+                if (binding != null) refreshCarStatusSurface();
+            });
+            carTelemetryExporter = nextExporter;
+        } catch (RuntimeException failure) {
+            try { nextExporter.stop(); } catch (RuntimeException ignored) { }
+            try { car.setAvailabilityChangedListener(null); } catch (RuntimeException ignored) { }
+            throw failure;
+        }
+    }
+
+    private void ensureHomeAssistantRuntimeGraph() {
+        if (haApiController != null) return;
         haApiController = new HaApiController(this, prefs, automationStates, connectorValues,
                 new HaApiController.Listener() {
                     @Override public void onStateChanged(@NonNull String scope,
@@ -953,97 +1135,69 @@ public class WidgetService extends Service {
                         Log.i(TAG, "Home Assistant catalog: " + catalog.size() + " entities");
                     }
                 });
-        actionDispatcher = new ConnectorActionDispatcher(
-                mqttController, sprutController, haApiController);
-        scenarioController = new LocalScenarioController(prefs, automationStates, connectorValues,
-                CarIntegrations.get(this),
-                targets -> {
-                    // Initial startup performs one consolidated render after all providers and
-                    // scenarios are configured. Credential-only refresh follows the same rule:
-                    // collect changed scopes, then perform one bounded surface pass afterwards.
-                    if (automaticSurfaceRefreshSuppressed()) {
-                        synchronized (automationUiLock) {
-                            for (String target : targets) {
-                                int divider = target.indexOf('|');
-                                if (divider <= 0 || divider >= target.length() - 1) continue;
-                                pendingAutomationUi.computeIfAbsent(
-                                        target.substring(0, divider),
-                                        ignored -> new HashSet<>())
-                                        .add(target.substring(divider + 1));
-                            }
-                        }
-                        return;
-                    }
-                    mainHandler.post(() -> {
-                        if (destroyed) return;
-                        if (binding != null) renderHomeAssistantBricks();
-                        applyPopupPreferencesSafely();
-                        boolean phoneFieldsChanged = false;
-                        for (String target : targets) {
-                            if (target.startsWith(AutomationContract.SCOPE_POPUP + "|")
-                                    && PhoneNotificationAutomation.isFieldAutomationId(
-                                    target.substring(target.indexOf('|') + 1))) {
-                                phoneFieldsChanged = true;
-                            }
-                            if (target.startsWith(AutomationContract.SCOPE_DRIVER + "|")) {
-                                DriverPanelService.apply(this);
-                            }
-                            if (target.startsWith(AutomationContract.SCOPE_HUD + "|")) {
-                                if (prefs.hudPanelAutostart.get()
-                                        || HudPresentationService.isRunning(this)) {
-                                    HudPresentationService.notifyAutomationChanged(this);
-                                }
-                            }
-                        }
-                        if (binding != null) {
-                            if (phoneFieldsChanged && activePhoneNotification != null) {
-                                updateMediaInfo();
-                            }
-                            applyBrickVisibility(currentBrickSet());
-                        }
-                    });
-                });
-        intentScenarioController = new IntentScenarioController(this, prefs, actionDispatcher);
-        ensurePopupOverlayManager();
+    }
 
-        boolean headlessHostRequired = WidgetServiceStarter.requiresHeadlessHost(prefs);
-        boolean overlayRuntimeAvailable = Permissions.allPermissionsGranted(this);
-        if (!overlayRuntimeAvailable && !headlessHostRequired) {
-            // Locked boot and a few OEM AppOps implementations can report a temporary denial.
-            // Never turn that transient state into a permanent user preference and never pull
-            // the settings activity over HOME without an explicit user action.
-            Log.w(TAG, "Overlay permissions are not available yet; keeping widget enabled");
-            stopSelf();
+    private void ensureScenarioRuntimeGraph() {
+        if (scenarioController != null) return;
+        ensureMqttRuntimeGraph();
+        ensureSprutRuntimeGraph();
+        ensureHomeAssistantRuntimeGraph();
+        ConnectorActionDispatcher nextDispatcher = new ConnectorActionDispatcher(
+                mqttController, sprutController, haApiController);
+        LocalScenarioController nextScenario = new LocalScenarioController(
+                prefs, automationStates, connectorValues,
+                CarIntegrations.get(this), this::onScenarioTargetsChanged);
+        actionDispatcher = nextDispatcher;
+        scenarioController = nextScenario;
+        ensurePopupOverlayManager();
+    }
+
+    private void ensureIntentScenarioRuntimeGraph() {
+        if (intentScenarioController != null) return;
+        ensureScenarioRuntimeGraph();
+        IntentScenarioController next = new IntentScenarioController(this, prefs, actionDispatcher);
+        intentScenarioController = next;
+    }
+
+    private void onScenarioTargetsChanged(@NonNull Set<String> targets) {
+        // Initial startup performs one consolidated render after all providers and scenarios are
+        // configured. Credential-only refresh follows the same coalescing rule.
+        if (automaticSurfaceRefreshSuppressed()) {
+            synchronized (automationUiLock) {
+                for (String target : targets) {
+                    int divider = target.indexOf('|');
+                    if (divider <= 0 || divider >= target.length() - 1) continue;
+                    pendingAutomationUi.computeIfAbsent(target.substring(0, divider),
+                            ignored -> new HashSet<>()).add(target.substring(divider + 1));
+                }
+            }
             return;
         }
-
-        instance = this;
-
-        touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
-        timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
-
-        windowManager = getSystemService(WindowManager.class);
-
-        // Re-evaluate brick visibility when the car SDK's asynchronous service connect finally
-        // answers whether the car sensors exist — critical on the boot-autostart path, where
-        // the first applyPreferences runs before the vendor service is up and would otherwise
-        // hide configured car bricks until the user happens to open the settings UI.
-        CarIntegrations.get(this).setAvailabilityChangedListener(() -> {
-            // Only supported/unsupported car bricks changed. Connector credentials and large
-            // catalogs are unrelated and must not be reparsed when the vendor service binds.
-            if (binding != null) applyPreferences(false);
+        mainHandler.post(() -> {
+            if (destroyed) return;
+            if (binding != null) renderHomeAssistantBricks();
+            applyPopupPreferencesSafely();
+            boolean phoneFieldsChanged = false;
+            for (String target : targets) {
+                if (target.startsWith(AutomationContract.SCOPE_POPUP + "|")
+                        && PhoneNotificationAutomation.isFieldAutomationId(
+                        target.substring(target.indexOf('|') + 1))) {
+                    phoneFieldsChanged = true;
+                }
+                if (target.startsWith(AutomationContract.SCOPE_DRIVER + "|")) {
+                    DriverPanelService.apply(this);
+                }
+                if (target.startsWith(AutomationContract.SCOPE_HUD + "|")
+                        && (prefs.hudPanelAutostart.get()
+                        || HudPresentationService.isRunning(this))) {
+                    HudPresentationService.notifyAutomationChanged(this);
+                }
+            }
+            if (binding != null) {
+                if (phoneFieldsChanged && activePhoneNotification != null) updateMediaInfo();
+                applyBrickVisibility(currentBrickSet());
+            }
         });
-
-        if (prefs.widgetEnabled.get() && overlayRuntimeAvailable) {
-            createOverlayView();
-        } else if (headlessHostRequired) {
-            // Driver/HUD surfaces and the phone connector are independent. Keep integrations
-            // alive without attaching the status-row window when only a headless consumer needs
-            // this foreground service.
-            runInitialIntegrationStartup();
-        } else {
-            stopSelf();
-        }
     }
 
     /** Starts the long-lived integrations once, after the first attached status frame was drawn. */
@@ -1052,72 +1206,182 @@ public class WidgetService extends Service {
         integrationStartupScheduled = true;
         initialIntegrationStartupInProgress = true;
         initialIntegrationStage = 0;
+        initialIntegrationStageRetryCount = 0;
         mainHandler.removeCallbacks(initialIntegrationStageRunner);
         mainHandler.post(initialIntegrationStageRunner);
     }
 
     private void runNextInitialIntegrationStage() {
         if (destroyed || !initialIntegrationStartupInProgress) return;
+        if (automaticLifecycleQuiet) {
+            // Keep the exact stage parked. The host-phase generation will resume it; no polling
+            // and no transport/vendor construction is allowed inside the QuickBoot quiet lane.
+            mainHandler.removeCallbacks(initialIntegrationStageRunner);
+            return;
+        }
+        StartupPerformanceTrace.mark("integration_stage_" + initialIntegrationStage);
+        boolean stageSucceeded = true;
         switch (initialIntegrationStage) {
             case 0:
-                // Bind selected-phone presence before the phone transport can publish a state.
-                runIntegrationStep("phone presence", () -> {
-                    if (phonePresenceExporter != null) phonePresenceExporter.reconfigure();
-                    if (phoneAncsPresenceExporter != null) {
-                        phoneAncsPresenceExporter.reconfigure();
-                    }
-                });
-                break;
+                // Persist the session barrier before any connector is allowed to publish fresh.
+                runCachedStateFreshnessBarrier();
+                return;
             case 1:
-                runIntegrationStep("phone", () -> {
-                    if (phoneController != null) phoneController.reconfigure();
+                // Bind selected-phone presence before the phone transport can publish a state.
+                stageSucceeded = runIntegrationStep("phone presence", () -> {
+                    ensureSprutRuntimeGraph();
+                    phonePresenceExporter.reconfigure();
+                    phoneAncsPresenceExporter.reconfigure();
                 });
                 break;
             case 2:
-                runIntegrationStep("car telemetry", () -> {
-                    if (carTelemetryExporter != null) carTelemetryExporter.reconfigure();
+                stageSucceeded = runIntegrationStep("phone", () -> {
+                    ensurePhoneRuntimeGraph();
+                    phoneController.reconfigure();
                 });
                 break;
             case 3:
-                runIntegrationStep("MQTT", () -> {
-                    if (mqttController != null) mqttController.reconfigure();
+                // System listeners are useful but not required for the first visible row. Start
+                // them only now, after the fade and three serialized correctness stages.
+                stageSucceeded = runIntegrationStep("status surface runtime", () -> {
+                    if (binding != null) applyPreferences(false);
                 });
                 break;
             case 4:
-                runIntegrationStep("Home Assistant", () -> {
-                    if (haApiController != null) haApiController.reconfigure();
+                stageSucceeded = runIntegrationStep("car telemetry", () -> {
+                    ensureCarRuntimeGraph();
+                    carTelemetryExporter.reconfigure();
+                    refreshCarStatusSurface();
                 });
                 break;
             case 5:
-                runIntegrationStep("Sprut.hub", () -> {
-                    if (sprutController != null) sprutController.reconfigure();
+                stageSucceeded = runIntegrationStep("MQTT", () -> {
+                    ensureMqttRuntimeGraph();
+                    mqttController.reconfigure();
                 });
                 break;
             case 6:
-                runIntegrationStep("visual scenarios", () -> {
-                    if (scenarioController != null) scenarioController.reconfigure();
+                stageSucceeded = runIntegrationStep("Home Assistant", () -> {
+                    ensureHomeAssistantRuntimeGraph();
+                    haApiController.reconfigure();
                 });
                 break;
             case 7:
-                runIntegrationStep("intent scenarios", () -> {
-                    if (intentScenarioController != null) {
-                        intentScenarioController.reconfigure();
-                    }
+                stageSucceeded = runIntegrationStep("Sprut.hub", () -> {
+                    ensureSprutRuntimeGraph();
+                    sprutController.reconfigure();
+                });
+                break;
+            case 8:
+                stageSucceeded = runIntegrationStep("visual scenarios", () -> {
+                    ensureScenarioRuntimeGraph();
+                    scenarioController.reconfigure();
+                });
+                break;
+            case 9:
+                stageSucceeded = runIntegrationStep("intent scenarios", () -> {
+                    ensureIntentScenarioRuntimeGraph();
+                    intentScenarioController.reconfigure();
+                    drainPendingIntentScenarioCommands();
                 });
                 break;
             default:
                 finishInitialIntegrationStartup();
                 return;
         }
+        if (!stageSucceeded
+                && initialIntegrationStageRetryCount
+                < MAX_INITIAL_INTEGRATION_STAGE_RETRIES) {
+            initialIntegrationStageRetryCount++;
+            mainHandler.postDelayed(initialIntegrationStageRunner,
+                    INITIAL_INTEGRATION_STAGE_MS);
+            return;
+        }
+        initialIntegrationStageRetryCount = 0;
         initialIntegrationStage++;
         mainHandler.postDelayed(initialIntegrationStageRunner,
                 INITIAL_INTEGRATION_STAGE_MS);
+    }
+
+    private void runCachedStateFreshnessBarrier() {
+        // Reserve the next state before dispatch so settings callbacks cannot start a parallel
+        // lane while the worker owns the retained JSON document.
+        initialIntegrationStage = 1;
+        final long ownerToken = startupStateOwnerToken;
+        try {
+            startupStateWorker.execute(() -> {
+                List<HaBrickConfig> loadedMainBricks = Collections.emptyList();
+                String loadedMainJson = "[]";
+                try {
+                    // Both documents can be large after long use. Parse/rewrite them at Android's
+                    // background priority while the already-attached shell remains responsive.
+                    loadedMainJson = prefs.haMainBricksJson.get();
+                    loadedMainBricks = haConfigs.loadMain(loadedMainJson);
+                    if (!automationStates.markAllStaleIf(
+                            () -> ownsStartupState(ownerToken))) return;
+                    if (!ownsStartupState(ownerToken)) return;
+                    clearRetainedPhonePopupStateForStartup(ownerToken);
+                } catch (RuntimeException failure) {
+                    // Leave the session projection fail-closed/stale if persistence is malformed.
+                    Log.e(TAG, "Could not persist cached-state freshness barrier", failure);
+                }
+                List<HaBrickConfig> immutableMainBricks = Collections.unmodifiableList(
+                        new ArrayList<>(loadedMainBricks));
+                String immutableMainJson = loadedMainJson;
+                mainHandler.post(() -> {
+                    if (destroyed || !initialIntegrationStartupInProgress) return;
+                    configuredMainBricks = immutableMainBricks;
+                    configuredMainBricksJson = immutableMainJson;
+                    StartupPerformanceTrace.mark("cached_state_ready");
+                    if (automaticLifecycleQuiet) return;
+                    mainHandler.postDelayed(initialIntegrationStageRunner,
+                            INITIAL_INTEGRATION_STAGE_MS);
+                });
+            });
+        } catch (RuntimeException rejected) {
+            Log.e(TAG, "Could not schedule cached-state freshness barrier", rejected);
+            mainHandler.postDelayed(initialIntegrationStageRunner,
+                    INITIAL_INTEGRATION_STAGE_MS);
+        }
+    }
+
+    private boolean ownsStartupState(long token) {
+        return token != 0L && STARTUP_STATE_OWNER.get() == token && !destroyed
+                && !Thread.currentThread().isInterrupted();
+    }
+
+    /** Worker-only startup cleanup; popup windows/controllers do not exist at this point. */
+    private void clearRetainedPhonePopupStateForStartup(long ownerToken) {
+        if (automationStates == null) return;
+        try {
+            long now = System.currentTimeMillis();
+            for (String overlayId : new String[]{
+                    PhoneNotificationAutomation.OVERLAY_ID,
+                    PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID}) {
+                if (!automationStates.applyIf(() -> ownsStartupState(ownerToken),
+                        AutomationContract.SCOPE_OVERLAY, overlayId,
+                        new JSONObject().put("visible", false).put("fresh", false)
+                                .put("updated_at", now))) return;
+            }
+            for (String automationId : PhoneNotificationAutomation.fieldAutomationIds()) {
+                if (!automationStates.applyIf(() -> ownsStartupState(ownerToken),
+                        AutomationContract.SCOPE_POPUP, automationId,
+                        new JSONObject().put("text", "").put("visible", false)
+                                .put("fresh", false).put("updated_at", now))) return;
+            }
+        } catch (JSONException | RuntimeException failure) {
+            Log.w(TAG, "Could not clear retained phone popup state", failure);
+        }
     }
 
     private void finishInitialIntegrationStartup() {
         initialIntegrationStartupInProgress = false;
         integrationStartupScheduled = false;
         integrationsStarted = true;
+        StartupPerformanceTrace.mark("integrations_ready");
+        // A constructor failure in stage 8 must not strand a still-valid explicit command. The
+        // on-demand retry remains serialized on the service main looper and executes at most once.
+        drainPendingIntentScenarioCommands();
         if (binding != null) {
             runIntegrationStep("initial status-row projection", () -> {
                 renderHomeAssistantBricks();
@@ -1128,6 +1392,7 @@ public class WidgetService extends Service {
         // Scenario callbacks are deliberately coalesced while integrations start. Rebuild the
         // driver rail once after that consolidated evaluation so boot-time visibility/action
         // overrides are already reflected in its very first stable configuration.
+        automaticSurfaceReconcilePending = false;
         if (prefs.driverPanelEnabled.get()) DriverPanelService.apply(this);
         if (prefs.hudPanelEnabled.get() && prefs.hudPanelAutostart.get()) {
             mainHandler.postDelayed(() -> {
@@ -1159,54 +1424,97 @@ public class WidgetService extends Service {
     }
 
     private void scheduleInitialIntegrationStartupAfterFrame() {
-        if (destroyed || integrationsStarted || integrationStartupScheduled) return;
+        if (destroyed || binding == null || !overlayAttached) return;
+        if (integrationsStarted && !automaticLifecycleQuiet
+                && !automaticSurfaceReconcilePending) return;
+        View root = binding.getRoot();
+        int generation = overlayAttachGeneration;
+        if (root.getAlpha() < 0.999f
+                || !isCurrentOverlayAttachment(generation, root)) return;
+        DeferredIntegrationStart existing = deferredIntegrationStart;
+        if (integrationStartupScheduled && existing != null
+                && existing.attachmentGeneration == generation && existing.root == root) return;
+        cancelDeferredIntegrationStart();
         integrationStartupScheduled = true;
+        DeferredIntegrationStart next = new DeferredIntegrationStart(generation, root);
+        deferredIntegrationStart = next;
         try {
-            Choreographer.getInstance().postFrameCallback(integrationStartupFrame);
+            Choreographer.getInstance().postFrameCallback(next);
         } catch (RuntimeException failure) {
             // Choreographer should always be available on the service main Looper. A broken OEM
             // implementation must not leave all connectors permanently stopped, however.
             Log.w(TAG, "Could not defer integrations to the first frame", failure);
-            mainHandler.post(integrationStartup);
+            mainHandler.post(next);
         }
+    }
+
+    private void cancelDeferredIntegrationStart() {
+        DeferredIntegrationStart pending = deferredIntegrationStart;
+        deferredIntegrationStart = null;
+        if (pending != null) {
+            mainHandler.removeCallbacks(pending);
+            try {
+                Choreographer.getInstance().removeFrameCallback(pending);
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "Could not remove deferred integration startup", failure);
+            }
+        }
+        if (!initialIntegrationStartupInProgress && !integrationsStarted) {
+            integrationStartupScheduled = false;
+        }
+    }
+
+    private boolean isCurrentOverlayAttachment(int generation, @NonNull View root) {
+        return !destroyed && generation == overlayAttachGeneration && overlayAttached
+                && binding != null && binding.getRoot() == root && root.isAttachedToWindow();
     }
 
     /** Reconfigures each independent integration without letting one bad provider block the rest. */
     private void reconfigureIntegrationControllers() {
         runIntegrationStep("MQTT", () -> {
-            if (mqttController != null) mqttController.reconfigure();
+            ensureMqttRuntimeGraph();
+            mqttController.reconfigure();
         });
         // Load the exact selected-address boundary before the phone transport can emit its
         // current state. A device change therefore clears the old Sprut switch first.
         runIntegrationStep("phone presence", () -> {
-            if (phonePresenceExporter != null) phonePresenceExporter.reconfigure();
-            if (phoneAncsPresenceExporter != null) phoneAncsPresenceExporter.reconfigure();
+            ensureSprutRuntimeGraph();
+            phonePresenceExporter.reconfigure();
+            phoneAncsPresenceExporter.reconfigure();
         });
         runIntegrationStep("phone", () -> {
-            if (phoneController != null) phoneController.reconfigure();
+            ensurePhoneRuntimeGraph();
+            phoneController.reconfigure();
         });
         runIntegrationStep("car telemetry", () -> {
-            if (carTelemetryExporter != null) carTelemetryExporter.reconfigure();
+            ensureCarRuntimeGraph();
+            carTelemetryExporter.reconfigure();
         });
         runIntegrationStep("Sprut.hub", () -> {
-            if (sprutController != null) sprutController.reconfigure();
+            ensureSprutRuntimeGraph();
+            sprutController.reconfigure();
         });
         runIntegrationStep("Home Assistant", () -> {
-            if (haApiController != null) haApiController.reconfigure();
+            ensureHomeAssistantRuntimeGraph();
+            haApiController.reconfigure();
         });
         runIntegrationStep("visual scenarios", () -> {
-            if (scenarioController != null) scenarioController.reconfigure();
+            ensureScenarioRuntimeGraph();
+            scenarioController.reconfigure();
         });
         runIntegrationStep("intent scenarios", () -> {
-            if (intentScenarioController != null) intentScenarioController.reconfigure();
+            ensureIntentScenarioRuntimeGraph();
+            intentScenarioController.reconfigure();
         });
     }
 
-    private void runIntegrationStep(@NonNull String name, @NonNull Runnable step) {
+    private boolean runIntegrationStep(@NonNull String name, @NonNull Runnable step) {
         try {
             step.run();
+            return true;
         } catch (RuntimeException failure) {
             Log.e(TAG, "Could not configure " + name, failure);
+            return false;
         }
     }
 
@@ -1251,6 +1559,11 @@ public class WidgetService extends Service {
     public int onStartCommand(@Nullable Intent intent, int flags, int startId) {
         dezz.status.widget.diagnostics.ActionRecorder.recordServiceIntent(
                 getClass().getName(), intent == null ? null : intent.getAction(), startId);
+        boolean explicitScenarioCommand = !destroyed && intent != null
+                && ScenarioTriggerReceiver.ACTION_EXECUTE_RULE.equals(intent.getAction());
+        // Queue before visual/headless admission. An explicit, already-authenticated user command
+        // is allowed to keep a temporary headless host even when overlay AppOps are unavailable.
+        if (explicitScenarioCommand) enqueueIntentScenarioCommand(intent);
         if (!runtimeInitialized) {
             if (intent == null
                     && StartupWorkCoordinator.shouldDeferAutomaticStickyRestart(this)) {
@@ -1262,6 +1575,10 @@ public class WidgetService extends Service {
             initializeRuntime();
         }
         if (!runtimeInitialized || prefs == null) return START_NOT_STICKY;
+        if (explicitScenarioCommand) {
+            armTemporaryScenarioHeadlessHostIfNeeded(
+                    Permissions.allPermissionsGranted(this));
+        }
         if (!destroyed && prefs != null
                 && ((prefs.widgetEnabled.get() && binding == null
                 && !overlayAttachRetryScheduled
@@ -1270,21 +1587,85 @@ public class WidgetService extends Service {
                 && (binding != null || popupOverlay != null)))) {
             applyPreferences(false);
         }
-        if (!destroyed && intent != null
-                && ScenarioTriggerReceiver.ACTION_EXECUTE_RULE.equals(intent.getAction())
-                && intentScenarioController != null) {
-            // Reload before lookup so a broadcast accepted from the latest device-protected
-            // preferences cannot execute an older in-memory target after a settings edit.
-            intentScenarioController.reconfigure();
-            intentScenarioController.triggerRuleId(
-                    intent.getStringExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_ID),
-                    intent.getStringExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_TOKEN),
-                    intent.getStringExtra(ScenarioTriggerReceiver.EXTRA_RULE_FINGERPRINT),
-                    intent.getLongExtra(ScenarioTriggerReceiver.EXTRA_DEADLINE_ELAPSED, 0L));
+        if (explicitScenarioCommand) {
+            if (integrationsStarted) {
+                drainPendingIntentScenarioCommands();
+            } else if (binding == null && !initialIntegrationStartupInProgress) {
+                // A rejected/missing overlay must not hold an explicit physical command behind
+                // WindowManager retries. This is user work, not automatic boot-time work.
+                runInitialIntegrationStartup();
+            }
         }
         // A sticky restart restores the long-lived widget/connectors but carries no old command.
         // Re-delivering a TOGGLE after process death would be unsafe, so null intents do nothing.
         return START_STICKY;
+    }
+
+    private void enqueueIntentScenarioCommand(@NonNull Intent command) {
+        if (pendingIntentScenarioCommands.size() >= MAX_PENDING_INTENT_SCENARIO_COMMANDS) {
+            // Fail closed under a broadcast storm. Dropping the new command is safer than
+            // evicting an older TOGGLE whose execution state is not yet known.
+            Log.w(TAG, "Ignored Intent scenario command while startup queue is full");
+            return;
+        }
+        pendingIntentScenarioCommands.addLast(new Intent(command));
+    }
+
+    /** Re-arms the bounded host even when a command reaches an already initialized service. */
+    private void armTemporaryScenarioHeadlessHostIfNeeded(boolean overlayRuntimeAvailable) {
+        if (prefs == null || pendingIntentScenarioCommands.isEmpty()
+                || WidgetServiceStarter.requiresHeadlessHost(prefs)
+                || (prefs.widgetEnabled.get() && overlayRuntimeAvailable)) return;
+        temporaryScenarioHeadlessHost = true;
+        mainHandler.removeCallbacks(temporaryScenarioHostExpiry);
+        mainHandler.postDelayed(temporaryScenarioHostExpiry,
+                TEMPORARY_SCENARIO_HOST_MAX_MS);
+    }
+
+    private void drainPendingIntentScenarioCommands() {
+        if (destroyed || pendingIntentScenarioCommands.isEmpty()) return;
+        if (intentScenarioController == null) {
+            if (!integrationsStarted) return;
+            runIntegrationStep("intent scenarios on demand", () -> {
+                ensureIntentScenarioRuntimeGraph();
+                intentScenarioController.reconfigure();
+            });
+            if (intentScenarioController == null) return;
+        }
+        Intent command;
+        while ((command = pendingIntentScenarioCommands.pollFirst()) != null) {
+            // Reload before lookup so a broadcast accepted from the latest device-protected
+            // preferences cannot execute an older in-memory target after a settings edit.
+            intentScenarioController.reconfigure();
+            intentScenarioController.triggerRuleId(
+                    command.getStringExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_ID),
+                    command.getStringExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_TOKEN),
+                    command.getStringExtra(ScenarioTriggerReceiver.EXTRA_RULE_FINGERPRINT),
+                    command.getLongExtra(ScenarioTriggerReceiver.EXTRA_DEADLINE_ELAPSED, 0L));
+        }
+        reconcileTemporaryScenarioHeadlessHost(false);
+    }
+
+    private void reconcileTemporaryScenarioHeadlessHost(boolean force) {
+        mainHandler.removeCallbacks(temporaryScenarioHostRecheck);
+        if (!temporaryScenarioHeadlessHost || destroyed || prefs == null) return;
+        boolean executionPending = intentScenarioController != null
+                && intentScenarioController.hasPendingExecutions();
+        if (!force && (!pendingIntentScenarioCommands.isEmpty() || executionPending)) {
+            mainHandler.postDelayed(temporaryScenarioHostRecheck,
+                    TEMPORARY_SCENARIO_HOST_RECHECK_MS);
+            return;
+        }
+        temporaryScenarioHeadlessHost = false;
+        pendingIntentScenarioCommands.clear();
+        mainHandler.removeCallbacks(temporaryScenarioHostExpiry);
+        boolean persistentSurfaceHost = prefs.widgetEnabled.get()
+                && Permissions.allPermissionsGranted(this);
+        if (binding == null && !persistentSurfaceHost
+                && !WidgetServiceStarter.requiresHeadlessHost(prefs)) {
+            Log.i(TAG, "Stopping temporary scenario host after command deadline/completion");
+            stopSelf();
+        }
     }
 
     private void createOverlayView() {
@@ -1294,6 +1675,8 @@ public class WidgetService extends Service {
         // Create the overlay view
         LayoutInflater layoutInflater = LayoutInflater.from(this);
         binding = OverlayStatusWidgetBinding.inflate(layoutInflater);
+        final int attachmentGeneration = ++overlayAttachGeneration;
+        final View attachmentRoot = binding.getRoot();
         // Start invisible — the addView() below makes the window appear instantly; we then
         // fade the content in to match the symmetric fade-out the overlay does elsewhere.
         binding.getRoot().setAlpha(0f);
@@ -1378,7 +1761,7 @@ public class WidgetService extends Service {
         overlayAttached = false;
         prepareOverlayGeometryBeforeAttach();
         try {
-            windowManager.addView(binding.getRoot(), params);
+            windowManager.addView(attachmentRoot, params);
         } catch (Exception e) {
             Log.e(TAG, "Could not attach status overlay (attempt "
                     + (overlayAttachAttempts + 1) + ")", e);
@@ -1408,23 +1791,48 @@ public class WidgetService extends Service {
         mainHandler.removeCallbacks(overlayAttachRetry);
         overlayAttachRetryScheduled = false;
         overlayAttachAttempts = 0;
-        // Reconnecting here used to duplicate the explicit startup reconfigure block in
-        // onCreate(), including a full mapping pass over large Sprut.hub catalogs.
-        applyPreferences(false);
+        if (integrationsStarted && !automaticLifecycleQuiet) {
+            // A later user-driven reattach reuses the live graph and needs its listeners now.
+            applyPreferences(false);
+        }
 
         updateWifiStatus();
         updateGnssStatus();
 
-        // Fade in the freshly-added view; addView itself is instant.
-        binding.getRoot().animate()
+        // Fade in the geometry-only shell. Controller construction and system listener
+        // registration begin only after the row is fully visible.
+        attachmentRoot.animate()
                 .alpha(1f)
-                .setDuration(OVERLAY_FADE_DURATION_MS)
+                .setDuration(INITIAL_OVERLAY_FADE_DURATION_MS)
+                .withEndAction(() -> completeInitialOverlayVisibility(
+                        attachmentGeneration, attachmentRoot, false))
                 .start();
-        if (integrationsStarted) {
+        if (integrationsStarted && !automaticLifecycleQuiet) {
             // Dynamic headless -> status-row attach reuses the already-running connectors, but
             // popup windows still need to be recreated for the newly enabled status surface.
             applyPopupPreferencesSafely();
-        } else {
+        }
+        if (!integrationsStarted || automaticLifecycleQuiet
+                || automaticSurfaceReconcilePending) {
+            // OEM animators have occasionally missed an end callback after a SurfaceFlinger
+            // restart. This bounded idempotent fallback preserves headless/connectivity startup.
+            mainHandler.postDelayed(() -> completeInitialOverlayVisibility(
+                            attachmentGeneration, attachmentRoot, true),
+                    INITIAL_OVERLAY_FADE_DURATION_MS + 250L);
+        }
+    }
+
+    private void completeInitialOverlayVisibility(int generation, @NonNull View root,
+                                                  boolean animatorFallback) {
+        if (!isCurrentOverlayAttachment(generation, root)) return;
+        if (animatorFallback && root.getAlpha() < 0.999f) {
+            root.animate().cancel();
+            root.setAlpha(1f);
+        }
+        if (root.getAlpha() < 0.999f || overlayVisibleGeneration == generation) return;
+        overlayVisibleGeneration = generation;
+        if (!integrationsStarted || automaticLifecycleQuiet
+                || automaticSurfaceReconcilePending) {
             scheduleInitialIntegrationStartupAfterFrame();
         }
     }
@@ -1434,14 +1842,12 @@ public class WidgetService extends Service {
      *
      * <p>This deliberately runs before {@link WindowManager#addView(View,
      * ViewGroup.LayoutParams)} and does not start listeners/integrations. The normal
-     * {@link #applyPreferences(boolean)} pass still runs immediately after attach and remains the
+     * {@link #applyPreferences(boolean)} pass runs in its own post-visible stage and remains the
      * single owner of those lifecycle side effects.</p>
      */
     private void prepareOverlayGeometryBeforeAttach() {
-        // HA tiles contribute to the configured height floor too. Load their lightweight
-        // persisted descriptors now so even an OEM WindowManager that measures synchronously
-        // inside addView() sees the same tree as the normal post-attach preference pass.
-        if (haConfigs != null) configuredMainBricks = haConfigs.loadMain();
+        // HA descriptors were loaded once by the visual shell before inflation. Re-reading them
+        // here used to parse the same JSON three times before the first visible frame.
         updateThemedContext();
         updateDateTime();
 
@@ -1480,11 +1886,15 @@ public class WidgetService extends Service {
     }
 
     private void removeStatusOverlaySafely(@NonNull String reason) {
+        overlayAttachGeneration++;
+        overlayVisibleGeneration = -1;
+        cancelDeferredIntegrationStart();
         if (binding == null || windowManager == null) {
             overlayAttached = false;
             return;
         }
         View root = binding.getRoot();
+        root.animate().cancel();
         if (!overlayAttached && !root.isAttachedToWindow()) return;
         try {
             windowManager.removeView(root);
@@ -1532,11 +1942,13 @@ public class WidgetService extends Service {
             runCleanupStep("status reachability checker", checker::shutdown);
         }
 
-        runCleanupStep("status car sensor subscriptions", () -> {
-            CarIntegration car = CarIntegrations.get(this);
-            car.unsubscribe(BrickType.INDOOR_TEMP);
-            car.unsubscribe(BrickType.OUTDOOR_TEMP);
-        });
+        if (carTelemetryExporter != null) {
+            runCleanupStep("status car sensor subscriptions", () -> {
+                CarIntegration car = CarIntegrations.get(this);
+                car.unsubscribe(BrickType.INDOOR_TEMP);
+                car.unsubscribe(BrickType.OUTDOOR_TEMP);
+            });
+        }
 
         if (popupOverlay != null) {
             runCleanupStep("popup overlays", popupOverlay::destroy);
@@ -1598,6 +2010,7 @@ public class WidgetService extends Service {
      */
     void ensureEnabledRuntime() {
         if (destroyed || prefs == null) return;
+        if (automaticLifecycleQuiet) return;
         if (WidgetServiceStarter.requiresHeadlessHost(prefs)
                 && !integrationsStarted) {
             runInitialIntegrationStartup();
@@ -1619,14 +2032,31 @@ public class WidgetService extends Service {
             mainHandler.post(this::reconcileAutomaticLifecycleSurfaces);
             return;
         }
+        automaticSurfaceReconcilePending = true;
         if (prefs.widgetEnabled.get() && binding != null) {
             // QuickBoot can invalidate the remote WindowManager/SurfaceFlinger owner while the
             // local ViewRoot still reports attached. One controlled lifecycle transaction is more
             // reliable than trusting that process-local flag and is isolated after the quiet lane.
             detachStatusSurfaceRuntime("automatic lifecycle surface revalidation");
         }
-        ensureEnabledRuntime();
-        if (initialIntegrationStartupInProgress || !integrationsStarted) return;
+        boolean waitsForVisibleSurface = prefs.widgetEnabled.get()
+                && Permissions.allPermissionsGranted(this);
+        if (waitsForVisibleSurface) {
+            createOverlayView();
+            // completeInitialOverlayVisibility -> Choreographer -> Handler owns the resume. This
+            // keeps every parked transport/vendor stage behind the replacement root's real frame.
+            if (binding != null) return;
+            if (!WidgetServiceStarter.requiresHeadlessHost(prefs)) return;
+        }
+        boolean resumedQuietLane = automaticLifecycleQuiet;
+        resumeAutomaticLifecycleIntegrationsAfterQuiet();
+        if (!resumedQuietLane) finishAutomaticSurfaceReconcileIfReady();
+    }
+
+    private void finishAutomaticSurfaceReconcileIfReady() {
+        if (!automaticSurfaceReconcilePending || automaticLifecycleQuiet
+                || initialIntegrationStartupInProgress || !integrationsStarted) return;
+        automaticSurfaceReconcilePending = false;
         if (prefs.driverPanelEnabled.get()) {
             runIntegrationStep("automatic Driver surface reconcile",
                     () -> DriverPanelService.apply(this));
@@ -1641,7 +2071,6 @@ public class WidgetService extends Service {
             }, INITIAL_HUD_AFTER_DRIVER_MS);
         }
         schedulePendingAutomationUiRefresh();
-        resumeAutomaticLifecycleIntegrationsAfterQuiet();
     }
 
     /**
@@ -1649,7 +2078,11 @@ public class WidgetService extends Service {
      * Park only reconnecting transports immediately; the FGS notification and cached UI remain.
      */
     public void enterAutomaticLifecycleQuiet() {
-        mainHandler.post(this::enterAutomaticLifecycleQuietOnMain);
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            enterAutomaticLifecycleQuietOnMain();
+        } else {
+            mainHandler.post(this::enterAutomaticLifecycleQuietOnMain);
+        }
     }
 
     private void enterAutomaticLifecycleQuietOnMain() {
@@ -1657,18 +2090,12 @@ public class WidgetService extends Service {
         if (automaticLifecycleQuiet) return;
         automaticLifecycleQuiet = true;
         automaticLifecycleResumeGeneration++;
-        runIntegrationStep("quiet phone", () -> {
-            if (phoneController != null) phoneController.stop();
-        });
-        runIntegrationStep("quiet MQTT", () -> {
-            if (mqttController != null) mqttController.pauseForAutomaticLifecycle();
-        });
-        runIntegrationStep("quiet Home Assistant", () -> {
-            if (haApiController != null) haApiController.pauseForAutomaticLifecycle();
-        });
-        runIntegrationStep("quiet Sprut.hub", () -> {
-            if (sprutController != null) sprutController.pauseForAutomaticLifecycle();
-        });
+        mainHandler.removeCallbacks(initialIntegrationStageRunner);
+        cancelDeferredIntegrationStart();
+        // The BroadcastReceiver-visible fence above is synchronous. Socket/Binder teardown is
+        // deliberately posted so QuickBoot's main-thread broadcast can return immediately.
+        mainHandler.removeCallbacks(automaticLifecycleQuietTeardown);
+        mainHandler.post(automaticLifecycleQuietTeardown);
     }
 
     public void resumeAutomaticLifecycleIntegrationsAfterQuiet() {
@@ -1677,13 +2104,28 @@ public class WidgetService extends Service {
             return;
         }
         if (!automaticLifecycleQuiet || destroyed) return;
+        mainHandler.removeCallbacks(automaticLifecycleQuietTeardown);
         automaticLifecycleQuiet = false;
         int generation = ++automaticLifecycleResumeGeneration;
+        if (initialIntegrationStartupInProgress) {
+            // Stage zero is a one-time persistence barrier. Every later partially-started graph is
+            // replayed from stage one so stopped transports regain a fresh serialized session.
+            if (initialIntegrationStage > 1) initialIntegrationStage = 1;
+            initialIntegrationStageRetryCount = 0;
+            mainHandler.removeCallbacks(initialIntegrationStageRunner);
+            mainHandler.post(initialIntegrationStageRunner);
+            return;
+        }
+        if (!integrationsStarted) {
+            runInitialIntegrationStartup();
+            return;
+        }
+        credentialRefreshPending = false;
         Runnable[] stages = new Runnable[] {
-                () -> { if (phoneController != null) phoneController.reconfigure(); },
-                () -> { if (mqttController != null) mqttController.reconfigure(); },
-                () -> { if (haApiController != null) haApiController.reconfigure(); },
-                () -> { if (sprutController != null) sprutController.reconfigure(); }
+                () -> { ensurePhoneRuntimeGraph(); phoneController.reconfigure(); },
+                () -> { ensureMqttRuntimeGraph(); mqttController.reconfigure(); },
+                () -> { ensureHomeAssistantRuntimeGraph(); haApiController.reconfigure(); },
+                () -> { ensureSprutRuntimeGraph(); sprutController.reconfigure(); }
         };
         for (int index = 0; index < stages.length; index++) {
             final int stage = index;
@@ -1691,7 +2133,10 @@ public class WidgetService extends Service {
                 if (destroyed || automaticLifecycleQuiet
                         || generation != automaticLifecycleResumeGeneration) return;
                 runIntegrationStep("automatic lifecycle resume " + stage, stages[stage]);
-                if (stage == stages.length - 1) schedulePendingAutomationUiRefresh();
+                if (stage == stages.length - 1) {
+                    schedulePendingAutomationUiRefresh();
+                    finishAutomaticSurfaceReconcileIfReady();
+                }
             }, (stage + 1L) * INITIAL_INTEGRATION_STAGE_MS);
         }
     }
@@ -1719,23 +2164,26 @@ public class WidgetService extends Service {
         if (automaticLifecycleQuiet) {
             // The staged lifecycle resume includes every Keystore-backed transport and Phone;
             // do not schedule a second overlapping MQTT/HA/Sprut pass for the same unlock edge.
-            resumeAutomaticLifecycleIntegrationsAfterQuiet();
+            credentialRefreshPending = true;
             return;
         }
         if (credentialRefreshScheduled) return;
         credentialRefreshScheduled = true;
         runIntegrationStep("MQTT unlock", () -> {
-            if (mqttController != null) mqttController.reconfigure();
+            ensureMqttRuntimeGraph();
+            mqttController.reconfigure();
         });
         mainHandler.postDelayed(() -> {
             if (destroyed) return;
             runIntegrationStep("Home Assistant unlock", () -> {
-                if (haApiController != null) haApiController.reconfigure();
+                ensureHomeAssistantRuntimeGraph();
+                haApiController.reconfigure();
             });
             mainHandler.postDelayed(() -> {
                 if (destroyed) return;
                 runIntegrationStep("Sprut.hub unlock", () -> {
-                    if (sprutController != null) sprutController.reconfigure();
+                    ensureSprutRuntimeGraph();
+                    sprutController.reconfigure();
                 });
                 credentialRefreshScheduled = false;
                 schedulePendingIntegrationReconfigure();
@@ -1830,9 +2278,16 @@ public class WidgetService extends Service {
         if (activePhoneAlertDisabled) {
             clearPhoneStatusNotification(true);
         }
-        // Configuration changes are comparatively rare. Cache the parsed document here so
-        // frequent connector packets only update existing views and in-memory states.
-        if (haConfigs != null) configuredMainBricks = haConfigs.loadMain();
+        // The cold pass was parsed on startupStateWorker. Reparse here only after a real settings
+        // edit changed the immutable preference snapshot; stage 3 must not repeat large JSON on
+        // the main looper merely to register status listeners.
+        if (haConfigs != null) {
+            String currentMainJson = prefs.haMainBricksJson.get();
+            if (!Objects.equals(currentMainJson, configuredMainBricksJson)) {
+                configuredMainBricks = haConfigs.loadMain(currentMainJson);
+                configuredMainBricksJson = currentMainJson;
+            }
+        }
         hiddenInPackages = prefs.hideInPackages.get();
         rebuildEffectiveHideLists();
         safeUpdateForegroundAppTracking("preferences applied");
@@ -2176,8 +2631,32 @@ public class WidgetService extends Service {
         return popupBuiltinTypes().contains(type);
     }
 
+    /** Adds only the delayed ECARX-backed temperature portion to an already visible row. */
+    private void refreshCarStatusSurface() {
+        if (binding == null || carTelemetryExporter == null) return;
+        Set<BrickType> visible = currentBrickSet();
+        Set<BrickType> tracking = EnumSet.noneOf(BrickType.class);
+        tracking.addAll(visible);
+        tracking.addAll(popupBuiltinTypes());
+        tracking.addAll(driverInformationBrickTypes());
+        updateCarTempSubscription(BrickType.INDOOR_TEMP, tracking, binding.indoorTempText);
+        updateCarTempSubscription(BrickType.OUTDOOR_TEMP, tracking, binding.outdoorTempText);
+        applyBrickVisibility(visible);
+        int verticalPadding = binding.overlayContainer.getPaddingTop()
+                + binding.overlayContainer.getPaddingBottom();
+        binding.overlayContainer.setMinimumHeight(
+                computeMinWidgetHeight(visible) + verticalPadding);
+    }
+
     private void updateCarTempSubscription(BrickType type, Set<BrickType> bricksSet,
                                            OutlineTextView target) {
+        if (carTelemetryExporter == null) {
+            // The visual shell reserves configured geometry without touching the ECARX Binder.
+            if (bricksSet.contains(type) && target.getText().length() == 0) {
+                target.setText(TEMP_PLACEHOLDER);
+            }
+            return;
+        }
         CarIntegration car = CarIntegrations.get(this);
         if (bricksSet.contains(type)) {
             // Subscribe regardless of isBrickSupported(): right after boot the vendor service
@@ -3289,11 +3768,13 @@ public class WidgetService extends Service {
         // Car bricks only render when the vehicle supports the sensor — a preset imported from
         // another car may list them in brickOrder, and an unsupported sensor would otherwise
         // leave a permanently frozen placeholder brick in the row.
-        CarIntegration car = CarIntegrations.get(this);
+        // Before the delayed ECARX stage, reserve configured temperature slots using placeholders.
+        // The later capability callback collapses unsupported sensors without blocking first draw.
+        CarIntegration car = carTelemetryExporter == null ? null : CarIntegrations.get(this);
         boolean indoorTempActive = bricksSet.contains(BrickType.INDOOR_TEMP)
-                && car.isBrickSupported(BrickType.INDOOR_TEMP);
+                && (car == null || car.isBrickSupported(BrickType.INDOOR_TEMP));
         boolean outdoorTempActive = bricksSet.contains(BrickType.OUTDOOR_TEMP)
-                && car.isBrickSupported(BrickType.OUTDOOR_TEMP);
+                && (car == null || car.isBrickSupported(BrickType.OUTDOOR_TEMP));
         boolean homeAssistantActive = bricksSet.contains(BrickType.HOME_ASSISTANT)
                 && binding.homeAssistantContainer.getChildCount() > 0;
         boolean phoneStatusActive = bricksSet.contains(BrickType.PHONE_STATUS)
@@ -3774,11 +4255,13 @@ public class WidgetService extends Service {
         // Car bricks only contribute to the height floor when the vehicle actually renders them
         // (same isBrickSupported gate as applyBrickVisibility) — otherwise a preset from another
         // car would inflate the widget height for bricks that never appear.
-        CarIntegration car = CarIntegrations.get(this);
-        if (bricks.contains(BrickType.INDOOR_TEMP) && car.isBrickSupported(BrickType.INDOOR_TEMP)) {
+        CarIntegration car = carTelemetryExporter == null ? null : CarIntegrations.get(this);
+        if (bricks.contains(BrickType.INDOOR_TEMP)
+                && (car == null || car.isBrickSupported(BrickType.INDOOR_TEMP))) {
             h = Math.max(h, textLineHeight(binding.indoorTempText, prefs.indoorTemp.fontSize.get()));
         }
-        if (bricks.contains(BrickType.OUTDOOR_TEMP) && car.isBrickSupported(BrickType.OUTDOOR_TEMP)) {
+        if (bricks.contains(BrickType.OUTDOOR_TEMP)
+                && (car == null || car.isBrickSupported(BrickType.OUTDOOR_TEMP))) {
             h = Math.max(h, textLineHeight(binding.outdoorTempText, prefs.outdoorTemp.fontSize.get()));
         }
         if (bricks.contains(BrickType.HOME_ASSISTANT)) {
@@ -5360,17 +5843,19 @@ public class WidgetService extends Service {
     public void onDestroy() {
         destroyed = true;
         instance = null;
+        long ownerToken = startupStateOwnerToken;
+        if (ownerToken != 0L) {
+            STARTUP_STATE_OWNER.compareAndSet(ownerToken, ownerToken + 1L);
+            startupStateOwnerToken = 0L;
+        }
         if (!runtimeInitialized) {
             stopForeground(true);
             super.onDestroy();
             return;
         }
         integrationStartupScheduled = false;
-        try {
-            Choreographer.getInstance().removeFrameCallback(integrationStartupFrame);
-        } catch (RuntimeException failure) {
-            Log.w(TAG, "Could not remove deferred integration startup", failure);
-        }
+        cancelDeferredIntegrationStart();
+        startupStateWorker.shutdownNow();
 
         mainHandler.removeCallbacksAndMessages(null);
 
@@ -5383,6 +5868,7 @@ public class WidgetService extends Service {
         phoneStatusValues.clear();
         observedPhoneNotificationKeys.clear();
         queuedPhoneNotifications.clear();
+        pendingIntentScenarioCommands.clear();
         phoneNotificationBurstActive = false;
         phoneAncsReady = false;
         activePhoneNotification = null;
@@ -5421,7 +5907,8 @@ public class WidgetService extends Service {
             runCleanupStep("phone ANCS presence", phoneAncsPresenceExporter::stop);
         }
         phoneAncsPresenceExporter = null;
-        if (carTelemetryExporter != null) {
+        boolean carRuntimeWasInitialized = carTelemetryExporter != null;
+        if (carRuntimeWasInitialized) {
             runCleanupStep("car telemetry", carTelemetryExporter::stop);
         }
         carTelemetryExporter = null;
@@ -5454,12 +5941,14 @@ public class WidgetService extends Service {
         runCleanupStep("media tracking", this::disableMediaTracking);
         // Drop car sensor subscriptions but keep the process-wide integration alive — the
         // settings UI may still query isBrickSupported after the overlay service stops.
-        runCleanupStep("car sensor subscriptions", () -> {
-            CarIntegration car = CarIntegrations.get(this);
-            car.setAvailabilityChangedListener(null);
-            car.unsubscribe(BrickType.INDOOR_TEMP);
-            car.unsubscribe(BrickType.OUTDOOR_TEMP);
-        });
+        if (carRuntimeWasInitialized) {
+            runCleanupStep("car sensor subscriptions", () -> {
+                CarIntegration car = CarIntegrations.get(this);
+                car.setAvailabilityChangedListener(null);
+                car.unsubscribe(BrickType.INDOOR_TEMP);
+                car.unsubscribe(BrickType.OUTDOOR_TEMP);
+            });
+        }
         super.onDestroy();
     }
 

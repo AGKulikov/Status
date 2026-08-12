@@ -26,6 +26,7 @@ import androidx.core.content.ContextCompat;
 import dezz.status.widget.HudPanelSettingsActivity;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.R;
+import dezz.status.widget.StatusWidgetApplication;
 import dezz.status.widget.StartupWorkCoordinator;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
@@ -195,6 +196,9 @@ public final class HudPresentationService extends Service
         data.start();
         reconcileStockHudCarPreference();
         reconcilePresentation();
+        // The isolated process has now paid its own HUD construction cost; enable only its
+        // diagnostic preference layer after that useful surface attempt, never from Application.
+        StatusWidgetApplication.notifyFirstUsefulSurface(this);
     }
 
     @Override
