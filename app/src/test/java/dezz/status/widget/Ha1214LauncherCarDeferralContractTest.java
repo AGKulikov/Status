@@ -103,7 +103,8 @@ public final class Ha1214LauncherCarDeferralContractTest {
         Path root = Paths.get("app", "src", "main", "java", "dezz", "status", "widget");
         Path module = Paths.get("src", "main", "java", "dezz", "status", "widget");
         Path base = Files.isDirectory(root) ? root : module;
-        return Files.readString(base.resolve(relative), StandardCharsets.UTF_8);
+        return new String(Files.readAllBytes(base.resolve(relative)),
+                StandardCharsets.UTF_8);
     }
 
     private static String between(String source, String start, String end) {
