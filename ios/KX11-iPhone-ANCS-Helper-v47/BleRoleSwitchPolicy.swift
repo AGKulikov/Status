@@ -81,7 +81,7 @@ public struct BleRoleSwitchPolicy {
         case closeAll
     }
 
-    private enum ControlTransmitStatus: Equatable {
+    fileprivate enum ControlTransmitStatus: Equatable {
         case idle
         case inFlight
         case retryWait
