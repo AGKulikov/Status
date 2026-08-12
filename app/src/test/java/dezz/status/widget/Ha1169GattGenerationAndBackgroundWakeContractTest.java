@@ -41,44 +41,6 @@ public final class Ha1169GattGenerationAndBackgroundWakeContractTest {
         assertTrue(card.contains("slotBottom - childTop - visibleHeight"));
     }
 
-    @Test public void androidPublishesCurrentBootstrapB4NotifyWithRealCccd() throws Exception {
-        String transport = source("phone/transport/IphoneAncsTransport.java");
-        String server = between(transport, "private void openGattServer()",
-                "private void startPreparedAdvertising()");
-        String callbacks = between(transport, "private final BluetoothGattServerCallback",
-                "private void handleIphonePeripheralConnectionState");
-
-        assertTrue(transport.contains("d2d9e4b0-47f1-4e44-a8bb-a932fd5a2f04"));
-        assertTrue(transport.contains("d2d9e4b4-47f1-4e44-a8bb-a932fd5a2f04"));
-        assertTrue(server.contains("BluetoothGattCharacteristic.PROPERTY_NOTIFY"));
-        assertTrue(server.contains("telemetry.addDescriptor(telemetryCccd)"));
-        assertTrue(callbacks.contains("public void onDescriptorWriteRequest"));
-        assertTrue(callbacks.contains("setServerTelemetrySubscription(device, enable)"));
-        assertTrue(transport.contains("SERVER_TELEMETRY_WAKE_POLL_MS = 5_000L"));
-        assertTrue(transport.contains("notifyCharacteristicChanged(target, telemetry, false)"));
-    }
-
-    @Test public void helper17AvoidsOldGattCacheAndBoundsRetainedConnect() throws Exception {
-        String helper = project("ios/KX11-iPhone-ANCS-Helper-v17/"
-                + "KX11ANCSHelper/ViewController.swift");
-
-        assertTrue(helper.contains("KX11 ANCS HELPER v17"));
-        assertTrue(helper.contains("D2D9E4B0-47F1-4E44-A8BB-A932FD5A2F02"));
-        assertTrue(helper.contains("peripheral.v17.single-link-g2"));
-        assertTrue(helper.contains("central.v17.geely-ancs-g2"));
-        assertTrue(helper.contains("source: \"current Core Bluetooth cache\""));
-        assertTrue(helper.contains("peripheral.discoverCharacteristics(missing, for: service)"));
-        assertTrue(helper.contains("cache fallback after uuidNotAllowed"));
-        assertTrue(helper.contains("connect timeout; fresh D2D9 advertisement required"));
-        assertTrue(helper.contains("deadline: .now() + 15"));
-    }
-
-    @Test public void releaseIdentityIsHa1169() throws Exception {
-        String build = project("build.gradle");
-        if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1196'"));
-    }
-
     private static String source(String relative) throws Exception {
         return project("app/src/main/java/dezz/status/widget/" + relative);
     }

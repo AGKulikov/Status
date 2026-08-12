@@ -11,58 +11,8 @@ import java.nio.file.Paths;
 
 import org.junit.Test;
 
-/** HA1190 regressions derived from the fixed-F04 cache failure and binary limiter trace. */
+/** Retained binary limiter aggregate coverage for the car runtime. */
 public final class Ha1190DynamicGattAndBinaryLimiterContractTest {
-    @Test public void androidPublishesCacheBustingNamespaceBehindStableBeacon()
-            throws Exception {
-        String transport = project(
-                "app/src/main/java/dezz/status/widget/phone/transport/IphoneAncsTransport.java");
-        String start = between(transport,
-                "private boolean startGeelyAncsAdvertising",
-                "/** Allocates one persistent namespace");
-        String namespace = between(transport,
-                "private void rotateManagedIncomingDiagnosticNamespace",
-                "/** Legacy comparison test");
-        String disconnect = between(transport,
-                "private void preserveManagedIncomingPublicationAfterLinkLoss",
-                "private static String deviceKey");
-
-        assertTrue(transport.contains("d2d9e4bf-47f1-4e44-a8bb-a932fd5affff"));
-        assertTrue(start.contains("rotateManagedIncomingDiagnosticNamespace()"));
-        assertTrue(start.contains("addManufacturerData"));
-        assertTrue(start.contains("MANAGED_INCOMING_BEACON_SERVICE"));
-        assertTrue(namespace.contains("SharedPreferences"));
-        assertTrue(namespace.contains("managedIncomingUuid(0, generation)"));
-        assertTrue(namespace.contains("serverControlCharacteristic = managedIncomingUuid(2"));
-        assertTrue(namespace.contains("serverSecureCharacteristic = managedIncomingUuid(3"));
-        assertTrue(disconnect.contains("resetVerifiedPeerSession()"));
-        assertFalse(disconnect.contains("stopAdvertising()"));
-        assertFalse(disconnect.contains("closeGattServer()"));
-        assertFalse(disconnect.contains("rotateManagedIncomingDiagnosticNamespace"));
-        assertTrue(transport.contains("serverDiagnosticService.equals(service.getUuid())"));
-    }
-
-    @Test public void helperResolvesFreshGenerationBeforeBootstrap() throws Exception {
-        String helper = project("ios/KX11-iPhone-ANCS-Helper-v28/"
-                + "KX11ANCSHelper/ViewController.swift");
-        String bootstrap = between(helper,
-                "private func beginCentralDiscovery",
-                "private func stopCentralRoute");
-        String discovery = between(helper,
-                "func centralManager(_ central: CBCentralManager, didDiscover peripheral",
-                "func centralManager(_ central: CBCentralManager, didConnect peripheral");
-
-        assertTrue(helper.contains("KX11 ANCS HELPER v28"));
-        assertTrue(helper.contains("managedIncomingBeaconUUID"));
-        assertTrue(helper.contains("decodeCentralNamespace"));
-        assertTrue(helper.contains("applyCentralNamespace(generation)"));
-        assertTrue(helper.contains("managedIncomingUUID(kind: 2"));
-        assertTrue(helper.contains("withServices: [managedIncomingBeaconUUID]"));
-        assertTrue(discovery.contains("let generation = advertisedCentralNamespace"));
-        assertTrue(bootstrap.contains("peripheral.discoverServices([centralServiceUUID])"));
-        assertFalse(bootstrap.contains("centralNamespaceResolved = false"));
-    }
-
     @Test public void binaryAggregatesUseDeclaredGettersAndFastDiagnosticPolling()
             throws Exception {
         String fallback = project(
@@ -86,14 +36,6 @@ public final class Ha1190DynamicGattAndBinaryLimiterContractTest {
         assertTrue(reads.contains("reader.invoke(manager)"));
         assertTrue(fallback.contains("listener.onAdasBinarySignal"));
         assertTrue(fallback.contains("adasRecorderDemand ? RECORDER_HEALTH_READ_MILLIS"));
-    }
-
-    @Test public void releaseIdentityAdvancesAsMatchedPair() throws Exception {
-        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1196'"));
-        String helperProject = project("ios/KX11-iPhone-ANCS-Helper-v28/"
-                + "KX11ANCSHelper.xcodeproj/project.pbxproj");
-        assertTrue(helperProject.contains("MARKETING_VERSION = 28.0"));
-        assertTrue(helperProject.contains("CURRENT_PROJECT_VERSION = 28"));
     }
 
     private static String project(String relative) throws Exception {

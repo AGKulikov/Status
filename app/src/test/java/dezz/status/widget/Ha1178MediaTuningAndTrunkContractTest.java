@@ -52,7 +52,8 @@ public final class Ha1178MediaTuningAndTrunkContractTest {
         String launcher = source("LauncherActivity.java");
         String driver = source("driver/DriverPanelActionExecutor.java");
 
-        assertTrue(geely.contains("TRUNK_FUNCTION_ID = 0x02210100"));
+        assertTrue(geely.contains("TRUNK_FUNCTION_ID = 0x21020100"));
+        assertFalse(geely.contains("TRUNK_FUNCTION_ID = 0x02210100"));
         assertTrue(geely.contains("TRUNK_ZONE = 0x20000000"));
         assertTrue(geely.contains("option(0, \"Закрыт\"), option(1, \"Открыт\")"));
         assertTrue(geely.indexOf("direct trunk probe is not ready")
@@ -64,7 +65,7 @@ public final class Ha1178MediaTuningAndTrunkContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1178() throws Exception {
-        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1196'"));
+        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1212'"));
     }
 
     private static String source(String relative) throws Exception {

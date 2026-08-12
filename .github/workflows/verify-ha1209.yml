@@ -73,7 +73,7 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Preserved transport, launcher and quiet-start contracts
+      - name: Preserved product, launcher and quiet-start contracts
         shell: bash
         run: |
           set -euo pipefail
@@ -84,22 +84,12 @@ jobs:
             --tests dezz.status.widget.Ha1154HelperAndDriverFavoritesContractTest \
             --tests dezz.status.widget.Ha1141HudProcessIsolationTest \
             --tests dezz.status.widget.Ha1197TrunkAndReconnectContractTest \
-            --tests dezz.status.widget.Ha1198AutomaticBleRecoveryContractTest \
-            --tests dezz.status.widget.Ha1199ReferenceAncsConnectionContractTest \
-            --tests dezz.status.widget.Ha1200CurrentLinkSecurityContractTest \
-            --tests dezz.status.widget.Ha1201DirectAttachContractTest \
-            --tests dezz.status.widget.Ha1202ColdStartAuthorizationContractTest \
             --tests dezz.status.widget.Ha1203VectorIconPickerContractTest \
             --tests dezz.status.widget.Ha1204LiveClimateAndModernIconContractTest \
-            --tests dezz.status.widget.Ha1205AncsRecoveryContractTest \
-            --tests dezz.status.widget.Ha1206HotUpdateRecoveryContractTest \
-            --tests dezz.status.widget.Ha1207PostReadyAttachContractTest \
             --tests dezz.status.widget.Ha1208PublicationRecoveryContractTest \
             --tests dezz.status.widget.Ha1209LauncherStartupContractTest \
             --tests dezz.status.widget.StartupLoadPolicyTest \
             --tests dezz.status.widget.WidgetServiceStarterPolicyTest \
-            --tests dezz.status.widget.phone.transport.AncsRecoveryPolicyTest \
-            --tests dezz.status.widget.phone.transport.ManagedIncomingPublicationPolicyTest \
             --tests dezz.status.widget.launcher.LiveClimateIconPolicyTest \
             --tests dezz.status.widget.car.CarThreeLevelCyclePolicyTest \
             --tests dezz.status.widget.car.GeelyClimateControlReliabilityTest \

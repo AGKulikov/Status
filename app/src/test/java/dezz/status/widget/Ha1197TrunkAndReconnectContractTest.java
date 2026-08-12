@@ -35,30 +35,6 @@ public final class Ha1197TrunkAndReconnectContractTest {
                 "source.setFunctionValue(definition.functionId, definition.zone, value)"));
     }
 
-    @Test public void helperRecyclesOnlyTheStaleOwnerAfterFifteenSeconds() throws Exception {
-        String helper = project(
-                "ios/KX11-iPhone-ANCS-Helper-v34/KX11ANCSHelper/ViewController.swift");
-        String watchdog = between(helper,
-                "private func armCentralConnectTimeout",
-                "private func scheduleCentralReconnect");
-        String reset = between(helper,
-                "private func resetCentralLink",
-                "private func isCentralEncryptionError");
-
-        assertTrue(helper.contains("centralConnectTimeout: TimeInterval = 15"));
-        assertTrue(watchdog.contains("case .connecting:"));
-        assertTrue(watchdog.contains("Central .connecting завис"));
-        assertTrue(watchdog.contains(
-                "resetCentralLink(reason: \"stale .connecting watchdog"));
-        assertFalse(watchdog.contains("pending owner не отменяю"));
-        assertFalse(helper.contains("centralConnectingObservationInterval"));
-        assertTrue(reset.contains("centralHardResetReason != nil"));
-        assertTrue(reset.contains("centralRequireFreshAdvertisement = true"));
-        assertTrue(reset.contains("centralManager.cancelPeripheralConnection(peripheral)"));
-        assertEquals(1, occurrences(helper,
-                "centralManager.connect(peripheral, options: options)"));
-    }
-
     @Test public void playPauseIsVectorAndUsesTheSameContentScaleAsTransportButtons()
             throws Exception {
         String play = project("app/src/main/res/drawable/ic_media_play.xml");

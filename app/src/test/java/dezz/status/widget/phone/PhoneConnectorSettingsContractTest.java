@@ -24,7 +24,8 @@ public final class PhoneConnectorSettingsContractTest {
 
         assertTrue(source.contains("\"phoneConnectorEnabled\", false"));
         assertTrue(source.contains("new Str(this, \"phoneDeviceAddress\", \"\")"));
-        assertTrue(source.contains("\"phoneAncsDeviceAddress\", \"\""));
+        assertFalse(source.contains("new Str(this,\n"
+                + "            \"phoneAncsDeviceAddress\", \"\")"));
         assertTrue(source.contains("\"phoneNotificationsEnabled\", true"));
         assertTrue(source.contains("\"phoneMessagesEnabled\", false"));
         assertTrue(source.contains("\"phoneIncludeNotificationText\", false"));
@@ -79,8 +80,9 @@ public final class PhoneConnectorSettingsContractTest {
         assertTrue(source.contains("R.string.phone_choose_required"));
         assertTrue(source.contains(
                 "preferences.phoneDeviceAddress.set(selectedDeviceAddress)"));
+        assertFalse(source.contains("preferences.phoneAncsDeviceAddress"));
         assertTrue(source.contains(
-                "preferences.phoneAncsDeviceAddress.set(selectedDeviceAddress)"));
+                "getString(R.string.phone_diag_ancs_transport_names)"));
         assertFalse(source.contains("selectedDeviceAddress = position == 0"));
         assertFalse(source.contains("labels[0] = getString(R.string.phone_no_device)"));
     }

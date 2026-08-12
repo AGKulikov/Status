@@ -274,8 +274,8 @@
     <string name="phone_enable_title">Подключение iPhone</string>
     <string name="phone_enable_subtitle">Отслеживается только выбранное сопряжённое устройство, а не любой телефон рядом</string>
     <string name="phone_ble_role_title">Роль iPhone в BLE: Peripheral / Central</string>
-    <string name="phone_ble_role_peripheral">Peripheral — текущая схема; KX11 подключается к iPhone_ANCS</string>
-    <string name="phone_ble_role_central">Central — Helper подключается к Geely_ANCS</string>
+    <string name="phone_ble_role_peripheral">Peripheral — Helper публикует только UUID без BLE-имени; KX11 подключается как GATT-клиент</string>
+    <string name="phone_ble_role_central">Central — Helper подключается к UUID-маршруту KX11 без BLE-имени</string>
     <string name="phone_device_title">Выбранный iPhone</string>
     <string name="phone_choose_device">Выбрать сопряжённый iPhone</string>
     <string name="phone_open_bluetooth">Настройки Bluetooth</string>
@@ -369,7 +369,7 @@
     <string name="phone_diag_device">Конкретный сопряжённый iPhone</string>
     <string name="phone_diag_ble_role">Роль BLE</string>
     <string name="phone_diag_ancs_transport">Отдельный транспорт BLE/ANCS</string>
-    <string name="phone_diag_ancs_transport_names">%1$s ↔ %2$s; имя и сопряжение Classic Bluetooth не меняются</string>
+    <string name="phone_diag_ancs_transport_names">ANCS transport v2 использует фиксированные UUID сервисов и identity установки; отдельное BLE-имя не рекламируется</string>
     <string name="phone_diag_ancs_dedicated_route">Отдельный BLE-сервис приложения и восстановление ANCS с разрешением личности iPhone</string>
     <string name="phone_diag_not_bonded">сохранённый iPhone сейчас не сопряжён</string>
     <string name="phone_diag_connection">Подключение выбранного iPhone</string>
@@ -438,7 +438,7 @@
     <string name="phone_test_bluetooth_required">Включите Bluetooth и сначала сопрягите iPhone в штатных настройках Bluetooth магнитолы.</string>
     <string name="phone_test_pairing_required">Выбранный iPhone сейчас не сопряжён. Эта проверка не заменяет штатное сопряжение Bluetooth.</string>
     <string name="phone_test_started_title">Проверка штатного подключения и ANCS</string>
-    <string name="phone_test_started">Штатной службе ECARX отправлен запрос подключить уже сопряжённый iPhone. Это не новое сопряжение и само по себе не вызывает запрос на телефоне. Затем Status Widget обновит кэш GATT, проверит ANCS и при необходимости выполнит одну чистую повторную попытку; оставьте iPhone разблокированным на 2–3 минуты. На Android 9 приложение не может принудительно объявить ANCS и показать системный запрос iPhone. Если ANCS не появится, на iPhone откройте «Настройки → Bluetooth → ⓘ рядом с магнитолой» и включите «Показывать уведомления». Если такого пункта нет, удалите сопряжение на обеих сторонах и выполните его заново через штатные настройки Bluetooth магнитолы.</string>
+    <string name="phone_test_started">Штатной службе ECARX отправлен запрос сохранить подключение уже сопряжённого iPhone. Status Widget v2 завершает точного текущего BLE-владельца и запускает свежее поколение выбранного режима; скрытый GATT-кэш не обновляется, Bluetooth не перезапускается, пара не удаляется. Оставьте Helper запущенным, а iPhone разблокированным до завершения авторизации и подписок ANCS. Если iOS отклоняет ANCS, проверьте «Показывать уведомления» у магнитолы в настройках Bluetooth iPhone.</string>
     <string name="phone_privacy_hint">Данные ANCS и MAP с подтверждённым устройством принимаются только от выбранного iPhone; Android Notification Access и доступ к общему хранилищу SMS не требуются. Точный Bluetooth-адрес хранится только на этой магнитоле и показывается здесь в маскированном виде.</string>
     <string name="phone_apply">Применить настройки телефона</string>
     <string name="phone_saved">Настройки телефона применены</string>

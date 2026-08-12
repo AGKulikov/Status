@@ -27,44 +27,17 @@ public final class Ha1147ExplicitChargingContractTest {
                 "batteryChargingEstimated = batteryCharging == null ? null : false"));
     }
 
-    @Test public void basFallbackCarriesPercentageButNotPowerState() throws Exception {
-        String transport = source("phone/transport/IphoneAncsTransport.java");
-        String prepare = between(transport, "private void prepareBatteryBootstrap",
-                "private void resetBatteryBootstrap");
-        String advance = between(transport, "private void advanceBatteryBootstrapIfIdle",
-                "private boolean startOptionalBatteryRead");
-        String subscribe = between(transport, "private boolean startOptionalBatterySubscription",
-                "private void handleNotificationSource");
-
-        assertTrue(prepare.contains("batteryStage = BatteryStage.READ_LEVEL_STATUS"));
-        assertBefore(advance, "case READ_LEVEL_STATUS:", "case READ_LEVEL:");
-        assertFalse(transport.contains("BATTERY_POWER_STATE"));
-        assertFalse(advance.contains("READ_POWER"));
-        assertTrue(subscribe.contains("PROPERTY_NOTIFY"));
-        assertTrue(subscribe.contains("PROPERTY_INDICATE"));
-        assertTrue(subscribe.contains("ENABLE_INDICATION_VALUE"));
-        assertTrue(subscribe.contains("ENABLE_NOTIFICATION_VALUE"));
-    }
-
     @Test public void helperIsTheOnlyPublishedChargingAuthority()
             throws Exception {
         String controller = source("phone/PhoneConnectorController.java");
 
         assertTrue(controller.contains("batteryChargingSource = \"iphone_helper\""));
-        assertTrue(controller.contains("the sole power-state authority"));
+        assertTrue(controller.contains("Cable/charging state remains Helper-only"));
         assertFalse(controller.contains("selectBasChargingState"));
         assertFalse(controller.contains("basLevelStatusBatteryCharging"));
         assertFalse(controller.contains("basPowerStateBatteryCharging"));
         assertFalse(controller.contains("batteryChargingSource = \"android_metadata\""));
         assertFalse(controller.contains("batteryChargingSource = \"hfp_vendor\""));
-    }
-
-    private static void assertBefore(String source, String first, String second) {
-        int firstIndex = source.indexOf(first);
-        int secondIndex = source.indexOf(second);
-        assertTrue("Missing first marker: " + first, firstIndex >= 0);
-        assertTrue("Missing second marker: " + second, secondIndex >= 0);
-        assertTrue(first + " must precede " + second, firstIndex < secondIndex);
     }
 
     private static String source(String relative) throws Exception {
@@ -74,13 +47,5 @@ public final class Ha1147ExplicitChargingContractTest {
                 .resolve(relative);
         Path file = Files.isRegularFile(root) ? root : app;
         return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
-    }
-
-    private static String between(String source, String start, String end) {
-        int from = source.indexOf(start);
-        int to = source.indexOf(end, from + Math.max(1, start.length()));
-        assertTrue("Missing section start: " + start, from >= 0);
-        assertTrue("Missing section end: " + end, to > from);
-        return source.substring(from, to);
     }
 }

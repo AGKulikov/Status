@@ -13,21 +13,6 @@ import java.nio.file.Paths;
 
 /** Guard rails for the HA1144 fixes requested on the KX11 head unit. */
 public final class Ha1144RegressionContractTest {
-    @Test public void aclLossKeepsTheResolvedAncsOwnerAlive() throws Exception {
-        String controller = source("phone/PhoneConnectorController.java");
-        String transport = source("phone/transport/IphoneAncsTransport.java");
-
-        assertTrue(controller.contains("requestManagedAncsReconnect(token,"));
-        assertTrue(controller.contains(
-                "current.requestSavedPeerReconnect(detail, confirmedLeLoss)"));
-        assertTrue(controller.contains(
-                "state.contains(\"RECOVERING\") || state.contains(\"IDENTITY SCAN\")"));
-        assertTrue(controller.contains("ancsReady = false"));
-        assertTrue(transport.contains("managedResolvedPeer"));
-        assertTrue(transport.contains("sameDevice(managedResolvedPeer, observed)"));
-        assertTrue(transport.contains("scheduleManagedReconnect(reason.trim().isEmpty()"));
-    }
-
     @Test public void bothDriverDrawersUseOneDuplicateSafeTogglePath() throws Exception {
         String overlay = source("driver/DriverPanelOverlayController.java");
         String gate = source("driver/DriverPanelToggleGate.java");

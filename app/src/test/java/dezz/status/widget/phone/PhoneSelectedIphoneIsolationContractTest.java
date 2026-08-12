@@ -71,40 +71,6 @@ public final class PhoneSelectedIphoneIsolationContractTest {
         }
     }
 
-    @Test public void ancsTransportAndInitialProfilesUseTheSelectedAddressOnly()
-            throws IOException {
-        String source = controller();
-        String transport = transport();
-        String ensureGatt = method(source, "private void ensureGatt",
-                "private void ensureLegacyBatteryGatt");
-        String batteryOnly = method(source, "private void ensureLegacyBatteryGatt",
-                "private void startAncsTransportOnMain");
-        String savedPeer = method(transport, "public boolean connectSavedIphone",
-                "public boolean acceptIphoneCentral");
-
-        assertTrue(source.contains("final String address = PhoneBleRole.isIphoneCentral(current.bleRole)"));
-        assertTrue(source.contains("? current.ancsDeviceAddress : current.deviceAddress"));
-        assertTrue(source.contains("created.connectSavedIphone(address)"));
-        assertTrue(source.contains("new AncsTransportListener(token, transportSession)"));
-        assertTrue(savedPeer.contains("adapter.getRemoteDevice(address.trim())"));
-        assertTrue(savedPeer.contains("return scheduleColdBackgroundAttach(device,"));
-        assertTrue(savedPeer.contains("return startSavedPeerScan(device)"));
-        assertFalse(savedPeer.contains("startGeelyAncsAdvertising()"));
-        assertFalse(transport.contains(".setDeviceAddress(address)"));
-        assertTrue(transport.contains("matchesManagedSavedPeer("));
-        assertTrue(transport.contains("uniqueBondedNameMatch("));
-        assertTrue(transport.contains("AncsReconnectPolicy.candidateMayBeSelected("));
-        assertFalse(ensureGatt.contains("selectedDevice.connectGatt("));
-        assertFalse(ensureGatt.contains("scheduleConnectWatchdog("));
-        assertTrue(batteryOnly.contains("selectedDevice.connectGatt(context, autoConnect"));
-        assertTrue(batteryOnly.contains("config == null || config.transportNeeded()"));
-        assertTrue(source.contains("proxy.getConnectedDevices()"));
-        assertTrue(source.contains("if (isSelected(device))"));
-        assertTrue(source.contains("transportSession != activeAncsTransportSession"));
-        assertTrue(transport.contains("if (callbackGatt != gatt) return;"));
-        assertTrue(source.contains("generation == token"));
-    }
-
     @Test public void mapBackfillStartsOnlyAfterTheExactMapSessionBarrier()
             throws IOException {
         String method = method(controller(), "private void queryInitialProfileState",
@@ -144,10 +110,6 @@ public final class PhoneSelectedIphoneIsolationContractTest {
 
     private static String controller() throws IOException {
         return source("PhoneConnectorController.java");
-    }
-
-    private static String transport() throws IOException {
-        return source("transport", "IphoneAncsTransport.java");
     }
 
     private static String source(String... relative) throws IOException {

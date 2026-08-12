@@ -1109,9 +1109,7 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                         : R.string.phone_ble_role_peripheral)));
         result.append('\n').append(line(ancsRequested,
                 getString(R.string.phone_diag_ancs_transport),
-                getString(R.string.phone_diag_ancs_transport_names,
-                        dezz.status.widget.phone.transport.IphoneAncsTransport.LOCAL_LOGICAL_NAME,
-                        dezz.status.widget.phone.transport.IphoneAncsTransport.REMOTE_LOGICAL_NAME)));
+                getString(R.string.phone_diag_ancs_transport_names)));
         result.append('\n').append(line(phoneConnected,
                 getString(R.string.phone_diag_connection),
                 phoneConnected
@@ -1764,16 +1762,8 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 || preferences.phoneLowBatteryAlertThreshold.get()
                         != savedLowBatteryThreshold;
 
-        String previouslySelectedDevice = clean(preferences.phoneDeviceAddress.get());
-        String rememberedAncsAddress = clean(preferences.phoneAncsDeviceAddress.get());
         preferences.phoneConnectorEnabled.set(connectorRequested);
         preferences.phoneDeviceAddress.set(selectedDeviceAddress);
-        // Classic and ANCS start with the same physical iPhone, but the BLE transport owns a
-        // separate identity key and never mutates the stock Classic pairing/name.
-        if (rememberedAncsAddress.isEmpty()
-                || !selectedDeviceAddress.equalsIgnoreCase(previouslySelectedDevice)) {
-            preferences.phoneAncsDeviceAddress.set(selectedDeviceAddress);
-        }
         preferences.phoneBleRole.set(checked(iphoneCentralRole,
                 PhoneBleRole.isIphoneCentral(preferences.phoneBleRole.get()))
                 ? PhoneBleRole.IPHONE_CENTRAL : PhoneBleRole.IPHONE_PERIPHERAL);

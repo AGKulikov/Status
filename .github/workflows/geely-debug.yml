@@ -49,7 +49,9 @@ jobs:
       - name: Decode stable update keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          REQUIRE_STABLE: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+          # Pull requests validate with debug signing. Stable signing remains mandatory for
+          # branch/tag publications, where repository secrets are intentionally available.
+          REQUIRE_STABLE: ${{ github.event_name != 'pull_request' }}
         shell: bash
         run: |
           if [[ -n "$KEYSTORE_BASE64" ]]; then

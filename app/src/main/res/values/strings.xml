@@ -279,8 +279,8 @@
     <string name="phone_enable_title">iPhone connector</string>
     <string name="phone_enable_subtitle">Observe only the selected paired device, never any nearby phone</string>
     <string name="phone_ble_role_title">iPhone BLE role: Peripheral / Central</string>
-    <string name="phone_ble_role_peripheral">Peripheral — current route; KX11 connects to iPhone_ANCS</string>
-    <string name="phone_ble_role_central">Central — Helper connects to Geely_ANCS</string>
+    <string name="phone_ble_role_peripheral">Peripheral — Helper advertises UUID only; KX11 connects as the GATT client</string>
+    <string name="phone_ble_role_central">Central — Helper connects to the KX11 UUID-only reverse route</string>
     <string name="phone_device_title">Selected iPhone</string>
     <string name="phone_choose_device">Choose paired iPhone</string>
     <string name="phone_open_bluetooth">Bluetooth settings</string>
@@ -374,7 +374,7 @@
     <string name="phone_diag_device">Exact paired iPhone</string>
     <string name="phone_diag_ble_role">BLE role</string>
     <string name="phone_diag_ancs_transport">Dedicated BLE/ANCS transport</string>
-    <string name="phone_diag_ancs_transport_names">%1$s ↔ %2$s; Classic Bluetooth name and pairing stay unchanged</string>
+    <string name="phone_diag_ancs_transport_names">ANCS transport v2 uses fixed service UUIDs and stable installation identity; no BLE local name is advertised</string>
     <string name="phone_diag_ancs_dedicated_route">Dedicated app BLE service with identity-resolving ANCS recovery</string>
     <string name="phone_diag_not_bonded">the saved iPhone is not paired</string>
     <string name="phone_diag_connection">Selected iPhone connection</string>
@@ -443,7 +443,7 @@
     <string name="phone_test_bluetooth_required">Turn on Bluetooth and pair the iPhone in the head unit’s stock Bluetooth settings before testing notifications.</string>
     <string name="phone_test_pairing_required">The selected iPhone is not currently paired. This test does not replace stock Bluetooth pairing.</string>
     <string name="phone_test_started_title">Stock connection and ANCS check</string>
-    <string name="phone_test_started">The stock ECARX service was asked to connect the already paired iPhone. This is not new pairing and does not itself create a phone prompt. Status Widget will then refresh the GATT cache, check ANCS, and run one clean retry if needed; keep the iPhone unlocked for 2–3 minutes. On Android 9 the app cannot force ANCS advertising or an iPhone system prompt. If ANCS stays unavailable, open iPhone Settings → Bluetooth → ⓘ next to the head unit and enable “Show Notifications”. If that option is missing, forget the pairing on both sides and pair again through the head unit’s stock Bluetooth settings.</string>
+    <string name="phone_test_started">The stock ECARX service was asked to retain the already paired iPhone. Status Widget v2 is draining the exact current BLE owner and starting a fresh generation in the selected topology; it does not refresh hidden GATT caches, cycle Bluetooth, or delete the bond. Keep Helper running and the iPhone unlocked while the authorization and ANCS subscriptions complete. If iOS denies ANCS, check “Show Notifications” for the head unit in iPhone Bluetooth settings.</string>
     <string name="phone_privacy_hint">ANCS and device-qualified MAP data come only from the selected iPhone over Bluetooth and require neither Android Notification Access nor access to the shared Android SMS inbox. The exact Bluetooth address stays on this head unit and is shown here only in masked form.</string>
     <string name="phone_apply">Apply phone settings</string>
     <string name="phone_saved">Phone settings applied</string>

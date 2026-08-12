@@ -11,23 +11,8 @@ import java.nio.file.Paths;
 
 import org.junit.Test;
 
-/** HA1188 regressions derived from the first in-car HA1187/v26 trace. */
+/** Retained limiter type-discovery coverage from the HA1188 regression set. */
 public final class Ha1188PhysicalAncsHandoffAndFastLimiterCaptureContractTest {
-    @Test public void sameOwnerReadyNeverSchedulesPhysicalHandoff() throws Exception {
-        String transport = project(
-                "app/src/main/java/dezz/status/widget/phone/transport/IphoneAncsTransport.java");
-        String ready = between(transport,
-                "private boolean canAcceptAncsReady",
-                "private void scheduleSecureClientStart");
-
-        assertTrue(ready.contains("findConnectedServerPeer(device) != null"));
-        assertTrue(ready.contains("BluetoothDevice exactIncomingDevice = serverLink.device"));
-        assertTrue(ready.contains("ANCS-READY принят без disconnect"));
-        assertFalse(ready.contains("cancelConnection"));
-        assertFalse(transport.contains("ANCS_HANDOFF_RECONNECT_TIMEOUT_MS"));
-        assertFalse(transport.contains("ANCS-HANDOFF"));
-    }
-
     @Test public void limiterTypeDiscoveryBuildsOneMethodIndex() throws Exception {
         String fallback = project(
                 "app/src/geely/java/dezz/status/widget/car/EcarxSignalFallback.java");
@@ -41,10 +26,6 @@ public final class Ha1188PhysicalAncsHandoffAndFastLimiterCaptureContractTest {
         assertTrue(scan.contains("for (Method method : manager.getClass().getMethods())"));
         assertTrue(scan.contains("getterNames.contains(getterName)"));
         assertFalse(scan.contains("findMethodIgnoreCase"));
-    }
-
-    @Test public void releaseIdentityAdvancesToHa1188() throws Exception {
-        assertTrue(project("build.gradle").contains("return 'v2.8.2-ha1196'"));
     }
 
     private static String project(String relative) throws Exception {

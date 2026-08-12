@@ -34,48 +34,6 @@ public final class Ha1175CircularIconAndSamePeerHandoffContractTest {
         assertFalse(icon.contains("outputBounds.set(0f, 0f, width, height)"));
     }
 
-    @Test public void serverFacadeReleaseCannotCloseTheSamePhysicalAncsClient() throws Exception {
-        String transport = source("phone/transport/IphoneAncsTransport.java");
-        String handler = between(transport,
-                "private void handleVerifiedServerLinkDisconnected",
-                "private static String deviceKey");
-
-        assertTrue(handler.contains("boolean samePhysicalLinkClientOwner = "
-                + "exactClientRoleOwnsPhysicalLink(device)"));
-        assertTrue(handler.contains("if (samePhysicalLinkClientOwner)"));
-        assertTrue(handler.contains("SAME PHYSICAL LINK · ANCS CLIENT PRESERVED"));
-        assertTrue(handler.contains("Android ANCS client remains owner"));
-        assertTrue(handler.indexOf("if (samePhysicalLinkClientOwner)")
-                < handler.indexOf("BluetoothGatt current = gatt"));
-        assertTrue(handler.indexOf("return;")
-                < handler.indexOf("BluetoothGatt current = gatt"));
-        assertTrue(transport.contains("exactClientRoleOwnsPhysicalLink"));
-        assertTrue(transport.contains("iphoneAncsSeen = true"));
-    }
-
-    @Test public void helperV18UsesOneFreshAdvertisementReconnectOwner() throws Exception {
-        String helper = project("ios/KX11-iPhone-ANCS-Helper-v18/"
-                + "KX11ANCSHelper/ViewController.swift");
-        String workflow = project(".github/workflows/verify-helper-v18.yml");
-
-        assertTrue(helper.contains("KX11 ANCS HELPER v18"));
-        assertTrue(helper.contains("peripheral.v18.single-link-g2"));
-        assertTrue(helper.contains("central.v18.geely-ancs-g2"));
-        assertTrue(helper.contains("AutoReconnect=false"));
-        assertTrue(helper.contains("ManualFreshAdvertisement=true"));
-        assertTrue(helper.contains("centralRequireFreshAdvertisement = true"));
-        assertTrue(helper.contains("clearCentralRuntime(keepPeripheral: false)"));
-        assertFalse(helper.contains("kCBConnectOptionEnableAutoReconnect"));
-        assertTrue(workflow.contains("MARKETING_VERSION = 18.0"));
-        assertTrue(workflow.contains("CURRENT_PROJECT_VERSION = 18"));
-    }
-
-    @Test public void releaseIdentityIsHa1175() throws Exception {
-        String build = project("build.gradle");
-        if (!build.contains("String getVersionName()")) build = project("../build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1196'"));
-    }
-
     private static String source(String relative) throws Exception {
         return project("app/src/main/java/dezz/status/widget/" + relative);
     }

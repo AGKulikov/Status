@@ -98,7 +98,7 @@ public final class Ha1177ResponsiveMediaAndNotificationQueueContractTest {
 
     @Test public void releaseIdentityAdvancesToHa1177() throws Exception {
         String build = rootProject("build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1196'"));
+        assertTrue(build.contains("return 'v2.8.2-ha1212'"));
     }
 
     private static String source(String relative) throws Exception {

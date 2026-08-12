@@ -76,11 +76,12 @@ jobs:
         # Never package a release from stale incremental outputs. A previous local HA1147
         # artifact retained dex files but omitted resources.arsc and every res/ entry.
         ./gradlew --no-daemon --no-configuration-cache clean
-        ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
-          testGeelyDebugUnitTest \
+        ./gradlew --no-daemon --no-configuration-cache --max-workers=1 testGeelyDebugUnitTest \
+          --tests 'dezz.status.widget.phone.transport.v2.*' \
+          --tests 'dezz.status.widget.phone.transport.switching.*' \
+          --tests dezz.status.widget.phone.PhoneConnectorSettingsContractTest \
           --tests dezz.status.widget.Ha1196AuthorizedAncsAndTrunkCatalogContractTest \
-          --tests dezz.status.widget.Ha1197TrunkAndReconnectContractTest \
-          --tests dezz.status.widget.Ha1198AutomaticBleRecoveryContractTest
+          --tests dezz.status.widget.Ha1197TrunkAndReconnectContractTest
         ./gradlew --no-daemon --no-configuration-cache --max-workers=1 assembleGeelyRelease
         APK="app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}-release.apk"
         test -f "$APK"
@@ -101,14 +102,22 @@ jobs:
         "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$APK"
         # Force verification from API 24 so apksigner checks the embedded v2 block as well
         # as the v3 block used by the Android 9 KX11 package installer.
-        "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify \
-          --verbose --print-certs --min-sdk-version 24 "$APK" | tee /tmp/apk-certs.txt
+        "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs \
+          --min-sdk-version 24 "$APK" | tee /tmp/apk-certs.txt
         grep -F "Verified using v2 scheme (APK Signature Scheme v2): true" /tmp/apk-certs.txt
         grep -F "Verified using v3 scheme (APK Signature Scheme v3): true" /tmp/apk-certs.txt
         grep -qi "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75" /tmp/apk-certs.txt
         mv "$APK" "app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}.apk"
 
-    - name: Package matched HA1198 and Helper v35 release
+    - name: Verify Helper v47 portable wire and switch contracts
+      shell: bash
+      run: |
+        set -euo pipefail
+        chmod +x ios/KX11-iPhone-ANCS-Helper-v47/verify-v47-contract.sh
+        PYTHONDONTWRITEBYTECODE=1 \
+          ios/KX11-iPhone-ANCS-Helper-v47/verify-v47-contract.sh
+
+    - name: Package Android and Helper v47 transport-v2 candidate
       env:
         VERSION_NAME: ${{ steps.version.outputs.version }}
       shell: bash
@@ -119,26 +128,27 @@ jobs:
         cp "$APK" "release-out/status-widget-ha-${VERSION_NAME}.apk"
         git archive \
           --format=zip \
-          --prefix=KX11-iPhone-ANCS-Helper-v35/ \
-          --output=release-out/KX11-iPhone-ANCS-Helper-v35.zip \
-          HEAD:ios/KX11-iPhone-ANCS-Helper-v35
+          --prefix=KX11-iPhone-ANCS-Helper-v47/ \
+          --output=release-out/KX11-iPhone-ANCS-Helper-v47.zip \
+          HEAD:ios/KX11-iPhone-ANCS-Helper-v47
         jq -n \
           --arg android "$VERSION_NAME" \
-          --arg helper "35.0" \
+          --arg helper "47.0" \
           --arg sourceSha "$GITHUB_SHA" \
           '{android: $android, helper: $helper, sourceSha: $sourceSha,
-            connectionModel: "single RequiresANCS owner; Android background-open on retained link",
-            androidGattOwner: "one retained clientIf; status 133 re-arms with BluetoothGatt.connect"}' \
+            status: "candidate; hosted Xcode and physical-device field matrix are release gates",
+            connectionModel: "dual route v2 with persisted confirmed-quiescence switching",
+            identity: "installation UUID proof and UUID-only discovery; no local-name fallback"}' \
           > release-out/matched-pair.json
         sha256sum \
           "release-out/status-widget-ha-${VERSION_NAME}.apk" \
-          release-out/KX11-iPhone-ANCS-Helper-v35.zip \
+          release-out/KX11-iPhone-ANCS-Helper-v47.zip \
           > release-out/SHA256SUMS.txt
 
-    - name: Upload verified matched release pair
+    - name: Upload matched v47 candidate pair
       uses: actions/upload-artifact@v4
       with:
-        name: status-widget-ha-${{ steps.version.outputs.version }}-helper-v35
+        name: status-widget-ha-${{ steps.version.outputs.version }}-helper-v47-candidate
         path: release-out/*
         if-no-files-found: error
         retention-days: 30
@@ -147,10 +157,10 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ steps.version.outputs.version }}
-        name: Release ${{ steps.version.outputs.version }}
-        body_path: release-manifests/HA1198.md
+        name: Candidate ${{ steps.version.outputs.version }} + Helper v47
+        body_path: ios/KX11-iPhone-ANCS-Helper-v47/RELEASE.txt
         draft: false
-        prerelease: false
+        prerelease: true
         files: release-out/*
 
   report-release-result:
@@ -168,7 +178,7 @@ jobs:
       with:
         ref: ${{ github.ref_name }}
 
-    - name: Record production result
+    - name: Record HA1212 v47 candidate result
       env:
         GH_TOKEN: ${{ github.token }}
         RELEASE_RESULT: ${{ needs.build-and-release.result }}
@@ -195,9 +205,9 @@ jobs:
               html_url,
               steps: [.steps[]? | {number, name, status, conclusion}]
             }]
-          }' /tmp/release-jobs.json > ci-status/HA1198-release.json
+          }' /tmp/release-jobs.json > ci-status/HA1212-v47-candidate-release.json
         git config user.name "github-actions[bot]"
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git add ci-status/HA1198-release.json
-        git commit -m "ci: record HA1198 production result"
+        git add ci-status/HA1212-v47-candidate-release.json
+        git commit -m "ci: record HA1212 v47 candidate result"
         git push origin "HEAD:${GITHUB_REF_NAME}"

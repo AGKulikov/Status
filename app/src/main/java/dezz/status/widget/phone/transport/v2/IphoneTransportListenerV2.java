@@ -1,0 +1,28 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+package dezz.status.widget.phone.transport.v2;
+
+/** Listener DTO boundary shared by both v2 routes. */
+public interface IphoneTransportListenerV2 {
+    void onStatus(IphoneTransportStatusV2 status);
+
+    void onTelemetry(IphoneTelemetryV2 telemetry);
+
+    /** Raw source event, including REMOVED, category, replay flag, and observation time. */
+    void onNotificationEvent(IphoneNotificationEventV2 event);
+
+    void onNotification(IphoneNotificationV2 notification);
+
+    void onAppName(IphoneAppNameV2 appName);
+
+    /** Persist only after encrypted exact-bond bootstrap proof succeeds. */
+    void onHelperInstallationIdLearned(String helperInstallationId);
+
+    void onRoleControl(IphoneRoleControlV2 control);
+
+    void onRoleControlWriteResult(IphoneRoleControlV2 control, boolean success);
+
+    /** Input to the role-switch coordinator; it must still verify app-owned owner count is zero. */
+    void onLocalTerminal(IphoneBleMode mode, BleRouteEpoch epoch);
+
+    void onError(IphoneTransportErrorV2 error);
+}

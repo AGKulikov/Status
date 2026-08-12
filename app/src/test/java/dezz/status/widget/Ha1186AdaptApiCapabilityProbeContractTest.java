@@ -41,10 +41,6 @@ public final class Ha1186AdaptApiCapabilityProbeContractTest {
         assertFalse(probe.contains("setProperty("));
     }
 
-    @Test public void releaseIdentityAdvancesToHa1186() throws Exception {
-        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1196'"));
-    }
-
     @Test public void discoverySignalsRemainCallbackOnlyDuringHealthPolling() throws Exception {
         String fallback = geely("car/EcarxSignalFallback.java");
         String healthRead = between(fallback,
@@ -53,20 +49,6 @@ public final class Ha1186AdaptApiCapabilityProbeContractTest {
 
         assertTrue(healthRead.contains("EcarxAdasSignalCatalog.propertyIds()"));
         assertFalse(healthRead.contains("ids.addAll(activeRecorderIds)"));
-    }
-
-    @Test public void incomingLeBondPathIsAndroid9VerifierSafe() throws Exception {
-        String transport = project(
-                "app/src/main/java/dezz/status/widget/phone/transport/IphoneAncsTransport.java");
-        String createBond = between(transport,
-                "private void requestBond(BluetoothDevice device)",
-                "private void scheduleAncsRetryAfterBond");
-
-        assertTrue(createBond.contains("device.createBond()"));
-        assertFalse(createBond.contains("getMethod("));
-        assertFalse(createBond.contains("method.invoke("));
-        assertFalse(transport.contains("import java.lang.reflect.Method;"));
-        assertFalse(transport.contains("requestIncomingPrePairLeBond"));
     }
 
     private static String geely(String relative) throws Exception {
@@ -83,19 +65,6 @@ public final class Ha1186AdaptApiCapabilityProbeContractTest {
             }
         }
         throw new IllegalStateException("Project file not found: " + relative);
-    }
-
-    private static String rootProject(String relative) throws Exception {
-        Path current = Paths.get("").toAbsolutePath();
-        for (int depth = 0; depth < 8 && current != null;
-             depth++, current = current.getParent()) {
-            if (!Files.isRegularFile(current.resolve("settings.gradle"))) continue;
-            Path candidate = current.resolve(relative);
-            if (Files.isRegularFile(candidate)) {
-                return new String(Files.readAllBytes(candidate), StandardCharsets.UTF_8);
-            }
-        }
-        throw new IllegalStateException("Root project file not found: " + relative);
     }
 
     private static String between(String source, String start, String end) {

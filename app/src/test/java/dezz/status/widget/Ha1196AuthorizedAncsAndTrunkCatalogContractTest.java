@@ -11,54 +11,8 @@ import java.nio.file.Paths;
 
 import org.junit.Test;
 
-/** Release gate for real iOS ANCS authorization, serialized CCCDs and trunk visibility. */
+/** Retained trunk command and catalog visibility coverage. */
 public final class Ha1196AuthorizedAncsAndTrunkCatalogContractTest {
-    @Test public void helperWaitsForIosAuthorizationOnTheOriginalOwner() throws Exception {
-        String helper = project(
-                "ios/KX11-iPhone-ANCS-Helper-v33/KX11ANCSHelper/ViewController.swift");
-        String gate = between(helper,
-                "private func continueCentralAfterSecurity",
-                "private func writeCentralAncsReady");
-        String callback = between(helper,
-                "didUpdateANCSAuthorizationFor peripheral",
-                "extension ViewController: CBPeripheralDelegate");
-        String readiness = between(helper,
-                "private func centralReadyForGreen",
-                "private func refreshCentralReadiness");
-
-        assertTrue(gate.contains("centralAncsAuthorized = peripheral.ancsAuthorized"));
-        assertTrue(gate.contains("guard centralAncsAuthorized else"));
-        assertTrue(gate.contains("centralHandshake = .waitingAncsAuthorization"));
-        assertFalse(gate.contains("centralManager.connect"));
-        assertTrue(callback.contains("writeCentralAncsReady(peripheral)"));
-        assertTrue(callback.contains("centralSecureLinkReady"));
-        assertTrue(readiness.contains("&& centralAncsAuthorized"));
-    }
-
-    @Test public void androidSerializesMandatoryNotificationSourceBeforeDataSource()
-            throws Exception {
-        String transport = project(
-                "app/src/main/java/dezz/status/widget/phone/transport/IphoneAncsTransport.java");
-        int first = transport.indexOf(
-                "state(\"ANCS-FIRST · ПОДПИСКА NOTIFICATION SOURCE\")");
-        int second = transport.indexOf(
-                "state(\"NOTIFICATION SOURCE OK · ПОДПИСКА DATA SOURCE\")");
-
-        assertTrue(first >= 0);
-        assertTrue(second > first);
-        assertTrue(transport.contains("ANCS_SECOND_CCCD_DELAY_MS"));
-        assertTrue(transport.contains("earlyNotificationSourceFrames.addLast(value.clone())"));
-        assertTrue(transport.contains("flushEarlyNotificationSourceFrames()"));
-        assertTrue(transport.contains("status == STATUS_WRITE_NOT_PERMITTED"));
-        assertTrue(transport.contains("scheduleAncsPermissionRetry(callbackGatt)"));
-        String retry = between(transport,
-                "private void scheduleAncsPermissionRetry",
-                "private void scheduleAncsRetryAfterBond");
-        assertTrue(retry.contains("discoverServices(expected)"));
-        assertFalse(retry.contains(".close()"));
-        assertFalse(retry.contains("connectGatt("));
-    }
-
     @Test public void trunkRemainsSelectableButUnsafeWritesStayGated() throws Exception {
         String integration = project(
                 "app/src/geely/java/dezz/status/widget/car/GeelyCarIntegration.java");

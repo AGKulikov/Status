@@ -10,11 +10,6 @@ import android.app.NotificationChannelGroup;
 import android.app.NotificationManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
-import android.bluetooth.BluetoothGatt;
-import android.bluetooth.BluetoothGattCallback;
-import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothGattDescriptor;
-import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.content.BroadcastReceiver;
@@ -32,7 +27,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.lang.reflect.Method;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -43,7 +37,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 
 import dezz.status.widget.Preferences;
 import dezz.status.widget.R;
@@ -51,7 +44,20 @@ import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.SourceBinding;
-import dezz.status.widget.phone.transport.IphoneAncsTransport;
+import dezz.status.widget.phone.transport.v2.BleRouteEpoch;
+import dezz.status.widget.phone.transport.v2.IphoneAppNameV2;
+import dezz.status.widget.phone.transport.v2.IphoneBleMode;
+import dezz.status.widget.phone.transport.v2.IphoneDualTransportListenerV2;
+import dezz.status.widget.phone.transport.v2.IphoneDualTransportRuntimeV2;
+import dezz.status.widget.phone.transport.v2.IphoneDualTransportStatusV2;
+import dezz.status.widget.phone.transport.v2.IphoneNotificationEventV2;
+import dezz.status.widget.phone.transport.v2.IphoneNotificationV2;
+import dezz.status.widget.phone.transport.v2.IphoneRoleControlV2;
+import dezz.status.widget.phone.transport.v2.IphoneTelemetryV2;
+import dezz.status.widget.phone.transport.v2.IphoneTransportErrorV2;
+import dezz.status.widget.phone.transport.v2.IphoneTransportLifecycle;
+import dezz.status.widget.phone.transport.v2.IphoneTransportStatusV2;
+import dezz.status.widget.phone.transport.v2.android.AndroidIphoneDualRuntimeV2;
 
 /**
  * Best-effort Android 9 bridge for one explicitly selected, bonded iPhone.
@@ -150,16 +156,6 @@ public final class PhoneConnectorController {
     private static final int HFP_AUDIO_DISCONNECTED = 0;
     private static final int HFP_AUDIO_CONNECTING = 1;
     private static final int HFP_AUDIO_CONNECTED = 2;
-    private static final UUID BATTERY_SERVICE =
-            UUID.fromString("0000180f-0000-1000-8000-00805f9b34fb");
-    private static final UUID BATTERY_LEVEL =
-            UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb");
-    private static final UUID BATTERY_LEVEL_STATUS =
-            UUID.fromString("00002bed-0000-1000-8000-00805f9b34fb");
-    private static final UUID GENERIC_ATTRIBUTE_SERVICE =
-            UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
-    private static final UUID SERVICE_CHANGED =
-            UUID.fromString("00002a05-0000-1000-8000-00805f9b34fb");
 
     private static final String CHANNEL_GROUP_ID = "phone_mirror_group";
     private static final String CHANNEL_ID = "phone_mirror";
@@ -194,11 +190,11 @@ public final class PhoneConnectorController {
     @Nullable private HandlerThread workerThread;
     @Nullable private volatile Handler worker;
     @Nullable private BroadcastReceiver bluetoothReceiver;
-    @Nullable private volatile IphoneAncsTransport ancsTransport;
+    /** Sole clean-room dual-role ANCS owner. */
+    @Nullable private volatile IphoneDualTransportRuntimeV2 ancsRuntimeV2;
     private long nextAncsTransportSession;
     private volatile long activeAncsTransportSession;
     private volatile boolean ancsTransportStartPending;
-    @Nullable private BluetoothGatt gatt;
     @Nullable private PhoneOemConnectionBridge.Observation oemPowerObservation;
 
     // The following fields are worker-thread owned. Publishing is additionally guarded by
@@ -212,6 +208,8 @@ public final class PhoneConnectorController {
     private boolean mapConnected;
     private boolean gattConnected;
     private boolean connected;
+    /** True from ingress freeze until the rewritten coordinator commits the fresh target. */
+    private boolean v2SwitchInProgress;
     private int reconnectAttempt;
     private String lastError = "";
     private String ancsStatus = "stopped";
@@ -221,13 +219,10 @@ public final class PhoneConnectorController {
     private boolean smsAvailable;
     private boolean hfpBatteryKnown;
     private boolean hfpBatteryPercentScale;
-    private boolean basBatteryKnown;
     private boolean genericBatteryKnown;
     @Nullable private Integer hfpBatteryLevel;
-    @Nullable private Integer basBatteryLevel;
     @Nullable private Integer genericBatteryLevel;
     private long hfpBatteryUpdatedAt;
-    private long basBatteryUpdatedAt;
     private long genericBatteryUpdatedAt;
     @Nullable private Integer batteryLevel;
     @Nullable private Boolean batteryCharging;
@@ -265,51 +260,13 @@ public final class PhoneConnectorController {
     @Nullable private Boolean callMultiparty;
     private final Map<String, CallRecord> calls = new LinkedHashMap<>();
 
-    @Nullable private BluetoothGattCharacteristic ancsControlPoint;
-    @Nullable private BluetoothGattCharacteristic ancsDataSource;
-    @Nullable private BluetoothGattCharacteristic ancsNotificationSource;
-    @Nullable private BluetoothGattCharacteristic serviceChangedCharacteristic;
-    private boolean ancsDataSubscribed;
-    private boolean ancsNotificationSubscribed;
-    private boolean ancsNotificationListening;
-    private boolean serviceChangedSubscribed;
-    private boolean ancsAuthorizedThisRun;
-    private boolean forceDirectGatt;
-    private boolean serviceDiscoveryStarted;
-    private boolean mtuPending;
-    @Nullable private Runnable connectWatchdog;
-    @Nullable private Runnable mtuWatchdog;
-    @Nullable private Runnable discoveryWatchdog;
     @Nullable private Runnable deviceRescanTask;
-    @Nullable private Runnable gattReconnectTask;
-    @Nullable private Runnable ancsPublicationRetryTask;
     @Nullable private Runnable ancsStableReadyTask;
     @Nullable private Runnable stockConnectionTask;
     @Nullable private Runnable oemGattRefreshTask;
-    private int ancsPublicationRetryCount;
     private int stockConnectionAttempt;
     private boolean stockConnectionRequestInProgress;
-    private final ArrayDeque<GattOperation> gattOperations = new ArrayDeque<>();
-    @Nullable private GattOperation currentGattOperation;
-    @Nullable private Runnable gattOperationTimeout;
-
-    private final Map<Long, AncsProtocol.Event> pendingAncsEvents = new LinkedHashMap<>();
-    private final ArrayDeque<Long> attributeRequests = new ArrayDeque<>();
-    private final Set<Long> queuedAttributeUids = new LinkedHashSet<>();
-    private final Set<Long> dirtyAttributeUids = new LinkedHashSet<>();
-    private final Set<Long> removedAttributeUids = new LinkedHashSet<>();
-    private final Set<Long> fullTextAttributeUids = new LinkedHashSet<>();
-    @Nullable private Long activeAttributeUid;
-    @Nullable private AncsProtocol.AttributeAccumulator attributeAccumulator;
-    private boolean activeAttributeIncludesText;
-    private long activeAncsRequestSequence;
-    private long nextAncsRequestSequence;
-    private final ArrayDeque<String> appAttributeRequests = new ArrayDeque<>();
-    private final Set<String> queuedAppIdentifiers = new LinkedHashSet<>();
     private final Map<String, String> appDisplayNames = new LinkedHashMap<>();
-    @Nullable private String activeAppIdentifier;
-    @Nullable private AncsProtocol.AppAttributeAccumulator appAttributeAccumulator;
-    @Nullable private Runnable attributeTimeout;
     private final LinkedHashMap<Long, NotificationRecord> notificationCache =
             new LinkedHashMap<>();
 
@@ -365,6 +322,27 @@ public final class PhoneConnectorController {
                 if (current != null) current.post(() -> publishSnapshot(token));
                 return;
             }
+            if (running && config != null
+                    && config.bleRole != next.bleRole
+                    && config.signatureWithoutBleRole().equals(
+                    next.signatureWithoutBleRole())) {
+                signature = next.signature();
+                config = next;
+                IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
+                Handler current = worker;
+                long token = generation;
+                if (current != null) current.post(() -> runIfCurrent(token, () -> {
+                    // Helper telemetry is generation-scoped even though the outer controller is
+                    // intentionally retained across an A/B role switch.
+                    clearHelperTelemetry();
+                    refreshBatteryValues();
+                    if (runtime != null) runtime.requestMode(v2Mode(next.bleRole));
+                    publishSnapshot(token);
+                }));
+                PhoneConnectionJournal.append("controller",
+                        "v2 role switch retained controller generation=" + token);
+                return;
+            }
             stopLocked(next.enabled ? "reconfigured" : "disabled");
             signature = next.signature();
             if (!next.enabled) return;
@@ -399,6 +377,13 @@ public final class PhoneConnectorController {
     public boolean reconnectForDiagnostics() {
         synchronized (lifecycleLock) {
             if (!running || config == null || config.deviceAddress.isEmpty()) return false;
+            IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
+            if (runtime != null) {
+                PhoneConnectionJournal.append("controller",
+                        "v2: ручной same-role recovery без cache refresh и сброса пары");
+                runtime.requestSameModeRecovery();
+                return true;
+            }
             Handler currentWorker = worker;
             long token = generation;
             if (currentWorker == null) return false;
@@ -407,21 +392,11 @@ public final class PhoneConnectorController {
                         "ручное чистое переподключение без сброса пары");
                 String configuredAddress = config == null ? "" : config.deviceAddress;
                 closeAncsTransport();
-                BluetoothGatt previous = gatt;
-                gatt = null;
-                cancelGattWatchdogs();
-                cancelGattReconnect();
-                cancelAncsPublicationRetry();
                 cancelStockConnectionRequest();
-                refreshGattCache(previous);
-                closeGatt(previous);
                 gattConnected = false;
                 persistCurrentTelemetry();
-                clearBasData();
                 resetAncsSession(token, "connecting");
-                forceDirectGatt = true;
                 reconnectAttempt = 0;
-                ancsPublicationRetryCount = 0;
                 lastError = "";
                 updateConnected(token);
                 if (selectedDevice == null
@@ -442,16 +417,14 @@ public final class PhoneConnectorController {
         Handler oldWorker = worker;
         HandlerThread oldThread = workerThread;
         BroadcastReceiver oldReceiver = bluetoothReceiver;
-        IphoneAncsTransport oldAncsTransport = ancsTransport;
-        BluetoothGatt oldGatt = gatt;
+        IphoneDualTransportRuntimeV2 oldV2Runtime = ancsRuntimeV2;
         PhoneOemConnectionBridge.Observation oldOemObservation = oemPowerObservation;
         worker = null;
         workerThread = null;
         bluetoothReceiver = null;
-        ancsTransport = null;
+        ancsRuntimeV2 = null;
         ancsTransportStartPending = false;
         activeAncsTransportSession = ++nextAncsTransportSession;
-        gatt = null;
         oemPowerObservation = null;
         config = null;
 
@@ -464,8 +437,7 @@ public final class PhoneConnectorController {
             }
         }
         closeOemObservation(oldOemObservation);
-        closeAncsTransportOnMain(oldAncsTransport);
-        closeGatt(oldGatt);
+        if (oldV2Runtime != null) oldV2Runtime.close();
         cancelAllMirroredNotifications();
         clearRuntimeState(reason);
         updatePresenceLocked(false);
@@ -495,9 +467,9 @@ public final class PhoneConnectorController {
         hfpConnected = false;
         mapConnected = false;
         gattConnected = false;
+        v2SwitchInProgress = false;
         connected = false;
         reconnectAttempt = 0;
-        ancsPublicationRetryCount = 0;
         stockConnectionAttempt = 0;
         stockConnectionRequestInProgress = false;
         lastError = "";
@@ -508,13 +480,10 @@ public final class PhoneConnectorController {
         smsAvailable = false;
         hfpBatteryKnown = false;
         hfpBatteryPercentScale = false;
-        basBatteryKnown = false;
         genericBatteryKnown = false;
         hfpBatteryLevel = null;
-        basBatteryLevel = null;
         genericBatteryLevel = null;
         hfpBatteryUpdatedAt = 0L;
-        basBatteryUpdatedAt = 0L;
         genericBatteryUpdatedAt = 0L;
         batteryLevel = null;
         batteryCharging = null;
@@ -543,11 +512,6 @@ public final class PhoneConnectorController {
         callDirection = "";
         callMultiparty = null;
         calls.clear();
-        ancsAuthorizedThisRun = false;
-        forceDirectGatt = false;
-        serviceDiscoveryStarted = false;
-        mtuPending = false;
-        cancelGattWatchdogs();
         cancelRetryTasks();
         clearAncsRuntime();
         appDisplayNames.clear();
@@ -603,10 +567,13 @@ public final class PhoneConnectorController {
         if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
             int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,
                     BluetoothAdapter.STATE_OFF);
-            if (state == BluetoothAdapter.STATE_ON && selectedDevice == null) {
-                selectAndConnect(token);
-            } else if (state != BluetoothAdapter.STATE_ON) {
-                invalidateSelectedPhone(token, "bluetooth_off");
+            boolean enabled = state == BluetoothAdapter.STATE_ON;
+            IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
+            if (runtime != null) runtime.radioChanged(enabled);
+            if (enabled) {
+                if (selectedDevice == null) selectAndConnect(token);
+            } else {
+                invalidateSelectedPhone(token, "bluetooth_off", runtime != null);
             }
             return;
         }
@@ -616,10 +583,10 @@ public final class PhoneConnectorController {
             int state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE,
                     BluetoothDevice.BOND_NONE);
             if (state == BluetoothDevice.BOND_BONDED) {
-                if (gattConnected && gatt != null
-                        && ("authorization_required".equals(ancsStatus)
-                        || "service_not_published".equals(ancsStatus))) {
-                    restartAncsAfterBond(token, gatt);
+                IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
+                if (runtime != null) {
+                    if (selectedDevice == null) selectAndConnect(token);
+                    else if (!ancsReady) runtime.requestSameModeRecovery();
                 } else {
                     selectAndConnect(token);
                 }
@@ -709,19 +676,20 @@ public final class PhoneConnectorController {
     }
 
     private void invalidateSelectedPhone(long token, @NonNull String status) {
+        invalidateSelectedPhone(token, status, false);
+    }
+
+    /** Clears Classic/profile state while optionally retaining the v2 owner across radio-off. */
+    private void invalidateSelectedPhone(long token, @NonNull String status,
+                                         boolean retainV2Runtime) {
         persistCurrentTelemetry();
         replaceOemPowerObservation(null);
-        closeAncsTransport();
-        BluetoothGatt previous = gatt;
-        gatt = null;
-        cancelGattWatchdogs();
+        if (!retainV2Runtime) closeAncsTransport();
         cancelStockConnectionRequest();
-        closeGatt(previous);
         aclConnected = false;
         hfpConnected = false;
         mapConnected = false;
         gattConnected = false;
-        clearBasData();
         clearHfpData();
         clearGenericBatteryData();
         updateConnected(token);
@@ -862,23 +830,21 @@ public final class PhoneConnectorController {
             oemGattRefreshTask = null;
             if (!address.equalsIgnoreCase(selectedAddress)
                     || config == null || !config.transportNeeded() || ancsReady) return;
-            BluetoothGatt expected = gatt;
-            forceDirectGatt = true;
-            ancsPublicationRetryCount = 0;
-            if (expected == null) {
-                ancsStatus = "connecting";
-                ensureGatt(token);
-            } else {
-                refreshGattCache(expected);
-                scheduleGattReconnect(token,
-                        "ECARX selected-phone state changed: " + change.name(),
-                        "services_changed");
+            IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
+            if (runtime != null) {
+                PhoneConnectionJournal.append("v2-recovery",
+                        "ECARX selected-phone state changed: " + change.name());
+                runtime.requestSameModeRecovery();
+                publishSnapshot(token);
+                return;
             }
+            ancsStatus = "connecting";
+            ensureGatt(token);
             publishSnapshot(token);
         });
         oemGattRefreshTask = refresh;
-        // Let the stock owner finish writing its paired-device/UUID database before reopening
-        // Android 9's GATT client. Repeated callbacks collapse into this one clean refresh.
+        // Let the stock owner finish writing its paired-device state before v2 acquisition.
+        // Repeated callbacks collapse into this one serialized same-role recovery/start.
         handler.postDelayed(refresh, 900L);
     }
 
@@ -1124,199 +1090,242 @@ public final class PhoneConnectorController {
     private void ensureGatt(long token) {
         if (!isCurrent(token) || selectedDevice == null
                 || stockConnectionRequestInProgress) return;
-        cancelGattReconnect();
         Config current = config;
         if (current == null) return;
         if (!current.transportNeeded()) {
             ancsStatus = "disabled";
-            ensureLegacyBatteryGatt(token);
             return;
         }
+        ensureV2Runtime(token, current);
+    }
+
+    private void ensureV2Runtime(long token, @NonNull Config current) {
         synchronized (lifecycleLock) {
-            if (!isCurrentLocked(token) || ancsTransport != null
+            if (!isCurrentLocked(token) || ancsRuntimeV2 != null
                     || ancsTransportStartPending) return;
             ancsTransportStartPending = true;
             activeAncsTransportSession = ++nextAncsTransportSession;
         }
-        ancsStatus = "connecting";
+        ancsStatus = "starting_v2";
         publishSnapshot(token);
-
-        final long transportSession = activeAncsTransportSession;
-        // HA1162 stored the reverse route's verified incoming LE identity in
-        // phoneAncsDeviceAddress. Reusing that identity after switching back made the original
-        // Android-central route target the wrong BluetoothDevice. The established Peripheral
-        // route must always start from the selected Classic/bond identity; only the opt-in
-        // iPhone-central route consumes the separately learned incoming LE identity.
-        final String address = PhoneBleRole.isIphoneCentral(current.bleRole)
-                ? current.ancsDeviceAddress : current.deviceAddress;
-        final String classicAddress = current.deviceAddress;
-        final int bleRole = current.bleRole;
-        mainHandler.post(() -> startAncsTransportOnMain(
-                token, transportSession, address, classicAddress, bleRole));
+        long transportSession = activeAncsTransportSession;
+        mainHandler.post(() -> startV2RuntimeOnMain(
+                token,
+                transportSession,
+                current.deviceAddress,
+                current.bleRole));
     }
 
-    /**
-     * HA1122 opened a BLE GATT even when ANCS was disabled so BAS 0x180F could supplement the
-     * classic HFP/OEM battery sources. Keep that exact path for battery-only configurations; it
-     * is mutually exclusive with {@link IphoneAncsTransport}, which owns GATT whenever ANCS is
-     * enabled.
-     */
-    private void ensureLegacyBatteryGatt(long token) {
-        if (!isCurrent(token) || selectedDevice == null || gatt != null
-                || stockConnectionRequestInProgress) return;
-        boolean autoConnect = ancsAuthorizedThisRun && !forceDirectGatt;
+    private void startV2RuntimeOnMain(long token, long transportSession,
+                                      @NonNull String selectedBondAddress, int bleRole) {
+        if (!isCurrent(token) || transportSession != activeAncsTransportSession) return;
+        final IphoneDualTransportRuntimeV2 created;
         try {
-            BluetoothGatt created = selectedDevice.connectGatt(context, autoConnect,
-                    new SessionGattCallback(token), BluetoothDevice.TRANSPORT_LE);
-            synchronized (lifecycleLock) {
-                if (!isCurrentLocked(token)
-                        || config == null || config.transportNeeded()) {
-                    closeGatt(created);
-                    return;
+            created = AndroidIphoneDualRuntimeV2.create(context, prefs);
+        } catch (RuntimeException error) {
+            dispatchAncsTransport(token, transportSession, () -> {
+                synchronized (lifecycleLock) {
+                    if (isCurrentLocked(token)) ancsTransportStartPending = false;
                 }
-                gatt = created;
-            }
-            if (created == null) {
-                scheduleGattReconnect(token, "connectGatt returned null");
-            } else {
-                scheduleConnectWatchdog(token, created, autoConnect);
-            }
-        } catch (Throwable error) {
-            scheduleGattReconnect(token, "BAS GATT connect: " + safeMessage(error));
-        }
-    }
-
-    /**
-     * Starts the proven Android-central saved-peer path on the main looper. The transport owns
-     * the only live BluetoothGatt instance; the legacy GATT methods below remain solely for
-     * source compatibility while the rest of the phone connector (HFP/A2DP/MAP/OEM data) stays
-     * unchanged.
-     */
-    private void startAncsTransportOnMain(long token, long transportSession,
-                                          @NonNull String address,
-                                          @NonNull String classicAddress, int bleRole) {
-        if (!isCurrent(token)
-                || transportSession != activeAncsTransportSession) return;
-
-        final IphoneAncsTransport created;
-        try {
-            created = new IphoneAncsTransport(context,
-                    new AncsTransportListener(token, transportSession));
-        } catch (Throwable error) {
-            dispatchAncsTransport(token, transportSession, () ->
-                    handleAncsTransportFailure(token,
-                            "ANCS transport init: " + safeMessage(error)));
+                lastError = "ANCS v2 init: " + safeMessage(error);
+                ancsStatus = "failed_closed";
+                publishSnapshot(token);
+            });
             return;
         }
-
-        boolean accepted;
+        boolean mayStart;
+        int startBleRole = bleRole;
         synchronized (lifecycleLock) {
-            accepted = isCurrentLocked(token)
+            mayStart = isCurrentLocked(token)
                     && transportSession == activeAncsTransportSession
-                    && ancsTransport == null;
-            if (accepted) {
-                ancsTransport = created;
-                ancsTransportStartPending = false;
-            }
+                    && ancsRuntimeV2 == null;
+            // A settings callback can change only the desired role while construction is queued
+            // on main.  Initialization must consume that latest durable intent.
+            if (mayStart && config != null) startBleRole = config.bleRole;
         }
-        if (!accepted) {
+        if (!mayStart) {
             created.close();
             return;
         }
+        BluetoothAdapter bluetooth = bluetoothAdapter();
+        boolean initialRadioEnabled = bluetooth != null && bluetooth.isEnabled();
+        created.start(new IphoneDualTransportRuntimeV2.Config(
+                        selectedBondAddress,
+                        v2Mode(startBleRole),
+                        initialRadioEnabled,
+                        prefs.phoneBleV2HelperInstallationId().trim().isEmpty()),
+                new V2TransportListener(token, transportSession));
 
-        try {
-            created.publishCapabilities();
-            boolean started = PhoneBleRole.isIphoneCentral(bleRole)
-                    ? created.acceptIphoneCentral(address, classicAddress)
-                    : created.connectSavedIphone(address);
-            if (!started) {
-                dispatchAncsTransport(token, transportSession, () ->
-                        handleAncsTransportFailure(token,
-                                "BLE role start rejected " + maskedAddress(address)));
+        boolean accepted;
+        int latestBleRole = startBleRole;
+        synchronized (lifecycleLock) {
+            accepted = isCurrentLocked(token)
+                    && transportSession == activeAncsTransportSession
+                    && ancsRuntimeV2 == null;
+            if (accepted) {
+                ancsRuntimeV2 = created;
+                ancsTransportStartPending = false;
+                if (config != null) latestBleRole = config.bleRole;
             }
-        } catch (Throwable error) {
-            dispatchAncsTransport(token, transportSession, () ->
-                    handleAncsTransportFailure(token,
-                            "ANCS saved-peer connect: " + safeMessage(error)));
         }
+        if (!accepted) {
+            // start() and close() use the same FIFO, so a rejected construction can never expose
+            // or overlap its restoration owner with the replacement runtime.
+            created.close();
+            return;
+        }
+        if (latestBleRole != startBleRole) {
+            created.requestMode(v2Mode(latestBleRole));
+        }
+        // Re-read after publication.  A radio broadcast in the construction window saw no
+        // runtime by design; this FIFO command closes that otherwise-lost boundary.
+        BluetoothAdapter currentBluetooth = bluetoothAdapter();
+        created.radioChanged(currentBluetooth != null && currentBluetooth.isEnabled());
     }
 
-    private final class AncsTransportListener implements IphoneAncsTransport.Listener {
+    private final class V2TransportListener implements IphoneDualTransportListenerV2 {
         private final long token;
         private final long transportSession;
 
-        AncsTransportListener(long token, long transportSession) {
+        V2TransportListener(long token, long transportSession) {
             this.token = token;
             this.transportSession = transportSession;
         }
 
-        @Override public void onState(String state) {
-            PhoneConnectionJournal.append("transport-state",
-                    redactedDiagnostic(state == null ? "" : state));
+        @Override public void onDualTransportStatus(IphoneDualTransportStatusV2 status) {
             dispatchAncsTransport(token, transportSession,
-                    () -> handleAncsTransportState(token, state));
+                    () -> applyV2DualStatus(token, status));
         }
 
-        @Override public void onRetryRequired(String reason) {
-            PhoneConnectionJournal.append("transport-retry",
-                    redactedDiagnostic(reason == null ? "без причины" : reason));
+        @Override public void onStatus(IphoneTransportStatusV2 status) {
             dispatchAncsTransport(token, transportSession,
-                    () -> handleAncsTransportFailure(token,
-                            reason == null || reason.trim().isEmpty()
-                                    ? "ANCS transport disconnected" : reason));
+                    () -> applyV2RouteStatus(token, status));
         }
 
-        @Override public void onLog(String line) {
-            if (line != null && !line.trim().isEmpty()) {
-                String safe = redactedDiagnostic(line);
-                Log.d(TAG, "ANCS: " + safe);
-                PhoneConnectionJournal.append("transport", safe);
-            }
-        }
-
-        @Override public void onCandidates(List<IphoneAncsTransport.Candidate> candidates) {
-            // Identity-resolution scans are transport-internal. The production controller keeps
-            // the selected phone fixed and never exposes nearby BLE candidates to the UI.
-        }
-
-        @Override public void onNotification(IphoneAncsTransport.NotificationItem item) {
+        @Override public void onTelemetry(IphoneTelemetryV2 telemetry) {
             dispatchAncsTransport(token, transportSession,
-                    () -> handleAncsTransportNotification(token, item));
+                    () -> applyHelperTelemetryV2(token, telemetry));
         }
 
-        @Override public void onAppName(String appIdentifier, String displayName) {
+        @Override public void onNotificationEvent(IphoneNotificationEventV2 event) {
+            if (event == null || event.eventId != IphoneNotificationEventV2.REMOVED) return;
+            dispatchAncsTransport(token, transportSession,
+                    () -> removeAncsNotification(token, event.uid));
+        }
+
+        @Override public void onNotification(IphoneNotificationV2 notification) {
+            dispatchAncsTransport(token, transportSession,
+                    () -> handleAncsTransportNotificationV2(token, notification));
+        }
+
+        @Override public void onAppName(IphoneAppNameV2 appName) {
+            if (appName == null) return;
             dispatchAncsTransport(token, transportSession,
                     () -> handleAncsTransportAppName(
-                            token, appIdentifier, displayName));
+                            token, appName.appIdentifier, appName.appName));
         }
 
-        @Override public void onBatteryCharacteristic(UUID characteristicUuid, byte[] value) {
-            byte[] copy = value == null ? null : value.clone();
-            dispatchAncsTransport(token, transportSession,
-                    () -> applyBatteryCharacteristic(token, characteristicUuid, copy));
+        @Override public void onHelperInstallationIdLearned(String helperInstallationId) {
+            PhoneConnectionJournal.append("v2-identity",
+                    "Helper installation identity accepted for selected bond");
         }
 
-        @Override public void onHelperTelemetry(IphoneHelperTelemetry telemetry) {
-            dispatchAncsTransport(token, transportSession,
-                    () -> applyHelperTelemetry(token, telemetry));
+        @Override public void onRoleControl(IphoneRoleControlV2 control) {
+            PhoneConnectionJournal.append("v2-switch",
+                    "remote control " + (control == null ? "invalid" : control.type));
         }
 
-        @Override public void onVerifiedPeerAddress(String address) {
-            dispatchAncsTransport(token, transportSession,
-                    () -> rememberVerifiedAncsAddress(address));
+        @Override public void onRoleControlWriteResult(
+                IphoneRoleControlV2 control, boolean success) {
+            PhoneConnectionJournal.append("v2-switch",
+                    "control completion=" + success);
+        }
+
+        @Override public void onLocalTerminal(IphoneBleMode mode, BleRouteEpoch epoch) {
+            PhoneConnectionJournal.append("v2-terminal",
+                    "local route terminal " + mode + " epoch=" + epoch);
+        }
+
+        @Override public void onError(IphoneTransportErrorV2 error) {
+            dispatchAncsTransport(token, transportSession, () -> {
+                if (error == null) return;
+                lastError = bounded(error.kind + ": " + error.detail, 512);
+                if (!error.retryable) ancsStatus = "failed_closed";
+                publishSnapshot(token);
+            });
         }
     }
 
-    /** Keeps the reverse route's bonded LE identity separate from the stock Classic address. */
-    private void rememberVerifiedAncsAddress(@Nullable String address) {
-        String normalized = address == null ? "" : address.trim();
-        if (config == null || !PhoneBleRole.isIphoneCentral(config.bleRole)
-                || !BluetoothAdapter.checkBluetoothAddress(normalized)) return;
-        String previous = prefs.phoneAncsDeviceAddress.get();
-        if (normalized.equalsIgnoreCase(previous == null ? "" : previous.trim())) return;
-        prefs.phoneAncsDeviceAddress.set(normalized);
-        PhoneConnectionJournal.append("transport-identity",
-                "сохранена подтверждённая BLE identity " + maskedAddress(normalized));
+    private void applyV2DualStatus(long token, @Nullable IphoneDualTransportStatusV2 status) {
+        if (status == null) return;
+        PhoneConnectionJournal.append("v2-switch",
+                "phase=" + status.switchPhase + ", desired=" + status.desiredMode
+                        + ", active=" + status.activeMode + ", failure="
+                        + status.switchFailure + ", detail="
+                        + redactedDiagnostic(status.detail));
+        boolean activePhase = status.switchPhase ==
+                dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Phase.ACTIVE;
+        v2SwitchInProgress = !activePhase;
+        if (!activePhase) {
+            // FREEZING is the generation boundary. Clear before any successor route can publish
+            // so a prior Helper sample cannot survive switch, retry, link-loss, or FAILED.
+            clearHelperTelemetry();
+            refreshBatteryValues();
+        }
+        if (!activePhase && ancsReady) {
+            resetAncsSession(token, "switching_"
+                    + status.switchPhase.name().toLowerCase(Locale.ROOT));
+        }
+        if (!activePhase && status.switchPhase !=
+                dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Phase.FAILED) {
+            ancsStatus = "switching_"
+                    + status.switchPhase.name().toLowerCase(Locale.ROOT);
+            updateMessageAvailability();
+        }
+        if (status.switchPhase !=
+                dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Phase.FAILED) {
+            // desiredMode is the durable user/peer intent.  activeMode may be a deliberately
+            // short intermediate role while a rapid A→B→A request is being drained.
+            int storedRole = status.desiredMode == IphoneBleMode.ANDROID_PERIPHERAL
+                    ? PhoneBleRole.IPHONE_CENTRAL : PhoneBleRole.IPHONE_PERIPHERAL;
+            if (prefs.phoneBleRole.get() != storedRole) prefs.phoneBleRole.set(storedRole);
+        } else if (status.switchPhase ==
+                dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Phase.FAILED) {
+            ancsReady = false;
+            gattConnected = false;
+            ancsStatus = "switch_failed_closed";
+            lastError = bounded(status.detail, 512);
+            updateAncsPresenceLocked(false);
+        }
+        publishSnapshot(token);
+    }
+
+    private void applyV2RouteStatus(long token, @Nullable IphoneTransportStatusV2 status) {
+        if (status == null) return;
+        IphoneTransportLifecycle lifecycle = status.lifecycle;
+        boolean ready = lifecycle == IphoneTransportLifecycle.READY
+                && !v2SwitchInProgress;
+        boolean linkActive = ready
+                || lifecycle == IphoneTransportLifecycle.AUTHENTICATING
+                || lifecycle == IphoneTransportLifecycle.SUBSCRIBING;
+        boolean hadSession = gattConnected || ancsReady;
+        gattConnected = linkActive;
+        ancsReady = ready;
+        if (ready) {
+            lastError = "";
+            reconnectAttempt = 0;
+            scheduleStableAncsReadyReset(token);
+            cancelSmsFallbackNotifications();
+        } else if (!linkActive) {
+            clearHelperTelemetry();
+            refreshBatteryValues();
+            if (hadSession) {
+                resetAncsSession(token, lifecycle.name().toLowerCase(Locale.ROOT));
+            }
+        }
+        ancsStatus = lifecycle.name().toLowerCase(Locale.ROOT);
+        updateMessageAvailability();
+        updateConnected(token);
     }
 
     private void dispatchAncsTransport(long token, long transportSession,
@@ -1330,52 +1339,39 @@ public final class PhoneConnectorController {
         });
     }
 
-    /** Applies only values delivered by the authenticated iPhone Helper channel. */
-    private void applyHelperTelemetry(long token, @NonNull IphoneHelperTelemetry telemetry) {
+    /** Applies the fixed eight-byte v2 telemetry frame from either rewritten topology. */
+    private void applyHelperTelemetryV2(long token, @Nullable IphoneTelemetryV2 telemetry) {
+        if (telemetry == null) return;
         long now = SystemClock.elapsedRealtime();
-        boolean hasPower = telemetry.kind == IphoneHelperTelemetry.Kind.POWER
-                || telemetry.kind == IphoneHelperTelemetry.Kind.SNAPSHOT;
-        boolean hasNetwork = telemetry.kind == IphoneHelperTelemetry.Kind.NETWORK
-                || telemetry.kind == IphoneHelperTelemetry.Kind.SNAPSHOT;
-        boolean hasLock = telemetry.kind == IphoneHelperTelemetry.Kind.SNAPSHOT
-                && telemetry.phoneLocked != null;
-        boolean powerChanged = hasPower && (helperPowerUpdatedAtElapsed <= 0L
-                || !Objects.equals(helperBatteryLevel, telemetry.batteryLevel)
+        boolean powerChanged = helperPowerUpdatedAtElapsed <= 0L
+                || !Objects.equals(helperBatteryLevel, telemetry.batteryPercent)
                 || !Objects.equals(helperExternalPower, telemetry.externalPower)
-                || !Objects.equals(helperChargeState, telemetry.chargeState));
-        boolean networkChanged = hasNetwork && (helperNetworkUpdatedAtElapsed <= 0L
-                || !Objects.equals(helperNetworkType, telemetry.networkType));
-        boolean lockChanged = hasLock && (helperLockUpdatedAtElapsed <= 0L
-                || !Objects.equals(helperPhoneLocked, telemetry.phoneLocked));
-        if (hasPower) {
-            helperBatteryLevel = telemetry.batteryLevel;
-            helperExternalPower = telemetry.externalPower;
-            helperChargeState = telemetry.chargeState;
-            helperPowerUpdatedAtElapsed = now;
-            refreshBatteryValues();
-        }
-        if (hasNetwork) {
-            helperNetworkType = telemetry.networkType;
-            helperNetworkUpdatedAtElapsed = now;
-        }
-        if (hasLock) {
-            helperPhoneLocked = telemetry.phoneLocked;
-            helperLockUpdatedAtElapsed = now;
-        }
+                || !Objects.equals(helperChargeState, telemetry.chargeState);
+        boolean networkChanged = helperNetworkUpdatedAtElapsed <= 0L
+                || !Objects.equals(helperNetworkType, telemetry.networkType);
+        boolean lockChanged = helperLockUpdatedAtElapsed <= 0L
+                || !Objects.equals(helperPhoneLocked, telemetry.phoneLocked);
+        helperBatteryLevel = telemetry.batteryPercent;
+        helperExternalPower = telemetry.externalPower;
+        helperChargeState = telemetry.chargeState;
+        helperNetworkType = telemetry.networkType;
+        helperPhoneLocked = telemetry.phoneLocked;
+        helperPowerUpdatedAtElapsed = now;
+        helperNetworkUpdatedAtElapsed = now;
+        helperLockUpdatedAtElapsed = telemetry.phoneLocked == null ? 0L : now;
+        refreshBatteryValues();
         if (powerChanged || networkChanged || lockChanged) {
-            PhoneConnectionJournal.append("helper-telemetry",
-                    "kind=" + telemetry.kind + ", battery=" + telemetry.batteryLevel
+            PhoneConnectionJournal.append("helper-telemetry-v2",
+                    "battery=" + telemetry.batteryPercent
                             + ", externalPower=" + telemetry.externalPower
                             + ", chargeState=" + telemetry.chargeState
                             + ", network=" + telemetry.networkType
-                            + ", locked=" + telemetry.phoneLocked);
-            markTelemetryUpdated(hasPower, hasNetwork);
+                            + ", locked=" + telemetry.phoneLocked
+                            + ", sequence=" + telemetry.sequence);
+            markTelemetryUpdated(true, true);
         } else {
-            // A one-second identical control read only refreshes liveness. Do not rewrite
-            // SharedPreferences or replace the UI snapshot every second: that would waste I/O
-            // and could make overlay views flicker despite no visible value changing.
-            if (hasPower) batteryLiveSeenThisConnection = true;
-            if (hasNetwork) networkLiveSeenThisConnection = true;
+            batteryLiveSeenThisConnection = true;
+            networkLiveSeenThisConnection = true;
             telemetryStale = false;
         }
         scheduleHelperTelemetryExpiry(token);
@@ -1454,127 +1450,39 @@ public final class PhoneConnectorController {
         helperLockUpdatedAtElapsed = 0L;
     }
 
-    private void handleAncsTransportState(long token, @Nullable String rawState) {
-        String state = rawState == null ? "" : rawState.trim();
-        if (state.contains("ANCS READY")) {
-            gattConnected = true;
-            ancsReady = true;
-            ancsAuthorizedThisRun = true;
-            ancsStatus = "ready";
-            lastError = "";
-            scheduleStableAncsReadyReset(token);
-            rebuildMessageSnapshot();
-            cancelSmsFallbackNotifications();
-            updateMessageAvailability();
-            updateConnected(token);
-            return;
-        }
-        if (state.contains("IPHONE BLE CONNECTED")
-                || state.contains("INCOMING LINK")
-                || state.contains("SAME-PEER GATT CONNECTED")
-                || state.contains("SAME-PEER ATTACH")) {
-            gattConnected = true;
-            ancsReady = false;
-            ancsStatus = "negotiating";
-            updateConnected(token);
-            return;
-        }
-        if (state.contains("RECOVERING") || state.contains("IDENTITY SCAN")) {
-            cancelStableAncsReadyReset();
-            gattConnected = false;
-            ancsReady = false;
-            ancsStatus = "retrying";
-            updateMessageAvailability();
-            updateConnected(token);
-            return;
-        }
-        if (state.contains("AUTO · SERVICE CHANGED · RECONNECT")) {
-            scheduleGattReconnect(token, "ANCS Service Changed", "services_changed");
-            return;
-        }
-        if (isTerminalAncsTransportState(state)) {
-            scheduleGattReconnect(token,
-                    state.isEmpty() ? "ANCS transport failed" : state,
-                    "retrying");
-            return;
-        }
-        if (!state.isEmpty() && !"ОТКЛЮЧЕНО".equals(state)) {
-            ancsStatus = normalizeAncsState(state);
-            publishSnapshot(token);
-        }
+    private void handleAncsTransportNotificationV2(
+            long token, @Nullable IphoneNotificationV2 item) {
+        if (item == null) return;
+        handleAncsNotificationFields(token, item.eventId, item.uid, item.categoryId,
+                item.appIdentifier, item.appName, item.title, item.message, item.date,
+                item.observedAtElapsedMillis);
     }
 
-    private static boolean isTerminalAncsTransportState(@NonNull String state) {
-        return state.contains("CONNECT RETURNED NULL")
-                || state.contains("CONNECT TIMEOUT")
-                || state.contains("CONNECT EXCEPTION")
-                || state.contains("SAVED PEER SCAN UNAVAILABLE")
-                || state.contains("SAVED PEER SCAN FAILED")
-                || state.contains("SAVED PEER CONFLICT")
-                || state.contains("PEER CONFLICT")
-                || state.contains("CONNECTION FAILED")
-                || state.contains("GPS-STYLE FAILED")
-                || state.contains("IPHONE DISCONNECTED")
-                || state.contains("DISCOVERY_FAILED_")
-                || state.contains("DISCOVERY_START_FAILED")
-                || state.contains("DISCOVERY_TIMEOUT")
-                || state.contains("ANCS_INCOMPLETE")
-                || state.contains("SUBSCRIBE_EXCEPTION")
-                || state.contains("SUBSCRIBE_LOCAL_FAILED")
-                || state.contains("CCCD_START_FAILED")
-                || state.contains("CCCD_WRITE_EXCEPTION")
-                || state.contains("CCCD_WRITE_TIMEOUT")
-                || state.contains("CCCD_FAILED_")
-                || state.contains("ANCS DATA DESYNC")
-                || state.contains("ANCS WAIT TIMEOUT")
-                || state.contains("SECURE READ FAILED")
-                || state.contains("BOND_START_FAILED")
-                || state.contains("LE BOND TIMEOUT")
-                || state.contains("LE BOND FAILED")
-                || state.contains("ATTEMPTS EXHAUSTED")
-                || state.contains("PAIRING FAILED")
-                || state.contains("AUTH FAILED ПОСЛЕ BOND");
-    }
-
-    @NonNull
-    private static String normalizeAncsState(@NonNull String state) {
-        String normalized = state.trim().toLowerCase(Locale.ROOT)
-                .replace('·', '_')
-                .replace(' ', '_');
-        while (normalized.contains("__")) normalized = normalized.replace("__", "_");
-        return bounded(normalized, 128);
-    }
-
-    private void handleAncsTransportFailure(long token, @NonNull String detail) {
-        synchronized (lifecycleLock) {
-            if (isCurrentLocked(token)) ancsTransportStartPending = false;
-        }
-        scheduleGattReconnect(token, detail, "retrying");
-    }
-
-    private void handleAncsTransportNotification(
-            long token, @Nullable IphoneAncsTransport.NotificationItem item) {
-        if (item == null || !ancsReady || config == null || !config.ancsNeeded()) return;
-        if (item.eventId == dezz.status.widget.phone.transport.AncsProtocol.EVENT_REMOVED) {
-            removeAncsNotification(token, item.uid);
+    private void handleAncsNotificationFields(
+            long token, int eventId, long uid, int categoryId,
+            @Nullable String appIdentifier, @Nullable String appName,
+            @Nullable String title, @Nullable String message, @Nullable String date,
+            long observedAt) {
+        if (!ancsReady || config == null || !config.ancsNeeded()) return;
+        if (eventId == dezz.status.widget.phone.transport.AncsProtocol.EVENT_REMOVED) {
+            removeAncsNotification(token, uid);
             return;
         }
-
-        String cleanAppIdentifier = bounded(item.appIdentifier, 512);
-        String cleanAppName = bounded(item.appName, 256);
+        String cleanAppIdentifier = bounded(appIdentifier, 512);
+        String cleanAppName = bounded(appName, 256);
         PhoneAppIconStore.Observation iconObservation =
                 PhoneAppIconStore.get(context).observe(
-                        cleanAppIdentifier, cleanAppName, item.categoryId);
-        boolean appleMessage = isAppleMessagesApp(item.appIdentifier);
+                        cleanAppIdentifier, cleanAppName, categoryId);
+        boolean appleMessage = isAppleMessagesApp(appIdentifier);
         boolean allowed = config.notificationsEnabled
                 || config.messagesEnabled && appleMessage;
         if (!allowed || !config.allowsNotification(
-                item.appIdentifier, item.categoryId)) return;
-        long observedAtElapsedMs = item.observedAtElapsedMs > 0L
-                ? item.observedAtElapsedMs : SystemClock.elapsedRealtime();
+                appIdentifier, categoryId)) return;
+        long observedAtElapsedMs = observedAt > 0L
+                ? observedAt : SystemClock.elapsedRealtime();
         if (SystemClock.elapsedRealtime() - observedAtElapsedMs
                 > APP_DISPLAY_NAME_WAIT_TIMEOUT_MS) {
-            Log.w(TAG, "Dropping ANCS notification " + item.uid
+            Log.w(TAG, "Dropping ANCS notification " + uid
                     + ": transport item exceeded real-time TTL");
             return;
         }
@@ -1583,19 +1491,19 @@ public final class PhoneConnectorController {
             cacheAppDisplayName(cleanAppIdentifier, cleanAppName);
         }
         AncsProtocol.Notification notification = new AncsProtocol.Notification(
-                item.uid,
+                uid,
                 cleanAppIdentifier,
-                bounded(item.title, 4096),
+                bounded(title, 4096),
                 "",
-                bounded(item.message, 4096),
-                bounded(item.date, 256));
+                bounded(message, 4096),
+                bounded(date, 256));
         boolean hasDisplayName = !cleanAppName.isEmpty()
                 || appDisplayNames.containsKey(cleanAppIdentifier);
         NotificationRecord record = new NotificationRecord(
-                notification, item.categoryId, System.currentTimeMillis(), false,
+                notification, categoryId, System.currentTimeMillis(), false,
                 observedAtElapsedMs, iconObservation.iconWasCached);
-        notificationCache.remove(item.uid);
-        notificationCache.put(item.uid, record);
+        notificationCache.remove(uid);
+        notificationCache.put(uid, record);
         trimNotificationCache();
         if (hasDisplayName) {
             presentAncsNotification(token, record, true);
@@ -1678,716 +1586,6 @@ public final class PhoneConnectorController {
                 > APP_DISPLAY_NAME_WAIT_TIMEOUT_MS;
     }
 
-    private final class SessionGattCallback extends BluetoothGattCallback {
-        private final long token;
-
-        SessionGattCallback(long token) {
-            this.token = token;
-        }
-
-        private void dispatch(@NonNull Runnable action) {
-            Handler handler = worker;
-            if (handler != null) handler.post(() -> runIfCurrent(token, action));
-        }
-
-        @Override public void onConnectionStateChange(BluetoothGatt callbackGatt, int status,
-                                                       int newState) {
-            dispatch(() -> handleGattConnection(token, callbackGatt, status, newState));
-        }
-
-        @Override public void onServicesDiscovered(BluetoothGatt callbackGatt, int status) {
-            dispatch(() -> handleServicesDiscovered(token, callbackGatt, status));
-        }
-
-        @Override public void onDescriptorWrite(BluetoothGatt callbackGatt,
-                                                BluetoothGattDescriptor descriptor, int status) {
-            dispatch(() -> {
-                if (callbackGatt == gatt) {
-                    finishGattOperation(token, GattKind.DESCRIPTOR,
-                            descriptor, null, status);
-                }
-            });
-        }
-
-        @Override public void onCharacteristicWrite(BluetoothGatt callbackGatt,
-                                                    BluetoothGattCharacteristic characteristic,
-                                                    int status) {
-            dispatch(() -> {
-                if (callbackGatt == gatt) {
-                    finishGattOperation(token, GattKind.CONTROL_WRITE,
-                            null, characteristic, status);
-                }
-            });
-        }
-
-        @Override public void onCharacteristicRead(BluetoothGatt callbackGatt,
-                                                   BluetoothGattCharacteristic characteristic,
-                                                   int status) {
-            byte[] rawValue = characteristic.getValue();
-            byte[] value = rawValue == null ? null : rawValue.clone();
-            dispatch(() -> {
-                if (callbackGatt != gatt) return;
-                if (!matchesGattOperation(GattKind.CHARACTERISTIC_READ,
-                        null, characteristic)) return;
-                if (status == BluetoothGatt.GATT_SUCCESS) {
-                    applyBatteryCharacteristic(token, characteristic.getUuid(), value);
-                }
-                finishGattOperation(token, GattKind.CHARACTERISTIC_READ,
-                        null, characteristic, status);
-            });
-        }
-
-        @Override public void onMtuChanged(BluetoothGatt callbackGatt, int mtu, int status) {
-            dispatch(() -> {
-                if (callbackGatt != gatt || !mtuPending) return;
-                mtuPending = false;
-                cancelMtuWatchdog();
-                startServiceDiscovery(token, callbackGatt);
-            });
-        }
-
-        @Override public void onCharacteristicChanged(BluetoothGatt callbackGatt,
-                                                      BluetoothGattCharacteristic characteristic) {
-            byte[] rawValue = characteristic.getValue();
-            byte[] value = rawValue == null ? null : rawValue.clone();
-            UUID uuid = characteristic.getUuid();
-            dispatch(() -> {
-                if (callbackGatt == gatt) {
-                    handleCharacteristicChanged(token, uuid, value);
-                }
-            });
-        }
-    }
-
-    private void handleGattConnection(long token, @NonNull BluetoothGatt callbackGatt, int status,
-                                      int newState) {
-        if (callbackGatt != gatt) {
-            closeGatt(callbackGatt);
-            return;
-        }
-        if (status == BluetoothGatt.GATT_SUCCESS
-                && newState == BluetoothProfile.STATE_CONNECTED) {
-            cancelConnectWatchdog();
-            gattConnected = true;
-            serviceDiscoveryStarted = false;
-            if (config != null && config.ancsNeeded()) ancsStatus = "negotiating";
-            else reconnectAttempt = 0;
-            updateConnected(token);
-            beginMtuNegotiation(token, callbackGatt);
-            return;
-        }
-        cancelGattWatchdogs();
-        gattConnected = false;
-        persistCurrentTelemetry();
-        clearBasData();
-        resetAncsSession(token, "disconnected");
-        updateConnected(token);
-        scheduleGattReconnect(token, "GATT disconnected (" + status + ")");
-    }
-
-    private void beginMtuNegotiation(long token, @NonNull BluetoothGatt callbackGatt) {
-        boolean requested = false;
-        try {
-            requested = callbackGatt.requestMtu(DESIRED_GATT_MTU);
-        } catch (RuntimeException ignored) {
-            // MTU enlargement is only an optimisation; fragmented ANCS responses remain valid.
-        }
-        if (!requested) {
-            startServiceDiscovery(token, callbackGatt);
-            return;
-        }
-        mtuPending = true;
-        Handler handler = worker;
-        if (handler == null) {
-            mtuPending = false;
-            startServiceDiscovery(token, callbackGatt);
-            return;
-        }
-        Runnable timeout = () -> runIfCurrent(token, () -> {
-            if (callbackGatt != gatt || !mtuPending) return;
-            mtuPending = false;
-            mtuWatchdog = null;
-            startServiceDiscovery(token, callbackGatt);
-        });
-        mtuWatchdog = timeout;
-        handler.postDelayed(timeout, GATT_MTU_TIMEOUT_MS);
-    }
-
-    private void startServiceDiscovery(long token, @NonNull BluetoothGatt callbackGatt) {
-        if (!isCurrent(token) || callbackGatt != gatt || serviceDiscoveryStarted) return;
-        cancelMtuWatchdog();
-        mtuPending = false;
-        serviceDiscoveryStarted = true;
-        if (config != null && config.ancsNeeded()) ancsStatus = "discovering";
-        try {
-            if (!callbackGatt.discoverServices()) {
-                serviceDiscoveryStarted = false;
-                scheduleGattReconnect(token, "Service discovery did not start");
-                return;
-            }
-            scheduleDiscoveryWatchdog(token, callbackGatt);
-        } catch (RuntimeException error) {
-            serviceDiscoveryStarted = false;
-            scheduleGattReconnect(token, "Service discovery: " + safeMessage(error));
-        }
-    }
-
-    private void handleServicesDiscovered(long token, @NonNull BluetoothGatt callbackGatt,
-                                          int status) {
-        if (callbackGatt != gatt) {
-            closeGatt(callbackGatt);
-            return;
-        }
-        if (!serviceDiscoveryStarted) return;
-        cancelDiscoveryWatchdog();
-        serviceDiscoveryStarted = false;
-        if (status != BluetoothGatt.GATT_SUCCESS) {
-            scheduleGattReconnect(token, "Service discovery failed (" + status + ")");
-            return;
-        }
-        resetGattOperationState();
-        if (config == null || !config.ancsNeeded()) {
-            ancsStatus = "disabled";
-            configureBatteryService(callbackGatt);
-            pumpGattOperations(token);
-            publishSnapshot(token);
-            return;
-        }
-        BluetoothGattService service = callbackGatt.getService(AncsProtocol.SERVICE);
-        if (service == null) {
-            // No protected ANCS characteristic exists to provoke an authorization prompt in this
-            // state. Stay connected and let Service Changed publish ANCS after stock pairing or
-            // after the user enables notification sharing on the iPhone.
-            ancsStatus = "service_not_published";
-            if (!configureServiceChanged(callbackGatt)) {
-                lastError = "ANCS is not published and GATT Service Changed is unavailable";
-            }
-            configureBatteryService(callbackGatt);
-            publishSnapshot(token);
-            pumpGattOperations(token);
-            scheduleAncsPublicationRetry(token, callbackGatt);
-            return;
-        }
-        cancelAncsPublicationRetry();
-        ancsPublicationRetryCount = 0;
-        ancsControlPoint = service.getCharacteristic(AncsProtocol.CONTROL_POINT);
-        ancsDataSource = service.getCharacteristic(AncsProtocol.DATA_SOURCE);
-        ancsNotificationSource = service.getCharacteristic(AncsProtocol.NOTIFICATION_SOURCE);
-        if (ancsControlPoint == null || ancsDataSource == null
-                || ancsNotificationSource == null) {
-            ancsStatus = "characteristic_unavailable";
-            publishSnapshot(token);
-            scheduleGattReconnect(token, "ANCS characteristics are incomplete");
-            return;
-        }
-        if (!queueNotificationSubscription(callbackGatt, ancsDataSource,
-                GattTag.ANCS_DATA)
-                || !queueNotificationSubscription(callbackGatt, ancsNotificationSource,
-                GattTag.ANCS_NOTIFICATION)) {
-            scheduleGattReconnect(token, "ANCS subscription is unsupported");
-            return;
-        }
-        // Service Changed is a resilience subscription, not part of the ANCS authorization
-        // handshake. Queue it only after the protected ANCS descriptors so an OEM Android 9
-        // failure cannot prevent the iPhone permission request.
-        if (!configureServiceChanged(callbackGatt)) {
-            lastError = "GATT Service Changed subscription is unavailable";
-        }
-        ancsStatus = "subscribing";
-        configureBatteryService(callbackGatt);
-        publishSnapshot(token);
-        pumpGattOperations(token);
-    }
-
-    private void configureBatteryService(@NonNull BluetoothGatt callbackGatt) {
-        BluetoothGattService battery = callbackGatt.getService(BATTERY_SERVICE);
-        if (battery == null) return;
-        BluetoothGattCharacteristic level = battery.getCharacteristic(BATTERY_LEVEL);
-        if (level != null) {
-            queueCharacteristicRead(level, GattTag.BATTERY_LEVEL_READ);
-            queueOptionalNotificationSubscription(callbackGatt, level,
-                    GattTag.BATTERY_LEVEL_SUBSCRIPTION);
-        }
-        BluetoothGattCharacteristic status = battery.getCharacteristic(BATTERY_LEVEL_STATUS);
-        if (status != null) {
-            queueCharacteristicRead(status, GattTag.BATTERY_LEVEL_STATUS_READ);
-            queueOptionalNotificationSubscription(callbackGatt, status,
-                    GattTag.BATTERY_LEVEL_STATUS_SUBSCRIPTION);
-        }
-    }
-
-    private boolean configureServiceChanged(@NonNull BluetoothGatt callbackGatt) {
-        BluetoothGattService generic = callbackGatt.getService(GENERIC_ATTRIBUTE_SERVICE);
-        if (generic == null) return false;
-        BluetoothGattCharacteristic changed = generic.getCharacteristic(SERVICE_CHANGED);
-        if (changed == null) return false;
-        serviceChangedCharacteristic = changed;
-        return queueIndicationSubscription(callbackGatt, changed, GattTag.SERVICE_CHANGED);
-    }
-
-    private boolean queueNotificationSubscription(@NonNull BluetoothGatt callbackGatt,
-                                                  @NonNull BluetoothGattCharacteristic item,
-                                                  @NonNull GattTag tag) {
-        BluetoothGattDescriptor descriptor =
-                item.getDescriptor(AncsProtocol.CLIENT_CONFIGURATION);
-        if (descriptor == null) return false;
-        try {
-            if (!callbackGatt.setCharacteristicNotification(item, true)) return false;
-            gattOperations.add(new GattOperation(GattKind.DESCRIPTOR, tag, descriptor,
-                    null, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE));
-            if (tag == GattTag.ANCS_NOTIFICATION) ancsNotificationListening = true;
-            return true;
-        } catch (RuntimeException error) {
-            return false;
-        }
-    }
-
-    private boolean queueIndicationSubscription(@NonNull BluetoothGatt callbackGatt,
-                                                @NonNull BluetoothGattCharacteristic item,
-                                                @NonNull GattTag tag) {
-        int properties = item.getProperties();
-        if ((properties & BluetoothGattCharacteristic.PROPERTY_INDICATE) == 0) return false;
-        BluetoothGattDescriptor descriptor =
-                item.getDescriptor(AncsProtocol.CLIENT_CONFIGURATION);
-        if (descriptor == null) return false;
-        try {
-            if (callbackGatt.setCharacteristicNotification(item, true)) {
-                gattOperations.add(new GattOperation(GattKind.DESCRIPTOR, tag, descriptor,
-                        null, BluetoothGattDescriptor.ENABLE_INDICATION_VALUE));
-                return true;
-            }
-        } catch (RuntimeException ignored) {
-            // Service Changed is a resilience feature. ANCS may still remain stable for the
-            // lifetime of this encrypted connection on stacks that hide the indication.
-        }
-        return false;
-    }
-
-    private void queueOptionalNotificationSubscription(
-            @NonNull BluetoothGatt callbackGatt,
-            @NonNull BluetoothGattCharacteristic item, @NonNull GattTag tag) {
-        int properties = item.getProperties();
-        if ((properties & BluetoothGattCharacteristic.PROPERTY_NOTIFY) == 0) return;
-        BluetoothGattDescriptor descriptor =
-                item.getDescriptor(AncsProtocol.CLIENT_CONFIGURATION);
-        if (descriptor == null) return;
-        try {
-            if (callbackGatt.setCharacteristicNotification(item, true)) {
-                gattOperations.add(new GattOperation(GattKind.DESCRIPTOR, tag, descriptor,
-                        null, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE));
-            }
-        } catch (RuntimeException ignored) {
-            // Standard battery service notifications are optional; the initial read still works.
-        }
-    }
-
-    private void queueCharacteristicRead(@NonNull BluetoothGattCharacteristic characteristic,
-                                         @NonNull GattTag tag) {
-        if ((characteristic.getProperties() & BluetoothGattCharacteristic.PROPERTY_READ) != 0) {
-            gattOperations.add(new GattOperation(GattKind.CHARACTERISTIC_READ, tag, null,
-                    characteristic, null));
-        }
-    }
-
-    private void pumpGattOperations(long token) {
-        if (!isCurrent(token) || currentGattOperation != null || gatt == null) return;
-        GattOperation operation = gattOperations.poll();
-        if (operation == null) {
-            maybeFinishAncsSetup(token);
-            return;
-        }
-        currentGattOperation = operation;
-        boolean started = false;
-        try {
-            if (operation.kind == GattKind.DESCRIPTOR && operation.descriptor != null) {
-                operation.descriptor.setValue(operation.payload == null
-                        ? BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE : operation.payload);
-                started = gatt.writeDescriptor(operation.descriptor);
-            } else if (operation.kind == GattKind.CHARACTERISTIC_READ
-                    && operation.characteristic != null) {
-                started = gatt.readCharacteristic(operation.characteristic);
-            } else if (operation.kind == GattKind.CONTROL_WRITE
-                    && operation.characteristic != null && operation.payload != null) {
-                operation.characteristic.setValue(operation.payload);
-                started = gatt.writeCharacteristic(operation.characteristic);
-            }
-        } catch (RuntimeException error) {
-            lastError = "GATT operation: " + safeMessage(error);
-        }
-        if (!started) {
-            finishGattOperation(token, operation.kind, operation.descriptor,
-                    operation.characteristic, -1);
-            return;
-        }
-        Handler handler = worker;
-        if (handler != null) {
-            Runnable timeout = () -> runIfCurrent(token, () -> {
-                if (currentGattOperation == operation) {
-                    if (operation.tag == GattTag.SERVICE_CHANGED) {
-                        // Service Changed is optional. Completing its stuck write as a failure
-                        // lets the bounded ANCS-publication recovery own the one allowed reconnect
-                        // instead of creating a fresh unbounded 90-second reconnect loop.
-                        finishGattOperation(token, operation.kind, operation.descriptor,
-                                operation.characteristic, -1);
-                    } else {
-                        scheduleGattReconnect(token,
-                                "GATT operation timed out: " + operation.tag.name());
-                    }
-                }
-            });
-            gattOperationTimeout = timeout;
-            handler.postDelayed(timeout, gattOperationTimeoutMillis(operation));
-        }
-    }
-
-    private long gattOperationTimeoutMillis(@NonNull GattOperation operation) {
-        if (!ancsAuthorizedThisRun && operation.kind == GattKind.DESCRIPTOR
-                && (operation.tag == GattTag.ANCS_DATA
-                || operation.tag == GattTag.ANCS_NOTIFICATION
-                || operation.tag == GattTag.SERVICE_CHANGED)) {
-            return ANCS_AUTHORIZATION_OPERATION_TIMEOUT_MS;
-        }
-        return GATT_OPERATION_TIMEOUT_MS;
-    }
-
-    private void finishGattOperation(long token, @NonNull GattKind callbackKind,
-                                     @Nullable BluetoothGattDescriptor callbackDescriptor,
-                                     @Nullable BluetoothGattCharacteristic callbackCharacteristic,
-                                     int status) {
-        GattOperation operation = currentGattOperation;
-        if (operation == null || operation.kind != callbackKind) return;
-        if (callbackKind == GattKind.DESCRIPTOR
-                && operation.descriptor != callbackDescriptor) return;
-        if ((callbackKind == GattKind.CHARACTERISTIC_READ
-                || callbackKind == GattKind.CONTROL_WRITE)
-                && operation.characteristic != callbackCharacteristic) return;
-        boolean success = status == BluetoothGatt.GATT_SUCCESS;
-        Runnable operationTimeout = gattOperationTimeout;
-        if (operationTimeout != null && worker != null) {
-            worker.removeCallbacks(operationTimeout);
-        }
-        gattOperationTimeout = null;
-        currentGattOperation = null;
-        if (operation.tag == GattTag.ANCS_DATA) {
-            ancsDataSubscribed = success;
-        } else if (operation.tag == GattTag.ANCS_NOTIFICATION) {
-            ancsNotificationSubscribed = success;
-        } else if (operation.tag == GattTag.SERVICE_CHANGED) {
-            serviceChangedSubscribed = success;
-            if (success && ancsReady) {
-                ancsStatus = "ready";
-                lastError = "";
-                publishSnapshot(token);
-            } else if (!success) {
-                lastError = "GATT Service Changed descriptor write failed (" + status + ")";
-            }
-        } else if (operation.tag == GattTag.CONTROL) {
-            if (operation.requestSequence != activeAncsRequestSequence) {
-                // This exact response already completed before Android delivered the write
-                // callback. A newer request, even for the same UID, must own subsequent state.
-                pumpGattOperations(token);
-                return;
-            }
-            if (success) scheduleAttributeTimeout(token, operation);
-            else if (status == ANCS_INVALID_PARAMETER) {
-                abandonInvalidAncsRequest(token, operation);
-                return;
-            } else {
-                scheduleGattReconnect(token, "ANCS control-point write failed (" + status + ")",
-                        isAuthorizationFailure(status) ? "authorization_required" : "retrying");
-                return;
-            }
-        }
-        if (!success && (operation.tag == GattTag.ANCS_DATA
-                || operation.tag == GattTag.ANCS_NOTIFICATION)) {
-            if (isAuthorizationFailure(status)) {
-                // Do not tear down the LE link while Android/iOS may still be completing their
-                // user-driven security flow. Continue to the other descriptor and the optional
-                // Service Changed subscription; a bond completion, service change or explicit
-                // test can then retry the full ANCS setup on this exact device.
-                lastError = "ANCS authorization is required (" + status + ")";
-                ancsStatus = "authorization_required";
-                publishSnapshot(token);
-                pumpGattOperations(token);
-                return;
-            }
-            scheduleGattReconnect(token, "ANCS descriptor write failed (" + status + ")",
-                    "retrying");
-            return;
-        }
-        maybeFinishAncsSetup(token);
-        pumpGattOperations(token);
-    }
-
-    private boolean matchesGattOperation(@NonNull GattKind callbackKind,
-                                         @Nullable BluetoothGattDescriptor callbackDescriptor,
-                                         @Nullable BluetoothGattCharacteristic callbackCharacteristic) {
-        GattOperation operation = currentGattOperation;
-        if (operation == null || operation.kind != callbackKind) return false;
-        if (callbackKind == GattKind.DESCRIPTOR) {
-            return operation.descriptor == callbackDescriptor;
-        }
-        return operation.characteristic == callbackCharacteristic;
-    }
-
-    private void maybeFinishAncsSetup(long token) {
-        if (!ancsReady && ancsDataSubscribed && ancsNotificationSubscribed) {
-            ancsReady = true;
-            ancsAuthorizedThisRun = true;
-            forceDirectGatt = false;
-            reconnectAttempt = 0;
-            ancsStatus = serviceChangedSubscribed ? "ready" : "ready_degraded";
-            if (serviceChangedSubscribed) lastError = "";
-            rebuildMessageSnapshot();
-            cancelSmsFallbackNotifications();
-            updateMessageAvailability();
-            publishSnapshot(token);
-            pumpAttributeRequests(token);
-        }
-    }
-
-    private void handleCharacteristicChanged(long token, @NonNull UUID uuid,
-                                             @Nullable byte[] payload) {
-        if (AncsProtocol.NOTIFICATION_SOURCE.equals(uuid)) {
-            handleAncsEvent(token, AncsProtocol.parseEvent(payload));
-        } else if (AncsProtocol.DATA_SOURCE.equals(uuid)) {
-            handleAncsData(token, payload);
-        } else if (SERVICE_CHANGED.equals(uuid)) {
-            handleServiceChanged(token);
-        } else if (BATTERY_LEVEL.equals(uuid) || BATTERY_LEVEL_STATUS.equals(uuid)) {
-            applyBatteryCharacteristic(token, uuid, payload);
-        }
-    }
-
-    private void handleAncsEvent(long token, @Nullable AncsProtocol.Event event) {
-        Config current = config;
-        if (event == null || current == null || !current.ancsNeeded()
-                || ancsNotificationSource == null || !ancsNotificationListening) return;
-        if (event.eventId == AncsProtocol.EVENT_REMOVED) {
-            removeAncsNotification(token, event.uid);
-            return;
-        }
-        if (!current.allowsCategory(event.categoryId)) return;
-        removedAttributeUids.remove(event.uid);
-        pendingAncsEvents.remove(event.uid);
-        pendingAncsEvents.put(event.uid, event);
-        if (activeAttributeUid != null && activeAttributeUid == event.uid) {
-            dirtyAttributeUids.add(event.uid);
-        } else if (queuedAttributeUids.add(event.uid)) {
-            trimPendingNotificationRequests();
-            attributeRequests.add(event.uid);
-        }
-        pumpAttributeRequests(token);
-    }
-
-    private void trimPendingNotificationRequests() {
-        while (attributeRequests.size() >= MAX_PENDING_ANCS_REQUESTS) {
-            Long dropped = attributeRequests.poll();
-            if (dropped == null) break;
-            queuedAttributeUids.remove(dropped);
-            pendingAncsEvents.remove(dropped);
-            dirtyAttributeUids.remove(dropped);
-            fullTextAttributeUids.remove(dropped);
-        }
-    }
-
-    private void handleServiceChanged(long token) {
-        if (gatt == null || !gattConnected) return;
-        // Android 9 vendor stacks can deliver late callbacks from the old attribute database.
-        // Refreshing then reopening GATT gives the new database its own callback identity and
-        // operation queue instead of rediscovering Android's stale cached service list.
-        forceDirectGatt = true;
-        refreshGattCache(gatt);
-        scheduleGattReconnect(token, "GATT services changed", "services_changed");
-    }
-
-    private void restartAncsAfterBond(long token, @NonNull BluetoothGatt expected) {
-        Handler handler = worker;
-        if (handler == null) return;
-        handler.postDelayed(() -> runIfCurrent(token, () -> {
-            if (gatt != expected || !gattConnected) return;
-            // Never overlap service discovery with a descriptor write that Android's security
-            // manager may still be completing. Reopen one clean client after the bond settles.
-            forceDirectGatt = true;
-            scheduleGattReconnect(token, "Bluetooth LE bond completed", "negotiating");
-        }), 750L);
-    }
-
-    private void pumpAttributeRequests(long token) {
-        if (!ancsReady || activeAttributeUid != null || activeAppIdentifier != null
-                || ancsControlPoint == null) return;
-        Long uid = attributeRequests.poll();
-        if (uid != null) {
-            queuedAttributeUids.remove(uid);
-            activeAttributeUid = uid;
-            long requestSequence = ++nextAncsRequestSequence;
-            activeAncsRequestSequence = requestSequence;
-            boolean includeText = config != null && config.includeNotificationText
-                    && (config.notificationsEnabled || fullTextAttributeUids.contains(uid));
-            activeAttributeIncludesText = includeText;
-            attributeAccumulator = new AncsProtocol.AttributeAccumulator(uid, includeText);
-            byte[] request = AncsProtocol.notificationAttributeRequest(uid, includeText);
-            gattOperations.add(new GattOperation(GattKind.CONTROL_WRITE, GattTag.CONTROL,
-                    null, ancsControlPoint, request, uid, requestSequence));
-            pumpGattOperations(token);
-            return;
-        }
-        while (true) {
-            String appIdentifier = appAttributeRequests.poll();
-            if (appIdentifier == null) return;
-            queuedAppIdentifiers.remove(appIdentifier);
-            final AncsProtocol.AppAttributeAccumulator accumulator;
-            final byte[] request;
-            try {
-                accumulator = new AncsProtocol.AppAttributeAccumulator(appIdentifier);
-                request = AncsProtocol.appAttributeRequest(appIdentifier);
-            } catch (IllegalArgumentException invalidIdentifier) {
-                cacheAppDisplayName(appIdentifier,
-                        PhoneAppCatalog.displayNameFallback(appIdentifier));
-                continue;
-            }
-            activeAppIdentifier = appIdentifier;
-            long requestSequence = ++nextAncsRequestSequence;
-            activeAncsRequestSequence = requestSequence;
-            appAttributeAccumulator = accumulator;
-            gattOperations.add(new GattOperation(GattKind.CONTROL_WRITE, GattTag.CONTROL,
-                    null, ancsControlPoint, request, appIdentifier, requestSequence));
-            pumpGattOperations(token);
-            return;
-        }
-    }
-
-    private void scheduleAttributeTimeout(long token, @NonNull GattOperation operation) {
-        Handler handler = worker;
-        if (handler == null) {
-            scheduleGattReconnect(token, "ANCS response worker unavailable");
-            return;
-        }
-        long expectedSequence = operation.requestSequence;
-        // The Data Source response is allowed to arrive before Android reports completion of the
-        // Control Point write. If that already completed this exact request, there is no response
-        // left to time out and the next serialized request owns any newly queued operation.
-        if (expectedSequence == 0L || activeAncsRequestSequence != expectedSequence) return;
-        Runnable timeout = () -> runIfCurrent(token, () -> {
-            if (activeAncsRequestSequence == expectedSequence) {
-                scheduleGattReconnect(token, "ANCS attribute response timed out");
-            }
-        });
-        attributeTimeout = timeout;
-        handler.postDelayed(timeout, ATTRIBUTE_TIMEOUT_MS);
-    }
-
-    private void handleAncsData(long token, @Nullable byte[] payload) {
-        if (payload == null) return;
-        if (activeAttributeUid != null && attributeAccumulator != null) {
-            handleNotificationAttributes(token, payload);
-            return;
-        }
-        if (activeAppIdentifier != null && appAttributeAccumulator != null) {
-            handleAppAttributes(token, payload);
-        }
-    }
-
-    private void handleNotificationAttributes(long token, @NonNull byte[] payload) {
-        Long uid = activeAttributeUid;
-        AncsProtocol.AttributeAccumulator accumulator = attributeAccumulator;
-        long requestSequence = activeAncsRequestSequence;
-        boolean responseIncludedText = activeAttributeIncludesText;
-        if (uid == null || accumulator == null) return;
-        if (!accumulator.append(payload)) {
-            scheduleGattReconnect(token, "ANCS notification response exceeded its limit");
-            return;
-        }
-        AncsProtocol.Notification notification = accumulator.complete();
-        if (notification == null) return;
-        Config current = config;
-        AncsProtocol.Event pendingEvent = pendingAncsEvents.get(uid);
-        int categoryId = pendingEvent == null ? 0 : pendingEvent.categoryId;
-        PhoneAppIconStore.Observation iconObservation =
-                PhoneAppIconStore.get(context).observe(
-                        notification.appIdentifier,
-                        displayNameFor(notification.appIdentifier),
-                        categoryId);
-        boolean appleMessage = isAppleMessagesApp(notification.appIdentifier);
-        boolean allowed = current != null && (current.notificationsEnabled
-                || current.messagesEnabled && appleMessage)
-                && current.allowsNotification(
-                notification.appIdentifier, categoryId);
-        boolean needsMessageTextFollowUp = allowed && !responseIncludedText
-                && current != null && !current.notificationsEnabled
-                && current.messagesEnabled && current.includeNotificationText
-                && appleMessage;
-        if (needsMessageTextFollowUp && !removedAttributeUids.contains(uid)) {
-            fullTextAttributeUids.add(uid);
-            dirtyAttributeUids.add(uid);
-            completeAttributeRequest(token, uid, requestSequence);
-            return;
-        }
-        if (!allowed) {
-            pendingAncsEvents.remove(uid);
-            dirtyAttributeUids.remove(uid);
-            fullTextAttributeUids.remove(uid);
-        } else if (!removedAttributeUids.contains(uid)) {
-            pendingAncsEvents.remove(uid);
-            NotificationRecord record = new NotificationRecord(
-                    notification, categoryId, System.currentTimeMillis(), true,
-                    SystemClock.elapsedRealtime(), iconObservation.iconWasCached);
-            notificationCache.remove(uid);
-            notificationCache.put(uid, record);
-            trimNotificationCache();
-            queueAppDisplayName(notification.appIdentifier);
-            lastAppIdentifier = bounded(notification.appIdentifier, 512);
-            lastAppName = displayNameFor(notification.appIdentifier);
-            lastAppCategoryId = categoryId;
-            lastNotificationAt = record.receivedAt;
-            upsertAncsMessage(record);
-            mirrorAncsNotification(token, record);
-        }
-        completeAttributeRequest(token, uid, requestSequence);
-    }
-
-    private void handleAppAttributes(long token, @NonNull byte[] payload) {
-        String appIdentifier = activeAppIdentifier;
-        AncsProtocol.AppAttributeAccumulator accumulator = appAttributeAccumulator;
-        long requestSequence = activeAncsRequestSequence;
-        if (appIdentifier == null || accumulator == null) return;
-        if (!accumulator.append(payload)) {
-            scheduleGattReconnect(token, "ANCS app response exceeded its limit");
-            return;
-        }
-        String displayName = accumulator.complete();
-        if (displayName == null) return;
-        String cleanName = bounded(displayName, 256);
-        cacheAppDisplayName(appIdentifier, cleanName.isEmpty()
-                ? PhoneAppCatalog.displayNameFallback(appIdentifier) : cleanName);
-        PhoneAppIconStore.get(context).updateName(appIdentifier,
-                cleanName.isEmpty()
-                        ? PhoneAppCatalog.displayNameFallback(appIdentifier)
-                        : cleanName);
-        if (appIdentifier.equals(lastAppIdentifier)) {
-            lastAppName = displayNameFor(appIdentifier);
-        }
-        for (NotificationRecord record : notificationCache.values()) {
-            if (appIdentifier.equals(record.notification.appIdentifier)) {
-                mirrorAncsNotification(token, record);
-            }
-        }
-        completeAppAttributeRequest(token, appIdentifier, requestSequence);
-    }
-
-    private void queueAppDisplayName(@Nullable String rawAppIdentifier) {
-        String appIdentifier = bounded(rawAppIdentifier, 512);
-        if (appIdentifier.isEmpty() || appDisplayNames.containsKey(appIdentifier)
-                || appIdentifier.equals(activeAppIdentifier)
-                || !queuedAppIdentifiers.add(appIdentifier)) return;
-        while (appAttributeRequests.size() >= MAX_PENDING_ANCS_REQUESTS) {
-            String dropped = appAttributeRequests.poll();
-            if (dropped == null) break;
-            queuedAppIdentifiers.remove(dropped);
-        }
-        appAttributeRequests.add(appIdentifier);
-    }
-
     private void cacheAppDisplayName(@NonNull String appIdentifier,
                                      @NonNull String displayName) {
         appDisplayNames.remove(appIdentifier);
@@ -2400,81 +1598,7 @@ public final class PhoneConnectorController {
         }
     }
 
-    private void completeAttributeRequest(long token, long uid, long requestSequence) {
-        if (activeAncsRequestSequence != requestSequence
-                || activeAttributeUid == null || activeAttributeUid != uid) return;
-        cancelAttributeTimeout();
-        activeAttributeUid = null;
-        attributeAccumulator = null;
-        activeAttributeIncludesText = false;
-        activeAncsRequestSequence = 0L;
-        boolean removed = removedAttributeUids.remove(uid);
-        if (dirtyAttributeUids.remove(uid) && !removed
-                && queuedAttributeUids.add(uid)) {
-            attributeRequests.add(uid);
-        }
-        publishSnapshot(token);
-        pumpAttributeRequests(token);
-    }
-
-    private void cancelAttributeTimeout() {
-        Runnable timeout = attributeTimeout;
-        if (timeout != null && worker != null) worker.removeCallbacks(timeout);
-        attributeTimeout = null;
-    }
-
-    private void completeAppAttributeRequest(long token, @NonNull String appIdentifier,
-                                             long requestSequence) {
-        if (activeAncsRequestSequence != requestSequence
-                || !appIdentifier.equals(activeAppIdentifier)) return;
-        cancelAttributeTimeout();
-        activeAppIdentifier = null;
-        appAttributeAccumulator = null;
-        activeAncsRequestSequence = 0L;
-        publishSnapshot(token);
-        pumpAttributeRequests(token);
-    }
-
-    /**
-     * A notification may disappear between its Notification Source event and the serialized
-     * Control Point write. Apple reports that normal race as Invalid Parameter (0xA2); dropping
-     * only that request keeps the encrypted ANCS session alive and lets later events continue.
-     */
-    private void abandonInvalidAncsRequest(long token, @NonNull GattOperation operation) {
-        if (operation.requestSequence != activeAncsRequestSequence) {
-            pumpGattOperations(token);
-            return;
-        }
-        if (operation.uid >= 0L && activeAttributeUid != null
-                && activeAttributeUid.longValue() == operation.uid) {
-            pendingAncsEvents.remove(operation.uid);
-            fullTextAttributeUids.remove(operation.uid);
-            completeAttributeRequest(token, operation.uid, operation.requestSequence);
-            return;
-        }
-        String appIdentifier = operation.appIdentifier;
-        if (appIdentifier != null && appIdentifier.equals(activeAppIdentifier)) {
-            cacheAppDisplayName(appIdentifier,
-                    PhoneAppCatalog.displayNameFallback(appIdentifier));
-            if (appIdentifier.equals(lastAppIdentifier)) {
-                lastAppName = displayNameFor(appIdentifier);
-            }
-            completeAppAttributeRequest(token, appIdentifier, operation.requestSequence);
-            return;
-        }
-        pumpGattOperations(token);
-    }
-
     private void removeAncsNotification(long token, long uid) {
-        if (activeAttributeUid != null && activeAttributeUid.longValue() == uid) {
-            removedAttributeUids.add(uid);
-        } else {
-            removedAttributeUids.remove(uid);
-        }
-        pendingAncsEvents.remove(uid);
-        dirtyAttributeUids.remove(uid);
-        fullTextAttributeUids.remove(uid);
-        if (queuedAttributeUids.remove(uid)) attributeRequests.remove(uid);
         notificationCache.remove(uid);
         if (ancsMessageCache.remove(uid) != null) rebuildMessageSnapshot();
         Integer notificationId = mirroredAncsIds.remove(uid);
@@ -2489,36 +1613,9 @@ public final class PhoneConnectorController {
             if (!iterator.hasNext()) break;
             long uid = iterator.next().getKey();
             iterator.remove();
-            fullTextAttributeUids.remove(uid);
             Integer notificationId = mirroredAncsIds.remove(uid);
             if (notificationId != null) cancelMirroredNotification(notificationId);
         }
-    }
-
-    private void applyBatteryCharacteristic(long token, @NonNull UUID uuid,
-                                            @Nullable byte[] payload) {
-        if (payload == null || payload.length == 0) return;
-        int raw = payload[0] & 0xff;
-        boolean percentageUpdated = false;
-        if (BATTERY_LEVEL.equals(uuid) && raw <= 100) {
-            basBatteryKnown = true;
-            basBatteryLevel = raw;
-            basBatteryUpdatedAt = SystemClock.elapsedRealtime();
-            percentageUpdated = true;
-        } else if (BATTERY_LEVEL_STATUS.equals(uuid)) {
-            Integer decodedLevel = PhoneConnectorPolicy.decodeBatteryLevelStatusLevel(payload);
-            if (decodedLevel == null) return;
-            basBatteryKnown = true;
-            basBatteryLevel = decodedLevel;
-            basBatteryUpdatedAt = SystemClock.elapsedRealtime();
-            percentageUpdated = true;
-        }
-        // BAS is a primary direct 0..100 percentage source. Its charging bits are deliberately
-        // ignored: the encrypted iPhone Helper frame remains the sole power-state authority.
-        if (!percentageUpdated) return;
-        refreshBatteryValues();
-        markTelemetryUpdated(true, false);
-        publishSnapshot(token);
     }
 
     private void applyHfpEvent(long token, @NonNull Intent intent) {
@@ -2763,7 +1860,7 @@ public final class PhoneConnectorController {
 
     private void refreshBatteryValues() {
         PhoneBatteryLevelPolicy.Reading reading = PhoneBatteryLevelPolicy.resolve(
-                basBatteryKnown, basBatteryLevel, basBatteryUpdatedAt,
+                false, null, 0L,
                 genericBatteryKnown, genericBatteryLevel, genericBatteryUpdatedAt,
                 helperPowerUpdatedAtElapsed > 0L ? helperBatteryLevel : null,
                 hfpBatteryKnown, hfpBatteryLevel, hfpBatteryPercentScale);
@@ -2801,15 +1898,6 @@ public final class PhoneConnectorController {
         }
     }
 
-    private void clearBasData() {
-        basBatteryKnown = false;
-        basBatteryLevel = null;
-        basBatteryUpdatedAt = 0L;
-        refreshBatteryValues();
-        batteryLiveSeenThisConnection = hfpBatteryKnown || genericBatteryKnown
-                || helperPowerUpdatedAtElapsed > 0L;
-    }
-
     private void clearHfpData() {
         hfpBatteryKnown = false;
         hfpBatteryPercentScale = false;
@@ -2824,7 +1912,7 @@ public final class PhoneConnectorController {
         clearHfpCallData();
         refreshBatteryValues();
         networkLiveSeenThisConnection = false;
-        batteryLiveSeenThisConnection = basBatteryKnown || genericBatteryKnown
+        batteryLiveSeenThisConnection = genericBatteryKnown
                 || helperPowerUpdatedAtElapsed > 0L;
     }
 
@@ -2833,7 +1921,7 @@ public final class PhoneConnectorController {
         genericBatteryLevel = null;
         genericBatteryUpdatedAt = 0L;
         refreshBatteryValues();
-        batteryLiveSeenThisConnection = basBatteryKnown || hfpBatteryKnown
+        batteryLiveSeenThisConnection = hfpBatteryKnown
                 || helperPowerUpdatedAtElapsed > 0L;
     }
 
@@ -3036,7 +2124,6 @@ public final class PhoneConnectorController {
     private void clearDisconnectedData(long token) {
         persistCurrentTelemetry();
         clearHelperTelemetry();
-        clearBasData();
         clearHfpData();
         clearGenericBatteryData();
         batteryLevel = null;
@@ -3067,30 +2154,6 @@ public final class PhoneConnectorController {
     }
 
     private void clearAncsRuntime() {
-        ancsControlPoint = null;
-        ancsDataSource = null;
-        ancsNotificationSource = null;
-        serviceChangedCharacteristic = null;
-        ancsDataSubscribed = false;
-        ancsNotificationSubscribed = false;
-        ancsNotificationListening = false;
-        serviceChangedSubscribed = false;
-        resetGattOperationState();
-        pendingAncsEvents.clear();
-        attributeRequests.clear();
-        queuedAttributeUids.clear();
-        dirtyAttributeUids.clear();
-        removedAttributeUids.clear();
-        fullTextAttributeUids.clear();
-        appAttributeRequests.clear();
-        queuedAppIdentifiers.clear();
-        activeAttributeUid = null;
-        attributeAccumulator = null;
-        activeAttributeIncludesText = false;
-        activeAppIdentifier = null;
-        appAttributeAccumulator = null;
-        activeAncsRequestSequence = 0L;
-        cancelAttributeTimeout();
         notificationCache.clear();
         ancsMessageCache.clear();
         appDisplayNames.clear();
@@ -3099,14 +2162,6 @@ public final class PhoneConnectorController {
         lastAppCategoryId = 0;
         lastNotificationAt = 0L;
         rebuildMessageSnapshot();
-    }
-
-    private void resetGattOperationState() {
-        Runnable timeout = gattOperationTimeout;
-        if (timeout != null && worker != null) worker.removeCallbacks(timeout);
-        gattOperationTimeout = null;
-        gattOperations.clear();
-        currentGattOperation = null;
     }
 
     private void scheduleGattReconnect(long token, @NonNull String detail) {
@@ -3120,61 +2175,42 @@ public final class PhoneConnectorController {
      */
     private void requestManagedAncsReconnect(long token, @NonNull String detail,
                                              boolean confirmedLeLoss) {
-        IphoneAncsTransport current = ancsTransport;
-        long transportSession = activeAncsTransportSession;
-        if (current == null) {
-            scheduleGattReconnect(token, detail, "retrying");
+        IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
+        if (runtime != null) {
+            PhoneConnectionJournal.append("v2-recovery",
+                    redactedDiagnostic(detail) + ", confirmedLeLoss=" + confirmedLeLoss);
+            runtime.requestSameModeRecovery();
             return;
         }
-        mainHandler.post(() -> {
-            if (isCurrent(token) && current == ancsTransport
-                    && transportSession == activeAncsTransportSession) {
-                current.requestSavedPeerReconnect(detail, confirmedLeLoss);
-                return;
-            }
-            Handler handler = worker;
-            if (handler != null) {
-                handler.post(() -> runIfCurrent(token,
-                        () -> scheduleGattReconnect(token, detail, "retrying")));
-            }
-        });
+        scheduleGattReconnect(token, detail, "retrying");
     }
 
     private void scheduleGattReconnect(long token, @NonNull String detail,
                                        @NonNull String visibleStatus) {
         if (!isCurrent(token)) return;
-        cancelStableAncsReadyReset();
-        lastError = bounded(detail, 512);
-        ancsStatus = visibleStatus;
-        cancelAncsPublicationRetry();
-        if (gattReconnectTask != null) {
+        IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
+        if (runtime != null) {
+            lastError = bounded(detail, 512);
+            ancsStatus = visibleStatus;
+            PhoneConnectionJournal.append("v2-recovery",
+                    "controller signal translated to same-role drain: "
+                            + redactedDiagnostic(detail));
+            runtime.requestSameModeRecovery();
             publishSnapshot(token);
             return;
         }
-        closeAncsTransport();
-        cancelGattWatchdogs();
-        BluetoothGatt previous;
-        synchronized (lifecycleLock) {
-            previous = gatt;
-            gatt = null;
-        }
-        closeGatt(previous);
+        cancelStableAncsReadyReset();
+        lastError = bounded(detail, 512);
+        ancsStatus = "starting_v2";
         gattConnected = false;
         persistCurrentTelemetry();
-        clearBasData();
         resetAncsSession(token, visibleStatus);
         updateConnected(token);
-        long delay = PhoneConnectorPolicy.reconnectDelayMillis(reconnectAttempt++);
-        PhoneConnectionJournal.append("reconnect", "попытка #" + reconnectAttempt
-                + " через " + delay + " ms; " + redactedDiagnostic(detail));
-        Handler handler = worker;
-        if (handler == null) return;
-        Runnable retry = () -> runIfCurrent(token, () -> {
-            gattReconnectTask = null;
-            ensureGatt(token);
-        });
-        gattReconnectTask = retry;
-        handler.postDelayed(retry, delay);
+        PhoneConnectionJournal.append("v2-start",
+                "runtime отсутствовал; создаю clean-room owner: "
+                        + redactedDiagnostic(detail));
+        ensureGatt(token);
+        publishSnapshot(token);
     }
 
     private void scheduleStableAncsReadyReset(long token) {
@@ -3183,7 +2219,7 @@ public final class PhoneConnectorController {
         if (handler == null) return;
         Runnable stable = () -> runIfCurrent(token, () -> {
             ancsStableReadyTask = null;
-            if (!ancsReady || ancsTransport == null) return;
+            if (!ancsReady || ancsRuntimeV2 == null) return;
             reconnectAttempt = 0;
             Log.d(TAG, "ANCS READY stable for " + ANCS_STABLE_READY_RESET_MS
                     + " ms; reconnect backoff reset");
@@ -3199,70 +2235,18 @@ public final class PhoneConnectorController {
     }
 
     private void closeAncsTransport() {
-        IphoneAncsTransport previous;
+        IphoneDualTransportRuntimeV2 previousV2;
         synchronized (lifecycleLock) {
-            previous = ancsTransport;
-            ancsTransport = null;
+            previousV2 = ancsRuntimeV2;
+            ancsRuntimeV2 = null;
             ancsTransportStartPending = false;
             activeAncsTransportSession = ++nextAncsTransportSession;
         }
-        closeAncsTransportOnMain(previous);
-    }
-
-    private void closeAncsTransportOnMain(@Nullable IphoneAncsTransport transport) {
-        if (transport == null) return;
-        mainHandler.post(() -> {
-            try {
-                transport.close();
-            } catch (RuntimeException error) {
-                Log.w(TAG, "ANCS transport close failed", error);
-            }
-        });
-    }
-
-    private void scheduleConnectWatchdog(long token, @NonNull BluetoothGatt expected,
-                                         boolean autoConnect) {
-        cancelConnectWatchdog();
-        Handler handler = worker;
-        if (handler == null) return;
-        Runnable timeout = () -> runIfCurrent(token, () -> {
-            if (gatt != expected || gattConnected) return;
-            connectWatchdog = null;
-            if (autoConnect) forceDirectGatt = true;
-            scheduleGattReconnect(token, autoConnect
-                    ? "Background GATT connection timed out; retrying directly"
-                    : "Direct GATT connection timed out");
-        });
-        connectWatchdog = timeout;
-        handler.postDelayed(timeout, GATT_CONNECT_TIMEOUT_MS);
-    }
-
-    private void scheduleDiscoveryWatchdog(long token, @NonNull BluetoothGatt expected) {
-        cancelDiscoveryWatchdog();
-        Handler handler = worker;
-        if (handler == null) return;
-        Runnable timeout = () -> runIfCurrent(token, () -> {
-            if (gatt != expected || !serviceDiscoveryStarted) return;
-            discoveryWatchdog = null;
-            serviceDiscoveryStarted = false;
-            scheduleGattReconnect(token, "GATT service discovery timed out");
-        });
-        discoveryWatchdog = timeout;
-        handler.postDelayed(timeout, GATT_DISCOVERY_TIMEOUT_MS);
-    }
-
-    private void cancelGattWatchdogs() {
-        cancelConnectWatchdog();
-        cancelMtuWatchdog();
-        cancelDiscoveryWatchdog();
-        mtuPending = false;
-        serviceDiscoveryStarted = false;
+        if (previousV2 != null) previousV2.close();
     }
 
     private void cancelRetryTasks() {
         cancelDeviceRescan();
-        cancelGattReconnect();
-        cancelAncsPublicationRetry();
         cancelStableAncsReadyReset();
         cancelStockConnectionRequest();
         cancelOemGattRefresh();
@@ -3272,12 +2256,6 @@ public final class PhoneConnectorController {
         Runnable retry = deviceRescanTask;
         if (retry != null && worker != null) worker.removeCallbacks(retry);
         deviceRescanTask = null;
-    }
-
-    private void cancelGattReconnect() {
-        Runnable retry = gattReconnectTask;
-        if (retry != null && worker != null) worker.removeCallbacks(retry);
-        gattReconnectTask = null;
     }
 
     private void cancelStockConnectionRequest() {
@@ -3292,66 +2270,6 @@ public final class PhoneConnectorController {
         Runnable task = oemGattRefreshTask;
         if (task != null && worker != null) worker.removeCallbacks(task);
         oemGattRefreshTask = null;
-    }
-
-    private void scheduleAncsPublicationRetry(long token,
-                                              @NonNull BluetoothGatt expected) {
-        cancelAncsPublicationRetry();
-        Handler handler = worker;
-        if (handler == null) return;
-        Runnable retry = () -> runIfCurrent(token, () -> {
-            ancsPublicationRetryTask = null;
-            if (gatt != expected || !gattConnected
-                    || !"service_not_published".equals(ancsStatus)) return;
-            if (ancsPublicationRetryCount >= 1) {
-                ancsStatus = "stock_pairing_required";
-                lastError = "ANCS was not published by the iPhone after clean rediscovery";
-                publishSnapshot(token);
-                return;
-            }
-            ancsPublicationRetryCount++;
-            forceDirectGatt = true;
-            refreshGattCache(expected);
-            scheduleGattReconnect(token,
-                    serviceChangedSubscribed
-                            ? "ANCS was not published; refreshing one clean GATT session"
-                            : "ANCS was not published and Service Changed is unavailable; "
-                            + "refreshing one clean GATT session",
-                    "service_not_published");
-        });
-        ancsPublicationRetryTask = retry;
-        handler.postDelayed(retry, ANCS_SERVICE_PUBLICATION_RETRY_MS);
-    }
-
-    private void cancelAncsPublicationRetry() {
-        Runnable retry = ancsPublicationRetryTask;
-        if (retry != null && worker != null) worker.removeCallbacks(retry);
-        ancsPublicationRetryTask = null;
-    }
-
-    private void cancelConnectWatchdog() {
-        Runnable timeout = connectWatchdog;
-        if (timeout != null && worker != null) worker.removeCallbacks(timeout);
-        connectWatchdog = null;
-    }
-
-    private void cancelMtuWatchdog() {
-        Runnable timeout = mtuWatchdog;
-        if (timeout != null && worker != null) worker.removeCallbacks(timeout);
-        mtuWatchdog = null;
-    }
-
-    private void cancelDiscoveryWatchdog() {
-        Runnable timeout = discoveryWatchdog;
-        if (timeout != null && worker != null) worker.removeCallbacks(timeout);
-        discoveryWatchdog = null;
-    }
-
-    private static boolean isAuthorizationFailure(int status) {
-        return status == GATT_INSUFFICIENT_AUTHENTICATION
-                || status == GATT_INSUFFICIENT_AUTHORIZATION
-                || status == GATT_INSUFFICIENT_ENCRYPTION_KEY_SIZE
-                || status == GATT_INSUFFICIENT_ENCRYPTION;
     }
 
     private void mirrorAncsNotification(long token, @NonNull NotificationRecord record) {
@@ -3527,9 +2445,9 @@ public final class PhoneConnectorController {
         snapshot.add(value("transport.classic.name", null, false,
                 "string", "", now));
         snapshot.add(value("transport.ancs.local_name",
-                IphoneAncsTransport.LOCAL_LOGICAL_NAME, false, "string", "", now));
+                null, false, "string", "", now));
         snapshot.add(value("transport.ancs.remote_name",
-                IphoneAncsTransport.REMOTE_LOGICAL_NAME, false, "string", "", now));
+                null, false, "string", "", now));
         snapshot.add(value("profiles.hfp", null, false, "boolean", "", now));
         snapshot.add(value("profiles.map", null, false, "boolean", "", now));
         snapshot.add(value("profiles.ble", null, false, "boolean", "", now));
@@ -3630,12 +2548,12 @@ public final class PhoneConnectorController {
         snapshot.add(value("transport.classic.name",
                 selectedName.isEmpty() ? null : selectedName,
                 !selectedName.isEmpty(), "string", "", now));
+        // v2 discovery is UUID-only.  These legacy connector keys remain for schema stability,
+        // but no synthetic local name is put on air in either topology.
         snapshot.add(value("transport.ancs.local_name",
-                IphoneAncsTransport.LOCAL_LOGICAL_NAME,
-                config != null && config.transportNeeded(), "string", "", now));
+                null, false, "string", "", now));
         snapshot.add(value("transport.ancs.remote_name",
-                IphoneAncsTransport.REMOTE_LOGICAL_NAME,
-                config != null && config.transportNeeded(), "string", "", now));
+                null, false, "string", "", now));
         snapshot.add(value("profiles.hfp", hfpConnected, active, "boolean", "", now));
         snapshot.add(value("profiles.map", mapConnected, active, "boolean", "", now));
         snapshot.add(value("profiles.ble", gattConnected, active, "boolean", "", now));
@@ -3727,14 +2645,15 @@ public final class PhoneConnectorController {
         device.put("address", maskedAddress(selectedAddress));
         device.put("name", selectedName);
         device.put("classic_name", selectedName);
-        device.put("ancs_local_name", IphoneAncsTransport.LOCAL_LOGICAL_NAME);
-        device.put("ancs_remote_name", IphoneAncsTransport.REMOTE_LOGICAL_NAME);
+        device.put("ancs_local_name", null);
+        device.put("ancs_remote_name", null);
+        device.put("ancs_discovery_identity", "uuid_only");
         device.put("ancs_ble_role", config == null
                 ? PhoneBleRole.diagnosticName(PhoneBleRole.IPHONE_PERIPHERAL)
                 : PhoneBleRole.diagnosticName(config.bleRole));
         device.put("stock_connection", stockConnectionStatus);
         device.put("ancs_setup", config != null && config.transportNeeded()
-                ? "dedicated_ble_v1" : "disabled");
+                ? "dual_route_v2" : "disabled");
         snapshot.add(value("diagnostics.device", device, !selectedAddress.isEmpty(),
                 "object", "", now));
         LinkedHashMap<String, Object> lastApp = new LinkedHashMap<>();
@@ -4052,34 +2971,6 @@ public final class PhoneConnectorController {
                 + String.valueOf(message.get("id"));
     }
 
-    private static void closeGatt(@Nullable BluetoothGatt item) {
-        if (item == null) return;
-        try {
-            item.disconnect();
-        } catch (RuntimeException ignored) {}
-        try {
-            item.close();
-        } catch (RuntimeException ignored) {}
-    }
-
-    /**
-     * Android 9 caches a peripheral's attribute database across GATT clients. Its hidden refresh
-     * hook is the only best-effort way for a target-28 app to see ANCS after iPhone publishes the
-     * service without rebooting the head unit. Failure is harmless and the normal reconnect still
-     * runs.
-     */
-    private static boolean refreshGattCache(@Nullable BluetoothGatt item) {
-        if (item == null) return false;
-        try {
-            Method refresh = item.getClass().getMethod("refresh");
-            Object result = refresh.invoke(item);
-            return !(result instanceof Boolean) || (Boolean) result;
-        } catch (Throwable unavailable) {
-            Log.d(TAG, "Bluetooth GATT cache refresh is unavailable", unavailable);
-            return false;
-        }
-    }
-
     @NonNull
     private static String firstNonEmpty(@Nullable String first, @NonNull String fallback) {
         return first == null || first.trim().isEmpty() ? fallback : first.trim();
@@ -4096,84 +2987,6 @@ public final class PhoneConnectorController {
         String message = error.getMessage();
         return message == null || message.trim().isEmpty()
                 ? error.getClass().getSimpleName() : message.trim();
-    }
-
-    private enum GattKind {
-        DESCRIPTOR,
-        CHARACTERISTIC_READ,
-        CONTROL_WRITE
-    }
-
-    private enum GattTag {
-        SERVICE_CHANGED,
-        ANCS_DATA,
-        ANCS_NOTIFICATION,
-        BATTERY_LEVEL_READ,
-        BATTERY_LEVEL_STATUS_READ,
-        BATTERY_LEVEL_SUBSCRIPTION,
-        BATTERY_LEVEL_STATUS_SUBSCRIPTION,
-        CONTROL
-    }
-
-    private static final class GattOperation {
-        @NonNull final GattKind kind;
-        @NonNull final GattTag tag;
-        @Nullable final BluetoothGattDescriptor descriptor;
-        @Nullable final BluetoothGattCharacteristic characteristic;
-        @Nullable final byte[] payload;
-        final long uid;
-        @Nullable final String appIdentifier;
-        final long requestSequence;
-
-        GattOperation(@NonNull GattKind kind, @NonNull GattTag tag,
-                      @Nullable BluetoothGattDescriptor descriptor,
-                      @Nullable BluetoothGattCharacteristic characteristic,
-                      @Nullable byte[] payload) {
-            this(kind, tag, descriptor, characteristic, payload, -1L);
-        }
-
-        GattOperation(@NonNull GattKind kind, @NonNull GattTag tag,
-                      @Nullable BluetoothGattDescriptor descriptor,
-                      @Nullable BluetoothGattCharacteristic characteristic,
-                      @Nullable byte[] payload, long uid) {
-            this.kind = kind;
-            this.tag = tag;
-            this.descriptor = descriptor;
-            this.characteristic = characteristic;
-            this.payload = payload == null ? null : payload.clone();
-            this.uid = uid;
-            this.appIdentifier = null;
-            this.requestSequence = 0L;
-        }
-
-        GattOperation(@NonNull GattKind kind, @NonNull GattTag tag,
-                      @Nullable BluetoothGattDescriptor descriptor,
-                      @Nullable BluetoothGattCharacteristic characteristic,
-                      @Nullable byte[] payload, long uid, long requestSequence) {
-            this.kind = kind;
-            this.tag = tag;
-            this.descriptor = descriptor;
-            this.characteristic = characteristic;
-            this.payload = payload == null ? null : payload.clone();
-            this.uid = uid;
-            this.appIdentifier = null;
-            this.requestSequence = requestSequence;
-        }
-
-        GattOperation(@NonNull GattKind kind, @NonNull GattTag tag,
-                      @Nullable BluetoothGattDescriptor descriptor,
-                      @Nullable BluetoothGattCharacteristic characteristic,
-                      @Nullable byte[] payload, @NonNull String appIdentifier,
-                      long requestSequence) {
-            this.kind = kind;
-            this.tag = tag;
-            this.descriptor = descriptor;
-            this.characteristic = characteristic;
-            this.payload = payload == null ? null : payload.clone();
-            this.uid = -1L;
-            this.appIdentifier = appIdentifier;
-            this.requestSequence = requestSequence;
-        }
     }
 
     private static final class NotificationRecord {
@@ -4239,10 +3052,17 @@ public final class PhoneConnectorController {
         }
     }
 
+    /** Settings name the iPhone role; the v2 runtime names the corresponding Android role. */
+    @NonNull
+    private static IphoneBleMode v2Mode(int bleRole) {
+        return PhoneBleRole.isIphoneCentral(bleRole)
+                ? IphoneBleMode.ANDROID_PERIPHERAL
+                : IphoneBleMode.ANDROID_CENTRAL;
+    }
+
     private static final class Config {
         final boolean enabled;
         @NonNull final String deviceAddress;
-        @NonNull final String ancsDeviceAddress;
         final int bleRole;
         final boolean notificationsEnabled;
         final boolean messagesEnabled;
@@ -4253,7 +3073,7 @@ public final class PhoneConnectorController {
         @NonNull final Set<String> notificationAppFilterKeys;
 
         Config(boolean enabled, @NonNull String deviceAddress,
-               @NonNull String ancsDeviceAddress, int bleRole, boolean notificationsEnabled,
+               int bleRole, boolean notificationsEnabled,
                boolean messagesEnabled, boolean includeNotificationText,
                boolean ancsPresenceEnabled,
                @NonNull Set<Integer> notificationCategoryIds,
@@ -4261,7 +3081,6 @@ public final class PhoneConnectorController {
                @NonNull Set<String> notificationAppFilterKeys) {
             this.enabled = enabled;
             this.deviceAddress = deviceAddress;
-            this.ancsDeviceAddress = ancsDeviceAddress;
             this.bleRole = PhoneBleRole.normalize(bleRole);
             this.notificationsEnabled = notificationsEnabled;
             this.messagesEnabled = messagesEnabled;
@@ -4276,10 +3095,8 @@ public final class PhoneConnectorController {
         @NonNull
         static Config from(@NonNull Preferences prefs) {
             String classicAddress = bounded(prefs.phoneDeviceAddress.get(), 64);
-            String ancsAddress = bounded(prefs.phoneAncsDeviceAddress.get(), 64);
-            if (ancsAddress.trim().isEmpty()) ancsAddress = classicAddress;
             return new Config(prefs.phoneConnectorEnabled.get(),
-                    classicAddress, ancsAddress, prefs.phoneBleRole.get(),
+                    classicAddress, prefs.phoneBleRole.get(),
                     prefs.phoneNotificationsEnabled.get(),
                     prefs.phoneMessagesEnabled.get(),
                     prefs.phoneIncludeNotificationText.get(),
@@ -4293,10 +3110,20 @@ public final class PhoneConnectorController {
 
         @NonNull
         String signature() {
-            return enabled + "|" + deviceAddress + "|" + ancsDeviceAddress
+            return enabled + "|" + deviceAddress
                     + "|" + bleRole + "|" + notificationsEnabled + "|"
                     + messagesEnabled + "|" + includeNotificationText + "|"
                     + ancsPresenceEnabled + "|"
+                    + PhoneNotificationFilter.serializeCategoryIds(
+                    notificationCategoryIds) + "|" + notificationAppFilterMode + "|"
+                    + PhoneNotificationFilter.serializeAppKeys(notificationAppFilterKeys);
+        }
+
+        @NonNull
+        String signatureWithoutBleRole() {
+            return enabled + "|" + deviceAddress
+                    + "|" + notificationsEnabled + "|" + messagesEnabled + "|"
+                    + includeNotificationText + "|" + ancsPresenceEnabled + "|"
                     + PhoneNotificationFilter.serializeCategoryIds(
                     notificationCategoryIds) + "|" + notificationAppFilterMode + "|"
                     + PhoneNotificationFilter.serializeAppKeys(notificationAppFilterKeys);
