@@ -27,6 +27,7 @@ import dezz.status.widget.car.CarControlState;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.car.TrunkControlSafety;
 import dezz.status.widget.launcher.LauncherShortcutStore;
+import dezz.status.widget.integration.HwgpsIntegration;
 import dezz.status.widget.launcher.YandexWindowLauncher;
 import dezz.status.widget.launcher.routes.FavoriteRouteConfig;
 import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
@@ -189,6 +190,11 @@ final class DriverPanelActionExecutor {
                 return;
             case MEDIA_NEXT:
                 mediaKey(KeyEvent.KEYCODE_MEDIA_NEXT);
+                return;
+            case HWGPS_FIND_ME:
+                if (!HwgpsIntegration.requestFindMe(context)) {
+                    toast("HWGPS не установлен или недоступен");
+                }
                 return;
             case NOTIFICATION_ACCESS:
                 context.startActivity(new Intent(

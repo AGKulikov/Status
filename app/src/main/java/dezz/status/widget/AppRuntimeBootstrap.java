@@ -256,7 +256,7 @@ public final class AppRuntimeBootstrap {
                             (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
                     if (clipboard != null) {
                         clipboard.setPrimaryClip(ClipData.newPlainText(
-                                "Status Widget crash", content));
+                                "Natro crash", content));
                     }
                     Toast.makeText(activity, R.string.crash_report_copied,
                             Toast.LENGTH_SHORT).show();
@@ -272,7 +272,7 @@ public final class AppRuntimeBootstrap {
         try {
             Intent send = new Intent(Intent.ACTION_SEND)
                     .setType("text/plain")
-                    .putExtra(Intent.EXTRA_SUBJECT, "Status Widget crash")
+                    .putExtra(Intent.EXTRA_SUBJECT, "Natro crash")
                     .putExtra(Intent.EXTRA_TEXT, content);
             activity.startActivity(Intent.createChooser(send,
                     activity.getString(R.string.crash_report_chooser)));

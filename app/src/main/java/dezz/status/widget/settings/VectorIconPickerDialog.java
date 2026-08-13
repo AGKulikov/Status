@@ -6,10 +6,13 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
+import android.text.Editable;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -24,12 +27,20 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.color.MaterialColors;
+import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
+import dezz.status.widget.R;
 import dezz.status.widget.launcher.LauncherIconResolver;
 
 /**
@@ -48,12 +59,25 @@ public final class VectorIconPickerDialog {
     public static final class Option {
         @NonNull public final String key;
         @NonNull public final String label;
+        @NonNull public final String category;
+        @NonNull public final String searchTerms;
+        @NonNull final String normalizedSearch;
         @DrawableRes public final int drawableRes;
 
         public Option(@NonNull String key, @NonNull String label,
                       @DrawableRes int drawableRes) {
+            this(key, label, "Специальные", key.replace('_', ' '), drawableRes);
+        }
+
+        public Option(@NonNull String key, @NonNull String label,
+                      @NonNull String category, @NonNull String searchTerms,
+                      @DrawableRes int drawableRes) {
             this.key = key;
             this.label = label;
+            this.category = category;
+            this.searchTerms = searchTerms;
+            normalizedSearch = (label + ' ' + key + ' ' + searchTerms)
+                    .toLowerCase(Locale.ROOT);
             this.drawableRes = drawableRes;
         }
     }
@@ -102,20 +126,78 @@ public final class VectorIconPickerDialog {
         grid.setLayoutManager(new GridLayoutManager(context, columns));
 
         final AlertDialog[] dialogRef = new AlertDialog[1];
-        grid.setAdapter(new IconAdapter(options, selectedKey, option -> {
+        IconAdapter adapter = new IconAdapter(options, selectedKey, option -> {
             listener.onSelected(option);
             if (dialogRef[0] != null) dialogRef[0].dismiss();
-        }));
+        });
+        grid.setAdapter(adapter);
         int selectedPosition = indexOf(options, selectedKey);
         if (selectedPosition >= 0) grid.post(() -> grid.scrollToPosition(selectedPosition));
 
+        LinearLayout root = new LinearLayout(context);
+        root.setOrientation(LinearLayout.VERTICAL);
+
+        TextInputLayout searchBox = new TextInputLayout(context);
+        searchBox.setHint("Поиск иконки");
+        searchBox.setStartIconDrawable(R.drawable.ic_fluent_search);
+        searchBox.setEndIconMode(TextInputLayout.END_ICON_CLEAR_TEXT);
+        TextInputEditText search = new TextInputEditText(context);
+        search.setSingleLine(true);
+        search.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_DONE);
+        search.setContentDescription("Поиск по названиям иконок");
+        searchBox.addView(search, new TextInputLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        LinearLayout.LayoutParams searchLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        searchLp.setMargins(dp(context, 14), dp(context, 8), dp(context, 14), dp(context, 2));
+        root.addView(searchBox, searchLp);
+
+        ChipGroup categories = new ChipGroup(context);
+        categories.setSingleLine(true);
+        categories.setSingleSelection(true);
+        categories.setSelectionRequired(true);
+        HorizontalScrollView categoryScroll = new HorizontalScrollView(context);
+        categoryScroll.setHorizontalScrollBarEnabled(false);
+        categoryScroll.setFillViewport(false);
+        categoryScroll.setPadding(dp(context, 10), 0, dp(context, 10), 0);
+        categoryScroll.addView(categories, new HorizontalScrollView.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(categoryScroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        Set<String> categoryNames = new LinkedHashSet<>();
+        categoryNames.add("Все");
+        for (Option option : options) categoryNames.add(option.category);
+        for (String category : categoryNames) {
+            Chip chip = new Chip(context);
+            chip.setId(View.generateViewId());
+            chip.setText(category);
+            chip.setCheckable(true);
+            chip.setChecked("Все".equals(category));
+            chip.setOnClickListener(view -> adapter.setCategory(
+                    "Все".equals(category) ? null : category));
+            categories.addView(chip);
+        }
+
+        search.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence text, int start, int count,
+                                                    int after) {}
+            @Override public void onTextChanged(CharSequence text, int start, int before,
+                                                int count) {
+                adapter.setQuery(text == null ? "" : text.toString());
+            }
+            @Override public void afterTextChanged(Editable editable) {}
+        });
+
         int height = Math.min(dp(context, 620),
                 Math.round(context.getResources().getDisplayMetrics().heightPixels * 0.68f));
-        grid.setLayoutParams(new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, Math.max(dp(context, 320), height)));
+        root.addView(grid, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        root.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Math.max(dp(context, 360), height)));
         AlertDialog dialog = new AlertDialog.Builder(context)
                 .setTitle(title)
-                .setView(grid)
+                .setView(root)
                 .setNegativeButton(android.R.string.cancel, null)
                 .create();
         dialogRef[0] = dialog;
@@ -140,7 +222,7 @@ public final class VectorIconPickerDialog {
     @NonNull private static List<Option> buildCatalog() {
         List<Option> values = new ArrayList<>();
         for (LauncherIconResolver.Preset preset : LauncherIconResolver.presets()) {
-            values.add(new Option(preset.key, preset.label,
+            values.add(new Option(preset.key, preset.label, preset.category, preset.searchTerms,
                     LauncherIconResolver.resource(preset.key)));
         }
         return Collections.unmodifiableList(values);
@@ -155,20 +237,46 @@ public final class VectorIconPickerDialog {
     }
 
     private static final class IconAdapter extends RecyclerView.Adapter<IconHolder> {
-        @NonNull private final List<Option> options;
+        @NonNull private final List<Option> allOptions;
+        @NonNull private final List<Option> visibleOptions = new ArrayList<>();
         @Nullable private final String selectedKey;
         @NonNull private final Listener listener;
+        @NonNull private String query = "";
+        @Nullable private String category;
 
         private IconAdapter(@NonNull List<Option> options, @Nullable String selectedKey,
                             @NonNull Listener listener) {
-            this.options = options;
+            this.allOptions = options;
+            this.visibleOptions.addAll(options);
             this.selectedKey = selectedKey;
             this.listener = listener;
             setHasStableIds(true);
         }
 
         @Override public long getItemId(int position) {
-            return options.get(position).key.hashCode();
+            return visibleOptions.get(position).key.hashCode();
+        }
+
+        private void setQuery(@NonNull String value) {
+            query = value.trim().toLowerCase(Locale.ROOT);
+            applyFilter();
+        }
+
+        private void setCategory(@Nullable String value) {
+            category = value;
+            applyFilter();
+        }
+
+        private void applyFilter() {
+            visibleOptions.clear();
+            for (Option option : allOptions) {
+                if (category != null && !category.equals(option.category)) continue;
+                if (!query.isEmpty()) {
+                    if (!option.normalizedSearch.contains(query)) continue;
+                }
+                visibleOptions.add(option);
+            }
+            notifyDataSetChanged();
         }
 
         @NonNull @Override public IconHolder onCreateViewHolder(@NonNull ViewGroup parent,
@@ -210,7 +318,7 @@ public final class VectorIconPickerDialog {
 
         @Override public void onBindViewHolder(@NonNull IconHolder holder, int position) {
             Context context = holder.itemView.getContext();
-            Option option = options.get(position);
+            Option option = visibleOptions.get(position);
             boolean selected = option.key.equals(selectedKey);
             int onSurface = MaterialColors.getColor(holder.card,
                     com.google.android.material.R.attr.colorOnSurface, Color.WHITE);
@@ -239,7 +347,7 @@ public final class VectorIconPickerDialog {
             holder.card.setOnClickListener(view -> listener.onSelected(option));
         }
 
-        @Override public int getItemCount() { return options.size(); }
+        @Override public int getItemCount() { return visibleOptions.size(); }
     }
 
     private static final class IconHolder extends RecyclerView.ViewHolder {

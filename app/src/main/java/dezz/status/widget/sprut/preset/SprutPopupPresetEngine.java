@@ -621,7 +621,7 @@ public final class SprutPopupPresetEngine {
     }
 
     private static String allowedIcon(String requested) {
-        return PopupIconCatalog.IDS.contains(requested) ? requested : "power";
+        return PopupIconCatalog.isAllowedId(requested) ? requested : "power";
     }
 
     private static String titleFor(SprutCatalog.Accessory accessory,

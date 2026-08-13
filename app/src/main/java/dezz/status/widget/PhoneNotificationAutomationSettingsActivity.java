@@ -1,10 +1,12 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package dezz.status.widget;
 
+import android.content.ComponentName;
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
@@ -24,11 +26,19 @@ import androidx.core.widget.NestedScrollView;
 
 import com.google.android.material.button.MaterialButton;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
+import dezz.status.widget.launcher.InstalledAppCatalog;
 import dezz.status.widget.phone.PhoneNotificationAutomation;
+import dezz.status.widget.phone.PhoneNotificationDeferralPolicy;
 import dezz.status.widget.phone.PhoneStatusBarPolicy;
 import dezz.status.widget.scenario.TargetScope;
 import dezz.status.widget.settings.AppleColorPickerDialog;
@@ -39,13 +49,30 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
     private Switch statusRow;
     private Switch popup;
     private Switch onlyWhenLocked;
+    private Switch delayInApps;
     private TextView fieldsSummary;
     private TextView durationSummary;
+    private TextView delayAppsSummary;
+    private TextView delayMaxWaitSummary;
     private MaterialButton statusColor;
     private final Set<String> selectedFields = new LinkedHashSet<>();
+    private final Set<String> delayPackages = new LinkedHashSet<>();
     private int durationSeconds;
+    private int delayMaxWaitSeconds;
     private String tickerColor;
     private boolean binding;
+    private final ExecutorService appCatalogWorker = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(() -> {
+            try {
+                android.os.Process.setThreadPriority(
+                        android.os.Process.THREAD_PRIORITY_BACKGROUND);
+            } catch (RuntimeException ignored) {
+            }
+            runnable.run();
+        }, "phone-notification-apps");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     @Override
     protected void onCreate(@Nullable Bundle state) {
@@ -66,6 +93,7 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         statusRow.setChecked(prefs.phoneStatusBarNotificationsEnabled.get());
         popup.setChecked(prefs.phonePopupNotificationsEnabled.get());
         onlyWhenLocked.setChecked(prefs.phoneNotificationsOnlyWhenLocked.get());
+        delayInApps.setChecked(prefs.phoneNotificationDelayInAppsEnabled.get());
         binding = false;
         refreshSummaries();
     }
@@ -76,6 +104,10 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
                 prefs.phoneStatusBarNotificationFields.get(),
                 PhoneStatusBarPolicy.notificationFieldIds()));
         durationSeconds = clamp(prefs.phoneStatusBarNotificationSeconds.get(), 1, 120);
+        delayPackages.clear();
+        delayPackages.addAll(prefs.phoneNotificationDelayInPackages.get());
+        delayMaxWaitSeconds = PhoneNotificationDeferralPolicy.boundedMaxWaitSeconds(
+                prefs.phoneNotificationDelayMaxWaitSeconds.get());
         tickerColor = validColor(prefs.phoneStatusBarNotificationColor.get());
     }
 
@@ -109,7 +141,7 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         onlyWhenLocked = switchView("Показывать только когда телефон заблокирован",
                 prefs.phoneNotificationsOnlyWhenLocked.get());
         destinations.addView(onlyWhenLocked, topMargin(8));
-        destinations.addView(label("Состояние блокировки передаёт KX11 ANCS Helper v48."),
+        destinations.addView(label("Состояние блокировки передаёт KX11 ANCS Helper v50."),
                 topMargin(4));
         page.addView(destinations, topMargin(16));
 
@@ -132,6 +164,38 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         statusColor = new MaterialButton(this);
         statusColor.setOnClickListener(view -> chooseStatusColor());
         page.addView(statusColor, topMargin(10));
+
+        page.addView(heading(getString(R.string.phone_notification_delay_section), 20),
+                topMargin(24));
+        LinearLayout delayCard = card();
+        delayInApps = switchView(getString(R.string.phone_notification_delay_enable),
+                prefs.phoneNotificationDelayInAppsEnabled.get());
+        delayCard.addView(delayInApps, matchWrap());
+        delayCard.addView(label(getString(R.string.phone_notification_delay_hint)), topMargin(4));
+        page.addView(delayCard, topMargin(8));
+        delayInApps.setOnCheckedChangeListener((button, checked) -> {
+            if (binding) return;
+            if (checked && !foregroundTrackingAvailable()) {
+                binding = true;
+                delayInApps.setChecked(false);
+                binding = false;
+                showForegroundTrackingRequired();
+                return;
+            }
+            persist();
+        });
+
+        Button delayApps = button(getString(R.string.phone_notification_delay_apps_title));
+        delayApps.setOnClickListener(view -> chooseDelayApps());
+        page.addView(delayApps, topMargin(10));
+        delayAppsSummary = label("");
+        page.addView(delayAppsSummary, topMargin(4));
+
+        Button delayWait = button(getString(R.string.phone_notification_delay_wait_title));
+        delayWait.setOnClickListener(view -> chooseDelayMaxWait());
+        page.addView(delayWait, topMargin(10));
+        delayMaxWaitSummary = label("");
+        page.addView(delayMaxWaitSummary, topMargin(4));
 
         page.addView(heading("Всплывающий оверлей", 20), topMargin(24));
         page.addView(label("Размер и положение окна, компоновка иконки и текста, шрифты, "
@@ -245,6 +309,93 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         dialog.show();
     }
 
+    /** Loads the broad installed-app catalog only after the user opens the picker. */
+    private void chooseDelayApps() {
+        Toast.makeText(this, R.string.phone_notification_delay_apps_loading,
+                Toast.LENGTH_SHORT).show();
+        Set<String> selectedSnapshot = new LinkedHashSet<>(delayPackages);
+        appCatalogWorker.execute(() -> {
+            try {
+                Map<String, DelayAppChoice> unique = new LinkedHashMap<>();
+                for (InstalledAppCatalog.App app : InstalledAppCatalog.load(this)) {
+                    unique.put(app.packageName, new DelayAppChoice(app.packageName,
+                            app.label + " · " + app.packageName));
+                }
+                for (String packageName : selectedSnapshot) {
+                    unique.putIfAbsent(packageName,
+                            new DelayAppChoice(packageName, packageName));
+                }
+                List<DelayAppChoice> apps = new ArrayList<>(unique.values());
+                apps.sort(Comparator.comparing(value -> value.label,
+                        String.CASE_INSENSITIVE_ORDER));
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    showDelayAppsDialog(apps);
+                });
+            } catch (RuntimeException failure) {
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed()) showError(failure);
+                });
+            }
+        });
+    }
+
+    private void showDelayAppsDialog(@NonNull List<DelayAppChoice> apps) {
+        String[] labels = new String[apps.size()];
+        boolean[] checked = new boolean[apps.size()];
+        Set<String> working = new LinkedHashSet<>(delayPackages);
+        for (int index = 0; index < apps.size(); index++) {
+            DelayAppChoice app = apps.get(index);
+            labels[index] = app.label;
+            checked[index] = working.contains(app.packageName);
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.phone_notification_delay_apps_choose)
+                .setMultiChoiceItems(labels, checked, (dialog, which, selected) -> {
+                    String packageName = apps.get(which).packageName;
+                    if (selected) working.add(packageName); else working.remove(packageName);
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    delayPackages.clear();
+                    delayPackages.addAll(working);
+                    persist();
+                })
+                .show();
+    }
+
+    private void chooseDelayMaxWait() {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setText(String.valueOf(delayMaxWaitSeconds));
+        input.setSelectAllOnFocus(true);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.phone_notification_delay_wait_title)
+                .setMessage(R.string.phone_notification_delay_wait_prompt)
+                .setView(input)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(android.R.string.ok, null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    try {
+                        int value = Integer.parseInt(input.getText().toString().trim());
+                        if (value < PhoneNotificationDeferralPolicy.MIN_MAX_WAIT_SECONDS
+                                || value > PhoneNotificationDeferralPolicy.MAX_MAX_WAIT_SECONDS) {
+                            throw new NumberFormatException();
+                        }
+                        delayMaxWaitSeconds = value;
+                        persist();
+                        dialog.dismiss();
+                    } catch (NumberFormatException invalid) {
+                        input.setError(getString(
+                                R.string.phone_notification_delay_wait_invalid));
+                    }
+                }));
+        dialog.show();
+    }
+
     private void chooseStatusColor() {
         AppleColorPickerDialog.show(this, "Цвет текста в строке состояния", tickerColor,
                 AppleColorPickerDialog.Options.opaque(),
@@ -300,9 +451,22 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         try {
             boolean statusEnabled = statusRow.isChecked();
             boolean popupEnabled = popup.isChecked();
+            if (delayInApps.isChecked() && delayPackages.isEmpty()) {
+                Toast.makeText(this, R.string.phone_notification_delay_apps_required,
+                        Toast.LENGTH_LONG).show();
+                binding = true;
+                delayInApps.setChecked(false);
+                binding = false;
+            }
             prefs.phoneStatusBarNotificationsEnabled.set(statusEnabled);
             prefs.phonePopupNotificationsEnabled.set(popupEnabled);
             prefs.phoneNotificationsOnlyWhenLocked.set(onlyWhenLocked.isChecked());
+            prefs.phoneNotificationDelayInAppsEnabled.set(
+                    delayInApps.isChecked() && !delayPackages.isEmpty());
+            prefs.phoneNotificationDelayInPackages.set(delayPackages);
+            prefs.phoneNotificationDelayMaxWaitSeconds.set(
+                    PhoneNotificationDeferralPolicy.boundedMaxWaitSeconds(
+                            delayMaxWaitSeconds));
             prefs.phoneStatusBarNotificationFields.set(PhoneStatusBarPolicy.serializeIds(
                     selectedFields, PhoneStatusBarPolicy.notificationFieldIds()));
             prefs.phoneStatusBarNotificationSeconds.set(clamp(durationSeconds, 1, 120));
@@ -334,6 +498,45 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         }
     }
 
+    /**
+     * Delayed delivery is useful only when Natro can observe the foreground application. Keep
+     * activation fail-closed instead of pretending the selected camera/navigation application
+     * can be detected. Runtime also treats a temporarily unknown foreground as blocked until the
+     * configured deadline, covering service reconnects and permission revocation.
+     */
+    private boolean foregroundTrackingAvailable() {
+        String accessibilityComponent = new ComponentName(
+                this, WidgetAccessibilityService.class).flattenToString();
+        return Permissions.isAccessibilityServiceEnabled(this, accessibilityComponent)
+                || Permissions.isUsageAccessGranted(this);
+    }
+
+    private void showForegroundTrackingRequired() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.phone_notification_delay_access_title)
+                .setMessage(R.string.phone_notification_delay_access_message)
+                .setPositiveButton(R.string.phone_notification_delay_access_accessibility,
+                        (dialog, which) -> {
+                            try {
+                                startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                            } catch (RuntimeException error) {
+                                Toast.makeText(this,
+                                        R.string.phone_notification_delay_access_unavailable,
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        })
+                .setNeutralButton(R.string.phone_notification_delay_access_usage,
+                        (dialog, which) -> {
+                            if (!SettingsLauncher.openUsageAccessSettings(this)) {
+                                Toast.makeText(this,
+                                        R.string.phone_notification_delay_access_unavailable,
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
     private void refreshSummaries() {
         if (fieldsSummary != null) {
             fieldsSummary.setText("Выбрано полей: " + selectedFields.size());
@@ -341,7 +544,32 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         if (durationSummary != null) {
             durationSummary.setText("Показывать " + durationSeconds + " сек.");
         }
+        if (delayAppsSummary != null) {
+            delayAppsSummary.setText(getString(R.string.phone_notification_delay_apps_summary,
+                    delayPackages.size()));
+        }
+        if (delayMaxWaitSummary != null) {
+            delayMaxWaitSummary.setText(getString(
+                    R.string.phone_notification_delay_wait_summary,
+                    delayMaxWaitSeconds));
+        }
         decorateColor(tickerColor);
+    }
+
+    @Override
+    protected void onDestroy() {
+        appCatalogWorker.shutdownNow();
+        super.onDestroy();
+    }
+
+    private static final class DelayAppChoice {
+        @NonNull final String packageName;
+        @NonNull final String label;
+
+        DelayAppChoice(@NonNull String packageName, @NonNull String label) {
+            this.packageName = packageName;
+            this.label = label;
+        }
     }
 
     private void decorateColor(String color) {

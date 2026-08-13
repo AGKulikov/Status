@@ -23,7 +23,7 @@ String getVersionName() {
 
     logger.warn('Environment variable `VERSION_NAME` was not set, using default version')
 
-    return 'v2.8.2-ha1216'
+    return '2.0'
 }
 
 int getVersionCode() {
@@ -32,6 +32,11 @@ int getVersionCode() {
         return explicitCode.toInteger()
     }
     def version = getVersionName()
+    // Public version name 2.0 maps to the internal HA1217 release train. Keep its monotonic
+    // Android identity explicit so Natro updates every installed HA build in place.
+    if (version == '2.0') {
+        return 208021217
+    }
     def matcher = version =~ /^v?(\d+)\.(\d+)\.(\d+)(?:-ha(\d+))?$/
     if (!matcher.matches()) {
         throw new GradleException("Unsupported VERSION_NAME: ${version}")

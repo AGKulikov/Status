@@ -58,6 +58,7 @@ import java.util.concurrent.Executors;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.R;
 import dezz.status.widget.WidgetService;
+import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarControlState;
 import dezz.status.widget.car.CarIntegration;
@@ -526,7 +527,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         root.addView(drawer, drawerParams);
         WindowManager.LayoutParams params = allAppsOverlayParams(
                 attachedType, drawerWidth, metrics.heightPixels, drawerWindowX,
-                "Status Widget all applications");
+                "Natro all applications");
         try {
             manager.addView(root, params);
             drawerWindow = new AttachedWindow(root, params, manager);
@@ -655,7 +656,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                     anchorCenterY - height / 2));
             WindowManager.LayoutParams params = compactDrawerParams(
                     attachedType, width, height, x, y,
-                    "Status Widget driver favorites " + panelId);
+                    "Natro driver favorites " + panelId);
             manager.addView(root, params);
             Set<String> itemIds = new LinkedHashSet<>();
             for (LauncherShortcutStore.Shortcut value : values) itemIds.add(value.id);
@@ -1192,7 +1193,13 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         button.setClipToPadding(false);
         button.setContentDescription(shortcut.title);
         int background = safeColor(shortcut.backgroundColor, Color.TRANSPARENT);
-        button.setBackground(rippleBackground(background, 14));
+        AutomationState initialAutomation = automationState(shortcut.id);
+        DriverPanelStylePolicy.IconStyle initialStyle = DriverPanelStylePolicy.icon(
+                shortcut.iconColor, shortcut.backgroundColor, initialAutomation);
+        background = safeColor(initialStyle.backgroundColor, background);
+        button.setBackground(rippleBackground(background, 14,
+                safeColor(initialStyle.outlineColor, Color.TRANSPARENT),
+                initialStyle.outlineWidthPx));
 
         LinearLayout content = new LinearLayout(context);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -1205,7 +1212,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         @Nullable ImageView stateIcon = null;
         if (liveClimate) {
             icon = new DriverClimateShortcutView(context, CarIntegrations.get(appContext),
-                    shortcut.iconColor, shortcut.extendedClimateInfo,
+                    initialStyle.tint, shortcut.extendedClimateInfo,
                     shortcut.climateDetailsGapPx);
         } else {
             ImageView image = new ImageView(context);
@@ -1218,9 +1225,15 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 resolved = component == null ? null
                         : HighResolutionAppIconLoader.load(context, component);
             } else {
-                resolved = LauncherIconResolver.resolve(context, shortcut);
+                resolved = LauncherIconResolver.resolve(context, shortcut, initialStyle.tint);
             }
             if (resolved != null) image.setImageDrawable(resolved);
+            if (shortcut.kind == LauncherShortcutStore.Kind.APP
+                    && "app".equals(shortcut.icon)
+                    && initialAutomation.iconTint != null
+                    && !"none".equalsIgnoreCase(initialAutomation.iconTint)) {
+                image.setColorFilter(safeColor(initialStyle.tint, Color.WHITE));
+            }
             icon = image;
             stateIcon = image;
         }
@@ -1398,10 +1411,15 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             @NonNull Context context,
             @NonNull Preferences.DriverPanelProfile profile) {
         GradientDrawable background = new GradientDrawable();
-        background.setColor(safeOpaqueColor(profile.backgroundColor.get(),
+        DriverPanelStylePolicy.PanelStyle style = panelStyle(profile);
+        background.setColor(safeOpaqueColor(style.backgroundColor,
                 Color.rgb(19, 23, 28)));
         float radius = Math.max(dp(context, 20), profile.cornerRadiusPx.get());
         background.setCornerRadii(panelCornerRadii(radius, profile.side.get() == 1));
+        if (style.borderWidthPx > 0) {
+            background.setStroke(style.borderWidthPx,
+                    safeColor(style.borderColor, Color.TRANSPARENT));
+        }
         return background;
     }
 
@@ -1411,7 +1429,8 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             @NonNull Preferences.DriverPanelProfile profile,
             boolean panelOnRight) {
         GradientDrawable background = new GradientDrawable();
-        background.setColor(safeOpaqueColor(profile.backgroundColor.get(),
+        DriverPanelStylePolicy.PanelStyle style = panelStyle(profile);
+        background.setColor(safeOpaqueColor(style.backgroundColor,
                 Color.rgb(19, 23, 28)));
         float radius = Math.max(dp(context, 20), profile.cornerRadiusPx.get());
         // The edge that touches the rail is square, so Favorites reads as a continuation of the
@@ -1419,7 +1438,37 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         background.setCornerRadii(panelOnRight
                 ? new float[]{radius, radius, 0f, 0f, 0f, 0f, radius, radius}
                 : new float[]{0f, 0f, radius, radius, radius, radius, 0f, 0f});
+        if (style.borderWidthPx > 0) {
+            background.setStroke(style.borderWidthPx,
+                    safeColor(style.borderColor, Color.TRANSPARENT));
+        }
         return background;
+    }
+
+    @NonNull
+    private DriverPanelStylePolicy.PanelStyle panelStyle(
+            @NonNull Preferences.DriverPanelProfile profile) {
+        WidgetService service = WidgetService.getInstance();
+        AutomationState automation = service == null ? AutomationState.missing()
+                : service.driverAutomationState(DriverPanelStylePolicy.PANEL_TARGET_ID);
+        return DriverPanelStylePolicy.panel(profile.backgroundColor.get(),
+                profile.borderColor.get(), profile.borderWidthPx.get(), automation);
+    }
+
+    @NonNull
+    private DriverPanelStylePolicy.IconStyle iconStyle(
+            @NonNull LauncherShortcutStore.Shortcut shortcut,
+            @NonNull String liveTint,
+            @NonNull String liveBackground) {
+        return DriverPanelStylePolicy.icon(liveTint, liveBackground,
+                automationState(shortcut.id));
+    }
+
+    @NonNull
+    private AutomationState automationState(@NonNull String targetId) {
+        WidgetService service = WidgetService.getInstance();
+        return service == null ? AutomationState.missing()
+                : service.driverAutomationState(targetId);
     }
 
     @NonNull
@@ -1446,7 +1495,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         params.x = DriverPanelLayoutPolicy.panelWindowX(
                 screenWidth, width, profile.side.get() == 1);
         params.y = 0;
-        params.setTitle("Status Widget driver panel");
+        params.setTitle("Natro driver panel");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             params.layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
@@ -1594,11 +1643,16 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 SmartHomeShortcutStatePolicy.resolveValue(shortcut, rule, source, value);
         boolean active = state.present && state.fresh && state.available
                 && state.activeKnown && state.active;
-        int background = safeColor(active
-                ? shortcut.activeBackgroundColor : shortcut.backgroundColor,
+        String liveBackground = active
+                ? shortcut.activeBackgroundColor : shortcut.backgroundColor;
+        String liveTint = active ? shortcut.activeIconColor : shortcut.iconColor;
+        DriverPanelStylePolicy.IconStyle style = iconStyle(
+                shortcut, liveTint, liveBackground);
+        int background = safeColor(style.backgroundColor,
                 Color.TRANSPARENT);
-        binding.button.setBackground(rippleBackground(background, 14));
-        String tint = active ? shortcut.activeIconColor : shortcut.iconColor;
+        binding.button.setBackground(rippleBackground(background, 14,
+                safeColor(style.outlineColor, Color.TRANSPARENT), style.outlineWidthPx));
+        String tint = style.tint;
         String contentColor = SmartHomeTileColorPolicy.contentColor(
                 source, shortcut.textColor, tint);
         LauncherShortcutStore.Shortcut visual = shortcut.copy();
@@ -1651,14 +1705,19 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         if (confirmed && shortcut.command == CarControlCommand.Operation.SET) {
             active = Math.abs(state.value - shortcut.commandValue) < .01d;
         }
-        int background = safeColor(active
-                ? shortcut.activeBackgroundColor : shortcut.backgroundColor,
-                Color.TRANSPARENT);
-        binding.button.setBackground(rippleBackground(background, 14));
-        String tint = active ? shortcut.activeIconColor : shortcut.iconColor;
+        String liveBackground = active
+                ? shortcut.activeBackgroundColor : shortcut.backgroundColor;
+        String liveTint = active ? shortcut.activeIconColor : shortcut.iconColor;
         if (active && shortcut.useVehicleStateColor && state.suggestedColor != null) {
-            tint = state.suggestedColor;
+            liveTint = state.suggestedColor;
         }
+        DriverPanelStylePolicy.IconStyle style = iconStyle(
+                shortcut, liveTint, liveBackground);
+        int background = safeColor(style.backgroundColor,
+                Color.TRANSPARENT);
+        binding.button.setBackground(rippleBackground(background, 14,
+                safeColor(style.outlineColor, Color.TRANSPARENT), style.outlineWidthPx));
+        String tint = style.tint;
         if (TrunkControlSafety.isTrunk(shortcut.target)) {
             binding.icon.setImageDrawable(LauncherIconResolver.resolvePreset(appContext,
                     TrunkControlSafety.iconKey(shortcut.icon, state), tint));
@@ -1713,9 +1772,16 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
     @NonNull
     private static Drawable rippleBackground(int color, int radius) {
+        return rippleBackground(color, radius, Color.TRANSPARENT, 0);
+    }
+
+    @NonNull
+    private static Drawable rippleBackground(int color, int radius, int outlineColor,
+                                             int outlineWidthPx) {
         GradientDrawable content = new GradientDrawable();
         content.setColor(color);
         content.setCornerRadius(radius);
+        if (outlineWidthPx > 0) content.setStroke(outlineWidthPx, outlineColor);
         GradientDrawable mask = new GradientDrawable();
         mask.setColor(Color.WHITE);
         mask.setCornerRadius(radius);

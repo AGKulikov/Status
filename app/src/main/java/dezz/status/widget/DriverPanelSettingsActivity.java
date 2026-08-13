@@ -207,6 +207,7 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
         MaterialButton background = button("Цвет панели");
         AppleColorPickerDialog.decorateButton(background, "Цвет панели",
                 profile.backgroundColor.get());
+        background.setIconResource(R.drawable.ic_driver_format_color_fill);
         background.setOnClickListener(view -> AppleColorPickerDialog.show(this,
                 "Фон панели", profile.backgroundColor.get(),
                 AppleColorPickerDialog.Options.opaque(),
@@ -225,6 +226,35 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                     }
                 }));
         settings.addView(background, rowParams());
+
+        MaterialButton border = button("Цвет границы панели");
+        AppleColorPickerDialog.decorateButton(border, "Цвет границы панели",
+                profile.borderColor.get());
+        border.setIconResource(R.drawable.ic_driver_border_color);
+        border.setOnClickListener(view -> AppleColorPickerDialog.show(this,
+                "Граница панели", profile.borderColor.get(),
+                AppleColorPickerDialog.Options.standard(),
+                new AppleColorPickerDialog.Listener() {
+                    @Override public void onPreview(@Nullable String value) {
+                        if (value == null) return;
+                        profile.borderColor.set(value);
+                        AppleColorPickerDialog.decorateButton(border,
+                                "Цвет границы панели", value);
+                        refreshPreview();
+                    }
+
+                    @Override public void onSelected(@Nullable String value) {
+                        if (value != null) profile.borderColor.set(value);
+                        applyPanel();
+                    }
+                }));
+        settings.addView(border, rowParams());
+        slider(settings, "Толщина границы панели", 0, 32,
+                Math.max(0, Math.min(32, profile.borderWidthPx.get())), " px", value -> {
+                    profile.borderWidthPx.set(value);
+                    refreshPreview();
+                    applyPanel();
+                });
 
         title(settings, "Кнопки");
         countLabel = hint(settings, "");
@@ -1311,6 +1341,11 @@ public final class DriverPanelSettingsActivity extends AppCompatActivity {
                 0xFF13171C) | 0xFF000000);
         float radius = Math.max(dp(20), profile.cornerRadiusPx.get()) * .62f;
         background.setCornerRadii(panelCornerRadii(radius, side == 1));
+        int borderWidth = Math.max(0, profile.borderWidthPx.get());
+        if (borderWidth > 0) {
+            background.setStroke(Math.max(1, Math.round(borderWidth * .62f)),
+                    parseColor(profile.borderColor.get(), Color.TRANSPARENT));
+        }
         rail.setBackground(background);
         List<LauncherShortcutStore.Shortcut> topInformation = new ArrayList<>();
         List<LauncherShortcutStore.Shortcut> controls = new ArrayList<>();

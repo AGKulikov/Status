@@ -397,7 +397,16 @@ public class WidgetAccessibilityService extends AccessibilityService {
      */
     private boolean publishAndroidNineForegroundEvent(int eventType,
                                                        @NonNull String packageName) {
-        if (eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+        // ECARX' freeform TransparentSplashActivity commonly emits WINDOWS_CHANGED without a
+        // matching full-screen STATE_CHANGED event. Both are lifecycle events already included
+        // in our lean base subscription; accepting either makes windowed Navigator obey the same
+        // per-element hide rules as its full-screen Activity without traversing the unsafe API 28
+        // accessibility window tree.
+        boolean applicationStateChanged =
+                eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
+        boolean yandexFreeformChanged = eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED
+                && NavigationDataRepository.isYandexPackage(packageName);
+        if ((!applicationStateChanged && !yandexFreeformChanged)
                 || packageName.isEmpty() || packageName.equals(getPackageName())) {
             return false;
         }

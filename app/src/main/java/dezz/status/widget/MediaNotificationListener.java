@@ -18,6 +18,7 @@
 package dezz.status.widget;
 
 import android.app.Notification;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.media.session.MediaController;
 import android.media.session.MediaSession;
@@ -29,6 +30,7 @@ import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
 import java.util.ArrayList;
@@ -42,6 +44,7 @@ import java.util.Set;
 import dezz.status.widget.launcher.NavigationCollectionDemand;
 import dezz.status.widget.launcher.NavigationCollectionPolicy;
 import dezz.status.widget.launcher.NavigationDataRepository;
+import dezz.status.widget.launcher.MediaLikeActionPolicy;
 
 /**
  * Supplies media-session authorization and reads navigation notifications when HOME consumes
@@ -52,6 +55,8 @@ public class MediaNotificationListener extends NotificationListenerService {
     private static final long NAVIGATION_MISSING_GRACE_MS = 1_500L;
     private static final Object MEDIA_SESSION_LOCK = new Object();
     private static final Map<String, MediaNotificationSession> MEDIA_SESSIONS =
+            new LinkedHashMap<>();
+    private static final Map<String, MediaNotificationLikeAction> MEDIA_LIKE_ACTIONS =
             new LinkedHashMap<>();
     private int consecutiveNoRouteScans;
     private HandlerThread navigationThread;
@@ -165,6 +170,25 @@ public class MediaNotificationListener extends NotificationListenerService {
         return result;
     }
 
+    /** Executes the newest captured action belonging to the represented player notification. */
+    public static boolean sendMediaNotificationLike(@Nullable String targetPackage) {
+        List<MediaNotificationLikeAction> actions;
+        synchronized (MEDIA_SESSION_LOCK) {
+            actions = new ArrayList<>(MEDIA_LIKE_ACTIONS.values());
+        }
+        Collections.reverse(actions);
+        String target = targetPackage == null ? "" : targetPackage.trim();
+        for (MediaNotificationLikeAction action : actions) {
+            if (!target.isEmpty() && !target.equals(action.packageName)) continue;
+            try {
+                action.pendingIntent.send();
+                return true;
+            } catch (PendingIntent.CanceledException | RuntimeException ignored) {
+            }
+        }
+        return false;
+    }
+
     private void rebuildMediaSessions() {
         try {
             StatusBarNotification[] active = getActiveNotifications();
@@ -179,10 +203,19 @@ public class MediaNotificationListener extends NotificationListenerService {
         if (sbn == null || sbn.getNotification() == null) return;
         try {
             Notification notification = sbn.getNotification();
+            String key = sbn.getKey();
+            if (key == null || key.isEmpty()) return;
             Object token = notification.extras == null ? null
                     : notification.extras.get(NotificationCompat.EXTRA_MEDIA_SESSION);
-            String key = sbn.getKey();
-            if (!(token instanceof MediaSession.Token) || key == null || key.isEmpty()) return;
+            boolean mediaNotification = token instanceof MediaSession.Token
+                    || Notification.CATEGORY_TRANSPORT.equals(notification.category);
+            MediaNotificationLikeAction like = mediaNotification ? findLikeAction(
+                    sbn.getPackageName(), notification.actions) : null;
+            synchronized (MEDIA_SESSION_LOCK) {
+                MEDIA_LIKE_ACTIONS.remove(key);
+                if (like != null) MEDIA_LIKE_ACTIONS.put(key, like);
+            }
+            if (!(token instanceof MediaSession.Token)) return;
             synchronized (MEDIA_SESSION_LOCK) {
                 // Reinsert so LinkedHashMap order reflects the newest notification update.
                 MEDIA_SESSIONS.remove(key);
@@ -197,13 +230,28 @@ public class MediaNotificationListener extends NotificationListenerService {
         if (sbn == null || sbn.getKey() == null) return;
         synchronized (MEDIA_SESSION_LOCK) {
             MEDIA_SESSIONS.remove(sbn.getKey());
+            MEDIA_LIKE_ACTIONS.remove(sbn.getKey());
         }
     }
 
     private static void clearMediaSessions() {
         synchronized (MEDIA_SESSION_LOCK) {
             MEDIA_SESSIONS.clear();
+            MEDIA_LIKE_ACTIONS.clear();
         }
+    }
+
+    @Nullable
+    private static MediaNotificationLikeAction findLikeAction(
+            @Nullable String packageName, @Nullable Notification.Action[] actions) {
+        if (actions == null) return null;
+        for (Notification.Action action : actions) {
+            if (action == null || action.actionIntent == null
+                    || !MediaLikeActionPolicy.matchesNotificationAction(action.title)) continue;
+            return new MediaNotificationLikeAction(
+                    packageName == null ? "" : packageName, action.actionIntent);
+        }
+        return null;
     }
 
     private static final class MediaNotificationSession {
@@ -211,6 +259,17 @@ public class MediaNotificationListener extends NotificationListenerService {
 
         MediaNotificationSession(@NonNull MediaSession.Token token) {
             this.token = token;
+        }
+    }
+
+    private static final class MediaNotificationLikeAction {
+        @NonNull final String packageName;
+        @NonNull final PendingIntent pendingIntent;
+
+        MediaNotificationLikeAction(@NonNull String packageName,
+                                    @NonNull PendingIntent pendingIntent) {
+            this.packageName = packageName;
+            this.pendingIntent = pendingIntent;
         }
     }
 

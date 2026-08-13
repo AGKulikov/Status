@@ -139,6 +139,40 @@ public final class LocalScenarioControllerTest {
         assertTrue(overrides.isEmpty());
     }
 
+    @Test public void driverStyleFieldsKeepDeclarationOrderAndExactKeys() {
+        ValueReference reference = new ValueReference("SYSTEM", "default",
+                "hwgps.route_lost", null);
+        Condition condition = new Condition("lost", reference, Input.FIELD_VALUE,
+                Operator.TRUE, "", "");
+        Scenario first = new Scenario("first", Collections.singletonList(condition),
+                Collections.singletonList(new LocalAction(TargetScope.DRIVER, "driver_panel",
+                        LocalField.BORDER_WIDTH, 4)));
+        Scenario second = new Scenario("second", Collections.singletonList(condition),
+                Collections.singletonList(new LocalAction(TargetScope.DRIVER, "driver_panel",
+                        LocalField.BORDER_WIDTH, 9)));
+        JSONObject patch = LocalScenarioController.buildOverrides(
+                java.util.Arrays.asList(first, second), ignored -> Input.value(true, true, true))
+                .get("driver|driver_panel");
+        assertEquals(9, patch.optInt("border_width"));
+    }
+
+    @Test public void launcherIconStyleUsesItsOwnStableScope() {
+        ValueReference reference = new ValueReference("SYSTEM", "default",
+                "hwgps.route_lost", null);
+        Condition condition = new Condition("lost", reference, Input.FIELD_VALUE,
+                Operator.TRUE, "", "");
+        Scenario scenario = new Scenario("launcher_style",
+                Collections.singletonList(condition), Collections.singletonList(
+                new LocalAction(TargetScope.LAUNCHER, "home_music",
+                        LocalField.ICON_OUTLINE_WIDTH, 6)));
+
+        JSONObject patch = LocalScenarioController.buildOverrides(
+                Collections.singletonList(scenario), ignored -> Input.value(true, true, true))
+                .get("launcher|home_music");
+
+        assertEquals(6, patch.optInt("icon_outline_width"));
+    }
+
     private static Scenario scenario(String id, String resourceId, String targetId) {
         return scenario(id, resourceId, targetId, true);
     }

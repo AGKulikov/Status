@@ -58,7 +58,7 @@ final class HudOverlayWindow {
         params.gravity = Gravity.TOP | Gravity.LEFT;
         params.x = HudViewportPolicy.SAFE_LEFT;
         params.y = HudViewportPolicy.SAFE_TOP;
-        params.setTitle("Status Widget HUD overlay 728x190");
+        params.setTitle("Natro HUD overlay 728x190");
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             params.layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;

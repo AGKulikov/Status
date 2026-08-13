@@ -304,7 +304,7 @@ public final class HudRuntimeData {
             case CUSTOM_TEXT:
                 return item.options.optString("customText", item.title);
             case UPDATE_STATUS:
-                return "Status Widget " + appVersion();
+                return "Natro " + appVersion();
             case SMART_HOME_STATUS:
             case CONNECTOR_VALUE:
                 return connectorText(item);

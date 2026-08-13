@@ -418,6 +418,23 @@ public final class PhoneStatusBarPolicy {
         }
     }
 
+    /**
+     * Explicit last card for a pathological flood that exceeded the bounded KX11 hold queue.
+     * Normal camera/360 bursts remain below the limit and retain every original card; this makes
+     * the exceptional loss visible instead of silently dropping private notification text or
+     * persisting that text to disk.
+     */
+    public static NotificationPresentation overflowSummary(int count, long receivedAt) {
+        int safeCount = Math.max(1, count);
+        String application = "Natro · ещё " + safeCount;
+        String topic = "Очередь уведомлений";
+        String body = "Получено ещё " + safeCount
+                + " уведомлений. Откройте телефон для полного текста.";
+        return new NotificationPresentation("overflow+" + receivedAt + "+" + safeCount,
+                0L, Math.max(1L, receivedAt), application, topic, body,
+                combine(topic, body), "", 0, false);
+    }
+
     private enum Kind {
         CONNECTION,
         CHARGING,

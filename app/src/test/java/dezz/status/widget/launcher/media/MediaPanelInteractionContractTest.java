@@ -30,6 +30,20 @@ public final class MediaPanelInteractionContractTest {
         assertFalse(button.contains("MediaAppLauncher.launchYandexMusic"));
     }
 
+    @Test public void likeUsesRatingThenCapturedNotificationActionWithoutMsaverBroadcast()
+            throws IOException {
+        String controller = source("dezz/status/widget/launcher/LauncherMediaController.java");
+        String listener = source("dezz/status/widget/MediaNotificationListener.java");
+        String panel = source("dezz/status/widget/launcher/media/MediaPanelView.java");
+        assertTrue(controller.contains("PlaybackState.ACTION_SET_RATING"));
+        assertTrue(controller.contains("Rating.newHeartRating("));
+        assertTrue(controller.contains("sendMediaNotificationLike(targetPackage)"));
+        assertTrue(listener.contains("MediaLikeActionPolicy.matchesNotificationAction"));
+        assertTrue(panel.contains("R.drawable.ic_media_like"));
+        assertFalse(controller.contains("PERFORM_LIKE"));
+        assertFalse(listener.contains("new Intent(\"PERFORM_LIKE\")"));
+    }
+
     @Test public void mediaButtonScaleChangesTheGlyphInsideTheCell() throws IOException {
         String source = source("dezz/status/widget/launcher/media/MediaPanelView.java");
         int buttonStart = source.indexOf("private ImageButton button(");
@@ -103,6 +117,18 @@ public final class MediaPanelInteractionContractTest {
         assertTrue(artwork.contains("artwork.setImageDrawable(null)"));
         assertTrue(artwork.contains("artwork.setBackground(null)"));
         assertFalse(artwork.contains("setImageResource"));
+    }
+
+    @Test public void artworkRadiusClipsTheImageWithoutAllocatingRoundedBitmaps()
+            throws IOException {
+        String panel = source("dezz/status/widget/launcher/media/MediaPanelView.java");
+        String settings = source("dezz/status/widget/MediaPanelSettingsActivity.java");
+
+        assertTrue(panel.contains("artwork.setClipToOutline(config.artworkCornerRadiusPx > 0)"));
+        assertTrue(panel.contains("outline.setRoundRect("));
+        assertFalse(panel.contains("RoundedBitmapDrawable"));
+        assertTrue(settings.contains("Скругление обложки"));
+        assertTrue(settings.contains("config.setArtworkCornerRadiusPx(selected)"));
     }
 
     @Test public void transportControlsScheduleOnlyBoundedReconciliation() throws IOException {

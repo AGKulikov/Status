@@ -208,7 +208,7 @@ public final class ActionRecorderOverlayService extends Service {
         windowParams.gravity = Gravity.TOP | Gravity.START;
         windowParams.x = Math.max(0, preferences.actionRecorderOverlayX.get());
         windowParams.y = Math.max(0, preferences.actionRecorderOverlayY.get());
-        windowParams.setTitle("Status Widget action recorder");
+        windowParams.setTitle("Natro action recorder");
         try {
             windowManager.addView(frame, windowParams);
             ActionRecorder.recordOverlay("action_recorder", "OPENED", "persistent control");

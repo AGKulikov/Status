@@ -118,6 +118,7 @@ import dezz.status.widget.launcher.panels.PanelContentEditOverlay;
 import dezz.status.widget.launcher.panels.PanelElementConfigStore;
 import dezz.status.widget.launcher.panels.PanelGridLayout;
 import dezz.status.widget.launcher.routes.FavoriteRoutesConfigStore;
+import dezz.status.widget.integration.HwgpsIntegration;
 import dezz.status.widget.launcher.routes.FavoriteRoutesPanelView;
 import dezz.status.widget.launcher.routes.FavoriteRouteConfig;
 import dezz.status.widget.launcher.routes.YandexRouteLauncher;
@@ -128,7 +129,10 @@ import dezz.status.widget.car.CarControlState;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.car.TrunkControlSafety;
+import dezz.status.widget.automation.AutomationContract;
+import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.automation.ScenarioTriggerReceiver;
+import dezz.status.widget.driver.DriverPanelStylePolicy;
 import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.SourceBinding;
@@ -297,6 +301,7 @@ public final class LauncherActivity extends AppCompatActivity {
     @Nullable private CarIntegration carIntegration;
     private final Map<String, CarControlState> carControlStates = new HashMap<>();
     private final Map<String, ShortcutTileBinding> carShortcutBindings = new HashMap<>();
+    private final Map<String, ShortcutTileBinding> launcherShortcutBindings = new HashMap<>();
     private final List<InformationShortcutView> informationShortcutViews = new ArrayList<>();
     private final Map<String, ShortcutTileBinding> smartHomeShortcutBindings = new HashMap<>();
     private Map<String, IntentActionRule> smartHomeRules = Collections.emptyMap();
@@ -334,6 +339,12 @@ public final class LauncherActivity extends AppCompatActivity {
         List<ConnectorValue> copy = new ArrayList<>(changed);
         navigationUiHandler.post(() -> applySmartHomeChanges(copy));
     };
+    private final WidgetService.AutomationPresentationListener launcherAutomationListener =
+            (scope, ids) -> {
+                if (!AutomationContract.SCOPE_LAUNCHER.equals(scope)) return;
+                Set<String> copy = new LinkedHashSet<>(ids);
+                navigationUiHandler.post(() -> applyLauncherAutomationStyles(copy));
+            };
     private boolean safeAreaRefreshPosted;
     private final Runnable safeAreaRefresh = () -> {
         safeAreaRefreshPosted = false;
@@ -349,13 +360,18 @@ public final class LauncherActivity extends AppCompatActivity {
             if (current != smartHomeValueService) {
                 if (smartHomeValueService != null) {
                     smartHomeValueService.removeConnectorValueListener(smartHomeValueListener);
+                    smartHomeValueService.removeAutomationPresentationListener(
+                            launcherAutomationListener);
                 }
                 smartHomeValueService = current;
                 if (current != null) {
+                    current.addAutomationPresentationListener(launcherAutomationListener);
                     applySmartHomeValues(
                             current.addConnectorValueListener(smartHomeValueListener));
+                    applyLauncherAutomationStyles(Collections.emptySet());
                 } else {
                     applySmartHomeValues(Collections.emptyList());
+                    applyLauncherAutomationStyles(Collections.emptySet());
                 }
             }
             // WindowInsets and lifecycle changes are event-driven. This low-rate fallback covers
@@ -634,6 +650,8 @@ public final class LauncherActivity extends AppCompatActivity {
         if (!allAppsUninstallInProgress) dismissAllAppsDialog();
         if (smartHomeValueService != null) {
             smartHomeValueService.removeConnectorValueListener(smartHomeValueListener);
+            smartHomeValueService.removeAutomationPresentationListener(
+                    launcherAutomationListener);
             smartHomeValueService = null;
         }
         applySmartHomeValues(Collections.emptyList());
@@ -881,6 +899,8 @@ public final class LauncherActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        // Defensive cleanup for vendor lifecycle teardown that omits a matching pause callback.
+        StatusBarSurfaceContext.setLauncherHomeForeground(false);
         dismissAllAppsDialog();
         launcherBootstrapGeneration++;
         panelInitializationGeneration++;
@@ -911,6 +931,9 @@ public final class LauncherActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        // Package identity cannot distinguish this HOME surface from LauncherSettingsActivity.
+        // Publish the resumed Activity directly so per-element hide rules never affect settings.
+        StatusBarSurfaceContext.setLauncherHomeForeground(true);
         if (!launcherBootstrapReady) {
             getWindow().getDecorView().requestApplyInsets();
             return;
@@ -929,6 +952,15 @@ public final class LauncherActivity extends AppCompatActivity {
         if (shortcutStore != null) {
             refreshShortcutGrid();
         }
+    }
+
+    @Override
+    protected void onPause() {
+        // A freeform Navigator or any settings Activity can cover HOME without stopping its task.
+        // onPause/onResume therefore models the foreground surface more accurately than
+        // onStart/onStop and adds no timer or package polling.
+        StatusBarSurfaceContext.setLauncherHomeForeground(false);
+        super.onPause();
     }
 
     private void registerNavigationReceiver() {
@@ -3268,6 +3300,9 @@ public final class LauncherActivity extends AppCompatActivity {
                     @Override public void next() {
                         if (mediaController != null) mediaController.next();
                     }
+                    @Override public boolean like() {
+                        return mediaController != null && mediaController.like();
+                    }
                     @Override public void seekTo(long positionMs) {
                         if (mediaController != null) mediaController.seekTo(positionMs);
                     }
@@ -3601,6 +3636,7 @@ public final class LauncherActivity extends AppCompatActivity {
         shortcutGrid.removeAllViews();
         informationShortcutViews.clear();
         carShortcutBindings.clear();
+        launcherShortcutBindings.clear();
         smartHomeShortcutBindings.clear();
         smartHomeRules = loadSmartHomeRules();
         List<LauncherShortcutStore.Shortcut> shortcuts = shortcutStore.all();
@@ -3871,16 +3907,17 @@ public final class LauncherActivity extends AppCompatActivity {
                     return true;
                 });
             }
+            ShortcutTileBinding binding = new ShortcutTileBinding(shortcut.copy(), card,
+                    icon, titleLabel, stateLabel);
+            launcherShortcutBindings.put(shortcut.id, binding);
             if (shortcut.kind == LauncherShortcutStore.Kind.CAR) {
-                ShortcutTileBinding binding = new ShortcutTileBinding(shortcut.copy(), card,
-                        icon, titleLabel, stateLabel);
                 carShortcutBindings.put(shortcut.id, binding);
                 applyCarState(binding, carControlStates.get(shortcut.target));
             } else if (shortcut.kind == LauncherShortcutStore.Kind.RULE) {
-                ShortcutTileBinding binding = new ShortcutTileBinding(shortcut.copy(), card,
-                        icon, titleLabel, stateLabel);
                 smartHomeShortcutBindings.put(shortcut.id, binding);
                 applySmartHomeState(binding);
+            } else {
+                applyLauncherAutomationStyle(binding);
             }
         }
         return card;
@@ -4030,6 +4067,52 @@ public final class LauncherActivity extends AppCompatActivity {
         }
     }
 
+    /** Applies only the changed HOME targets; an empty set means initial/all-target reconcile. */
+    private void applyLauncherAutomationStyles(@NonNull Set<String> changedIds) {
+        if (!activityStarted && !changedIds.isEmpty()) return;
+        if (changedIds.isEmpty()) {
+            for (ShortcutTileBinding binding :
+                    new ArrayList<>(launcherShortcutBindings.values())) {
+                applyLauncherAutomationStyle(binding);
+            }
+            return;
+        }
+        for (String id : changedIds) {
+            ShortcutTileBinding binding = launcherShortcutBindings.get(id);
+            if (binding != null) applyLauncherAutomationStyle(binding);
+        }
+    }
+
+    /** Scenario style wins over the live CAR/RULE state; removal restores that exact live state. */
+    private void applyLauncherAutomationStyle(@NonNull ShortcutTileBinding binding) {
+        WidgetService service = WidgetService.getInstance();
+        AutomationState automation = service == null ? AutomationState.missing()
+                : service.launcherAutomationState(binding.shortcut.id);
+        DriverPanelStylePolicy.IconStyle style = DriverPanelStylePolicy.icon(
+                binding.liveTint, binding.liveBackground, automation);
+        try { binding.card.setCardBackgroundColor(Color.parseColor(style.backgroundColor)); }
+        catch (IllegalArgumentException ignored) {
+            binding.card.setCardBackgroundColor(Color.argb(180, 34, 39, 51));
+        }
+        int outlineColor;
+        try { outlineColor = Color.parseColor(style.outlineColor); }
+        catch (IllegalArgumentException ignored) { outlineColor = Color.TRANSPARENT; }
+        binding.card.setStrokeColor(outlineColor);
+        binding.card.setStrokeWidth(style.outlineWidthPx);
+
+        LauncherShortcutStore.Shortcut visual = binding.shortcut.copy();
+        visual.icon = binding.liveIconKey;
+        binding.icon.clearColorFilter();
+        binding.icon.setImageDrawable(LauncherIconResolver.resolve(this, visual, style.tint));
+        boolean originalApplicationIcon = visual.kind == LauncherShortcutStore.Kind.APP
+                && "app".equals(visual.icon);
+        if (originalApplicationIcon && automation.iconTint != null
+                && !"none".equalsIgnoreCase(automation.iconTint)) {
+            try { binding.icon.setColorFilter(Color.parseColor(automation.iconTint)); }
+            catch (IllegalArgumentException ignored) { binding.icon.clearColorFilter(); }
+        }
+    }
+
     private void applyCarState(@NonNull ShortcutTileBinding binding,
                                @Nullable CarControlState state) {
         LauncherShortcutStore.Shortcut shortcut = binding.shortcut;
@@ -4038,21 +4121,16 @@ public final class LauncherActivity extends AppCompatActivity {
         if (confirmed && shortcut.command == CarControlCommand.Operation.SET) {
             active = Math.abs(state.value - shortcut.commandValue) < .01d;
         }
-        String background = active ? shortcut.activeBackgroundColor : shortcut.backgroundColor;
-        try { binding.card.setCardBackgroundColor(Color.parseColor(background)); }
-        catch (IllegalArgumentException ignored) {
-            binding.card.setCardBackgroundColor(Color.argb(180, 34, 39, 51));
-        }
-        String tint = active ? shortcut.activeIconColor : shortcut.iconColor;
+        binding.liveBackground = active
+                ? shortcut.activeBackgroundColor : shortcut.backgroundColor;
+        binding.liveTint = active ? shortcut.activeIconColor : shortcut.iconColor;
         if (active && shortcut.useVehicleStateColor && state.suggestedColor != null) {
-            tint = state.suggestedColor;
+            binding.liveTint = state.suggestedColor;
         }
-        if (TrunkControlSafety.isTrunk(shortcut.target)) {
-            binding.icon.setImageDrawable(LauncherIconResolver.resolvePreset(this,
-                    TrunkControlSafety.iconKey(shortcut.icon, state), tint));
-        } else {
-            binding.icon.setImageDrawable(LauncherIconResolver.resolve(this, shortcut, tint));
-        }
+        binding.liveIconKey = TrunkControlSafety.isTrunk(shortcut.target)
+                ? TrunkControlSafety.iconKey(shortcut.icon, state) : shortcut.icon;
+        applyLauncherAutomationStyle(binding);
+        String tint = binding.liveTint;
         if (binding.titleLabel != null) {
             try { binding.titleLabel.setTextColor(Color.parseColor(tint)); }
             catch (IllegalArgumentException ignored) {
@@ -4107,18 +4185,13 @@ public final class LauncherActivity extends AppCompatActivity {
                 SmartHomeShortcutStatePolicy.resolveValue(shortcut, rule, source, value);
         boolean active = state.present && state.fresh && state.available
                 && state.activeKnown && state.active;
-        String background = active
+        binding.liveBackground = active
                 ? shortcut.activeBackgroundColor : shortcut.backgroundColor;
-        try { binding.card.setCardBackgroundColor(Color.parseColor(background)); }
-        catch (IllegalArgumentException ignored) {
-            binding.card.setCardBackgroundColor(Color.argb(180, 34, 39, 51));
-        }
-        String tint = active ? shortcut.activeIconColor : shortcut.iconColor;
+        binding.liveTint = active ? shortcut.activeIconColor : shortcut.iconColor;
         String contentColor = SmartHomeTileColorPolicy.contentColor(
-                source, shortcut.textColor, tint);
-        LauncherShortcutStore.Shortcut visual = shortcut.copy();
-        visual.icon = state.iconKey;
-        binding.icon.setImageDrawable(LauncherIconResolver.resolve(this, visual, tint));
+                source, shortcut.textColor, binding.liveTint);
+        binding.liveIconKey = state.iconKey;
+        applyLauncherAutomationStyle(binding);
         if (binding.titleLabel != null) {
             try { binding.titleLabel.setTextColor(Color.parseColor(contentColor)); }
             catch (IllegalArgumentException ignored) {
@@ -4209,6 +4282,12 @@ public final class LauncherActivity extends AppCompatActivity {
             case MEDIA_PLAY_PAUSE: mediaController.playPause(); break;
             case MEDIA_PREVIOUS: mediaController.previous(); break;
             case MEDIA_NEXT: mediaController.next(); break;
+            case HWGPS_FIND_ME:
+                if (!HwgpsIntegration.requestFindMe(this)) {
+                    Toast.makeText(this, "HWGPS не установлен или недоступен",
+                            Toast.LENGTH_SHORT).show();
+                }
+                break;
             case EDIT_HOME: setEditMode(true); break;
             case HOME_SETTINGS:
                 startActivity(SettingsHubActivity.intent(this,
@@ -5000,6 +5079,9 @@ public final class LauncherActivity extends AppCompatActivity {
         final ImageView icon;
         @Nullable final TextView titleLabel;
         @Nullable final TextView stateLabel;
+        @NonNull String liveTint;
+        @NonNull String liveBackground;
+        @NonNull String liveIconKey;
 
         ShortcutTileBinding(LauncherShortcutStore.Shortcut shortcut, MaterialCardView card,
                             ImageView icon, @Nullable TextView titleLabel,
@@ -5009,6 +5091,9 @@ public final class LauncherActivity extends AppCompatActivity {
             this.icon = icon;
             this.titleLabel = titleLabel;
             this.stateLabel = stateLabel;
+            this.liveTint = shortcut.iconColor;
+            this.liveBackground = shortcut.backgroundColor;
+            this.liveIconKey = shortcut.icon;
         }
     }
 

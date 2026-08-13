@@ -11,6 +11,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Typeface;
@@ -54,6 +55,7 @@ public final class MediaPanelView extends FrameLayout {
         void previous();
         void playPause();
         void next();
+        boolean like();
         void seekTo(long positionMs);
         void finishSeek(long positionMs);
         boolean openPlayer();
@@ -293,8 +295,15 @@ public final class MediaPanelView extends FrameLayout {
                 artwork.setAdjustViewBounds(false);
                 artwork.setContentDescription("Обложка");
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    artwork.setClipToOutline(true);
-                    artwork.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
+                    artwork.setClipToOutline(config.artworkCornerRadiusPx > 0);
+                    artwork.setOutlineProvider(new ViewOutlineProvider() {
+                        @Override public void getOutline(View view, Outline outline) {
+                            if (view.getWidth() <= 0 || view.getHeight() <= 0) return;
+                            float maximum = Math.min(view.getWidth(), view.getHeight()) / 2f;
+                            float radius = Math.min(config.artworkCornerRadiusPx, maximum);
+                            outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radius);
+                        }
+                    });
                 }
                 return artwork;
             case MediaPanelConfig.TITLE:
@@ -333,6 +342,13 @@ public final class MediaPanelView extends FrameLayout {
                 return button(R.drawable.ic_media_next, "Следующий трек",
                         controls == null || layoutEditor != null
                                 ? null : v -> controls.next(), element.scalePercent);
+            case MediaPanelConfig.LIKE:
+                return button(R.drawable.ic_media_like, "Нравится",
+                        controls == null || layoutEditor != null ? null : v -> {
+                            if (!controls.like()) Toast.makeText(getContext(),
+                                    "Плеер не предоставил действие «Нравится»",
+                                    Toast.LENGTH_SHORT).show();
+                        }, element.scalePercent);
             case MediaPanelConfig.VOLUME:
                 return volumeElement(element.scalePercent, element.volumeThumbVisible,
                         element.volumeThumbSizePercent);

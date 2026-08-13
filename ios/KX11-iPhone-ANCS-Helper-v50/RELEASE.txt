@@ -1,0 +1,38 @@
+KX11 ANCS Helper v50 — production Route-A candidate
+Bundle ID: ru.natro.kx11ancshelper
+Build: 50
+Marketing version: 50.0
+Paired runtime: HA1217 Android UI/notification/HWGPS checkpoint
+Status: source/replay accepted; hosted Xcode build and physical-device matrix remain release gates
+
+Implemented:
+
+- Route A / F201 is the default production topology; Route B / F202 remains behind the explicit
+  KX11ANCSHelper.experimentalRouteB developer flag and cannot run beside Route A;
+- a persisted diagnostic Route B is safely drained and migrated to Route A when production mode
+  becomes locally operational;
+- F201 advertises only its service UUID: no local name, manufacturer alias, address token or
+  second Bluetooth identity;
+- stable Core Bluetooth restoration keeps Route A available while no authenticated Android owner
+  is attached;
+- a live exact CONTROL owner is not restarted while Android waits for ANCS/Service Changed;
+  actual unsubscribe, radio loss or terminal failure uses full same-role drain and a fresh
+  generation with stale callbacks fenced;
+- encrypted installation-ID peer proof, CONTROL ownership and generation-gated telemetry remain
+  mandatory;
+- no system-pair deletion, cache clear, global Bluetooth toggle or unrelated-device control.
+
+Portable verification covers shared wire vectors, strict negative frames, role-switch and
+same-role recovery replays, restoration callback inversions, production Route-A enforcement,
+diagnostic opt-in, UUID-only advertising, exact owner release and telemetry fencing.
+
+Not yet claimed:
+
+- an Xcode/Apple-SDK build from this Linux workspace;
+- a signed IPA or a physical-device installation;
+- physical iPhone/car reconnect stability or completion of the README acceptance matrix;
+- immunity from iOS force-quit, ANCS authorization policy, background scheduling or historical
+  Bluetooth UI caches.
+
+Install over v49 with the same bundle ID and existing system pair. Do not label this candidate stable
+until the hosted unsigned build and physical acceptance matrix pass.

@@ -27,6 +27,7 @@ public final class MediaPanelConfig {
     public static final String PREVIOUS = "media.previous";
     public static final String PLAY_PAUSE = "media.play_pause";
     public static final String NEXT = "media.next";
+    public static final String LIKE = "media.like";
     public static final String VOLUME = "media.volume";
 
     public static final class Spec {
@@ -124,11 +125,14 @@ public final class MediaPanelConfig {
             new Spec(PREVIOUS, "Предыдущий трек", 64, 64, 3, 4, 1, 1),
             new Spec(PLAY_PAUSE, "Играть / пауза", 72, 72, 4, 4, 1, 1),
             new Spec(NEXT, "Следующий трек", 64, 64, 5, 4, 1, 1),
-            new Spec(VOLUME, "Громкость", 220, 58, 6, 4, 5, 1)));
+            new Spec(VOLUME, "Громкость", 220, 58, 6, 4, 5, 1),
+            new Spec(LIKE, "Нравится", 64, 64, 11, 4, 1, 1)));
 
     @NonNull public String backgroundColor = "#121923";
     public int backgroundAlpha = 0;
     public int cornerRadiusPx = 28;
+    /** Independent clipping radius of the album artwork; zero preserves legacy square covers. */
+    public int artworkCornerRadiusPx = 0;
     public int spacingPx = 0;
     public int contentPaddingPx = 0;
     @NonNull public String titleColor = "#FFFFFF";
@@ -211,6 +215,10 @@ public final class MediaPanelConfig {
     public void setVolumeThumbSizePercent(int sizePercent) {
         Element value = elements.get(VOLUME);
         if (value != null) value.volumeThumbSizePercent = sizePercent;
+    }
+
+    public void setArtworkCornerRadiusPx(int radiusPx) {
+        artworkCornerRadiusPx = radiusPx;
     }
 
     public boolean setPosition(@NonNull String id, int column, int row) {
@@ -301,6 +309,7 @@ public final class MediaPanelConfig {
         value.backgroundColor = backgroundColor;
         value.backgroundAlpha = backgroundAlpha;
         value.cornerRadiusPx = cornerRadiusPx;
+        value.artworkCornerRadiusPx = artworkCornerRadiusPx;
         value.spacingPx = spacingPx;
         value.contentPaddingPx = contentPaddingPx;
         value.titleColor = titleColor;
@@ -326,6 +335,7 @@ public final class MediaPanelConfig {
         gridRows = clamp(gridRows, MIN_GRID_ROWS, MAX_GRID_ROWS);
         backgroundAlpha = clamp(backgroundAlpha, 0, 255);
         cornerRadiusPx = clamp(cornerRadiusPx, 0, 96);
+        artworkCornerRadiusPx = clamp(artworkCornerRadiusPx, 0, 128);
         spacingPx = clamp(spacingPx, 0, 48);
         contentPaddingPx = clamp(contentPaddingPx, 0, 64);
         glassAlpha = clamp(glassAlpha, 0, 255);

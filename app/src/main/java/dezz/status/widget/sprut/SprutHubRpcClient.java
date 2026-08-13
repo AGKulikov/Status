@@ -404,7 +404,7 @@ public final class SprutHubRpcClient implements Closeable {
         }
         JSONObject info = new JSONObject();
         info.put("id", normalizedClientId);
-        info.put("name", "Status Widget HA");
+        info.put("name", "Natro");
         info.put("type", "CLIENT_DESKTOP");
         return new JSONObject().put("server",
                 new JSONObject().put("clientInfo", info));

@@ -170,8 +170,10 @@ public final class Ha1203VectorIconPickerContractTest {
 
     @Test public void popupAllowListRemainsOfflineAndUsesTheSameStableCatalog() throws Exception {
         String popup = source("popup/PopupIconCatalog.java");
-        assertTrue(popup.contains("IDS.contains(id)"));
-        assertTrue(popup.contains("PERSISTED_ONLY_IDS.contains(id)"));
+        assertTrue(popup.contains("isAllowedId(id)"));
+        assertTrue(popup.contains("LauncherIconResolver.isKnownKey(id)"));
+        assertFalse(popup.contains("LauncherIconResolver.presets()"));
+        assertFalse(popup.contains("LABELS"));
         assertTrue(popup.contains("LauncherIconResolver.resource(id)"));
         assertFalse(popup.contains("java.net"));
         assertFalse(popup.contains("android.net.Uri"));

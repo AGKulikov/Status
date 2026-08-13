@@ -104,6 +104,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -139,6 +140,8 @@ import dezz.status.widget.phone.PhoneBluetoothIndicatorPolicy;
 import dezz.status.widget.phone.PhoneConnectorController;
 import dezz.status.widget.phone.PhoneLowBatteryAlertPolicy;
 import dezz.status.widget.phone.PhoneNotificationAutomation;
+import dezz.status.widget.phone.PhoneNotificationDeferralPolicy;
+import dezz.status.widget.phone.PhoneNotificationDeferralQueue;
 import dezz.status.widget.phone.PhoneNetworkTypePolicy;
 import dezz.status.widget.phone.PhoneNotificationLockPolicy;
 import dezz.status.widget.phone.PhoneStatusBarPolicy;
@@ -154,6 +157,11 @@ import dezz.status.widget.sprut.SprutCatalog;
 import dezz.status.widget.sprut.SprutHubController;
 
 public class WidgetService extends Service {
+    /** Same-process, event-driven presentation invalidation for surfaces outside this Service. */
+    public interface AutomationPresentationListener {
+        void onAutomationPresentationChanged(@NonNull String scope,
+                                             @NonNull Set<String> ids);
+    }
     enum GnssState {
         OFF, BAD, GOOD
     }
@@ -258,7 +266,6 @@ public class WidgetService extends Service {
     private static final int MAX_OBSERVED_PHONE_NOTIFICATIONS = 128;
     /** Burst deliveries are intentionally readable and deterministic, one card per second. */
     private static final long PHONE_NOTIFICATION_QUEUE_SLOT_MS = 1_000L;
-    private static final int MAX_QUEUED_PHONE_NOTIFICATIONS = 128;
     /** Gap between the play/pause indicator and the text it precedes, as a fraction of that
      *  text's size — same rationale as the icon's own size: it must track the font sliders. */
     private static final float STATE_ICON_GAP_RATIO = 0.25f;
@@ -328,7 +335,11 @@ public class WidgetService extends Service {
     @Nullable private String configuredDriverInformationJson;
     private boolean configuredDriverPanelEnabled;
     private final Object automationUiLock = new Object();
+    private static final int MAX_AUTOMATION_PRESENTATION_LISTENERS = 8;
     private final Map<String, Set<String>> pendingAutomationUi = new LinkedHashMap<>();
+    private final CopyOnWriteArrayList<AutomationPresentationListener>
+            automationPresentationListeners =
+            new CopyOnWriteArrayList<>();
     private boolean automationUiRefreshScheduled;
     /** Fresh visual-only host is admitted, but controller/vendor work still belongs to host phase. */
     private boolean automaticRuntimeParked;
@@ -396,6 +407,7 @@ public class WidgetService extends Service {
             automationUiRefreshScheduled = false;
         }
         if (WidgetService.this.destroyed || changed.isEmpty()) return;
+        dispatchAutomationPresentationChanges(changed);
         boolean affectsStatusRow = changed.containsKey(AutomationContract.SCOPE_MAIN)
                 || changed.containsKey(AutomationContract.SCOPE_BUILTIN);
         boolean affectsPhoneNotification = false;
@@ -449,9 +461,16 @@ public class WidgetService extends Service {
     private final Set<String> observedPhoneNotificationKeys = new LinkedHashSet<>();
     private final ArrayDeque<QueuedPhoneNotification> queuedPhoneNotifications =
             new ArrayDeque<>();
+    /** Notifications held only while a configured full-screen app owns the head-unit display. */
+    private final PhoneNotificationDeferralQueue<QueuedPhoneNotification>
+            deferredPhoneNotifications = new PhoneNotificationDeferralQueue<>();
+    private int deferredPhoneNotificationOverflowCount;
+    private long deferredPhoneNotificationOverflowStartedElapsed;
+    private int queuedPhoneNotificationOverflowCount;
     private boolean phoneNotificationBurstActive;
     private long activePhoneNotificationExpiresAt;
     private long activePhonePopupNotificationExpiresAt;
+    private boolean activePhoneLowBatteryPopup;
     private boolean phoneNotificationPopupConfigured;
     private int mediaDurationVisibilityBeforePhoneNotification = View.GONE;
     private int mediaProgressVisibilityBeforePhoneNotification = View.GONE;
@@ -467,6 +486,10 @@ public class WidgetService extends Service {
                 return;
             }
             clearPhoneStatusNotification(true);
+            if (phoneNotificationBurstActive && !queuedPhoneNotifications.isEmpty()) {
+                mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
+                mainHandler.post(phoneNotificationQueueAdvance);
+            }
             if (binding != null) {
                 updateMediaInfo();
                 applyBrickVisibility(currentBrickSet());
@@ -489,18 +512,32 @@ public class WidgetService extends Service {
     private final Runnable phoneNotificationQueueAdvance = new Runnable() {
         @Override public void run() {
             if (destroyed || !phoneNotificationBurstActive) return;
+            long batteryRemaining = activePhoneLowBatteryRemaining();
+            if (batteryRemaining > 0L) {
+                mainHandler.postDelayed(this, batteryRemaining);
+                return;
+            }
             QueuedPhoneNotification next = queuedPhoneNotifications.pollFirst();
             if (next == null) {
-                finishPhoneNotificationBurst();
-                return;
+                if (queuedPhoneNotificationOverflowCount <= 0) {
+                    finishPhoneNotificationBurst();
+                    return;
+                }
+                int overflow = queuedPhoneNotificationOverflowCount;
+                queuedPhoneNotificationOverflowCount = 0;
+                next = phoneNotificationOverflowDelivery(overflow);
             }
             boolean presented = presentPhoneNotification(next);
             if (!presented) {
-                if (queuedPhoneNotifications.isEmpty()) finishPhoneNotificationBurst();
+                if (queuedPhoneNotifications.isEmpty()
+                        && queuedPhoneNotificationOverflowCount <= 0) {
+                    finishPhoneNotificationBurst();
+                }
                 else mainHandler.post(this);
                 return;
             }
-            if (queuedPhoneNotifications.isEmpty()) {
+            if (queuedPhoneNotifications.isEmpty()
+                    && queuedPhoneNotificationOverflowCount <= 0) {
                 releasePhoneNotificationBurstToConfiguredExpiry();
                 return;
             }
@@ -510,6 +547,9 @@ public class WidgetService extends Service {
             mainHandler.postDelayed(this, PHONE_NOTIFICATION_QUEUE_SLOT_MS);
         }
     };
+    /** Exactly one callback is armed for the oldest (therefore nearest) hold deadline. */
+    private final Runnable phoneNotificationDeferralDeadline =
+            this::reconcileDeferredPhoneNotifications;
     private final Runnable crossSourceRuleRefresh = () -> {
         crossSourceRuleRefreshScheduled.set(false);
         if (destroyed) return;
@@ -1382,7 +1422,7 @@ public class WidgetService extends Service {
         ConnectorActionDispatcher dispatcher = new ConnectorActionDispatcher(
                 mqtt, sprut, homeAssistant);
         LocalScenarioController controller = new LocalScenarioController(
-                prefs, automationStates, connectorValues,
+                this, prefs, automationStates, connectorValues,
                 CarIntegrations.get(this), this::onScenarioTargetsChanged);
         return new ScenarioRuntimeGraph(dispatcher, controller);
     }
@@ -1420,9 +1460,11 @@ public class WidgetService extends Service {
         }
         mainHandler.post(() -> {
             if (destroyed) return;
+            dispatchAutomationPresentationTargets(targets);
             if (binding != null) renderHomeAssistantBricks();
             applyPopupPreferencesSafely();
             boolean phoneFieldsChanged = false;
+            boolean driverTargetsChanged = false;
             for (String target : targets) {
                 if (target.startsWith(AutomationContract.SCOPE_POPUP + "|")
                         && PhoneNotificationAutomation.isFieldAutomationId(
@@ -1430,7 +1472,7 @@ public class WidgetService extends Service {
                     phoneFieldsChanged = true;
                 }
                 if (target.startsWith(AutomationContract.SCOPE_DRIVER + "|")) {
-                    DriverPanelService.apply(this);
+                    driverTargetsChanged = true;
                 }
                 if (target.startsWith(AutomationContract.SCOPE_HUD + "|")
                         && (prefs.hudPanelAutostart.get()
@@ -1438,6 +1480,7 @@ public class WidgetService extends Service {
                     HudPresentationService.notifyAutomationChanged(this);
                 }
             }
+            if (driverTargetsChanged) DriverPanelService.apply(this);
             if (binding != null) {
                 if (phoneFieldsChanged && activePhoneNotification != null) updateMediaInfo();
                 applyBrickVisibility(currentBrickSet());
@@ -1723,7 +1766,8 @@ public class WidgetService extends Service {
     @NonNull
     private PreparedInitialIntegrationStage prepareStatusSurfaceStage(int stage) {
         boolean phonePopupReady = phoneNotificationPopupConfigured;
-        if (!phonePopupReady && prefs.phonePopupNotificationsEnabled.get()) {
+        if (!phonePopupReady && (prefs.phonePopupNotificationsEnabled.get()
+                || prefs.phoneLowBatteryAlertEnabled.get())) {
             try {
                 PhoneNotificationAutomation.ensureConfigured(prefs);
                 phonePopupReady = true;
@@ -2722,8 +2766,10 @@ public class WidgetService extends Service {
             binding.overlayContainer.setLayoutTransition(null);
         }
         pendingBufferedTransitions = 0;
-        usageStatsManager = null;
-        lastForegroundPackage = null;
+        if (!phoneNotificationForegroundTrackingNeeded()) {
+            usageStatsManager = null;
+            lastForegroundPackage = null;
+        }
         overlayHiddenByApp = false;
         wifiState = WiFiState.OFF;
         gnssState = GnssState.OFF;
@@ -2735,6 +2781,9 @@ public class WidgetService extends Service {
         removeStatusOverlaySafely(reason);
         binding = null;
         params = null;
+        // Notification deferral is independent from the optional status-row surface. Reconcile
+        // its event/poll path after binding becomes null instead of silently losing foreground.
+        if (phoneNotificationForegroundTrackingNeeded()) updateForegroundAppTracking();
     }
 
     @Override
@@ -3036,9 +3085,16 @@ public class WidgetService extends Service {
             integrationReconfigurePending = true;
             reconfigureIntegrations = false;
         }
-        if (prefs.phonePopupNotificationsEnabled.get()) {
+        if (prefs.phonePopupNotificationsEnabled.get()
+                || prefs.phoneLowBatteryAlertEnabled.get()) {
             ensurePhoneNotificationPopupConfigured();
         }
+
+        // Refresh hide targets before a disabled status surface detaches. Foreground ownership is
+        // shared with popup notification deferral and must reflect the just-saved preferences
+        // even when no status-row View will be recreated in this pass.
+        hiddenInPackages = prefs.hideInPackages.get();
+        rebuildEffectiveHideLists();
 
         boolean statusSurfaceEnabled = prefs.widgetEnabled.get();
         if (!statusSurfaceEnabled) {
@@ -3086,13 +3142,21 @@ public class WidgetService extends Service {
                 && !prefs.phonePopupNotificationsEnabled.get()) {
             cancelPhoneNotificationQueue();
         }
-        if (!prefs.phonePopupNotificationsEnabled.get()) {
+        if (!prefs.phonePopupNotificationsEnabled.get()
+                && !prefs.phoneLowBatteryAlertEnabled.get()) {
+            clearPhonePopupNotification();
+        } else if (!prefs.phoneLowBatteryAlertEnabled.get()
+                && activePhoneLowBatteryPopup) {
             clearPhonePopupNotification();
         } else if (integrationsStarted) {
             // The reserved overlay can be created by this preference pass after the manager's
             // previous catalog snapshot. Reconcile its state owner before an event arrives.
             applyPopupPreferencesSafely();
         }
+        // A settings edit can remove the active blocker or shorten the wait. Reconcile even when
+        // the optional status-row surface is disabled; popup-only delivery still owns this queue.
+        safeUpdateForegroundAppTracking("phone notification preferences applied");
+        reconcileDeferredPhoneNotifications();
         if (binding == null) return;
 
         phoneLowBatteryAlertLatched = prefs.phoneLowBatteryAlertEnabled.get()
@@ -3118,9 +3182,7 @@ public class WidgetService extends Service {
                 configuredMainBricksJson = currentMainJson;
             }
         }
-        hiddenInPackages = prefs.hideInPackages.get();
-        rebuildEffectiveHideLists();
-        safeUpdateForegroundAppTracking("preferences applied");
+        safeUpdateForegroundAppTracking("status preferences applied");
         updateThemedContext();
         ConnectorValue currentPhoneBattery = phoneStatusValues.get("battery.level");
         if (currentPhoneBattery != null) {
@@ -3767,8 +3829,7 @@ public class WidgetService extends Service {
             AutomationState state = automationStates.get(AutomationContract.SCOPE_MAIN, config.id);
             if (!state.visible) continue;
 
-            boolean hiddenByOwnAppList = lastForegroundPackage != null
-                    && config.hideInPackages.contains(lastForegroundPackage);
+            boolean hiddenByOwnAppList = matchesForegroundContext(config.hideInPackages);
             boolean hiddenByGroupList = config.inheritGroupHide
                     && isBrickHiddenByApp(BrickType.HOME_ASSISTANT);
             if ((hiddenByOwnAppList || hiddenByGroupList) && !config.hideKeepsSpace) continue;
@@ -3903,6 +3964,14 @@ public class WidgetService extends Service {
             }
         }
 
+        if (!sessionEnded && latestNotification != null
+                && phoneNotificationForegroundTrackingNeeded()
+                && lastForegroundPackage == null) {
+            // Accessibility seeds event-driven state immediately. Usage access is the explicit
+            // Android 9 fallback; sample before enqueueing so the first delivery cannot slip
+            // past the selected full-screen blocker before its normal fallback cadence.
+            safeCheckForegroundApp("phone notification arrival");
+        }
         if (latestNotification != null) {
             // Observe the delivery even while status-row notifications are disabled. Enabling
             // the preference later must not replay whatever happened to be the last phone item.
@@ -3977,6 +4046,37 @@ public class WidgetService extends Service {
         if (!phoneNotificationAllowedByLockState()) return;
         QueuedPhoneNotification delivery = new QueuedPhoneNotification(
                 presentation, selectedFields);
+        if (phoneNotificationBlockedByForeground()) {
+            long now = SystemClock.elapsedRealtime();
+            if (!deferredPhoneNotifications.offer(delivery, now)) {
+                if (deferredPhoneNotificationOverflowCount == 0) {
+                    deferredPhoneNotificationOverflowStartedElapsed = now;
+                }
+                deferredPhoneNotificationOverflowCount = saturatingIncrement(
+                        deferredPhoneNotificationOverflowCount);
+            }
+            schedulePhoneNotificationDeferralDeadline();
+            return;
+        }
+        // A missed/coalesced foreground callback must not let a newcomer overtake older held
+        // notifications. Release those first, then append this delivery to the normal sequencer.
+        if (!deferredPhoneNotifications.isEmpty()
+                || deferredPhoneNotificationOverflowCount > 0) {
+            releaseAllDeferredPhoneNotifications();
+        }
+        enqueuePhoneNotificationNow(delivery);
+    }
+
+    /** Enters the existing one-second sequencer without re-applying foreground deferral. */
+    private void enqueuePhoneNotificationNow(@NonNull QueuedPhoneNotification delivery) {
+        long batteryRemaining = activePhoneLowBatteryRemaining();
+        if (batteryRemaining > 0L) {
+            appendQueuedPhoneNotification(delivery);
+            phoneNotificationBurstActive = true;
+            mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
+            mainHandler.postDelayed(phoneNotificationQueueAdvance, batteryRemaining);
+            return;
+        }
         if (phoneNotificationBurstActive) {
             appendQueuedPhoneNotification(delivery);
             return;
@@ -3984,24 +4084,113 @@ public class WidgetService extends Service {
         if (hasActiveRoutinePhoneNotificationDestination()) {
             appendQueuedPhoneNotification(delivery);
             phoneNotificationBurstActive = true;
-            long nextSlot = SystemClock.elapsedRealtime()
-                    + PHONE_NOTIFICATION_QUEUE_SLOT_MS;
-            holdPhoneNotificationDestinationsUntil(nextSlot);
+            long delay = PHONE_NOTIFICATION_QUEUE_SLOT_MS;
+            holdPhoneNotificationDestinationsUntil(
+                    SystemClock.elapsedRealtime() + delay);
             mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
-            mainHandler.postDelayed(phoneNotificationQueueAdvance,
-                    PHONE_NOTIFICATION_QUEUE_SLOT_MS);
+            mainHandler.postDelayed(phoneNotificationQueueAdvance, delay);
             return;
         }
         presentPhoneNotification(delivery);
     }
 
     private void appendQueuedPhoneNotification(@NonNull QueuedPhoneNotification delivery) {
-        if (queuedPhoneNotifications.size() >= MAX_QUEUED_PHONE_NOTIFICATIONS) {
-            // Preserve the already promised order. This is only a pathological safety bound;
-            // normal ANCS bursts (including ten simultaneous notifications) are never reduced.
+        if (queuedPhoneNotifications.size() >= PhoneNotificationDeferralQueue.MAX_ITEMS) {
+            queuedPhoneNotificationOverflowCount = saturatingIncrement(
+                    queuedPhoneNotificationOverflowCount);
             return;
         }
         queuedPhoneNotifications.addLast(delivery);
+    }
+
+    private boolean phoneNotificationForegroundTrackingNeeded() {
+        return prefs != null && prefs.phoneNotificationDelayInAppsEnabled.get()
+                && !prefs.phoneNotificationDelayInPackages.get().isEmpty();
+    }
+
+    private boolean phoneNotificationBlockedByForeground() {
+        if (prefs == null || !prefs.phoneNotificationDelayInAppsEnabled.get()
+                || prefs.phoneNotificationDelayInPackages.get().isEmpty()) {
+            return false;
+        }
+        // Foreground identity can be briefly unknown while Accessibility reconnects, before the
+        // first UsageStats sample, or after its permission is revoked. Showing immediately would
+        // defeat the feature exactly for full-screen camera applications. Hold conservatively;
+        // each delivery still has its configured monotonic maximum-wait deadline.
+        if (lastForegroundPackage == null) return true;
+        return PhoneNotificationDeferralPolicy.isBlocking(true,
+                prefs.phoneNotificationDelayInPackages.get(), lastForegroundPackage);
+    }
+
+    /** Called by the shared event-driven foreground tracker only when its package really changes. */
+    private void onPhoneNotificationForegroundChanged() {
+        reconcileDeferredPhoneNotifications();
+    }
+
+    /**
+     * Releases every due item while blocked, or the whole ordered queue as soon as the blocker
+     * leaves. The next callback always targets the oldest item's exact monotonic deadline.
+     */
+    private void reconcileDeferredPhoneNotifications() {
+        mainHandler.removeCallbacks(phoneNotificationDeferralDeadline);
+        if ((deferredPhoneNotifications.isEmpty()
+                && deferredPhoneNotificationOverflowCount <= 0) || prefs == null) return;
+        if (!phoneNotificationAllowedByLockState()
+                || (!prefs.phoneStatusBarNotificationsEnabled.get()
+                && !prefs.phonePopupNotificationsEnabled.get())) {
+            deferredPhoneNotifications.clear();
+            deferredPhoneNotificationOverflowCount = 0;
+            deferredPhoneNotificationOverflowStartedElapsed = 0L;
+            return;
+        }
+        if (!phoneNotificationBlockedByForeground()) {
+            releaseAllDeferredPhoneNotifications();
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        int seconds = prefs.phoneNotificationDelayMaxWaitSeconds.get();
+        for (QueuedPhoneNotification delivery
+                : deferredPhoneNotifications.drainDue(now, seconds)) {
+            enqueuePhoneNotificationNow(delivery);
+        }
+        if (deferredPhoneNotificationOverflowCount > 0
+                && now >= PhoneNotificationDeferralPolicy.deadline(
+                deferredPhoneNotificationOverflowStartedElapsed, seconds)) {
+            releaseDeferredPhoneNotificationOverflow();
+        }
+        schedulePhoneNotificationDeferralDeadline();
+    }
+
+    private void releaseAllDeferredPhoneNotifications() {
+        mainHandler.removeCallbacks(phoneNotificationDeferralDeadline);
+        for (QueuedPhoneNotification delivery : deferredPhoneNotifications.drainAll()) {
+            enqueuePhoneNotificationNow(delivery);
+        }
+        releaseDeferredPhoneNotificationOverflow();
+    }
+
+    private void releaseDeferredPhoneNotificationOverflow() {
+        if (deferredPhoneNotificationOverflowCount <= 0) return;
+        int overflow = deferredPhoneNotificationOverflowCount;
+        deferredPhoneNotificationOverflowCount = 0;
+        deferredPhoneNotificationOverflowStartedElapsed = 0L;
+        enqueuePhoneNotificationNow(phoneNotificationOverflowDelivery(overflow));
+    }
+
+    private void schedulePhoneNotificationDeferralDeadline() {
+        mainHandler.removeCallbacks(phoneNotificationDeferralDeadline);
+        if (prefs == null || !phoneNotificationBlockedByForeground()) return;
+        long deadline = deferredPhoneNotifications.nextDeadline(
+                prefs.phoneNotificationDelayMaxWaitSeconds.get());
+        if (deferredPhoneNotificationOverflowCount > 0) {
+            long overflowDeadline = PhoneNotificationDeferralPolicy.deadline(
+                    deferredPhoneNotificationOverflowStartedElapsed,
+                    prefs.phoneNotificationDelayMaxWaitSeconds.get());
+            deadline = deadline < 0L ? overflowDeadline : Math.min(deadline, overflowDeadline);
+        }
+        if (deadline < 0L) return;
+        long remaining = Math.max(1L, deadline - SystemClock.elapsedRealtime());
+        mainHandler.postDelayed(phoneNotificationDeferralDeadline, remaining);
     }
 
     private boolean presentPhoneNotification(@NonNull QueuedPhoneNotification delivery) {
@@ -4049,6 +4238,7 @@ public class WidgetService extends Service {
     private void finishPhoneNotificationBurst() {
         mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
         queuedPhoneNotifications.clear();
+        queuedPhoneNotificationOverflowCount = 0;
         phoneNotificationBurstActive = false;
         if (activePhoneNotification != null) clearPhoneStatusNotification(true);
         if (activePhonePopupNotificationExpiresAt > 0L) clearPhonePopupNotification();
@@ -4063,6 +4253,7 @@ public class WidgetService extends Service {
     private void releasePhoneNotificationBurstToConfiguredExpiry() {
         mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
         queuedPhoneNotifications.clear();
+        queuedPhoneNotificationOverflowCount = 0;
         phoneNotificationBurstActive = false;
     }
 
@@ -4081,8 +4272,30 @@ public class WidgetService extends Service {
 
     private void cancelPhoneNotificationQueue() {
         mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
+        mainHandler.removeCallbacks(phoneNotificationDeferralDeadline);
         queuedPhoneNotifications.clear();
+        deferredPhoneNotifications.clear();
+        queuedPhoneNotificationOverflowCount = 0;
+        deferredPhoneNotificationOverflowCount = 0;
+        deferredPhoneNotificationOverflowStartedElapsed = 0L;
         phoneNotificationBurstActive = false;
+    }
+
+    @NonNull
+    private static QueuedPhoneNotification phoneNotificationOverflowDelivery(int count) {
+        return new QueuedPhoneNotification(
+                PhoneStatusBarPolicy.overflowSummary(count, System.currentTimeMillis()),
+                new LinkedHashSet<>(PhoneStatusBarPolicy.notificationFieldIds()));
+    }
+
+    private static int saturatingIncrement(int value) {
+        return value == Integer.MAX_VALUE ? value : value + 1;
+    }
+
+    private long activePhoneLowBatteryRemaining() {
+        if (activePhoneBatteryAlertText == null) return 0L;
+        return Math.max(0L, activePhoneNotificationExpiresAt
+                - SystemClock.elapsedRealtime());
     }
 
     private static final class QueuedPhoneNotification {
@@ -4428,10 +4641,10 @@ public class WidgetService extends Service {
 
     /**
      * Playback-state indicator. It lives at the head of the source row — "▶ Spotify" reads as one
-     * statement — but the source line is optional, so when it's off the icon is re-parented to the
-     * head of the title row instead of vanishing with its host. Either way it takes the size,
-     * outline and opacity of the line it sits on, so it scales with that line's font-size slider
-     * and flips colour with the widget theme like the text around it.
+     * statement — but the source line is optional, so when it's off the enabled icon is
+     * re-parented to the head of the title row instead of vanishing with its host. The icon has an
+     * independent visibility preference; when shown it takes the size, outline and opacity of the
+     * line it sits on and flips colour with the widget theme like the text around it.
      */
     private void applyMediaStateIcon(int textColor) {
         boolean onSourceRow = prefs.media.showSource.get();
@@ -4441,6 +4654,8 @@ public class WidgetService extends Service {
             if (parent != null) parent.removeView(binding.mediaStateIcon);
             host.addView(binding.mediaStateIcon, 0);
         }
+        binding.mediaStateIcon.setVisibility(
+                prefs.media.showPlaybackStateIcon.get() ? View.VISIBLE : View.GONE);
 
         int fontSize = onSourceRow ? prefs.media.sourceFontSize.get() : prefs.media.fontSize.get();
         int outlineAlpha = onSourceRow
@@ -4628,17 +4843,39 @@ public class WidgetService extends Service {
     }
 
     private boolean isBrickHiddenByApp(BrickType type) {
-        if (lastForegroundPackage == null) return false;
+        // This legacy key now means exactly what the launcher setting says: hide only our TIME
+        // and BLUETOOTH views while HOME is foreground. It must never collapse the root row or
+        // alter Android's global SystemUI policy.
+        if (prefs.launcherHideSystemStatusBar.get()
+                && isLauncherHomeTopSurface()
+                && (type == BrickType.TIME || type == BrickType.BLUETOOTH)) {
+            return true;
+        }
         Set<String> list = effectiveHideLists.get(type);
-        return list != null && list.contains(lastForegroundPackage);
+        return matchesForegroundContext(list);
     }
 
-    private boolean anyBrickHasHideList() {
+    private boolean isLauncherHomeTopSurface() {
+        // This process-local lifecycle token comes from LauncherActivity itself. On the target
+        // Android 9 head unit only one Activity is resumed at a time, so waiting for a second
+        // accessibility/UsageStats package sample merely leaves the freshly resumed HOME visible
+        // with stale rules for one foreground-tracker pass.
+        return StatusBarSurfaceContext.isLauncherHomeForeground();
+    }
+
+    private boolean matchesForegroundContext(@Nullable Set<String> targets) {
+        return StatusBarSurfaceContext.matches(
+                targets, lastForegroundPackage, isLauncherHomeTopSurface());
+    }
+
+    private boolean anyBrickNeedsPackageTracking() {
         for (Set<String> s : effectiveHideLists.values()) {
-            if (s != null && !s.isEmpty()) return true;
+            if (StatusBarSurfaceContext.requiresPackageTracking(s)) return true;
         }
         for (HaBrickConfig config : configuredMainBricks) {
-            if (!config.hideInPackages.isEmpty()) return true;
+            if (StatusBarSurfaceContext.requiresPackageTracking(config.hideInPackages)) {
+                return true;
+            }
         }
         return false;
     }
@@ -4701,8 +4938,12 @@ public class WidgetService extends Service {
         // deferred post-boot integration refresh must not make an empty mediaContainer visible
         // after enableMediaTracking already hid it: only real active media may occupy the row.
         boolean phoneNotificationActive = isPhoneNotificationActive();
-        boolean mediaSessionActive = phoneNotificationActive
-                || pickActiveMediaController() != null;
+        MediaController mediaController = pickActiveMediaController();
+        boolean mediaSessionActive = StatusMediaVisibilityPolicy.hasVisibleContent(
+                phoneNotificationActive,
+                mediaController != null,
+                isActuallyPlaying(mediaController),
+                prefs.media.onlyWhilePlaying.get());
         boolean mediaShouldBeGone = !bricksSet.contains(BrickType.MEDIA)
                 || !isRemotelyVisible(BrickType.MEDIA) || !mediaSessionActive;
         boolean mediaHiddenByApp = !mediaShouldBeGone
@@ -4824,6 +5065,32 @@ public class WidgetService extends Service {
             pendingAutomationUi.computeIfAbsent(scope, ignored -> new HashSet<>()).add(id);
         }
         schedulePendingAutomationUiRefresh();
+    }
+
+    private void dispatchAutomationPresentationTargets(@NonNull Set<String> targets) {
+        Map<String, Set<String>> grouped = new LinkedHashMap<>();
+        for (String target : targets) {
+            int divider = target.indexOf('|');
+            if (divider <= 0 || divider >= target.length() - 1) continue;
+            grouped.computeIfAbsent(target.substring(0, divider), ignored -> new HashSet<>())
+                    .add(target.substring(divider + 1));
+        }
+        dispatchAutomationPresentationChanges(grouped);
+    }
+
+    private void dispatchAutomationPresentationChanges(
+            @NonNull Map<String, Set<String>> changed) {
+        if (automationPresentationListeners.isEmpty()) return;
+        for (Map.Entry<String, Set<String>> entry : changed.entrySet()) {
+            Set<String> ids = Collections.unmodifiableSet(new LinkedHashSet<>(entry.getValue()));
+            for (AutomationPresentationListener listener : automationPresentationListeners) {
+                try {
+                    listener.onAutomationPresentationChanged(entry.getKey(), ids);
+                } catch (RuntimeException failure) {
+                    Log.w(TAG, "Automation presentation listener failed", failure);
+                }
+            }
+        }
     }
 
     private boolean automaticSurfaceRefreshSuppressed() {
@@ -5407,6 +5674,7 @@ public class WidgetService extends Service {
                     shownOverlay);
             activePhonePopupNotificationExpiresAt =
                     android.os.SystemClock.elapsedRealtime() + seconds * 1_000L;
+            activePhoneLowBatteryPopup = false;
             mainHandler.removeCallbacks(phonePopupNotificationExpiry);
             mainHandler.postDelayed(phonePopupNotificationExpiry, seconds * 1_000L);
             return true;
@@ -5419,6 +5687,7 @@ public class WidgetService extends Service {
     private void clearPhonePopupNotification() {
         mainHandler.removeCallbacks(phonePopupNotificationExpiry);
         activePhonePopupNotificationExpiresAt = 0L;
+        activePhoneLowBatteryPopup = false;
         if (automationStates == null) return;
         try {
             long now = System.currentTimeMillis();
@@ -5480,6 +5749,76 @@ public class WidgetService extends Service {
                 getString(R.string.phone_low_battery_alert_text, level);
         clearPhoneNotificationFieldsIfInactive();
         schedulePhoneStatusAlert();
+        if (phoneNotificationBurstActive && !queuedPhoneNotifications.isEmpty()) {
+            mainHandler.removeCallbacks(phoneNotificationQueueAdvance);
+            mainHandler.postDelayed(phoneNotificationQueueAdvance,
+                    activePhoneLowBatteryRemaining());
+        }
+        showPhoneLowBatteryPopup(level);
+    }
+
+    /**
+     * Publishes the low-battery warning into the configured icon notification card. This alert
+     * has its own enable switch, so it must not depend on the routine ANCS-popup destination.
+     */
+    private boolean showPhoneLowBatteryPopup(int level) {
+        if (automationStates == null || prefs == null) return false;
+        try {
+            ensurePhoneNotificationPopupConfigured();
+            if (!phoneNotificationPopupConfigured) return false;
+            applyPopupPreferencesSafely();
+            int seconds = Math.max(1, Math.min(120,
+                    prefs.phoneStatusBarNotificationSeconds.get()));
+            long now = System.currentTimeMillis();
+            long expiresAt = now + seconds * 1_000L;
+            String[] text = new String[]{
+                    getString(R.string.phone_low_battery_popup_application),
+                    getString(R.string.phone_low_battery_popup_title),
+                    getString(R.string.phone_low_battery_popup_body, level)
+            };
+            String[] ids = new String[]{
+                    PhoneNotificationAutomation.APPLICATION_AUTOMATION_ID,
+                    PhoneNotificationAutomation.TOPIC_AUTOMATION_ID,
+                    PhoneNotificationAutomation.TEXT_AUTOMATION_ID
+            };
+            for (int index = 0; index < ids.length; index++) {
+                JSONObject field = new JSONObject()
+                        .put("text", text[index])
+                        .put("visible", true)
+                        .put("fresh", true)
+                        .put("source", "phone-low-battery")
+                        .put("updated_at", now)
+                        .put("expires_at", expiresAt);
+                if (index == 0) {
+                    field.put("icon", PhoneNotificationAutomation.LOW_BATTERY_ICON_ID);
+                }
+                automationStates.apply(AutomationContract.SCOPE_POPUP, ids[index], field);
+                onAutomationStateChanged(AutomationContract.SCOPE_POPUP, ids[index]);
+            }
+            automationStates.apply(AutomationContract.SCOPE_OVERLAY,
+                    PhoneNotificationAutomation.OVERLAY_ID,
+                    new JSONObject().put("visible", false).put("fresh", false)
+                            .put("updated_at", now));
+            onAutomationStateChanged(AutomationContract.SCOPE_OVERLAY,
+                    PhoneNotificationAutomation.OVERLAY_ID);
+            automationStates.apply(AutomationContract.SCOPE_OVERLAY,
+                    PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID,
+                    new JSONObject().put("visible", true).put("fresh", true)
+                            .put("source", "phone-low-battery")
+                            .put("updated_at", now).put("expires_at", expiresAt));
+            onAutomationStateChanged(AutomationContract.SCOPE_OVERLAY,
+                    PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID);
+            activePhonePopupNotificationExpiresAt =
+                    SystemClock.elapsedRealtime() + seconds * 1_000L;
+            activePhoneLowBatteryPopup = true;
+            mainHandler.removeCallbacks(phonePopupNotificationExpiry);
+            mainHandler.postDelayed(phonePopupNotificationExpiry, seconds * 1_000L);
+            schedulePopupRefresh();
+            return true;
+        } catch (JSONException | RuntimeException failure) {
+            Log.e(TAG, "Could not present low-phone-battery popup", failure);
+            return false;
+        }
     }
 
     private void schedulePhoneStatusAlert() {
@@ -5601,17 +5940,26 @@ public class WidgetService extends Service {
         }
         // Restore every view property temporarily changed by the ANCS presentation before
         // rendering the current MediaSession snapshot.
-        binding.mediaStateIcon.setVisibility(View.VISIBLE);
+        binding.mediaStateIcon.setVisibility(
+                prefs.media.showPlaybackStateIcon.get() ? View.VISIBLE : View.GONE);
         binding.mediaTitleText.setMarqueeEnabled(prefs.media.marqueeEnabled.get());
         boolean mainMediaRequested = currentBrickSet().contains(BrickType.MEDIA)
                 && isRemotelyVisible(BrickType.MEDIA);
         boolean mainMediaHidden = mainMediaRequested && isBrickHiddenByApp(BrickType.MEDIA);
-        boolean mainMediaKeepsSpace = mainMediaHidden
-                && prefs.hideKeepsSpaceFor(BrickType.MEDIA).get();
-        boolean mainMediaVisible = mainMediaRequested && !mainMediaHidden;
         boolean popupMediaRequested = isPopupBuiltinRequested(BrickType.MEDIA);
         boolean driverMediaRequested =
                 driverInformationBrickTypes().contains(BrickType.MEDIA);
+        MediaController playing = pickActiveMediaController();
+        PlaybackState playbackState = playing == null ? null : playing.getPlaybackState();
+        boolean musicPresentationVisible = StatusMediaVisibilityPolicy.hasVisibleContent(
+                false,
+                playing != null,
+                isActuallyPlaying(playbackState),
+                prefs.media.onlyWhilePlaying.get());
+        boolean mainMediaKeepsSpace = musicPresentationVisible && mainMediaHidden
+                && prefs.hideKeepsSpaceFor(BrickType.MEDIA).get();
+        boolean mainMediaVisible = musicPresentationVisible
+                && mainMediaRequested && !mainMediaHidden;
         if (!mainMediaVisible && !mainMediaKeepsSpace
                 && !popupMediaRequested && !driverMediaRequested) {
             binding.mediaContainer.setVisibility(View.GONE);
@@ -5622,7 +5970,6 @@ public class WidgetService extends Service {
             schedulePopupRefresh();
             return;
         }
-        MediaController playing = pickActiveMediaController();
         if (playing == null) {
             binding.mediaContainer.setVisibility(View.GONE);
             stopMediaProgressTicker();
@@ -5656,7 +6003,6 @@ public class WidgetService extends Service {
             // placeholder so the user can see that media playback is active.
             subtitle = getString(R.string.media_unknown_track);
         }
-        PlaybackState playbackState = playing.getPlaybackState();
         if (playbackState != null
                 && (playbackState.getState() == PlaybackState.STATE_PLAYING
                 || playbackState.getState() == PlaybackState.STATE_PAUSED)) {
@@ -5932,6 +6278,14 @@ public class WidgetService extends Service {
         }
     }
 
+    private static boolean isActuallyPlaying(@Nullable MediaController controller) {
+        return controller != null && isActuallyPlaying(controller.getPlaybackState());
+    }
+
+    private static boolean isActuallyPlaying(@Nullable PlaybackState state) {
+        return state != null && state.getState() == PlaybackState.STATE_PLAYING;
+    }
+
     private String getAppLabel(String pkg) {
         try {
             PackageManager pm = getPackageManager();
@@ -6174,13 +6528,16 @@ public class WidgetService extends Service {
     }
 
     private void updateForegroundAppTracking() {
-        if (binding == null) {
+        boolean phoneTrackingNeeded = phoneNotificationForegroundTrackingNeeded();
+        boolean surfaceVisibilityNeeded = StatusBarSurfaceContext.requiresPackageTracking(
+                hiddenInPackages) || anyBrickNeedsPackageTracking();
+        if (binding == null && !phoneTrackingNeeded && !surfaceVisibilityNeeded) {
             mainHandler.removeCallbacks(foregroundAppCheckRunnable);
             usageStatsManager = null;
             lastForegroundPackage = null;
             return;
         }
-        boolean needTracking = !hiddenInPackages.isEmpty() || anyBrickHasHideList();
+        boolean needTracking = surfaceVisibilityNeeded || phoneTrackingNeeded;
         boolean accessibilityActive = WidgetAccessibilityService.getInstance() != null;
         boolean usageGranted = Permissions.isUsageAccessGranted(this);
         // Two paths to the foreground package:
@@ -6205,8 +6562,15 @@ public class WidgetService extends Service {
         } else {
             mainHandler.removeCallbacks(foregroundAppCheckRunnable);
             usageStatsManager = null;
-            lastForegroundPackage = null;
-            applyOverlayVisibility(false);
+            String fallbackPackage = StatusBarSurfaceContext.isLauncherHomeForeground()
+                    ? getPackageName() : null;
+            boolean packageChanged = !Objects.equals(
+                    lastForegroundPackage, fallbackPackage);
+            lastForegroundPackage = fallbackPackage;
+            // A synthetic HOME-only rule is fully event-driven and deliberately requires no
+            // package tracker, but it still owns current visibility during initial service bind.
+            applyOverlayVisibility(matchesForegroundContext(hiddenInPackages));
+            if (packageChanged) onPhoneNotificationForegroundChanged();
         }
     }
 
@@ -6216,6 +6580,29 @@ public class WidgetService extends Service {
      */
     public void onForegroundDisplayMapUpdated() {
         mainHandler.post(() -> safeCheckForegroundApp("display map update"));
+    }
+
+    /** Event-driven lifecycle update for non-package targets such as our HOME Activity. */
+    public void onForegroundSurfaceContextChanged() {
+        Runnable update = () -> {
+            boolean packageChanged = false;
+            if (StatusBarSurfaceContext.isLauncherHomeForeground()) {
+                // API 28 deliberately ignores our own accessibility events. Replace a closed
+                // freeform Navigator's stale package immediately when HOME regains focus.
+                packageChanged = !getPackageName().equals(lastForegroundPackage);
+                lastForegroundPackage = getPackageName();
+            }
+            applyOverlayVisibility(matchesForegroundContext(hiddenInPackages));
+            if (packageChanged) onPhoneNotificationForegroundChanged();
+            if (binding != null) {
+                renderHomeAssistantBricks();
+                applyBrickVisibility(currentBrickSet());
+            }
+        };
+        // Launcher lifecycle callbacks already run on main. Applying inline avoids a one-loop
+        // flash of stale visibility while preserving a safe path for any future non-UI caller.
+        if (Looper.myLooper() == Looper.getMainLooper()) update.run();
+        else mainHandler.post(update);
     }
 
     /**
@@ -6260,7 +6647,9 @@ public class WidgetService extends Service {
     }
 
     private void checkForegroundApp() {
-        if (hiddenInPackages.isEmpty() && !anyBrickHasHideList()) return;
+        if (!StatusBarSurfaceContext.requiresPackageTracking(hiddenInPackages)
+                && !anyBrickNeedsPackageTracking()
+                && !phoneNotificationForegroundTrackingNeeded()) return;
 
         WidgetAccessibilityService a11y = WidgetAccessibilityService.getInstance();
         String latestPackage;
@@ -6287,10 +6676,13 @@ public class WidgetService extends Service {
 
         boolean changed = !latestPackage.equals(lastForegroundPackage);
         lastForegroundPackage = latestPackage;
-        applyOverlayVisibility(hiddenInPackages.contains(latestPackage));
-        if (changed && binding != null) {
-            renderHomeAssistantBricks();
-            applyBrickVisibility(currentBrickSet());
+        applyOverlayVisibility(matchesForegroundContext(hiddenInPackages));
+        if (changed) {
+            onPhoneNotificationForegroundChanged();
+            if (binding != null) {
+                renderHomeAssistantBricks();
+                applyBrickVisibility(currentBrickSet());
+            }
         }
     }
 
@@ -6743,6 +7135,7 @@ public class WidgetService extends Service {
     public void onDestroy() {
         destroyed = true;
         instance = null;
+        automationPresentationListeners.clear();
         // A first-useful-surface event may have been waiting solely for this host's readiness.
         // Once the host is gone, let Application finish its immediate event-driven initialization.
         StatusWidgetApplication.resumeSurfaceOwnedInitialization(this);
@@ -6775,6 +7168,10 @@ public class WidgetService extends Service {
         phoneStatusValues.clear();
         observedPhoneNotificationKeys.clear();
         queuedPhoneNotifications.clear();
+        deferredPhoneNotifications.clear();
+        queuedPhoneNotificationOverflowCount = 0;
+        deferredPhoneNotificationOverflowCount = 0;
+        deferredPhoneNotificationOverflowStartedElapsed = 0L;
         pendingIntentScenarioCommands.clear();
         phoneNotificationBurstActive = false;
         phoneAncsReady = false;
@@ -6784,6 +7181,7 @@ public class WidgetService extends Service {
         phoneLowBatteryAlertLatched = false;
         activePhoneNotificationExpiresAt = 0L;
         activePhonePopupNotificationExpiresAt = 0L;
+        activePhoneLowBatteryPopup = false;
         phoneNotificationPopupConfigured = false;
         crossSourceRuleRefreshScheduled.set(false);
         synchronized (automationUiLock) {
@@ -7142,6 +7540,24 @@ public class WidgetService extends Service {
         if (current != null) current.removeListener(listener);
     }
 
+    /** Registers a same-process visual surface for already-coalesced automation invalidations. */
+    public void addAutomationPresentationListener(
+            @NonNull AutomationPresentationListener listener) {
+        synchronized (automationPresentationListeners) {
+            if (automationPresentationListeners.contains(listener)) return;
+            if (automationPresentationListeners.size()
+                    >= MAX_AUTOMATION_PRESENTATION_LISTENERS) {
+                throw new IllegalStateException("Too many automation presentation listeners");
+            }
+            automationPresentationListeners.add(listener);
+        }
+    }
+
+    public void removeAutomationPresentationListener(
+            @NonNull AutomationPresentationListener listener) {
+        automationPresentationListeners.remove(listener);
+    }
+
     /** Complete scenario/broadcast presentation state for one external HUD element. */
     @NonNull
     public AutomationState hudAutomationState(@NonNull String automationId) {
@@ -7163,6 +7579,22 @@ public class WidgetService extends Service {
         AutomationStateStore current = automationStates;
         return current == null ? defaultValue : current.effectiveActionEnabled(
                 AutomationContract.SCOPE_DRIVER, shortcutId, defaultValue);
+    }
+
+    /** Complete effective driver style, including the in-memory scenario precedence layer. */
+    @NonNull
+    public AutomationState driverAutomationState(@NonNull String targetId) {
+        AutomationStateStore current = automationStates;
+        return current == null ? AutomationState.missing() : current.get(
+                AutomationContract.SCOPE_DRIVER, targetId);
+    }
+
+    /** Complete effective HOME shortcut style, including the in-memory scenario layer. */
+    @NonNull
+    public AutomationState launcherAutomationState(@NonNull String targetId) {
+        AutomationStateStore current = automationStates;
+        return current == null ? AutomationState.missing() : current.get(
+                AutomationContract.SCOPE_LAUNCHER, targetId);
     }
 
     /** Explicit automation decision for one transient Favorites panel; null preserves manual UI. */

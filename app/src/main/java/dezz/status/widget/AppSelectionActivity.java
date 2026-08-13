@@ -188,6 +188,7 @@ public class AppSelectionActivity extends AppCompatActivity {
             List<AppEntry> result = new ArrayList<>(launchableApps.size() + homeApps.size());
             String selfPackage = getPackageName();
             HashSet<String> seen = new HashSet<>();
+            addLauncherHomeEntry(pm, seen, result);
             collectEntries(pm, launchableApps, selfPackage, seen, result);
             collectEntries(pm, homeApps, selfPackage, seen, result);
 
@@ -199,6 +200,24 @@ public class AppSelectionActivity extends AppCompatActivity {
                 Log.w(TAG, "Failed to sort app list", t);
             }
             return result;
+        }
+
+        /**
+         * The package picker deliberately excludes our settings package. Add only the actual
+         * HOME surface back as a synthetic target, so choosing it cannot hide elements while the
+         * user is editing those same settings.
+         */
+        private void addLauncherHomeEntry(PackageManager pm, HashSet<String> seen,
+                                          List<AppEntry> result) {
+            if (!seen.add(StatusBarSurfaceContext.LAUNCHER_HOME)) return;
+            Drawable icon = null;
+            try {
+                icon = getApplicationInfo().loadIcon(pm);
+            } catch (RuntimeException error) {
+                Log.w(TAG, "Could not load HOME icon", error);
+            }
+            result.add(new AppEntry(StatusBarSurfaceContext.LAUNCHER_HOME,
+                    getString(R.string.app_selection_launcher_home), icon));
         }
 
         private List<ResolveInfo> safeQueryIntentActivities(PackageManager pm, String category) {

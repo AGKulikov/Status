@@ -14,6 +14,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.AudioManager;
 import android.media.MediaMetadata;
+import android.media.Rating;
 import android.media.session.MediaController;
 import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
@@ -378,6 +379,55 @@ public final class LauncherMediaController {
         if (target.isEmpty()) return;
         MediaResumeCommand.next(context, target);
         scheduleCommandReconcile();
+    }
+
+    /**
+     * mSaver-compatible Like: heart rating on the represented MediaSession first, then the
+     * captured Like action from that player's live media notification. No mSaver-private
+     * broadcast is emitted.
+     */
+    public boolean like() {
+        String targetPackage = seekTargetPackage();
+        for (MediaController controller : resolveSeekControllers(true)) {
+            boolean matches = !targetPackage.isEmpty()
+                    ? samePackage(targetPackage, controllerPackage(controller))
+                    : controllerMatchesVisibleTrack(controller) || sameSession(current, controller);
+            if (!matches) continue;
+            try {
+                PlaybackState playback = controller.getPlaybackState();
+                if (playback == null
+                        || (playback.getActions() & PlaybackState.ACTION_SET_RATING) == 0L) {
+                    continue;
+                }
+                MediaMetadata metadata = controller.getMetadata();
+                Rating rating = metadata == null ? null
+                        : metadata.getRating(MediaMetadata.METADATA_KEY_RATING);
+                if (rating == null && metadata != null) {
+                    rating = metadata.getRating(MediaMetadata.METADATA_KEY_USER_RATING);
+                }
+                boolean heartRating = rating != null
+                        && rating.getRatingStyle() == Rating.RATING_HEART;
+                boolean hasHeart = heartRating && rating.hasHeart();
+                controller.getTransportControls().setRating(Rating.newHeartRating(
+                        MediaLikeActionPolicy.nextHeart(heartRating, hasHeart)));
+                recordLike("media_session", targetPackage);
+                scheduleCommandReconcile();
+                return true;
+            } catch (RuntimeException ignored) {
+            }
+        }
+        if (MediaNotificationListener.sendMediaNotificationLike(targetPackage)) {
+            recordLike("notification_action", targetPackage);
+            scheduleCommandReconcile();
+            return true;
+        }
+        recordLike("unavailable", targetPackage);
+        return false;
+    }
+
+    private static void recordLike(@NonNull String route, @NonNull String packageName) {
+        ActionRecorder.record(ActionRecorder.SOURCE_ACTIVITY, "MEDIA_LIKE",
+                ActionRecorder.object("route", route, "package", packageName));
     }
 
     /** Coalesces live scrubbing while preserving the exact player represented on HOME. */

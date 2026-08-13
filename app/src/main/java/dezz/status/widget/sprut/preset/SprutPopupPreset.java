@@ -48,7 +48,7 @@ public final class SprutPopupPreset {
                      ActionOperation actionOperation, Object defaultActionPayload,
                      List<StatusRule> statusRules, int columnSpan, int rowSpan) {
         String normalizedIcon = normalize(iconId);
-        if (!PopupIconCatalog.IDS.contains(normalizedIcon)) {
+        if (!PopupIconCatalog.isAllowedId(normalizedIcon)) {
             throw new IllegalArgumentException("Unknown popup icon id: " + iconId);
         }
         if (columnSpan < 1 || rowSpan < 1) {

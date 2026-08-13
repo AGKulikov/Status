@@ -343,6 +343,13 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
                         return config.element(element.id).scalePercent;
                     },
                     selected -> selected + "%");
+            if (MediaPanelConfig.ARTWORK.equals(element.id)) {
+                addElementSlider(card, "Скругление обложки", config.artworkCornerRadiusPx,
+                        0, 128, selected -> {
+                            config.setArtworkCornerRadiusPx(selected);
+                            return config.artworkCornerRadiusPx;
+                        }, selected -> selected + " px");
+            }
             if (MediaPanelConfig.PROGRESS.equals(element.id)) {
                 addElementSlider(card, "Толщина полосы", element.progressBarHeightDp, 2, 40,
                         selected -> {

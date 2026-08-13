@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 
 import dezz.status.widget.launcher.LauncherSettingsMigrationRegistry;
+import dezz.status.widget.phone.PhoneNotificationDeferralPolicy;
 
 public class Preferences {
     private static final String TAG = "Preferences";
@@ -251,6 +252,10 @@ public class Preferences {
         public final Int alignment;
         /** Whether to show the app-name line above the track title. */
         public final Bool showSource;
+        /** Whether to draw the play/pause state glyph independently of both text rows. */
+        public final Bool showPlaybackStateIcon;
+        /** Hide the complete status-row media brick unless MediaSession reports PLAYING. */
+        public final Bool onlyWhilePlaying;
         /** {@code true} → render as "title — artist"; {@code false} (default) → "artist — title". */
         public final Bool titleFirst;
         /** Vertical gap (px) between the app-name line and the track-title line. */
@@ -306,6 +311,8 @@ public class Preferences {
             maxWidth = new Int(p, "mediaMaxWidth", 500);
             alignment = new Int(p, "mediaAlignment", 0);
             showSource = new Bool(p, "mediaShowSource", true);
+            showPlaybackStateIcon = new Bool(p, "mediaShowPlaybackStateIcon", true);
+            onlyWhilePlaying = new Bool(p, "mediaOnlyWhilePlaying", false);
             titleFirst = new Bool(p, "mediaTitleFirst", false);
             lineGap = new Int(p, "mediaLineGap", 0);
             marqueeEnabled = new Bool(p, "mediaMarqueeEnabled", true);
@@ -437,6 +444,8 @@ public class Preferences {
         public final Int itemGapPx;
         public final Int cornerRadiusPx;
         public final Str backgroundColor;
+        public final Str borderColor;
+        public final Int borderWidthPx;
         public final Str shortcutsJson;
 
         private DriverPanelProfile(@NonNull Preferences preferences,
@@ -452,6 +461,8 @@ public class Preferences {
             // Driver mode in the reference applies a minimum 20 px radius over the 16 px resource.
             cornerRadiusPx = new Int(preferences, prefix + "CornerRadiusPx", 20);
             backgroundColor = new Str(preferences, prefix + "BackgroundColor", "#FF13171C");
+            borderColor = new Str(preferences, prefix + "BorderColor", "#00FFFFFF");
+            borderWidthPx = new Int(preferences, prefix + "BorderWidthPx", 0);
             shortcutsJson = new Str(preferences, prefix + "ShortcutsJson", "");
         }
     }
@@ -581,6 +592,7 @@ public class Preferences {
     public final Bool launcherShowGrid = new Bool(this, "launcherShowGrid", true);
     public final Int launcherSnapPx = new Int(this, "launcherSnapPx", 20);
     public final Bool launcherImmersive = new Bool(this, "launcherImmersive", true);
+    /** Legacy key retained: now hides only TIME and BLUETOOTH views while our HOME is resumed. */
     public final Bool launcherHideSystemStatusBar = new Bool(this,
             "launcherHideSystemStatusBar", false);
     public final Str launcherSystemStatusBarOriginalPolicy = new Str(this,
@@ -678,6 +690,8 @@ public class Preferences {
     public final Int driverPanelItemGapPx = driverPanelNew.itemGapPx;
     public final Int driverPanelCornerRadiusPx = driverPanelNew.cornerRadiusPx;
     public final Str driverPanelBackgroundColor = driverPanelNew.backgroundColor;
+    public final Str driverPanelBorderColor = driverPanelNew.borderColor;
+    public final Int driverPanelBorderWidthPx = driverPanelNew.borderWidthPx;
     /** Ordered collection for the unified current driver panel. */
     public final Str driverPanelShortcutsJson = driverPanelNew.shortcutsJson;
     /** Independent fully customizable drawer opened from a driver-panel Favorites shortcut. */
@@ -829,6 +843,15 @@ public class Preferences {
     /** Suppresses both phone notification destinations unless helper telemetry says locked. */
     public final Bool phoneNotificationsOnlyWhenLocked = new Bool(this,
             "phoneNotificationsOnlyWhenLocked", false);
+    /** Holds new phone notifications while one of the selected head-unit apps is foreground. */
+    public final Bool phoneNotificationDelayInAppsEnabled = new Bool(this,
+            "phoneNotificationDelayInAppsEnabled", false);
+    /** Exact Android package names; stored as a StringSet for lossless settings migration. */
+    public final StringSet phoneNotificationDelayInPackages = new StringSet(this,
+            "phoneNotificationDelayInPackages");
+    /** Maximum hold time for each notification before it must enter the normal presentation. */
+    public final Int phoneNotificationDelayMaxWaitSeconds = new Int(this,
+            "phoneNotificationDelayMaxWaitSeconds", 30);
     /** How long the temporary notification presentation remains visible. */
     public final Int phoneStatusBarNotificationSeconds = new Int(this,
             "phoneNotificationTickerSeconds", 10);
@@ -1015,7 +1038,44 @@ public class Preferences {
         migrateLegacyPrefsIfNeeded();
         migrateUnifiedDriverPanelIfNeeded();
         migrateUnifiedLauncherSettingsIfNeeded();
+        migratePhoneNotificationDeferralIfNeeded();
         startupMigrationsComplete = true;
+    }
+
+    /** Normalizes experimental/imported HA1217 values without changing an existing selection. */
+    private void migratePhoneNotificationDeferralIfNeeded() {
+        if (prefs.getBoolean("phoneNotificationDeferralHa1217", false)) return;
+        Set<String> migrated = new HashSet<>();
+        Object rawPackages = prefs.getAll().get("phoneNotificationDelayInPackages");
+        if (rawPackages instanceof Set<?>) {
+            for (Object raw : (Set<?>) rawPackages) {
+                if (!(raw instanceof String)) continue;
+                String packageName = ((String) raw).trim();
+                if (packageName.matches("[A-Za-z0-9_]+(?:\\.[A-Za-z0-9_]+)*")) {
+                    migrated.add(packageName);
+                }
+            }
+        }
+        Object rawWait = prefs.getAll().get("phoneNotificationDelayMaxWaitSeconds");
+        int requestedWait = PhoneNotificationDeferralPolicy.DEFAULT_MAX_WAIT_SECONDS;
+        if (rawWait instanceof Number) {
+            requestedWait = ((Number) rawWait).intValue();
+        } else if (rawWait instanceof String) {
+            try { requestedWait = Integer.parseInt(((String) rawWait).trim()); }
+            catch (NumberFormatException ignored) { }
+        }
+        int seconds = PhoneNotificationDeferralPolicy.boundedMaxWaitSeconds(
+                requestedWait);
+        boolean enabled = false;
+        Object rawEnabled = prefs.getAll().get("phoneNotificationDelayInAppsEnabled");
+        if (rawEnabled instanceof Boolean) enabled = (Boolean) rawEnabled;
+        prefs.edit()
+                .putStringSet("phoneNotificationDelayInPackages", migrated)
+                .putInt("phoneNotificationDelayMaxWaitSeconds", seconds)
+                .putBoolean("phoneNotificationDelayInAppsEnabled",
+                        enabled && !migrated.isEmpty())
+                .putBoolean("phoneNotificationDeferralHa1217", true)
+                .apply();
     }
 
     /**
@@ -1062,6 +1122,10 @@ public class Preferences {
                     driverPanelOld.cornerRadiusPx.get());
             editor.putString(driverPanelNew.backgroundColor.key,
                     driverPanelOld.backgroundColor.get());
+            editor.putString(driverPanelNew.borderColor.key,
+                    driverPanelOld.borderColor.get());
+            editor.putInt(driverPanelNew.borderWidthPx.key,
+                    driverPanelOld.borderWidthPx.get());
             editor.putString(driverPanelNew.shortcutsJson.key,
                     driverPanelOld.shortcutsJson.get());
         }
@@ -1359,7 +1423,7 @@ public class Preferences {
         }
         JSONObject root = new JSONObject(json);
         if (!EXPORT_FILE_TYPE.equals(root.optString(KEY_FILE_TYPE, null))) {
-            throw new InvalidSettingsFileException("Not a Status Widget settings file");
+            throw new InvalidSettingsFileException("Not a Natro settings file");
         }
         int version = root.optInt(KEY_FILE_VERSION, -1);
         if (version <= 0 || version > EXPORT_FILE_VERSION) {

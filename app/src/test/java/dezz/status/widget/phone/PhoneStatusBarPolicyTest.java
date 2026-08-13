@@ -2,6 +2,7 @@
 package dezz.status.widget.phone;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -21,6 +22,15 @@ import dezz.status.widget.integration.ConnectorType;
 import dezz.status.widget.integration.ConnectorValue;
 
 public final class PhoneStatusBarPolicyTest {
+    @Test public void overflowSummaryIsExplicitRatherThanSilent() {
+        PhoneStatusBarPolicy.NotificationPresentation summary =
+                PhoneStatusBarPolicy.overflowSummary(17, 1234L);
+        assertEquals("Natro · ещё 17", summary.application);
+        assertTrue(summary.text.contains("17 уведомлений"));
+        assertEquals(1234L, summary.receivedAt);
+        assertFalse(summary.iconCached);
+    }
+
     @Test public void scalarCatalogHasStableOrderIdsPathsAndRussianLabels() {
         List<PhoneStatusBarPolicy.StatusItem> items =
                 PhoneStatusBarPolicy.statusItems();

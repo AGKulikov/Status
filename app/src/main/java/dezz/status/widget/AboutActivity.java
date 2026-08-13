@@ -94,7 +94,7 @@ public class AboutActivity extends AppCompatActivity {
 
         binding.backButton.setOnClickListener(v -> finish());
 
-        binding.appVersionText.setText("Status Widget · версия "
+        binding.appVersionText.setText("Natro · версия "
                 + VersionGetter.getAppVersionName(this) + "\n" + getPackageName());
         binding.allSettingsButton.setOnClickListener(v -> startActivity(
                 SettingsHubActivity.intent(this,

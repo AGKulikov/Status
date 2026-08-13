@@ -1281,7 +1281,7 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         }
         Intent share = new Intent(Intent.ACTION_SEND)
                 .setType("text/plain")
-                .putExtra(Intent.EXTRA_SUBJECT, "Status Widget — подключение iPhone")
+                .putExtra(Intent.EXTRA_SUBJECT, "Natro — подключение iPhone")
                 .putExtra(Intent.EXTRA_TEXT, text);
         try {
             startActivity(Intent.createChooser(share, "Экспортировать журнал"));

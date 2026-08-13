@@ -17,7 +17,7 @@
 
 <resources>
     <string name="launcher_settings_button">Home screen and blocks</string>
-    <string name="app_name">Status Widget HA</string>
+    <string name="app_name">Natro</string>
     <string name="brick_title_home_assistant">Home Assistant</string>
     <string name="automation_settings_button">Smart-home elements</string>
     <string name="automation_settings_title">Main-row elements</string>
@@ -131,6 +131,8 @@
     <string name="brick_adjust_y">Vertical offset</string>
     <string name="brick_media_max_width">Media maximum width</string>
     <string name="brick_media_show_source">Show source app</string>
+    <string name="brick_media_show_playback_state_icon">Show play/pause icon</string>
+    <string name="brick_media_only_while_playing">Show media only while playing</string>
     <string name="brick_media_title_first">Title before artist</string>
     <string name="brick_media_marquee_enabled">Scroll long title</string>
     <string name="brick_media_progress_bar_enabled">Show track progress</string>
@@ -201,6 +203,7 @@
     <string name="hide_in_apps_title">Hide widget in:</string>
     <string name="app_selection_load_failed_title">Failed to load the list of apps</string>
     <string name="app_selection_load_failed_message">An error occurred:\n\n%1$s</string>
+    <string name="app_selection_launcher_home">Our launcher · HOME only</string>
     <string name="menu_about">About</string>
     <string name="menu_import_preset">Import preset…</string>
     <string name="menu_export_settings">Export settings…</string>
@@ -266,10 +269,10 @@
     <string name="export_failed_toast">Failed to export settings</string>
     <string name="import_success_toast">Settings imported</string>
     <string name="import_failed_toast">Failed to import settings</string>
-    <string name="import_invalid_file_toast">This file is not a Status Widget settings export</string>
+    <string name="import_invalid_file_toast">This file is not a Natro settings export</string>
     <string name="all_permissions_granted_toast">All permissions granted!</string>
     <string name="missing_permissions_toast">Some permissions were denied. The app may not work properly.</string>
-    <string name="notification_channel_title">Status Widget Overlay Service</string>
+    <string name="notification_channel_title">Natro background service</string>
     <string name="notification_content">Widget service is running</string>
 
     <!-- Exact paired-iPhone connector settings. -->
@@ -332,14 +335,34 @@
 
     <string name="phone_section_alerts">iPhone alerts</string>
     <string name="phone_low_battery_enable_title">Low iPhone battery alert</string>
-    <string name="phone_low_battery_enable_subtitle">Temporarily replace Now Playing once when the selected iPhone drops below the threshold</string>
+    <string name="phone_low_battery_enable_subtitle">Show one status-row warning and one popup card when the selected iPhone drops below the threshold</string>
     <string name="phone_low_battery_threshold_title">Battery threshold</string>
     <string name="phone_low_battery_threshold_value">Alert below %1$d%%</string>
     <string name="phone_low_battery_threshold_prompt">Percentage from 1 to 100</string>
     <string name="phone_low_battery_threshold_invalid">Enter a value from 1 to 100.</string>
     <string name="phone_low_battery_color_title">Low-battery alert color</string>
-    <string name="phone_low_battery_hint">The warning fires once when the fresh battery value enters the configured range. It is rearmed after the charge recovers above the threshold.</string>
+    <string name="phone_low_battery_hint">The warning fires once when the fresh battery value enters the configured range. Popup mode uses the notification card with a battery icon. It is rearmed after the charge recovers above the threshold.</string>
     <string name="phone_low_battery_alert_text">Low iPhone battery · %1$d%%</string>
+    <string name="phone_low_battery_popup_application">iPhone</string>
+    <string name="phone_low_battery_popup_title">Low iPhone battery</string>
+    <string name="phone_low_battery_popup_body">Charge remaining: %1$d%%</string>
+    <string name="phone_notification_delay_section">Delay in selected applications</string>
+    <string name="phone_notification_delay_enable">Wait before showing notifications in selected applications</string>
+    <string name="phone_notification_delay_hint">While a selected application is foreground, new iPhone notifications are kept in order. They enter the standard display sequence immediately when it closes, or after the maximum wait even if it remains open.</string>
+    <string name="phone_notification_delay_apps_title">Applications that block overlays</string>
+    <string name="phone_notification_delay_apps_choose">Choose head-unit applications</string>
+    <string name="phone_notification_delay_apps_summary">%1$d applications selected</string>
+    <string name="phone_notification_delay_apps_loading">Loading installed applications…</string>
+    <string name="phone_notification_delay_apps_required">Select at least one application before enabling delayed display.</string>
+    <string name="phone_notification_delay_wait_title">Maximum wait</string>
+    <string name="phone_notification_delay_wait_summary">No longer than %1$d seconds</string>
+    <string name="phone_notification_delay_wait_prompt">Enter from 1 to 600 seconds. At the deadline the notification enters the standard display sequence even if the application is still foreground.</string>
+    <string name="phone_notification_delay_wait_invalid">Enter a value from 1 to 600.</string>
+    <string name="phone_notification_delay_access_title">Foreground application access required</string>
+    <string name="phone_notification_delay_access_message">Natro must know which application is open to hold notifications behind full-screen cameras. Enable the Natro accessibility service (recommended for multiple displays) or grant Usage Access.</string>
+    <string name="phone_notification_delay_access_accessibility">Accessibility</string>
+    <string name="phone_notification_delay_access_usage">Usage Access</string>
+    <string name="phone_notification_delay_access_unavailable">This settings screen is unavailable on the head unit.</string>
 
     <string name="phone_section_sprut">Sprut.hub presence</string>
     <string name="phone_sprut_enable_title">Export iPhone presence</string>
@@ -438,12 +461,12 @@
     <string name="phone_notification_settings">Android notification settings</string>
     <string name="phone_test_enable_first">Enable the iPhone connector first.</string>
     <string name="phone_test_choose_source">Enable notifications or messages before testing ANCS.</string>
-    <string name="phone_test_service_unavailable">Start the Status Widget service, then repeat the test.</string>
+    <string name="phone_test_service_unavailable">Start the Natro service, then repeat the test.</string>
     <string name="phone_test_pairing_required_title">Stock Bluetooth pairing required</string>
     <string name="phone_test_bluetooth_required">Turn on Bluetooth and pair the iPhone in the head unit’s stock Bluetooth settings before testing notifications.</string>
     <string name="phone_test_pairing_required">The selected iPhone is not currently paired. This test does not replace stock Bluetooth pairing.</string>
     <string name="phone_test_started_title">Stock connection and ANCS check</string>
-    <string name="phone_test_started">The stock ECARX service was asked to retain the already paired iPhone. Status Widget v2 is draining the exact current BLE owner and starting a fresh generation in the selected topology; it does not refresh hidden GATT caches, cycle Bluetooth, or delete the bond. Keep Helper running and the iPhone unlocked while the authorization and ANCS subscriptions complete. If iOS denies ANCS, check “Show Notifications” for the head unit in iPhone Bluetooth settings.</string>
+    <string name="phone_test_started">The stock ECARX service was asked to retain the already paired iPhone. Natro is draining the exact current BLE owner and starting a fresh generation in the selected topology; it does not refresh hidden GATT caches, cycle Bluetooth, or delete the bond. Keep Helper running and the iPhone unlocked while authorization and ANCS subscriptions complete. If iOS denies ANCS, check “Show Notifications” for the head unit in iPhone Bluetooth settings.</string>
     <string name="phone_privacy_hint">ANCS and device-qualified MAP data come only from the selected iPhone over Bluetooth and require neither Android Notification Access nor access to the shared Android SMS inbox. The exact Bluetooth address stays on this head unit and is shown here only in masked form.</string>
     <string name="phone_apply">Apply phone settings</string>
     <string name="phone_saved">Phone settings applied</string>

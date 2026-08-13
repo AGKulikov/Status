@@ -206,8 +206,8 @@ public class StatusWidgetApplication extends Application {
         File file = new File(getCacheDir(), hudProcess ? HUD_CRASH_FILE : CRASH_FILE);
         try (PrintWriter out = new PrintWriter(new FileWriter(file))) {
             out.println(hudProcess
-                    ? "Status Widget isolated HUD crash report"
-                    : "Status Widget crash report");
+                    ? "Natro isolated HUD crash report"
+                    : "Natro crash report");
             out.println("Time: " + new Date());
             out.println("Thread: " + thread.getName());
             out.println("Device: " + Build.MANUFACTURER + " " + Build.MODEL);
