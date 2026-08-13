@@ -51,40 +51,34 @@ public class StatusWidgetApplication extends Application {
     public static final String CRASH_FILE = "last_crash.txt";
     /** A HUD renderer failure is diagnostic only and must not masquerade as a main-process crash. */
     public static final String HUD_CRASH_FILE = "last_hud_crash.txt";
-    /** Keeps diagnostics/vendor policy out of the surface and FGS first-frame burst. */
-    private static final long SURFACE_RUNTIME_GRACE_MS = 1_500L;
     private final Handler main = new Handler(Looper.getMainLooper());
     private boolean hudProcess;
     private boolean unlockedRuntimeInitialized;
     private boolean firstUsefulSurfaceSeen;
-    private long firstUsefulSurfaceElapsed;
-    private final Runnable unlockedRuntimeRetry = this::attemptSurfaceOwnedInitialization;
 
     @Override
     public void onCreate() {
         super.onCreate();
         hudProcess = AppProcessPolicy.isHudProcess();
         StartupPerformanceTrace.beginProcess(AppProcessPolicy.currentProcessLabel());
-        // LOCKED_BOOT exists only to record the quiet boundary. Avoid preference migrations,
-        // recorder recovery, privileged shell discovery and vendor status-bar calls while OEM
-        // packages are still starting; BOOT/USER_UNLOCKED completes this idempotently.
+        // Keep Application.onCreate minimal. Preferences, recorder recovery and vendor status-bar
+        // calls begin from the first-surface event instead of delaying startup with a timer.
         DiagnosticJournal.initialize(this, false);
         installCrashHandler(hudProcess);
         // The main process is the sole coordinator writer. MODE_MULTI_PROCESS is read-through
         // compatibility for :hud, not a transactional cross-process state machine.
-        if (!hudProcess) StartupWorkCoordinator.primeEarlyBootQuiet(this);
+        if (!hudProcess) StartupWorkCoordinator.clearLegacyStartupDeferrals(this);
         if (!StartupWorkCoordinator.isUserUnlocked(this)) return;
         // Full diagnostics and the ECARX status-bar Binder are surface work. Launcher/settings
-        // notify after their first traversal; a headless exact host notifies after startForeground.
-        // A timer here could overtake Choreographer on a slow boot and jank another app's startup.
+        // notify after their first traversal; a headless host notifies after startForeground.
     }
 
     public synchronized void ensureUnlockedRuntimeInitialized() {
-        if (unlockedRuntimeInitialized || !StartupWorkCoordinator.isUserUnlocked(this)
-                || StartupWorkCoordinator.remainingQuietMillis(this) > 0L
-                || StartupWorkCoordinator.isStartupInitializationBlocked(this)) return;
+        if (unlockedRuntimeInitialized || !firstUsefulSurfaceSeen
+                || !StartupWorkCoordinator.isUserUnlocked(this)) return;
         unlockedRuntimeInitialized = true;
-        Preferences preferences = new Preferences(this);
+        Preferences preferences = new Preferences(this, false);
+        completePreferenceMigrationsInBackground(preferences);
         DiagnosticJournal.initialize(this,
                 !hudProcess && preferences.debugModeEnabled.get());
         if (hudProcess) {
@@ -119,14 +113,13 @@ public class StatusWidgetApplication extends Application {
             application.main.post(() -> {
                 if (!application.firstUsefulSurfaceSeen) {
                     application.firstUsefulSurfaceSeen = true;
-                    application.firstUsefulSurfaceElapsed = android.os.SystemClock.elapsedRealtime();
                 }
                 application.attemptSurfaceOwnedInitialization();
             });
         }
     }
 
-    /** Rechecks a previously rendered surface after the exact persisted host barrier opens. */
+    /** Rechecks a rendered surface when the integration host reports a real readiness transition. */
     public static void resumeSurfaceOwnedInitialization(@NonNull Context context) {
         Context app = context.getApplicationContext();
         if (app instanceof StatusWidgetApplication) {
@@ -136,25 +129,54 @@ public class StatusWidgetApplication extends Application {
     }
 
     private void attemptSurfaceOwnedInitialization() {
-        main.removeCallbacks(unlockedRuntimeRetry);
         if (!firstUsefulSurfaceSeen || unlockedRuntimeInitialized) return;
-        long surfaceDelay = Math.max(0L, firstUsefulSurfaceElapsed
-                + SURFACE_RUNTIME_GRACE_MS - android.os.SystemClock.elapsedRealtime());
-        long coordinatorDelay = StartupWorkCoordinator.startupInitializationDelayMillis(this);
-        long delay = Math.max(surfaceDelay, coordinatorDelay);
-        if (delay > 0L) {
-            main.postDelayed(unlockedRuntimeRetry, delay + 50L);
-            return;
-        }
         WidgetService host = WidgetService.getInstance();
         if (host != null && !host.isIntegrationRuntimeReadyForApplication()) {
             // The process diagnostics/privileged ECARX policy is not needed for the row. Avoid an
-            // independent timer colliding with the serialized controller lane.
-            main.postDelayed(unlockedRuntimeRetry, 1_000L);
+            // independent polling timer colliding with the serialized controller lane. The host's
+            // integrations-ready transition calls resumeSurfaceOwnedInitialization() exactly once.
             return;
         }
         ensureUnlockedRuntimeInitialized();
         if (unlockedRuntimeInitialized) StartupPerformanceTrace.mark("application_runtime_ready");
+    }
+
+    @SuppressWarnings("deprecation")
+    private static void completePreferenceMigrationsInBackground(
+            @NonNull Preferences preferences) {
+        // Use Android's process-shared serial executor instead of creating another startup pool or
+        // persistent thread. Diagnostics can initialize from current values immediately; migration
+        // I/O runs once at background priority and remains idempotent with the service's own pass.
+        try {
+            android.os.AsyncTask.SERIAL_EXECUTOR.execute(() -> {
+                int tid = android.os.Process.myTid();
+                int previousPriority;
+                try {
+                    previousPriority = android.os.Process.getThreadPriority(tid);
+                } catch (RuntimeException ignored) {
+                    previousPriority = android.os.Process.THREAD_PRIORITY_DEFAULT;
+                }
+                try {
+                    android.os.Process.setThreadPriority(
+                            android.os.Process.THREAD_PRIORITY_BACKGROUND);
+                } catch (RuntimeException ignored) {
+                }
+                try {
+                    preferences.completeDeferredStartupMigrations();
+                } catch (RuntimeException failure) {
+                    DiagnosticJournal.warn("application",
+                            "Deferred preference migration failed: " + failure);
+                } finally {
+                    try {
+                        android.os.Process.setThreadPriority(previousPriority);
+                    } catch (RuntimeException ignored) {
+                    }
+                }
+            });
+        } catch (RuntimeException rejected) {
+            DiagnosticJournal.warn("application",
+                    "Could not schedule deferred preference migration: " + rejected);
+        }
     }
 
     private void installCrashHandler(boolean hudProcess) {

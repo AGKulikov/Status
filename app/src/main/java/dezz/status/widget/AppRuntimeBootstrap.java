@@ -14,6 +14,7 @@ import android.util.Log;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -49,7 +50,6 @@ public final class AppRuntimeBootstrap {
     public static void run(@NonNull AppCompatActivity activity,
                            @NonNull Preferences preferences) {
         reconcileServices(activity, preferences);
-        if (StartupWorkCoordinator.automaticReconcileDelayMillis(activity) > 0L) return;
         maybeShowCrashReport(activity);
         tryAutoGrant(activity.getApplicationContext(), preferences);
     }
@@ -68,22 +68,7 @@ public final class AppRuntimeBootstrap {
                 WidgetServiceStarter.requiresIntegrationHost(preferences);
         boolean headlessHostRequired =
                 WidgetServiceStarter.requiresHeadlessHost(preferences);
-        boolean bootQuiet = StartupWorkCoordinator.automaticReconcileDelayMillis(appContext)
-                > 0L || StartupWorkCoordinator.isStartupInitializationBlocked(appContext);
         WidgetService runningHost = WidgetService.getInstance();
-        if (bootQuiet) {
-            if (integrationHostRequired) {
-                StartupWorkCoordinator.ensureIntegrationHostScheduled(appContext);
-            }
-            // A Settings/HOME activity can be restored while SystemServer is still starting OEM
-            // packages. Do not let that UI path bypass the boot lane with WindowManager/vendor
-            // work; the coordinator restores Climate after the shared host phase.
-            if (preferences.climatePanelEnabled.get()
-                    || new ScreenReservationStateStore(appContext).hasManagedReservation()) {
-                StartupWorkCoordinator.ensureClimateScheduled(appContext);
-            }
-            return;
-        }
         if (integrationHostRequired) {
             if (runningHost != null) {
                 // In particular, wake live smart-home/scenario state when the driver rail is
@@ -206,22 +191,62 @@ public final class AppRuntimeBootstrap {
         File crashFile = new File(activity.getCacheDir(), StatusWidgetApplication.CRASH_FILE);
         if (!crashFile.exists() || !crashFile.canRead()) return;
 
-        String content;
+        // Reading a large stack/diagnostic tail must not extend Activity.onCreate. Reuse Android's
+        // process-shared serial executor; this submits immediately without creating another pool.
+        try {
+            //noinspection deprecation
+            android.os.AsyncTask.SERIAL_EXECUTOR.execute(() -> {
+                int tid = android.os.Process.myTid();
+                int previousPriority;
+                try {
+                    previousPriority = android.os.Process.getThreadPriority(tid);
+                } catch (RuntimeException ignored) {
+                    previousPriority = android.os.Process.THREAD_PRIORITY_DEFAULT;
+                }
+                try {
+                    android.os.Process.setThreadPriority(
+                            android.os.Process.THREAD_PRIORITY_BACKGROUND);
+                } catch (RuntimeException ignored) {
+                }
+                try {
+                    String content = consumeCrashReport(crashFile);
+                    if (content == null) return;
+                    activity.runOnUiThread(() -> {
+                        if (activity.isFinishing() || activity.isDestroyed()) return;
+                        showCrashReport(activity, content);
+                    });
+                } finally {
+                    try {
+                        android.os.Process.setThreadPriority(previousPriority);
+                    } catch (RuntimeException ignored) {
+                    }
+                }
+            });
+        } catch (RuntimeException rejected) {
+            Log.w(TAG, "Could not schedule crash-report load", rejected);
+        }
+    }
+
+    @Nullable
+    private static String consumeCrashReport(@NonNull File crashFile) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(
                 new java.io.FileInputStream(crashFile), StandardCharsets.UTF_8))) {
             StringBuilder value = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) value.append(line).append('\n');
-            content = value.toString();
+            // Consume before publishing so two restored activities cannot show the same report.
+            //noinspection ResultOfMethodCallIgnored
+            crashFile.delete();
+            return value.toString();
         } catch (IOException error) {
             //noinspection ResultOfMethodCallIgnored
             crashFile.delete();
-            return;
+            return null;
         }
-        // Consume immediately so Back/outside dismissal cannot show the same report forever.
-        //noinspection ResultOfMethodCallIgnored
-        crashFile.delete();
+    }
 
+    private static void showCrashReport(@NonNull AppCompatActivity activity,
+                                        @NonNull String content) {
         new AlertDialog.Builder(activity)
                 .setTitle(activity.getString(R.string.crash_report_title))
                 .setMessage(content)

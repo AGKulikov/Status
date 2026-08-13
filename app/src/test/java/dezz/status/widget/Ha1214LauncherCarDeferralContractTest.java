@@ -34,19 +34,27 @@ public final class Ha1214LauncherCarDeferralContractTest {
         assertTrue(shortcut.contains("if (automaticLifecycle) content.start();"));
     }
 
-    @Test public void automaticCarResolutionLivesOnlyInRuntimeStageTwo() throws Exception {
+    @Test public void automaticCarResolutionUsesTheSerialWorkerFromRuntimeStageTwo()
+            throws Exception {
         String launcher = source("LauncherActivity.java");
         String runtime = between(launcher,
                 "private final Runnable deferredLauncherRuntimeStep",
                 "@Override\n    protected void onCreate");
-        int gate = runtime.indexOf("launcherRuntimeDelayMillis(");
-        int gateReturn = runtime.indexOf("if (laneDelay > 0L)", gate);
-        int stageTwo = runtime.indexOf("case 2:", gateReturn);
-        int resolve = runtime.indexOf("requireLauncherCarIntegration();", stageTwo);
-        int shortcutRuntime = runtime.indexOf("reconcileInformationShortcutRuntime();",
-                resolve);
-        assertTrue(gate >= 0 && gateReturn > gate && stageTwo > gateReturn
-                && resolve > stageTwo && shortcutRuntime > resolve);
+        int stageTwo = runtime.indexOf("case 2:");
+        int asyncStart = runtime.indexOf("startLauncherCarRuntimeAsync();", stageTwo);
+        assertTrue(stageTwo >= 0 && asyncStart > stageTwo);
+        assertFalse(runtime.contains("launcherRuntimeDelayMillis("));
+        assertFalse(runtime.contains("requireLauncherCarIntegration();"));
+
+        String async = between(launcher,
+                "private void startLauncherCarRuntimeAsync()",
+                "private void activateLauncherCarRuntime()");
+        assertTrue(async.contains("launcherWorker.execute"));
+        assertTrue(async.contains("CarIntegrations.get(getApplicationContext())"));
+        String activate = between(launcher,
+                "private void activateLauncherCarRuntime()",
+                "/** Resolves ECARX after automatic background warm-up");
+        assertTrue(activate.contains("reconcileInformationShortcutRuntime()"));
 
         String resolver = between(launcher,
                 "private CarIntegration requireLauncherCarIntegration()",
@@ -57,10 +65,10 @@ public final class Ha1214LauncherCarDeferralContractTest {
         assertFalse(initialize.contains("CarIntegrations.get"));
 
         String command = between(launcher, "private void executeCarControl(",
-                "/** Resolves ECARX only");
+                "/** Constructs the process-wide vendor bridge");
         assertTrue(command.contains("requireLauncherCarIntegration().executeControl"));
         String stop = between(launcher, "protected void onStop()",
-                "private void scheduleDeferredLauncherRuntimeStart()");
+                "/** Starts migration immediately");
         assertFalse(stop.contains("requireLauncherCarIntegration"));
         assertFalse(stop.contains("CarIntegrations.get"));
         assertTrue(stop.contains("InformationShortcutView shortcut"));

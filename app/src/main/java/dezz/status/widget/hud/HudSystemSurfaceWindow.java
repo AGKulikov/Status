@@ -14,6 +14,7 @@ import android.view.Display;
 import android.view.View;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -27,10 +28,11 @@ import java.security.SecureRandom;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
+import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.shell.PrivilegedShell;
 
 /**
@@ -50,7 +52,9 @@ final class HudSystemSurfaceWindow {
     private static final int HELLO_OK = 1;
     private static final int FRAME_OK = 1;
     private static final int STOP = -1;
-    private static final long FRAME_INTERVAL_MS = 250L;
+    /** Snow is the only deliberately continuous effect; all normal frames are data-driven. */
+    private static final long SNOW_FRAME_INTERVAL_MS = 250L;
+    private static final long WARNING_BLINK_INTERVAL_MS = 500L;
     private static final int CONNECT_ATTEMPTS = 250;
     private static final int CONNECT_TIMEOUT_MS = 120;
     private static final int SOCKET_TIMEOUT_MS = 5_000;
@@ -59,13 +63,18 @@ final class HudSystemSurfaceWindow {
     @NonNull private final Handler main = new Handler(Looper.getMainLooper());
     @NonNull private final ExecutorService io =
             Executors.newSingleThreadExecutor(daemonThreadFactory());
-    @NonNull private final AtomicReference<byte[]> pendingFrame = new AtomicReference<>();
-    @NonNull private final AtomicBoolean drainScheduled = new AtomicBoolean();
+    @NonNull private final Object frameLock = new Object();
+    @NonNull private final FrameBuffer[] frameBuffers = {
+            new FrameBuffer(), new FrameBuffer()
+    };
+    @Nullable private FrameBuffer renderingFrame;
+    @Nullable private FrameBuffer pendingFrame;
+    @Nullable private FrameBuffer encodingFrame;
+    private boolean drainScheduled;
+    @NonNull private final AtomicBoolean dirtyFramePosted = new AtomicBoolean();
     @NonNull private final HudCanvasView canvas;
-    @NonNull private final Bitmap bitmap = Bitmap.createBitmap(
-            HudViewportPolicy.SAFE_WIDTH,
-            HudViewportPolicy.SAFE_HEIGHT,
-            Bitmap.Config.ARGB_8888);
+    @NonNull private final HudRuntimeData data;
+    @NonNull private HudPanelConfig config;
     @NonNull private final Listener listener;
     @NonNull private final String nonce;
     private final int port;
@@ -75,16 +84,25 @@ final class HudSystemSurfaceWindow {
     private volatile Socket socket;
     private volatile DataInputStream input;
     private volatile DataOutputStream output;
-    private boolean connected;
-    private boolean ready;
-    private boolean dismissed;
+    private volatile boolean connected;
+    private volatile boolean ready;
+    private volatile boolean dismissed;
     private boolean failureDelivered;
 
-    @NonNull private final Runnable frameTick = new Runnable() {
+    /** Re-armed only while a configured effect is currently time-dependent. */
+    @NonNull private final Runnable animationTick = new Runnable() {
         @Override public void run() {
             if (dismissed || !connected) return;
+            invalidateHud();
+        }
+    };
+    /** One no-delay main-loop task coalesces bursts of telemetry into their newest snapshot. */
+    @NonNull private final Runnable renderDirtyFrame = new Runnable() {
+        @Override public void run() {
+            dirtyFramePosted.set(false);
+            if (dismissed || !connected) return;
             renderAndQueue();
-            main.postDelayed(this, FRAME_INTERVAL_MS);
+            scheduleNextAnimationFrame();
         }
     };
 
@@ -95,6 +113,8 @@ final class HudSystemSurfaceWindow {
                                    @NonNull Listener listener) {
         appContext = context.getApplicationContext() == null
                 ? context : context.getApplicationContext();
+        this.config = config;
+        this.data = data;
         this.listener = listener;
         displayId = display.getDisplayId();
         layerStack = resolveLayerStack(display);
@@ -123,16 +143,19 @@ final class HudSystemSurfaceWindow {
     }
 
     void updateConfig(@NonNull HudPanelConfig config) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            main.post(() -> updateConfig(config));
+            return;
+        }
         if (dismissed) return;
+        this.config = config;
         canvas.updateConfig(config);
         invalidateHud();
     }
 
     void invalidateHud() {
         if (dismissed || !connected) return;
-        main.removeCallbacks(frameTick);
-        renderAndQueue();
-        main.postDelayed(frameTick, FRAME_INTERVAL_MS);
+        if (dirtyFramePosted.compareAndSet(false, true)) main.post(renderDirtyFrame);
     }
 
     boolean isReady() {
@@ -144,23 +167,36 @@ final class HudSystemSurfaceWindow {
     }
 
     void dismiss() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            main.post(this::dismiss);
+            return;
+        }
         if (dismissed) return;
         dismissed = true;
         connected = false;
-        main.removeCallbacks(frameTick);
-        pendingFrame.set(null);
-        io.execute(() -> {
-            DataOutputStream current = output;
-            if (current != null) {
-                try {
-                    current.writeInt(STOP);
-                    current.flush();
-                } catch (Exception ignored) {}
-            }
+        main.removeCallbacks(animationTick);
+        main.removeCallbacks(renderDirtyFrame);
+        dirtyFramePosted.set(false);
+        synchronized (frameLock) {
+            pendingFrame = null;
+        }
+        try {
+            io.execute(() -> {
+                DataOutputStream current = output;
+                if (current != null) {
+                    try {
+                        current.writeInt(STOP);
+                        current.flush();
+                    } catch (Exception ignored) {}
+                }
+                closeSocket();
+                recycleFrameBuffers();
+            });
+        } catch (RejectedExecutionException stopped) {
             closeSocket();
-        });
+            recycleFrameBuffers();
+        }
         io.shutdown();
-        if (!bitmap.isRecycled()) bitmap.recycle();
     }
 
     private void startBridge() {
@@ -169,7 +205,12 @@ final class HudSystemSurfaceWindow {
                 command, new PrivilegedShell.LongRunningCommandCallback() {
             @Override
             public void onStarted() {
-                if (!dismissed) io.execute(HudSystemSurfaceWindow.this::connectToBridge);
+                if (dismissed) return;
+                try {
+                    io.execute(HudSystemSurfaceWindow.this::connectToBridge);
+                } catch (RejectedExecutionException stopped) {
+                    if (!dismissed) failFromIo("очередь запуска HUD bridge остановлена");
+                }
             }
 
             @Override
@@ -229,8 +270,7 @@ final class HudSystemSurfaceWindow {
                     return;
                 }
                 connected = true;
-                renderAndQueue();
-                main.postDelayed(frameTick, FRAME_INTERVAL_MS);
+                invalidateHud();
             });
         } catch (Exception failure) {
             closeSocket();
@@ -238,41 +278,92 @@ final class HudSystemSurfaceWindow {
         }
     }
 
-    /** Must run on the main thread because View.draw() is not thread-safe. */
+    /**
+     * Draws only the Android View snapshot on main. The pending buffer can be overwritten while the
+     * worker encodes its sibling, so a slow PNG/socket never builds an unbounded frame queue.
+     */
     private void renderAndQueue() {
-        if (dismissed || !connected || bitmap.isRecycled()) return;
-        Canvas target = new Canvas(bitmap);
-        target.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
-        canvas.draw(target);
-        ByteArrayOutputStream encoded = new ByteArrayOutputStream(96 * 1024);
-        if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, encoded)) {
-            fail("не удалось подготовить HUD-кадр");
+        if (dismissed || !connected) return;
+        final FrameBuffer target;
+        synchronized (frameLock) {
+            // A not-yet-encoded pending frame is owned by main and is safe to replace in place.
+            target = pendingFrame != null ? pendingFrame : availableFrameLocked();
+            if (target == null || target.bitmap.isRecycled()) return;
+            pendingFrame = null;
+            renderingFrame = target;
+        }
+
+        try {
+            target.canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
+            canvas.draw(target.canvas);
+        } catch (RuntimeException failure) {
+            synchronized (frameLock) {
+                if (renderingFrame == target) renderingFrame = null;
+            }
+            fail("не удалось нарисовать HUD-кадр: " + shortMessage(failure));
             return;
         }
-        pendingFrame.set(encoded.toByteArray());
+
+        synchronized (frameLock) {
+            if (renderingFrame == target) renderingFrame = null;
+            if (dismissed) return;
+            // Replaces the prior pending snapshot; the worker will always take the newest one.
+            pendingFrame = target;
+        }
         scheduleDrain();
     }
 
+    @Nullable
+    private FrameBuffer availableFrameLocked() {
+        for (FrameBuffer candidate : frameBuffers) {
+            if (candidate != encodingFrame && candidate != renderingFrame) return candidate;
+        }
+        return null;
+    }
+
     private void scheduleDrain() {
-        if (!drainScheduled.compareAndSet(false, true)) return;
-        io.execute(this::drainFrames);
+        synchronized (frameLock) {
+            if (dismissed || !connected || drainScheduled || pendingFrame == null) return;
+            drainScheduled = true;
+        }
+        try {
+            io.execute(this::drainFrames);
+        } catch (RejectedExecutionException stopped) {
+            synchronized (frameLock) {
+                drainScheduled = false;
+            }
+            if (!dismissed) failFromIo("очередь HUD-кодировщика остановлена");
+        }
     }
 
     private void drainFrames() {
+        ReusableByteArrayOutputStream encoded = new ReusableByteArrayOutputStream(96 * 1024);
         try {
             while (!dismissed) {
-                byte[] frame = pendingFrame.getAndSet(null);
+                FrameBuffer frame;
+                synchronized (frameLock) {
+                    frame = pendingFrame;
+                    pendingFrame = null;
+                    encodingFrame = frame;
+                }
                 if (frame == null) break;
+                encoded.reset();
+                if (!frame.bitmap.compress(Bitmap.CompressFormat.PNG, 100, encoded)) {
+                    throw new IllegalStateException("PNG encoder rejected HUD bitmap");
+                }
                 DataOutputStream currentOutput = output;
                 DataInputStream currentInput = input;
                 if (currentOutput == null || currentInput == null) {
                     throw new IllegalStateException("HUD bridge socket is closed");
                 }
-                currentOutput.writeInt(frame.length);
-                currentOutput.write(frame);
+                currentOutput.writeInt(encoded.size());
+                currentOutput.write(encoded.buffer(), 0, encoded.size());
                 currentOutput.flush();
                 if (currentInput.readUnsignedByte() != FRAME_OK) {
                     throw new IllegalStateException("HUD bridge rejected a frame");
+                }
+                synchronized (frameLock) {
+                    if (encodingFrame == frame) encodingFrame = null;
                 }
                 if (!ready) {
                     main.post(() -> {
@@ -283,12 +374,90 @@ final class HudSystemSurfaceWindow {
                 }
             }
         } catch (Exception failure) {
+            connected = false;
             closeSocket();
             failFromIo("потеряна системная HUD-поверхность: " + shortMessage(failure));
         } finally {
-            drainScheduled.set(false);
-            if (!dismissed && pendingFrame.get() != null) scheduleDrain();
+            boolean hasPending;
+            synchronized (frameLock) {
+                encodingFrame = null;
+                drainScheduled = false;
+                hasPending = !dismissed && connected && pendingFrame != null;
+            }
+            if (hasPending) scheduleDrain();
         }
+    }
+
+    private void scheduleNextAnimationFrame() {
+        main.removeCallbacks(animationTick);
+        if (dismissed || !connected) return;
+        long delay = nextAnimationDelayMillis();
+        if (delay > 0L) main.postDelayed(animationTick, delay);
+    }
+
+    /** No timer exists for a static HUD; only an actively changing visual effect returns a delay. */
+    private long nextAnimationDelayMillis() {
+        long now = SystemClock.uptimeMillis();
+        long next = config.snowMode ? SNOW_FRAME_INTERVAL_MS : Long.MAX_VALUE;
+        for (HudElementConfig item : config.elements) {
+            if (!item.enabled) continue;
+            AutomationState automation = data.automation(item);
+            if (automation.present && !automation.visible) continue;
+            if ((item.type == HudElementType.TURN_SIGNAL_LEFT
+                    || item.type == HudElementType.TURN_SIGNAL_RIGHT)
+                    && item.options.optBoolean("animated", true) && data.active(item)) {
+                long frequency = Math.max(150L,
+                        item.options.optLong("blinkFrequencyMs", 500L));
+                next = Math.min(next, delayToBoundary(now, frequency));
+            } else if (item.type == HudElementType.NAV_SPEED_LIMIT
+                    && item.options.optBoolean("overspeedBlink", true)
+                    && isSpeedLimitWarningActive(item)) {
+                next = Math.min(next, delayToBoundary(now, WARNING_BLINK_INTERVAL_MS));
+            } else if (isTirePressure(item.type)
+                    && item.options.optBoolean("blinkBelowThreshold", true)) {
+                double value = data.numericValue(item);
+                if (Double.isFinite(value)
+                        && value < item.options.optDouble("lowThreshold", 2d)) {
+                    next = Math.min(next,
+                            delayToBoundary(now, WARNING_BLINK_INTERVAL_MS));
+                }
+            }
+        }
+        return next == Long.MAX_VALUE ? -1L : Math.max(1L, next);
+    }
+
+    private boolean isSpeedLimitWarningActive(@NonNull HudElementConfig item) {
+        double limit = unsignedDigits(data.textFor(item));
+        double current = data.numericValue(item);
+        return Double.isFinite(limit) && Double.isFinite(current)
+                && current > limit + item.options.optInt("overspeedDelta", 10);
+    }
+
+    /** Matches the canvas' digits-only speed-limit parsing without allocating a regex result. */
+    private static double unsignedDigits(@NonNull String text) {
+        long value = 0L;
+        boolean found = false;
+        for (int index = 0; index < text.length(); index++) {
+            char character = text.charAt(index);
+            if (character < '0' || character > '9') continue;
+            found = true;
+            value = Math.min(Integer.MAX_VALUE, value * 10L + character - '0');
+        }
+        return found ? value : Double.NaN;
+    }
+
+    private static boolean isTirePressure(@NonNull HudElementType type) {
+        return type == HudElementType.TIRE_PRESSURE_FRONT_LEFT
+                || type == HudElementType.TIRE_PRESSURE_FRONT_RIGHT
+                || type == HudElementType.TIRE_PRESSURE_REAR_LEFT
+                || type == HudElementType.TIRE_PRESSURE_REAR_RIGHT;
+    }
+
+    static long delayToBoundary(long nowMillis, long intervalMillis) {
+        long interval = Math.max(1L, intervalMillis);
+        long normalized = Math.max(0L, nowMillis);
+        long remainder = normalized % interval;
+        return remainder == 0L ? interval : interval - remainder;
     }
 
     private void failFromIo(@NonNull String detail) {
@@ -296,10 +465,16 @@ final class HudSystemSurfaceWindow {
     }
 
     private void fail(@NonNull String detail) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            main.post(() -> fail(detail));
+            return;
+        }
         if (dismissed || failureDelivered) return;
         failureDelivered = true;
         connected = false;
-        main.removeCallbacks(frameTick);
+        main.removeCallbacks(animationTick);
+        main.removeCallbacks(renderDirtyFrame);
+        dirtyFramePosted.set(false);
         Log.w(TAG, detail);
         listener.onFailed(this, detail);
     }
@@ -332,6 +507,15 @@ final class HudSystemSurfaceWindow {
         input = null;
         output = null;
         socket = null;
+    }
+
+    private void recycleFrameBuffers() {
+        synchronized (frameLock) {
+            pendingFrame = null;
+            renderingFrame = null;
+            encodingFrame = null;
+            for (FrameBuffer frame : frameBuffers) frame.recycle();
+        }
     }
 
     private static int resolveLayerStack(@NonNull Display display) {
@@ -399,9 +583,34 @@ final class HudSystemSurfaceWindow {
     @NonNull
     private static ThreadFactory daemonThreadFactory() {
         return runnable -> {
-            Thread thread = new Thread(runnable, "hud-system-surface");
+            Thread thread = new Thread(() -> {
+                try {
+                    android.os.Process.setThreadPriority(
+                            android.os.Process.THREAD_PRIORITY_BACKGROUND);
+                } catch (RuntimeException ignored) {}
+                runnable.run();
+            }, "hud-system-surface");
             thread.setDaemon(true);
             return thread;
         };
+    }
+
+    /** One of two fixed-size buffers; Canvas allocation never appears in the steady-state path. */
+    private static final class FrameBuffer {
+        @NonNull final Bitmap bitmap = Bitmap.createBitmap(
+                HudViewportPolicy.SAFE_WIDTH, HudViewportPolicy.SAFE_HEIGHT,
+                Bitmap.Config.ARGB_8888);
+        @NonNull final Canvas canvas = new Canvas(bitmap);
+
+        void recycle() {
+            canvas.setBitmap(null);
+            if (!bitmap.isRecycled()) bitmap.recycle();
+        }
+    }
+
+    /** Exposes ByteArrayOutputStream's reusable backing array to avoid one byte[] per HUD frame. */
+    private static final class ReusableByteArrayOutputStream extends ByteArrayOutputStream {
+        ReusableByteArrayOutputStream(int size) { super(size); }
+        byte[] buffer() { return buf; }
     }
 }

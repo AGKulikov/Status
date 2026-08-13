@@ -13,7 +13,7 @@ import static org.junit.Assert.assertTrue;
 
 /** Release barriers for immediate visual admission with a separately parked runtime graph. */
 public final class Ha1214ImmediateSurfaceRuntimeContractTest {
-    @Test public void quietBypassStartsOnlyTheEnabledVisualSurface() throws Exception {
+    @Test public void immediateVisualPathAvoidsPreferenceMigrations() throws Exception {
         String starter = source("WidgetServiceStarter.java");
         String attempt = between(starter, "private static boolean attemptStart(",
                 "static boolean requiresIntegrationHost(@NonNull Preferences");
@@ -22,8 +22,8 @@ public final class Ha1214ImmediateSurfaceRuntimeContractTest {
         assertTrue(attempt.contains("canStartVisualSurfaceWhileRuntimeParked("));
         assertTrue(attempt.contains("isStatusWidgetEnabledForVisualBootstrap(app)"));
         assertTrue(attempt.contains("setAction(ACTION_START_VISIBLE_SURFACE)"));
-        int visual = attempt.indexOf("if (runtimeParked && allowVisualSurfaceDuringQuiet)");
-        int fullPreferences = attempt.indexOf("Preferences preferences = new Preferences(app)");
+        int visual = attempt.indexOf("if (allowVisualSurfaceDuringQuiet)");
+        int fullPreferences = attempt.indexOf("Preferences preferences = new Preferences(app, false)");
         assertTrue(visual >= 0 && fullPreferences > visual);
 
         String policy = between(starter,
@@ -33,16 +33,26 @@ public final class Ha1214ImmediateSurfaceRuntimeContractTest {
         assertFalse(policy.contains("requiresHeadlessHost"));
     }
 
-    @Test public void bootCreatesTheRuntimeGenerationBeforeImmediateSurfaceAdmission()
+    @Test public void unlockedBootAdmitsVisualSurfaceBeforeCoordinatorTransaction()
             throws Exception {
         String receiver = source("BootReceiver.java");
         String lifecycle = between(receiver,
                 "if (Intent.ACTION_BOOT_COMPLETED.equals(action)",
                 "private static boolean restoreStatusWidget(");
-        assertTrue(lifecycle.indexOf("scheduleForLifecycle(context, action)")
-                < lifecycle.indexOf("startVisibleSurfaceImmediatelyWithRetry(context)"));
+        int visual = lifecycle.indexOf(
+                "startVisibleSurfaceImmediatelyWithRetry(context)");
+        int coordinator = lifecycle.indexOf("scheduleForLifecycle(context, action)");
+        assertTrue(visual >= 0 && coordinator > visual);
+        String visualAdmission = between(lifecycle,
+                "// Admit the tiny visual surface",
+                "// LOCKED_BOOT/BOOT/QUICKBOOT often arrive");
+        assertTrue(visualAdmission.contains("Intent.ACTION_BOOT_COMPLETED.equals(action)"));
+        assertTrue(visualAdmission.contains("ACTION_QUICKBOOT_POWERON.equals(action)"));
+        assertTrue(visualAdmission.contains("Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)"));
+        assertFalse(visualAdmission.contains("Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(action)"));
         assertTrue(lifecycle.contains("ACTION_QUICKBOOT_POWERON.equals(action)"));
-        assertTrue(lifecycle.contains("enterAutomaticLifecycleQuiet("));
+        assertFalse(lifecycle.contains("enterAutomaticLifecycleQuiet("));
+        assertTrue(lifecycle.contains("revalidateAutomaticVisualSurfaceAfterQuickBoot"));
     }
 
     @Test public void serviceParksBeforeInitializationAndVisibleFrameCannotOpenBarrier()
@@ -72,7 +82,7 @@ public final class Ha1214ImmediateSurfaceRuntimeContractTest {
 
         String initializeRuntime = between(service, "private void initializeRuntime()",
                 "private void ensureMqttRuntimeGraph()");
-        assertTrue(initializeRuntime.contains("new Preferences(this, !automaticRuntimeParked)"));
+        assertTrue(initializeRuntime.contains("new Preferences(this, false)"));
         assertTrue(initializeRuntime.contains(
                 "if (!automaticRuntimeParked && !automaticLifecycleQuiet)"));
         String barrier = between(service, "private void runCachedStateFreshnessBarrier()",
@@ -122,8 +132,8 @@ public final class Ha1214ImmediateSurfaceRuntimeContractTest {
                 "private void runNextAutomaticLifecycleQuietTeardown()",
                 "private final Runnable automaticVisualSurfaceRevalidation");
         assertTrue(teardown.contains("switch (automaticLifecycleTeardownStage++)"));
-        assertTrue(teardown.contains("postDelayed(automaticLifecycleQuietTeardown"));
-        assertTrue(teardown.contains("AUTOMATIC_QUIET_TEARDOWN_SLICE_MS"));
+        assertTrue(teardown.contains("mainHandler.post(automaticLifecycleQuietTeardown)"));
+        assertFalse(teardown.contains("postDelayed(automaticLifecycleQuietTeardown"));
 
         String application = source("StatusWidgetApplication.java");
         String attempt = between(application, "private void attemptSurfaceOwnedInitialization()",

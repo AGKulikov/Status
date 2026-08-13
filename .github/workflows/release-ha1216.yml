@@ -1,0 +1,441 @@
+name: Publish HA1216 signed release
+
+on:
+  push:
+    tags:
+      - 'v2.8.2-ha1216'
+  workflow_dispatch:
+    inputs:
+      release_ref:
+        description: 'Exact v2.8.2-ha1216 tag or the full 40-character SHA it points to'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-ha1216-${{ inputs.release_ref || github.ref }}
+  cancel-in-progress: false
+
+env:
+  VERSION_NAME: 'v2.8.2-ha1216'
+  VERSION_CODE: '208021216'
+  PACKAGE_NAME: 'ru.natro.statuswidget'
+  MIN_SDK: '28'
+  TARGET_SDK: '28'
+  HELPER_VERSION: '49.0'
+  HELPER_BUILD: '49'
+  HELPER_BUNDLE_ID: 'ru.natro.kx11ancshelper'
+  HELPER_TREE: '7167947dc57757e46f3d7553a1af4664351fc2d8'
+  STABLE_CERT_SHA256: '6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75'
+  BUILD_TOOLS_VERSION: '36.0.0'
+
+jobs:
+  build-sign-verify:
+    name: Test, sign and verify exact HA1216 bytes
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    outputs:
+      artifact_name: ${{ steps.package.outputs.artifact_name }}
+      apk_name: ${{ steps.package.outputs.apk_name }}
+      apk_sha256: ${{ steps.package.outputs.apk_sha256 }}
+      unsigned_apk_sha256: ${{ steps.unsigned.outputs.apk_sha256 }}
+      source_sha: ${{ steps.identity.outputs.source_sha }}
+      source_tree: ${{ steps.identity.outputs.source_tree }}
+      source_short: ${{ steps.identity.outputs.source_short }}
+
+    steps:
+      - name: Checkout requested tag or full SHA without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_ref || github.ref }}
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Require exact immutable HA1216 tag and source commit
+        id: identity
+        shell: bash
+        env:
+          REQUESTED_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.release_ref || github.ref }}
+        run: |
+          set -euo pipefail
+          TAG_REF="refs/tags/${VERSION_NAME}"
+          case "$REQUESTED_REF" in
+            "$VERSION_NAME"|"$TAG_REF") ;;
+            *)
+              [[ "$REQUESTED_REF" =~ ^[0-9a-f]{40}$ ]] || {
+                echo 'release_ref must be the exact HA1216 tag or a full lowercase commit SHA' >&2
+                exit 1
+              }
+              ;;
+          esac
+          git show-ref --verify --quiet "$TAG_REF" || {
+            echo "Required tag $TAG_REF does not exist" >&2
+            exit 1
+          }
+          SOURCE_SHA=$(git rev-parse 'HEAD^{commit}')
+          REQUESTED_SHA=$(git rev-parse "${REQUESTED_REF}^{commit}")
+          TAG_SHA=$(git rev-parse "${TAG_REF}^{commit}")
+          test "$SOURCE_SHA" = "$REQUESTED_SHA"
+          test "$SOURCE_SHA" = "$TAG_SHA"
+          if test "$GITHUB_EVENT_NAME" = 'push'; then
+            test "$GITHUB_REF" = "$TAG_REF"
+            test "$(git rev-parse "${GITHUB_SHA}^{commit}")" = "$SOURCE_SHA"
+          fi
+          test -z "$(git status --short --ignore-submodules=none)"
+          SOURCE_TREE=$(git rev-parse 'HEAD^{tree}')
+          TAG_OBJECT=$(git rev-parse "$TAG_REF")
+          HELPER_ACTUAL_TREE=$(git rev-parse \
+            "${SOURCE_SHA}:ios/KX11-iPhone-ANCS-Helper-v49")
+          test "$HELPER_ACTUAL_TREE" = "$HELPER_TREE"
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          echo "source_tree=$SOURCE_TREE" >> "$GITHUB_OUTPUT"
+          echo "source_short=${SOURCE_SHA:0:12}" >> "$GITHUB_OUTPUT"
+          echo "tag_object=$TAG_OBJECT" >> "$GITHUB_OUTPUT"
+          echo "helper_tree=$HELPER_ACTUAL_TREE" >> "$GITHUB_OUTPUT"
+
+      - name: Verify frozen Android and Helper identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "return 'v2.8.2-ha1216'" build.gradle
+          grep -Fq 'Android version code: `208021216`' release-manifests/HA1216.md
+          grep -Fq 'Package: `ru.natro.statuswidget`' release-manifests/HA1216.md
+          PROJECT=ios/KX11-iPhone-ANCS-Helper-v49/KX11ANCSHelper.xcodeproj/project.pbxproj
+          test "$(grep -Fc 'CURRENT_PROJECT_VERSION = 49;' "$PROJECT")" -eq 2
+          test "$(grep -Fc 'MARKETING_VERSION = 49.0;' "$PROJECT")" -eq 2
+          test "$(grep -Fc \
+            'PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper;' "$PROJECT")" -eq 2
+
+      - name: Verify exact Helper v49 portable contract
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          bash ios/KX11-iPhone-ANCS-Helper-v49/verify-v49-contract.sh
+          test -z "$(git status --short --ignore-submodules=none)"
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v2
+
+      - name: Install exact Android SDK and signing tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +o pipefail
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null
+          set -o pipefail
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            'platforms;android-36' "build-tools;${BUILD_TOOLS_VERSION}"
+
+      - name: Run complete geelyDebug unit suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
+            clean testGeelyDebugUnitTest
+
+      - name: Assemble exact unsigned geelyRelease input
+        id: unsigned
+        shell: bash
+        env:
+          ALLOW_UNSIGNED_RELEASE: 'true'
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
+            assembleGeelyRelease
+          APK="app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}-release.apk"
+          test -s "$APK"
+          if "$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}/apksigner" \
+              verify "$APK" >/dev/null 2>&1; then
+            echo 'Gradle signing was not isolated: unsigned input already has a valid signature' >&2
+            exit 1
+          fi
+          echo "apk_sha256=$(sha256sum "$APK" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          test -z "$(git status --short --untracked-files=no --ignore-submodules=none)"
+
+      - name: Sign only with the stable GitHub keystore
+        id: sign
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          for required in KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS; do
+            test -n "${!required:-}" || {
+              echo "::error::Required stable signing secret $required is not configured"
+              exit 1
+            }
+          done
+          umask 077
+          KEYSTORE="$RUNNER_TEMP/ha1216-stable-keystore.jks"
+          trap 'shred -u -- "$KEYSTORE" 2>/dev/null || true' EXIT
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          test -s "$KEYSTORE"
+          KEYTOOL_OUTPUT=$(keytool -J-Duser.language=en -J-Duser.country=US \
+            -list -v -keystore "$KEYSTORE" -alias "$KEY_ALIAS" \
+            -storepass:env KEY_PASSWORD)
+          KEYSTORE_CERT=$(printf '%s\n' "$KEYTOOL_OUTPUT" \
+            | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' \
+            | tr -d ':\r' | tr 'A-F' 'a-f' | head -n 1)
+          test "$KEYSTORE_CERT" = "$STABLE_CERT_SHA256" || {
+            echo 'Configured keystore certificate is not the stable update certificate' >&2
+            exit 1
+          }
+          OUT="$RUNNER_TEMP/ha1216-release"
+          mkdir -p "$OUT"
+          UNSIGNED="app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}-release.apk"
+          APK_NAME="Status-Widget-${VERSION_NAME}-signed.apk"
+          SIGNED="$OUT/$APK_NAME"
+          "$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}/apksigner" sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEY_PASSWORD \
+            --key-pass env:KEY_PASSWORD \
+            --min-sdk-version "$MIN_SDK" \
+            --v1-signing-enabled false \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            --v4-signing-enabled false \
+            --out "$SIGNED" \
+            "$UNSIGNED"
+          test -s "$SIGNED"
+          echo "apk=$SIGNED" >> "$GITHUB_OUTPUT"
+          echo "apk_name=$APK_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Verify signed APK identity, resources, alignment and certificate
+        id: apk
+        shell: bash
+        env:
+          SIGNED_APK: ${{ steps.sign.outputs.apk }}
+        run: |
+          set -euo pipefail
+          TOOLS="$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}"
+          test -s "$SIGNED_APK"
+          unzip -Z1 "$SIGNED_APK" | grep -Fx 'AndroidManifest.xml'
+          unzip -Z1 "$SIGNED_APK" | grep -Fx 'resources.arsc'
+          unzip -Z1 "$SIGNED_APK" | grep -Fx 'classes.dex'
+          RESOURCE_ENTRIES=$(unzip -Z1 "$SIGNED_APK" | grep -c '^res/')
+          test "$RESOURCE_ENTRIES" -gt 500
+          "$TOOLS/aapt" dump resources "$SIGNED_APK" >/dev/null
+          BADGING=$("$TOOLS/aapt" dump badging "$SIGNED_APK")
+          printf '%s\n' "$BADGING"
+          printf '%s\n' "$BADGING" | grep -F \
+            "package: name='${PACKAGE_NAME}' versionCode='${VERSION_CODE}' versionName='${VERSION_NAME}'"
+          printf '%s\n' "$BADGING" | grep -F "sdkVersion:'${MIN_SDK}'"
+          printf '%s\n' "$BADGING" | grep -F "targetSdkVersion:'${TARGET_SDK}'"
+          if printf '%s\n' "$BADGING" | grep -Fq 'application-debuggable'; then
+            echo 'Signed release APK must not be debuggable' >&2
+            exit 1
+          fi
+          "$TOOLS/zipalign" -c -P 16 -v 4 "$SIGNED_APK" >/dev/null
+          REPORT="$RUNNER_TEMP/ha1216-release/apk-certificates.txt"
+          "$TOOLS/apksigner" verify --verbose --print-certs \
+            --min-sdk-version 24 "$SIGNED_APK" | tee "$REPORT"
+          grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' "$REPORT"
+          grep -Fq 'Verified using v3 scheme (APK Signature Scheme v3): true' "$REPORT"
+          grep -Fq 'Number of signers: 1' "$REPORT"
+          NORMALIZED_REPORT=$(tr 'A-F' 'a-f' < "$REPORT")
+          printf '%s\n' "$NORMALIZED_REPORT" | grep -Fq \
+            "signer #1 certificate sha-256 digest: ${STABLE_CERT_SHA256}"
+          APK_SHA=$(sha256sum "$SIGNED_APK" | awk '{print $1}')
+          echo "apk_sha256=$APK_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Package exact source and machine-readable provenance
+        id: package
+        shell: bash
+        env:
+          REQUESTED_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.release_ref || github.ref }}
+          SIGNED_APK: ${{ steps.sign.outputs.apk }}
+          APK_NAME: ${{ steps.sign.outputs.apk_name }}
+          APK_SHA256: ${{ steps.apk.outputs.apk_sha256 }}
+          UNSIGNED_APK_SHA256: ${{ steps.unsigned.outputs.apk_sha256 }}
+          SOURCE_SHA: ${{ steps.identity.outputs.source_sha }}
+          SOURCE_TREE: ${{ steps.identity.outputs.source_tree }}
+          SOURCE_SHORT: ${{ steps.identity.outputs.source_short }}
+          TAG_OBJECT: ${{ steps.identity.outputs.tag_object }}
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/ha1216-release"
+          TAG_REF="refs/tags/${VERSION_NAME}"
+          SOURCE_ARCHIVE="Status-Widget-${VERSION_NAME}-source.tar.gz"
+          SOURCE_BUNDLE="Status-Widget-${VERSION_NAME}-source.bundle"
+          HELPER_ARCHIVE="KX11-iPhone-ANCS-Helper-v49-source.zip"
+          cp release-manifests/HA1216.md "$OUT/HA1216-release-notes.md"
+          git archive --format=tar.gz \
+            --prefix="Status-Widget-${VERSION_NAME}-source/" \
+            --output="$OUT/$SOURCE_ARCHIVE" "$SOURCE_SHA"
+          git bundle create "$OUT/$SOURCE_BUNDLE" "$TAG_REF"
+          git bundle verify "$OUT/$SOURCE_BUNDLE" >/dev/null
+          git archive --format=zip \
+            --prefix='KX11-iPhone-ANCS-Helper-v49/' \
+            --output="$OUT/$HELPER_ARCHIVE" \
+            "${SOURCE_SHA}:ios/KX11-iPhone-ANCS-Helper-v49"
+          SOURCE_ARCHIVE_SHA=$(sha256sum "$OUT/$SOURCE_ARCHIVE" | awk '{print $1}')
+          SOURCE_BUNDLE_SHA=$(sha256sum "$OUT/$SOURCE_BUNDLE" | awk '{print $1}')
+          HELPER_ARCHIVE_SHA=$(sha256sum "$OUT/$HELPER_ARCHIVE" | awk '{print $1}')
+          jq -n \
+            --arg schema 'status-widget-release-provenance/v1' \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg tag "$VERSION_NAME" \
+            --arg tagObjectSha "$TAG_OBJECT" \
+            --arg requestedRef "$REQUESTED_REF" \
+            --arg sourceSha "$SOURCE_SHA" \
+            --arg sourceTree "$SOURCE_TREE" \
+            --arg sourceArchiveSha256 "$SOURCE_ARCHIVE_SHA" \
+            --arg sourceBundleSha256 "$SOURCE_BUNDLE_SHA" \
+            --arg helperTree "$HELPER_TREE" \
+            --arg helperVersion "$HELPER_VERSION" \
+            --arg helperBundleId "$HELPER_BUNDLE_ID" \
+            --arg helperArchiveSha256 "$HELPER_ARCHIVE_SHA" \
+            --arg packageName "$PACKAGE_NAME" \
+            --arg versionName "$VERSION_NAME" \
+            --arg signedApk "$APK_NAME" \
+            --arg signedApkSha256 "$APK_SHA256" \
+            --arg unsignedApkSha256 "$UNSIGNED_APK_SHA256" \
+            --arg signingCertificateSha256 "$STABLE_CERT_SHA256" \
+            --arg buildTools "$BUILD_TOOLS_VERSION" \
+            --arg workflow "$GITHUB_WORKFLOW" \
+            --arg workflowRef "$GITHUB_WORKFLOW_REF" \
+            --arg workflowSha "$GITHUB_WORKFLOW_SHA" \
+            --arg runId "$GITHUB_RUN_ID" \
+            --arg runAttempt "$GITHUB_RUN_ATTEMPT" \
+            --arg actor "$GITHUB_ACTOR" \
+            --argjson versionCode "$VERSION_CODE" \
+            --argjson helperBuild "$HELPER_BUILD" \
+            --argjson minSdk "$MIN_SDK" \
+            --argjson targetSdk "$TARGET_SDK" \
+            '{schema: $schema, repository: $repository, tag: $tag,
+              tagObjectSha: $tagObjectSha, requestedRef: $requestedRef,
+              sourceSha: $sourceSha, sourceTree: $sourceTree,
+              sourceArchiveSha256: $sourceArchiveSha256,
+              sourceBundleSha256: $sourceBundleSha256,
+              helper: {version: $helperVersion, build: $helperBuild,
+                bundleId: $helperBundleId, tree: $helperTree,
+                sourceArchiveSha256: $helperArchiveSha256},
+              android: {package: $packageName, versionName: $versionName,
+                versionCode: $versionCode, minSdk: $minSdk, targetSdk: $targetSdk,
+                flavor: "geely", buildType: "release", signed: true,
+                apk: $signedApk, apkSha256: $signedApkSha256,
+                unsignedInputSha256: $unsignedApkSha256,
+                certificateSha256: $signingCertificateSha256,
+                signatureSchemes: ["v2", "v3"]},
+              validation: {unitTask: "testGeelyDebugUnitTest",
+                helperContract: "verify-v49-contract.sh",
+                buildTask: "assembleGeelyRelease", buildTools: $buildTools},
+              github: {workflow: $workflow, workflowRef: $workflowRef,
+                workflowSha: $workflowSha, runId: $runId,
+                runAttempt: $runAttempt, actor: $actor}}' \
+            > "$OUT/HA1216-provenance.json"
+          (
+            cd "$OUT"
+            sha256sum \
+              "$APK_NAME" \
+              "$SOURCE_ARCHIVE" \
+              "$SOURCE_BUNDLE" \
+              "$HELPER_ARCHIVE" \
+              HA1216-release-notes.md \
+              HA1216-provenance.json \
+              apk-certificates.txt \
+              > SHA256SUMS.txt
+            sha256sum -c SHA256SUMS.txt
+          )
+          test -z "$(find "$OUT" -maxdepth 1 -type f \
+            \( -iname '*.jks' -o -iname '*.keystore' -o -iname '*.p12' \) -print)"
+          ARTIFACT_NAME="ha1216-signed-${SOURCE_SHORT}"
+          echo "artifact_name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
+          echo "apk_name=$APK_NAME" >> "$GITHUB_OUTPUT"
+          echo "apk_sha256=$APK_SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Upload exact signed release, source and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: ${{ runner.temp }}/ha1216-release/*
+          if-no-files-found: error
+          retention-days: 90
+
+  publish:
+    name: Publish immutable HA1216 prerelease
+    needs: build-sign-verify
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Download exact verified release payload
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-sign-verify.outputs.artifact_name }}
+          path: ${{ runner.temp }}/ha1216-release
+
+      - name: Recheck artifact checksums and provenance before publication
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ needs.build-sign-verify.outputs.source_sha }}
+          SOURCE_TREE: ${{ needs.build-sign-verify.outputs.source_tree }}
+          APK_NAME: ${{ needs.build-sign-verify.outputs.apk_name }}
+          APK_SHA256: ${{ needs.build-sign-verify.outputs.apk_sha256 }}
+          UNSIGNED_APK_SHA256: ${{ needs.build-sign-verify.outputs.unsigned_apk_sha256 }}
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/ha1216-release"
+          test -s "$OUT/$APK_NAME"
+          (
+            cd "$OUT"
+            sha256sum -c SHA256SUMS.txt
+          )
+          test "$(sha256sum "$OUT/$APK_NAME" | awk '{print $1}')" = "$APK_SHA256"
+          jq -e \
+            --arg tag "$VERSION_NAME" \
+            --arg sourceSha "$SOURCE_SHA" \
+            --arg sourceTree "$SOURCE_TREE" \
+            --arg apk "$APK_NAME" \
+            --arg apkSha "$APK_SHA256" \
+            --arg unsignedApkSha "$UNSIGNED_APK_SHA256" \
+            --arg helperTree "$HELPER_TREE" \
+            --arg cert "$STABLE_CERT_SHA256" \
+            '.tag == $tag and .sourceSha == $sourceSha
+              and .sourceTree == $sourceTree
+              and .helper.tree == $helperTree
+              and .android.apk == $apk and .android.apkSha256 == $apkSha
+              and .android.unsignedInputSha256 == $unsignedApkSha
+              and .android.certificateSha256 == $cert
+              and .android.signatureSchemes == ["v2", "v3"]' \
+            "$OUT/HA1216-provenance.json" >/dev/null
+
+      - name: Create one non-overwriting signed HA1216 prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.build-sign-verify.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          if gh release view "$VERSION_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $VERSION_NAME already exists; refusing to replace signed assets" >&2
+            exit 1
+          fi
+          OUT="$RUNNER_TEMP/ha1216-release"
+          gh release create "$VERSION_NAME" "$OUT"/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --target "$SOURCE_SHA" \
+            --title "Signed candidate ${VERSION_NAME} + Helper v49" \
+            --notes-file "$OUT/HA1216-release-notes.md" \
+            --prerelease

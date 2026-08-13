@@ -108,10 +108,10 @@ public final class WidgetServiceStarter {
                 Log.i(TAG, "Integration host deferred until USER_UNLOCKED");
                 return false;
             }
-            if (runtimeParked && allowVisualSurfaceDuringQuiet) {
-                // Do not run Preferences migrations twice in the receiver and service. This
-                // direct-boot bit is the entire early admission contract; headless features stay
-                // behind the exact host generation.
+            if (allowVisualSurfaceDuringQuiet) {
+                // The visual bootstrap must stay tiny even now that HA1216 has no quiet timer.
+                // Reading the direct-boot enable bit avoids running migrations on the receiver
+                // lane; WidgetService owns them once on its background-priority state worker.
                 if (!canStartVisualSurfaceWhileRuntimeParked(
                         Preferences.isStatusWidgetEnabledForVisualBootstrap(app),
                         Permissions.allPermissionsGranted(app))) {
@@ -123,7 +123,7 @@ public final class WidgetServiceStarter {
                 cancelPendingRetry(app);
                 return true;
             }
-            Preferences preferences = new Preferences(app);
+            Preferences preferences = new Preferences(app, false);
             boolean integrationHostRequired = automaticLifecycle
                     ? requiresAutomaticIntegrationHost(preferences)
                     : requiresIntegrationHost(preferences);

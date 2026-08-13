@@ -69,7 +69,8 @@ public final class Ha1213BalancedStartupContractTest {
                 "\"Sprut.hub\"",
                 "visual scenarios",
                 "intent scenarios");
-        assertTrue(stages.contains("mainHandler.postDelayed(initialIntegrationStageRunner,"));
+        assertTrue(stages.contains("mainHandler.post(initialIntegrationStageRunner)"));
+        assertTrue(stages.contains("INITIAL_INTEGRATION_RETRY_MS"));
         String barrier = between(service, "private void runCachedStateFreshnessBarrier()",
                 "private void clearRetainedPhonePopupStateForStartup(long");
         assertTrue(barrier.contains("startupStateWorker.execute"));
@@ -96,25 +97,21 @@ public final class Ha1213BalancedStartupContractTest {
         assertFalse(start.contains("IntentScenarioController.deadlineAfter"));
     }
 
-    @Test public void bootDeadlineIsAdaptiveAndVisibleHomeKeepsDurableAlarmFallback()
+    @Test public void bootWorkIsImmediateAndKeepsDurableAlarmFallback()
             throws Exception {
         String policy = javaSource("StartupLoadPolicy.java");
-        assertTrue(policy.contains("COLD_BOOT_RUNTIME_TARGET_ELAPSED_MS = 4_500L"));
-        assertTrue(policy.contains("BOOT_EVENT_SETTLE_MS = 1_000L"));
-        assertTrue(policy.contains("QUICK_BOOT_QUIET_MS = 1_500L"));
-        assertFalse(policy.contains("LOCKED_BOOT_QUIET_MS = 12_000L"));
-        assertFalse(policy.contains("BOOT_COMPLETED_QUIET_MS = 10_000L"));
+        assertTrue(policy.contains("COLD_BOOT_RUNTIME_TARGET_ELAPSED_MS = 0L"));
+        assertTrue(policy.contains("BOOT_EVENT_SETTLE_MS = 0L"));
+        assertTrue(policy.contains("QUICK_BOOT_QUIET_MS = 0L"));
 
         String coordinator = javaSource("StartupWorkCoordinator.java");
-        assertTrue(coordinator.contains("coalescingActiveBootLane"));
-        assertTrue(coordinator.contains("StartupLoadPolicy.isBootLifecycle(trigger)"));
         assertTrue(coordinator.contains("dispatchPendingIntegrationHostIfDue"));
         assertTrue(coordinator.contains("durable AlarmManager copy is still pending"));
-        assertTrue(coordinator.contains("retainedMediaNotBefore"));
-        assertTrue(coordinator.contains("coalescingActiveBootLane && retainedHost"));
-        assertTrue(coordinator.contains("coalescingActiveBootLane && retainedClimate"));
-        assertTrue(coordinator.contains("|| coalescingActiveBootLane"));
-        assertTrue(coordinator.contains("retainedPhaseNotBefore"));
+        assertTrue(coordinator.contains("dispatchPhaseNowWithFallback"));
+        assertTrue(coordinator.contains("app.sendBroadcast(phaseIntent("));
+        assertTrue(coordinator.contains("PHASE_DELIVERY_FALLBACK_MS = 1_000L"));
+        assertFalse(coordinator.contains("coalescingActiveBootLane"));
+        assertFalse(coordinator.contains("retainedPhaseNotBefore"));
 
         String launcher = javaSource("LauncherActivity.java");
         String stop = between(launcher, "protected void onStop()",
@@ -139,9 +136,10 @@ public final class Ha1213BalancedStartupContractTest {
         String service = javaSource("WidgetService.java");
         assertTrue(application.contains("StartupPerformanceTrace.beginProcess"));
         assertTrue(application.contains("firstUsefulSurfaceSeen"));
-        assertTrue(application.contains("SURFACE_RUNTIME_GRACE_MS = 1_500L"));
-        assertTrue(application.contains("Math.max(surfaceDelay, coordinatorDelay)"));
         assertTrue(application.contains("resumeSurfaceOwnedInitialization"));
+        assertFalse(application.contains("SURFACE_RUNTIME_GRACE_MS"));
+        assertFalse(application.contains("main.postDelayed"));
+        assertTrue(application.contains("isIntegrationRuntimeReadyForApplication"));
         assertTrue(receiver.contains("resumeSurfaceOwnedInitialization(context)"));
         assertTrue(launcher.contains("launcher_first_draw"));
         assertTrue(settings.contains("addOnDrawListener"));
@@ -193,40 +191,40 @@ public final class Ha1213BalancedStartupContractTest {
         assertTrue(sprut.contains("SprutHubController nextController"));
         assertTrue(sprut.contains("PhoneSprutPresenceExporter nextPresence"));
         assertTrue(sprut.contains("PhoneSprutPresenceExporter nextAncsPresence"));
-        assertTrue(sprut.indexOf("sprutController = nextController")
+        assertTrue(sprut.indexOf("return new SprutRuntimeGraph(nextController, nextPresence,")
                 > sprut.indexOf("nextAncsPresence"));
+        assertTrue(sprut.contains("private void publishSprutRuntimeGraph"));
+        assertTrue(sprut.contains("sprutController = graph.controller"));
+        assertTrue(sprut.contains("phoneAncsPresenceExporter = graph.ancsPresence"));
         assertTrue(sprut.contains("nextController.stop()"));
 
         String car = between(service, "private void ensureCarRuntimeGraph()",
                 "private void ensureHomeAssistantRuntimeGraph()");
-        assertTrue(car.contains("CarTelemetryExporter nextExporter"));
-        assertTrue(car.indexOf("carTelemetryExporter = nextExporter")
+        assertTrue(car.contains("new CarTelemetryExporter(prefs, car, sprut, mainHandler)"));
+        assertTrue(car.indexOf("carTelemetryExporter = graph.exporter")
                 > car.indexOf("setAvailabilityChangedListener"));
-        assertTrue(car.contains("nextExporter.stop()"));
+        assertTrue(car.contains("graph.exporter.stop()"));
     }
 
-    @Test public void deferredHomeWorkStartsOnlyAfterDrawAndHasADurableNoDrawFallback()
+    @Test public void immediateHomeWorkKeepsUiAttachmentBehindBootstrapReadiness()
             throws Exception {
         String launcher = javaSource("LauncherActivity.java");
-        String start = between(launcher, "private void startDeferredHomeWorkAfterFirstDraw()",
+        String start = between(launcher, "private void startImmediateHomeRuntime()",
                 "private boolean launcherRuntimeStageReached");
-        assertTrue(start.contains("launcherFirstDrawCompleted"));
         assertTrue(start.contains("registerNavigationReceiver()"));
-        assertTrue(start.contains("globalElementRefresh"));
+        assertTrue(start.contains("requestGlobalElementRefresh()"));
         assertTrue(start.contains("startVisibleSurfaceImmediatelyAutomatically"));
+        assertTrue(start.contains("if (!launcherBootstrapReady)"));
 
         String onStart = between(launcher, "protected void onStart()",
                 "protected void onStop()");
-        assertFalse(onStart.contains("registerNavigationReceiver()"));
-        assertFalse(onStart.contains("startIfNeededAutomatically"));
-        assertFalse(onStart.contains("navigationUiHandler.post(globalElementRefresh)"));
-        assertTrue(onStart.contains("!launcherFirstDrawCompleted"));
-        String panelGate = between(launcher, "private final Runnable allowPanelInitialization",
-                "private final Runnable panelInitializationStep");
-        assertTrue(panelGate.contains("!launcherFirstDrawCompleted"));
-        assertTrue(start.contains("postDelayed(allowPanelInitialization"));
+        assertTrue(onStart.contains("navigationUiHandler.post(this::startImmediateHomeRuntime)"));
+        String bootstrap = between(launcher, "private void startLauncherBootstrapNow()",
+                "private void finishLauncherBootstrap(");
+        assertTrue(bootstrap.contains("launcherWorker.execute"));
+        assertTrue(bootstrap.contains("preferences.completeDeferredStartupMigrations()"));
         String stop = between(launcher, "protected void onStop()",
-                "private void scheduleDeferredLauncherRuntimeStart()");
+                "/** Starts migration immediately");
         assertTrue(stop.contains("ensureIntegrationHostScheduledAfter"));
         assertFalse(stop.contains("startIfNeededAutomatically"));
     }
