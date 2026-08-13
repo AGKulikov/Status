@@ -181,6 +181,8 @@ public final class LauncherActivity extends AppCompatActivity {
         }
     };
     private boolean globalElementRefreshPosted;
+    private boolean globalElementsActivated;
+    private boolean activityStarted;
     private final Runnable globalElementRefresh = () -> {
         globalElementRefreshPosted = false;
         if (!activityStarted || !globalElementsActivated
@@ -226,7 +228,6 @@ public final class LauncherActivity extends AppCompatActivity {
     private int launcherBootstrapGeneration;
     @Nullable private LauncherBootstrapState pendingLauncherBootstrapState;
     @Nullable private RuntimeException pendingLauncherBootstrapFailure;
-    private boolean globalElementsActivated;
     private boolean initialBackdropsSynchronized;
     private boolean initialBackdropLoadInFlight;
     private int initialBackdropLoadGeneration;
@@ -304,7 +305,6 @@ public final class LauncherActivity extends AppCompatActivity {
     private int runtimeBindingProbeFailures;
     private boolean runtimeBindingProbePosted;
     private final Set<String> pendingCarControls = new LinkedHashSet<>();
-    private boolean activityStarted;
     private ClimatePanelView climatePanel;
     private FavoriteRoutesPanelView favoriteRoutesPanel;
     private boolean favoriteRoutesAvailable;
