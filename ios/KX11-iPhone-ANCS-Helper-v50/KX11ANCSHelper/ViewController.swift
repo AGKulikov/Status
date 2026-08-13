@@ -18,8 +18,7 @@ final class ViewController: UIViewController {
         // managers there only opens an unusable daemon client and produces the misleading
         // "XPC connection invalid" console line.
         renderSimulatorUnavailable()
-        return
-#endif
+#else
         do {
             let runtime = try HelperSwitchRuntimeCoordinator()
             switchRuntime = runtime
@@ -36,6 +35,7 @@ final class ViewController: UIViewController {
         } catch {
             renderConstructionFailure(error)
         }
+#endif
     }
 
     private func renderSimulatorUnavailable() {

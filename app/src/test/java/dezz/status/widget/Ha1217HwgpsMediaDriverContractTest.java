@@ -97,12 +97,12 @@ public final class Ha1217HwgpsMediaDriverContractTest {
     }
 
     private static String source(String relative) throws IOException {
-        return Files.readString(project("app/src/main/java/" + relative),
+        return new String(Files.readAllBytes(project("app/src/main/java/" + relative)),
                 StandardCharsets.UTF_8);
     }
 
     private static String resource(String file) throws IOException {
-        return Files.readString(project("app/src/main/res/drawable/" + file),
+        return new String(Files.readAllBytes(project("app/src/main/res/drawable/" + file)),
                 StandardCharsets.UTF_8);
     }
 

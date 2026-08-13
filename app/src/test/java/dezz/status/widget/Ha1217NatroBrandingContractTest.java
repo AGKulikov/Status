@@ -49,7 +49,7 @@ public final class Ha1217NatroBrandingContractTest {
     }
 
     private static String project(String relative) throws IOException {
-        return Files.readString(projectPath(relative), StandardCharsets.UTF_8);
+        return new String(Files.readAllBytes(projectPath(relative)), StandardCharsets.UTF_8);
     }
 
     private static Path projectPath(String relative) {
