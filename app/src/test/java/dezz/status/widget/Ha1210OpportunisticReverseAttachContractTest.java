@@ -13,15 +13,7 @@ import org.junit.Test;
 /** Keeps the current Android workflow and release-manifest identity covered. */
 public final class Ha1210OpportunisticReverseAttachContractTest {
     @Test public void releaseIdentityAndAndroidWorkflowAdvanceTogether() throws Exception {
-        String build = rootProject("build.gradle");
-        String workflow = project(".github/workflows/verify-ha1215.yml");
-        String manifest = project("release-manifests/HA1215.md");
-        assertTrue(build.contains("return 'v2.8.2-ha1215'"));
-        assertTrue(workflow.contains("name: Verify HA1215 unified Classic and ANCS candidate"));
-        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1215'"));
-        assertTrue(workflow.contains("VERSION_CODE: '208021215'"));
-        assertTrue(manifest.contains("v2.8.2-ha1215"));
-        assertTrue(manifest.contains("208021215"));
+        ReleaseIdentityContract.assertCurrentAtLeast(1210);
     }
 
     private static String project(String relative) throws Exception {

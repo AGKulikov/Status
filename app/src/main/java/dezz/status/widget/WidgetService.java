@@ -106,6 +106,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
@@ -219,7 +220,6 @@ public class WidgetService extends Service {
     private static final int STYLE_COLOR = 1;
 
     private static final long INTERNET_PROBE_INTERVAL_MS = 30_000L;
-    private static final long WIFI_SIGNAL_REFRESH_INTERVAL_MS = 2_000L;
 
     /** Cross-fade duration for the entire overlay (show/hide / per-app hide). */
     private static final int OVERLAY_FADE_DURATION_MS = 500;
@@ -240,17 +240,15 @@ public class WidgetService extends Service {
     private static final String TAG = "WidgetService";
     private static final int NOTIFICATION_ID = 1001;
     private static final String CHANNEL_ID = "WidgetServiceChannel";
-    private static final long GNSS_STATUS_CHECK_INTERVAL = 2_000L;
+    private static final long GNSS_FIX_DEGRADED_AFTER_MS = 5_000L;
+    private static final long GNSS_FIX_OFF_AFTER_MS = 10_000L;
     private static final long GNSS_LOCATION_INTERVAL_MS = 2_000L;
     private static final long DATETIME_UPDATE_INTERVAL_MS = 60_000L;
     private static final long SYSTEM_CONDITION_REFRESH_INTERVAL_MS = 60_000L;
-    /** One connector/vendor startup per main-loop slice; never one boot-time burst. */
-    private static final long INITIAL_INTEGRATION_STAGE_MS = 650L;
-    /** QuickBoot teardown is cooperative too; it must not become a reverse startup burst. */
-    private static final long AUTOMATIC_QUIET_TEARDOWN_SLICE_MS = 180L;
+    /** A real constructor/provider failure gets a bounded retry instead of a tight loop. */
+    private static final long INITIAL_INTEGRATION_RETRY_MS = 650L;
     /** A one-off vendor/Binder rejection is retried without turning startup into a tight loop. */
     private static final int MAX_INITIAL_INTEGRATION_STAGE_RETRIES = 2;
-    private static final long INITIAL_HUD_AFTER_DRIVER_MS = 1_000L;
     /** Cadence for advancing the media progress bar while a track is actively playing. 250ms
      *  is fast enough to look smooth on a thin bar and slow enough to not show up in profilers. */
     // One repaint per second is visually sufficient for a compact status-row progress line and
@@ -289,8 +287,8 @@ public class WidgetService extends Service {
     private long startupStateOwnerToken;
     private AutomationStateStore automationStates;
     private ConnectorValueRegistry connectorValues;
-    private LocalScenarioController scenarioController;
-    private IntentScenarioController intentScenarioController;
+    private volatile LocalScenarioController scenarioController;
+    private volatile IntentScenarioController intentScenarioController;
     /**
      * Cold explicit commands may reach the foreground service while the post-visible controller
      * lane is still warming up. Retain only a small in-process queue: every entry keeps the
@@ -309,19 +307,26 @@ public class WidgetService extends Service {
             reconcileTemporaryScenarioHeadlessHost(false);
     private final Runnable temporaryScenarioHostExpiry = () ->
             reconcileTemporaryScenarioHeadlessHost(true);
-    private ConnectorActionDispatcher actionDispatcher;
+    private volatile ConnectorActionDispatcher actionDispatcher;
     private HaBrickConfigStore haConfigs;
-    private HaApiController haApiController;
-    private MqttController mqttController;
-    private SprutHubController sprutController;
-    private PhoneConnectorController phoneController;
-    private PhoneSprutPresenceExporter phonePresenceExporter;
-    private PhoneSprutPresenceExporter phoneAncsPresenceExporter;
-    private CarTelemetryExporter carTelemetryExporter;
+    private volatile HaApiController haApiController;
+    private volatile MqttController mqttController;
+    private volatile SprutHubController sprutController;
+    private volatile PhoneConnectorController phoneController;
+    private volatile PhoneSprutPresenceExporter phonePresenceExporter;
+    private volatile PhoneSprutPresenceExporter phoneAncsPresenceExporter;
+    private volatile CarTelemetryExporter carTelemetryExporter;
     private PopupOverlayManager popupOverlay;
     /** Parsed only when settings change; connector packets must never reparse the JSON document. */
     private List<HaBrickConfig> configuredMainBricks = Collections.emptyList();
     @Nullable private String configuredMainBricksJson;
+    /** Startup worker projections used by the main-only visual/listener pass. */
+    private Set<BrickType> configuredPopupBuiltinTypes = Collections.emptySet();
+    @Nullable private String configuredPopupOverlaysJson;
+    @Nullable private String configuredPopupItemsJson;
+    private Set<BrickType> configuredDriverInformationTypes = Collections.emptySet();
+    @Nullable private String configuredDriverInformationJson;
+    private boolean configuredDriverPanelEnabled;
     private final Object automationUiLock = new Object();
     private final Map<String, Set<String>> pendingAutomationUi = new LinkedHashMap<>();
     private boolean automationUiRefreshScheduled;
@@ -367,8 +372,7 @@ public class WidgetService extends Service {
             default:
                 return;
         }
-        mainHandler.postDelayed(automaticLifecycleQuietTeardown,
-                AUTOMATIC_QUIET_TEARDOWN_SLICE_MS);
+        mainHandler.post(automaticLifecycleQuietTeardown);
     }
     private final Runnable automaticVisualSurfaceRevalidation = () -> {
         if (destroyed || !automaticSurfaceRevalidationRequired || prefs == null) return;
@@ -602,6 +606,14 @@ public class WidgetService extends Service {
     private int initialIntegrationStageRetryCount;
     /** Stage zero owns persistence until its worker result is committed on the main thread. */
     private boolean startupStateBarrierInFlight;
+    /** Exactly one controller stage may prepare state on the serialized startup worker. */
+    private boolean initialIntegrationWorkerInFlight;
+    /**
+     * A prepared graph is owned here between worker completion and its main-thread publication.
+     * onDestroy atomically takes and cleans it before removing Handler callbacks.
+     */
+    private final AtomicReference<PreparedInitialIntegrationStage>
+            pendingInitialIntegrationStage = new AtomicReference<>();
     private final Runnable initialIntegrationStageRunner = this::runNextInitialIntegrationStage;
     @Nullable private DeferredIntegrationStart deferredIntegrationStart;
 
@@ -696,8 +708,10 @@ public class WidgetService extends Service {
     private boolean gnssStatusCallbackRegistered;
     private boolean locationUpdatesRegistered;
     private boolean networkCallbackRegistered;
+    private boolean wifiRssiReceiverRegistered;
     private boolean overlayAttached;
-    private long lastLocationUpdateTime = 0;
+    /** Monotonic timestamp; wall-clock changes must not prolong or expire a GNSS fix. */
+    private long lastLocationUpdateElapsed;
 
     private GradientDrawable background = null;
     private int bgColor = -1;
@@ -853,13 +867,21 @@ public class WidgetService extends Service {
     private final Runnable updateGnssStatusRunnable = new Runnable() {
         @Override
         public void run() {
-            if (System.currentTimeMillis() - lastLocationUpdateTime > 10000) {
+            if (destroyed || !locationUpdatesRegistered || lastLocationUpdateElapsed <= 0L) {
+                return;
+            }
+            long age = Math.max(0L,
+                    SystemClock.elapsedRealtime() - lastLocationUpdateElapsed);
+            if (age >= GNSS_FIX_OFF_AFTER_MS) {
                 setGnssStatus(GnssState.OFF);
-            } else if (System.currentTimeMillis() - lastLocationUpdateTime > 5000) {
+                return;
+            }
+            if (age >= GNSS_FIX_DEGRADED_AFTER_MS) {
                 setGnssStatus(GnssState.BAD);
             }
-
-            mainHandler.postDelayed(this, GNSS_STATUS_CHECK_INTERVAL);
+            long nextBoundary = age < GNSS_FIX_DEGRADED_AFTER_MS
+                    ? GNSS_FIX_DEGRADED_AFTER_MS : GNSS_FIX_OFF_AFTER_MS;
+            mainHandler.postDelayed(this, Math.max(1L, nextBoundary - age));
         }
     };
 
@@ -867,41 +889,62 @@ public class WidgetService extends Service {
         @Override
         public void onStarted() {
             Log.d(TAG, "GNSS is started");
+            lastLocationUpdateElapsed = SystemClock.elapsedRealtime();
             setGnssStatus(GnssState.BAD);
+            scheduleGnssFreshnessDeadline();
         }
 
         @Override
         public void onStopped() {
             Log.d(TAG, "GNSS is stopped");
+            lastLocationUpdateElapsed = 0L;
+            mainHandler.removeCallbacks(updateGnssStatusRunnable);
             setGnssStatus(GnssState.OFF);
         }
 
         @Override
         public void onFirstFix(int ttffMillis) {
             Log.d(TAG, "GNSS has first fix");
+            lastLocationUpdateElapsed = SystemClock.elapsedRealtime();
             setGnssStatus(GnssState.BAD);
+            scheduleGnssFreshnessDeadline();
         }
     };
 
     private final LocationListener locationListener = new LocationListener() {
         @Override
         public void onLocationChanged(@NonNull Location location) {
-            lastLocationUpdateTime = System.currentTimeMillis();
+            lastLocationUpdateElapsed = SystemClock.elapsedRealtime();
             if (location.hasAccuracy() && location.getAccuracy() < 20.0) {
                 setGnssStatus(GnssState.GOOD);
             } else {
                 setGnssStatus(GnssState.BAD);
             }
+            scheduleGnssFreshnessDeadline();
         }
 
         @Override
         public void onProviderEnabled(@NonNull String provider) {
             Log.d(TAG, "Provider enabled: " + provider);
+            lastLocationUpdateElapsed = SystemClock.elapsedRealtime();
+            setGnssStatus(GnssState.BAD);
+            scheduleGnssFreshnessDeadline();
         }
 
         @Override
         public void onProviderDisabled(@NonNull String provider) {
             Log.d(TAG, "Provider disabled: " + provider);
+            lastLocationUpdateElapsed = 0L;
+            mainHandler.removeCallbacks(updateGnssStatusRunnable);
+            setGnssStatus(GnssState.OFF);
+        }
+    };
+
+    private final BroadcastReceiver wifiRssiReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (intent != null && WifiManager.RSSI_CHANGED_ACTION.equals(intent.getAction())) {
+                refreshWifiSignalLevel();
+            }
         }
     };
 
@@ -945,17 +988,11 @@ public class WidgetService extends Service {
         @Override
         public void run() {
             if (wifiState != WiFiState.OFF) {
+                // Thirty-second safety refresh covers vendor stacks that suppress RSSI broadcasts.
+                refreshWifiSignalLevel();
                 probeReachability();
             }
             mainHandler.postDelayed(this, INTERNET_PROBE_INTERVAL_MS);
-        }
-    };
-
-    private final Runnable wifiSignalRefreshRunnable = new Runnable() {
-        @Override public void run() {
-            if (destroyed || !networkCallbackRegistered) return;
-            refreshWifiSignalLevel();
-            mainHandler.postDelayed(this, WIFI_SIGNAL_REFRESH_INTERVAL_MS);
         }
     };
 
@@ -1002,7 +1039,7 @@ public class WidgetService extends Service {
 
         // The early visual host reads geometry immediately but runs upgrade migrations inside the
         // background-priority state barrier at the delayed runtime phase.
-        prefs = new Preferences(this, !automaticRuntimeParked);
+        prefs = new Preferences(this, false);
         automationStates = new AutomationStateStore(this);
         // Cached values may be rendered in the first frame, but never as current. The persisted
         // mark-all-stale pass is intentionally delayed until after that frame.
@@ -1032,6 +1069,11 @@ public class WidgetService extends Service {
 
         if (prefs.widgetEnabled.get() && overlayRuntimeAvailable) {
             createOverlayView();
+            // Start the background freshness barrier immediately. Controller stages yield through
+            // the main queue, so WindowManager can still draw without waiting for JSON migration.
+            if (!automaticRuntimeParked && !automaticLifecycleQuiet) {
+                runInitialIntegrationStartup();
+            }
         } else if (headlessHostRequired) {
             // No visual frame exists in headless mode, so the same serialized controller lane can
             // begin immediately. It still creates and starts at most one integration per stage.
@@ -1046,7 +1088,12 @@ public class WidgetService extends Service {
 
     private void ensureMqttRuntimeGraph() {
         if (mqttController != null) return;
-        mqttController = new MqttController(this, prefs, automationStates, connectorValues,
+        mqttController = createMqttController();
+    }
+
+    @NonNull
+    private MqttController createMqttController() {
+        return new MqttController(this, prefs, automationStates, connectorValues,
                 new MqttController.StateListener() {
                     @Override public void onStateChanged(String scope, String id) {
                         onAutomationStateChanged(scope, id);
@@ -1057,6 +1104,31 @@ public class WidgetService extends Service {
                                 + ": " + detail);
                     }
                 });
+    }
+
+    private static final class SprutRuntimeGraph {
+        final SprutHubController controller;
+        final PhoneSprutPresenceExporter phonePresence;
+        final PhoneSprutPresenceExporter ancsPresence;
+
+        SprutRuntimeGraph(@NonNull SprutHubController controller,
+                          @NonNull PhoneSprutPresenceExporter phonePresence,
+                          @NonNull PhoneSprutPresenceExporter ancsPresence) {
+            this.controller = controller;
+            this.phonePresence = phonePresence;
+            this.ancsPresence = ancsPresence;
+        }
+    }
+
+    private static final class PhonePresenceRuntimeGraph {
+        final PhoneSprutPresenceExporter phonePresence;
+        final PhoneSprutPresenceExporter ancsPresence;
+
+        PhonePresenceRuntimeGraph(@NonNull PhoneSprutPresenceExporter phonePresence,
+                                  @NonNull PhoneSprutPresenceExporter ancsPresence) {
+            this.phonePresence = phonePresence;
+            this.ancsPresence = ancsPresence;
+        }
     }
 
     private void ensureSprutRuntimeGraph() {
@@ -1073,6 +1145,11 @@ public class WidgetService extends Service {
             phonePresenceExporter = null;
             phoneAncsPresenceExporter = null;
         }
+        publishSprutRuntimeGraph(createSprutRuntimeGraph());
+    }
+
+    @NonNull
+    private SprutRuntimeGraph createSprutRuntimeGraph() {
         SprutHubController nextController = new SprutHubController(
                 this, prefs, automationStates, connectorValues,
                 new SprutHubController.Listener() {
@@ -1131,10 +1208,7 @@ public class WidgetService extends Service {
             nextAncsPresence = new PhoneSprutPresenceExporter(
                     prefs, nextController, mainHandler,
                     PhoneSprutPresenceExporter.Signal.ANCS);
-            // Publish the complete bundle last.
-            sprutController = nextController;
-            phonePresenceExporter = nextPresence;
-            phoneAncsPresenceExporter = nextAncsPresence;
+            return new SprutRuntimeGraph(nextController, nextPresence, nextAncsPresence);
         } catch (RuntimeException failure) {
             try { if (nextAncsPresence != null) nextAncsPresence.stop(); }
             catch (RuntimeException ignored) { }
@@ -1145,9 +1219,53 @@ public class WidgetService extends Service {
         }
     }
 
+    /** Main-thread publication keeps callbacks from observing a partial three-object graph. */
+    private void publishSprutRuntimeGraph(@NonNull SprutRuntimeGraph graph) {
+        sprutController = graph.controller;
+        phonePresenceExporter = graph.phonePresence;
+        phoneAncsPresenceExporter = graph.ancsPresence;
+    }
+
+    private void discardSprutRuntimeGraph(@NonNull SprutRuntimeGraph graph) {
+        try { if (graph.ancsPresence != null) graph.ancsPresence.stop(); }
+        catch (RuntimeException ignored) { }
+        try { if (graph.phonePresence != null) graph.phonePresence.stop(); }
+        catch (RuntimeException ignored) { }
+        try { if (graph.controller != null) graph.controller.stop(); }
+        catch (RuntimeException ignored) { }
+    }
+
+    @NonNull
+    private PhonePresenceRuntimeGraph createPhonePresenceRuntimeGraph(
+            @NonNull SprutHubController controller) {
+        PhoneSprutPresenceExporter phone = null;
+        try {
+            phone = new PhoneSprutPresenceExporter(prefs, controller, mainHandler);
+            PhoneSprutPresenceExporter ancs = new PhoneSprutPresenceExporter(
+                    prefs, controller, mainHandler, PhoneSprutPresenceExporter.Signal.ANCS);
+            return new PhonePresenceRuntimeGraph(phone, ancs);
+        } catch (RuntimeException failure) {
+            if (phone != null) {
+                try { phone.stop(); } catch (RuntimeException ignored) { }
+            }
+            throw failure;
+        }
+    }
+
+    private void discardPhonePresenceRuntimeGraph(
+            @NonNull PhonePresenceRuntimeGraph graph) {
+        try { graph.ancsPresence.stop(); } catch (RuntimeException ignored) { }
+        try { graph.phonePresence.stop(); } catch (RuntimeException ignored) { }
+    }
+
     private void ensurePhoneRuntimeGraph() {
         if (phoneController != null) return;
-        phoneController = new PhoneConnectorController(this, prefs, connectorValues,
+        phoneController = createPhoneController();
+    }
+
+    @NonNull
+    private PhoneConnectorController createPhoneController() {
+        return new PhoneConnectorController(this, prefs, connectorValues,
                 new PhoneConnectorController.PresenceSink() {
                     @Override public void onPhoneConnectionChanged(boolean connected) {
                         PhoneSprutPresenceExporter exporter = phonePresenceExporter;
@@ -1161,28 +1279,63 @@ public class WidgetService extends Service {
                 });
     }
 
+    private static final class CarRuntimeGraph {
+        final CarIntegration car;
+        final CarTelemetryExporter exporter;
+
+        CarRuntimeGraph(@NonNull CarIntegration car, @NonNull CarTelemetryExporter exporter) {
+            this.car = car;
+            this.exporter = exporter;
+        }
+    }
+
     private void ensureCarRuntimeGraph() {
         if (carTelemetryExporter != null) return;
         ensureSprutRuntimeGraph();
+        publishCarRuntimeGraph(createCarRuntimeGraph(sprutController));
+    }
+
+    @NonNull
+    private CarRuntimeGraph createCarRuntimeGraph(@NonNull SprutHubController sprut) {
         CarIntegration car = CarIntegrations.get(this);
-        CarTelemetryExporter nextExporter = new CarTelemetryExporter(
-                prefs, car, sprutController, mainHandler);
+        return new CarRuntimeGraph(car,
+                new CarTelemetryExporter(prefs, car, sprut, mainHandler));
+    }
+
+    /** Vendor availability callbacks and service field publication remain main-thread-owned. */
+    private void publishCarRuntimeGraph(@NonNull CarRuntimeGraph graph) {
+        boolean replacingPublishedGraph = carTelemetryExporter != null;
         try {
             // Re-evaluate placeholders when the asynchronous vendor capability answer arrives.
-            car.setAvailabilityChangedListener(() -> {
-                if (binding != null) refreshCarStatusSurface();
-            });
-            carTelemetryExporter = nextExporter;
+            graph.car.setAvailabilityChangedListener(() -> mainHandler.post(() -> {
+                if (!destroyed && binding != null) refreshCarStatusSurface();
+            }));
+            carTelemetryExporter = graph.exporter;
         } catch (RuntimeException failure) {
-            try { nextExporter.stop(); } catch (RuntimeException ignored) { }
-            try { car.setAvailabilityChangedListener(null); } catch (RuntimeException ignored) { }
+            try { graph.exporter.stop(); } catch (RuntimeException ignored) { }
+            // With a current graph, the old callback is still valid. The vendor setter may throw
+            // either before or after accepting the identical service-level callback, so clearing
+            // it here would break the live graph that remains authoritative.
+            if (!replacingPublishedGraph) {
+                try { graph.car.setAvailabilityChangedListener(null); }
+                catch (RuntimeException ignored) { }
+            }
             throw failure;
         }
     }
 
+    private void discardCarRuntimeGraph(@NonNull CarRuntimeGraph graph) {
+        try { graph.exporter.stop(); } catch (RuntimeException ignored) { }
+    }
+
     private void ensureHomeAssistantRuntimeGraph() {
         if (haApiController != null) return;
-        haApiController = new HaApiController(this, prefs, automationStates, connectorValues,
+        haApiController = createHomeAssistantController();
+    }
+
+    @NonNull
+    private HaApiController createHomeAssistantController() {
+        return new HaApiController(this, prefs, automationStates, connectorValues,
                 new HaApiController.Listener() {
                     @Override public void onStateChanged(@NonNull String scope,
                                                          @NonNull String id) {
@@ -1201,26 +1354,54 @@ public class WidgetService extends Service {
                 });
     }
 
+    private static final class ScenarioRuntimeGraph {
+        final ConnectorActionDispatcher dispatcher;
+        final LocalScenarioController controller;
+
+        ScenarioRuntimeGraph(@NonNull ConnectorActionDispatcher dispatcher,
+                             @NonNull LocalScenarioController controller) {
+            this.dispatcher = dispatcher;
+            this.controller = controller;
+        }
+    }
+
     private void ensureScenarioRuntimeGraph() {
         if (scenarioController != null) return;
         ensureMqttRuntimeGraph();
         ensureSprutRuntimeGraph();
         ensureHomeAssistantRuntimeGraph();
-        ConnectorActionDispatcher nextDispatcher = new ConnectorActionDispatcher(
-                mqttController, sprutController, haApiController);
-        LocalScenarioController nextScenario = new LocalScenarioController(
+        publishScenarioRuntimeGraph(createScenarioRuntimeGraph(
+                mqttController, sprutController, haApiController));
+        ensurePopupOverlayManager();
+    }
+
+    @NonNull
+    private ScenarioRuntimeGraph createScenarioRuntimeGraph(
+            @NonNull MqttController mqtt, @NonNull SprutHubController sprut,
+            @NonNull HaApiController homeAssistant) {
+        ConnectorActionDispatcher dispatcher = new ConnectorActionDispatcher(
+                mqtt, sprut, homeAssistant);
+        LocalScenarioController controller = new LocalScenarioController(
                 prefs, automationStates, connectorValues,
                 CarIntegrations.get(this), this::onScenarioTargetsChanged);
-        actionDispatcher = nextDispatcher;
-        scenarioController = nextScenario;
-        ensurePopupOverlayManager();
+        return new ScenarioRuntimeGraph(dispatcher, controller);
+    }
+
+    private void publishScenarioRuntimeGraph(@NonNull ScenarioRuntimeGraph graph) {
+        actionDispatcher = graph.dispatcher;
+        scenarioController = graph.controller;
     }
 
     private void ensureIntentScenarioRuntimeGraph() {
         if (intentScenarioController != null) return;
         ensureScenarioRuntimeGraph();
-        IntentScenarioController next = new IntentScenarioController(this, prefs, actionDispatcher);
-        intentScenarioController = next;
+        intentScenarioController = createIntentScenarioController(actionDispatcher);
+    }
+
+    @NonNull
+    private IntentScenarioController createIntentScenarioController(
+            @NonNull ConnectorActionDispatcher dispatcher) {
+        return new IntentScenarioController(this, prefs, dispatcher);
     }
 
     private void onScenarioTargetsChanged(@NonNull Set<String> targets) {
@@ -1264,7 +1445,35 @@ public class WidgetService extends Service {
         });
     }
 
-    /** Starts the long-lived integrations once, after the first attached status frame was drawn. */
+    private static final class PreparedInitialIntegrationStage {
+        final int stage;
+        @NonNull final String name;
+        final boolean succeeded;
+        @NonNull final Runnable publication;
+        @NonNull final Runnable cleanup;
+        private boolean published;
+
+        PreparedInitialIntegrationStage(int stage, @NonNull String name, boolean succeeded,
+                                        @NonNull Runnable publication,
+                                        @NonNull Runnable cleanup) {
+            this.stage = stage;
+            this.name = name;
+            this.succeeded = succeeded;
+            this.publication = publication;
+            this.cleanup = cleanup;
+        }
+
+        void publish() {
+            publication.run();
+            published = true;
+        }
+
+        void discard() {
+            if (!published) cleanup.run();
+        }
+    }
+
+    /** Starts every enabled integration immediately; persistence and controllers run off-main. */
     private void runInitialIntegrationStartup() {
         if (destroyed || automaticRuntimeParked || automaticLifecycleQuiet
                 || integrationsStarted || initialIntegrationStartupInProgress) return;
@@ -1277,7 +1486,8 @@ public class WidgetService extends Service {
     }
 
     private void runNextInitialIntegrationStage() {
-        if (destroyed || !initialIntegrationStartupInProgress) return;
+        if (destroyed || !initialIntegrationStartupInProgress
+                || initialIntegrationWorkerInFlight) return;
         if (automaticRuntimeParked || automaticLifecycleQuiet) {
             // Keep the exact stage parked. The host-phase generation will resume it; no polling
             // and no transport/vendor construction is allowed inside the QuickBoot quiet lane.
@@ -1285,87 +1495,485 @@ public class WidgetService extends Service {
             return;
         }
         StartupPerformanceTrace.mark("integration_stage_" + initialIntegrationStage);
-        boolean stageSucceeded = true;
         switch (initialIntegrationStage) {
             case 0:
                 // Persist the session barrier before any connector is allowed to publish fresh.
                 runCachedStateFreshnessBarrier();
                 return;
             case 1:
-                // Bind selected-phone presence before the phone transport can publish a state.
-                stageSucceeded = runIntegrationStep("phone presence", () -> {
-                    ensureSprutRuntimeGraph();
-                    phonePresenceExporter.reconfigure();
-                    phoneAncsPresenceExporter.reconfigure();
-                });
-                break;
             case 2:
-                stageSucceeded = runIntegrationStep("phone", () -> {
-                    ensurePhoneRuntimeGraph();
-                    phoneController.reconfigure();
-                });
-                break;
             case 3:
-                // System listeners are useful but not required for the first visible row. Start
-                // them only now, after the fade and three serialized correctness stages.
-                stageSucceeded = runIntegrationStep("status surface runtime", () -> {
-                    if (binding != null) applyPreferences(false);
-                });
-                break;
             case 4:
-                stageSucceeded = runIntegrationStep("car telemetry", () -> {
-                    ensureCarRuntimeGraph();
-                    carTelemetryExporter.reconfigure();
-                    refreshCarStatusSurface();
-                });
-                break;
             case 5:
-                stageSucceeded = runIntegrationStep("MQTT", () -> {
-                    ensureMqttRuntimeGraph();
-                    mqttController.reconfigure();
-                });
-                break;
             case 6:
-                stageSucceeded = runIntegrationStep("Home Assistant", () -> {
-                    ensureHomeAssistantRuntimeGraph();
-                    haApiController.reconfigure();
-                });
-                break;
             case 7:
-                stageSucceeded = runIntegrationStep("Sprut.hub", () -> {
-                    ensureSprutRuntimeGraph();
-                    sprutController.reconfigure();
-                });
-                break;
             case 8:
-                stageSucceeded = runIntegrationStep("visual scenarios", () -> {
-                    ensureScenarioRuntimeGraph();
-                    scenarioController.reconfigure();
-                });
-                break;
             case 9:
-                stageSucceeded = runIntegrationStep("intent scenarios", () -> {
-                    ensureIntentScenarioRuntimeGraph();
-                    intentScenarioController.reconfigure();
-                    drainPendingIntentScenarioCommands();
-                });
-                break;
+                submitInitialIntegrationWorkerStage(initialIntegrationStage);
+                return;
             default:
                 finishInitialIntegrationStartup();
                 return;
         }
+    }
+
+    /**
+     * Submits the current stage now to the one background-priority startup lane. The worker may
+     * parse preferences, touch journals and start transport-owned threads, but it never publishes
+     * a service field or invokes view/system-listener code. Publication is one fenced main task.
+     */
+    private void submitInitialIntegrationWorkerStage(int stage) {
+        initialIntegrationWorkerInFlight = true;
+        final long ownerToken = startupStateOwnerToken;
+        try {
+            startupStateWorker.execute(() -> {
+                PreparedInitialIntegrationStage workerResult;
+                try {
+                    workerResult = prepareInitialIntegrationWorkerStage(stage);
+                } catch (RuntimeException failure) {
+                    // An unexpected parser/controller exception must still reach the main
+                    // completion path so initialIntegrationWorkerInFlight is always released.
+                    workerResult = failedInitialIntegrationStage(
+                            stage, "integration stage " + stage, failure);
+                }
+                final PreparedInitialIntegrationStage prepared = workerResult;
+                if (!ownsStartupState(ownerToken)) {
+                    discardPreparedInitialIntegrationStage(prepared);
+                    return;
+                }
+                if (!pendingInitialIntegrationStage.compareAndSet(null, prepared)) {
+                    discardPreparedInitialIntegrationStage(prepared);
+                    mainHandler.post(() -> completeInitialIntegrationWorkerStage(
+                            ownerToken, stage, null));
+                    return;
+                }
+                if (!ownsStartupState(ownerToken)) {
+                    if (pendingInitialIntegrationStage.compareAndSet(prepared, null)) {
+                        discardPreparedInitialIntegrationStage(prepared);
+                    }
+                    return;
+                }
+                mainHandler.post(() -> completeInitialIntegrationWorkerStage(
+                        ownerToken, stage, prepared));
+            });
+        } catch (RuntimeException rejected) {
+            initialIntegrationWorkerInFlight = false;
+            Log.e(TAG, "Could not schedule integration stage " + stage, rejected);
+            advanceInitialIntegrationStage(false);
+        }
+    }
+
+    /** Main-thread owner/stage fence and the only publication point for prepared controllers. */
+    private void completeInitialIntegrationWorkerStage(long ownerToken, int stage,
+                                                       @Nullable
+                                                       PreparedInitialIntegrationStage prepared) {
+        if (prepared != null
+                && !pendingInitialIntegrationStage.compareAndSet(prepared, null)) return;
+        initialIntegrationWorkerInFlight = false;
+        if (prepared == null) {
+            if (!destroyed && initialIntegrationStartupInProgress
+                    && initialIntegrationStage == stage) {
+                advanceInitialIntegrationStage(false);
+            }
+            return;
+        }
+        if (!ownsStartupState(ownerToken) || startupStateOwnerToken != ownerToken
+                || prepared.stage != stage || !initialIntegrationStartupInProgress
+                || initialIntegrationStage != stage
+                || automaticRuntimeParked || automaticLifecycleQuiet) {
+            discardPreparedInitialIntegrationStage(prepared);
+            // QuickBoot may resume and rewind to stage one while this older stage is still on the
+            // worker. Its already-posted runner observes inFlight and returns; hand ownership back
+            // here once the stale result is discarded or the rewound lane would remain stranded.
+            if (ownsStartupState(ownerToken) && startupStateOwnerToken == ownerToken
+                    && initialIntegrationStartupInProgress
+                    && !automaticRuntimeParked && !automaticLifecycleQuiet) {
+                mainHandler.post(initialIntegrationStageRunner);
+            }
+            return;
+        }
+        boolean stageSucceeded = prepared.succeeded
+                && runIntegrationStep(prepared.name + " publication", prepared::publish);
+        if (!stageSucceeded) discardPreparedInitialIntegrationStage(prepared);
+        advanceInitialIntegrationStage(stageSucceeded);
+    }
+
+    private void advanceInitialIntegrationStage(boolean stageSucceeded) {
         if (!stageSucceeded
                 && initialIntegrationStageRetryCount
                 < MAX_INITIAL_INTEGRATION_STAGE_RETRIES) {
             initialIntegrationStageRetryCount++;
             mainHandler.postDelayed(initialIntegrationStageRunner,
-                    INITIAL_INTEGRATION_STAGE_MS);
+                    INITIAL_INTEGRATION_RETRY_MS);
             return;
         }
         initialIntegrationStageRetryCount = 0;
         initialIntegrationStage++;
-        mainHandler.postDelayed(initialIntegrationStageRunner,
-                INITIAL_INTEGRATION_STAGE_MS);
+        mainHandler.post(initialIntegrationStageRunner);
+    }
+
+    private void discardPreparedInitialIntegrationStage(
+            @NonNull PreparedInitialIntegrationStage prepared) {
+        runCleanupStep(prepared.name + " unpublished startup", prepared::discard);
+    }
+
+    @NonNull
+    private PreparedInitialIntegrationStage prepareInitialIntegrationWorkerStage(int stage) {
+        switch (stage) {
+            case 1:
+                return preparePhonePresenceStage(stage);
+            case 2:
+                return preparePhoneStage(stage);
+            case 3:
+                return prepareStatusSurfaceStage(stage);
+            case 4:
+                return prepareCarTelemetryStage(stage);
+            case 5:
+                return prepareMqttStage(stage);
+            case 6:
+                return prepareHomeAssistantStage(stage);
+            case 7:
+                return prepareSprutStage(stage);
+            case 8:
+                return prepareVisualScenarioStage(stage);
+            case 9:
+                return prepareIntentScenarioStage(stage);
+            default:
+                return failedInitialIntegrationStage(stage, "unknown integration stage");
+        }
+    }
+
+    @NonNull
+    private PreparedInitialIntegrationStage preparePhonePresenceStage(int stage) {
+        SprutHubController currentController = sprutController;
+        PhoneSprutPresenceExporter currentPhone = phonePresenceExporter;
+        PhoneSprutPresenceExporter currentAncs = phoneAncsPresenceExporter;
+        if (currentController != null && currentPhone != null && currentAncs != null) {
+            PhonePresenceRuntimeGraph next = createPhonePresenceRuntimeGraph(currentController);
+            return successfulInitialIntegrationStage(stage, "phone presence", () -> {
+                if (sprutController != currentController
+                        || phonePresenceExporter != currentPhone
+                        || phoneAncsPresenceExporter != currentAncs) {
+                    throw new IllegalStateException(
+                            "Sprut presence graph changed before replacement");
+                }
+                // Both fallible reloads finish before either authoritative field changes.
+                next.phonePresence.reconfigure();
+                next.ancsPresence.reconfigure();
+                phonePresenceExporter = next.phonePresence;
+                phoneAncsPresenceExporter = next.ancsPresence;
+                runCleanupStep("replaced phone presence", currentPhone::stop);
+                runCleanupStep("replaced phone ANCS presence", currentAncs::stop);
+            }, () -> discardPhonePresenceRuntimeGraph(next));
+        }
+        if (currentController != null || currentPhone != null || currentAncs != null) {
+            return failedInitialIntegrationStage(stage, "phone presence partial graph");
+        }
+
+        SprutRuntimeGraph next = null;
+        try {
+            next = createSprutRuntimeGraph();
+            SprutRuntimeGraph prepared = next;
+            return successfulInitialIntegrationStage(stage, "phone presence", () -> {
+                if (sprutController != null || phonePresenceExporter != null
+                        || phoneAncsPresenceExporter != null) {
+                    throw new IllegalStateException("Sprut graph changed before publication");
+                }
+                // Do not leave service fields pointing at a stopped bundle if either reload fails.
+                prepared.phonePresence.reconfigure();
+                prepared.ancsPresence.reconfigure();
+                publishSprutRuntimeGraph(prepared);
+            }, () -> discardSprutRuntimeGraph(prepared));
+        } catch (RuntimeException failure) {
+            if (next != null) discardSprutRuntimeGraph(next);
+            return failedInitialIntegrationStage(stage, "phone presence", failure);
+        }
+    }
+
+    @NonNull
+    private PreparedInitialIntegrationStage preparePhoneStage(int stage) {
+        PhoneConnectorController current = phoneController;
+        if (current != null) {
+            return successfulInitialIntegrationStage(stage, "phone", () -> {
+                if (phoneController != current) {
+                    throw new IllegalStateException("Phone graph changed before reconfigure");
+                }
+                current.reconfigure();
+            }, () -> { });
+        }
+        PhoneConnectorController next = null;
+        try {
+            next = createPhoneController();
+            next.reconfigure();
+            PhoneConnectorController prepared = next;
+            return successfulInitialIntegrationStage(stage, "phone", () -> {
+                if (phoneController != null) {
+                    throw new IllegalStateException("Phone graph changed before publication");
+                }
+                phoneController = prepared;
+            }, prepared::stop);
+        } catch (RuntimeException failure) {
+            if (next != null) {
+                try { next.stop(); } catch (RuntimeException ignored) { }
+            }
+            return failedInitialIntegrationStage(stage, "phone", failure);
+        }
+    }
+
+    @NonNull
+    private PreparedInitialIntegrationStage prepareStatusSurfaceStage(int stage) {
+        boolean phonePopupReady = phoneNotificationPopupConfigured;
+        if (!phonePopupReady && prefs.phonePopupNotificationsEnabled.get()) {
+            try {
+                PhoneNotificationAutomation.ensureConfigured(prefs);
+                phonePopupReady = true;
+            } catch (JSONException | RuntimeException failure) {
+                Log.e(TAG, "Could not configure phone notification popup", failure);
+            }
+        }
+        Set<BrickType> popupTypes = immutableBrickTypes(loadPopupBuiltinTypes());
+        String popupOverlaysJson = prefs.popupOverlaysJson.get();
+        String popupItemsJson = prefs.popupItemsJson.get();
+        Set<BrickType> driverTypes = immutableBrickTypes(loadDriverInformationBrickTypes());
+        String driverInformationJson = prefs.activeDriverPanelProfile().shortcutsJson.get();
+        boolean driverPanelEnabled = prefs.driverPanelEnabled.get();
+        boolean preparedPhonePopup = phonePopupReady;
+        return successfulInitialIntegrationStage(stage, "status surface runtime", () -> {
+            phoneNotificationPopupConfigured = preparedPhonePopup;
+            configuredPopupBuiltinTypes = popupTypes;
+            configuredPopupOverlaysJson = popupOverlaysJson;
+            configuredPopupItemsJson = popupItemsJson;
+            configuredDriverInformationTypes = driverTypes;
+            configuredDriverInformationJson = driverInformationJson;
+            configuredDriverPanelEnabled = driverPanelEnabled;
+            if (binding != null) {
+                runIntegrationStep("status surface runtime main", () -> applyPreferences(false));
+            }
+        }, () -> { });
+    }
+
+    @NonNull
+    private PreparedInitialIntegrationStage prepareCarTelemetryStage(int stage) {
+        CarTelemetryExporter current = carTelemetryExporter;
+        SprutHubController sprut = sprutController;
+        if (sprut == null) {
+            return failedInitialIntegrationStage(stage, "car telemetry missing Sprut graph");
+        }
+        CarRuntimeGraph next = null;
+        try {
+            next = createCarRuntimeGraph(sprut);
+            CarRuntimeGraph prepared = next;
+            return successfulInitialIntegrationStage(stage, "car telemetry", () -> {
+                if (carTelemetryExporter != current) {
+                    throw new IllegalStateException("Car graph changed before publication");
+                }
+                // Parse and subscribe on the main thread, but do not replace the authoritative
+                // field/listener until the complete reconfigure succeeds. A retry therefore sees
+                // either the previous live exporter or a fully configured replacement.
+                prepared.exporter.reconfigure();
+                if (carTelemetryExporter != current) {
+                    throw new IllegalStateException("Car graph changed during reconfigure");
+                }
+                publishCarRuntimeGraph(prepared);
+                if (current != null) {
+                    runCleanupStep("replaced car telemetry", current::stop);
+                }
+                runIntegrationStep("car telemetry surface", this::refreshCarStatusSurface);
+            }, () -> discardCarRuntimeGraph(prepared));
+        } catch (RuntimeException failure) {
+            if (next != null) discardCarRuntimeGraph(next);
+            return failedInitialIntegrationStage(stage, "car telemetry", failure);
+        }
+    }
+
+    @NonNull
+    private PreparedInitialIntegrationStage prepareMqttStage(int stage) {
+        MqttController current = mqttController;
+        if (current != null) {
+            return successfulInitialIntegrationStage(stage, "MQTT", () -> {
+                if (mqttController != current) {
+                    throw new IllegalStateException("MQTT graph changed before reconfigure");
+                }
+                current.reconfigure();
+            }, () -> { });
+        }
+        MqttController next = null;
+        try {
+            next = createMqttController();
+            next.reconfigure();
+            MqttController prepared = next;
+            return successfulInitialIntegrationStage(stage, "MQTT", () -> {
+                if (mqttController != null) {
+                    throw new IllegalStateException("MQTT graph changed before publication");
+                }
+                mqttController = prepared;
+            }, prepared::stop);
+        } catch (RuntimeException failure) {
+            if (next != null) {
+                try { next.stop(); } catch (RuntimeException ignored) { }
+            }
+            return failedInitialIntegrationStage(stage, "MQTT", failure);
+        }
+    }
+
+    @NonNull
+    private PreparedInitialIntegrationStage prepareHomeAssistantStage(int stage) {
+        HaApiController current = haApiController;
+        if (current != null) {
+            return successfulInitialIntegrationStage(stage, "Home Assistant", () -> {
+                if (haApiController != current) {
+                    throw new IllegalStateException("HA graph changed before reconfigure");
+                }
+                current.reconfigure();
+            }, () -> { });
+        }
+        HaApiController next = null;
+        try {
+            next = createHomeAssistantController();
+            next.reconfigure();
+            HaApiController prepared = next;
+            return successfulInitialIntegrationStage(stage, "Home Assistant", () -> {
+                if (haApiController != null) {
+                    throw new IllegalStateException("HA graph changed before publication");
+                }
+                haApiController = prepared;
+            }, prepared::stop);
+        } catch (RuntimeException failure) {
+            if (next != null) {
+                try { next.stop(); } catch (RuntimeException ignored) { }
+            }
+            return failedInitialIntegrationStage(stage, "Home Assistant", failure);
+        }
+    }
+
+    @NonNull
+    private PreparedInitialIntegrationStage prepareSprutStage(int stage) {
+        SprutHubController current = sprutController;
+        if (current == null || phonePresenceExporter == null
+                || phoneAncsPresenceExporter == null) {
+            return failedInitialIntegrationStage(stage, "Sprut.hub missing runtime graph");
+        }
+        return successfulInitialIntegrationStage(stage, "Sprut.hub", () -> {
+            if (sprutController != current) {
+                throw new IllegalStateException("Sprut graph changed before reconfigure");
+            }
+            current.reconfigure();
+        }, () -> { });
+    }
+
+    @NonNull
+    private PreparedInitialIntegrationStage prepareVisualScenarioStage(int stage) {
+        LocalScenarioController current = scenarioController;
+        if (current != null && actionDispatcher != null) {
+            ConnectorActionDispatcher currentDispatcher = actionDispatcher;
+            return successfulInitialIntegrationStage(stage, "visual scenarios", () -> {
+                if (scenarioController != current || actionDispatcher != currentDispatcher) {
+                    throw new IllegalStateException(
+                            "Scenario graph changed before reconfigure");
+                }
+                current.reconfigure();
+            }, () -> { });
+        }
+        if (current != null || actionDispatcher != null || mqttController == null
+                || sprutController == null || haApiController == null) {
+            return failedInitialIntegrationStage(stage, "visual scenario partial graph");
+        }
+        ScenarioRuntimeGraph next = null;
+        try {
+            next = createScenarioRuntimeGraph(
+                    mqttController, sprutController, haApiController);
+            ScenarioRuntimeGraph prepared = next;
+            return successfulInitialIntegrationStage(stage, "visual scenarios", () -> {
+                if (scenarioController != null || actionDispatcher != null) {
+                    throw new IllegalStateException("Scenario graph changed before publication");
+                }
+                prepared.controller.reconfigure();
+                publishScenarioRuntimeGraph(prepared);
+            }, prepared.controller::destroy);
+        } catch (RuntimeException failure) {
+            if (next != null) {
+                try { next.controller.destroy(); } catch (RuntimeException ignored) { }
+            }
+            return failedInitialIntegrationStage(stage, "visual scenarios", failure);
+        }
+    }
+
+    @NonNull
+    private PreparedInitialIntegrationStage prepareIntentScenarioStage(int stage) {
+        IntentScenarioController current = intentScenarioController;
+        if (current != null) {
+            return successfulInitialIntegrationStage(stage, "intent scenarios",
+                    () -> publishIntentScenarioStage(current, false), () -> { });
+        }
+        ConnectorActionDispatcher dispatcher = actionDispatcher;
+        if (dispatcher == null) {
+            return failedInitialIntegrationStage(stage, "intent scenario missing dispatcher");
+        }
+        IntentScenarioController next = null;
+        try {
+            next = createIntentScenarioController(dispatcher);
+            IntentScenarioController prepared = next;
+            return successfulInitialIntegrationStage(stage, "intent scenarios",
+                    () -> publishIntentScenarioStage(prepared, true), prepared::destroy);
+        } catch (RuntimeException failure) {
+            if (next != null) {
+                try { next.destroy(); } catch (RuntimeException ignored) { }
+            }
+            return failedInitialIntegrationStage(stage, "intent scenarios", failure);
+        }
+    }
+
+    /**
+     * Main-publication-only boundary for IntentScenarioController maps, Handler retries and the
+     * dynamic receiver. A stale worker result is destroyed without ever entering this method.
+     */
+    private void publishIntentScenarioStage(@NonNull IntentScenarioController controller,
+                                            boolean publishNewController) {
+        if (publishNewController) {
+            if (intentScenarioController != null) {
+                throw new IllegalStateException("Intent graph changed before publication");
+            }
+            // Publish before receiver registration so even an immediate main-loop broadcast can
+            // resolve the controller through the service's authoritative field.
+            intentScenarioController = controller;
+        } else if (intentScenarioController != controller) {
+            throw new IllegalStateException("Intent graph changed before reconfigure");
+        }
+        try {
+            controller.reconfigure();
+        } catch (RuntimeException failure) {
+            if (publishNewController && intentScenarioController == controller) {
+                intentScenarioController = null;
+                controller.destroy();
+            }
+            throw failure;
+        }
+        runIntegrationStep("pending intent scenarios",
+                () -> drainPendingIntentScenarioCommands(false));
+    }
+
+    @NonNull
+    private PreparedInitialIntegrationStage successfulInitialIntegrationStage(
+            int stage, @NonNull String name, @NonNull Runnable publication,
+            @NonNull Runnable cleanup) {
+        return new PreparedInitialIntegrationStage(
+                stage, name, true, publication, cleanup);
+    }
+
+    @NonNull
+    private PreparedInitialIntegrationStage failedInitialIntegrationStage(
+            int stage, @NonNull String name) {
+        Log.e(TAG, "Could not configure " + name);
+        return new PreparedInitialIntegrationStage(
+                stage, name, false, () -> { }, () -> { });
+    }
+
+    @NonNull
+    private PreparedInitialIntegrationStage failedInitialIntegrationStage(
+            int stage, @NonNull String name, @NonNull RuntimeException failure) {
+        Log.e(TAG, "Could not configure " + name, failure);
+        return new PreparedInitialIntegrationStage(
+                stage, name, false, () -> { }, () -> { });
     }
 
     private void runCachedStateFreshnessBarrier() {
@@ -1402,15 +2010,13 @@ public class WidgetService extends Service {
                     configuredMainBricksJson = immutableMainJson;
                     StartupPerformanceTrace.mark("cached_state_ready");
                     if (automaticRuntimeParked || automaticLifecycleQuiet) return;
-                    mainHandler.postDelayed(initialIntegrationStageRunner,
-                            INITIAL_INTEGRATION_STAGE_MS);
+                    mainHandler.post(initialIntegrationStageRunner);
                 });
             });
         } catch (RuntimeException rejected) {
             startupStateBarrierInFlight = false;
             Log.e(TAG, "Could not schedule cached-state freshness barrier", rejected);
-            mainHandler.postDelayed(initialIntegrationStageRunner,
-                    INITIAL_INTEGRATION_STAGE_MS);
+            mainHandler.post(initialIntegrationStageRunner);
         }
     }
 
@@ -1467,11 +2073,11 @@ public class WidgetService extends Service {
         automaticSurfaceReconcilePending = false;
         if (prefs.driverPanelEnabled.get()) DriverPanelService.apply(this);
         if (prefs.hudPanelEnabled.get() && prefs.hudPanelAutostart.get()) {
-            mainHandler.postDelayed(() -> {
+            mainHandler.post(() -> {
                 if (!destroyed && prefs != null && prefs.hudPanelEnabled.get()) {
                     HudPresentationService.notifyAutomationChanged(this);
                 }
-            }, INITIAL_HUD_AFTER_DRIVER_MS);
+            });
         }
         synchronized (automationUiLock) {
             // Driver/HUD are reconciled exactly once above from the final startup state.
@@ -1488,8 +2094,7 @@ public class WidgetService extends Service {
                         - (now % SYSTEM_CONDITION_REFRESH_INTERVAL_MS));
         if (credentialRefreshPending) {
             credentialRefreshPending = false;
-            mainHandler.postDelayed(this::reconfigureCredentialBackedIntegrationsAfterUnlock,
-                    INITIAL_INTEGRATION_STAGE_MS);
+            mainHandler.post(this::reconfigureCredentialBackedIntegrationsAfterUnlock);
         } else {
             schedulePendingIntegrationReconfigure();
         }
@@ -1724,8 +2329,18 @@ public class WidgetService extends Service {
     }
 
     private void drainPendingIntentScenarioCommands() {
+        drainPendingIntentScenarioCommands(true);
+    }
+
+    /**
+     * Startup stage nine has just loaded the current rules on the worker, so its main publication
+     * must not parse the same JSON once per queued command. Other callers retain the strict
+     * reload-before-lookup boundary used after settings edits.
+     */
+    private void drainPendingIntentScenarioCommands(boolean reloadRules) {
         if (destroyed || pendingIntentScenarioCommands.isEmpty()) return;
         if (intentScenarioController == null) {
+            if (!reloadRules) return;
             if (!integrationsStarted) return;
             runIntegrationStep("intent scenarios on demand", () -> {
                 ensureIntentScenarioRuntimeGraph();
@@ -1737,7 +2352,7 @@ public class WidgetService extends Service {
         while ((command = pendingIntentScenarioCommands.pollFirst()) != null) {
             // Reload before lookup so a broadcast accepted from the latest device-protected
             // preferences cannot execute an older in-memory target after a settings edit.
-            intentScenarioController.reconfigure();
+            if (reloadRules) intentScenarioController.reconfigure();
             intentScenarioController.triggerRuleId(
                     command.getStringExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_ID),
                     command.getStringExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_TOKEN),
@@ -2112,7 +2727,7 @@ public class WidgetService extends Service {
         overlayHiddenByApp = false;
         wifiState = WiFiState.OFF;
         gnssState = GnssState.OFF;
-        lastLocationUpdateTime = 0L;
+        lastLocationUpdateElapsed = 0L;
         btConnectedAddrs.clear();
         bluetoothState = BluetoothState.OFF;
         phoneAncsReady = false;
@@ -2183,6 +2798,18 @@ public class WidgetService extends Service {
         createOverlayView();
     }
 
+    /** Reattaches only the WindowManager root after QuickBoot; live connectors stay untouched. */
+    public void revalidateAutomaticVisualSurfaceAfterQuickBoot() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post(this::revalidateAutomaticVisualSurfaceAfterQuickBoot);
+            return;
+        }
+        if (destroyed || prefs == null || !prefs.widgetEnabled.get()
+                || !Permissions.allPermissionsGranted(this)) return;
+        automaticSurfaceRevalidationRequired = false;
+        revalidateStatusOverlayWindowOnly("immediate QuickBoot surface revalidation");
+    }
+
     /**
      * QuickBoot can preserve this integration host while WindowManager/HUD processes are
      * recreated. Reconcile automatic surfaces after the quiet lane without reconnecting any
@@ -2244,13 +2871,13 @@ public class WidgetService extends Service {
                     () -> DriverPanelService.apply(this));
         }
         if (prefs.hudPanelEnabled.get() && prefs.hudPanelAutostart.get()) {
-            mainHandler.postDelayed(() -> {
+            mainHandler.post(() -> {
                 if (!destroyed && prefs != null && prefs.hudPanelEnabled.get()
                         && prefs.hudPanelAutostart.get()) {
                     runIntegrationStep("automatic HUD surface reconcile",
                             () -> HudPresentationService.reconcileAutomaticLifecycle(this));
                 }
-            }, INITIAL_HUD_AFTER_DRIVER_MS);
+            });
         }
         schedulePendingAutomationUiRefresh();
     }
@@ -2332,7 +2959,7 @@ public class WidgetService extends Service {
         };
         for (int index = 0; index < stages.length; index++) {
             final int stage = index;
-            mainHandler.postDelayed(() -> {
+            mainHandler.post(() -> {
                 if (destroyed || automaticRuntimeParked || automaticLifecycleQuiet
                         || generation != automaticLifecycleResumeGeneration) return;
                 runIntegrationStep("automatic lifecycle resume " + stage, stages[stage]);
@@ -2340,7 +2967,7 @@ public class WidgetService extends Service {
                     schedulePendingAutomationUiRefresh();
                     finishAutomaticSurfaceReconcileIfReady();
                 }
-            }, (stage + 1L) * INITIAL_INTEGRATION_STAGE_MS);
+            });
         }
     }
 
@@ -2376,13 +3003,13 @@ public class WidgetService extends Service {
             ensureMqttRuntimeGraph();
             mqttController.reconfigure();
         });
-        mainHandler.postDelayed(() -> {
+        mainHandler.post(() -> {
             if (destroyed) return;
             runIntegrationStep("Home Assistant unlock", () -> {
                 ensureHomeAssistantRuntimeGraph();
                 haApiController.reconfigure();
             });
-            mainHandler.postDelayed(() -> {
+            mainHandler.post(() -> {
                 if (destroyed) return;
                 runIntegrationStep("Sprut.hub unlock", () -> {
                     ensureSprutRuntimeGraph();
@@ -2391,8 +3018,8 @@ public class WidgetService extends Service {
                 credentialRefreshScheduled = false;
                 schedulePendingIntegrationReconfigure();
                 schedulePendingAutomationUiRefresh();
-            }, INITIAL_INTEGRATION_STAGE_MS);
-        }, INITIAL_INTEGRATION_STAGE_MS);
+            });
+        });
     }
 
     /** Queues a fresh direct handshake for the explicit test button in Phone settings. */
@@ -2672,14 +3299,28 @@ public class WidgetService extends Service {
         }
         mainHandler.removeCallbacks(reachabilityProbeRunnable);
         mainHandler.postDelayed(reachabilityProbeRunnable, INTERNET_PROBE_INTERVAL_MS);
-        mainHandler.removeCallbacks(wifiSignalRefreshRunnable);
         refreshWifiSignalLevel();
-        mainHandler.postDelayed(wifiSignalRefreshRunnable, WIFI_SIGNAL_REFRESH_INTERVAL_MS);
+        if (!wifiRssiReceiverRegistered) {
+            try {
+                registerReceiver(wifiRssiReceiver,
+                        new IntentFilter(WifiManager.RSSI_CHANGED_ACTION));
+                wifiRssiReceiverRegistered = true;
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "Could not register Wi-Fi RSSI receiver", failure);
+            }
+        }
     }
 
     private void stopConnectivityTracking() {
         mainHandler.removeCallbacks(reachabilityProbeRunnable);
-        mainHandler.removeCallbacks(wifiSignalRefreshRunnable);
+        if (wifiRssiReceiverRegistered) {
+            try {
+                unregisterReceiver(wifiRssiReceiver);
+            } catch (RuntimeException failure) {
+                Log.w(TAG, "Wi-Fi RSSI receiver was already unregistered", failure);
+            }
+            wifiRssiReceiverRegistered = false;
+        }
         ConnectivityManager manager = connectivityManager;
         if (manager != null && networkCallbackRegistered) {
             try {
@@ -2730,8 +3371,22 @@ public class WidgetService extends Service {
             }
         }
 
+        scheduleGnssFreshnessDeadline();
+    }
+
+    private void scheduleGnssFreshnessDeadline() {
         mainHandler.removeCallbacks(updateGnssStatusRunnable);
-        mainHandler.postDelayed(updateGnssStatusRunnable, GNSS_STATUS_CHECK_INTERVAL);
+        if (!locationUpdatesRegistered || lastLocationUpdateElapsed <= 0L) return;
+        long age = Math.max(0L,
+                SystemClock.elapsedRealtime() - lastLocationUpdateElapsed);
+        if (age >= GNSS_FIX_OFF_AFTER_MS) {
+            mainHandler.post(updateGnssStatusRunnable);
+        } else {
+            long boundary = age < GNSS_FIX_DEGRADED_AFTER_MS
+                    ? GNSS_FIX_DEGRADED_AFTER_MS : GNSS_FIX_OFF_AFTER_MS;
+            mainHandler.postDelayed(updateGnssStatusRunnable,
+                    Math.max(1L, boundary - age));
+        }
     }
 
     private void stopLocationTracking() {
@@ -2753,6 +3408,7 @@ public class WidgetService extends Service {
         }
         locationUpdatesRegistered = false;
         gnssStatusCallbackRegistered = false;
+        lastLocationUpdateElapsed = 0L;
         locationManager = null;
     }
 
@@ -2814,6 +3470,22 @@ public class WidgetService extends Service {
     }
 
     private Set<BrickType> popupBuiltinTypes() {
+        String overlaysJson = prefs.popupOverlaysJson.get();
+        String itemsJson = prefs.popupItemsJson.get();
+        if (Objects.equals(overlaysJson, configuredPopupOverlaysJson)
+                && Objects.equals(itemsJson, configuredPopupItemsJson)) {
+            return configuredPopupBuiltinTypes;
+        }
+        Set<BrickType> result = immutableBrickTypes(loadPopupBuiltinTypes());
+        // A legacy load may persist its projection, so capture the post-load documents.
+        configuredPopupOverlaysJson = prefs.popupOverlaysJson.get();
+        configuredPopupItemsJson = prefs.popupItemsJson.get();
+        configuredPopupBuiltinTypes = result;
+        return result;
+    }
+
+    @NonNull
+    private Set<BrickType> loadPopupBuiltinTypes() {
         Set<BrickType> result = EnumSet.noneOf(BrickType.class);
         Set<String> enabledOverlays = new HashSet<>();
         for (PopupOverlayConfig overlay : new PopupOverlayConfigStore(prefs).load()) {
@@ -2828,6 +3500,13 @@ public class WidgetService extends Service {
             }
         }
         return result;
+    }
+
+    @NonNull
+    private static Set<BrickType> immutableBrickTypes(@NonNull Set<BrickType> source) {
+        Set<BrickType> copy = EnumSet.noneOf(BrickType.class);
+        copy.addAll(source);
+        return Collections.unmodifiableSet(copy);
     }
 
     private boolean isPopupBuiltinRequested(BrickType type) {
@@ -4157,9 +4836,9 @@ public class WidgetService extends Service {
         if (!integrationReconfigurePending || automaticSurfaceRefreshSuppressed()
                 || destroyed) return;
         integrationReconfigurePending = false;
-        mainHandler.postDelayed(() -> {
+        mainHandler.post(() -> {
             if (!destroyed) applyPreferences(true);
-        }, INITIAL_INTEGRATION_STAGE_MS);
+        });
     }
 
     private void schedulePendingAutomationUiRefresh() {
@@ -4376,6 +5055,24 @@ public class WidgetService extends Service {
 
     @NonNull
     private Set<BrickType> driverInformationBrickTypes() {
+        boolean enabled = prefs != null && prefs.driverPanelEnabled.get();
+        String json = prefs == null ? ""
+                : prefs.activeDriverPanelProfile().shortcutsJson.get();
+        if (configuredDriverInformationJson != null
+                && enabled == configuredDriverPanelEnabled
+                && Objects.equals(json, configuredDriverInformationJson)) {
+            return configuredDriverInformationTypes;
+        }
+        Set<BrickType> result = immutableBrickTypes(loadDriverInformationBrickTypes());
+        configuredDriverPanelEnabled = enabled;
+        configuredDriverInformationJson = prefs == null ? ""
+                : prefs.activeDriverPanelProfile().shortcutsJson.get();
+        configuredDriverInformationTypes = result;
+        return result;
+    }
+
+    @NonNull
+    private Set<BrickType> loadDriverInformationBrickTypes() {
         Set<BrickType> result = EnumSet.noneOf(BrickType.class);
         if (prefs == null || !prefs.driverPanelEnabled.get()) return result;
         for (LauncherShortcutStore.Shortcut shortcut :
@@ -6046,6 +6743,9 @@ public class WidgetService extends Service {
     public void onDestroy() {
         destroyed = true;
         instance = null;
+        // A first-useful-surface event may have been waiting solely for this host's readiness.
+        // Once the host is gone, let Application finish its immediate event-driven initialization.
+        StatusWidgetApplication.resumeSurfaceOwnedInitialization(this);
         long ownerToken = startupStateOwnerToken;
         if (ownerToken != 0L) {
             STARTUP_STATE_OWNER.compareAndSet(ownerToken, ownerToken + 1L);
@@ -6059,6 +6759,10 @@ public class WidgetService extends Service {
         integrationStartupScheduled = false;
         cancelDeferredIntegrationStart();
         startupStateWorker.shutdownNow();
+        initialIntegrationWorkerInFlight = false;
+        PreparedInitialIntegrationStage unpublished =
+                pendingInitialIntegrationStage.getAndSet(null);
+        if (unpublished != null) discardPreparedInitialIntegrationStage(unpublished);
 
         mainHandler.removeCallbacksAndMessages(null);
 

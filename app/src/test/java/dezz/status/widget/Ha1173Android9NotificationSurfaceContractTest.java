@@ -47,8 +47,6 @@ public final class Ha1173Android9NotificationSurfaceContractTest {
 
     @Test public void existingStyleKeysAndUpdateIdentityArePreserved() throws Exception {
         String config = source("phone/PhoneNotificationLayoutConfig.java");
-        String build = project("build.gradle");
-        if (!build.contains("String getVersionName()")) build = project("../build.gradle");
 
         assertTrue(config.contains("backgroundColor"));
         assertTrue(config.contains("backgroundAlpha"));
@@ -56,7 +54,7 @@ public final class Ha1173Android9NotificationSurfaceContractTest {
         assertTrue(config.contains("borderWidthPx"));
         assertTrue(config.contains("borderColor"));
         assertTrue(config.contains("iconCornerRadiusPx"));
-        assertTrue(build.contains("return 'v2.8.2-ha1215'"));
+        ReleaseIdentityContract.assertCurrentAtLeast(1173);
     }
 
     private static String source(String relative) throws Exception {

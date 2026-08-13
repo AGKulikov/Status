@@ -89,16 +89,7 @@ public final class Ha1204LiveClimateAndModernIconContractTest {
     }
 
     @Test public void releaseIdentityIsMonotonicAndInstallCompatible() throws Exception {
-        String rootBuild = rootProject("build.gradle");
-        String workflow = project(".github/workflows/verify-ha1215.yml");
-        String manifest = project("release-manifests/HA1215.md");
-        assertTrue(rootBuild.contains("return 'v2.8.2-ha1215'"));
-        assertTrue(workflow.contains("name: Verify HA1215 unified Classic and ANCS candidate"));
-        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1215'"));
-        assertTrue(workflow.contains("VERSION_CODE: '208021215'"));
-        assertTrue(workflow.contains("LiveClimateIconPolicyTest"));
-        assertTrue(manifest.contains("`ru.natro.statuswidget`"));
-        assertTrue(manifest.contains("208021215"));
+        ReleaseIdentityContract.assertCurrentAtLeast(1204);
     }
 
     private static Set<String> noticeResources(String notice) {

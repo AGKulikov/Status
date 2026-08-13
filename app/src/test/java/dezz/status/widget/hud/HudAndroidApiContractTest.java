@@ -27,6 +27,7 @@ public final class HudAndroidApiContractTest {
         assertFalse(source.contains("import dezz.status.widget.BuildConfig"));
         assertFalse(source.contains("BuildConfig.VERSION_NAME"));
         assertTrue(source.contains("getPackageInfo(context.getPackageName(), 0).versionName"));
+        assertTrue(source.contains("if (cachedAppVersion != null) return cachedAppVersion"));
     }
 
     @Test public void systemHudMaskLivesAboveEcarxDaemonAndHasSafeFallback()
@@ -43,7 +44,8 @@ public final class HudAndroidApiContractTest {
         assertTrue(client.contains("display.getDisplayId() == HudViewportPolicy.VERIFIED_DISPLAY_ID"));
         assertTrue(client.contains("? HudViewportPolicy.VERIFIED_LAYER_STACK"));
         assertFalse(client.contains("? 1 : Math.max(0, display.getDisplayId())"));
-        assertTrue(client.contains("pendingFrame.getAndSet(null)"));
+        assertTrue(client.contains("pendingFrame = target"));
+        assertTrue(client.contains("frame.bitmap.compress(Bitmap.CompressFormat.PNG"));
         assertTrue(client.contains("runLongRunningCommand"));
         assertFalse(client.contains(">/dev/null 2>&1 &)"));
         assertTrue(service.contains("showWindowManagerFallback(display)"));

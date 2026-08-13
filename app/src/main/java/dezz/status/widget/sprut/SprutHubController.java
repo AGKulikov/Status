@@ -1009,10 +1009,9 @@ public final class SprutHubController {
             cachedCatalogLoadSignature = expectedSignature;
         }
         try {
-            // Let WindowManager render the status row before competing for CPU with a large JSON
-            // parse on low-end head units.
-            scheduler.schedule(() -> loadCachedCatalog(expectedSignature),
-                    1_500L, TimeUnit.MILLISECONDS);
+            // Parse immediately, but stay serialized on this controller's background-priority
+            // worker so a large cache never blocks the visual/main thread.
+            scheduler.execute(() -> loadCachedCatalog(expectedSignature));
         } catch (RejectedExecutionException ignored) {
             // stop() won a race with settings; there is no cache consumer left.
         }

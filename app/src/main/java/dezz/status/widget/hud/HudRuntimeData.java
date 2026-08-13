@@ -28,6 +28,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import dezz.status.widget.AppProcessPolicy;
 import dezz.status.widget.WidgetService;
 import dezz.status.widget.WidgetServiceStarter;
 import dezz.status.widget.automation.AutomationContract;
@@ -49,6 +50,10 @@ import dezz.status.widget.launcher.NavigationDataRepository;
 public final class HudRuntimeData {
     public interface Listener { void onHudDataChanged(); }
 
+    private static final long HOST_ATTACH_RETRY_MS = 1_000L;
+    private static final long HOST_LIVENESS_CHECK_MS = 30_000L;
+    private static final long CLOCK_TICK_SLOP_MS = 25L;
+
     @NonNull private final Context context;
     @NonNull private final Listener listener;
     @NonNull private final Handler main = new Handler(Looper.getMainLooper());
@@ -57,6 +62,7 @@ public final class HudRuntimeData {
     @NonNull private final LauncherMediaController mediaController;
     @NonNull private final CarIntegration carIntegration;
     @NonNull private AutomationStateStore retainedAutomation;
+    @NonNull private final Map<String, AutomationState> retainedAutomationCache = new HashMap<>();
     @NonNull private final NavigatorMapFrameProvider navigatorMap;
     @NonNull private final Map<String, CarIntegration.TelemetryValue> telemetry = new HashMap<>();
     @NonNull private final Map<String, ConnectorValue> connectorValues = new HashMap<>();
@@ -64,15 +70,18 @@ public final class HudRuntimeData {
     @Nullable private NavigationDataRepository.Snapshot navigation;
     @Nullable private LauncherMediaController.Snapshot media;
     @Nullable private WidgetService attachedHost;
+    @Nullable private String cachedAppVersion;
+    private final boolean isolatedHudProcess;
     private boolean started;
     private boolean navigationReceiverRegistered;
     @NonNull private final NavigatorMapFrameProvider.Listener navigatorMapListener =
             this::notifyChanged;
 
-    private final CarIntegration.TelemetryListener telemetryListener = value -> {
+    private final CarIntegration.TelemetryListener telemetryListener = value -> runOnMain(() -> {
+        if (!started) return;
         telemetry.put(value.id, value);
         notifyChanged();
-    };
+    });
     private final ConnectorValueRegistry.Listener connectorListener = changed -> {
         List<ConnectorValue> copy = new ArrayList<>(changed);
         main.post(() -> {
@@ -88,12 +97,22 @@ public final class HudRuntimeData {
             }
         }
     };
-    private final Runnable ticker = new Runnable() {
+    /** Main-process editor only: retry promptly until its already-started WidgetService appears. */
+    private final Runnable hostProbe = new Runnable() {
         @Override public void run() {
-            if (!started) return;
-            attachIntegrationHost();
+            if (!started || isolatedHudProcess) return;
+            boolean changed = attachIntegrationHost();
+            if (changed) notifyChanged();
+            main.postDelayed(this, attachedHost == null
+                    ? HOST_ATTACH_RETRY_MS : HOST_LIVENESS_CHECK_MS);
+        }
+    };
+    /** CLOCK has minute precision, so it only invalidates at the next visible minute boundary. */
+    private final Runnable clockTick = new Runnable() {
+        @Override public void run() {
+            if (!started || !hasEnabledClock()) return;
             notifyChanged();
-            main.postDelayed(this, 1_000L);
+            scheduleClockTick();
         }
     };
 
@@ -103,10 +122,12 @@ public final class HudRuntimeData {
         this.context = app == null ? context : app;
         this.config = config;
         this.listener = listener;
-        mediaController = new LauncherMediaController(this.context, state -> {
+        isolatedHudProcess = AppProcessPolicy.isHudProcess();
+        mediaController = new LauncherMediaController(this.context, state -> runOnMain(() -> {
+            if (!started) return;
             media = state;
             notifyChanged();
-        });
+        }));
         carIntegration = CarIntegrations.get(this.context);
         retainedAutomation = new AutomationStateStore(this.context);
         navigatorMap = NavigatorMapFrameProvider.get(this.context);
@@ -129,15 +150,20 @@ public final class HudRuntimeData {
         navigatorMap.attach(config, navigatorMapListener);
         reconfigureVehicleSubscription();
         WidgetServiceStarter.startIfNeeded(context);
-        attachIntegrationHost();
-        main.removeCallbacks(ticker);
-        main.post(ticker);
+        if (!isolatedHudProcess) {
+            attachIntegrationHost();
+            main.removeCallbacks(hostProbe);
+            main.postDelayed(hostProbe, attachedHost == null
+                    ? HOST_ATTACH_RETRY_MS : HOST_LIVENESS_CHECK_MS);
+        }
+        scheduleClockTick();
     }
 
     public void stop() {
         if (!started) return;
         started = false;
-        main.removeCallbacks(ticker);
+        main.removeCallbacks(hostProbe);
+        main.removeCallbacks(clockTick);
         navigatorMap.detach(navigatorMapListener);
         mediaController.stop();
         carIntegration.unsubscribeTelemetry(telemetryListener);
@@ -153,6 +179,7 @@ public final class HudRuntimeData {
         navigationWorker = null;
         navigationReadQueued.set(false);
         if (worker != null) worker.shutdownNow();
+        retainedAutomationCache.clear();
     }
 
     public void updateConfig(@NonNull HudPanelConfig next) {
@@ -160,6 +187,7 @@ public final class HudRuntimeData {
         if (started) {
             navigatorMap.update(next, navigatorMapListener);
             reconfigureVehicleSubscription();
+            scheduleClockTick();
         }
         notifyChanged();
     }
@@ -168,6 +196,7 @@ public final class HudRuntimeData {
     public void refreshCrossProcessState() {
         runOnMain(() -> {
             retainedAutomation = new AutomationStateStore(context);
+            retainedAutomationCache.clear();
             refreshNavigation();
             notifyChanged();
         });
@@ -182,7 +211,17 @@ public final class HudRuntimeData {
     public AutomationState automation(@NonNull HudElementConfig item) {
         WidgetService host = attachedHost;
         if (host != null) return host.hudAutomationState(item.automationId);
-        return retainedAutomation.get(AutomationContract.SCOPE_HUD, item.automationId);
+        // Main-process editor state may include volatile local scenario overrides, so only the
+        // isolated HUD caches its explicitly invalidated, cross-process preference snapshot.
+        if (!isolatedHudProcess) {
+            return retainedAutomation.get(AutomationContract.SCOPE_HUD, item.automationId);
+        }
+        AutomationState cached = retainedAutomationCache.get(item.automationId);
+        if (cached != null) return cached;
+        AutomationState loaded = retainedAutomation.get(
+                AutomationContract.SCOPE_HUD, item.automationId);
+        retainedAutomationCache.put(item.automationId, loaded);
+        return loaded;
     }
 
     @Nullable
@@ -486,9 +525,10 @@ public final class HudRuntimeData {
         carIntegration.subscribeTelemetry(Collections.unmodifiableSet(ids), telemetryListener);
     }
 
-    private void attachIntegrationHost() {
+    private boolean attachIntegrationHost() {
+        if (isolatedHudProcess) return false;
         WidgetService current = WidgetService.getInstance();
-        if (current == attachedHost) return;
+        if (current == attachedHost) return false;
         WidgetService previous = attachedHost;
         attachedHost = null;
         if (previous != null) previous.removeConnectorValueListener(connectorListener);
@@ -498,6 +538,7 @@ public final class HudRuntimeData {
             mergeConnectorValues(snapshot);
             attachedHost = current;
         }
+        return true;
     }
 
     private void mergeConnectorValues(@NonNull Collection<ConnectorValue> values) {
@@ -540,6 +581,10 @@ public final class HudRuntimeData {
     }
 
     private void notifyChanged() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            main.post(this::notifyChanged);
+            return;
+        }
         if (!started) return;
         try { listener.onHudDataChanged(); }
         catch (RuntimeException ignored) {}
@@ -550,22 +595,47 @@ public final class HudRuntimeData {
         else main.post(action);
     }
 
+    private boolean hasEnabledClock() {
+        for (HudElementConfig item : config.elements) {
+            if (item.enabled && item.type == HudElementType.CLOCK) return true;
+        }
+        return false;
+    }
+
+    private void scheduleClockTick() {
+        main.removeCallbacks(clockTick);
+        if (!started || !hasEnabledClock()) return;
+        long wallMillis = System.currentTimeMillis();
+        long delay = 60_000L - Math.floorMod(wallMillis, 60_000L) + CLOCK_TICK_SLOP_MS;
+        main.postDelayed(clockTick, delay);
+    }
+
     @NonNull
     private String appVersion() {
+        if (cachedAppVersion != null) return cachedAppVersion;
+        String resolved;
         try {
             String version = context.getPackageManager()
                     .getPackageInfo(context.getPackageName(), 0).versionName;
-            return version == null || version.trim().isEmpty() ? "—" : version.trim();
+            resolved = version == null || version.trim().isEmpty() ? "—" : version.trim();
         } catch (android.content.pm.PackageManager.NameNotFoundException
                  | RuntimeException ignored) {
-            return "—";
+            resolved = "—";
         }
+        cachedAppVersion = resolved;
+        return resolved;
     }
 
     @NonNull
     private static ExecutorService newNavigationWorker() {
         return Executors.newSingleThreadExecutor(runnable -> {
-            Thread thread = new Thread(runnable, "hud-navigation-reader");
+            Thread thread = new Thread(() -> {
+                try {
+                    android.os.Process.setThreadPriority(
+                            android.os.Process.THREAD_PRIORITY_BACKGROUND);
+                } catch (RuntimeException ignored) {}
+                runnable.run();
+            }, "hud-navigation-reader");
             thread.setDaemon(true);
             return thread;
         });

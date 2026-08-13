@@ -7,10 +7,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-/** Executable truth table for the coalesced, low-contention boot lane. */
+/** Executable truth table for immediate, coalesced startup admission. */
 public final class StartupLoadPolicyTest {
-    @Test public void lockedBootRecordsQuietButStartsNoHeavySurface() {
-        assertEquals(4_500L, StartupLoadPolicy.quietWindowMillis(
+    @Test public void lockedBootHasNoTimerButStillRespectsTheCredentialGate() {
+        assertEquals(0L, StartupLoadPolicy.quietWindowMillis(
                 StartupLoadPolicy.Trigger.LOCKED_BOOT, 0L));
         assertFalse(StartupLoadPolicy.schedulesIntegrationHost(
                 StartupLoadPolicy.Trigger.LOCKED_BOOT));
@@ -18,10 +18,10 @@ public final class StartupLoadPolicyTest {
                 StartupLoadPolicy.Trigger.LOCKED_BOOT));
     }
 
-    @Test public void normalAndQuickBootUseOneStagedHostThenClimateLane() {
-        assertEquals(4_500L, StartupLoadPolicy.quietWindowMillis(
+    @Test public void normalAndQuickBootAdmitEveryEnabledLaneImmediately() {
+        assertEquals(0L, StartupLoadPolicy.quietWindowMillis(
                 StartupLoadPolicy.Trigger.BOOT_COMPLETED, 0L));
-        assertEquals(1_500L, StartupLoadPolicy.quietWindowMillis(
+        assertEquals(0L, StartupLoadPolicy.quietWindowMillis(
                 StartupLoadPolicy.Trigger.QUICK_BOOT, 0L));
         for (StartupLoadPolicy.Trigger trigger : new StartupLoadPolicy.Trigger[]{
                 StartupLoadPolicy.Trigger.BOOT_COMPLETED,
@@ -29,7 +29,7 @@ public final class StartupLoadPolicyTest {
             assertTrue(StartupLoadPolicy.schedulesIntegrationHost(trigger));
             assertTrue(StartupLoadPolicy.schedulesClimate(trigger));
         }
-        assertEquals(7_500L, StartupLoadPolicy.CLIMATE_AFTER_HOST_MS);
+        assertEquals(0L, StartupLoadPolicy.CLIMATE_AFTER_HOST_MS);
         assertTrue(StartupLoadPolicy.schedulesMediaPlan(
                 StartupLoadPolicy.Trigger.BOOT_COMPLETED));
         assertTrue(StartupLoadPolicy.schedulesMediaPlan(
@@ -41,12 +41,12 @@ public final class StartupLoadPolicyTest {
         assertTrue(StartupLoadPolicy.opensCredentialGate(unlock));
         assertTrue(StartupLoadPolicy.schedulesIntegrationHost(unlock));
         assertFalse(StartupLoadPolicy.schedulesClimate(unlock));
-        assertEquals(750L, StartupLoadPolicy.quietWindowMillis(unlock, 50_000L));
+        assertEquals(0L, StartupLoadPolicy.quietWindowMillis(unlock, 50_000L));
     }
 
     @Test public void packageReplacementIsBoundedButNeverTreatedAsLockedBoot() {
         StartupLoadPolicy.Trigger replacement = StartupLoadPolicy.Trigger.PACKAGE_REPLACED;
-        assertEquals(750L, StartupLoadPolicy.quietWindowMillis(replacement, 50_000L));
+        assertEquals(0L, StartupLoadPolicy.quietWindowMillis(replacement, 50_000L));
         assertTrue(StartupLoadPolicy.schedulesIntegrationHost(replacement));
         assertTrue(StartupLoadPolicy.schedulesClimate(replacement));
         assertFalse(StartupLoadPolicy.opensCredentialGate(replacement));
@@ -62,28 +62,26 @@ public final class StartupLoadPolicyTest {
                 now, now + StartupLoadPolicy.MAX_VALID_QUIET_MS + 1L));
     }
 
-    @Test public void vendorFallbackAndMediaCannotJoinTheBootBurst() {
-        assertEquals(4_500L, StartupLoadPolicy.COLD_BOOT_RUNTIME_TARGET_ELAPSED_MS);
-        assertTrue(StartupLoadPolicy.LAUNCHER_RUNTIME_AFTER_HOST_MS > 0L);
-        assertTrue(StartupLoadPolicy.CLIMATE_AFTER_HOST_MS
-                > StartupLoadPolicy.LAUNCHER_RUNTIME_AFTER_HOST_MS);
-        assertTrue(StartupLoadPolicy.MEDIA_AUTO_RESUME_MIN_MS
-                > StartupLoadPolicy.CLIMATE_AFTER_HOST_MS);
-        assertTrue(StartupLoadPolicy.HUD_FALLBACK_DELAY_MS
-                > StartupLoadPolicy.MEDIA_AUTO_RESUME_MIN_MS);
+    @Test public void everyArtificialStartupDelayIsDisabled() {
+        assertEquals(0L, StartupLoadPolicy.COLD_BOOT_RUNTIME_TARGET_ELAPSED_MS);
+        assertEquals(0L, StartupLoadPolicy.LAUNCHER_RUNTIME_AFTER_HOST_MS);
+        assertEquals(0L, StartupLoadPolicy.CLIMATE_AFTER_HOST_MS);
+        assertEquals(0L, StartupLoadPolicy.MEDIA_AUTO_RESUME_MIN_MS);
+        assertEquals(0L, StartupLoadPolicy.HUD_FALLBACK_DELAY_MS);
+        assertEquals(0L, StartupLoadPolicy.HOST_HANDOFF_GRACE_MS);
     }
 
-    @Test public void earlyHomeAndBootGenerationCannotBypassTheRuntimeQuietLane() {
-        assertEquals(4_500L, StartupLoadPolicy.earlyBootQuietMillis(0L));
-        assertEquals(1L, StartupLoadPolicy.earlyBootQuietMillis(4_499L));
+    @Test public void earlyHomeHasNoTimerWhileBootGenerationStillDeduplicates() {
+        assertEquals(0L, StartupLoadPolicy.earlyBootQuietMillis(0L));
+        assertEquals(0L, StartupLoadPolicy.earlyBootQuietMillis(4_499L));
         assertEquals(0L, StartupLoadPolicy.earlyBootQuietMillis(4_500L));
         assertTrue(StartupLoadPolicy.isNewBootGeneration(41, 40));
         assertFalse(StartupLoadPolicy.isNewBootGeneration(41, 41));
         assertFalse(StartupLoadPolicy.isNewBootGeneration(-1, 41));
     }
 
-    @Test public void lateBootBroadcastDoesNotAddAnotherFixedColdBootDelay() {
-        assertEquals(1_000L, StartupLoadPolicy.quietWindowMillis(
+    @Test public void lateBootBroadcastAlsoRunsImmediately() {
+        assertEquals(0L, StartupLoadPolicy.quietWindowMillis(
                 StartupLoadPolicy.Trigger.BOOT_COMPLETED, 4_000L));
         assertEquals(StartupLoadPolicy.BOOT_EVENT_SETTLE_MS,
                 StartupLoadPolicy.quietWindowMillis(
@@ -93,11 +91,10 @@ public final class StartupLoadPolicyTest {
                         StartupLoadPolicy.Trigger.QUICK_BOOT, 2_000_000L));
     }
 
-    @Test public void visibleSurfacesLeadButHeavyLanesRemainSeparated() {
-        assertEquals(400L, StartupLoadPolicy.MAIN_PROCESS_SETTLE_MS);
-        assertEquals(2_500L, StartupLoadPolicy.LAUNCHER_RUNTIME_AFTER_HOST_MS);
-        assertTrue(StartupLoadPolicy.CLIMATE_AFTER_HOST_MS
-                > StartupLoadPolicy.LAUNCHER_RUNTIME_AFTER_HOST_MS);
+    @Test public void visibleAndControllerLanesHaveNoWallClockGap() {
+        assertEquals(0L, StartupLoadPolicy.MAIN_PROCESS_SETTLE_MS);
+        assertEquals(0L, StartupLoadPolicy.LAUNCHER_RUNTIME_AFTER_HOST_MS);
+        assertEquals(0L, StartupLoadPolicy.CLIMATE_AFTER_HOST_MS);
     }
 
     @Test public void phaseLaneDeadlinesUseMonotonicBoundedDurations() {

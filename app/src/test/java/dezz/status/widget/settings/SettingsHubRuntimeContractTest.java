@@ -32,7 +32,7 @@ public final class SettingsHubRuntimeContractTest {
         assertTrue(hub.contains("AppRuntimeBootstrap.run(this, preferences)"));
         assertTrue(main.contains("AppRuntimeBootstrap.run(this, prefs)"));
         assertTrue(bootstrap.contains("WidgetServiceStarter.startIfNeeded(appContext)"));
-        assertTrue(bootstrap.contains("automaticReconcileDelayMillis"));
+        assertFalse(bootstrap.contains("automaticReconcileDelayMillis"));
         assertTrue(bootstrap.contains("ClimatePanelService.apply("));
         assertTrue(bootstrap.contains("maybeShowCrashReport(activity)"));
         assertTrue(bootstrap.contains("tryAutoGrant(activity.getApplicationContext()"));

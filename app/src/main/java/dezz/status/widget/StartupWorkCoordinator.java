@@ -15,12 +15,12 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 /**
- * Serializes automatic startup work so ECARX/SystemServer can finish its own boot first.
+ * Coalesces automatic startup work without imposing an artificial boot delay.
  *
- * <p>All deadlines use elapsed realtime. Each phase carries a persisted generation and its own
- * not-before boundary, so a queued alarm from an older BOOT/QuickBoot event cannot pull newer work
- * forward or mark it complete. LOCKED_BOOT only parks work; USER_UNLOCKED resumes it without a
- * wakeup polling loop.</p>
+ * <p>Each phase carries a persisted generation, so a queued fallback alarm from an older
+ * BOOT/QuickBoot event cannot mark newer work complete. Due work is broadcast immediately and its
+ * AlarmManager copy is only a durable fallback. LOCKED_BOOT parks only on the real credential gate;
+ * USER_UNLOCKED resumes without a wakeup polling loop.</p>
  */
 public final class StartupWorkCoordinator {
     static final String ACTION_RUN_PHASE =
@@ -63,52 +63,26 @@ public final class StartupWorkCoordinator {
     private static final int REQUEST_HOST = 0x5351;
     private static final int REQUEST_CLIMATE = 0x5352;
     private static final int REQUEST_MEDIA = 0x5353;
+    /** Immediate broadcast is primary; this alarm only covers process death/delivery failure. */
+    private static final long PHASE_DELIVERY_FALLBACK_MS = 1_000L;
 
     private StartupWorkCoordinator() {}
 
-    /**
-     * Establishes a quiet boundary even when SystemServer launches HOME before BOOT_COMPLETED.
-     * BOOT_COUNT handles a late cold HOME start; the uptime floor covers providers/activities that
-     * race the boot broadcasts. This only touches one tiny device-protected record.
-     */
-    static void primeEarlyBootQuiet(@NonNull Context context) {
+    /** Clears persisted delays written by older builds without doing any heavyweight startup work. */
+    static void clearLegacyStartupDeferrals(@NonNull Context context) {
         Context app = applicationContext(context);
         SharedPreferences state = state(app);
-        long now = SystemClock.elapsedRealtime();
         int bootCount = currentBootCount(app);
         int recordedBootCount = state.getInt(KEY_LAST_BOOT_COUNT, Integer.MIN_VALUE);
-        boolean newBoot = StartupLoadPolicy.isNewBootGeneration(bootCount, recordedBootCount);
-        long earlyBootQuiet = StartupLoadPolicy.earlyBootQuietMillis(now);
-        boolean existingStartupBarrier = startupBarrierActive(state, now);
-        long quiet = Math.max(earlyBootQuiet,
-                newBoot ? StartupLoadPolicy.MAIN_PROCESS_SETTLE_MS : 0L);
-        boolean fullBootLane = newBoot || earlyBootQuiet > 0L || existingStartupBarrier;
-        if (quiet <= 0L && !existingStartupBarrier) {
-            quiet = StartupLoadPolicy.MAIN_PROCESS_SETTLE_MS;
-        }
-        if (quiet <= 0L) return;
-        long requestedUntil = now + quiet;
-        // elapsedRealtime restarts at a kernel reboot. Never interpret the previous kernel's
-        // small absolute deadlines as future work in the new BOOT_COUNT generation.
-        long currentUntil = newBoot ? 0L : validFutureDeadline(
-                state, KEY_QUIET_UNTIL_ELAPSED, now, StartupLoadPolicy.MAX_VALID_QUIET_MS);
-        long quietUntil = Math.max(currentUntil, requestedUntil);
         SharedPreferences.Editor edit = state.edit();
-        if (newBoot) {
+        if (StartupLoadPolicy.isNewBootGeneration(bootCount, recordedBootCount)) {
+            // AlarmManager drops elapsed-realtime alarms at reboot. Drop their persisted owners too,
+            // before an early HOME process can dispatch a generation from the previous kernel.
             clearElapsedGenerationState(edit);
-            edit.putInt(KEY_LAST_BOOT_COUNT, bootCount)
-                    .putBoolean(KEY_STARTUP_INCOMPLETE, true)
-                    .putLong(KEY_STARTUP_BARRIER_EXPIRES_ELAPSED,
-                            now + StartupLoadPolicy.MAX_VALID_QUIET_MS);
         }
-        if (fullBootLane) {
-            writeSharedLaneDeadlines(edit, quietUntil);
-        } else {
-            writeProcessSettleDeadlines(edit, quietUntil);
-        }
-        edit.commit();
-        Log.i(TAG, "Early HOME/process start joined boot quiet lane for " + quiet + " ms"
-                + (newBoot ? " (new BOOT_COUNT)" : " (early uptime)"));
+        clearArtificialDeferralState(edit);
+        if (bootCount >= 0) edit.putInt(KEY_LAST_BOOT_COUNT, bootCount);
+        edit.apply();
     }
 
     public static void scheduleForLifecycle(@NonNull Context context,
@@ -122,21 +96,11 @@ public final class StartupWorkCoordinator {
         int bootCount = currentBootCount(app);
         int recordedBootCount = state.getInt(KEY_LAST_BOOT_COUNT, Integer.MIN_VALUE);
         boolean newBoot = StartupLoadPolicy.isNewBootGeneration(bootCount, recordedBootCount);
-        long currentUntil = validFutureDeadline(state, KEY_QUIET_UNTIL_ELAPSED, now,
-                StartupLoadPolicy.MAX_VALID_QUIET_MS);
-        if (newBoot) currentUntil = 0L;
-        boolean coalescingActiveBootLane = !newBoot
-                && startupBarrierActive(state, now)
-                && StartupLoadPolicy.isBootLifecycle(trigger);
-        long quietUntil = coalescingActiveBootLane ? Math.max(now, currentUntil)
-                : Math.max(currentUntil,
-                now + StartupLoadPolicy.quietWindowMillis(trigger, now));
         long generation = nextGeneration(state);
         boolean retainedCredentialRefresh = state.getBoolean(
                 KEY_UNLOCK_REFRESH_PENDING, false);
         boolean retainedClimate = state.getBoolean(KEY_CLIMATE_PHASE_PENDING, false);
         boolean retainedMedia = state.getBoolean(KEY_MEDIA_PHASE_PENDING, false);
-        boolean retainedHost = state.getBoolean(KEY_HOST_PHASE_PENDING, false);
         boolean retainedSurfaceReconcile = state.getBoolean(
                 KEY_SURFACE_RECONCILE_PENDING, false);
         boolean scheduleHost = StartupLoadPolicy.schedulesIntegrationHost(trigger);
@@ -147,16 +111,9 @@ public final class StartupWorkCoordinator {
 
         SharedPreferences.Editor edit = state.edit();
         if (newBoot) clearElapsedGenerationState(edit);
+        clearArtificialDeferralState(edit);
         edit.putLong(KEY_GENERATION_COUNTER, generation);
         if (bootCount >= 0) edit.putInt(KEY_LAST_BOOT_COUNT, bootCount);
-        if (trigger == StartupLoadPolicy.Trigger.LOCKED_BOOT
-                || trigger == StartupLoadPolicy.Trigger.BOOT_COMPLETED
-                || trigger == StartupLoadPolicy.Trigger.QUICK_BOOT) {
-            edit.putBoolean(KEY_STARTUP_INCOMPLETE, true)
-                    .putLong(KEY_STARTUP_BARRIER_EXPIRES_ELAPSED,
-                            now + StartupLoadPolicy.MAX_VALID_QUIET_MS);
-        }
-        writeSharedLaneDeadlines(edit, quietUntil);
         if (scheduleHost && (StartupLoadPolicy.opensCredentialGate(trigger)
                 || retainedCredentialRefresh)) {
             edit.putBoolean(KEY_UNLOCK_REFRESH_PENDING, true)
@@ -169,86 +126,51 @@ public final class StartupWorkCoordinator {
             edit.putBoolean(KEY_SURFACE_RECONCILE_PENDING, true)
                     .putLong(KEY_SURFACE_RECONCILE_GENERATION, generation);
         }
-        long hostNotBefore = coalescingActiveBootLane && retainedHost
-                ? retainedPhaseNotBefore(state, KEY_HOST_NOT_BEFORE_ELAPSED, now)
-                : quietUntil;
-        long climateNotBefore = coalescingActiveBootLane && retainedClimate
-                ? retainedPhaseNotBefore(state, KEY_CLIMATE_NOT_BEFORE_ELAPSED, now)
-                : quietUntil + StartupLoadPolicy.CLIMATE_AFTER_HOST_MS;
-        boolean retainedMediaOnly = retainedMedia
-                && (!StartupLoadPolicy.schedulesMediaPlan(trigger)
-                || coalescingActiveBootLane);
-        long retainedMediaNotBefore = retainedMediaOnly
-                ? retainedPhaseNotBefore(state, KEY_MEDIA_NOT_BEFORE_ELAPSED, now) : 0L;
-        long mediaNotBefore = retainedMediaNotBefore > 0L
-                ? retainedMediaNotBefore : Math.max(quietUntil,
-                now + StartupLoadPolicy.MEDIA_AUTO_RESUME_MIN_MS);
-        if (scheduleHost) writePhase(edit, PHASE_INTEGRATION_HOST, generation, hostNotBefore);
-        if (scheduleClimate) writePhase(edit, PHASE_CLIMATE, generation, climateNotBefore);
-        if (scheduleMedia) writePhase(edit, PHASE_MEDIA_PLAN, generation, mediaNotBefore);
+        if (scheduleHost) writePhase(edit, PHASE_INTEGRATION_HOST, generation, now);
+        if (scheduleClimate) writePhase(edit, PHASE_CLIMATE, generation, now);
+        if (scheduleMedia) writePhase(edit, PHASE_MEDIA_PLAN, generation, now);
         edit.commit();
 
         if (scheduleHost) {
-            schedulePhaseAtElapsed(app, PHASE_INTEGRATION_HOST, generation, hostNotBefore);
+            dispatchPhaseNowWithFallback(app, PHASE_INTEGRATION_HOST, generation);
         }
         if (scheduleClimate) {
-            schedulePhaseAtElapsed(app, PHASE_CLIMATE, generation, climateNotBefore);
+            dispatchPhaseNowWithFallback(app, PHASE_CLIMATE, generation);
         }
         if (scheduleMedia) {
-            schedulePhaseAtElapsed(app, PHASE_MEDIA_PLAN, generation, mediaNotBefore);
+            dispatchPhaseNowWithFallback(app, PHASE_MEDIA_PLAN, generation);
         }
-        Log.i(TAG, "Coalesced " + trigger + " generation=" + generation
-                + "; automatic runtime quiet for " + Math.max(0L, quietUntil - now) + " ms");
+        Log.i(TAG, "Dispatched " + trigger + " generation=" + generation
+                + " without an artificial startup delay");
     }
 
     public static long hudFallbackDelayMillis() {
-        return StartupLoadPolicy.HUD_FALLBACK_DELAY_MS;
+        return 0L;
     }
 
     public static long mediaAutoResumeMinimumDelayMillis() {
-        return StartupLoadPolicy.MEDIA_AUTO_RESUME_MIN_MS;
+        return 0L;
     }
 
     static long remainingQuietMillis(@NonNull Context context) {
-        return remainingDeadline(context, KEY_QUIET_UNTIL_ELAPSED,
-                StartupLoadPolicy.MAX_VALID_QUIET_MS, !AppProcessPolicy.isHudProcess());
+        return 0L;
     }
 
-    static long launcherPanelDelayMillis(@NonNull Context context, long normalDelayMillis) {
-        // Panel inflation is visual work and already runs after HOME's first draw, one panel per
-        // frame. Tying it to the integration-host deadline made a healthy HOME look blank for
-        // 4.5-10 seconds. Vendor/controllers remain behind launcherRuntimeDelayMillis().
-        return Math.max(0L, normalDelayMillis);
-    }
-
-    /** True while controller/vendor work must remain parked behind the exact host generation. */
+    /** Startup timing never parks automatic runtime; real permission/readiness gates still apply. */
     static boolean shouldParkAutomaticRuntime(@NonNull Context context) {
-        return remainingQuietMillis(context) > 0L
-                || isStartupInitializationBlocked(context);
-    }
-
-    static long launcherRuntimeDelayMillis(@NonNull Context context) {
-        return Math.max(remainingDeadline(context, KEY_LAUNCHER_RUNTIME_NOT_BEFORE_ELAPSED,
-                        StartupLoadPolicy.MAX_VALID_STARTUP_LANE_MS, true),
-                remainingHostHandoffMillis(context));
+        return false;
     }
 
     /**
-     * Exact in-process handoff for a visible HOME. AlarmManager remains the durable owner when HOME
-     * is hidden or the process dies, while this deadline prevents an inexact alarm from leaving a
-     * foreground launcher blank for several extra seconds.
+     * Exact in-process handoff for a visible HOME. Every pending generation is due immediately;
+     * AlarmManager remains the durable owner when HOME is hidden or the process dies.
      *
-     * @return milliseconds until the current host phase is due, or {@code -1} when none is pending.
+     * @return {@code 0} when a host phase is pending, or {@code -1} when none is pending.
      */
     static long pendingIntegrationHostDelayMillis(@NonNull Context context) {
         SharedPreferences state = state(applicationContext(context));
         if (!state.getBoolean(KEY_HOST_PHASE_PENDING, false)) return -1L;
-        long now = SystemClock.elapsedRealtime();
-        return Math.max(
-                StartupLoadPolicy.remainingQuietMillis(now,
-                        state.getLong(KEY_QUIET_UNTIL_ELAPSED, 0L)),
-                StartupLoadPolicy.remainingStartupLaneMillis(now,
-                        state.getLong(KEY_HOST_NOT_BEFORE_ELAPSED, 0L)));
+        return 0L;
     }
 
     /** Dispatches only an exact, unlocked, already-due host generation. */
@@ -277,56 +199,34 @@ public final class StartupWorkCoordinator {
         }
     }
 
-    /** Automatic Settings/runtime reconciliation must not jump ahead of the surface lanes. */
-    static long automaticReconcileDelayMillis(@NonNull Context context) {
-        return Math.max(remainingQuietMillis(context), remainingDeadline(context,
-                KEY_AUTOMATIC_RECONCILE_NOT_BEFORE_ELAPSED,
-                StartupLoadPolicy.MAX_VALID_STARTUP_LANE_MS, true));
-    }
-
     public static void ensureIntegrationHostScheduled(@NonNull Context context) {
         Context app = applicationContext(context);
-        long now = SystemClock.elapsedRealtime();
-        long notBefore = now + remainingQuietMillis(app);
-        ensurePhaseScheduled(app, PHASE_INTEGRATION_HOST, notBefore);
+        ensurePhaseScheduled(app, PHASE_INTEGRATION_HOST);
     }
 
-    /** Durable no-draw HOME fallback; never starts a foreground service in the outgoing frame. */
-    static void ensureIntegrationHostScheduledAfter(@NonNull Context context, long delayMillis) {
+    /** Legacy no-draw API; HA1216 admits the durable host request immediately. */
+    static void ensureIntegrationHostScheduledAfter(@NonNull Context context,
+                                                    long ignoredDelayMillis) {
         Context app = applicationContext(context);
-        long now = SystemClock.elapsedRealtime();
-        long requestedDelay = Math.max(remainingQuietMillis(app), Math.max(1L, delayMillis));
-        ensurePhaseScheduled(app, PHASE_INTEGRATION_HOST, now + requestedDelay);
+        ensurePhaseScheduled(app, PHASE_INTEGRATION_HOST);
     }
 
     public static void ensureClimateScheduled(@NonNull Context context) {
         Context app = applicationContext(context);
-        long now = SystemClock.elapsedRealtime();
-        long laneDelay = automaticReconcileDelayMillis(app);
-        ensurePhaseScheduled(app, PHASE_CLIMATE, now + Math.max(1L, laneDelay));
+        ensurePhaseScheduled(app, PHASE_CLIMATE);
     }
 
     static boolean isPhaseIntent(@Nullable Intent intent) {
         return intent != null && ACTION_RUN_PHASE.equals(intent.getAction());
     }
 
-    /** Returns true for a stale/parked/deferred phase; only an exact current generation may run. */
+    /** Returns true for a stale or credential-locked phase; timing never defers due work. */
     static boolean deferPhaseIfNeeded(@NonNull Context context, int phase, long generation) {
         Context app = applicationContext(context);
         SharedPreferences state = state(app);
         if (!state.getBoolean(pendingKey(phase), false)
                 || state.getLong(generationKey(phase), Long.MIN_VALUE) != generation) {
             Log.i(TAG, "Ignoring stale startup phase=" + phase + " generation=" + generation);
-            return true;
-        }
-        long now = SystemClock.elapsedRealtime();
-        long notBefore = state.getLong(notBeforeKey(phase), 0L);
-        long delay = Math.max(
-                StartupLoadPolicy.remainingStartupLaneMillis(now, notBefore),
-                StartupLoadPolicy.remainingQuietMillis(now,
-                        state.getLong(KEY_QUIET_UNTIL_ELAPSED, 0L)));
-        if (delay > 0L) {
-            schedulePhase(app, phase, generation, delay);
             return true;
         }
         if (!isUserUnlocked(app)) {
@@ -373,35 +273,12 @@ public final class StartupWorkCoordinator {
         if (changed) edit.commit();
     }
 
-    /** Blocks full Application migrations/vendor setup until the exact delayed host phase. */
-    static boolean isStartupInitializationBlocked(@NonNull Context context) {
-        SharedPreferences state = state(applicationContext(context));
-        long now = SystemClock.elapsedRealtime();
-        boolean active = startupBarrierActive(state, now);
-        if (!active && !AppProcessPolicy.isHudProcess()
-                && state.getBoolean(KEY_STARTUP_INCOMPLETE, false)) {
-            state.edit().putBoolean(KEY_STARTUP_INCOMPLETE, false)
-                    .remove(KEY_STARTUP_BARRIER_EXPIRES_ELAPSED).apply();
-        }
-        return active;
-    }
-
-    /** Null-intent START_STICKY recovery may not bypass an active boot/process quiet barrier. */
+    /** START_STICKY recovery is immediate; service-local readiness checks remain authoritative. */
     public static boolean shouldDeferAutomaticStickyRestart(@NonNull Context context) {
-        return remainingQuietMillis(context) > 0L
-                || isStartupInitializationBlocked(context);
+        return false;
     }
 
-    static long startupInitializationDelayMillis(@NonNull Context context) {
-        SharedPreferences state = state(applicationContext(context));
-        long now = SystemClock.elapsedRealtime();
-        long barrier = startupBarrierActive(state, now)
-                ? StartupLoadPolicy.remainingQuietMillis(now,
-                state.getLong(KEY_STARTUP_BARRIER_EXPIRES_ELAPSED, 0L)) : 0L;
-        return Math.max(remainingQuietMillis(context), barrier);
-    }
-
-    /** Opens the barrier only for the current host generation after all delay/unlock checks. */
+    /** Clears a legacy barrier only for the exact current host generation. */
     static void openInitializationBarrierForHost(@NonNull Context context, long generation) {
         SharedPreferences state = state(applicationContext(context));
         if (state.getBoolean(KEY_HOST_PHASE_PENDING, false)
@@ -420,7 +297,8 @@ public final class StartupWorkCoordinator {
     }
 
     static void markPhaseCompleted(@NonNull Context context, int phase, long generation) {
-        SharedPreferences state = state(applicationContext(context));
+        Context app = applicationContext(context);
+        SharedPreferences state = state(app);
         if (state.getLong(generationKey(phase), Long.MIN_VALUE) != generation) return;
         SharedPreferences.Editor edit = state.edit()
                 .putBoolean(pendingKey(phase), false)
@@ -430,6 +308,7 @@ public final class StartupWorkCoordinator {
                     .remove(KEY_STARTUP_BARRIER_EXPIRES_ELAPSED);
         }
         edit.commit();
+        cancelPhaseFallback(app, phase);
     }
 
     /** Keeps an exact failed phase pending and retries it without minting a new generation. */
@@ -444,65 +323,30 @@ public final class StartupWorkCoordinator {
                 Math.max(1_000L, delayMillis));
     }
 
-    private static void ensurePhaseScheduled(@NonNull Context app, int phase,
-                                             long requestedNotBefore) {
+    private static void ensurePhaseScheduled(@NonNull Context app, int phase) {
         SharedPreferences state = state(app);
         boolean pending = state.getBoolean(pendingKey(phase), false);
         long generation = pending
                 ? state.getLong(generationKey(phase), Long.MIN_VALUE)
                 : nextGeneration(state);
         if (generation == Long.MIN_VALUE) generation = nextGeneration(state);
-        long existing = pending ? state.getLong(notBeforeKey(phase), 0L) : 0L;
-        long notBefore = Math.max(existing, requestedNotBefore);
+        long now = SystemClock.elapsedRealtime();
         SharedPreferences.Editor edit = state.edit();
         if (!pending) edit.putLong(KEY_GENERATION_COUNTER, generation);
-        writePhase(edit, phase, generation, notBefore);
+        clearArtificialDeferralState(edit);
+        writePhase(edit, phase, generation, now);
         edit.commit();
-        schedulePhaseAtElapsed(app, phase, generation, notBefore);
+        dispatchPhaseNowWithFallback(app, phase, generation);
     }
 
-    private static void writeSharedLaneDeadlines(@NonNull SharedPreferences.Editor edit,
-                                                 long quietUntil) {
-        edit.putLong(KEY_QUIET_UNTIL_ELAPSED, quietUntil)
+    private static void clearArtificialDeferralState(
+            @NonNull SharedPreferences.Editor edit) {
+        edit.remove(KEY_QUIET_UNTIL_ELAPSED)
                 .remove(KEY_LAUNCHER_PANELS_NOT_BEFORE_ELAPSED)
-                .putLong(KEY_LAUNCHER_RUNTIME_NOT_BEFORE_ELAPSED,
-                        quietUntil + StartupLoadPolicy.LAUNCHER_RUNTIME_AFTER_HOST_MS)
-                .putLong(KEY_AUTOMATIC_RECONCILE_NOT_BEFORE_ELAPSED,
-                        quietUntil + StartupLoadPolicy.CLIMATE_AFTER_HOST_MS);
-    }
-
-    /** A normal post-boot process restart gets a short settle, not the full cold-boot UX delay. */
-    private static void writeProcessSettleDeadlines(@NonNull SharedPreferences.Editor edit,
-                                                    long quietUntil) {
-        edit.putLong(KEY_QUIET_UNTIL_ELAPSED, quietUntil)
-                .remove(KEY_LAUNCHER_PANELS_NOT_BEFORE_ELAPSED)
-                .putLong(KEY_LAUNCHER_RUNTIME_NOT_BEFORE_ELAPSED,
-                        quietUntil + StartupLoadPolicy.PROCESS_SETTLE_RUNTIME_AFTER_MS)
-                .putLong(KEY_AUTOMATIC_RECONCILE_NOT_BEFORE_ELAPSED,
-                        quietUntil + StartupLoadPolicy.PROCESS_SETTLE_RUNTIME_AFTER_MS);
-    }
-
-    /**
-     * AlarmManager is inexact on Android 9. Keep dependent launcher work behind the current host
-     * handoff for a bounded five-second grace, then fail open so a missing alarm cannot blank HOME.
-     */
-    private static long remainingHostHandoffMillis(@NonNull Context context) {
-        SharedPreferences state = state(applicationContext(context));
-        if (!state.getBoolean(KEY_HOST_PHASE_PENDING, false)) return 0L;
-        long generation = state.getLong(KEY_HOST_PHASE_GENERATION, Long.MIN_VALUE);
-        boolean pendingCredentialRefresh = state.getBoolean(KEY_UNLOCK_REFRESH_PENDING, false)
-                && state.getLong(KEY_UNLOCK_REFRESH_GENERATION, Long.MIN_VALUE) == generation;
-        boolean pendingSurfaceReconcile = state.getBoolean(KEY_SURFACE_RECONCILE_PENDING, false)
-                && state.getLong(KEY_SURFACE_RECONCILE_GENERATION, Long.MIN_VALUE) == generation;
-        if (WidgetService.isRunning()
-                && !pendingCredentialRefresh && !pendingSurfaceReconcile) return 0L;
-        long now = SystemClock.elapsedRealtime();
-        long notBefore = state.getLong(KEY_HOST_NOT_BEFORE_ELAPSED, 0L);
-        if (notBefore <= 0L || now > notBefore + StartupLoadPolicy.HOST_HANDOFF_GRACE_MS) {
-            return 0L;
-        }
-        long untilHost = notBefore - now;
-        return untilHost > 0L ? untilHost : 250L;
+                .remove(KEY_LAUNCHER_RUNTIME_NOT_BEFORE_ELAPSED)
+                .remove(KEY_AUTOMATIC_RECONCILE_NOT_BEFORE_ELAPSED)
+                .remove(KEY_STARTUP_INCOMPLETE)
+                .remove(KEY_STARTUP_BARRIER_EXPIRES_ELAPSED);
     }
 
     private static void writePhase(@NonNull SharedPreferences.Editor edit, int phase,
@@ -512,21 +356,25 @@ public final class StartupWorkCoordinator {
                 .putLong(notBeforeKey(phase), notBefore);
     }
 
-    private static void schedulePhaseAtElapsed(@NonNull Context app, int phase,
-                                               long generation, long triggerElapsedMillis) {
-        schedulePhase(app, phase, generation,
-                Math.max(1L, triggerElapsedMillis - SystemClock.elapsedRealtime()));
+    private static void dispatchPhaseNowWithFallback(@NonNull Context app, int phase,
+                                                     long generation) {
+        if (!isUserUnlocked(app)) {
+            Log.i(TAG, "Startup phase " + phase + " waiting for USER_UNLOCKED");
+            return;
+        }
+        schedulePhase(app, phase, generation, PHASE_DELIVERY_FALLBACK_MS);
+        try {
+            app.sendBroadcast(phaseIntent(app, phase, generation));
+        } catch (RuntimeException failure) {
+            // The generation-fenced AlarmManager copy remains the delivery fallback.
+            Log.w(TAG, "Could not immediately dispatch startup phase " + phase, failure);
+        }
     }
 
     private static void schedulePhase(@NonNull Context app, int phase, long generation,
                                       long delayMillis) {
-        Intent intent = new Intent(app, BootReceiver.class)
-                .setAction(ACTION_RUN_PHASE)
-                .putExtra(EXTRA_PHASE, phase)
-                .putExtra(EXTRA_GENERATION, generation);
-        int requestCode = phase == PHASE_CLIMATE ? REQUEST_CLIMATE
-                : phase == PHASE_MEDIA_PLAN ? REQUEST_MEDIA : REQUEST_HOST;
-        PendingIntent pending = PendingIntent.getBroadcast(app, requestCode, intent,
+        PendingIntent pending = PendingIntent.getBroadcast(app, requestCode(phase),
+                phaseIntent(app, phase, generation),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         AlarmManager alarms = app.getSystemService(AlarmManager.class);
         if (alarms == null) {
@@ -541,47 +389,37 @@ public final class StartupWorkCoordinator {
         }
     }
 
-    private static long remainingDeadline(@NonNull Context context, @NonNull String key,
-                                          long maximum, boolean clearExpired) {
-        SharedPreferences state = state(applicationContext(context));
-        long now = SystemClock.elapsedRealtime();
-        long until = state.getLong(key, 0L);
-        long remaining = validRemaining(now, until, maximum);
-        if (clearExpired && !AppProcessPolicy.isHudProcess()
-                && remaining == 0L && until != 0L) {
-            state.edit().remove(key).apply();
+    @NonNull
+    private static Intent phaseIntent(@NonNull Context app, int phase, long generation) {
+        return new Intent(app, BootReceiver.class)
+                .setAction(ACTION_RUN_PHASE)
+                .putExtra(EXTRA_PHASE, phase)
+                .putExtra(EXTRA_GENERATION, generation);
+    }
+
+    private static int requestCode(int phase) {
+        return phase == PHASE_CLIMATE ? REQUEST_CLIMATE
+                : phase == PHASE_MEDIA_PLAN ? REQUEST_MEDIA : REQUEST_HOST;
+    }
+
+    private static void cancelPhaseFallback(@NonNull Context app, int phase) {
+        PendingIntent pending = PendingIntent.getBroadcast(app, requestCode(phase),
+                phaseIntent(app, phase, 0L),
+                PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
+        if (pending == null) return;
+        AlarmManager alarms = app.getSystemService(AlarmManager.class);
+        try {
+            if (alarms != null) alarms.cancel(pending);
+            pending.cancel();
+        } catch (RuntimeException failure) {
+            // Completion is already generation-fenced; a late fallback will be rejected as stale.
+            Log.w(TAG, "Could not cancel completed startup fallback phase " + phase, failure);
         }
-        return remaining;
-    }
-
-    private static long validFutureDeadline(@NonNull SharedPreferences state,
-                                            @NonNull String key, long now, long maximum) {
-        long until = state.getLong(key, 0L);
-        return validRemaining(now, until, maximum) > 0L ? until : 0L;
-    }
-
-    /** Retains a pending lane without letting an expired/corrupt absolute value delay it again. */
-    private static long retainedPhaseNotBefore(@NonNull SharedPreferences state,
-                                               @NonNull String key, long now) {
-        long future = validFutureDeadline(state, key, now,
-                StartupLoadPolicy.MAX_VALID_STARTUP_LANE_MS);
-        return future > 0L ? future : now;
-    }
-
-    private static long validRemaining(long now, long until, long maximum) {
-        long remaining = until - now;
-        return remaining > 0L && remaining <= maximum ? remaining : 0L;
     }
 
     private static long nextGeneration(@NonNull SharedPreferences state) {
         long current = state.getLong(KEY_GENERATION_COUNTER, 0L);
         return current == Long.MAX_VALUE ? 1L : current + 1L;
-    }
-
-    private static boolean startupBarrierActive(@NonNull SharedPreferences state, long now) {
-        if (!state.getBoolean(KEY_STARTUP_INCOMPLETE, false)) return false;
-        long expires = state.getLong(KEY_STARTUP_BARRIER_EXPIRES_ELAPSED, 0L);
-        return StartupLoadPolicy.remainingQuietMillis(now, expires) > 0L;
     }
 
     private static void clearElapsedGenerationState(

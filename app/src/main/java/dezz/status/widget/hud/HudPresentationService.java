@@ -53,8 +53,6 @@ public final class HudPresentationService extends Service
     /** Stay well below Android's process-wide Binder transaction limit. */
     private static final int MAX_COMMAND_CONFIG_CHARS = 240_000;
     private static final long SYSTEM_SURFACE_RETRY_MS = 60_000L;
-    private static final long ISOLATED_STICKY_SETTLE_MS = 2_000L;
-    private static final long PROCESS_CREATED_ELAPSED = SystemClock.elapsedRealtime();
     @Nullable private static volatile HudPresentationService instance;
     @NonNull private static volatile String runtimeDetail = "HUD не запущен";
 
@@ -215,23 +213,6 @@ public final class HudPresentationService extends Service
             stopForeground(true);
             stopSelf(startId);
             return START_NOT_STICKY;
-        }
-        if (intent == null) {
-            long localSettle = ISOLATED_STICKY_SETTLE_MS
-                    - (SystemClock.elapsedRealtime() - PROCESS_CREATED_ELAPSED);
-            if (localSettle > 0L) {
-                main.postDelayed(() -> {
-                    if (instance != this) return;
-                    if (StartupWorkCoordinator.shouldDeferAutomaticStickyRestart(this)) {
-                        stopForeground(true);
-                        stopSelf(startId);
-                        return;
-                    }
-                    initializeRuntime();
-                    reloadAndReconcile(true);
-                }, localSettle);
-                return START_STICKY;
-            }
         }
         initializeRuntime();
         boolean commandHasConfig = applyCommandConfig(intent);

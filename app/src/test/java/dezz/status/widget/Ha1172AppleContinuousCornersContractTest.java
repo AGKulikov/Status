@@ -59,12 +59,10 @@ public final class Ha1172AppleContinuousCornersContractTest {
     @Test public void settingsDescribeAppleGeometryAndReleaseIdentityIsHa1172()
             throws Exception {
         String editor = source("PhoneNotificationLayoutEditorActivity.java");
-        String build = project("build.gradle");
-        if (!build.contains("String getVersionName()")) build = project("../build.gradle");
 
         assertTrue(editor.contains("Радиус карточки Apple"));
         assertTrue(editor.contains("Радиус иконки Apple"));
-        assertTrue(build.contains("return 'v2.8.2-ha1215'"));
+        ReleaseIdentityContract.assertCurrentAtLeast(1172);
     }
 
     private static String source(String relative) throws Exception {

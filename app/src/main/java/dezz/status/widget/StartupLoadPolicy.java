@@ -13,28 +13,24 @@ final class StartupLoadPolicy {
     }
 
     /**
-     * Cold HOME gets a bounded quiet period measured from kernel start, not from whichever boot
-     * broadcast happens to arrive last. This keeps the first useful surface out of SystemServer's
-     * initial burst without adding another fixed ten seconds on a slow ECARX boot.
+     * HA1216 has no artificial boot quiet window. Work is admitted immediately and made cheap by
+     * background thread priority, bounded concurrency and event-driven refreshes instead of by
+     * leaving enabled features unavailable for several seconds.
      */
-    static final long COLD_BOOT_RUNTIME_TARGET_ELAPSED_MS = 4_500L;
-    /** Coalesces a late BOOT_COMPLETED edge without penalising an already-settled system. */
-    static final long BOOT_EVENT_SETTLE_MS = 1_000L;
-    /** QuickBoot keeps kernel uptime, so it needs its own short relative settle window. */
-    static final long QUICK_BOOT_QUIET_MS = 1_500L;
-    /** Normal process recovery should be perceptible as a restart, not as a blank two-second UI. */
-    static final long MAIN_PROCESS_SETTLE_MS = 400L;
-    static final long PROCESS_SETTLE_RUNTIME_AFTER_MS = 750L;
-    static final long USER_UNLOCKED_QUIET_MS = 750L;
-    static final long PACKAGE_REPLACED_QUIET_MS = 750L;
-    /** Host stages finish first; Driver/HUD, Climate, media and fallback occupy separate lanes. */
-    static final long LAUNCHER_RUNTIME_AFTER_HOST_MS = 2_500L;
-    static final long CLIMATE_AFTER_HOST_MS = 7_500L;
-    static final long MEDIA_AUTO_RESUME_MIN_MS = 26_000L;
-    static final long HUD_FALLBACK_DELAY_MS = 32_000L;
+    static final long COLD_BOOT_RUNTIME_TARGET_ELAPSED_MS = 0L;
+    static final long BOOT_EVENT_SETTLE_MS = 0L;
+    static final long QUICK_BOOT_QUIET_MS = 0L;
+    static final long MAIN_PROCESS_SETTLE_MS = 0L;
+    static final long PROCESS_SETTLE_RUNTIME_AFTER_MS = 0L;
+    static final long USER_UNLOCKED_QUIET_MS = 0L;
+    static final long PACKAGE_REPLACED_QUIET_MS = 0L;
+    static final long LAUNCHER_RUNTIME_AFTER_HOST_MS = 0L;
+    static final long CLIMATE_AFTER_HOST_MS = 0L;
+    static final long MEDIA_AUTO_RESUME_MIN_MS = 0L;
+    static final long HUD_FALLBACK_DELAY_MS = 0L;
     static final long MAX_VALID_QUIET_MS = 45_000L;
     static final long MAX_VALID_STARTUP_LANE_MS = 120_000L;
-    static final long HOST_HANDOFF_GRACE_MS = 5_000L;
+    static final long HOST_HANDOFF_GRACE_MS = 0L;
 
     private StartupLoadPolicy() {}
 

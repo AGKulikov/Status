@@ -19,16 +19,72 @@ public class PhoneWidgetServiceIntegrationContractTest {
     @Test
     public void serviceOwnsPhoneTransportAndPresenceExporter() throws Exception {
         String source = readService();
-        assertTrue(source.contains("private PhoneConnectorController phoneController;"));
+        assertTrue(source.contains("private volatile PhoneConnectorController phoneController;"));
         assertTrue(source.contains(
-                "private PhoneSprutPresenceExporter phonePresenceExporter;"));
+                "private volatile PhoneSprutPresenceExporter phonePresenceExporter;"));
         assertTrue(source.contains(
-                "private PhoneSprutPresenceExporter phoneAncsPresenceExporter;"));
+                "private volatile PhoneSprutPresenceExporter phoneAncsPresenceExporter;"));
         assertTrue(source.contains("new PhoneConnectorController(this, prefs, connectorValues,"));
         assertTrue(source.contains(
                 "exporter.onPhoneConnectionChanged(connected)"));
         assertTrue(source.contains("PhoneSprutPresenceExporter.Signal.ANCS"));
         assertTrue(source.contains("onAncsConnectionChanged(boolean connected)"));
+
+        String dispatch = between(source,
+                "private PreparedInitialIntegrationStage prepareInitialIntegrationWorkerStage(",
+                "private PreparedInitialIntegrationStage preparePhonePresenceStage(");
+        assertTrue(dispatch.contains("case 1:"));
+        assertTrue(dispatch.contains("return preparePhonePresenceStage(stage)"));
+        assertTrue(dispatch.contains("case 2:"));
+        assertTrue(dispatch.contains("return preparePhoneStage(stage)"));
+
+        String presence = between(source,
+                "private PreparedInitialIntegrationStage preparePhonePresenceStage(",
+                "private PreparedInitialIntegrationStage preparePhoneStage(");
+        int phonePresenceReady = presence.indexOf("prepared.phonePresence.reconfigure()");
+        int ancsPresenceReady = presence.indexOf("prepared.ancsPresence.reconfigure()");
+        int presencePublication = presence.indexOf("publishSprutRuntimeGraph(prepared)");
+        assertTrue(phonePresenceReady >= 0);
+        assertTrue(ancsPresenceReady > phonePresenceReady);
+        assertTrue(presencePublication > ancsPresenceReady);
+        assertTrue(presence.contains("() -> discardSprutRuntimeGraph(prepared)"));
+
+        String phone = between(source,
+                "private PreparedInitialIntegrationStage preparePhoneStage(",
+                "private PreparedInitialIntegrationStage prepareStatusSurfaceStage(");
+        int phonePrepared = phone.indexOf("next.reconfigure()");
+        int phonePublished = phone.indexOf("phoneController = prepared");
+        assertTrue(phonePrepared >= 0);
+        assertTrue(phonePublished > phonePrepared);
+        assertTrue(phone.contains("prepared::stop"));
+
+        String submission = between(source,
+                "private void submitInitialIntegrationWorkerStage(",
+                "private void completeInitialIntegrationWorkerStage(");
+        assertTrue(submission.contains("final long ownerToken = startupStateOwnerToken"));
+        assertTrue(submission.contains("if (!ownsStartupState(ownerToken))"));
+        assertTrue(submission.contains(
+                "pendingInitialIntegrationStage.compareAndSet(null, prepared)"));
+        assertTrue(submission.contains("discardPreparedInitialIntegrationStage(prepared)"));
+
+        String completion = between(source,
+                "private void completeInitialIntegrationWorkerStage(",
+                "private void advanceInitialIntegrationStage(");
+        assertTrue(completion.contains("!ownsStartupState(ownerToken)"));
+        assertTrue(completion.contains("startupStateOwnerToken != ownerToken"));
+        assertTrue(completion.contains("prepared.stage != stage"));
+        assertTrue(completion.contains("prepared::publish"));
+        assertTrue(completion.contains("discardPreparedInitialIntegrationStage(prepared)"));
+
+        String destroy = between(source, "public void onDestroy()", "public IBinder onBind(");
+        int invalidateOwner = destroy.indexOf("startupStateOwnerToken = 0L");
+        int takeUnpublished = destroy.indexOf(
+                "pendingInitialIntegrationStage.getAndSet(null)");
+        int discardUnpublished = destroy.indexOf(
+                "discardPreparedInitialIntegrationStage(unpublished)");
+        assertTrue(invalidateOwner >= 0);
+        assertTrue(takeUnpublished > invalidateOwner);
+        assertTrue(discardUnpublished > takeUnpublished);
     }
 
     @Test

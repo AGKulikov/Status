@@ -20,7 +20,13 @@ package dezz.status.widget;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Process;
 import android.util.Log;
+
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import dezz.status.widget.climate.ClimatePanelService;
 import dezz.status.widget.climate.ScreenReservationStateStore;
@@ -30,9 +36,59 @@ public class BootReceiver extends BroadcastReceiver {
     private static final String TAG = "BootReceiver";
 
     private static final String ACTION_QUICKBOOT_POWERON = "android.intent.action.QUICKBOOT_POWERON";
+    /** Covers the complete ECARX boot/unlock/phase burst while bounding retained Intents. */
+    private static final int STARTUP_QUEUE_CAPACITY = 32;
+    /**
+     * One temporary background-priority lane keeps boot broadcasts off the process main Looper.
+     * Zero core threads means it releases its stack after the short startup burst; the queue
+     * preserves phase ordering and StartupWorkCoordinator rejects stale generations.
+     */
+    private static final ThreadPoolExecutor STARTUP_LANE = createStartupLane();
+
+    private static ThreadPoolExecutor createStartupLane() {
+        ThreadPoolExecutor lane = new ThreadPoolExecutor(
+                0, 1, 15L, TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(STARTUP_QUEUE_CAPACITY), task -> {
+                Thread worker = new Thread(() -> {
+                    try {
+                        Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND);
+                    } catch (RuntimeException ignored) {
+                    }
+                    task.run();
+                }, "status-boot-lane");
+                worker.setDaemon(true);
+                return worker;
+            }, new ThreadPoolExecutor.AbortPolicy());
+        lane.allowCoreThreadTimeOut(true);
+        return lane;
+    }
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        Context app = context.getApplicationContext();
+        if (app == null) app = context;
+        Context receiverContext = app;
+        Intent received = intent == null ? null : new Intent(intent);
+        PendingResult pending = goAsync();
+        try {
+            STARTUP_LANE.execute(() -> {
+                try {
+                    handleReceive(receiverContext, received);
+                } finally {
+                    pending.finish();
+                }
+            });
+        } catch (RejectedExecutionException rejected) {
+            // Never run coordinator commits on BroadcastReceiver's main thread as an overflow
+            // fallback. Completing the token avoids an ANR; the action in logcat makes a rare
+            // saturated boot burst diagnosable, while coordinator alarms retain durable phases.
+            pending.finish();
+            Log.e(TAG, "Startup queue full; rejected action="
+                    + (received == null ? null : received.getAction()), rejected);
+        }
+    }
+
+    private void handleReceive(Context context, Intent intent) {
         String action = intent == null ? null : intent.getAction();
         dezz.status.widget.diagnostics.ActionRecorder.record(
                 dezz.status.widget.diagnostics.ActionRecorder.SOURCE_SERVICE,
@@ -98,29 +154,25 @@ public class BootReceiver extends BroadcastReceiver {
             Log.d(TAG, "System lifecycle event, restoring enabled services: "
                     + action);
 
-            // LOCKED_BOOT/BOOT/QUICKBOOT often arrive close together on ECARX. Merge them into
-            // one quiet, alarm-backed lane instead of launching four foreground services and
-            // every radio/vendor integration from the receiver's main Looper at once.
-            if (!Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
-                MediaAutoResumeController.captureBootHistorySnapshot(context, action);
-            }
-            if (Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(action)
-                    || Intent.ACTION_BOOT_COMPLETED.equals(action)
-                    || ACTION_QUICKBOOT_POWERON.equals(action)) {
-                WidgetService survivingHost = WidgetService.getInstance();
-                if (survivingHost != null) {
-                    survivingHost.enterAutomaticLifecycleQuiet(
-                            ACTION_QUICKBOOT_POWERON.equals(action));
-                }
-            }
-            StartupWorkCoordinator.scheduleForLifecycle(context, action);
-            // BOOT_COMPLETED/QuickBoot may show the lightweight cached row immediately. The exact
-            // generation above still owns every controller, ECARX and headless surface.
+            // Admit the tiny visual surface before scheduleForLifecycle performs its durable
+            // coordinator transaction. LOCKED_BOOT cannot start the credential-backed surface.
             if (Intent.ACTION_BOOT_COMPLETED.equals(action)
                     || ACTION_QUICKBOOT_POWERON.equals(action)
                     || Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
                 WidgetServiceStarter.startVisibleSurfaceImmediatelyWithRetry(context);
             }
+            // LOCKED_BOOT/BOOT/QUICKBOOT often arrive close together on ECARX. Serialize their
+            // snapshot and generation work off the receiver's main Looper.
+            if (!Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
+                MediaAutoResumeController.captureBootHistorySnapshot(context, action);
+            }
+            if (ACTION_QUICKBOOT_POWERON.equals(action)) {
+                WidgetService survivingHost = WidgetService.getInstance();
+                if (survivingHost != null) {
+                    survivingHost.revalidateAutomaticVisualSurfaceAfterQuickBoot();
+                }
+            }
+            StartupWorkCoordinator.scheduleForLifecycle(context, action);
         }
     }
 

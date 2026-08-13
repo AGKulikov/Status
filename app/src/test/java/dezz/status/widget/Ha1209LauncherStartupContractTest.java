@@ -43,7 +43,7 @@ public final class Ha1209LauncherStartupContractTest {
             throws Exception {
         String launcher = javaSource("LauncherActivity.java");
         String layout = between(launcher, "workspace.addOnLayoutChangeListener",
-                "// HA1048 inflated");
+                "@Override\n    protected void onNewIntent");
         assertTrue(layout.indexOf("scheduleInitialLauncherBackdrops();") >= 0);
         assertFalse(layout.contains("syncLauncherBackdrops();"));
         assertTrue(layout.indexOf("scheduleInitialLauncherBackdrops();")
@@ -81,20 +81,23 @@ public final class Ha1209LauncherStartupContractTest {
         assertTrue(launcher.contains("Intent.CATEGORY_HOME"));
     }
 
-    @Test public void lifecyclePhasesOwnGenerationAndMonotonicNotBeforeBoundaries()
+    @Test public void lifecyclePhasesOwnGenerationAndDispatchImmediatelyWithFallback()
             throws Exception {
         String receiver = javaSource("BootReceiver.java");
         String coordinator = javaSource("StartupWorkCoordinator.java");
         String application = javaSource("StatusWidgetApplication.java");
-        assertTrue(application.contains("StartupWorkCoordinator.primeEarlyBootQuiet(this)"));
+        assertTrue(application.contains("StartupWorkCoordinator.clearLegacyStartupDeferrals(this)"));
         assertTrue(coordinator.contains("Settings.Global.BOOT_COUNT"));
         assertTrue(coordinator.contains("KEY_QUIET_UNTIL_ELAPSED"));
         assertTrue(coordinator.contains("EXTRA_GENERATION"));
         assertTrue(coordinator.contains("generationKey(phase)"));
         assertTrue(coordinator.contains("notBeforeKey(phase)"));
         assertTrue(coordinator.contains("Ignoring stale startup phase"));
-        assertTrue(coordinator.contains("remainingStartupLaneMillis"));
-        assertTrue(coordinator.contains("remainingQuietMillis(now"));
+        assertTrue(coordinator.contains("dispatchPhaseNowWithFallback"));
+        assertTrue(coordinator.contains("app.sendBroadcast(phaseIntent("));
+        assertTrue(coordinator.contains("PHASE_DELIVERY_FALLBACK_MS"));
+        assertTrue(coordinator.contains("cancelPhaseFallback(app, phase)"));
+        assertFalse(coordinator.contains("remainingStartupLaneMillis"));
         assertTrue(receiver.contains("StartupWorkCoordinator.generation(intent)"));
         assertTrue(receiver.contains("deferPhaseIfNeeded(context, phase, generation)"));
         assertTrue(receiver.contains("markPhaseCompleted(context, phase, generation)"));
@@ -102,20 +105,27 @@ public final class Ha1209LauncherStartupContractTest {
         assertFalse(coordinator.contains("CATEGORY_HOME"));
     }
 
-    @Test public void launcherAndSettingsRecheckEveryAbsoluteStartupLane() throws Exception {
+    @Test public void launcherAndSettingsDoNotWaitForAnArtificialStartupLane() throws Exception {
         String bootstrap = javaSource("AppRuntimeBootstrap.java");
-        assertTrue(bootstrap.contains("automaticReconcileDelayMillis"));
-        assertTrue(bootstrap.contains("StartupWorkCoordinator.ensureClimateScheduled"));
+        assertFalse(bootstrap.contains("automaticReconcileDelayMillis"));
+        assertTrue(bootstrap.contains("WidgetServiceStarter.startIfNeeded(appContext)"));
+        assertTrue(bootstrap.contains("ClimatePanelService.apply(appContext)"));
+
+        String coordinator = javaSource("StartupWorkCoordinator.java");
+        assertFalse(coordinator.contains("launcherRuntimeDelayMillis"));
+        assertFalse(coordinator.contains("automaticReconcileDelayMillis"));
+        assertFalse(coordinator.contains("startupInitializationDelayMillis"));
 
         String launcher = javaSource("LauncherActivity.java");
         String panelStep = between(launcher, "private void continuePanelInitialization()",
                 "private void makePanelTransparent");
-        assertTrue(panelStep.contains("launcherPanelDelayMillis(this, 0L)"));
+        assertFalse(panelStep.contains("launcherPanelDelayMillis"));
         String runtimeStep = between(launcher,
                 "private final Runnable deferredLauncherRuntimeStep",
                 "@Override\n    protected void onCreate");
-        assertTrue(runtimeStep.contains("launcherRuntimeDelayMillis("));
-        assertTrue(runtimeStep.contains("DEFERRED_LAUNCHER_STAGE_MS"));
+        assertFalse(runtimeStep.contains("launcherRuntimeDelayMillis("));
+        assertFalse(runtimeStep.contains("DEFERRED_LAUNCHER_STAGE_MS"));
+        assertTrue(runtimeStep.contains("navigationUiHandler.post(this)"));
 
         String fallback = project("app/src/geely/java/dezz/status/widget/car/"
                 + "HudModeFallbackBootReceiver.java");
@@ -129,17 +139,17 @@ public final class Ha1209LauncherStartupContractTest {
         String launcher = javaSource("LauncherActivity.java");
         String handoff = between(launcher,
                 "private final Runnable visibleIntegrationHostHandoff",
-                "private final Runnable allowPanelInitialization");
+                "private boolean launcherFirstDrawCompleted");
         assertTrue(handoff.contains("pendingIntegrationHostDelayMillis"));
         assertTrue(handoff.contains("dispatchPendingIntegrationHostIfDue"));
         String stop = between(launcher, "protected void onStop()",
-                "private void scheduleDeferredLauncherRuntimeStart");
+                "/** Starts migration immediately");
         assertTrue(stop.contains("removeCallbacks(visibleIntegrationHostHandoff)"));
 
         String coordinator = javaSource("StartupWorkCoordinator.java");
         String dispatch = between(coordinator,
                 "static boolean dispatchPendingIntegrationHostIfDue",
-                "/** Automatic Settings/runtime reconciliation");
+                "public static void ensureIntegrationHostScheduled");
         assertTrue(dispatch.contains("KEY_HOST_PHASE_PENDING"));
         assertTrue(dispatch.contains("KEY_HOST_PHASE_GENERATION"));
         assertTrue(dispatch.contains("isUserUnlocked(app)"));
@@ -153,9 +163,10 @@ public final class Ha1209LauncherStartupContractTest {
         String initial = between(service, "private void runInitialIntegrationStartup()",
                 "private void scheduleInitialIntegrationStartupAfterFrame");
         assertTrue(initial.contains("runNextInitialIntegrationStage"));
-        assertTrue(initial.contains("INITIAL_INTEGRATION_STAGE_MS"));
+        assertTrue(initial.contains("mainHandler.post(initialIntegrationStageRunner)"));
         assertFalse(initial.contains("reconfigureIntegrationControllers();"));
-        assertTrue(initial.contains("INITIAL_HUD_AFTER_DRIVER_MS"));
+        assertFalse(initial.contains("INITIAL_INTEGRATION_STAGE_MS"));
+        assertFalse(initial.contains("INITIAL_HUD_AFTER_DRIVER_MS"));
         assertTrue(service.contains("integrationReconfigurePending"));
         assertTrue(service.contains("schedulePendingIntegrationReconfigure()"));
 
@@ -250,16 +261,15 @@ public final class Ha1209LauncherStartupContractTest {
 
     @Test public void releaseIdentityAndWorkflowAdvanceTogether() throws Exception {
         String build = rootProject("build.gradle");
-        String workflow = project(".github/workflows/verify-ha1215.yml");
-        String manifest = project("release-manifests/HA1215.md");
-        assertTrue(build.contains("return 'v2.8.2-ha1215'"));
-        assertTrue(workflow.contains("name: Verify HA1215 unified Classic and ANCS candidate"));
-        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1215'"));
-        assertTrue(workflow.contains("VERSION_CODE: '208021215'"));
-        assertTrue(workflow.contains("StartupLoadPolicyTest"));
-        assertTrue(workflow.contains("LauncherActionsPanelEditorContractTest"));
+        String workflow = project(".github/workflows/verify-ha1216.yml");
+        String manifest = project("release-manifests/HA1216.md");
+        assertTrue(build.contains("return 'v2.8.2-ha1216'"));
+        assertTrue(workflow.contains("name: Verify HA1216 immediate lean runtime candidate"));
+        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1216'"));
+        assertTrue(workflow.contains("VERSION_CODE: '208021216'"));
+        assertTrue(workflow.contains("testGeelyDebugUnitTest"));
         assertTrue(manifest.contains("ru.natro.statuswidget"));
-        assertTrue(manifest.contains("208021215"));
+        assertTrue(manifest.contains("208021216"));
     }
 
     private static String javaSource(String relative) throws Exception {

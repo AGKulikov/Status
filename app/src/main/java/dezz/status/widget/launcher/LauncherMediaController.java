@@ -291,9 +291,16 @@ public final class LauncherMediaController {
     };
 
     public LauncherMediaController(@NonNull Context context, @NonNull Listener listener) {
+        this(context, new Preferences(context), listener);
+    }
+
+    /** Reuses HOME's already-migrated graph instead of repeating migration on the UI thread. */
+    public LauncherMediaController(@NonNull Context context,
+                                   @NonNull Preferences preferences,
+                                   @NonNull Listener listener) {
         Context app = context.getApplicationContext();
         this.context = app == null ? context : app;
-        preferences = new Preferences(this.context);
+        this.preferences = preferences;
         this.listener = listener;
         manager = (MediaSessionManager) context.getSystemService(Context.MEDIA_SESSION_SERVICE);
         audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);

@@ -31,8 +31,7 @@ public final class Ha1159ExactBatteryContractTest {
     }
 
     @Test public void releaseIdentityIsHa1160() throws Exception {
-        String build = project("build.gradle");
-        assertTrue(build.contains("return 'v2.8.2-ha1215'"));
+        ReleaseIdentityContract.assertCurrentAtLeast(1160);
     }
 
     private static String source(String relative) throws Exception {
