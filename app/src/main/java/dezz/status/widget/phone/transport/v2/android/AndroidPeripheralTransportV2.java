@@ -48,6 +48,7 @@ import dezz.status.widget.phone.transport.v2.IphoneTelemetryProtocolV2;
 import dezz.status.widget.phone.transport.v2.IphoneTelemetryV2;
 import dezz.status.widget.phone.transport.v2.IphoneTransportErrorV2;
 import dezz.status.widget.phone.transport.v2.IphoneTransportLifecycle;
+import dezz.status.widget.phone.transport.v2.IphoneTransportRecoveryStateV2;
 import dezz.status.widget.phone.transport.v2.IphoneTransportSessionListenerV2;
 import dezz.status.widget.phone.transport.v2.IphoneTransportStartRequest;
 import dezz.status.widget.phone.transport.v2.IphoneTransportStatusV2;
@@ -2217,7 +2218,27 @@ public final class AndroidPeripheralTransportV2 implements IphoneSwitchTransport
     private IphoneTransportStatusV2 toStatus(AndroidPeripheralRoute.State route) {
         return new IphoneTransportStatusV2(mode(), route.epoch, lifecycle(route.phase),
                 route.selectedSystemBondAddress, route.helperInstallationId,
-                route.detail, route.consecutiveFailures);
+                route.detail, route.consecutiveFailures, recoveryState(route.phase));
+    }
+
+    private static IphoneTransportRecoveryStateV2 recoveryState(
+            AndroidPeripheralRoute.Phase phase) {
+        switch (phase) {
+            case WAIT_RADIO:
+                return IphoneTransportRecoveryStateV2.NO_OWNER;
+            case WAIT_ANCS:
+                return IphoneTransportRecoveryStateV2.WAIT_SERVICE_CHANGED;
+            case WAIT_AUTHORIZATION:
+                return IphoneTransportRecoveryStateV2.WAIT_AUTHORIZATION;
+            case READY:
+                return IphoneTransportRecoveryStateV2.READY;
+            case NEEDS_FRESH_LINK:
+            case STOPPED:
+            case FAILED:
+                return IphoneTransportRecoveryStateV2.OWNER_DOWN;
+            default:
+                return IphoneTransportRecoveryStateV2.PROGRESSING;
+        }
     }
 
     private static IphoneTransportLifecycle lifecycle(AndroidPeripheralRoute.Phase phase) {

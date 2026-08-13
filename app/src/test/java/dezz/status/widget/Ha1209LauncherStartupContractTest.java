@@ -250,16 +250,16 @@ public final class Ha1209LauncherStartupContractTest {
 
     @Test public void releaseIdentityAndWorkflowAdvanceTogether() throws Exception {
         String build = rootProject("build.gradle");
-        String workflow = project(".github/workflows/verify-ha1214.yml");
-        String manifest = project("release-manifests/HA1214.md");
-        assertTrue(build.contains("return 'v2.8.2-ha1214'"));
-        assertTrue(workflow.contains("name: Verify HA1214 immediate cooperative startup candidate"));
-        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1214'"));
-        assertTrue(workflow.contains("VERSION_CODE: '208021214'"));
+        String workflow = project(".github/workflows/verify-ha1215.yml");
+        String manifest = project("release-manifests/HA1215.md");
+        assertTrue(build.contains("return 'v2.8.2-ha1215'"));
+        assertTrue(workflow.contains("name: Verify HA1215 unified Classic and ANCS candidate"));
+        assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1215'"));
+        assertTrue(workflow.contains("VERSION_CODE: '208021215'"));
         assertTrue(workflow.contains("StartupLoadPolicyTest"));
         assertTrue(workflow.contains("LauncherActionsPanelEditorContractTest"));
         assertTrue(manifest.contains("ru.natro.statuswidget"));
-        assertTrue(manifest.contains("208021214"));
+        assertTrue(manifest.contains("208021215"));
     }
 
     private static String javaSource(String relative) throws Exception {

@@ -12,7 +12,14 @@ import static org.junit.Assert.assertTrue;
 
 import dezz.status.widget.phone.transport.switching.BleRoleSwitchCoordinator.ControlTransmit;
 import dezz.status.widget.phone.transport.switching.BleRoleSwitchCoordinator.Owner;
+import dezz.status.widget.phone.transport.switching.BleRoleSwitchCoordinator.WireSwitchToken;
+import dezz.status.widget.phone.transport.switching.BleRoleSwitchOrigin;
 import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.ControlFrame;
+import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Failure;
+import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Phase;
+import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Role;
+import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Sequence;
+import dezz.status.widget.phone.transport.switching.BleRoleSwitchSnapshotCodec;
 import java.security.SecureRandom;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -372,6 +379,140 @@ public final class IphoneDualTransportRuntimeV2Test {
         assertEquals(1, fixture.factory.created.get(1).startCount);
     }
 
+    @Test public void productionRejectsRouteBQueuedBeforeStart() {
+        Fixture fixture = new Fixture(false, "");
+
+        fixture.runtime.requestMode(IphoneBleMode.ANDROID_PERIPHERAL);
+        fixture.runtime.start(new IphoneDualTransportRuntimeV2.Config(
+                "11:22:33:44:55:66",
+                IphoneBleMode.ANDROID_CENTRAL,
+                true,
+                true,
+                true,
+                false), fixture.listener);
+        fixture.scheduler.drain();
+
+        assertEquals(IphoneBleMode.ANDROID_CENTRAL,
+                fixture.factory.created.get(0).mode());
+        fixture.scheduler.advanceBy(10L);
+        assertEquals(IphoneBleMode.ANDROID_CENTRAL,
+                fixture.factory.created.get(1).mode());
+        assertEquals(IphoneBleMode.ANDROID_CENTRAL,
+                fixture.listener.lastDual.activeMode);
+    }
+
+    @Test public void externallyManagedTerminalWaitsForBoundedControllerCommand() {
+        Fixture fixture = new Fixture(false, "");
+        fixture.startProduction();
+        fixture.scheduler.advanceBy(10L);
+        FakeTransport terminal = fixture.factory.created.get(1);
+
+        terminal.deliverFailedStatus("route terminal");
+        fixture.scheduler.drain();
+        assertEquals(0, terminal.stopCount);
+        assertEquals(2, fixture.factory.created.size());
+
+        fixture.runtime.requestSameModeRecovery();
+        fixture.scheduler.drain();
+        assertEquals(1, terminal.stopCount);
+        fixture.scheduler.advanceBy(10L);
+        assertEquals(3, fixture.factory.created.size());
+        assertEquals(IphoneBleMode.ANDROID_CENTRAL,
+                fixture.factory.created.get(2).mode());
+    }
+
+    @Test public void productionRuntimeRejectsLocalAndRemoteRouteB() {
+        Fixture fixture = new Fixture(false, "");
+        fixture.startProduction();
+        fixture.scheduler.advanceBy(10L);
+        FakeTransport active = fixture.factory.created.get(1);
+
+        fixture.runtime.requestMode(IphoneBleMode.ANDROID_PERIPHERAL);
+        fixture.scheduler.drain();
+        assertEquals(IphoneBleMode.ANDROID_CENTRAL,
+                fixture.listener.lastDual.activeMode);
+        assertEquals(2, fixture.factory.created.size());
+
+        byte[] token = new byte[IphoneBleControlProtocolV2.PAYLOAD_BYTES];
+        token[0] = 1;
+        active.deliverControl(new IphoneRoleControlV2(
+                IphoneRoleControlV2.Type.CLOSE_REQUEST,
+                IphoneBleMode.ANDROID_PERIPHERAL,
+                token));
+        fixture.scheduler.drain();
+        assertNotNull(fixture.listener.lastError);
+        assertEquals(IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
+                fixture.listener.lastError.kind);
+        assertEquals(2, fixture.factory.created.size());
+    }
+
+    @Test public void productionMigratesPersistedActiveRouteBWithoutStartingIt() {
+        BleRoleSwitchSnapshotCodec codec = new BleRoleSwitchSnapshotCodec();
+        String snapshot = codec.encode(BleRoleSwitchSnapshotCodec.Snapshot.active(
+                PROCESS + 1L,
+                Sequence.zero(),
+                Role.HELPER_CENTRAL_ANDROID_PERIPHERAL,
+                Sequence.of(1L)));
+
+        assertProductionMigrationStartsOnlyRouteA(snapshot);
+    }
+
+    @Test public void productionMigratesPersistedDrainToRouteBWithoutStartingIt() {
+        BleRoleSwitchSnapshotCodec codec = new BleRoleSwitchSnapshotCodec();
+        byte[] token = new byte[16];
+        token[0] = 7;
+        String snapshot = codec.encode(BleRoleSwitchSnapshotCodec.Snapshot.drain(
+                PROCESS + 1L,
+                BleRoleSwitchOrigin.LOCAL,
+                Phase.FREEZING,
+                Sequence.of(2L),
+                Role.HELPER_CENTRAL_ANDROID_PERIPHERAL,
+                Role.HELPER_PERIPHERAL_ANDROID_CENTRAL,
+                Sequence.of(1L),
+                Role.HELPER_CENTRAL_ANDROID_PERIPHERAL,
+                Sequence.of(2L),
+                new WireSwitchToken(token),
+                Failure.NONE));
+
+        assertProductionMigrationStartsOnlyRouteA(snapshot);
+    }
+
+    private static void assertProductionMigrationStartsOnlyRouteA(String snapshot) {
+        Fixture fixture = new Fixture(true, snapshot);
+        fixture.startProduction();
+        fixture.scheduler.advanceBy(10L);
+        fixture.scheduler.advanceBy(10L);
+        fixture.scheduler.advanceBy(10L);
+
+        FakeTransport active = fixture.factory.created.get(
+                fixture.factory.created.size() - 1);
+        assertEquals(IphoneBleMode.ANDROID_CENTRAL, active.mode());
+        assertEquals(1, active.startCount);
+        for (FakeTransport candidate : fixture.factory.created) {
+            if (candidate.mode() == IphoneBleMode.ANDROID_PERIPHERAL) {
+                assertEquals(0, candidate.startCount);
+                assertTrue(candidate.preparedRestoration);
+            }
+        }
+        assertEquals(ACTIVE, fixture.listener.lastDual.switchPhase);
+        assertEquals(IphoneBleMode.ANDROID_CENTRAL,
+                fixture.listener.lastDual.activeMode);
+        BleRoleSwitchSnapshotCodec codec = new BleRoleSwitchSnapshotCodec();
+        boolean logicalBCheckpoint = false;
+        boolean drainToProductionA = false;
+        for (String written : fixture.store.writes) {
+            BleRoleSwitchSnapshotCodec.Snapshot decoded = codec.decode(written);
+            logicalBCheckpoint |= decoded.kind() ==
+                    BleRoleSwitchSnapshotCodec.Kind.ACTIVE
+                    && decoded.activeRole() == Role.HELPER_CENTRAL_ANDROID_PERIPHERAL;
+            drainToProductionA |= decoded.kind() ==
+                    BleRoleSwitchSnapshotCodec.Kind.DRAIN
+                    && decoded.desiredRole() == Role.HELPER_PERIPHERAL_ANDROID_CENTRAL;
+        }
+        assertTrue(logicalBCheckpoint);
+        assertTrue(drainToProductionA);
+    }
+
     private static final class Fixture {
         final FakeScheduler scheduler = new FakeScheduler();
         final FakeStore store;
@@ -389,6 +530,17 @@ public final class IphoneDualTransportRuntimeV2Test {
         void start(IphoneBleMode mode) {
             runtime.start(new IphoneDualTransportRuntimeV2.Config(
                     "11:22:33:44:55:66", mode, true, true), listener);
+            scheduler.drain();
+        }
+
+        void startProduction() {
+            runtime.start(new IphoneDualTransportRuntimeV2.Config(
+                    "11:22:33:44:55:66",
+                    IphoneBleMode.ANDROID_CENTRAL,
+                    true,
+                    true,
+                    true,
+                    false), listener);
             scheduler.drain();
         }
     }
@@ -451,6 +603,7 @@ public final class IphoneDualTransportRuntimeV2Test {
         String snapshot;
         String androidId = "";
         String helperId = "";
+        final List<String> writes = new ArrayList<>();
         boolean failSwitchCommit;
 
         FakeStore(boolean present, String snapshot) {
@@ -464,6 +617,7 @@ public final class IphoneDualTransportRuntimeV2Test {
             if (failSwitchCommit) throw new IllegalStateException("durable write failed");
             present = true;
             snapshot = encodedSnapshot;
+            writes.add(encodedSnapshot);
         }
         @Override public String androidInstallationId() { return androidId; }
         @Override public boolean commitAndroidInstallationId(String value) {

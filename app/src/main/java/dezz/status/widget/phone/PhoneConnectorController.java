@@ -45,6 +45,7 @@ import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.integration.ConnectorValueRegistry;
 import dezz.status.widget.integration.SourceBinding;
 import dezz.status.widget.phone.transport.v2.BleRouteEpoch;
+import dezz.status.widget.phone.transport.v2.ClassicAncsRecoveryPolicy;
 import dezz.status.widget.phone.transport.v2.IphoneAppNameV2;
 import dezz.status.widget.phone.transport.v2.IphoneBleMode;
 import dezz.status.widget.phone.transport.v2.IphoneDualTransportListenerV2;
@@ -56,6 +57,7 @@ import dezz.status.widget.phone.transport.v2.IphoneRoleControlV2;
 import dezz.status.widget.phone.transport.v2.IphoneTelemetryV2;
 import dezz.status.widget.phone.transport.v2.IphoneTransportErrorV2;
 import dezz.status.widget.phone.transport.v2.IphoneTransportLifecycle;
+import dezz.status.widget.phone.transport.v2.IphoneTransportRecoveryStateV2;
 import dezz.status.widget.phone.transport.v2.IphoneTransportStatusV2;
 import dezz.status.widget.phone.transport.v2.android.AndroidIphoneDualRuntimeV2;
 
@@ -99,6 +101,8 @@ public final class PhoneConnectorController {
 
     private static final String ACTION_HFP_CONNECTION =
             "android.bluetooth.headsetclient.profile.action.CONNECTION_STATE_CHANGED";
+    private static final String ACTION_A2DP_CONNECTION =
+            "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED";
     private static final String ACTION_HFP_AG_EVENT =
             "android.bluetooth.headsetclient.profile.action.AG_EVENT";
     private static final String ACTION_HFP_AUDIO_STATE =
@@ -204,6 +208,9 @@ public final class PhoneConnectorController {
     private String selectedAddress = "";
     private String selectedName = "";
     private boolean aclConnected;
+    /** Confirmed BR/EDR ACL only; an unknown/LE ACL never triggers Classic→ANCS recovery. */
+    private boolean bredrAclConnected;
+    private boolean a2dpConnected;
     private boolean hfpConnected;
     private boolean mapConnected;
     private boolean gattConnected;
@@ -264,6 +271,11 @@ public final class PhoneConnectorController {
     @Nullable private Runnable ancsStableReadyTask;
     @Nullable private Runnable stockConnectionTask;
     @Nullable private Runnable oemGattRefreshTask;
+    @Nullable private Runnable classicAncsRecoveryTask;
+    private ClassicAncsRecoveryPolicy.State classicAncsRecovery =
+            ClassicAncsRecoveryPolicy.State.initial();
+    private IphoneTransportRecoveryStateV2 ancsRecoveryRoute =
+            IphoneTransportRecoveryStateV2.NO_OWNER;
     private int stockConnectionAttempt;
     private boolean stockConnectionRequestInProgress;
     private final Map<String, String> appDisplayNames = new LinkedHashMap<>();
@@ -464,9 +476,13 @@ public final class PhoneConnectorController {
         selectedAddress = "";
         selectedName = "";
         aclConnected = false;
+        bredrAclConnected = false;
+        a2dpConnected = false;
         hfpConnected = false;
         mapConnected = false;
         gattConnected = false;
+        classicAncsRecovery = ClassicAncsRecoveryPolicy.State.initial();
+        ancsRecoveryRoute = IphoneTransportRecoveryStateV2.NO_OWNER;
         v2SwitchInProgress = false;
         connected = false;
         reconnectAttempt = 0;
@@ -537,6 +553,7 @@ public final class PhoneConnectorController {
         filter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
         filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
         filter.addAction(ACTION_HFP_CONNECTION);
+        filter.addAction(ACTION_A2DP_CONNECTION);
         filter.addAction(ACTION_HFP_AG_EVENT);
         filter.addAction(ACTION_HFP_AUDIO_STATE);
         filter.addAction(ACTION_HFP_CALL_CHANGED);
@@ -600,30 +617,41 @@ public final class PhoneConnectorController {
         if (!isSelected(device)) return;
         if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
             aclConnected = true;
+            int transport = intent.getIntExtra(EXTRA_ACL_TRANSPORT,
+                    BluetoothDevice.TRANSPORT_AUTO);
+            if (transport == BluetoothDevice.TRANSPORT_BREDR) {
+                bredrAclConnected = true;
+            }
             updateConnected(token);
             ensureGatt(token);
         } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
             aclConnected = false;
             int transport = intent.getIntExtra(EXTRA_ACL_TRANSPORT,
                     BluetoothDevice.TRANSPORT_AUTO);
-            if (transport != BluetoothDevice.TRANSPORT_LE) {
+            if (transport == BluetoothDevice.TRANSPORT_BREDR) {
                 persistCurrentTelemetry();
+                bredrAclConnected = false;
+                a2dpConnected = false;
                 hfpConnected = false;
                 clearHfpData();
                 clearGenericBatteryData();
                 if (mapConnected) endMapSession("disconnected");
             }
             updateConnected(token);
-            // Some ECARX Android 9 builds omit the LE transport extra and can also lose the
-            // BluetoothGatt disconnect callback. The exact selected peer's LE/unknown ACL loss
-            // therefore becomes an explicit retry signal. The scheduler is idempotent when the
-            // ordinary GATT callback arrives too.
+            // Some ECARX Android 9 builds omit the transport extra. Unknown is neither proof of
+            // BR/EDR profile loss nor proof that the exact GATT owner died, so it only prompts a
+            // typed reconciliation and never clears HFP/A2DP/MAP or forces owner replacement.
             if (config != null && config.transportNeeded()
                     && transport != BluetoothDevice.TRANSPORT_BREDR) {
                 requestManagedAncsReconnect(token,
                         "Selected iPhone ACL link disconnected",
                         transport == BluetoothDevice.TRANSPORT_LE);
             }
+        } else if (ACTION_A2DP_CONNECTION.equals(action)) {
+            int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE,
+                    BluetoothProfile.STATE_DISCONNECTED);
+            a2dpConnected = state == BluetoothProfile.STATE_CONNECTED;
+            updateConnected(token);
         } else if (ACTION_HFP_CONNECTION.equals(action)) {
             int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE,
                     BluetoothProfile.STATE_DISCONNECTED);
@@ -687,6 +715,8 @@ public final class PhoneConnectorController {
         if (!retainV2Runtime) closeAncsTransport();
         cancelStockConnectionRequest();
         aclConnected = false;
+        bredrAclConnected = false;
+        a2dpConnected = false;
         hfpConnected = false;
         mapConnected = false;
         gattConnected = false;
@@ -830,16 +860,12 @@ public final class PhoneConnectorController {
             oemGattRefreshTask = null;
             if (!address.equalsIgnoreCase(selectedAddress)
                     || config == null || !config.transportNeeded() || ancsReady) return;
-            IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
-            if (runtime != null) {
-                PhoneConnectionJournal.append("v2-recovery",
-                        "ECARX selected-phone state changed: " + change.name());
-                runtime.requestSameModeRecovery();
-                publishSnapshot(token);
-                return;
-            }
-            ancsStatus = "connecting";
-            ensureGatt(token);
+            PhoneConnectionJournal.append("v2-recovery",
+                    "ECARX selected-phone state changed: " + change.name()
+                            + "; reconcile exact Classic/ANCS state");
+            // A vendor callback is only a nudge.  The typed policy preserves a live owner in
+            // WAIT_ANCS/WAIT_AUTHORIZATION and only replaces a route proven down.
+            reconcileClassicAncsRecovery(token);
             publishSnapshot(token);
         });
         oemGattRefreshTask = refresh;
@@ -971,6 +997,7 @@ public final class PhoneConnectorController {
                         } else if (exactDevice != null
                                 && profileId == BluetoothProfile.A2DP) {
                             runIfCurrent(token, () -> {
+                                a2dpConnected = true;
                                 aclConnected = true;
                                 updateConnected(token);
                             });
@@ -1107,17 +1134,20 @@ public final class PhoneConnectorController {
             activeAncsTransportSession = ++nextAncsTransportSession;
         }
         ancsStatus = "starting_v2";
+        ancsRecoveryRoute = IphoneTransportRecoveryStateV2.PROGRESSING;
         publishSnapshot(token);
         long transportSession = activeAncsTransportSession;
         mainHandler.post(() -> startV2RuntimeOnMain(
                 token,
                 transportSession,
                 current.deviceAddress,
-                current.bleRole));
+                current.bleRole,
+                current.experimentalRouteBEnabled));
     }
 
     private void startV2RuntimeOnMain(long token, long transportSession,
-                                      @NonNull String selectedBondAddress, int bleRole) {
+                                      @NonNull String selectedBondAddress, int bleRole,
+                                      boolean allowExperimentalRouteB) {
         if (!isCurrent(token) || transportSession != activeAncsTransportSession) return;
         final IphoneDualTransportRuntimeV2 created;
         try {
@@ -1129,6 +1159,8 @@ public final class PhoneConnectorController {
                 }
                 lastError = "ANCS v2 init: " + safeMessage(error);
                 ancsStatus = "failed_closed";
+                ancsRecoveryRoute = IphoneTransportRecoveryStateV2.OWNER_DOWN;
+                reconcileClassicAncsRecovery(token);
                 publishSnapshot(token);
             });
             return;
@@ -1153,7 +1185,9 @@ public final class PhoneConnectorController {
                         selectedBondAddress,
                         v2Mode(startBleRole),
                         initialRadioEnabled,
-                        prefs.phoneBleV2HelperInstallationId().trim().isEmpty()),
+                        prefs.phoneBleV2HelperInstallationId().trim().isEmpty(),
+                        true,
+                        allowExperimentalRouteB),
                 new V2TransportListener(token, transportSession));
 
         boolean accepted;
@@ -1242,8 +1276,8 @@ public final class PhoneConnectorController {
         }
 
         @Override public void onLocalTerminal(IphoneBleMode mode, BleRouteEpoch epoch) {
-            PhoneConnectionJournal.append("v2-terminal",
-                    "local route terminal " + mode + " epoch=" + epoch);
+            dispatchAncsTransport(token, transportSession,
+                    () -> applyV2LocalTerminal(token, mode, epoch));
         }
 
         @Override public void onError(IphoneTransportErrorV2 error) {
@@ -1267,6 +1301,12 @@ public final class PhoneConnectorController {
                 dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Phase.ACTIVE;
         v2SwitchInProgress = !activePhase;
         if (!activePhase) {
+            ancsRecoveryRoute = status.switchPhase ==
+                    dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Phase.FAILED
+                    ? IphoneTransportRecoveryStateV2.OWNER_DOWN
+                    : IphoneTransportRecoveryStateV2.PROGRESSING;
+        }
+        if (!activePhase) {
             // FREEZING is the generation boundary. Clear before any successor route can publish
             // so a prior Helper sample cannot survive switch, retry, link-loss, or FAILED.
             clearHelperTelemetry();
@@ -1286,7 +1326,9 @@ public final class PhoneConnectorController {
                 dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.Phase.FAILED) {
             // desiredMode is the durable user/peer intent.  activeMode may be a deliberately
             // short intermediate role while a rapid A→B→A request is being drained.
-            int storedRole = status.desiredMode == IphoneBleMode.ANDROID_PERIPHERAL
+            boolean diagnosticRouteB = config != null && config.experimentalRouteBEnabled;
+            int storedRole = diagnosticRouteB
+                    && status.desiredMode == IphoneBleMode.ANDROID_PERIPHERAL
                     ? PhoneBleRole.IPHONE_CENTRAL : PhoneBleRole.IPHONE_PERIPHERAL;
             if (prefs.phoneBleRole.get() != storedRole) prefs.phoneBleRole.set(storedRole);
         } else if (status.switchPhase ==
@@ -1297,12 +1339,14 @@ public final class PhoneConnectorController {
             lastError = bounded(status.detail, 512);
             updateAncsPresenceLocked(false);
         }
+        reconcileClassicAncsRecovery(token);
         publishSnapshot(token);
     }
 
     private void applyV2RouteStatus(long token, @Nullable IphoneTransportStatusV2 status) {
         if (status == null) return;
         IphoneTransportLifecycle lifecycle = status.lifecycle;
+        ancsRecoveryRoute = status.recoveryState;
         boolean ready = lifecycle == IphoneTransportLifecycle.READY
                 && !v2SwitchInProgress;
         boolean linkActive = ready
@@ -1323,9 +1367,26 @@ public final class PhoneConnectorController {
                 resetAncsSession(token, lifecycle.name().toLowerCase(Locale.ROOT));
             }
         }
-        ancsStatus = lifecycle.name().toLowerCase(Locale.ROOT);
+        if (status.recoveryState == IphoneTransportRecoveryStateV2.WAIT_SERVICE_CHANGED) {
+            ancsStatus = "waiting_for_ancs_service_changed";
+        } else if (status.recoveryState ==
+                IphoneTransportRecoveryStateV2.WAIT_AUTHORIZATION) {
+            ancsStatus = "authorization_required_on_iphone";
+        } else {
+            ancsStatus = lifecycle.name().toLowerCase(Locale.ROOT);
+        }
         updateMessageAvailability();
         updateConnected(token);
+    }
+
+    private void applyV2LocalTerminal(long token, @Nullable IphoneBleMode mode,
+                                      @Nullable BleRouteEpoch epoch) {
+        PhoneConnectionJournal.append("v2-terminal",
+                "local route terminal " + mode + " epoch=" + epoch);
+        if (!v2SwitchInProgress) {
+            ancsRecoveryRoute = IphoneTransportRecoveryStateV2.OWNER_DOWN;
+            reconcileClassicAncsRecovery(token);
+        }
     }
 
     private void dispatchAncsTransport(long token, long transportSession,
@@ -2098,10 +2159,15 @@ public final class PhoneConnectorController {
     }
 
     private void updateConnected(long token) {
-        boolean next = aclConnected || hfpConnected || mapConnected || gattConnected;
+        boolean next = aclConnected || a2dpConnected || hfpConnected
+                || mapConnected || gattConnected;
         if (next) {
             refreshBatteryValues();
         }
+        // Re-run on every exact profile edge, even when BLE already keeps aggregate presence
+        // true. The pure policy remembers its armed wakeup/route condition, so duplicate profile
+        // broadcasts cannot emit a second recovery command or recurse into owner construction.
+        reconcileClassicAncsRecovery(token);
         if (connected == next) {
             publishSnapshot(token);
             return;
@@ -2164,8 +2230,95 @@ public final class PhoneConnectorController {
         rebuildMessageSnapshot();
     }
 
-    private void scheduleGattReconnect(long token, @NonNull String detail) {
-        scheduleGattReconnect(token, detail, "retrying");
+    /**
+     * Reconciles exact selected-phone Classic profiles with the typed ANCS route condition.
+     * Unknown/LE ACL alone is deliberately excluded: only HFP, A2DP, MAP or a confirmed BR/EDR
+     * ACL may assert the Classic side of the one-logical-phone invariant.
+     */
+    private void reconcileClassicAncsRecovery(long token) {
+        if (!isCurrent(token)) return;
+        ClassicAncsRecoveryPolicy.Transition transition =
+                ClassicAncsRecoveryPolicy.observe(
+                        classicAncsRecovery,
+                        classicProfileConnected(),
+                        ancsRecoveryRoute,
+                        SystemClock.elapsedRealtime());
+        applyClassicAncsRecoveryTransition(token, transition);
+    }
+
+    private boolean classicProfileConnected() {
+        return bredrAclConnected || a2dpConnected || hfpConnected || mapConnected;
+    }
+
+    private void applyClassicAncsRecoveryTransition(
+            long token, @NonNull ClassicAncsRecoveryPolicy.Transition transition) {
+        if (!isCurrent(token)) return;
+        classicAncsRecovery = transition.state;
+        for (ClassicAncsRecoveryPolicy.Effect effect : transition.effects) {
+            switch (effect.type) {
+                case CANCEL_WAKEUP:
+                    cancelClassicAncsRecoveryWakeup();
+                    break;
+                case ENSURE_ROUTE:
+                    PhoneConnectionJournal.append("classic-ancs",
+                            "Classic exact profile is up; ensure "
+                                    + PhoneBleRole.diagnosticName(config == null
+                                    ? PhoneBleRole.IPHONE_PERIPHERAL : config.bleRole)
+                                    + " ANCS route without bond/radio mutation");
+                    ancsStatus = "classic_connected_ancs_recovery";
+                    IphoneDualTransportRuntimeV2 existing = ancsRuntimeV2;
+                    if (existing != null) existing.requestSameModeRecovery();
+                    else ensureGatt(token);
+                    break;
+                case REQUEST_SAME_ROUTE_RECOVERY:
+                    PhoneConnectionJournal.append("classic-ancs",
+                            "ANCS owner is down while Classic is up; fresh same-route generation"
+                                    + " (command "
+                                    + transition.state.recoveryCommands + ")");
+                    ancsStatus = "classic_connected_ancs_recovery";
+                    IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
+                    if (runtime != null) {
+                        runtime.requestSameModeRecovery();
+                    } else {
+                        ancsRecoveryRoute = IphoneTransportRecoveryStateV2.NO_OWNER;
+                        ensureGatt(token);
+                    }
+                    break;
+                case SCHEDULE_WAKEUP:
+                    scheduleClassicAncsRecoveryWakeup(token, effect.timerGeneration,
+                            effect.deadlineMillis);
+                    break;
+                default:
+                    throw new AssertionError(effect.type);
+            }
+        }
+    }
+
+    private void scheduleClassicAncsRecoveryWakeup(long token, long timerGeneration,
+                                                    long deadlineMillis) {
+        Handler handler = worker;
+        if (handler == null) return;
+        cancelClassicAncsRecoveryWakeup();
+        Runnable wakeup = () -> runIfCurrent(token, () -> {
+            classicAncsRecoveryTask = null;
+            ClassicAncsRecoveryPolicy.Transition transition =
+                    ClassicAncsRecoveryPolicy.wakeup(
+                            classicAncsRecovery,
+                            timerGeneration,
+                            SystemClock.elapsedRealtime());
+            applyClassicAncsRecoveryTransition(token, transition);
+            publishSnapshot(token);
+        });
+        classicAncsRecoveryTask = wakeup;
+        long delay = Math.max(0L,
+                deadlineMillis - SystemClock.elapsedRealtime());
+        handler.postDelayed(wakeup, delay);
+    }
+
+    private void cancelClassicAncsRecoveryWakeup() {
+        Runnable task = classicAncsRecoveryTask;
+        if (task != null && worker != null) worker.removeCallbacks(task);
+        classicAncsRecoveryTask = null;
     }
 
     /**
@@ -2175,41 +2328,16 @@ public final class PhoneConnectorController {
      */
     private void requestManagedAncsReconnect(long token, @NonNull String detail,
                                              boolean confirmedLeLoss) {
-        IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
-        if (runtime != null) {
-            PhoneConnectionJournal.append("v2-recovery",
-                    redactedDiagnostic(detail) + ", confirmedLeLoss=" + confirmedLeLoss);
-            runtime.requestSameModeRecovery();
-            return;
-        }
-        scheduleGattReconnect(token, detail, "retrying");
-    }
-
-    private void scheduleGattReconnect(long token, @NonNull String detail,
-                                       @NonNull String visibleStatus) {
-        if (!isCurrent(token)) return;
-        IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
-        if (runtime != null) {
-            lastError = bounded(detail, 512);
-            ancsStatus = visibleStatus;
-            PhoneConnectionJournal.append("v2-recovery",
-                    "controller signal translated to same-role drain: "
-                            + redactedDiagnostic(detail));
-            runtime.requestSameModeRecovery();
-            publishSnapshot(token);
-            return;
-        }
-        cancelStableAncsReadyReset();
         lastError = bounded(detail, 512);
-        ancsStatus = "starting_v2";
-        gattConnected = false;
-        persistCurrentTelemetry();
-        resetAncsSession(token, visibleStatus);
-        updateConnected(token);
-        PhoneConnectionJournal.append("v2-start",
-                "runtime отсутствовал; создаю clean-room owner: "
-                        + redactedDiagnostic(detail));
-        ensureGatt(token);
+        PhoneConnectionJournal.append("v2-recovery",
+                redactedDiagnostic(detail) + ", confirmedLeLoss=" + confirmedLeLoss);
+        // An unknown transport extra is not proof that the exact GATT owner died.  A confirmed
+        // LE loss is; the Classic-aware policy then decides whether/when to allocate a fresh
+        // same-topology generation.
+        if (confirmedLeLoss) {
+            ancsRecoveryRoute = IphoneTransportRecoveryStateV2.OWNER_DOWN;
+        }
+        reconcileClassicAncsRecovery(token);
         publishSnapshot(token);
     }
 
@@ -2243,6 +2371,7 @@ public final class PhoneConnectorController {
             activeAncsTransportSession = ++nextAncsTransportSession;
         }
         if (previousV2 != null) previousV2.close();
+        ancsRecoveryRoute = IphoneTransportRecoveryStateV2.NO_OWNER;
     }
 
     private void cancelRetryTasks() {
@@ -2250,6 +2379,7 @@ public final class PhoneConnectorController {
         cancelStableAncsReadyReset();
         cancelStockConnectionRequest();
         cancelOemGattRefresh();
+        cancelClassicAncsRecoveryWakeup();
     }
 
     private void cancelDeviceRescan() {
@@ -3064,6 +3194,7 @@ public final class PhoneConnectorController {
         final boolean enabled;
         @NonNull final String deviceAddress;
         final int bleRole;
+        final boolean experimentalRouteBEnabled;
         final boolean notificationsEnabled;
         final boolean messagesEnabled;
         final boolean includeNotificationText;
@@ -3073,7 +3204,8 @@ public final class PhoneConnectorController {
         @NonNull final Set<String> notificationAppFilterKeys;
 
         Config(boolean enabled, @NonNull String deviceAddress,
-               int bleRole, boolean notificationsEnabled,
+               int bleRole, boolean experimentalRouteBEnabled,
+               boolean notificationsEnabled,
                boolean messagesEnabled, boolean includeNotificationText,
                boolean ancsPresenceEnabled,
                @NonNull Set<Integer> notificationCategoryIds,
@@ -3082,6 +3214,7 @@ public final class PhoneConnectorController {
             this.enabled = enabled;
             this.deviceAddress = deviceAddress;
             this.bleRole = PhoneBleRole.normalize(bleRole);
+            this.experimentalRouteBEnabled = experimentalRouteBEnabled;
             this.notificationsEnabled = notificationsEnabled;
             this.messagesEnabled = messagesEnabled;
             this.includeNotificationText = includeNotificationText;
@@ -3095,8 +3228,10 @@ public final class PhoneConnectorController {
         @NonNull
         static Config from(@NonNull Preferences prefs) {
             String classicAddress = bounded(prefs.phoneDeviceAddress.get(), 64);
+            boolean diagnosticRouteB = prefs.phoneBleExperimentalRouteBEnabled.get();
             return new Config(prefs.phoneConnectorEnabled.get(),
-                    classicAddress, prefs.phoneBleRole.get(),
+                    classicAddress, productionBleRole(prefs.phoneBleRole.get(),
+                            diagnosticRouteB), diagnosticRouteB,
                     prefs.phoneNotificationsEnabled.get(),
                     prefs.phoneMessagesEnabled.get(),
                     prefs.phoneIncludeNotificationText.get(),
@@ -3108,10 +3243,18 @@ public final class PhoneConnectorController {
                             prefs.phoneNotificationAppFilterKeys.get()));
         }
 
+        /** Route B remains compiled for explicit diagnostics; production always starts Route A. */
+        private static int productionBleRole(int storedRole, boolean diagnosticRouteB) {
+            return diagnosticRouteB
+                    ? PhoneBleRole.normalize(storedRole)
+                    : PhoneBleRole.IPHONE_PERIPHERAL;
+        }
+
         @NonNull
         String signature() {
             return enabled + "|" + deviceAddress
-                    + "|" + bleRole + "|" + notificationsEnabled + "|"
+                    + "|" + bleRole + "|" + experimentalRouteBEnabled
+                    + "|" + notificationsEnabled + "|"
                     + messagesEnabled + "|" + includeNotificationText + "|"
                     + ancsPresenceEnabled + "|"
                     + PhoneNotificationFilter.serializeCategoryIds(
@@ -3122,7 +3265,8 @@ public final class PhoneConnectorController {
         @NonNull
         String signatureWithoutBleRole() {
             return enabled + "|" + deviceAddress
-                    + "|" + notificationsEnabled + "|" + messagesEnabled + "|"
+                    + "|" + experimentalRouteBEnabled + "|"
+                    + notificationsEnabled + "|" + messagesEnabled + "|"
                     + includeNotificationText + "|" + ancsPresenceEnabled + "|"
                     + PhoneNotificationFilter.serializeCategoryIds(
                     notificationCategoryIds) + "|" + notificationAppFilterMode + "|"

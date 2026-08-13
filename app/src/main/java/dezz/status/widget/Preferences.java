@@ -57,7 +57,7 @@ public class Preferences {
                     // Copying any of them to another head unit could replay a stale drain or
                     // impersonate the installation identity used by the paired Helper.
                     "phoneBleV2SwitchSnapshot", "phoneBleV2HelperInstallationId",
-                    "phoneBleV2AndroidInstallationId",
+                    "phoneBleV2AndroidInstallationId", "phoneBleExperimentalRouteBEnabled",
                     // Contains both the full bearer action and fixed-endpoint token. Layout
                     // presets are routinely shared, so rules must remain device-local too.
                     "intentActionRulesJson")));
@@ -756,6 +756,9 @@ public class Preferences {
      * never read this preference.
      */
     public final Int phoneBleRole = new Int(this, "phoneBleRole", 0);
+    /** Local diagnostics latch; normal settings entry clears it and production stays Route A. */
+    public final Bool phoneBleExperimentalRouteBEnabled = new Bool(this,
+            "phoneBleExperimentalRouteBEnabled", false);
 
     private static final String PHONE_BLE_V2_SWITCH_SNAPSHOT_KEY =
             "phoneBleV2SwitchSnapshot";

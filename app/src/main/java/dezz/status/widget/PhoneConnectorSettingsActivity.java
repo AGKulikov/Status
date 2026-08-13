@@ -82,6 +82,8 @@ import dezz.status.widget.sprut.SprutProtocolAdapter;
 public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     private static final String PHONE_MIRROR_CHANNEL_ID = "phone_mirror";
     private static final int REQUEST_ICON_STORAGE = 11135;
+    /** Deliberate diagnostics-only escape hatch; normal settings expose production Route A. */
+    static final String EXTRA_EXPERIMENTAL_ROUTE_B = "kx11_experimental_route_b";
 
     private Preferences preferences;
     private MaterialSwitch connectorEnabled;
@@ -128,6 +130,7 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     private int notificationAppFilterMode = PhoneNotificationFilter.MODE_ALL;
     private int notificationDurationSeconds = 10;
     private int lowBatteryThreshold = 20;
+    private boolean experimentalRouteB;
     @NonNull private String notificationTickerColor = "#FFFFFFFF";
     @NonNull private String lowBatteryAlertColor = "#FFFF453A";
     @NonNull private SprutCatalog sprutCatalog = SprutCatalog.empty();
@@ -135,7 +138,14 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        experimentalRouteB = getIntent() != null
+                && getIntent().getBooleanExtra(EXTRA_EXPERIMENTAL_ROUTE_B, false);
         preferences = new Preferences(this);
+        preferences.phoneBleExperimentalRouteBEnabled.set(experimentalRouteB);
+        if (!experimentalRouteB
+                && preferences.phoneBleRole.get() != PhoneBleRole.IPHONE_PERIPHERAL) {
+            preferences.phoneBleRole.set(PhoneBleRole.IPHONE_PERIPHERAL);
+        }
         PhoneConnectionJournal.initialize(this);
         selectedDeviceAddress = clean(preferences.phoneDeviceAddress.get());
         selectedSprutPath = clean(preferences.phoneSprutPresencePath.get());
@@ -213,14 +223,16 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         addSwitchRow(connectionRows, connectorEnabled,
                 R.string.phone_enable_title, R.string.phone_enable_subtitle, false);
 
-        iphoneCentralRole = new MaterialSwitch(this);
-        iphoneCentralRole.setChecked(PhoneBleRole.isIphoneCentral(
-                preferences.phoneBleRole.get()));
-        addPhoneBleRoleRow(connectionRows);
-        iphoneCentralRole.setOnCheckedChangeListener((button, checked) -> {
-            refreshPhoneBleRoleSummary();
-            refreshDiagnostics();
-        });
+        if (experimentalRouteB) {
+            iphoneCentralRole = new MaterialSwitch(this);
+            iphoneCentralRole.setChecked(PhoneBleRole.isIphoneCentral(
+                    preferences.phoneBleRole.get()));
+            addPhoneBleRoleRow(connectionRows);
+            iphoneCentralRole.setOnCheckedChangeListener((button, checked) -> {
+                refreshPhoneBleRoleSummary();
+                refreshDiagnostics();
+            });
+        }
 
         LinearLayout deviceRow = clickableRow(this::chooseBondedDevice);
         LinearLayout deviceLabels = column();
@@ -1100,7 +1112,7 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                         : selectedDeviceAddress.isEmpty()
                         ? getString(R.string.phone_no_device)
                         : getString(R.string.phone_diag_not_bonded)));
-        boolean iphoneCentral = checked(iphoneCentralRole,
+        boolean iphoneCentral = experimentalRouteB && checked(iphoneCentralRole,
                 PhoneBleRole.isIphoneCentral(preferences.phoneBleRole.get()));
         result.append('\n').append(line(true,
                 getString(R.string.phone_diag_ble_role),
@@ -1764,9 +1776,10 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
 
         preferences.phoneConnectorEnabled.set(connectorRequested);
         preferences.phoneDeviceAddress.set(selectedDeviceAddress);
-        preferences.phoneBleRole.set(checked(iphoneCentralRole,
+        preferences.phoneBleRole.set(experimentalRouteB && checked(iphoneCentralRole,
                 PhoneBleRole.isIphoneCentral(preferences.phoneBleRole.get()))
                 ? PhoneBleRole.IPHONE_CENTRAL : PhoneBleRole.IPHONE_PERIPHERAL);
+        preferences.phoneBleExperimentalRouteBEnabled.set(experimentalRouteB);
         preferences.phoneNotificationsEnabled.set(notificationsRequested);
         preferences.phoneMessagesEnabled.set(messagesRequested);
         preferences.phoneIncludeNotificationText.set(includeTextRequested);
