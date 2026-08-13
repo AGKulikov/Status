@@ -249,9 +249,9 @@ jobs:
           grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' "$REPORT"
           grep -Fq 'Verified using v3 scheme (APK Signature Scheme v3): true' "$REPORT"
           grep -Fq 'Number of signers: 1' "$REPORT"
-          NORMALIZED_REPORT=$(tr 'A-F' 'a-f' < "$REPORT")
-          printf '%s\n' "$NORMALIZED_REPORT" | grep -Fq \
-            "signer #1 certificate sha-256 digest: ${STABLE_CERT_SHA256}"
+          grep -Fq \
+            "Signer #1 certificate SHA-256 digest: ${STABLE_CERT_SHA256}" \
+            "$REPORT"
           APK_SHA=$(sha256sum "$SIGNED_APK" | awk '{print $1}')
           echo "apk_sha256=$APK_SHA" >> "$GITHUB_OUTPUT"
 

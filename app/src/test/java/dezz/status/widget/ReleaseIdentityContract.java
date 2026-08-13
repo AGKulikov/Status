@@ -129,7 +129,7 @@ final class ReleaseIdentityContract {
         assertTrue("Signed APK must reject a second signer", releaseWorkflow.contains(
                 "Number of signers: 1"));
         assertTrue("Signed APK certificate must be verified", releaseWorkflow.contains(
-                "signer #1 certificate sha-256 digest: ${STABLE_CERT_SHA256}"));
+                "Signer #1 certificate SHA-256 digest: ${STABLE_CERT_SHA256}"));
     }
 
     private static long versionCode(int major, int minor, int patch, int revision) {
