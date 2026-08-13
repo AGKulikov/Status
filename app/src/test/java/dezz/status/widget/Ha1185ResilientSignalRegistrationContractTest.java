@@ -41,8 +41,7 @@ public final class Ha1185ResilientSignalRegistrationContractTest {
     }
 
     @Test public void releaseIdentityAdvancesToHa1185() throws Exception {
-        assertTrue(rootProject("build.gradle").contains("return 'v2.8.2-ha1215'"));
-        assertTrue(project("release-manifests/HA1185.md").contains("208021185"));
+        ReleaseIdentityContract.assertCurrentAtLeast(1185);
     }
 
     private static String geely(String relative) throws Exception {
