@@ -273,9 +273,9 @@
     <string name="phone_section_connection">Подключение</string>
     <string name="phone_enable_title">Подключение iPhone</string>
     <string name="phone_enable_subtitle">Отслеживается только выбранное сопряжённое устройство, а не любой телефон рядом</string>
-    <string name="phone_ble_role_title">Роль iPhone в BLE: Peripheral / Central</string>
-    <string name="phone_ble_role_peripheral">Peripheral — Helper публикует только UUID без BLE-имени; KX11 подключается как GATT-клиент</string>
-    <string name="phone_ble_role_central">Central — Helper подключается к UUID-маршруту KX11 без BLE-имени</string>
+    <string name="phone_ble_role_title">Диагностика обратного маршрута ANCS</string>
+    <string name="phone_ble_role_peripheral">Основной — одна системная пара; KX11 подключает ANCS и телеметрию к UUID Helper</string>
+    <string name="phone_ble_role_central">Экспериментальный — Helper подключается к обратному UUID-маршруту KX11</string>
     <string name="phone_device_title">Выбранный iPhone</string>
     <string name="phone_choose_device">Выбрать сопряжённый iPhone</string>
     <string name="phone_open_bluetooth">Настройки Bluetooth</string>

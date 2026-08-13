@@ -278,9 +278,9 @@
     <string name="phone_section_connection">Connection</string>
     <string name="phone_enable_title">iPhone connector</string>
     <string name="phone_enable_subtitle">Observe only the selected paired device, never any nearby phone</string>
-    <string name="phone_ble_role_title">iPhone BLE role: Peripheral / Central</string>
-    <string name="phone_ble_role_peripheral">Peripheral — Helper advertises UUID only; KX11 connects as the GATT client</string>
-    <string name="phone_ble_role_central">Central — Helper connects to the KX11 UUID-only reverse route</string>
+    <string name="phone_ble_role_title">Experimental reverse ANCS route</string>
+    <string name="phone_ble_role_peripheral">Primary — one system bond; KX11 attaches ANCS and telemetry to the Helper UUID</string>
+    <string name="phone_ble_role_central">Experimental — Helper connects to the KX11 UUID-only reverse route</string>
     <string name="phone_device_title">Selected iPhone</string>
     <string name="phone_choose_device">Choose paired iPhone</string>
     <string name="phone_open_bluetooth">Bluetooth settings</string>

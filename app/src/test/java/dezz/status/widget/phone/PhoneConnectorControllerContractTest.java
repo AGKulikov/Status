@@ -25,10 +25,12 @@ public final class PhoneConnectorControllerContractTest {
         assertFalse(source.contains("bonded.size() == 1"));
     }
 
-    @Test public void exactPresenceAggregatesAclHfpMapAndGattAcrossRestart() throws IOException {
+    @Test public void exactPresenceAggregatesAclA2dpHfpMapAndGattAcrossRestart()
+            throws IOException {
         String source = controller();
         assertTrue(source.contains(
-                "aclConnected || hfpConnected || mapConnected || gattConnected"));
+                "aclConnected || a2dpConnected || hfpConnected\n"
+                        + "                || mapConnected || gattConnected"));
         assertTrue(source.contains("PROFILE_HEADSET_CLIENT = 16"));
         assertTrue(source.contains("PROFILE_MAP_CLIENT = 18"));
         assertTrue(source.contains("proxy.getConnectedDevices()"));

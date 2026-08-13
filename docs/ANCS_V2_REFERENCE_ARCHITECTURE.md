@@ -27,9 +27,53 @@ The implementation is checked against the following public sources:
 * BlueKitchen BTstack ANCS client and tests, audited at commit
   `7fa68bd9ea40aa86672e6a47bef0ab9afc27506d`:
   <https://github.com/bluekitchen/btstack/tree/7fa68bd9ea40aa86672e6a47bef0ab9afc27506d/src/ble/gatt-service>
+* Espressif ESP-IDF Bluedroid and NimBLE ANCS examples:
+  <https://github.com/espressif/esp-idf/tree/master/examples/bluetooth/bluedroid/ble/ble_ancs>
+  and
+  <https://github.com/espressif/esp-idf/tree/master/examples/bluetooth/nimble/ble_ancs>
+* The public Android experiments `Androdi-testANCSDemo` and `ultra`:
+  <https://github.com/billzbh/Androdi-testANCSDemo>
+  and <https://github.com/MarcoPeretti/ultra>
+* `bridgething`, the closest public Helper-central topology found (iOS companion plus a Linux
+  accessory, not an Android head unit): <https://github.com/JoeyEamigh/bridgething>
 
 BTstack is used only as a behavioral reference.  No source is copied from it.  Its license is
 not compatible with treating its implementation as drop-in production code for this project.
+
+## Evidence translated into HA1215 design
+
+No audited public project provides iPhone ANCS to a stock Android 9 head unit over an existing
+BR/EDR ACL alone.  BTstack, Nordic, both ESP-IDF examples, `Androdi-testANCSDemo`, and `ultra` all
+establish a separate LE link before consuming ANCS.  The ESP-IDF Bluedroid example even releases
+Classic controller memory, which is strong counter-evidence to treating Classic as the ANCS
+bearer.  Accordingly, HA1215 defines "one connection" as one logical, already bonded iPhone in
+the UI: HFP/A2DP/PBAP remain on BR/EDR while ANCS and Helper telemetry share one LE GATT link.
+The implementation never claims that those two Bluetooth transports become one physical ACL.
+
+Nordic and BTstack supply the proven ANCS ordering model: one serialized GATT operation, arm the
+parser before enabling notification delivery, discover fresh handles per link, and discard all
+session data after disconnect.  The Android demo and `ultra` confirm that GATT client/server roles
+may be combined on the same LE peer, but they do not justify a second bond, a name-based identity,
+or a Classic-only shortcut.  `bridgething` is useful evidence for the Helper-central
+`RequiresANCS` topology, but its accessory is custom Linux; it is not evidence that Android 9's
+hidden reverse observer is production-safe.
+
+Therefore Route A is the HA1215 production topology: the KX11 is the public GATT central/client
+for the exact selected system bond, and the Helper is the UUID-only peripheral.  Route B remains
+an explicit diagnostic experiment.  It is never an automatic fallback and can never overlap
+Route A.  Android 9's public API cannot emit the standard ANCS Service Solicitation advertising
+field (the SDK method arrived at API 31), but solicitation is not documented as mandatory for a
+Helper-mediated UUID bootstrap.  HA1215 does not forge that field or confuse a locally provided
+service UUID with a solicitation.
+
+The Android controller is the only endpoint that observes the exact selected Classic profiles.
+If that exact phone has a live Classic profile but ANCS is not ready, it declares a degraded
+single-phone session and actively acquires Route A.  Real link/owner failure receives bounded
+immediate recovery followed by bounded backoff while Classic stays connected.  A live encrypted
+owner waiting for ANCS after subscribing Generic Attribute Service Changed is deliberately left
+in place: polling or repeatedly replacing that owner would violate Apple's dynamic-publication
+contract.  Recovery never toggles the shared adapter, deletes a bond, refreshes the global GATT
+cache, or interrupts an unrelated GPS GATT client.
 
 ## Shared ANCS rules
 
@@ -81,7 +125,7 @@ match nor an arbitrary bonded peer may be promoted to the selected owner.
 
 No Android advertiser, GATT server, hidden API, adapter toggle, bond removal, or hidden cache
 refresh belongs to this route.  Helper telemetry is optional and cannot delay or own ANCS
-recovery.  Android serializes the v48 telemetry notification CCCD after the mandatory
+recovery.  Android serializes the v49 telemetry notification CCCD after the mandatory
 route-control indication CCCD and before ANCS subscription readiness.  A missing or rejected
 optional telemetry CCCD is reported but does not block ANCS.  Telemetry frames are accepted only
 from the successfully subscribed exact characteristic, owner epoch, and active route generation;

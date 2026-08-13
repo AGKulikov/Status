@@ -1,0 +1,143 @@
+name: Verify iPhone Helper v49 · ANCS v2 clean-room
+
+on:
+  push:
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v49/**'
+      - 'docs/ancs-v2-wire-vectors.json'
+      - 'app/src/main/java/dezz/status/widget/phone/transport/switching/ble-role-switch-transition-vectors.json'
+      - '.github/workflows/verify-helper-v49.yml'
+  pull_request:
+    paths:
+      - 'ios/KX11-iPhone-ANCS-Helper-v49/**'
+      - 'docs/ancs-v2-wire-vectors.json'
+      - 'app/src/main/java/dezz/status/widget/phone/transport/switching/ble-role-switch-transition-vectors.json'
+      - '.github/workflows/verify-helper-v49.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-helper-v49:
+    name: Compile and replay Helper v49 without signing
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Record exact Helper source identity
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --short)"
+          HELPER_TREE=$(git rev-parse HEAD:ios/KX11-iPhone-ANCS-Helper-v49)
+          echo "helper_tree=$HELPER_TREE" >> "$GITHUB_OUTPUT"
+
+      - name: Replay shared wire/switch/restoration contracts
+        shell: bash
+        run: ios/KX11-iPhone-ANCS-Helper-v49/verify-v49-contract.sh
+
+      - name: Validate project settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v49/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Release \
+            -sdk iphonesimulator \
+            CODE_SIGNING_ALLOWED=NO \
+            -showBuildSettings >"$RUNNER_TEMP/helper-v49-build-settings.txt"
+          grep -q 'PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper' \
+            "$RUNNER_TEMP/helper-v49-build-settings.txt"
+          grep -q 'MARKETING_VERSION = 49.0' "$RUNNER_TEMP/helper-v49-build-settings.txt"
+          grep -q 'CURRENT_PROJECT_VERSION = 49' "$RUNNER_TEMP/helper-v49-build-settings.txt"
+
+      - name: Compile Helper v49 Release simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/KX11-iPhone-ANCS-Helper-v49/KX11ANCSHelper.xcodeproj \
+            -target KX11ANCSHelper \
+            -configuration Release \
+            -sdk iphonesimulator \
+            SYMROOT="$RUNNER_TEMP/KX11ANCSHelperV49Products" \
+            OBJROOT="$RUNNER_TEMP/KX11ANCSHelperV49Intermediates" \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Verify unsigned product
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/KX11ANCSHelperV49Products/Release-iphonesimulator/KX11ANCSHelper.app"
+          test -d "$app"
+          test -x "$app/KX11ANCSHelper"
+          test ! -d "$app/_CodeSignature"
+          test -f ios/KX11-iPhone-ANCS-Helper-v49/README.md
+          test -f ios/KX11-iPhone-ANCS-Helper-v49/RELEASE.txt
+          test -x ios/KX11-iPhone-ANCS-Helper-v49/verify-v49-contract.sh
+
+      - name: Package exact unsigned app and source
+        id: package
+        shell: bash
+        env:
+          HELPER_TREE: ${{ steps.source.outputs.helper_tree }}
+        run: |
+          set -euo pipefail
+          products="$RUNNER_TEMP/KX11ANCSHelperV49Products/Release-iphonesimulator"
+          app_archive="$RUNNER_TEMP/KX11-ANCS-Helper-v49-unsigned-simulator.tar.gz"
+          source_archive="$RUNNER_TEMP/KX11-ANCS-Helper-v49-source.zip"
+          tar -czf "$app_archive" -C "$products" KX11ANCSHelper.app
+          staging="$RUNNER_TEMP/KX11-iPhone-ANCS-Helper-v49"
+          mkdir -p "$staging/shared"
+          git archive "$GITHUB_SHA:ios/KX11-iPhone-ANCS-Helper-v49" \
+            | tar -x -C "$staging"
+          git show "$GITHUB_SHA:docs/ancs-v2-wire-vectors.json" \
+            > "$staging/shared/ancs-v2-wire-vectors.json"
+          git show "$GITHUB_SHA:app/src/main/java/dezz/status/widget/phone/transport/switching/ble-role-switch-transition-vectors.json" \
+            > "$staging/shared/ble-role-switch-transition-vectors.json"
+          ditto -c -k --sequesterRsrc --keepParent "$staging" "$source_archive"
+          APP_SHA=$(shasum -a 256 "$app_archive" | awk '{print $1}')
+          SOURCE_SHA=$(shasum -a 256 "$source_archive" | awk '{print $1}')
+          XCODE_VERSION=$(xcodebuild -version | tr '\n' ' ' | sed 's/ $//')
+          SDK_VERSION=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          BUILD_ARCH=$(uname -m)
+          jq -n \
+            --arg sourceSha "$GITHUB_SHA" \
+            --arg helperTree "$HELPER_TREE" \
+            --arg appArchiveSha256 "$APP_SHA" \
+            --arg sourceArchiveSha256 "$SOURCE_SHA" \
+            --arg xcodeVersion "$XCODE_VERSION" \
+            --arg sdkVersion "$SDK_VERSION" \
+            --arg buildArch "$BUILD_ARCH" \
+            '{sourceSha: $sourceSha, helperTree: $helperTree,
+              bundleId: "ru.natro.kx11ancshelper", marketingVersion: "49.0",
+              build: 49, platform: "iphonesimulator", configuration: "Release",
+              deviceInstallable: false, signed: false,
+              xcodeVersion: $xcodeVersion, sdkVersion: $sdkVersion, buildArch: $buildArch,
+              appArchiveSha256: $appArchiveSha256,
+              sourceArchiveSha256: $sourceArchiveSha256}' \
+            > "$RUNNER_TEMP/helper-v49-candidate.json"
+          (cd "$RUNNER_TEMP" && shasum -a 256 \
+            KX11-ANCS-Helper-v49-unsigned-simulator.tar.gz \
+            KX11-ANCS-Helper-v49-source.zip > helper-v49.sha256)
+
+      - name: Upload unsigned app and exact clean-room source
+        uses: actions/upload-artifact@v4
+        with:
+          name: KX11-ANCS-Helper-v49-unsigned-simulator
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/KX11-ANCS-Helper-v49-unsigned-simulator.tar.gz
+            ${{ runner.temp }}/KX11-ANCS-Helper-v49-source.zip
+            ${{ runner.temp }}/helper-v49-candidate.json
+            ${{ runner.temp }}/helper-v49.sha256

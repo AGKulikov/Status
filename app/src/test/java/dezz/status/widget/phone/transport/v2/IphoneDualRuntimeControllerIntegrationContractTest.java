@@ -52,13 +52,15 @@ public final class IphoneDualRuntimeControllerIntegrationContractTest {
         String oem = between(source,
                 "private void handleOemDeviceStateChange",
                 "private void replaceOemPowerObservation");
-        assertTrue(oem.contains("runtime.requestSameModeRecovery()"));
+        assertTrue(oem.contains("reconcileClassicAncsRecovery(token)"));
 
-        String retry = between(source,
-                "private void scheduleGattReconnect(long token, @NonNull String detail,\n"
-                        + "                                       @NonNull String visibleStatus)",
-                "private void scheduleStableAncsReadyReset");
-        assertTrue(retry.contains("runtime.requestSameModeRecovery()"));
+        String policyEffects = between(source,
+                "private void applyClassicAncsRecoveryTransition",
+                "private void scheduleClassicAncsRecoveryWakeup");
+        assertTrue(policyEffects.contains("runtime.requestSameModeRecovery()"));
+        assertTrue(policyEffects.contains("ensureGatt(token)"));
+
+        assertFalse(source.contains("scheduleGattReconnect("));
         assertFalse(source.contains("refreshGattCache("));
         assertFalse(source.contains("BluetoothGattCallback"));
     }

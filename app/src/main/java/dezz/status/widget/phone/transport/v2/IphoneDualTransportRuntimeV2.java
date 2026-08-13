@@ -55,9 +55,21 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
         public final IphoneBleMode desiredMode;
         public final boolean radioEnabled;
         public final boolean explicitBootstrapRequested;
+        /** True when the selected-iPhone controller owns bounded top-level recovery timing. */
+        public final boolean externallyManagedRecovery;
+        /** Route B stays compiled but can be entered only by an explicit diagnostics session. */
+        public final boolean allowExperimentalRouteB;
 
         public Config(String selectedSystemBondAddress, IphoneBleMode desiredMode,
                       boolean radioEnabled, boolean explicitBootstrapRequested) {
+            this(selectedSystemBondAddress, desiredMode, radioEnabled,
+                    explicitBootstrapRequested, false, true);
+        }
+
+        public Config(String selectedSystemBondAddress, IphoneBleMode desiredMode,
+                      boolean radioEnabled, boolean explicitBootstrapRequested,
+                      boolean externallyManagedRecovery,
+                      boolean allowExperimentalRouteB) {
             this.selectedSystemBondAddress = IphoneBleAdvertisement.normalizePeerId(
                     selectedSystemBondAddress);
             if (this.selectedSystemBondAddress.isEmpty()) {
@@ -66,16 +78,23 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
             this.desiredMode = Objects.requireNonNull(desiredMode, "desiredMode");
             this.radioEnabled = radioEnabled;
             this.explicitBootstrapRequested = explicitBootstrapRequested;
+            this.externallyManagedRecovery = externallyManagedRecovery;
+            this.allowExperimentalRouteB = allowExperimentalRouteB;
+            if (!allowExperimentalRouteB && desiredMode == IphoneBleMode.ANDROID_PERIPHERAL) {
+                throw new IllegalArgumentException("Route B requires explicit diagnostics");
+            }
         }
 
         Config withDesiredMode(IphoneBleMode mode) {
             return new Config(selectedSystemBondAddress, mode, radioEnabled,
-                    explicitBootstrapRequested);
+                    explicitBootstrapRequested, externallyManagedRecovery,
+                    allowExperimentalRouteB);
         }
 
         Config withRadioEnabled(boolean enabled) {
             return new Config(selectedSystemBondAddress, desiredMode, enabled,
-                    explicitBootstrapRequested);
+                    explicitBootstrapRequested, externallyManagedRecovery,
+                    allowExperimentalRouteB);
         }
     }
 
@@ -193,7 +212,8 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
             } else if (coordinator != null) {
                 if (coordinator.state().phase() == Phase.STARTING && slot == null) {
                     startTarget(coordinator.targetOwner());
-                } else if (coordinator.state().phase() == Phase.ACTIVE
+                } else if (!config.externallyManagedRecovery
+                        && coordinator.state().phase() == Phase.ACTIVE
                         && (slot == null || slot.terminalObserved)) {
                     requestSameModeRecoveryOnSerialized();
                 }
@@ -244,6 +264,11 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
         initialized = true;
         IphoneBleMode initialMode = pendingPreInitializeMode == null
                 ? initialConfig.desiredMode : pendingPreInitializeMode;
+        boolean suppressedPendingRouteB = !initialConfig.allowExperimentalRouteB
+                && initialMode == IphoneBleMode.ANDROID_PERIPHERAL;
+        if (suppressedPendingRouteB) {
+            initialMode = IphoneBleMode.ANDROID_CENTRAL;
+        }
         boolean initialRadioEnabled = pendingPreInitializeRadioEnabled == null
                 ? initialConfig.radioEnabled : pendingPreInitializeRadioEnabled;
         pendingPreInitializeMode = null;
@@ -252,7 +277,9 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
                 initialConfig.selectedSystemBondAddress,
                 initialMode,
                 initialRadioEnabled,
-                initialConfig.explicitBootstrapRequested);
+                initialConfig.explicitBootstrapRequested,
+                initialConfig.externallyManagedRecovery,
+                initialConfig.allowExperimentalRouteB);
         listener = runtimeListener;
         try {
             androidInstallationId = identities.loadOrCreateAndroidIdentity(random);
@@ -295,7 +322,9 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
                         this
                 );
             }
-            publishDualStatus("restoration drain started");
+            publishDualStatus(suppressedPendingRouteB
+                    ? "pre-start Route B request rejected; production Route A drain started"
+                    : "restoration drain started");
         } catch (RuntimeException error) {
             failInitialization("v2 state unavailable: " + safeMessage(error));
         }
@@ -304,6 +333,11 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
     private void requestModeOnSerialized(IphoneBleMode desiredMode) {
         assertOnSerializedExecutor();
         if (closed) return;
+        if (desiredMode == IphoneBleMode.ANDROID_PERIPHERAL
+                && config != null && !config.allowExperimentalRouteB) {
+            publishDualStatus("Route B rejected: explicit diagnostics disabled");
+            return;
+        }
         if (config == null || coordinator == null) {
             if (!initialized) pendingPreInitializeMode = desiredMode;
             return;
@@ -484,11 +518,52 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
     @Override public void quiescentReached(Owner target) {
         assertOnSerializedExecutor();
         closeSlot();
-        enqueue(() -> coordinator.beginTargetStart(target));
+        if (suppressedProductionRouteB(target)) {
+            // The persisted v2 state may predate HA1215 and name Route B as ACTIVE or as the
+            // interrupted target. Its exact old owner has now crossed freeze, terminal, owner=0
+            // and drain gates. Persist a logical B placeholder only, then immediately persist a
+            // normal B→A drain transaction. No B adapter is started and no fake READY is
+            // published; a crash between the two writes restores and repeats the same safe drain.
+            enqueue(() -> migrateQuiescentRouteBToProductionA(target));
+        } else {
+            enqueue(() -> coordinator.beginTargetStart(target));
+        }
+    }
+
+    private boolean suppressedProductionRouteB(Owner owner) {
+        return owner != null && config != null && !config.allowExperimentalRouteB
+                && owner.role() == Role.HELPER_CENTRAL_ANDROID_PERIPHERAL;
+    }
+
+    private void migrateQuiescentRouteBToProductionA(Owner quiescentTarget) {
+        assertOnSerializedExecutor();
+        if (closed || !suppressedProductionRouteB(quiescentTarget)) return;
+        coordinator = BleRoleSwitchCoordinator.active(
+                processNonce,
+                quiescentTarget.role(),
+                quiescentTarget.epoch(),
+                quiescentTarget.generation(),
+                this,
+                this);
+        config = config.withDesiredMode(IphoneBleMode.ANDROID_CENTRAL);
+        requestModeOnSerialized(IphoneBleMode.ANDROID_CENTRAL);
+        publishDualStatus("persisted Route B drained; production Route A migration started");
     }
 
     @Override public void startTarget(Owner target) {
         assertOnSerializedExecutor();
+        if (suppressedProductionRouteB(target)) {
+            fatalDetail = "Route B target suppressed: explicit diagnostics disabled";
+            listener.onError(new IphoneTransportErrorV2(
+                    IphoneBleMode.ANDROID_PERIPHERAL,
+                    routeEpoch(target),
+                    IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
+                    fatalDetail,
+                    false));
+            coordinator.onTargetStartFailed(target);
+            publishDualStatus(fatalDetail);
+            return;
+        }
         if (!config.radioEnabled) {
             enqueue(() -> publishDualStatus("waiting for Bluetooth radio"));
             return;
@@ -574,7 +649,8 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
                         || status.lifecycle == IphoneTransportLifecycle.STOPPED)
                         && coordinator != null && coordinator.state().phase() == Phase.STARTING) {
                     failBoundTarget(bound);
-                } else if ((status.lifecycle == IphoneTransportLifecycle.FAILED
+                } else if (!config.externallyManagedRecovery
+                        && (status.lifecycle == IphoneTransportLifecycle.FAILED
                         || status.lifecycle == IphoneTransportLifecycle.STOPPED)
                         && coordinator != null && coordinator.state().phase() == Phase.ACTIVE) {
                     // Route-local fresh-owner retries are bounded. Their terminal status is an
@@ -582,6 +658,9 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
                     // dead adapter or spin another owner inside the same route epoch.
                     requestSameModeRecoveryOnSerialized();
                 }
+                // Externally managed FAILED/STOPPED remains an ACTIVE coordinator with its exact
+                // terminal slot attached until the controller's bounded policy asks for a full
+                // same-role drain. The status callback below is that typed recovery signal.
                 listener.onStatus(status);
                 publishDualStatus(status.detail);
             });
@@ -655,12 +734,18 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
                 if (!isCurrentSlot(bound) || mode != bound.transport.mode()
                         || !routeEpoch(bound.routeOwner).equals(epoch)) return;
                 bound.terminalObserved = true;
-                if (coordinator != null && coordinator.state().phase() == Phase.ACTIVE) {
+                if (coordinator != null && coordinator.state().phase() == Phase.ACTIVE
+                        && !config.externallyManagedRecovery) {
                     requestSameModeRecoveryOnSerialized();
-                } else {
+                } else if (coordinator == null
+                        || coordinator.state().phase() != Phase.ACTIVE) {
                     Owner source = coordinator == null ? null : coordinator.sourceOwner();
                     if (source != null) handleLocalTerminal(bound, source);
                 }
+                // Under externally managed recovery ACTIVE deliberately remains attached to the
+                // terminal slot. The controller receives this typed signal and its bounded policy
+                // requests the full same-role drain/fresh generation; no coordinator phase is
+                // mutated prematurely and no second owner can overlap it.
                 listener.onLocalTerminal(mode, epoch);
             });
         }
@@ -684,6 +769,17 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
                 ? coordinator.targetOwner() : coordinator.sourceOwner();
         if (!bound.matchesRouteGeneration(receiving)) return;
         Role target = role(control.targetMode);
+        if (control.targetMode == IphoneBleMode.ANDROID_PERIPHERAL
+                && !config.allowExperimentalRouteB) {
+            listener.onError(new IphoneTransportErrorV2(
+                    bound.transport.mode(),
+                    routeEpoch(bound.routeOwner),
+                    IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
+                    "Route B control rejected: explicit diagnostics disabled",
+                    false));
+            publishDualStatus("remote Route B rejected");
+            return;
+        }
         if (control.type == IphoneRoleControlV2.Type.CLOSE_REQUEST) {
             Outcome outcome = coordinator.requestSwitchFromRemote(
                     receiving,
