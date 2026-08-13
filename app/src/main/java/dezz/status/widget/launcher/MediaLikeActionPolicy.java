@@ -11,11 +11,13 @@ public final class MediaLikeActionPolicy {
             "\\b(лайк|like|нравится|heart|addlike|палец вверх|вверх|"
                     + "добавить в избранное|удалить из избранного|remove from favorites|"
                     + "add to favorites|выбрано|is_like|is_unlike)\\b",
-            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
+                    | Pattern.UNICODE_CHARACTER_CLASS);
     private static final Pattern DISLIKE_TITLE = Pattern.compile(
             "\\b(дизлайк|не нравится|палец вниз|вниз|dislike|adddislike|"
                     + "is_dislike|is_undislike)\\b",
-            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
+                    | Pattern.UNICODE_CHARACTER_CLASS);
 
     private MediaLikeActionPolicy() {}
 

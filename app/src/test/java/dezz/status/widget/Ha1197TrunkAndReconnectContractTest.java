@@ -53,7 +53,9 @@ public final class Ha1197TrunkAndReconnectContractTest {
                 "app/src/main/java/dezz/status/widget/launcher/media/MediaPanelView.java");
         String elements = between(view, "case MediaPanelConfig.PREVIOUS:",
                 "case MediaPanelConfig.VOLUME:");
-        assertEquals(3, occurrences(elements, "element.scalePercent"));
+        // Previous, play/pause, next and the new mSaver-compatible Like action all use the
+        // same optical scaling path.
+        assertEquals(4, occurrences(elements, "element.scalePercent"));
         String button = between(view, "private ImageButton button", "private void applySnapshot");
         assertTrue(button.contains("value.setScaleType(ImageView.ScaleType.FIT_CENTER)"));
         assertTrue(button.contains("Math.max(45, scalePercent)"));

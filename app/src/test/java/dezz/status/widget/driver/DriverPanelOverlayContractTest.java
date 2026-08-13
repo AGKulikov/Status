@@ -44,7 +44,8 @@ public class DriverPanelOverlayContractTest {
         assertTrue(source.contains("params.gravity = Gravity.TOP | Gravity.LEFT;"));
         assertTrue(source.contains("DriverPanelLayoutPolicy.panelWindowX("));
         assertTrue(source.contains("params.y = 0;"));
-        assertTrue(source.contains("safeOpaqueColor(profile.backgroundColor.get()"));
+        assertTrue(source.contains("safeOpaqueColor(style.backgroundColor,"));
+        assertTrue(source.contains("DriverPanelStylePolicy.panel(profile.backgroundColor.get(),"));
         assertTrue(source.contains("safeColor(raw, fallback) | 0xFF000000"));
         assertTrue(source.contains("Color.argb(0x33, 255, 255, 255)"));
         assertTrue(source.contains("background.setCornerRadii(panelCornerRadii("));

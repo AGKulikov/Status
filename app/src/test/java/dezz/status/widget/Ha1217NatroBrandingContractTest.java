@@ -55,6 +55,7 @@ public final class Ha1217NatroBrandingContractTest {
     private static Path projectPath(String relative) {
         Path current = Paths.get("").toAbsolutePath();
         for (int depth = 0; depth < 8 && current != null; depth++, current = current.getParent()) {
+            if (!Files.isRegularFile(current.resolve("settings.gradle"))) continue;
             Path candidate = current.resolve(relative);
             if (Files.exists(candidate)) return candidate;
         }

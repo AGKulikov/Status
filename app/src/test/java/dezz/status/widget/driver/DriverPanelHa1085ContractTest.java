@@ -138,7 +138,7 @@ public final class DriverPanelHa1085ContractTest {
 
         assertTrue(scope.contains("DRIVER"));
         assertTrue(contract.contains("SCOPE_DRIVER = \"driver\""));
-        assertTrue(editor.contains("\"Кнопка панели водителя\""));
+        assertTrue(editor.contains("\"Панель / кнопка водителя\""));
         assertTrue(editor.contains("case DRIVER:"));
         assertTrue(overlay.contains("driverShortcutVisible(shortcut.id, true)"));
         assertTrue(overlay.contains("driverShortcutActionEnabled(shortcut.id, true)"));
@@ -222,8 +222,8 @@ public final class DriverPanelHa1085ContractTest {
         assertTrue(bootstrap.contains("runningHost.ensureEnabledRuntime()"));
         assertTrue(receiver.contains("!preferences.driverPanelEnabled.get()"));
         assertTrue(editor.contains("keepDriverActionSupported()"));
-        assertTrue(editor.contains("targetScope == TargetScope.DRIVER"
-                + " && !isBooleanField(field)"));
+        assertTrue(editor.contains("targetScope == TargetScope.DRIVER"));
+        assertTrue(editor.contains("!isDriverFieldSupported(selectedTargetId, field)"));
         assertTrue(editor.contains("WidgetServiceStarter.startIfNeeded(this)"));
         assertTrue(intentRules.contains("DriverPanelService.apply(this)"));
     }
