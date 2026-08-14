@@ -46,6 +46,9 @@ public final class IphoneDualTransportRuntimeV2Test {
         assertFalse(active.preparedRestoration);
         assertEquals(1, active.startCount);
         assertEquals(IphoneBleMode.ANDROID_CENTRAL, active.mode());
+        assertEquals(IphoneAcquisitionModeV2.SELECTED_BOND,
+                active.startRequest.acquisitionMode);
+        assertTrue(active.startRequest.helperInstallationId.isEmpty());
         assertEquals(ACTIVE, fixture.listener.lastDual.switchPhase);
         assertEquals(IphoneBleMode.ANDROID_CENTRAL, fixture.listener.lastDual.activeMode);
         assertTrue(fixture.store.hasSwitchSnapshot());

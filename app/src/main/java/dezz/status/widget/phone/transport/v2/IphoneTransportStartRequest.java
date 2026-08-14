@@ -32,10 +32,8 @@ public final class IphoneTransportStartRequest {
         this.radioEnabled = radioEnabled;
         this.monotonicNowMillis = monotonicNowMillis;
         this.acquisitionMode = Objects.requireNonNull(acquisitionMode, "acquisitionMode");
-        if (acquisitionMode == IphoneAcquisitionModeV2.SELECTED_BOND
-                && this.helperInstallationId.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "daily selected-bond recovery requires learned helperInstallationId");
-        }
+        // SELECTED_BOND is also the first-bootstrap path. Before H is learned, the adapter still
+        // requires one exact bonded facade and an encryption-required Helper proof; an empty H
+        // never grants authority by itself.
     }
 }

@@ -181,6 +181,30 @@ public final class AndroidCentralRouteTest {
         assertEquals(AndroidCentralRoute.Phase.CONNECTING, match.state.phase);
     }
 
+    @Test public void productionBootstrapTargetsSelectedBondWithoutDependingOnScan() {
+        IphoneTransportStartRequest request = new IphoneTransportStartRequest(
+                new BleRouteEpoch(17L, 2L), BOND, "", true, 0L,
+                IphoneAcquisitionModeV2.SELECTED_BOND);
+        AndroidCentralRoute.State state = AndroidCentralRoute.start(request).state;
+        assertEquals(AndroidCentralRoute.Phase.STARTUP_QUIET, state.phase);
+        assertFalse(hasEffect(
+                AndroidCentralRoute.start(request), BleRouteEffect.Type.START_SCAN));
+
+        BleRouteTransition<AndroidCentralRoute.State> connect =
+                AndroidCentralRoute.startupQuietElapsed(state, state.expected, true);
+        assertEquals(AndroidCentralRoute.Phase.CONNECTING, connect.state.phase);
+        assertTrue(hasEffect(connect, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+        assertFalse(hasEffect(connect, BleRouteEffect.Type.START_SCAN));
+
+        state = connect.state;
+        state = AndroidCentralRoute.connected(state, state.expected, true).state;
+        state = AndroidCentralRoute.servicesDiscovered(state, state.expected, complete()).state;
+        BleRouteTransition<AndroidCentralRoute.State> learned = AndroidCentralRoute.peerProof(
+                state, state.expected, helperProof(HELPER), GattResultV2.SUCCESS);
+        assertEquals(HELPER, learned.state.helperInstallationId);
+        assertTrue(hasEffect(learned, BleRouteEffect.Type.REPORT_HELPER_ID_LEARNED));
+    }
+
     @Test public void bootstrapLearnsHelperIdOnlyOnEncryptedExactBondOwner() {
         IphoneTransportStartRequest request = new IphoneTransportStartRequest(
                 new BleRouteEpoch(18L, 1L), BOND, "", true, 0L,

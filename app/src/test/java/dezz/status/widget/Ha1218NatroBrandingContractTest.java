@@ -12,8 +12,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-/** Keeps the public Natro 2.0 identity separate from the stable Android update identity. */
-public final class Ha1217NatroBrandingContractTest {
+/** Keeps the public Natro 2.0.1 identity separate from the stable Android update identity. */
+public final class Ha1218NatroBrandingContractTest {
     @Test public void publicNameAndVersionAreExactWhilePackageStaysUpdateCompatible()
             throws IOException {
         String values = project("app/src/main/res/values/strings.xml");
@@ -24,8 +24,8 @@ public final class Ha1217NatroBrandingContractTest {
         assertTrue(valuesRu.contains("<string name=\"app_name\">Natro</string>"));
         assertFalse(values.contains("<string name=\"app_name\">Natro 2.0</string>"));
         assertTrue(manifest.contains("android:label=\"@string/app_name\""));
-        assertTrue(gradle.contains("return '2.0'"));
-        assertTrue(gradle.contains("return 208021217"));
+        assertTrue(gradle.contains("return '2.0.1'"));
+        assertTrue(gradle.contains("return 208021218"));
         assertTrue(project("app/build.gradle").contains(
                 "applicationId \"ru.natro.statuswidget\""));
     }

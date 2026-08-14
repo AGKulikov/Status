@@ -584,9 +584,11 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
         try {
             UUID helper = identities.learnedHelperIdentity();
             String helperId = helper == null ? "" : helper.toString();
-            IphoneAcquisitionModeV2 acquisition = helper == null
-                    ? IphoneAcquisitionModeV2.EXPLICIT_BOOTSTRAP_SCAN
-                    : IphoneAcquisitionModeV2.SELECTED_BOND;
+            // iOS moves service UUIDs into an Apple-only overflow area while a peripheral app is
+            // backgrounded, so Android cannot make a filtered F201 scan a production bootstrap
+            // prerequisite. The exact user-selected system bond is already the strict pre-GATT
+            // identity gate; encrypted H then learns or confirms the Helper installation UUID.
+            IphoneAcquisitionModeV2 acquisition = IphoneAcquisitionModeV2.SELECTED_BOND;
             IphoneTransportStartRequest request = new IphoneTransportStartRequest(
                     new BleRouteEpoch(target.processNonce(), target.generation().asBigInteger()),
                     config.selectedSystemBondAddress,

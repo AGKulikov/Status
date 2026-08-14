@@ -20,7 +20,7 @@ final class ReleaseIdentityContract {
     private static final String STABLE_CERT_SHA256 =
             "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75";
     private static final Pattern DEFAULT_VERSION = Pattern.compile(
-            "(?m)^\\s*return\\s+['\"](\\d+\\.\\d+)['\"]\\s*$");
+            "(?m)^\\s*return\\s+['\"](\\d+\\.\\d+(?:\\.\\d+)?)['\"]\\s*$");
 
     private ReleaseIdentityContract() {}
 
