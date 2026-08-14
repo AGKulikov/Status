@@ -25,8 +25,26 @@ public final class YandexRouteWindowContractTest {
         assertTrue(source.contains("YandexWindowLauncher.launchOverLauncher("));
         assertTrue(source.contains("windowProduct(route.product), false"));
         assertTrue(source.contains("postDelayed"));
-        assertTrue(source.contains(
-                "startDeepLink(context, route.product, deepLink, alternateDeepLink)"));
+        assertTrue(source.contains("alternateDeepLink, true)"));
+    }
+
+    @Test
+    public void everyRouteDeepLinkCarriesItsExplicitSurface() throws IOException {
+        String route = source("dezz/status/widget/launcher/routes/YandexRouteLauncher.java");
+        String launcher = source("dezz/status/widget/launcher/YandexWindowLauncher.java");
+
+        // Nonfloating and failed-window fallback are full-screen. Only the delayed handoff into
+        // an already-open floating task may assert the window surface.
+        assertTrue(occurrences(route, "alternateDeepLink, false)") == 2);
+        assertTrue(occurrences(route, "alternateDeepLink, true)") == 1);
+        assertTrue(route.contains("deepLink, windowed)"));
+        assertTrue(route.contains("alternateDeepLink, windowed)"));
+        assertTrue(occurrences(launcher, "public static boolean launchDeepLink(") == 1);
+        assertTrue(launcher.contains("@NonNull Uri deepLink,"));
+        assertTrue(launcher.contains("boolean windowed)"));
+        assertTrue(launcher.contains(".putExtra(\"ddnavwin\", windowed)"));
+        assertTrue(launcher.contains(
+                "if (!windowed) intent.putExtra(\"ddnavforcewinfull\", true)"));
     }
 
     @Test
@@ -54,5 +72,15 @@ public final class YandexRouteWindowContractTest {
         Path fromApp = Paths.get("src", "main", "java").resolve(relative);
         Path file = Files.isRegularFile(fromRoot) ? fromRoot : fromApp;
         return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+    }
+
+    private static int occurrences(String source, String needle) {
+        int count = 0;
+        int offset = 0;
+        while ((offset = source.indexOf(needle, offset)) >= 0) {
+            count++;
+            offset += needle.length();
+        }
+        return count;
     }
 }

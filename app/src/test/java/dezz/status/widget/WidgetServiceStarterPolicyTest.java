@@ -73,4 +73,17 @@ public final class WidgetServiceStarterPolicyTest {
         assertFalse(WidgetServiceStarter.canStartVisualSurfaceWhileRuntimeParked(true, false));
         assertFalse(WidgetServiceStarter.canStartVisualSurfaceWhileRuntimeParked(false, false));
     }
+
+    @Test public void localScenarioAloneRequiresTheHeadlessRuntime() {
+        assertFalse(WidgetServiceStarter.hasConfiguredLocalScenarios(null));
+        assertFalse(WidgetServiceStarter.hasConfiguredLocalScenarios("  [ \n ]  "));
+        assertTrue(WidgetServiceStarter.hasConfiguredLocalScenarios(
+                "[{\"id\":\"route_lost\"}]"));
+        assertFalse(WidgetServiceStarter.hasConfiguredLocalScenarios(
+                "[{\"id\":\"route_lost\",\"enabled\":false}]"));
+        assertTrue(WidgetServiceStarter.hasConfiguredLocalScenarios(
+                "[{\"enabled\":false},{\"id\":\"active\",\"enabled\":true}]"));
+        assertFalse(WidgetServiceStarter.hasConfiguredLocalScenarios("not-json"));
+        assertFalse(WidgetServiceStarter.hasConfiguredLocalScenarios("{}"));
+    }
 }

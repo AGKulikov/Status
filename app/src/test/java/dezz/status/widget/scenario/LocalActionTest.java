@@ -21,4 +21,17 @@ public final class LocalActionTest {
     public void rejectsIdsLongerThanAutomationContractLimit() {
         new LocalAction(TargetScope.POPUP, "a" + "b".repeat(128), LocalField.VISIBLE, true);
     }
+
+    @Test public void normalizesDriverWidthsAsBoundedIntegers() {
+        LocalAction action = new LocalAction(TargetScope.DRIVER, "driver_panel",
+                LocalField.BORDER_WIDTH, "12");
+        assertEquals(12, action.value);
+        assertEquals("12", action.stringValue());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsOutOfRangeDriverWidth() {
+        new LocalAction(TargetScope.DRIVER, "driver_panel",
+                LocalField.BORDER_WIDTH, 65);
+    }
 }

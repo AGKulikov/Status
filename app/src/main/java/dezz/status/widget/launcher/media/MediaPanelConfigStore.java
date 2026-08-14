@@ -19,7 +19,7 @@ import dezz.status.widget.Preferences;
 
 /** Versioned persistence for the visual media-panel editor. */
 public final class MediaPanelConfigStore {
-    public static final int SCHEMA_VERSION = 7;
+    public static final int SCHEMA_VERSION = 8;
     private static final int EDGE_TO_EDGE_SURFACE_SCHEMA_VERSION = 6;
     private static final int LEGACY_SURFACE_SCHEMA_VERSION = 5;
     private static final int ELEMENT_GRID_SCHEMA_VERSION = 4;
@@ -53,6 +53,8 @@ public final class MediaPanelConfigStore {
             value.backgroundColor = root.optString("backgroundColor", value.backgroundColor);
             value.backgroundAlpha = root.optInt("backgroundAlpha", value.backgroundAlpha);
             value.cornerRadiusPx = root.optInt("cornerRadiusPx", value.cornerRadiusPx);
+            value.artworkCornerRadiusPx = root.optInt(
+                    "artworkCornerRadiusPx", value.artworkCornerRadiusPx);
             value.spacingPx = root.optInt("spacingPx", value.spacingPx);
             value.contentPaddingPx = root.optInt("contentPaddingPx", value.contentPaddingPx);
             value.titleColor = root.optString("titleColor", value.titleColor);
@@ -141,6 +143,7 @@ public final class MediaPanelConfigStore {
             root.put("backgroundColor", value.backgroundColor);
             root.put("backgroundAlpha", value.backgroundAlpha);
             root.put("cornerRadiusPx", value.cornerRadiusPx);
+            root.put("artworkCornerRadiusPx", value.artworkCornerRadiusPx);
             root.put("spacingPx", value.spacingPx);
             root.put("contentPaddingPx", value.contentPaddingPx);
             root.put("titleColor", value.titleColor);

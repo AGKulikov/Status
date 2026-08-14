@@ -248,6 +248,8 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
         final LinearLayout brickMediaBlock;
         // Общие
         final MaterialSwitch brickMediaShowSource;
+        final MaterialSwitch brickMediaShowPlaybackStateIcon;
+        final MaterialSwitch brickMediaOnlyWhilePlaying;
         final MaterialSwitch brickMediaTitleFirst;
         final MaterialSwitch brickMediaMarqueeEnabled;
         final MaterialSwitch brickMediaProgressBarEnabled;
@@ -352,6 +354,10 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
             brickMarginRow = itemView.findViewById(R.id.brickMarginRow);
             brickMediaBlock = itemView.findViewById(R.id.brickMediaBlock);
             brickMediaShowSource = itemView.findViewById(R.id.brickMediaShowSource);
+            brickMediaShowPlaybackStateIcon =
+                    itemView.findViewById(R.id.brickMediaShowPlaybackStateIcon);
+            brickMediaOnlyWhilePlaying =
+                    itemView.findViewById(R.id.brickMediaOnlyWhilePlaying);
             brickMediaTitleFirst = itemView.findViewById(R.id.brickMediaTitleFirst);
             brickMediaMarqueeEnabled = itemView.findViewById(R.id.brickMediaMarqueeEnabled);
             brickMediaProgressBarEnabled = itemView.findViewById(R.id.brickMediaProgressBarEnabled);
@@ -439,6 +445,8 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
             brickCellularShowNetworkType.setOnCheckedChangeListener(null);
             brickBatteryShowPercentage.setOnCheckedChangeListener(null);
             brickMediaShowSource.setOnCheckedChangeListener(null);
+            brickMediaShowPlaybackStateIcon.setOnCheckedChangeListener(null);
+            brickMediaOnlyWhilePlaying.setOnCheckedChangeListener(null);
             brickMediaTitleFirst.setOnCheckedChangeListener(null);
             brickMediaMarqueeEnabled.setOnCheckedChangeListener(null);
             brickMediaProgressBarEnabled.setOnCheckedChangeListener(null);
@@ -722,11 +730,6 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
 
         private void openHideInApps(BrickType type) {
             try {
-                if (!Permissions.isUsageAccessGranted(activity)) {
-                    Toast.makeText(activity, R.string.usage_access_required, Toast.LENGTH_LONG).show();
-                    openUsageAccessSettings();
-                    return;
-                }
                 Intent intent = new Intent(activity, AppSelectionActivity.class);
                 intent.putExtra(AppSelectionActivity.EXTRA_PREF_KEY, prefs.hideListKeyFor(type));
                 intent.putExtra(AppSelectionActivity.EXTRA_TITLE, hideTitleFor(type));
@@ -739,12 +742,6 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
                 Toast.makeText(activity,
                         activity.getString(R.string.app_selection_load_failed_message, msg),
                         Toast.LENGTH_LONG).show();
-            }
-        }
-
-        private void openUsageAccessSettings() {
-            if (!SettingsLauncher.openUsageAccessSettings(activity)) {
-                Toast.makeText(activity, R.string.system_settings_not_available, Toast.LENGTH_LONG).show();
             }
         }
 
@@ -1030,6 +1027,17 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
             brickMediaShowSource.setOnCheckedChangeListener((v, c) -> {
                 prefs.media.showSource.set(c);
                 refreshMediaSourceSectionVisibility();
+                notifyService();
+            });
+            brickMediaShowPlaybackStateIcon.setChecked(
+                    prefs.media.showPlaybackStateIcon.get());
+            brickMediaShowPlaybackStateIcon.setOnCheckedChangeListener((v, c) -> {
+                prefs.media.showPlaybackStateIcon.set(c);
+                notifyService();
+            });
+            brickMediaOnlyWhilePlaying.setChecked(prefs.media.onlyWhilePlaying.get());
+            brickMediaOnlyWhilePlaying.setOnCheckedChangeListener((v, c) -> {
+                prefs.media.onlyWhilePlaying.set(c);
                 notifyService();
             });
             brickMediaTitleFirst.setChecked(prefs.media.titleFirst.get());

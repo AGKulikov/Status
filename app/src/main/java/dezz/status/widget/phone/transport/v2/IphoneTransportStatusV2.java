@@ -32,7 +32,7 @@ public final class IphoneTransportStatusV2 {
         this.epoch = Objects.requireNonNull(epoch, "epoch");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
         this.selectedSystemBondAddress =
-                IphoneBleAdvertisement.normalizePeerId(selectedSystemBondAddress);
+                IphoneBleAdvertisement.normalizeSystemBondAddress(selectedSystemBondAddress);
         this.helperInstallationId =
                 IphoneBleAdvertisement.normalizePeerId(helperInstallationId);
         this.detail = detail == null ? "" : detail;

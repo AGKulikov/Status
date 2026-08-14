@@ -16,6 +16,7 @@ public final class MediaPanelConfigMigrationTest {
         assertTrue(config.element(MediaPanelConfig.ALBUM).enabled);
         assertTrue(config.element(MediaPanelConfig.PROGRESS).enabled);
         assertTrue(config.element(MediaPanelConfig.VOLUME).enabled);
+        assertTrue(config.element(MediaPanelConfig.LIKE).enabled);
     }
 
     @Test public void richElementsAppendDisabledWhenMigratingAnExistingPanel() {
@@ -35,8 +36,9 @@ public final class MediaPanelConfigMigrationTest {
         assertFalse(config.element(MediaPanelConfig.ALBUM).enabled);
         assertFalse(config.element(MediaPanelConfig.PROGRESS).enabled);
         assertFalse(config.element(MediaPanelConfig.VOLUME).enabled);
+        assertFalse(config.element(MediaPanelConfig.LIKE).enabled);
         assertTrue(config.element(MediaPanelConfig.ALBUM).order > 6);
-        assertEquals(MediaPanelConfig.VOLUME,
+        assertEquals(MediaPanelConfig.LIKE,
                 config.orderedElements().get(config.orderedElements().size() - 1).id);
     }
 
@@ -61,6 +63,7 @@ public final class MediaPanelConfigMigrationTest {
         source.setProgressTimeGapDp(14);
         source.setVolumeThumbVisible(false);
         source.setVolumeThumbSizePercent(165);
+        source.setArtworkCornerRadiusPx(37);
         MediaPanelConfig restored = MediaPanelConfigStore.decode(
                 MediaPanelConfigStore.encode(source).toString());
         assertEquals(16, restored.gridColumns);
@@ -77,6 +80,7 @@ public final class MediaPanelConfigMigrationTest {
         assertFalse(restored.element(MediaPanelConfig.VOLUME).volumeThumbVisible);
         assertEquals(165,
                 restored.element(MediaPanelConfig.VOLUME).volumeThumbSizePercent);
+        assertEquals(37, restored.artworkCornerRadiusPx);
     }
 
     @Test public void versionThreeDefaultsMarqueeOnForOverflowingText() {

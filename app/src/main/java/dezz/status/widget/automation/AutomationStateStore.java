@@ -233,6 +233,12 @@ public final class AutomationStateStore {
                 copyIfPresent(source, filtered, "background_color");
                 copyIfPresent(source, filtered, "visible");
                 copyIfPresent(source, filtered, "action_enabled");
+                copyIfPresent(source, filtered, "border_color");
+                copyIfPresent(source, filtered, "border_width");
+                copyIfPresent(source, filtered, "icon_tint");
+                copyIfPresent(source, filtered, "icon_background_color");
+                copyIfPresent(source, filtered, "icon_outline_color");
+                copyIfPresent(source, filtered, "icon_outline_width");
             } catch (JSONException impossible) {
                 throw new IllegalArgumentException(impossible);
             }
@@ -324,6 +330,9 @@ public final class AutomationStateStore {
                 || "updated_at".equals(name) || "expires_at".equals(name)
                 || "value".equals(name) || "icon".equals(name) || "state".equals(name)
                 || "background_color".equals(name) || "action_enabled".equals(name)
+                || "border_color".equals(name) || "border_width".equals(name)
+                || "icon_tint".equals(name) || "icon_background_color".equals(name)
+                || "icon_outline_color".equals(name) || "icon_outline_width".equals(name)
                 || "enabled".equals(name)
                 || "fresh".equals(name) || "source".equals(name)
                 || "attributes".equals(name) || "request_id".equals(name);
@@ -338,6 +347,10 @@ public final class AutomationStateStore {
         checkLength(patch, "value", 8192);
         checkLength(patch, "color", 64);
         checkLength(patch, "background_color", 64);
+        checkLength(patch, "border_color", 64);
+        checkLength(patch, "icon_tint", 64);
+        checkLength(patch, "icon_background_color", 64);
+        checkLength(patch, "icon_outline_color", 64);
         checkLength(patch, "icon", 64);
         checkLength(patch, "request_id", 128);
         checkLength(patch, "source", 64);
@@ -364,6 +377,17 @@ public final class AutomationStateStore {
             return;
         }
         if (value == JSONObject.NULL) target.put(field, JSONObject.NULL);
+        else if ("border_width".equals(field) || "icon_outline_width".equals(field)) {
+            int width;
+            try { width = Integer.parseInt(String.valueOf(value)); }
+            catch (NumberFormatException invalid) {
+                throw new IllegalArgumentException("Scenario width is not a number");
+            }
+            if (width < 0 || width > 64) {
+                throw new IllegalArgumentException("Scenario width is outside 0..64");
+            }
+            target.put(field, width);
+        }
         else {
             String text = String.valueOf(value);
             if (text.length() > 1024 || text.indexOf('\u0000') >= 0) {

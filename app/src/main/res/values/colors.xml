@@ -17,7 +17,7 @@
   -->
 
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="ic_launcher_background">#071923</color>
 
     <!-- Overlay widget colors (used by the floating widget itself, not by the settings UI). -->
     <color name="widget_background">#FFFFFF</color>

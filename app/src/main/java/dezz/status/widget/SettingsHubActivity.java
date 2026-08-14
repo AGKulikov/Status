@@ -240,7 +240,7 @@ public final class SettingsHubActivity extends AppCompatActivity {
         sidebar.addView(hubBackButton, new LinearLayout.LayoutParams(wrap(), dp(50)));
         TextView title = text("Настройки", 32, Typeface.BOLD);
         sidebar.addView(title, topMargin(4));
-        TextView version = secondary("Status Widget · " + VersionGetter.getAppVersionName(this), 13);
+        TextView version = secondary("Natro · " + VersionGetter.getAppVersionName(this), 13);
         sidebar.addView(version, topMargin(2));
         search = searchField();
         sidebar.addView(search, topMargin(16));

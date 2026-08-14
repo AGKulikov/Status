@@ -11,6 +11,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Typeface;
@@ -54,6 +55,7 @@ public final class MediaPanelView extends FrameLayout {
         void previous();
         void playPause();
         void next();
+        boolean like();
         void seekTo(long positionMs);
         void finishSeek(long positionMs);
         boolean openPlayer();
@@ -101,6 +103,7 @@ public final class MediaPanelView extends FrameLayout {
     private ResponsiveVolumeBar volume;
     private TextView volumeLabel;
     private ImageButton playPause;
+    private ImageButton like;
     @Nullable private android.graphics.Bitmap artworkBitmap;
     @Nullable private android.graphics.Bitmap observedArtworkBitmap;
     private long observedArtworkFingerprint;
@@ -119,6 +122,9 @@ public final class MediaPanelView extends FrameLayout {
     private boolean playPauseRenderInitialized;
     private boolean renderedPlaying;
     private int renderedPlayPauseTint;
+    private boolean likeRenderInitialized;
+    private boolean renderedLikeActive;
+    private int renderedLikeTint;
     @NonNull private String titleValue = "Музыка не воспроизводится";
     @NonNull private String artistValue = "";
     @NonNull private String albumValue = "";
@@ -127,6 +133,8 @@ public final class MediaPanelView extends FrameLayout {
     private long positionMs;
     private int volumePercent;
     private boolean playing;
+    private boolean likeAvailable;
+    @Nullable private Boolean liked;
 
     public MediaPanelView(@NonNull Context context, @NonNull MediaPanelConfigStore store,
                           @Nullable Controls controls) {
@@ -209,6 +217,8 @@ public final class MediaPanelView extends FrameLayout {
         if (progress == null || !progress.isPressed()) positionMs = state.positionMs;
         volumePercent = state.volumePercent;
         playing = state.playing;
+        likeAvailable = state.likeAvailable;
+        liked = state.liked;
         applySnapshot();
     }
 
@@ -225,6 +235,8 @@ public final class MediaPanelView extends FrameLayout {
         positionMs = 1L * 60L * 1_000L + 24_000L;
         volumePercent = 42;
         this.playing = playing;
+        likeAvailable = true;
+        liked = false;
         applySnapshot();
     }
 
@@ -242,6 +254,7 @@ public final class MediaPanelView extends FrameLayout {
         volume = null;
         volumeLabel = null;
         playPause = null;
+        like = null;
         observedArtworkBitmap = null;
         observedArtworkFingerprint = 0L;
         renderedArtworkBitmap = null;
@@ -255,6 +268,8 @@ public final class MediaPanelView extends FrameLayout {
         // A genuinely different fingerprint clears the rejection in applyArtwork().
         playPauseRenderInitialized = false;
         renderedPlayPauseTint = 0;
+        likeRenderInitialized = false;
+        renderedLikeTint = 0;
         applySurface();
         configurePanelClick();
 
@@ -293,8 +308,15 @@ public final class MediaPanelView extends FrameLayout {
                 artwork.setAdjustViewBounds(false);
                 artwork.setContentDescription("Обложка");
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    artwork.setClipToOutline(true);
-                    artwork.setOutlineProvider(ViewOutlineProvider.BACKGROUND);
+                    artwork.setClipToOutline(config.artworkCornerRadiusPx > 0);
+                    artwork.setOutlineProvider(new ViewOutlineProvider() {
+                        @Override public void getOutline(View view, Outline outline) {
+                            if (view.getWidth() <= 0 || view.getHeight() <= 0) return;
+                            float maximum = Math.min(view.getWidth(), view.getHeight()) / 2f;
+                            float radius = Math.min(config.artworkCornerRadiusPx, maximum);
+                            outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radius);
+                        }
+                    });
                 }
                 return artwork;
             case MediaPanelConfig.TITLE:
@@ -333,6 +355,14 @@ public final class MediaPanelView extends FrameLayout {
                 return button(R.drawable.ic_media_next, "Следующий трек",
                         controls == null || layoutEditor != null
                                 ? null : v -> controls.next(), element.scalePercent);
+            case MediaPanelConfig.LIKE:
+                like = button(R.drawable.ic_media_like, "Нравится",
+                        controls == null || layoutEditor != null ? null : v -> {
+                            if (!controls.like()) Toast.makeText(getContext(),
+                                    "Плеер не предоставил действие «Нравится»",
+                                    Toast.LENGTH_SHORT).show();
+                        }, element.scalePercent);
+                return like;
             case MediaPanelConfig.VOLUME:
                 return volumeElement(element.scalePercent, element.volumeThumbVisible,
                         element.volumeThumbSizePercent);
@@ -570,6 +600,9 @@ public final class MediaPanelView extends FrameLayout {
         if (playPause != null) {
             applyPlayPause();
         }
+        if (like != null) {
+            applyLike();
+        }
         if (timeline != null) {
             setTextIfChanged(timeline, MediaTimeline.format(positionMs) + " / "
                     + MediaTimeline.format(durationMs));
@@ -706,6 +739,27 @@ public final class MediaPanelView extends FrameLayout {
             renderedPlayPauseTint = tint;
         }
         playPauseRenderInitialized = true;
+    }
+
+    /** Unknown state remains an outline; only an authoritative/optimistic true fills the heart. */
+    private void applyLike() {
+        boolean active = Boolean.TRUE.equals(liked);
+        int tint = color(config.controlColor, Color.WHITE);
+        if (!likeRenderInitialized || renderedLikeActive != active) {
+            like.setImageResource(active
+                    ? R.drawable.ic_media_like_active : R.drawable.ic_media_like);
+            like.setContentDescription(active ? "Убрать отметку «Нравится»" : "Нравится");
+            renderedLikeActive = active;
+        }
+        if (!likeRenderInitialized || renderedLikeTint != tint) {
+            like.setColorFilter(tint);
+            renderedLikeTint = tint;
+        }
+        boolean enabled = controls != null && layoutEditor == null && likeAvailable;
+        if (like.isEnabled() != enabled) like.setEnabled(enabled);
+        float alpha = likeAvailable || globalEditPreview ? 1f : 0.45f;
+        if (like.getAlpha() != alpha) like.setAlpha(alpha);
+        likeRenderInitialized = true;
     }
 
     private static boolean sameArtwork(@Nullable android.graphics.Bitmap first,

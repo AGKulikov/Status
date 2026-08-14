@@ -50,7 +50,8 @@ public final class LocalAction {
     }
 
     public String stringValue() {
-        return value instanceof String ? (String) value : null;
+        return value instanceof String || value instanceof Number
+                ? String.valueOf(value) : null;
     }
 
     @Override
@@ -76,6 +77,16 @@ public final class LocalAction {
                 if ("false".equalsIgnoreCase(value)) return Boolean.FALSE;
             }
             throw new IllegalArgumentException("Scenario boolean action requires true or false");
+        }
+        if (field == LocalField.BORDER_WIDTH || field == LocalField.ICON_OUTLINE_WIDTH) {
+            try {
+                int width = raw instanceof Number ? ((Number) raw).intValue()
+                        : Integer.parseInt(String.valueOf(raw).trim());
+                if (width < 0 || width > 64) throw new NumberFormatException();
+                return width;
+            } catch (RuntimeException invalid) {
+                throw new IllegalArgumentException("Scenario width must be 0..64");
+            }
         }
         if (!(raw instanceof CharSequence)) {
             throw new IllegalArgumentException("Scenario style action requires a string");

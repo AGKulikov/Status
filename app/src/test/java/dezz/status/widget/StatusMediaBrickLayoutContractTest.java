@@ -70,8 +70,8 @@ public final class StatusMediaBrickLayoutContractTest {
         assertTrue(visibility.contains(
                 "boolean phoneNotificationActive = isPhoneNotificationActive()"));
         assertTrue(visibility.contains(
-                "boolean mediaSessionActive = phoneNotificationActive"));
-        assertTrue(visibility.contains("|| pickActiveMediaController() != null"));
+                "boolean mediaSessionActive = StatusMediaVisibilityPolicy.hasVisibleContent("));
+        assertTrue(visibility.contains("prefs.media.onlyWhilePlaying.get()"));
         assertTrue(visibility.contains("|| !mediaSessionActive"));
     }
 

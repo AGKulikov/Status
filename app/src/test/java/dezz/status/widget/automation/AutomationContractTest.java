@@ -23,4 +23,9 @@ public final class AutomationContractTest {
         assertTrue(AutomationContract.parseBoolean("visible"));
         assertFalse(AutomationContract.parseBoolean("off"));
     }
+
+    @Test public void acceptsStableLauncherPresentationScope() {
+        assertEquals(AutomationContract.SCOPE_LAUNCHER,
+                AutomationContract.normalizeScope(" LAUNCHER "));
+    }
 }

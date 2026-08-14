@@ -6,94 +6,48 @@ import android.provider.Settings;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.shell.PrivilegedShell;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
- * Applies Android's real SystemUI status-bar policy globally on ECARX units.
+ * One-way cleanup for builds that previously changed Android's global status-bar policy.
  *
- * <p>This deliberately changes {@code policy_control}; it does not draw a mask over the
- * clock/Bluetooth area. The original value is retained and restored when the option is disabled.
+ * <p>The launcher option now hides only Status Widget's TIME and BLUETOOTH views. A prior build
+ * may have persisted the original {@code policy_control} before adding an immersive-status rule;
+ * restore that exact value once, then forget the migration marker. No current user action writes
+ * SystemUI policy.</p>
  */
 public final class EcarxSystemStatusBarPolicy {
     private static final String KEY = "policy_control";
-    private static final String STATUS_RULE = "immersive.status=*";
     private static final String UNSET = "__unset__";
     private static final String NULL = "__null__";
-
-    public interface Callback {
-        void onApplied(boolean success, String message);
-    }
 
     private EcarxSystemStatusBarPolicy() {
     }
 
     public static void applyStored(Context context) {
-        if (new Preferences(context).launcherHideSystemStatusBar.get()) {
-            apply(context, true, (success, message) -> {
-                // Best effort during process start.
-            });
-        }
-    }
-
-    public static void apply(Context context, boolean enabled, Callback callback) {
         Context appContext = context.getApplicationContext();
         Preferences preferences = new Preferences(appContext);
-        String current = readDirect(appContext);
-        if (enabled && UNSET.equals(preferences.launcherSystemStatusBarOriginalPolicy.get())) {
-            preferences.launcherSystemStatusBarOriginalPolicy.set(current == null ? NULL : current);
-        }
-
-        String desired = enabled
-                ? withStatusRule(current)
-                : originalPolicy(preferences.launcherSystemStatusBarOriginalPolicy.get());
+        String stored = preferences.launcherSystemStatusBarOriginalPolicy.get();
+        if (stored == null || UNSET.equals(stored)) return;
+        String desired = originalPolicy(stored);
 
         if (writeDirect(appContext, desired) && equalPolicy(readDirect(appContext), desired)) {
-            finish(preferences, enabled, callback, true, "Android SystemUI обновлён");
+            preferences.launcherSystemStatusBarOriginalPolicy.set(UNSET);
             return;
         }
-        if (!shellSafe(desired)) {
-            finish(preferences, enabled, callback, false,
-                    "Системная политика содержит неподдерживаемые символы");
-            return;
-        }
+        if (!shellSafe(desired)) return;
 
         String command = desired == null
                 ? "settings delete global policy_control"
                 : "settings put global policy_control '" + desired + "'";
         PrivilegedShell.get(appContext).runCommand(command, (output, error) -> {
-            if (error != null) {
-                finish(preferences, enabled, callback, false, error);
-                return;
-            }
+            if (error != null) return;
             PrivilegedShell.get(appContext).runCommand(
                     "settings get global policy_control",
                     (readOutput, readError) -> {
                         boolean success = readError == null
                                 && equalPolicy(normalizeShellValue(readOutput), desired);
-                        String message = readError;
-                        if (success) {
-                            message = "Android SystemUI обновлён";
-                        } else if (message == null) {
-                            message = "ECARX не применил policy_control";
-                        }
-                        finish(preferences, enabled, callback, success, message);
+                        if (success) preferences.launcherSystemStatusBarOriginalPolicy.set(UNSET);
                     });
         });
-    }
-
-    private static void finish(Preferences preferences,
-                               boolean enabled,
-                               Callback callback,
-                               boolean success,
-                               String message) {
-        if (success) {
-            preferences.launcherHideSystemStatusBar.set(enabled);
-            if (!enabled) {
-                preferences.launcherSystemStatusBarOriginalPolicy.set(UNSET);
-            }
-        }
-        callback.onApplied(success, message == null ? "" : message);
     }
 
     private static String readDirect(Context context) {
@@ -117,20 +71,6 @@ public final class EcarxSystemStatusBarPolicy {
             return null;
         }
         return stored;
-    }
-
-    static String withStatusRule(String policy) {
-        List<String> rules = new ArrayList<>();
-        if (policy != null) {
-            for (String part : policy.split(":")) {
-                String rule = part.trim();
-                if (!rule.isEmpty() && !rule.startsWith("immersive.status=")) {
-                    rules.add(rule);
-                }
-            }
-        }
-        rules.add(STATUS_RULE);
-        return String.join(":", rules);
     }
 
     private static boolean shellSafe(String value) {

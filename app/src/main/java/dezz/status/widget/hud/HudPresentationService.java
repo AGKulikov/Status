@@ -513,7 +513,7 @@ public final class HudPresentationService extends Service
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_smart_car)
-                .setContentTitle("Status Widget · HUD")
+                .setContentTitle("Natro · HUD")
                 .setContentText(text)
                 .setContentIntent(pending)
                 .setOngoing(true)

@@ -58,6 +58,21 @@ public final class YandexWindowLauncherContractTest {
         assertTrue(preferences.contains("launcherHomeOpensWindowedNavigator"));
     }
 
+    @Test
+    public void freeformNavigatorIsAnExternalEcarxWindowSoWeDoNotOfferFakeRounding()
+            throws IOException {
+        String window = source();
+        String settings = source("dezz/status/widget/LauncherSettingsActivity.java");
+
+        assertTrue(window.contains("context.startActivity(intent)"));
+        assertTrue(window.contains("intent.setComponent(new ComponentName("));
+        assertTrue(window.contains("TransparentSplashActivity"));
+        assertFalse(window.contains("SurfaceView"));
+        assertFalse(window.contains("SurfaceControl"));
+        assertFalse(window.contains("setCornerRadius"));
+        assertTrue(settings.contains("не владеет его Window/Surface"));
+    }
+
     private static String source() throws IOException {
         return source("dezz/status/widget/launcher/YandexWindowLauncher.java");
     }

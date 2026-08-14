@@ -30,6 +30,50 @@ public final class MediaPanelInteractionContractTest {
         assertFalse(button.contains("MediaAppLauncher.launchYandexMusic"));
     }
 
+    @Test public void likeUsesRatingThenCapturedNotificationActionWithoutMsaverBroadcast()
+            throws IOException {
+        String controller = source("dezz/status/widget/launcher/LauncherMediaController.java");
+        String listener = source("dezz/status/widget/MediaNotificationListener.java");
+        String panel = source("dezz/status/widget/launcher/media/MediaPanelView.java");
+        assertTrue(controller.contains("PlaybackState.ACTION_SET_RATING"));
+        assertTrue(controller.contains("Rating.newHeartRating("));
+        assertTrue(controller.contains("sendMediaNotificationLike(commandPackage)"));
+        assertTrue(listener.contains("MediaLikeActionPolicy.matchesNotificationAction"));
+        assertTrue(panel.contains("R.drawable.ic_media_like"));
+        assertFalse(controller.contains("PERFORM_LIKE"));
+        assertFalse(listener.contains("new Intent(\"PERFORM_LIKE\")"));
+    }
+
+    @Test public void likeStateIsObservedMergedOptimisticallyAndRenderedAsFilledHeart()
+            throws IOException {
+        String controller = source("dezz/status/widget/launcher/LauncherMediaController.java");
+        String listener = source("dezz/status/widget/MediaNotificationListener.java");
+        String policy = source("dezz/status/widget/launcher/MediaLikeActionPolicy.java");
+        String panel = source("dezz/status/widget/launcher/media/MediaPanelView.java");
+        assertTrue(listener.contains("class MediaNotificationLikeSnapshot"));
+        assertTrue(listener.contains("@Nullable public final Boolean active"));
+        assertTrue(listener.contains("interface MediaLikeObserver"));
+        assertTrue(listener.contains("MediaLikeActionPolicy.displayHeart("));
+        assertTrue(controller.contains("@Nullable public final Boolean liked"));
+        assertTrue(controller.contains("pendingLikeTarget"));
+        assertTrue(controller.contains("MediaLikeActionPolicy.keepPending("));
+        assertTrue(controller.contains("Boolean displayedHeart = MediaLikeActionPolicy.displayHeart("));
+        assertTrue(controller.contains(
+                "latestMediaNotificationLike(commandPackage)"));
+        assertTrue(controller.contains(
+                "if (notificationState != null) displayedHeart = notificationState.active"));
+        assertTrue(controller.contains("MediaLikeActionPolicy.nextHeartTarget("));
+        assertTrue(controller.contains("setPendingLike(commandPackage, target)"));
+        assertTrue(panel.contains("liked = state.liked"));
+        assertTrue(panel.contains("R.drawable.ic_media_like_active"));
+        assertTrue(resource("ic_media_like_active.xml").contains("favorite, 24px, wght400, fill1"));
+        // Android 9's libcore rejects the host-JVM-only flag value 0x100 at class init. Keep the
+        // Like matcher on its explicit code-point boundary implementation so that exact crash
+        // cannot return unnoticed while Java 21 unit tests remain green.
+        assertFalse(policy.contains("import java.util.regex.Pattern;"));
+        assertFalse(policy.contains("Pattern.compile"));
+    }
+
     @Test public void mediaButtonScaleChangesTheGlyphInsideTheCell() throws IOException {
         String source = source("dezz/status/widget/launcher/media/MediaPanelView.java");
         int buttonStart = source.indexOf("private ImageButton button(");
@@ -103,6 +147,18 @@ public final class MediaPanelInteractionContractTest {
         assertTrue(artwork.contains("artwork.setImageDrawable(null)"));
         assertTrue(artwork.contains("artwork.setBackground(null)"));
         assertFalse(artwork.contains("setImageResource"));
+    }
+
+    @Test public void artworkRadiusClipsTheImageWithoutAllocatingRoundedBitmaps()
+            throws IOException {
+        String panel = source("dezz/status/widget/launcher/media/MediaPanelView.java");
+        String settings = source("dezz/status/widget/MediaPanelSettingsActivity.java");
+
+        assertTrue(panel.contains("artwork.setClipToOutline(config.artworkCornerRadiusPx > 0)"));
+        assertTrue(panel.contains("outline.setRoundRect("));
+        assertFalse(panel.contains("RoundedBitmapDrawable"));
+        assertTrue(settings.contains("Скругление обложки"));
+        assertTrue(settings.contains("config.setArtworkCornerRadiusPx(selected)"));
     }
 
     @Test public void transportControlsScheduleOnlyBoundedReconciliation() throws IOException {
@@ -281,6 +337,13 @@ public final class MediaPanelInteractionContractTest {
     private static String manifest() throws IOException {
         Path fromRoot = Paths.get("app", "src", "main", "AndroidManifest.xml");
         Path fromApp = Paths.get("src", "main", "AndroidManifest.xml");
+        Path file = Files.isRegularFile(fromRoot) ? fromRoot : fromApp;
+        return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+    }
+
+    private static String resource(String relative) throws IOException {
+        Path fromRoot = Paths.get("app", "src", "main", "res", "drawable").resolve(relative);
+        Path fromApp = Paths.get("src", "main", "res", "drawable").resolve(relative);
         Path file = Files.isRegularFile(fromRoot) ? fromRoot : fromApp;
         return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
     }

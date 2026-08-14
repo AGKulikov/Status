@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# KX11 Bluetooth evidence collector for macOS/Linux.
+# KX11 Bluetooth evidence collector for macOS.
 #
 # The head unit is accessed read-only. This script never remounts a partition,
 # edits/deletes a head-unit file, toggles Bluetooth, restarts a Bluetooth
@@ -12,25 +12,40 @@ set -u
 set -o pipefail
 umask 077
 
-SCRIPT_VERSION="1.0"
+SCRIPT_VERSION="2.0"
 ROOT_MODE=0
+ADB_INSTALL_MODE="ask"
+ADB_BIN="${ADB_BIN:-}"
+ADB_DOWNLOAD_TMP=""
 ADB_SERIAL=""
-OUTPUT_PARENT="${PWD}"
+USER_HOME="${HOME:-}"
+[ -n "$USER_HOME" ] || {
+  printf '%s\n' 'ERROR: HOME is not set; cannot choose a private install/output path' >&2
+  exit 1
+}
+OUTPUT_PARENT="${USER_HOME}/Desktop"
 
 usage() {
   cat <<'EOF'
 KX11 Bluetooth collector (read-only on the head unit)
 
 Usage:
-  KX11_Bluetooth_Collect.command [--root] [--serial SERIAL] [--output DIR]
+  KX11_Bluetooth_Collect.command [--root]
+      [--serial SERIAL] [--output DIR] [--adb PATH]
+      [--install-adb | --no-install-adb]
 
 Options:
   --root          Explicitly run `adb root` once (restarts adbd only), then
                   collect protected Bluetooth state such as pairing/link keys.
-  --serial VALUE  Select an ADB device by serial. Required only when more than
-                  one device is connected.
-  --output DIR    Parent directory for the timestamped result. Default: current
-                  directory.
+  --serial VALUE  Select an ADB device by serial. With an interactive Terminal,
+                  the script offers a numbered choice when several are ready.
+  --output DIR    Parent directory for the timestamped result. Default: the
+                  current macOS user's Desktop.
+  --adb PATH      Use this adb executable.
+  --install-adb   If adb is missing, install official Google Platform Tools in
+                  the current macOS user's Library without sudo.
+  --no-install-adb
+                  Never offer to install adb; fail with instructions instead.
   -h, --help      Show this help.
 
 No command in this collector writes to the head unit. The result is private:
@@ -42,6 +57,21 @@ fail() {
   printf '\nERROR: %s\n' "$1" >&2
   exit 1
 }
+
+cleanup_adb_download() {
+  [ -n "$ADB_DOWNLOAD_TMP" ] || return 0
+  case "$(basename "$ADB_DOWNLOAD_TMP")" in
+    natro-platform-tools.*)
+      [ -d "$ADB_DOWNLOAD_TMP" ] && rm -rf -- "$ADB_DOWNLOAD_TMP"
+      ;;
+  esac
+  ADB_DOWNLOAD_TMP=""
+}
+
+trap cleanup_adb_download EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -59,6 +89,19 @@ while [ "$#" -gt 0 ]; do
       OUTPUT_PARENT="$2"
       shift 2
       ;;
+    --adb)
+      [ "$#" -ge 2 ] || fail "--adb requires a path"
+      ADB_BIN="$2"
+      shift 2
+      ;;
+    --install-adb)
+      ADB_INSTALL_MODE="yes"
+      shift
+      ;;
+    --no-install-adb)
+      ADB_INSTALL_MODE="no"
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -69,15 +112,97 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-command -v adb >/dev/null 2>&1 || fail \
-  "adb was not found; install Android Platform Tools first"
+find_adb() {
+  local candidate
+  if [ -n "$ADB_BIN" ]; then
+    [ -x "$ADB_BIN" ] || fail "adb is not executable: $ADB_BIN"
+    return 0
+  fi
+  candidate="$(command -v adb 2>/dev/null || true)"
+  if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+    ADB_BIN="$candidate"
+    return 0
+  fi
+  for candidate in \
+    /opt/homebrew/bin/adb \
+    /usr/local/bin/adb \
+    "${HOME}/Library/Android/sdk/platform-tools/adb" \
+    "${HOME}/Library/Application Support/Natro/platform-tools/adb"
+  do
+    if [ -x "$candidate" ]; then
+      ADB_BIN="$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+confirm_adb_install() {
+  case "$ADB_INSTALL_MODE" in
+    yes) return 0 ;;
+    no) return 1 ;;
+  esac
+  [ -t 0 ] || return 1
+  printf '%s\n' "ADB was not found."
+  printf '%s' "Install official Google Android Platform Tools for this macOS user? [y/N] "
+  IFS= read -r answer
+  case "$answer" in
+    y|Y|yes|YES|Yes) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+install_official_adb() {
+  local download_url install_parent install_dir download_tmp archive unpacked
+  command -v curl >/dev/null 2>&1 || fail "curl is required to install adb"
+  command -v ditto >/dev/null 2>&1 || fail "ditto is required to install adb"
+  download_url="https://dl.google.com/android/repository/platform-tools-latest-darwin.zip"
+  install_parent="${HOME}/Library/Application Support/Natro"
+  install_dir="${install_parent}/platform-tools"
+  if [ -e "$install_dir" ]; then
+    fail "adb install directory already exists but is unusable: $install_dir"
+  fi
+  download_tmp="$(mktemp -d "${TMPDIR:-/tmp}/natro-platform-tools.XXXXXX")" || \
+    fail "could not create a temporary directory"
+  ADB_DOWNLOAD_TMP="$download_tmp"
+  archive="${download_tmp}/platform-tools.zip"
+  printf '%s\n' \
+    "Android Platform Tools are provided under the Android SDK License Agreement:" \
+    "https://developer.android.com/studio/terms"
+  printf '%s\n' "Downloading official Android Platform Tools from Google..."
+  if ! curl --fail --location --proto '=https' --tlsv1.2 \
+      --output "$archive" "$download_url"; then
+    fail "could not download Android Platform Tools"
+  fi
+  if ! ditto -x -k "$archive" "$download_tmp"; then
+    fail "could not unpack Android Platform Tools"
+  fi
+  unpacked="${download_tmp}/platform-tools"
+  [ -x "${unpacked}/adb" ] || fail "downloaded archive does not contain executable adb"
+  "${unpacked}/adb" version >/dev/null 2>&1 || fail "downloaded adb did not start"
+  mkdir -p "$install_parent" || fail "cannot create: $install_parent"
+  mv "$unpacked" "$install_dir" || fail "cannot install Platform Tools in: $install_dir"
+  ADB_BIN="${install_dir}/adb"
+  "$ADB_BIN" version >/dev/null 2>&1 || fail "installed adb did not start"
+  cleanup_adb_download
+  printf '%s\n' "ADB installed in: $install_dir"
+}
+
+if ! find_adb; then
+  if confirm_adb_install; then
+    install_official_adb
+  else
+    fail "adb was not found; re-run with --install-adb or install Android Platform Tools"
+  fi
+fi
+
 command -v tar >/dev/null 2>&1 || fail "tar was not found"
 
 mkdir -p "$OUTPUT_PARENT" || fail "cannot create output parent: $OUTPUT_PARENT"
 [ -d "$OUTPUT_PARENT" ] || fail "output parent is not a directory: $OUTPUT_PARENT"
 
 TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
-RESULT_NAME="KX11_Bluetooth_Collect_${TIMESTAMP}"
+RESULT_NAME="KX11_Bluetooth_Collect_${TIMESTAMP}_$$"
 RESULT_DIR="${OUTPUT_PARENT%/}/${RESULT_NAME}"
 ARCHIVE_PATH="${RESULT_DIR}.tar.gz"
 ARCHIVE_SHA_PATH="${ARCHIVE_PATH}.sha256"
@@ -142,9 +267,9 @@ is_allowed_remote_path() {
   return 0
 }
 
-adb start-server >/dev/null 2>&1 || fail "could not start the local ADB server"
+"$ADB_BIN" start-server >/dev/null 2>&1 || fail "could not start the local ADB server"
 
-ADB_DEVICES_RAW="$(adb devices 2>/dev/null)" || fail "could not query ADB devices"
+ADB_DEVICES_RAW="$("$ADB_BIN" devices 2>/dev/null)" || fail "could not query ADB devices"
 if [ -n "$ADB_SERIAL" ]; then
   DEVICE_STATE="$(printf '%s\n' "$ADB_DEVICES_RAW" | awk -v serial="$ADB_SERIAL" \
     '$1 == serial { print $2; exit }')"
@@ -158,15 +283,44 @@ else
     fail "no authorized ADB device is ready"
   fi
   if [ "$READY_COUNT" -gt 1 ]; then
-    printf '%s\n' "$ADB_DEVICES_RAW" >&2
-    fail "more than one ADB device is ready; use --serial"
+    if [ -t 0 ]; then
+      READY_SERIALS="$(printf '%s\n' "$ADB_DEVICES_RAW" | \
+        awk '$2 == "device" { print $1 }')"
+      printf '%s\n' 'More than one ADB device is ready:'
+      printf '%s\n' "$READY_SERIALS" | nl -w 2 -s ') '
+      printf '%s' 'Select the KX11 device number: '
+      IFS= read -r selected_number
+      case "$selected_number" in
+        ''|*[!0-9]*) fail "invalid device number" ;;
+      esac
+      ADB_SERIAL="$(printf '%s\n' "$READY_SERIALS" | \
+        awk -v selected="$selected_number" 'NR == selected { print; exit }')"
+      [ -n "$ADB_SERIAL" ] || fail "device number is out of range"
+    else
+      printf '%s\n' "$ADB_DEVICES_RAW" >&2
+      fail "more than one ADB device is ready; use --serial"
+    fi
+  else
+    ADB_SERIAL="$(printf '%s\n' "$ADB_DEVICES_RAW" | \
+      awk '$2 == "device" { print $1; exit }')"
   fi
-  ADB_SERIAL="$(printf '%s\n' "$ADB_DEVICES_RAW" | \
-    awk '$2 == "device" { print $1; exit }')"
 fi
 
-ADB=(adb -s "$ADB_SERIAL")
-"${ADB[@]}" wait-for-device >/dev/null 2>&1 || fail "ADB device did not become ready"
+ADB=("$ADB_BIN" -s "$ADB_SERIAL")
+
+wait_for_device() {
+  local elapsed state
+  elapsed=0
+  while [ "$elapsed" -lt 60 ]; do
+    state="$("${ADB[@]}" get-state 2>/dev/null | tr -d '\r\n' || true)"
+    [ "$state" = "device" ] && return 0
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+  return 1
+}
+
+wait_for_device || fail "ADB device did not become ready within 60 seconds"
 
 if [ "$ROOT_MODE" -eq 1 ]; then
   say "--root selected: running adb root once; this restarts adbd only."
@@ -174,7 +328,7 @@ if [ "$ROOT_MODE" -eq 1 ]; then
   if ! "${ADB[@]}" root >"$RESULT_DIR/LOGS/adb_root.log" 2>&1; then
     fail "adb root failed; see LOGS/adb_root.log"
   fi
-  "${ADB[@]}" wait-for-device >/dev/null 2>&1 || fail "device did not return after adb root"
+  wait_for_device || fail "device did not return within 60 seconds after adb root"
   REMOTE_UID="$("${ADB[@]}" shell 'id -u' 2>/dev/null | tr -d '\r\n')"
   [ "$REMOTE_UID" = "0" ] || fail \
     "--root was requested but adbd UID is ${REMOTE_UID:-unknown}; protected data was not read"
@@ -188,6 +342,8 @@ say "Raw values are written only to the protected local result, not printed here
 printf '%s\n' \
   "KX11 Bluetooth evidence collection" \
   "Collector version: $SCRIPT_VERSION" \
+  "ADB executable: $ADB_BIN" \
+  "ADB version: $("$ADB_BIN" version 2>/dev/null | head -n 1)" \
   "Collected at local time: $(date '+%Y-%m-%d %H:%M:%S %z')" \
   "Explicit root mode: $ROOT_MODE" \
   "" \
@@ -264,6 +420,10 @@ run_remote_capture "$RESULT_DIR/META/getprop.txt" "getprop"
 run_remote_capture "$RESULT_DIR/META/build_fingerprint.txt" "getprop ro.build.fingerprint"
 run_remote_capture "$RESULT_DIR/META/device_identity.txt" \
   "printf 'model='; getprop ro.product.model; printf 'android='; getprop ro.build.version.release; printf 'sdk='; getprop ro.build.version.sdk; uname -a; id; getenforce 2>/dev/null"
+run_remote_capture "$RESULT_DIR/META/bluetooth_properties.txt" \
+  "getprop | grep -Ei 'bluetooth|btsnoop|persist[.]bt|vendor[.]bt' || true"
+run_remote_capture "$RESULT_DIR/META/bluetooth_android_settings.txt" \
+  "(settings list global; settings list secure; settings list system) 2>/dev/null | grep -Ei 'bluetooth|btsnoop' || true"
 run_remote_capture "$RESULT_DIR/DIAGNOSTICS/service_list.txt" "service list"
 run_remote_capture "$RESULT_DIR/DIAGNOSTICS/dumpsys_services.txt" "dumpsys -l"
 
@@ -459,7 +619,7 @@ printf '%s  %s\n' "$ARCHIVE_HASH" "$(basename "$ARCHIVE_PATH")" \
   >"$ARCHIVE_SHA_PATH"
 chmod 600 "$ARCHIVE_SHA_PATH"
 
-say "Collection complete."
+printf '%s\n' "Collection complete."
 printf '\nPrivate directory: %s\n' "$RESULT_DIR"
 printf 'Private archive:   %s\n' "$ARCHIVE_PATH"
 printf 'Archive SHA-256:   %s\n' "$ARCHIVE_HASH"

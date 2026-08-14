@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package dezz.status.widget.integration;
 
+import android.content.Context;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -70,11 +71,20 @@ public final class LocalScenarioController implements ConnectorValueRegistry.Lis
                                    @NonNull ConnectorValueRegistry valueRegistry,
                                    @Nullable CarIntegration carIntegration,
                                    @NonNull Listener listener) {
+        this(null, prefs, stateStore, valueRegistry, carIntegration, listener);
+    }
+
+    public LocalScenarioController(@Nullable Context context,
+                                   @NonNull Preferences prefs,
+                                   @NonNull AutomationStateStore stateStore,
+                                   @NonNull ConnectorValueRegistry valueRegistry,
+                                   @Nullable CarIntegration carIntegration,
+                                   @NonNull Listener listener) {
         this.prefs = prefs;
         this.stateStore = stateStore;
         this.valueRegistry = valueRegistry;
         this.listener = listener;
-        this.systemConditions = new SystemConditionResolver(prefs, stateStore,
+        this.systemConditions = new SystemConditionResolver(context, prefs, stateStore,
                 carIntegration, this::refreshSystemConditions);
         valueRegistry.addListener(this);
     }
@@ -204,6 +214,7 @@ public final class LocalScenarioController implements ConnectorValueRegistry.Lis
             case POPUP: stateScope = AutomationContract.SCOPE_POPUP; break;
             case BUILTIN: stateScope = AutomationContract.SCOPE_BUILTIN; break;
             case OVERLAY: stateScope = AutomationContract.SCOPE_OVERLAY; break;
+            case LAUNCHER: stateScope = AutomationContract.SCOPE_LAUNCHER; break;
             case DRIVER: stateScope = AutomationContract.SCOPE_DRIVER; break;
             case HUD: stateScope = AutomationContract.SCOPE_HUD; break;
             default: throw new IllegalArgumentException("Unsupported target scope");
@@ -219,6 +230,12 @@ public final class LocalScenarioController implements ConnectorValueRegistry.Lis
             case ICON: return "icon";
             case BACKGROUND_COLOR: return "background_color";
             case ACTION_ENABLED: return "action_enabled";
+            case BORDER_COLOR: return "border_color";
+            case BORDER_WIDTH: return "border_width";
+            case ICON_TINT: return "icon_tint";
+            case ICON_BACKGROUND_COLOR: return "icon_background_color";
+            case ICON_OUTLINE_COLOR: return "icon_outline_color";
+            case ICON_OUTLINE_WIDTH: return "icon_outline_width";
             default: throw new IllegalArgumentException("Unsupported local field");
         }
     }

@@ -92,7 +92,7 @@ public final class SprutHubRpcClientTest {
         JSONObject info = params.getJSONObject("server").getJSONObject("clientInfo");
 
         assertEquals("client-id", info.getString("id"));
-        assertEquals("Status Widget HA", info.getString("name"));
+        assertEquals("Natro", info.getString("name"));
         assertEquals("CLIENT_DESKTOP", info.getString("type"));
         assertFalse(info.has("auth"));
         assertEquals("", SprutHubRpcClient.buildLegacyClientInfoParams("client-id")

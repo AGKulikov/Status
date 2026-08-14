@@ -367,6 +367,7 @@ public class WidgetAccessibilityService extends AccessibilityService {
         boolean windowChanged = type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
                 || type == AccessibilityEvent.TYPE_WINDOWS_CHANGED;
         if (windowChanged) {
+            publishNavigatorWindowSurfaceEvent(type, eventPackage, eventClass);
             boolean foregroundChanged;
             if (supportsSafeWindowTraversal()) {
                 // Android 10+ can provide a coherent framework snapshot. Android 9 deliberately
@@ -397,7 +398,15 @@ public class WidgetAccessibilityService extends AccessibilityService {
      */
     private boolean publishAndroidNineForegroundEvent(int eventType,
                                                        @NonNull String packageName) {
-        if (eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+        // ECARX' freeform TransparentSplashActivity commonly emits WINDOWS_CHANGED without a
+        // matching full-screen STATE_CHANGED event. Both are lifecycle events already included
+        // in our lean base subscription. The separate surface publisher above preserves the
+        // window/full-screen distinction without traversing the unsafe API 28 accessibility tree.
+        boolean applicationStateChanged =
+                eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
+        boolean yandexFreeformChanged = eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED
+                && NavigationDataRepository.isYandexPackage(packageName);
+        if ((!applicationStateChanged && !yandexFreeformChanged)
                 || packageName.isEmpty() || packageName.equals(getPackageName())) {
             return false;
         }
@@ -405,6 +414,26 @@ public class WidgetAccessibilityService extends AccessibilityService {
             String previous = foregroundByDisplay.put(
                     android.view.Display.DEFAULT_DISPLAY, packageName);
             return !packageName.equals(previous);
+        }
+    }
+
+    private void publishNavigatorWindowSurfaceEvent(int eventType,
+                                                     @NonNull String packageName,
+                                                     @NonNull String className) {
+        if (packageName.isEmpty() || packageName.equals(getPackageName())) return;
+        boolean exactWindow = StatusBarSurfaceContext.isNavigatorWindow(packageName, className);
+        if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            // STATE_CHANGED carries the concrete Activity. Ignore auxiliary Yandex dialogs so
+            // they cannot accidentally collapse their still-open floating parent surface.
+            if (exactWindow) {
+                StatusBarSurfaceContext.setNavigatorWindowForeground(true);
+            } else if (!StatusBarSurfaceContext.isYandexPackage(packageName)
+                    || StatusBarSurfaceContext.isFullscreenYandex(packageName, className)) {
+                StatusBarSurfaceContext.setNavigatorWindowForeground(false);
+            }
+        } else if (eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED && exactWindow) {
+            // Some ECARX builds expose the floating Activity only through WINDOWS_CHANGED.
+            StatusBarSurfaceContext.setNavigatorWindowForeground(true);
         }
     }
 

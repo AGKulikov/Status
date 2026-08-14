@@ -13,6 +13,7 @@ import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
@@ -760,15 +761,63 @@ public final class LauncherGlobalElementProxyView extends View {
         canvas.scale(uniformScale / Math.max(.01f, Math.abs(sourceToScreenScaleX)),
                 uniformScale / Math.max(.01f, Math.abs(sourceToScreenScaleY)),
                 image.getWidth() / 2f, image.getHeight() / 2f);
-        canvas.clipRect(image.getPaddingLeft(), image.getPaddingTop(),
-                Math.max(image.getPaddingLeft(),
-                        image.getWidth() - image.getPaddingRight()),
-                Math.max(image.getPaddingTop(),
-                        image.getHeight() - image.getPaddingBottom()));
+        RectF viewport = imageViewport(image);
+        canvas.clipRect(viewport);
+        clipMediaArtworkDrawable(canvas, image, drawable, viewport);
         canvas.translate(image.getPaddingLeft(), image.getPaddingTop());
         canvas.concat(image.getImageMatrix());
         drawable.draw(canvas);
         canvas.restoreToCount(checkpoint);
+    }
+
+    /**
+     * The live media panel is alpha-suppressed on HOME, so ImageView#clipToOutline is never part
+     * of the pixels users see. Mirror its round outline in the proxy, but clip the transformed
+     * drawable rather than the whole ImageView: FIT_CENTER letterboxing must not move the corner
+     * arcs away from the actual cover. Canvas/Path only; no bitmap allocation or timer.
+     */
+    private static void clipMediaArtworkDrawable(
+            @NonNull Canvas canvas,
+            @NonNull ImageView image,
+            @NonNull Drawable drawable,
+            @NonNull RectF viewport) {
+        if (!isMediaArtwork(image) || !image.getClipToOutline()
+                || image.getOutlineProvider() == null) return;
+        android.graphics.Outline outline = new android.graphics.Outline();
+        image.getOutlineProvider().getOutline(image, outline);
+        float sourceRadius = Math.max(0f, outline.getRadius());
+        if (sourceRadius <= 0f) return;
+
+        Rect bounds = drawable.getBounds();
+        if (bounds.isEmpty()) return;
+        RectF drawn = new RectF(bounds);
+        image.getImageMatrix().mapRect(drawn);
+        drawn.offset(image.getPaddingLeft(), image.getPaddingTop());
+        if (!drawn.intersect(viewport) || drawn.isEmpty()) return;
+
+        // sourceRadius and drawn are both in ImageView coordinates after mapRect. Scaling the
+        // radius again by intrinsic bitmap size would turn (for example) a 24 px corner on a
+        // 1000 px cover fitted to 100 px into an incorrect 2.4 px corner.
+        float radius = Math.min(sourceRadius,
+                Math.min(drawn.width(), drawn.height()) / 2f);
+        Path clip = new Path();
+        clip.addRoundRect(drawn, radius, radius, Path.Direction.CW);
+        canvas.clipPath(clip);
+    }
+
+    private static boolean isMediaArtwork(@NonNull ImageView image) {
+        LauncherGlobalElementTag tag = LauncherGlobalElementTag.from(image);
+        return tag != null && (LauncherLayoutStore.MEDIA + "/" + MediaPanelConfig.ARTWORK)
+                .equals(tag.id);
+    }
+
+    @NonNull
+    private static RectF imageViewport(@NonNull ImageView image) {
+        return new RectF(image.getPaddingLeft(), image.getPaddingTop(),
+                Math.max(image.getPaddingLeft(),
+                        image.getWidth() - image.getPaddingRight()),
+                Math.max(image.getPaddingTop(),
+                        image.getHeight() - image.getPaddingBottom()));
     }
 
     /**

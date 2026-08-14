@@ -70,7 +70,7 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
                       boolean radioEnabled, boolean explicitBootstrapRequested,
                       boolean externallyManagedRecovery,
                       boolean allowExperimentalRouteB) {
-            this.selectedSystemBondAddress = IphoneBleAdvertisement.normalizePeerId(
+            this.selectedSystemBondAddress = IphoneBleAdvertisement.normalizeSystemBondAddress(
                     selectedSystemBondAddress);
             if (this.selectedSystemBondAddress.isEmpty()) {
                 throw new IllegalArgumentException("selected system bond is required");
@@ -104,6 +104,7 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
         final boolean restorationOnly;
         boolean terminalObserved;
         boolean targetFailureReported;
+        String targetFailureDetail = "";
         IphoneTransportStatusV2 status;
 
         Slot(IphoneSwitchTransportV2 transport, Owner routeOwner, boolean restorationOnly) {
@@ -552,6 +553,9 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
 
     @Override public void startTarget(Owner target) {
         assertOnSerializedExecutor();
+        // Every target attempt owns its own diagnostic lineage. A prior failed generation must
+        // never leak its root cause into this generation's fail-closed status.
+        fatalDetail = "";
         if (suppressedProductionRouteB(target)) {
             fatalDetail = "Route B target suppressed: explicit diagnostics disabled";
             listener.onError(new IphoneTransportErrorV2(
@@ -569,6 +573,7 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
             return;
         }
         if (slot != null) {
+            fatalDetail = "target start rejected: prior route slot is still attached";
             enqueue(() -> coordinator.onTargetStartFailed(target));
             return;
         }
@@ -576,6 +581,7 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
         try {
             transport = factory.create(mode(target.role()), androidInstallationId);
         } catch (RuntimeException error) {
+            fatalDetail = "target factory failed: " + safeMessage(error);
             enqueue(() -> coordinator.onTargetStartFailed(target));
             return;
         }
@@ -584,9 +590,11 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
         try {
             UUID helper = identities.learnedHelperIdentity();
             String helperId = helper == null ? "" : helper.toString();
-            IphoneAcquisitionModeV2 acquisition = helper == null
-                    ? IphoneAcquisitionModeV2.EXPLICIT_BOOTSTRAP_SCAN
-                    : IphoneAcquisitionModeV2.SELECTED_BOND;
+            // iOS moves service UUIDs into an Apple-only overflow area while a peripheral app is
+            // backgrounded, so Android cannot make a filtered F201 scan a production bootstrap
+            // prerequisite. The exact user-selected system bond is already the strict pre-GATT
+            // identity gate; encrypted H then learns or confirms the Helper installation UUID.
+            IphoneAcquisitionModeV2 acquisition = IphoneAcquisitionModeV2.SELECTED_BOND;
             IphoneTransportStartRequest request = new IphoneTransportStartRequest(
                     new BleRouteEpoch(target.processNonce(), target.generation().asBigInteger()),
                     config.selectedSystemBondAddress,
@@ -597,6 +605,7 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
             );
             transport.start(request, new BoundListener(fresh));
         } catch (RuntimeException error) {
+            fatalDetail = "target start failed: " + safeMessage(error);
             closeSlot();
             enqueue(() -> coordinator.onTargetStartFailed(target));
         }
@@ -615,7 +624,10 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
 
     @Override public void failClosed(Owner owner, Failure failure) {
         assertOnSerializedExecutor();
-        fatalDetail = "switch failed closed: " + failure;
+        String rootCause = fatalDetail == null ? "" : fatalDetail.trim();
+        fatalDetail = failure == Failure.TARGET_START_FAILED && !rootCause.isEmpty()
+                ? "switch failed closed: " + failure + "; " + rootCause
+                : "switch failed closed: " + failure;
         enqueue(() -> publishDualStatus(fatalDetail));
     }
 
@@ -642,6 +654,12 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
             enqueue(() -> {
                 if (!matchesBoundStatus(bound, status)) return;
                 bound.status = status;
+                if (status.lifecycle == IphoneTransportLifecycle.FAILED
+                        || status.lifecycle == IphoneTransportLifecycle.STOPPED) {
+                    bound.targetFailureDetail = "route "
+                            + status.lifecycle.name().toLowerCase(java.util.Locale.ROOT)
+                            + ": " + status.detail;
+                }
                 if (status.lifecycle == IphoneTransportLifecycle.READY
                         && coordinator != null && coordinator.state().phase() == Phase.STARTING) {
                     coordinator.onTargetActive(coordinator.targetOwner());
@@ -756,6 +774,7 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
                 listener.onError(error);
                 if (!error.retryable && coordinator != null
                         && coordinator.state().phase() == Phase.STARTING) {
+                    bound.targetFailureDetail = "route " + error.kind + ": " + error.detail;
                     failBoundTarget(bound);
                 }
             });
@@ -811,6 +830,9 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
         Owner target = coordinator.targetOwner();
         if (!bound.matchesRouteGeneration(target)) return;
         bound.targetFailureReported = true;
+        if (bound.targetFailureDetail != null && !bound.targetFailureDetail.trim().isEmpty()) {
+            fatalDetail = bound.targetFailureDetail.trim();
+        }
         closeSlot();
         coordinator.onTargetStartFailed(target);
     }

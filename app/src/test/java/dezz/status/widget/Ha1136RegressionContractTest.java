@@ -86,13 +86,14 @@ public final class Ha1136RegressionContractTest {
         assertTrue(layout.contains("android:layout_width=\"wrap_content\""));
     }
 
-    @Test public void systemStatusBarOptionChangesAndroidPolicyInsteadOfDrawingMask()
+    @Test public void oldSystemStatusBarPolicyIsOnlyRestoredAndNeverEnabledAgain()
             throws Exception {
         String policy = javaSource("launcher/EcarxSystemStatusBarPolicy.java");
         assertTrue(policy.contains("KEY = \"policy_control\""));
-        assertTrue(policy.contains("STATUS_RULE = \"immersive.status=*\""));
         assertTrue(policy.contains("Settings.Global.putString"));
-        assertTrue(policy.contains("settings put global policy_control"));
+        assertTrue(policy.contains("launcherSystemStatusBarOriginalPolicy.set(UNSET)"));
+        assertFalse(policy.contains("immersive.status=*"));
+        assertFalse(policy.contains("launcherHideSystemStatusBar.set"));
         assertFalse(policy.contains("WindowManager.addView"));
     }
 

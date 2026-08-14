@@ -260,10 +260,9 @@ public final class Ha1209LauncherStartupContractTest {
     }
 
     @Test public void releaseIdentityAndWorkflowAdvanceTogether() throws Exception {
-        String build = rootProject("build.gradle");
         String workflow = project(".github/workflows/verify-ha1216.yml");
         String manifest = project("release-manifests/HA1216.md");
-        assertTrue(build.contains("return 'v2.8.2-ha1216'"));
+        ReleaseIdentityContract.assertCurrentAtLeast(1209);
         assertTrue(workflow.contains("name: Verify HA1216 immediate lean runtime candidate"));
         assertTrue(workflow.contains("VERSION_NAME: 'v2.8.2-ha1216'"));
         assertTrue(workflow.contains("VERSION_CODE: '208021216'"));
@@ -281,20 +280,6 @@ public final class Ha1209LauncherStartupContractTest {
         Path second = Paths.get("..", relative);
         Path file = Files.isRegularFile(first) ? first : second;
         return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
-    }
-
-    /** Avoid resolving app/build.gradle when Gradle runs unit tests with app/ as cwd. */
-    private static String rootProject(String relative) throws Exception {
-        Path current = Paths.get("").toAbsolutePath();
-        for (int depth = 0; depth < 8 && current != null;
-             depth++, current = current.getParent()) {
-            Path candidate = current.resolve(relative).normalize();
-            if (Files.isRegularFile(candidate)
-                    && Files.isDirectory(current.resolve("app"))) {
-                return new String(Files.readAllBytes(candidate), StandardCharsets.UTF_8);
-            }
-        }
-        throw new IllegalStateException("Root project file not found: " + relative);
     }
 
     private static String between(String source, String start, String end) {

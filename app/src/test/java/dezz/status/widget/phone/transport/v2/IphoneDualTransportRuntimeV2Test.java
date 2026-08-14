@@ -30,6 +30,26 @@ import org.junit.Test;
 public final class IphoneDualTransportRuntimeV2Test {
     private static final long PROCESS = 0x1234L;
 
+    @Test public void selectedBluetoothAddressUsesAndroidUppercaseCanonicalForm() {
+        IphoneDualTransportRuntimeV2.Config config = new IphoneDualTransportRuntimeV2.Config(
+                " aa:bb:cc:dd:ee:ff ", IphoneBleMode.ANDROID_CENTRAL,
+                true, true);
+        IphoneTransportStartRequest request = new IphoneTransportStartRequest(
+                new BleRouteEpoch(1L, 1L), config.selectedSystemBondAddress,
+                "34f9515d-8d8d-4ef5-8b42-c052fdbe4e6f", true, 0L,
+                IphoneAcquisitionModeV2.SELECTED_BOND);
+        IphoneTransportStatusV2 status = new IphoneTransportStatusV2(
+                IphoneBleMode.ANDROID_CENTRAL, new BleRouteEpoch(1L, 1L),
+                IphoneTransportLifecycle.CONNECTING, "aa:bb:cc:dd:ee:ff",
+                request.helperInstallationId, "probe", 0);
+
+        assertEquals("AA:BB:CC:DD:EE:FF", config.selectedSystemBondAddress);
+        assertEquals("AA:BB:CC:DD:EE:FF", request.selectedSystemBondAddress);
+        assertEquals("AA:BB:CC:DD:EE:FF", status.selectedSystemBondAddress);
+        assertEquals("34f9515d-8d8d-4ef5-8b42-c052fdbe4e6f",
+                request.helperInstallationId);
+    }
+
     @Test public void absentSnapshotRunsDrainOnlyMigrationBeforeFreshTarget() {
         Fixture fixture = new Fixture(false, "");
         fixture.start(IphoneBleMode.ANDROID_CENTRAL);
@@ -46,6 +66,9 @@ public final class IphoneDualTransportRuntimeV2Test {
         assertFalse(active.preparedRestoration);
         assertEquals(1, active.startCount);
         assertEquals(IphoneBleMode.ANDROID_CENTRAL, active.mode());
+        assertEquals(IphoneAcquisitionModeV2.SELECTED_BOND,
+                active.startRequest.acquisitionMode);
+        assertTrue(active.startRequest.helperInstallationId.isEmpty());
         assertEquals(ACTIVE, fixture.listener.lastDual.switchPhase);
         assertEquals(IphoneBleMode.ANDROID_CENTRAL, fixture.listener.lastDual.activeMode);
         assertTrue(fixture.store.hasSwitchSnapshot());
@@ -162,6 +185,7 @@ public final class IphoneDualTransportRuntimeV2Test {
         FakeTransport failedTarget = fixture.factory.created.get(2);
         assertEquals(FAILED, fixture.listener.lastDual.switchPhase);
         BleRouteEpoch failedEpoch = failedTarget.startRequest.epoch;
+        assertTrue(fixture.listener.lastDual.detail.contains("route failed: start failed"));
 
         fixture.runtime.requestSameModeRecovery();
         fixture.scheduler.drain();
@@ -178,6 +202,63 @@ public final class IphoneDualTransportRuntimeV2Test {
         assertFalse(failedEpoch.equals(replacement.startRequest.epoch));
         assertEquals(IphoneBleMode.ANDROID_PERIPHERAL, replacement.mode());
         assertEquals(ACTIVE, fixture.listener.lastDual.switchPhase);
+    }
+
+    @Test public void failedTargetPreservesTypedRootCauseInDualStatus() {
+        Fixture fixture = new Fixture(false, "");
+        fixture.start(IphoneBleMode.ANDROID_CENTRAL);
+        fixture.scheduler.advanceBy(10L);
+        FakeTransport source = fixture.factory.created.get(1);
+        source.remoteControl = false;
+        source.ownerCount = 0;
+        fixture.factory.errorNextStart = true;
+
+        fixture.runtime.requestMode(IphoneBleMode.ANDROID_PERIPHERAL);
+        fixture.scheduler.drain();
+        fixture.scheduler.advanceBy(10L);
+
+        assertEquals(FAILED, fixture.listener.lastDual.switchPhase);
+        assertTrue(fixture.listener.lastDual.detail.contains("TARGET_START_FAILED"));
+        assertTrue(fixture.listener.lastDual.detail.contains("PEER_PROOF_REJECTED"));
+        assertTrue(fixture.listener.lastDual.detail.contains(
+                "selected bond absent or ambiguous"));
+    }
+
+    @Test public void synchronousFactoryFailureDoesNotReusePriorDiagnostic() {
+        Fixture fixture = new Fixture(false, "");
+        fixture.start(IphoneBleMode.ANDROID_CENTRAL);
+        fixture.scheduler.advanceBy(10L);
+        FakeTransport source = fixture.factory.created.get(1);
+        source.remoteControl = false;
+        source.ownerCount = 0;
+        fixture.factory.throwNextCreate = true;
+
+        fixture.runtime.requestMode(IphoneBleMode.ANDROID_PERIPHERAL);
+        fixture.scheduler.drain();
+        fixture.scheduler.advanceBy(10L);
+
+        assertEquals(FAILED, fixture.listener.lastDual.switchPhase);
+        assertTrue(fixture.listener.lastDual.detail.contains("target factory failed"));
+        assertTrue(fixture.listener.lastDual.detail.contains("factory probe"));
+        assertFalse(fixture.listener.lastDual.detail.contains("selected bond absent"));
+    }
+
+    @Test public void synchronousTransportStartFailurePreservesRootCause() {
+        Fixture fixture = new Fixture(false, "");
+        fixture.start(IphoneBleMode.ANDROID_CENTRAL);
+        fixture.scheduler.advanceBy(10L);
+        FakeTransport source = fixture.factory.created.get(1);
+        source.remoteControl = false;
+        source.ownerCount = 0;
+        fixture.factory.throwNextStart = true;
+
+        fixture.runtime.requestMode(IphoneBleMode.ANDROID_PERIPHERAL);
+        fixture.scheduler.drain();
+        fixture.scheduler.advanceBy(10L);
+
+        assertEquals(FAILED, fixture.listener.lastDual.switchPhase);
+        assertTrue(fixture.listener.lastDual.detail.contains("target start failed"));
+        assertTrue(fixture.listener.lastDual.detail.contains("start probe"));
     }
 
     @Test public void explicitRetryDrainsStillAttachedFailedSourceInsteadOfReplacingIt() {
@@ -636,15 +717,26 @@ public final class IphoneDualTransportRuntimeV2Test {
         final FakeScheduler scheduler;
         final List<FakeTransport> created = new ArrayList<>();
         boolean failNextStart;
+        boolean errorNextStart;
+        boolean throwNextCreate;
+        boolean throwNextStart;
 
         FakeFactory(FakeScheduler scheduler) { this.scheduler = scheduler; }
 
         @Override public IphoneSwitchTransportV2 create(
                 IphoneBleMode mode, java.util.UUID androidInstallationId) {
             assertNotNull(androidInstallationId);
+            if (throwNextCreate) {
+                throwNextCreate = false;
+                throw new IllegalStateException("factory probe");
+            }
             FakeTransport transport = new FakeTransport(mode, scheduler);
             transport.failOnStart = failNextStart;
+            transport.errorOnStart = errorNextStart;
+            transport.throwOnStart = throwNextStart;
             failNextStart = false;
+            errorNextStart = false;
+            throwNextStart = false;
             created.add(transport);
             return transport;
         }
@@ -666,6 +758,8 @@ public final class IphoneDualTransportRuntimeV2Test {
         boolean terminalDelivered;
         boolean identityAccepted;
         boolean failOnStart;
+        boolean errorOnStart;
+        boolean throwOnStart;
         Integer forcedOwnerCount;
         FreezeResult freezeResultOverride;
         int freezeCount;
@@ -688,12 +782,24 @@ public final class IphoneDualTransportRuntimeV2Test {
             this.listener = listener;
             startCount++;
             ownerCount = 1;
-            scheduler.execute(() -> listener.onStatus(new IphoneTransportStatusV2(
-                    mode, request.epoch,
-                    failOnStart ? IphoneTransportLifecycle.FAILED
-                            : IphoneTransportLifecycle.READY,
-                    request.selectedSystemBondAddress, request.helperInstallationId,
-                    failOnStart ? "start failed" : "ready", 0)));
+            if (throwOnStart) throw new IllegalStateException("start probe");
+            scheduler.execute(() -> {
+                if (errorOnStart) {
+                    listener.onError(new IphoneTransportErrorV2(
+                            mode,
+                            request.epoch,
+                            IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
+                            "selected bond absent or ambiguous",
+                            false));
+                    return;
+                }
+                listener.onStatus(new IphoneTransportStatusV2(
+                        mode, request.epoch,
+                        failOnStart ? IphoneTransportLifecycle.FAILED
+                                : IphoneTransportLifecycle.READY,
+                        request.selectedSystemBondAddress, request.helperInstallationId,
+                        failOnStart ? "start failed" : "ready", 0));
+            });
         }
         @Override public void stop(BleRouteEpoch epoch, IphoneTransportStopReason reason) {
             ownerCount = 0;
@@ -764,6 +870,7 @@ public final class IphoneDualTransportRuntimeV2Test {
                     request.selectedSystemBondAddress, request.helperInstallationId,
                     detail, 0)));
         }
+
     }
 
     private static final class FakeListener implements IphoneDualTransportListenerV2 {

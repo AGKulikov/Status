@@ -219,7 +219,7 @@ public final class SprutPopupPresetEngineTest {
         SprutPopupPreset preset = engine.recommend(accessory("Device", service), service);
         assertEquals(serviceType, icon, preset.iconId());
         assertTrue("Icon must come from PopupIconCatalog: " + preset.iconId(),
-                PopupIconCatalog.IDS.contains(preset.iconId()));
+                PopupIconCatalog.isAllowedId(preset.iconId()));
         assertEquals(serviceType, presentation, preset.presentation());
     }
 

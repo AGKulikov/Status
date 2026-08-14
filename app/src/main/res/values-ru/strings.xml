@@ -17,7 +17,7 @@
 
 <resources>
     <string name="launcher_settings_button">Домашний экран и блоки</string>
-    <string name="app_name">Status Widget HA</string>
+    <string name="app_name">Natro</string>
     <string name="brick_title_home_assistant">Home Assistant</string>
     <string name="automation_settings_button">Элементы умного дома</string>
     <string name="automation_settings_title">Элементы основной строки</string>
@@ -129,6 +129,8 @@
     <string name="brick_adjust_y">Сдвиг по вертикали</string>
     <string name="brick_media_max_width">Максимальная ширина медиа</string>
     <string name="brick_media_show_source">Показывать источник</string>
+    <string name="brick_media_show_playback_state_icon">Показывать значок play/pause</string>
+    <string name="brick_media_only_while_playing">Показывать медиа только во время воспроизведения</string>
     <string name="brick_media_title_first">Название перед исполнителем</string>
     <string name="brick_media_marquee_enabled">Прокручивать длинное название</string>
     <string name="brick_media_progress_bar_enabled">Показывать прогресс трека</string>
@@ -196,6 +198,8 @@
     <string name="hide_in_apps_title">Скрывать в:</string>
     <string name="app_selection_load_failed_title">Не удалось загрузить список приложений</string>
     <string name="app_selection_load_failed_message">Произошла ошибка:\n\n%1$s</string>
+    <string name="app_selection_launcher_home">Наш лаунчер · только HOME</string>
+    <string name="app_selection_navigator_window">Навигатор в окне · только окно</string>
     <string name="menu_about">О приложении</string>
     <string name="menu_import_preset">Импортировать пресет…</string>
     <string name="menu_export_settings">Экспорт настроек…</string>
@@ -327,14 +331,34 @@
 
     <string name="phone_section_alerts">Предупреждения iPhone</string>
     <string name="phone_low_battery_enable_title">Предупреждать о низком заряде</string>
-    <string name="phone_low_battery_enable_subtitle">Один раз временно заменять Now Playing, когда заряд выбранного iPhone опустится ниже порога</string>
+    <string name="phone_low_battery_enable_subtitle">Один раз показывать предупреждение в строке состояния и во всплывающей карточке</string>
     <string name="phone_low_battery_threshold_title">Порог заряда</string>
     <string name="phone_low_battery_threshold_value">Предупреждать ниже %1$d%%</string>
     <string name="phone_low_battery_threshold_prompt">Введите процент от 1 до 100</string>
     <string name="phone_low_battery_threshold_invalid">Введите значение от 1 до 100.</string>
     <string name="phone_low_battery_color_title">Цвет предупреждения о заряде</string>
-    <string name="phone_low_battery_hint">Предупреждение срабатывает один раз при входе свежего значения заряда ниже заданного порога. Повторное срабатывание разрешается после восстановления заряда выше порога.</string>
+    <string name="phone_low_battery_hint">Предупреждение срабатывает один раз при входе свежего значения заряда ниже заданного порога. Во всплывающем режиме используется карточка уведомления с иконкой батареи. Повторное срабатывание разрешается после восстановления заряда выше порога.</string>
     <string name="phone_low_battery_alert_text">Низкий заряд iPhone · %1$d%%</string>
+    <string name="phone_low_battery_popup_application">iPhone</string>
+    <string name="phone_low_battery_popup_title">Низкий заряд iPhone</string>
+    <string name="phone_low_battery_popup_body">Осталось заряда: %1$d%%</string>
+    <string name="phone_notification_delay_section">Отложенный показ в приложениях</string>
+    <string name="phone_notification_delay_enable">Ожидать показ уведомлений в выбранных приложениях</string>
+    <string name="phone_notification_delay_hint">Пока выбранное приложение открыто на экране, новые уведомления iPhone сохраняются по порядку. После его закрытия либо по истечении максимального времени они сразу переходят в нашу стандартную очередь показа.</string>
+    <string name="phone_notification_delay_apps_title">Приложения, блокирующие оверлеи</string>
+    <string name="phone_notification_delay_apps_choose">Выберите приложения магнитолы</string>
+    <string name="phone_notification_delay_apps_summary">Выбрано приложений: %1$d</string>
+    <string name="phone_notification_delay_apps_loading">Загружаю установленные приложения…</string>
+    <string name="phone_notification_delay_apps_required">Сначала выберите хотя бы одно приложение для отложенного показа.</string>
+    <string name="phone_notification_delay_wait_title">Максимальное время ожидания</string>
+    <string name="phone_notification_delay_wait_summary">Не более %1$d секунд</string>
+    <string name="phone_notification_delay_wait_prompt">Введите от 1 до 600 секунд. После этого уведомление перейдёт в стандартную очередь показа, даже если приложение всё ещё открыто.</string>
+    <string name="phone_notification_delay_wait_invalid">Введите значение от 1 до 600.</string>
+    <string name="phone_notification_delay_access_title">Нужен доступ к открытому приложению</string>
+    <string name="phone_notification_delay_access_message">Чтобы удерживать уведомления за полноэкранными камерами, Natro должен знать, какое приложение открыто. Включите службу специальных возможностей Natro (рекомендуется для нескольких экранов) или доступ к статистике использования.</string>
+    <string name="phone_notification_delay_access_accessibility">Спец. возможности</string>
+    <string name="phone_notification_delay_access_usage">Статистика использования</string>
+    <string name="phone_notification_delay_access_unavailable">Этот экран настроек недоступен на магнитоле.</string>
 
     <string name="phone_section_sprut">Присутствие в Sprut.hub</string>
     <string name="phone_sprut_enable_title">Передавать присутствие iPhone</string>
@@ -433,12 +457,12 @@
     <string name="phone_notification_settings">Настройки уведомлений Android</string>
     <string name="phone_test_enable_first">Сначала включите коннектор iPhone.</string>
     <string name="phone_test_choose_source">Перед проверкой ANCS включите уведомления или сообщения.</string>
-    <string name="phone_test_service_unavailable">Запустите службу Status Widget и повторите проверку.</string>
+    <string name="phone_test_service_unavailable">Запустите службу Natro и повторите проверку.</string>
     <string name="phone_test_pairing_required_title">Нужно штатное сопряжение Bluetooth</string>
     <string name="phone_test_bluetooth_required">Включите Bluetooth и сначала сопрягите iPhone в штатных настройках Bluetooth магнитолы.</string>
     <string name="phone_test_pairing_required">Выбранный iPhone сейчас не сопряжён. Эта проверка не заменяет штатное сопряжение Bluetooth.</string>
     <string name="phone_test_started_title">Проверка штатного подключения и ANCS</string>
-    <string name="phone_test_started">Штатной службе ECARX отправлен запрос сохранить подключение уже сопряжённого iPhone. Status Widget v2 завершает точного текущего BLE-владельца и запускает свежее поколение выбранного режима; скрытый GATT-кэш не обновляется, Bluetooth не перезапускается, пара не удаляется. Оставьте Helper запущенным, а iPhone разблокированным до завершения авторизации и подписок ANCS. Если iOS отклоняет ANCS, проверьте «Показывать уведомления» у магнитолы в настройках Bluetooth iPhone.</string>
+    <string name="phone_test_started">Штатной службе ECARX отправлен запрос сохранить подключение уже сопряжённого iPhone. Natro завершает точного текущего BLE-владельца и запускает свежее поколение выбранного режима; скрытый GATT-кэш не обновляется, Bluetooth не перезапускается, пара не удаляется. Оставьте Helper запущенным, а iPhone разблокированным до завершения авторизации и подписок ANCS. Если iOS отклоняет ANCS, проверьте «Показывать уведомления» у магнитолы в настройках Bluetooth iPhone.</string>
     <string name="phone_privacy_hint">Данные ANCS и MAP с подтверждённым устройством принимаются только от выбранного iPhone; Android Notification Access и доступ к общему хранилищу SMS не требуются. Точный Bluetooth-адрес хранится только на этой магнитоле и показывается здесь в маскированном виде.</string>
     <string name="phone_apply">Применить настройки телефона</string>
     <string name="phone_saved">Настройки телефона применены</string>

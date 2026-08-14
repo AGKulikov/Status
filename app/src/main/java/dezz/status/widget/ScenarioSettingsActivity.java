@@ -69,6 +69,7 @@ import dezz.status.widget.scenario.Operator;
 import dezz.status.widget.scenario.Scenario;
 import dezz.status.widget.scenario.TargetScope;
 import dezz.status.widget.scenario.ValueReference;
+import dezz.status.widget.driver.DriverPanelStylePolicy;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.VectorIconPickerDialog;
 import dezz.status.widget.launcher.LauncherShortcutStore;
@@ -114,20 +115,26 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             "актуально", "устарело", "всегда"
     };
     private static final String[] TARGET_VALUES = {
-            "MAIN", "POPUP", "BUILTIN", "OVERLAY", "DRIVER", "HUD"
+            "MAIN", "POPUP", "BUILTIN", "OVERLAY", "LAUNCHER", "DRIVER", "HUD"
     };
     private static final String[] TARGET_LABELS = {
             "Элемент основной строки", "Плитка плавающего оверлея",
-            "Штатный элемент", "Весь плавающий оверлей", "Кнопка панели водителя",
+            "Штатный элемент", "Весь плавающий оверлей", "Кнопка HOME",
+            "Панель / кнопка водителя",
             "Элемент отдельного HUD-дисплея"
     };
     private static final String[] FIELD_VALUES = {
-            "VISIBLE", "TEXT", "TEXT_COLOR", "BACKGROUND_COLOR", "ICON", "ACTION_ENABLED"
+            "VISIBLE", "TEXT", "TEXT_COLOR", "BACKGROUND_COLOR", "ICON", "ACTION_ENABLED",
+            "BORDER_COLOR", "BORDER_WIDTH", "ICON_TINT", "ICON_BACKGROUND_COLOR",
+            "ICON_OUTLINE_COLOR", "ICON_OUTLINE_WIDTH"
     };
     private static final String[] FIELD_LABELS = {
             "Показать или скрыть", "Задать отображаемый текст", "Изменить цвет текста",
             "Изменить цвет фона",
-            "Изменить иконку", "Разрешить или запретить нажатие"
+            "Изменить иконку", "Разрешить или запретить нажатие",
+            "Изменить цвет границы", "Изменить толщину границы",
+            "Изменить оттенок иконки", "Изменить фон иконки",
+            "Изменить цвет контура иконки", "Изменить толщину контура иконки"
     };
     private static final String[] BOOLEAN_BRANCH_LABELS = {
             "Не переопределять (обычное состояние)",
@@ -792,9 +799,19 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 throw new IllegalArgumentException("Видимость настраивается для всего "
                         + "плавающего оверлея. Выберите «Весь плавающий оверлей»");
             }
-            if (targetScope == TargetScope.DRIVER && !isBooleanField(field)) {
-                throw new IllegalArgumentException("Для панели водителя доступны только "
-                        + "показ/скрытие и разрешение/запрет нажатия");
+            if (targetScope == TargetScope.DRIVER
+                    && !isDriverFieldSupported(selectedTargetId, field)) {
+                throw new IllegalArgumentException("Выбранное оформление не поддерживается "
+                        + "этой целью панели водителя");
+            }
+            if (targetScope == TargetScope.LAUNCHER && !isLauncherFieldSupported(field)) {
+                throw new IllegalArgumentException("Для кнопки HOME доступны только цвет "
+                        + "иконки, фон и контур");
+            }
+            if (targetScope != TargetScope.DRIVER && targetScope != TargetScope.LAUNCHER
+                    && isShortcutSurfaceStyleField(field)) {
+                throw new IllegalArgumentException("Это оформление доступно только для кнопок "
+                        + "HOME и панели водителя");
             }
             List<LocalAction> trueActions = branchActions(false, targetScope,
                     selectedTargetId, field);
@@ -840,7 +857,8 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 field = LocalField.VISIBLE;
             }
             boolean bool = isBooleanField(field);
-            boolean directText = field == LocalField.TEXT;
+            boolean directText = field == LocalField.TEXT || isWidthField(field);
+            boolean width = isWidthField(field);
             trueStyleEnabled.setText(directText
                     ? "Если условие выполняется — задать текст"
                     : "Если условие выполняется — изменить оформление");
@@ -851,8 +869,13 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             falseBooleanChoice.setVisibility(bool ? View.VISIBLE : View.GONE);
             trueStyleEnabled.setVisibility(bool ? View.GONE : View.VISIBLE);
             falseStyleEnabled.setVisibility(bool ? View.GONE : View.VISIBLE);
-            stringValue.setHint("Текст при выполненном условии");
-            falseStringValue.setHint("Текст при невыполненном условии");
+            stringValue.setHint(width ? "Толщина 0–64 px" : "Текст при выполненном условии");
+            falseStringValue.setHint(width ? "Толщина 0–64 px"
+                    : "Текст при невыполненном условии");
+            int valueInputType = width ? InputType.TYPE_CLASS_NUMBER
+                    : InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
+            stringValue.setInputType(valueInputType);
+            falseStringValue.setInputType(valueInputType);
             stringValue.setVisibility(directText ? View.VISIBLE : View.GONE);
             falseStringValue.setVisibility(directText ? View.VISIBLE : View.GONE);
             chooseStyleValue.setVisibility(!bool && !directText ? View.VISIBLE : View.GONE);
@@ -886,18 +909,35 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             targetSummary.setText("Выберите плавающий оверлей целиком");
         }
 
-        /** Driver-panel scenarios intentionally expose only the two runtime-supported gates. */
+        /** Keeps HOME/driver fields target-specific; all other scopes preserve their editor. */
         private void keepDriverActionSupported() {
-            if (!TargetScope.DRIVER.jsonName().equals(
-                    mappedValue(target, TARGET_VALUES))) return;
             LocalField field;
             try {
                 field = LocalField.fromJsonName(mappedValue(localField, FIELD_VALUES));
             } catch (RuntimeException ignored) {
                 field = LocalField.VISIBLE;
             }
-            if (isBooleanField(field)) return;
-            selectSpinnerValue(localField, FIELD_VALUES, LocalField.VISIBLE.jsonName());
+            String selectedScope = mappedValue(target, TARGET_VALUES);
+            if (TargetScope.LAUNCHER.jsonName().equals(selectedScope)) {
+                if (!isLauncherFieldSupported(field)) {
+                    selectSpinnerValue(localField, FIELD_VALUES,
+                            LocalField.ICON_TINT.jsonName());
+                }
+                return;
+            }
+            if (!TargetScope.DRIVER.jsonName().equals(selectedScope)) {
+                if (isShortcutSurfaceStyleField(field)) {
+                    selectSpinnerValue(localField, FIELD_VALUES,
+                            LocalField.VISIBLE.jsonName());
+                }
+                return;
+            }
+            String selectedTargetId = text(targetId);
+            if (isDriverFieldSupported(selectedTargetId, field)) return;
+            selectSpinnerValue(localField, FIELD_VALUES,
+                    DriverPanelStylePolicy.PANEL_TARGET_ID.equals(selectedTargetId)
+                            ? LocalField.BACKGROUND_COLOR.jsonName()
+                            : LocalField.VISIBLE.jsonName());
         }
 
         private void showSourcePicker() {
@@ -940,6 +980,7 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             String[] labels = {
                     "Диапазон времени",
                     "Пассажир присутствует",
+                    "HWGPS · маршрут потерян",
                     "Элемент другой автоматизации отображается"
             };
             new AlertDialog.Builder(ScenarioSettingsActivity.this)
@@ -954,6 +995,11 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                                         "Автомобиль · пассажир присутствует");
                                 break;
                             case 2:
+                                applySystemSource(
+                                        SystemConditionResolver.HWGPS_ROUTE_LOST_RESOURCE,
+                                        "HWGPS · маршрут потерян");
+                                break;
+                            case 3:
                                 showVisibleAutomationScopePicker();
                                 break;
                             default:
@@ -1472,6 +1518,8 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                     .setItems(labels, (dialog, which) -> {
                         targetId.setText(options.get(which).id);
                         targetSummary.setText(options.get(which).label);
+                        keepDriverActionSupported();
+                        updateValueControl();
                     })
                     .setNegativeButton("Отмена", null)
                     .show();
@@ -1509,7 +1557,18 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                             overlay.name + " — весь оверлей [" + overlay.id + "]"));
                 }
                 break;
+            case LAUNCHER:
+                for (LauncherShortcutStore.Shortcut shortcut :
+                        new LauncherShortcutStore(prefs).all()) {
+                    if (shortcut.kind == LauncherShortcutStore.Kind.INFO
+                            || shortcut.kind == LauncherShortcutStore.Kind.DIVIDER) continue;
+                    result.add(new TargetOption(shortcut.id,
+                            "HOME · " + shortcut.title + " [" + shortcut.id + "]"));
+                }
+                break;
             case DRIVER:
+                result.add(new TargetOption(DriverPanelStylePolicy.PANEL_TARGET_ID,
+                        "Панель водителя · фон и граница"));
                 addDriverTargets(result, prefs.activeDriverPanelProfile(),
                         "Панель водителя");
                 for (dezz.status.widget.driver.DriverFavoritesPanelConfig panel :
@@ -1849,6 +1908,35 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
 
     private static boolean isBooleanField(LocalField field) {
         return field == LocalField.VISIBLE || field == LocalField.ACTION_ENABLED;
+    }
+
+    private static boolean isWidthField(LocalField field) {
+        return field == LocalField.BORDER_WIDTH || field == LocalField.ICON_OUTLINE_WIDTH;
+    }
+
+    private static boolean isDriverFieldSupported(@Nullable String targetId, LocalField field) {
+        if (DriverPanelStylePolicy.PANEL_TARGET_ID.equals(targetId)) {
+            return field == LocalField.BACKGROUND_COLOR || field == LocalField.BORDER_COLOR
+                    || field == LocalField.BORDER_WIDTH;
+        }
+        return isBooleanField(field) || field == LocalField.ICON_TINT
+                || field == LocalField.ICON_BACKGROUND_COLOR
+                || field == LocalField.ICON_OUTLINE_COLOR
+                || field == LocalField.ICON_OUTLINE_WIDTH;
+    }
+
+    private static boolean isLauncherFieldSupported(LocalField field) {
+        return field == LocalField.ICON_TINT || field == LocalField.ICON_BACKGROUND_COLOR
+                || field == LocalField.ICON_OUTLINE_COLOR
+                || field == LocalField.ICON_OUTLINE_WIDTH;
+    }
+
+    private static boolean isShortcutSurfaceStyleField(LocalField field) {
+        return field == LocalField.BORDER_COLOR || field == LocalField.BORDER_WIDTH
+                || field == LocalField.ICON_TINT
+                || field == LocalField.ICON_BACKGROUND_COLOR
+                || field == LocalField.ICON_OUTLINE_COLOR
+                || field == LocalField.ICON_OUTLINE_WIDTH;
     }
 
     private static String entryTitle(Entry entry, int index) {

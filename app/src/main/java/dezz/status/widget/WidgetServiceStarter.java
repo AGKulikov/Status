@@ -10,6 +10,9 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 /** Idempotent bootstrap shared by HOME, boot and package-update recovery paths. */
 public final class WidgetServiceStarter {
     private static final String TAG = "WidgetServiceStarter";
@@ -21,6 +24,8 @@ public final class WidgetServiceStarter {
     static final String EXTRA_RETRY_ATTEMPT = "retry_attempt";
     static final String EXTRA_VISUAL_SURFACE_ONLY = "visual_surface_only";
     private static final int RETRY_REQUEST_CODE = 0x5749;
+    private static final int MAX_LOCAL_SCENARIOS = 128;
+    private static final int MAX_LOCAL_SCENARIO_JSON_CHARS = 1_048_576;
 
     private WidgetServiceStarter() {}
 
@@ -155,7 +160,8 @@ public final class WidgetServiceStarter {
     }
 
     static boolean requiresIntegrationHost(@NonNull Preferences preferences) {
-        return requiresIntegrationHost(
+        return hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
+                || requiresIntegrationHost(
                 preferences.widgetEnabled.get(),
                 preferences.driverPanelEnabled.get(),
                 preferences.hudPanelEnabled.get(),
@@ -171,7 +177,8 @@ public final class WidgetServiceStarter {
     }
 
     static boolean requiresHeadlessHost(@NonNull Preferences preferences) {
-        return requiresHeadlessHost(
+        return hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
+                || requiresHeadlessHost(
                 preferences.driverPanelEnabled.get(),
                 preferences.hudPanelEnabled.get(),
                 preferences.phoneConnectorEnabled.get(),
@@ -181,7 +188,8 @@ public final class WidgetServiceStarter {
     }
 
     static boolean requiresAutomaticIntegrationHost(@NonNull Preferences preferences) {
-        return requiresAutomaticIntegrationHost(
+        return hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
+                || requiresAutomaticIntegrationHost(
                 preferences.widgetEnabled.get(),
                 preferences.driverPanelEnabled.get(),
                 preferences.hudPanelEnabled.get(),
@@ -193,7 +201,8 @@ public final class WidgetServiceStarter {
     }
 
     static boolean requiresAutomaticHeadlessHost(@NonNull Preferences preferences) {
-        return requiresAutomaticHeadlessHost(
+        return hasConfiguredLocalScenarios(preferences.localScenariosJson.get())
+                || requiresAutomaticHeadlessHost(
                 preferences.driverPanelEnabled.get(),
                 preferences.hudPanelEnabled.get(),
                 preferences.hudPanelAutostart.get(),
@@ -257,6 +266,27 @@ public final class WidgetServiceStarter {
                                         boolean haApiEnabled) {
         return driverPanelEnabled || hudPanelEnabled || phoneConnectorEnabled
                 || mqttEnabled || sprutEnabled || haApiEnabled;
+    }
+
+    /**
+     * Lightweight admission projection matching the scenario engine's outer bounds. Disabled or
+     * malformed configuration cannot keep a foreground host alive forever; individual enabled
+     * entries are validated in full only after the runtime is admitted.
+     */
+    static boolean hasConfiguredLocalScenarios(String raw) {
+        String json = raw == null ? "" : raw.trim();
+        if (json.isEmpty() || json.length() > MAX_LOCAL_SCENARIO_JSON_CHARS) return false;
+        try {
+            JSONArray scenarios = new JSONArray(json);
+            if (scenarios.length() > MAX_LOCAL_SCENARIOS) return false;
+            for (int index = 0; index < scenarios.length(); index++) {
+                JSONObject scenario = scenarios.optJSONObject(index);
+                if (scenario != null && scenario.optBoolean("enabled", true)) return true;
+            }
+        } catch (Exception invalid) {
+            // Invalid configuration is not a live consumer and must not pin the foreground host.
+        }
+        return false;
     }
 
     private static void scheduleRetry(@NonNull Context app, int retryAttempt,

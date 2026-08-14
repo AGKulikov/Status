@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 package dezz.status.widget.integration;
 
+import android.content.Context;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -27,6 +29,7 @@ import dezz.status.widget.scenario.ValueResolver;
  * <ul>
  *   <li>{@code time.range:HHmm-HHmm}</li>
  *   <li>{@code vehicle.passenger_present}</li>
+ *   <li>{@code hwgps.route_lost}</li>
  *   <li>{@code automation.visible:SCOPE:element_id}</li>
  * </ul>
  */
@@ -34,6 +37,7 @@ public final class SystemConditionResolver implements ValueResolver {
     public static final String CONNECTOR_TYPE = "SYSTEM";
     public static final String CONNECTOR_ID = "default";
     public static final String PASSENGER_RESOURCE = "vehicle.passenger_present";
+    public static final String HWGPS_ROUTE_LOST_RESOURCE = "hwgps.route_lost";
     public static final String TIME_RANGE_PREFIX = "time.range:";
     public static final String AUTOMATION_VISIBLE_PREFIX = "automation.visible:";
     public static final String PASSENGER_METRIC =
@@ -42,14 +46,24 @@ public final class SystemConditionResolver implements ValueResolver {
     private final AutomationStateStore states;
     private final PopupOverlayConfigStore overlays;
     @Nullable private final CarIntegration carIntegration;
+    @Nullable private final HwgpsIntegration.RouteStateSubscription hwgpsRouteState;
     private final Runnable changeListener;
     private final CarIntegration.TelemetryListener passengerListener;
 
     private boolean passengerSubscribed;
     private boolean passengerKnown;
     private boolean passengerPresent;
+    private boolean hwgpsSubscribed;
 
     public SystemConditionResolver(@NonNull Preferences prefs,
+                                   @NonNull AutomationStateStore states,
+                                   @Nullable CarIntegration carIntegration,
+                                   @NonNull Runnable changeListener) {
+        this(null, prefs, states, carIntegration, changeListener);
+    }
+
+    public SystemConditionResolver(@Nullable Context context,
+                                   @NonNull Preferences prefs,
                                    @NonNull AutomationStateStore states,
                                    @Nullable CarIntegration carIntegration,
                                    @NonNull Runnable changeListener) {
@@ -57,6 +71,9 @@ public final class SystemConditionResolver implements ValueResolver {
         this.overlays = new PopupOverlayConfigStore(prefs);
         this.carIntegration = carIntegration;
         this.changeListener = changeListener;
+        this.hwgpsRouteState = context == null ? null
+                : new HwgpsIntegration.RouteStateSubscription(context,
+                ignored -> this.changeListener.run());
         this.passengerListener = value -> {
             if (!PASSENGER_METRIC.equals(value.id)) return;
             boolean next = value.value > .5d;
@@ -68,27 +85,32 @@ public final class SystemConditionResolver implements ValueResolver {
     }
 
     public void configure(@NonNull List<Scenario> scenarios) {
-        boolean needed = false;
+        boolean passengerNeeded = false;
+        boolean hwgpsNeeded = false;
         for (Scenario scenario : scenarios) {
+            if (!scenario.enabled) continue;
             for (dezz.status.widget.scenario.Condition condition : scenario.conditions) {
                 ValueReference reference = condition.reference;
-                if (isSystem(reference)
-                        && PASSENGER_RESOURCE.equals(reference.resourceId)) {
-                    needed = true;
-                    break;
-                }
+                if (!isSystem(reference)) continue;
+                if (PASSENGER_RESOURCE.equals(reference.resourceId)) passengerNeeded = true;
+                if (HWGPS_ROUTE_LOST_RESOURCE.equals(reference.resourceId)) hwgpsNeeded = true;
             }
-            if (needed) break;
+            if (passengerNeeded && hwgpsNeeded) break;
         }
-        if (needed == passengerSubscribed || carIntegration == null) return;
-        passengerSubscribed = needed;
-        if (needed) {
-            carIntegration.subscribeTelemetry(
-                    Collections.singleton(PASSENGER_METRIC), passengerListener);
-        } else {
-            carIntegration.unsubscribeTelemetry(passengerListener);
-            passengerKnown = false;
-            passengerPresent = false;
+        if (passengerNeeded != passengerSubscribed && carIntegration != null) {
+            passengerSubscribed = passengerNeeded;
+            if (passengerNeeded) {
+                carIntegration.subscribeTelemetry(
+                        Collections.singleton(PASSENGER_METRIC), passengerListener);
+            } else {
+                carIntegration.unsubscribeTelemetry(passengerListener);
+                passengerKnown = false;
+                passengerPresent = false;
+            }
+        }
+        if (hwgpsNeeded != hwgpsSubscribed && hwgpsRouteState != null) {
+            hwgpsSubscribed = hwgpsNeeded;
+            if (hwgpsNeeded) hwgpsRouteState.start(); else hwgpsRouteState.stop();
         }
     }
 
@@ -98,6 +120,8 @@ public final class SystemConditionResolver implements ValueResolver {
         }
         passengerSubscribed = false;
         passengerKnown = false;
+        if (hwgpsRouteState != null) hwgpsRouteState.stop();
+        hwgpsSubscribed = false;
     }
 
     public static boolean isSystem(@Nullable ValueReference reference) {
@@ -115,6 +139,15 @@ public final class SystemConditionResolver implements ValueResolver {
             return passengerKnown
                     ? Input.value(passengerPresent, true, true)
                     : Input.unavailable();
+        }
+        if (HWGPS_ROUTE_LOST_RESOURCE.equals(resource)) {
+            if (hwgpsRouteState == null) return Input.unavailable();
+            switch (hwgpsRouteState.state()) {
+                case ROUTE_LOST: return Input.value(true, true, true);
+                case ROUTE_AVAILABLE: return Input.value(false, true, true);
+                case UNAVAILABLE:
+                default: return Input.unavailable();
+            }
         }
         if (resource.startsWith(TIME_RANGE_PREFIX)) {
             Boolean inside = inTimeRange(resource.substring(TIME_RANGE_PREFIX.length()),

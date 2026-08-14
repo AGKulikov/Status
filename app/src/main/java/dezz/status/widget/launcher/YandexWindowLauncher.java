@@ -13,6 +13,8 @@ import android.net.Uri;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import dezz.status.widget.StatusBarSurfaceContext;
+
 /** Starts the special floating-window entry points used by the head-unit Yandex builds. */
 public final class YandexWindowLauncher {
     public enum Product { MAPS, NAVIGATOR }
@@ -88,8 +90,10 @@ public final class YandexWindowLauncher {
             // The ECARX Yandex builds used by mSaver expose navi_win/<package>. Keep that proven
             // action first, then retry the same exported component without an action because a
             // few unified Maps versions reject the vendor action while accepting the component.
-            if (start(context, windowIntent(target, forceFullScreen, true))) return true;
-            if (start(context, windowIntent(target, forceFullScreen, false))) return true;
+            if (startYandexSurface(context,
+                    windowIntent(target, forceFullScreen, true), !forceFullScreen)) return true;
+            if (startYandexSurface(context,
+                    windowIntent(target, forceFullScreen, false), !forceFullScreen)) return true;
         }
 
         // Package launch intents are absent in a few head-unit builds, but trying every known
@@ -100,31 +104,37 @@ public final class YandexWindowLauncher {
             fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     .putExtra("ddnavwin", !forceFullScreen);
             if (forceFullScreen) fallback.putExtra("ddnavforcewinfull", true);
-            if (start(context, fallback)) return true;
+            if (startYandexSurface(context, fallback, !forceFullScreen)) return true;
         }
 
         Uri home = Uri.parse(product == Product.MAPS ? "yandexmaps://" : "yandexnavi://");
-        return launchDeepLink(context, product, home);
+        return launchDeepLink(context, product, home, !forceFullScreen);
     }
 
-    /** Delivers a destination to standalone Navigator, unified Maps, or Yango in that order. */
-    public static boolean launchDeepLink(@NonNull Context context, @NonNull Product product,
-                                         @NonNull Uri deepLink) {
+    /** Delivers a destination with an explicit full-screen/floating surface contract. */
+    public static boolean launchDeepLink(@NonNull Context context,
+                                         @NonNull Product product,
+                                         @NonNull Uri deepLink,
+                                         boolean windowed) {
         for (String packageName : packageCandidates(product)) {
-            Intent intent = deepLinkIntent(deepLink, packageName);
-            if (start(context, intent)) return true;
+            Intent intent = deepLinkIntent(deepLink, packageName, windowed);
+            if (startYandexSurface(context, intent, windowed)) return true;
         }
         // Regional builds can register the proprietary scheme under another package name.
-        return start(context, deepLinkIntent(deepLink, null));
+        return startYandexSurface(context,
+                deepLinkIntent(deepLink, null, windowed), windowed);
     }
 
     @NonNull
-    private static Intent deepLinkIntent(@NonNull Uri deepLink, @Nullable String packageName) {
+    private static Intent deepLinkIntent(@NonNull Uri deepLink,
+                                         @Nullable String packageName,
+                                         boolean windowed) {
         Intent intent = new Intent(Intent.ACTION_VIEW, deepLink)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
                         | Intent.FLAG_ACTIVITY_CLEAR_TOP
                         | Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                .putExtra("ddnavwin", true);
+                .putExtra("ddnavwin", windowed);
+        if (!windowed) intent.putExtra("ddnavforcewinfull", true);
         if (packageName != null) intent.setPackage(packageName);
         return intent;
     }
@@ -143,6 +153,16 @@ public final class YandexWindowLauncher {
         } catch (RuntimeException ignored) {
             return false;
         }
+    }
+
+    private static boolean startYandexSurface(@NonNull Context context,
+                                              @NonNull Intent intent,
+                                              boolean windowed) {
+        if (!start(context, intent)) return false;
+        // startActivity only confirms handoff; the accessibility event later confirms the exact
+        // class. Publishing now prevents one visible frame with stale per-element rules.
+        StatusBarSurfaceContext.setNavigatorWindowForeground(windowed);
+        return true;
     }
 
     @NonNull

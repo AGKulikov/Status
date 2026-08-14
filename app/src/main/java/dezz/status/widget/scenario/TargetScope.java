@@ -9,6 +9,7 @@ public enum TargetScope {
     POPUP,
     BUILTIN,
     OVERLAY,
+    LAUNCHER,
     DRIVER,
     HUD;
 

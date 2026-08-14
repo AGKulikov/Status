@@ -798,7 +798,7 @@ public final class ClimatePanelOverlayController {
             }
             result.x = 0;
             result.y = 0;
-            result.setTitle("Status Widget climate system dock");
+            result.setTitle("Natro climate system dock");
         } else if (edge == ClimateReservationWindowPolicy.EDGE_BOTTOM) {
             result.x = 0;
             result.y = Math.max(0, display.y - extent);
@@ -826,7 +826,7 @@ public final class ClimatePanelOverlayController {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, flags,
                 PixelFormat.TRANSLUCENT);
         result.gravity = Gravity.TOP | Gravity.LEFT;
-        result.setTitle(overscan ? "Status Widget climate dock" : "Status Widget climate overlay");
+        result.setTitle(overscan ? "Natro climate dock" : "Natro climate overlay");
         return result;
     }
 

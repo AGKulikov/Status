@@ -36,6 +36,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -51,18 +52,23 @@ import java.util.Locale;
 import java.util.Set;
 
 import dezz.status.widget.databinding.ActivityAppSelectionBinding;
+import dezz.status.widget.ha.HaBrickConfig;
+import dezz.status.widget.ha.HaBrickConfigStore;
 
 public class AppSelectionActivity extends AppCompatActivity {
     private static final String TAG = "AppSelectionActivity";
 
     /** SharedPreferences key (StringSet) of the brick-specific or global hide list to edit. */
     public static final String EXTRA_PREF_KEY = "prefKey";
+    /** Optional id of one custom MAIN/status-row element whose JSON hide list is edited. */
+    public static final String EXTRA_MAIN_BRICK_ID = "mainBrickId";
     /** Optional pre-formatted toolbar title. */
     public static final String EXTRA_TITLE = "title";
 
     private ActivityAppSelectionBinding binding;
     private Preferences prefs;
-    private Preferences.StringSet target;
+    @Nullable private String mainBrickId;
+    @Nullable private Preferences.StringSet target;
     private Set<String> selected = new HashSet<>();
     private final List<AppEntry> apps = new ArrayList<>();
     private AppAdapter adapter;
@@ -92,18 +98,25 @@ public class AppSelectionActivity extends AppCompatActivity {
 
             prefs = new Preferences(this);
             String prefKey = getIntent().getStringExtra(EXTRA_PREF_KEY);
+            mainBrickId = getIntent().getStringExtra(EXTRA_MAIN_BRICK_ID);
+            if (prefKey != null && mainBrickId != null) {
+                throw new IllegalArgumentException("Specify one hide-list owner");
+            }
             if (prefKey != null && !prefs.isHideListKey(prefKey)) {
                 throw new IllegalArgumentException("Недопустимый список приложений: " + prefKey);
             }
-            target = (prefKey != null)
-                    ? new Preferences.StringSet(prefs, prefKey)
-                    : prefs.hideInPackages;
+            if (mainBrickId == null) {
+                target = prefKey != null
+                        ? new Preferences.StringSet(prefs, prefKey) : prefs.hideInPackages;
+                selected = target.get();
+            } else {
+                target = null;
+                selected = loadMainBrickTargets(mainBrickId);
+            }
             String customTitle = getIntent().getStringExtra(EXTRA_TITLE);
             if (customTitle != null && !customTitle.isEmpty()) {
                 binding.titleText.setText(customTitle);
             }
-            selected = target.get();
-
             adapter = new AppAdapter();
             binding.appList.setLayoutManager(new LinearLayoutManager(this));
             binding.appList.setAdapter(adapter);
@@ -156,11 +169,39 @@ public class AppSelectionActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        if (target != null) {
+        if (prefs == null) return;
+        if (mainBrickId != null) {
+            saveMainBrickTargets(mainBrickId, selected);
+        } else if (target != null) {
             target.set(selected);
-            if (WidgetService.isRunning()) {
-                WidgetService.getInstance().applyPreferences();
+        }
+        if (WidgetService.isRunning()) {
+            WidgetService.getInstance().applyPreferences();
+        }
+    }
+
+    @NonNull
+    private Set<String> loadMainBrickTargets(@NonNull String brickId) {
+        for (HaBrickConfig config : new HaBrickConfigStore(prefs).loadMain()) {
+            if (brickId.equals(config.id)) return new HashSet<>(config.hideInPackages);
+        }
+        throw new IllegalArgumentException("Элемент строки не найден: " + brickId);
+    }
+
+    private void saveMainBrickTargets(@NonNull String brickId,
+                                      @NonNull Set<String> targets) {
+        HaBrickConfigStore store = new HaBrickConfigStore(prefs);
+        List<HaBrickConfig> configs = store.loadMain();
+        for (HaBrickConfig config : configs) {
+            if (!brickId.equals(config.id)) continue;
+            config.hideInPackages.clear();
+            config.hideInPackages.addAll(targets);
+            try {
+                store.saveMain(configs);
+            } catch (Exception error) {
+                Log.e(TAG, "Could not save MAIN element hide targets", error);
             }
+            return;
         }
     }
 
@@ -185,9 +226,11 @@ public class AppSelectionActivity extends AppCompatActivity {
             // in the list above — query them separately.
             List<ResolveInfo> homeApps = safeQueryIntentActivities(pm, Intent.CATEGORY_HOME);
 
-            List<AppEntry> result = new ArrayList<>(launchableApps.size() + homeApps.size());
+            List<AppEntry> result = new ArrayList<>(launchableApps.size() + homeApps.size() + 2);
             String selfPackage = getPackageName();
             HashSet<String> seen = new HashSet<>();
+            addLauncherHomeEntry(pm, seen, result);
+            addNavigatorWindowEntry(seen, result);
             collectEntries(pm, launchableApps, selfPackage, seen, result);
             collectEntries(pm, homeApps, selfPackage, seen, result);
 
@@ -199,6 +242,33 @@ public class AppSelectionActivity extends AppCompatActivity {
                 Log.w(TAG, "Failed to sort app list", t);
             }
             return result;
+        }
+
+        /**
+         * The package picker deliberately excludes our settings package. Add only the actual
+         * HOME surface back as a synthetic target, so choosing it cannot hide elements while the
+         * user is editing those same settings.
+         */
+        private void addLauncherHomeEntry(PackageManager pm, HashSet<String> seen,
+                                          List<AppEntry> result) {
+            if (!seen.add(StatusBarSurfaceContext.LAUNCHER_HOME)) return;
+            Drawable icon = null;
+            try {
+                icon = getApplicationInfo().loadIcon(pm);
+            } catch (RuntimeException error) {
+                Log.w(TAG, "Could not load HOME icon", error);
+            }
+            result.add(new AppEntry(StatusBarSurfaceContext.LAUNCHER_HOME,
+                    getString(R.string.app_selection_launcher_home), icon));
+        }
+
+        /** Adds the floating ECARX surface separately from the normal Yandex package entry. */
+        private void addNavigatorWindowEntry(HashSet<String> seen, List<AppEntry> result) {
+            if (!seen.add(StatusBarSurfaceContext.NAVIGATOR_WINDOW)) return;
+            Drawable icon = ContextCompat.getDrawable(
+                    AppSelectionActivity.this, R.drawable.ic_launcher_navigation);
+            result.add(new AppEntry(StatusBarSurfaceContext.NAVIGATOR_WINDOW,
+                    getString(R.string.app_selection_navigator_window), icon));
         }
 
         private List<ResolveInfo> safeQueryIntentActivities(PackageManager pm, String category) {

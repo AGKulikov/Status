@@ -57,12 +57,14 @@ public final class MediaPanelConfigTest {
         config.backgroundAlpha = 999;
         config.spacingPx = -4;
         config.contentPaddingPx = 1000;
+        config.artworkCornerRadiusPx = 900;
         config.titleColor = "invalid";
         config.setScale(MediaPanelConfig.PLAY_PAUSE, 5);
         config.normalize();
         assertEquals(255, config.backgroundAlpha);
         assertEquals(0, config.spacingPx);
         assertEquals(64, config.contentPaddingPx);
+        assertEquals(128, config.artworkCornerRadiusPx);
         assertEquals("#FFFFFF", config.titleColor);
         assertEquals(45, config.element(MediaPanelConfig.PLAY_PAUSE).scalePercent);
     }

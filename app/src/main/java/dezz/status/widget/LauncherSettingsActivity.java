@@ -38,7 +38,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import dezz.status.widget.launcher.LauncherAppCatalog;
-import dezz.status.widget.launcher.EcarxSystemStatusBarPolicy;
 import dezz.status.widget.launcher.MediaPlaybackHistoryStore;
 import dezz.status.widget.launcher.MediaPlaybackTargetPolicy;
 import dezz.status.widget.settings.AppleColorPickerDialog;
@@ -62,7 +61,6 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
     private MaterialButton applicationVisibilityButton;
     private MaterialButton fixedPlayerButton;
     private MaterialSwitch fixedPlayerSwitch;
-    private boolean bindingSystemStatusBar;
     @NonNull private List<LauncherAppCatalog.App> installedApplications =
             Collections.emptyList();
     private final ExecutorService appLoader = Executors.newSingleThreadExecutor(runnable -> {
@@ -117,31 +115,16 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         addButton("Выбрать домашний экран по умолчанию", view -> chooseDefaultHome());
 
         addSwitch("Полноэкранный режим", preferences.launcherImmersive);
-        MaterialSwitch systemStatusBarSwitch = addSwitch(
-                "Скрывать системные часы и Bluetooth во всех приложениях",
-                preferences.launcherHideSystemStatusBar.get(),
-                checked -> {
-                    // Replaced below so the concrete switch can be disabled while applying.
-                });
-        systemStatusBarSwitch.setOnCheckedChangeListener((button, checked) -> {
-            if (bindingSystemStatusBar) return;
-            systemStatusBarSwitch.setEnabled(false);
-            EcarxSystemStatusBarPolicy.apply(this, checked, (success, message) -> {
-                systemStatusBarSwitch.setEnabled(true);
-                if (!success) {
-                    bindingSystemStatusBar = true;
-                    systemStatusBarSwitch.setChecked(!checked);
-                    bindingSystemStatusBar = false;
-                    message = "Не удалось изменить SystemUI: " + message;
-                }
-                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
-            });
-        });
-        addHint("Это отключает настоящую системную панель Android через policy_control; "
-                + "поверх приложений ничего не маскируется.");
+        addSwitch("Скрывать часы и Bluetooth нашей строки только на HOME",
+                preferences.launcherHideSystemStatusBar);
+        addHint("Скрываются только два выбранных элемента Natro. Сама строка, остальные "
+                + "элементы и системная панель Android остаются на месте.");
         addSwitch("Показывать сетку в режиме компоновки", preferences.launcherShowGrid);
         addSwitch("HOME → наш лаунчер → оконный Навигатор",
                 preferences.launcherHomeOpensWindowedNavigator);
+        addHint("Оконный Навигатор создаёт ECARX внутри чужого процесса Яндекса. Natro "
+                + "не владеет его Window/Surface, поэтому радиус углов задаётся самой прошивкой, "
+                + "а не настройкой лаунчера.");
         addIntControl("Шаг привязки", 1, 100,
                 clamp(preferences.launcherSnapPx.get(), 1, 100), " px",
                 preferences.launcherSnapPx::set);
@@ -224,7 +207,7 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         } catch (RuntimeException ignored) {
         }
         homeStatus.setText(getPackageName().equals(selected)
-                ? "Сейчас Status Widget выбран как HOME."
+                ? "Сейчас Natro выбран как HOME."
                 : "Сейчас используется другой HOME. Можно сначала открыть предпросмотр.");
     }
 

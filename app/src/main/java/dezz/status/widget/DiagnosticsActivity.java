@@ -372,7 +372,7 @@ public final class DiagnosticsActivity extends AppCompatActivity {
             if (value.length() > 0) value.append('\n');
             value.append("adb shell ").append(command);
         }
-        manager.setPrimaryClip(ClipData.newPlainText("Status Widget ADB grants", value));
+        manager.setPrimaryClip(ClipData.newPlainText("Natro ADB grants", value));
         Toast.makeText(this, "Четыре одноразовые ADB-команды скопированы",
                 Toast.LENGTH_SHORT).show();
     }
@@ -450,7 +450,7 @@ public final class DiagnosticsActivity extends AppCompatActivity {
                 (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (manager == null) return;
         manager.setPrimaryClip(ClipData.newPlainText(
-                "Status Widget diagnostics", journal.getText()));
+                "Natro diagnostics", journal.getText()));
         Toast.makeText(this, "Журнал скопирован", Toast.LENGTH_SHORT).show();
     }
 

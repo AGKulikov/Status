@@ -14,6 +14,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.AudioManager;
 import android.media.MediaMetadata;
+import android.media.Rating;
 import android.media.session.MediaController;
 import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
@@ -79,12 +80,17 @@ public final class LauncherMediaController {
         public final long positionMs;
         public final boolean playing;
         public final boolean available;
+        /** True when the represented player exposes MediaSession rating or a notification action. */
+        public final boolean likeAvailable;
+        /** Nullable because many notification actions expose no selected-state signal. */
+        @Nullable public final Boolean liked;
         /** Current STREAM_MUSIC volume, from 0 to 100. */
         public final int volumePercent;
 
         Snapshot(@NonNull String title, @NonNull String artist, @NonNull String album,
                  @NonNull String application, @Nullable Bitmap artwork, long durationMs,
-                 long positionMs, boolean playing, boolean available, int volumePercent) {
+                 long positionMs, boolean playing, boolean available, boolean likeAvailable,
+                 @Nullable Boolean liked, int volumePercent) {
             this.title = title;
             this.artist = artist;
             this.album = album;
@@ -94,12 +100,14 @@ public final class LauncherMediaController {
             this.positionMs = MediaTimeline.clampPosition(positionMs, this.durationMs);
             this.playing = playing;
             this.available = available;
+            this.likeAvailable = likeAvailable;
+            this.liked = liked;
             this.volumePercent = Math.max(0, Math.min(100, volumePercent));
         }
 
         static Snapshot empty(int volumePercent) {
             return new Snapshot("Музыка не воспроизводится", "", "", "", null,
-                    0L, 0L, false, false, volumePercent);
+                    0L, 0L, false, false, false, null, volumePercent);
         }
     }
 
@@ -115,6 +123,8 @@ public final class LauncherMediaController {
         final long durationMs;
         final long positionMs;
         final boolean playing;
+        final boolean likeAvailable;
+        @Nullable final Boolean liked;
         final long positionTimestampWallMs;
         final long receivedElapsedMs;
         final long contentChangedElapsedMs;
@@ -140,6 +150,19 @@ public final class LauncherMediaController {
                    long positionTimestampWallMs, long receivedElapsedMs,
                    long contentChangedElapsedMs, long playbackChangedElapsedMs,
                    long artworkChangedElapsedMs) {
+            this(title, artist, album, packageName, application, artwork,
+                    observedArtworkIdentity, durationMs, positionMs, playing, false, null,
+                    positionTimestampWallMs, receivedElapsedMs, contentChangedElapsedMs,
+                    playbackChangedElapsedMs, artworkChangedElapsedMs);
+        }
+
+        MediaState(@NonNull String title, @NonNull String artist, @NonNull String album,
+                   @NonNull String packageName, @NonNull String application,
+                   @Nullable Bitmap artwork, long observedArtworkIdentity,
+                   long durationMs, long positionMs, boolean playing, boolean likeAvailable,
+                   @Nullable Boolean liked, long positionTimestampWallMs, long receivedElapsedMs,
+                   long contentChangedElapsedMs, long playbackChangedElapsedMs,
+                   long artworkChangedElapsedMs) {
             this.title = title;
             this.artist = artist;
             this.album = album;
@@ -150,6 +173,8 @@ public final class LauncherMediaController {
             this.durationMs = Math.max(0L, durationMs);
             this.positionMs = Math.max(0L, positionMs);
             this.playing = playing;
+            this.likeAvailable = likeAvailable;
+            this.liked = liked;
             this.positionTimestampWallMs = positionTimestampWallMs;
             this.receivedElapsedMs = receivedElapsedMs;
             this.contentChangedElapsedMs = contentChangedElapsedMs;
@@ -197,6 +222,9 @@ public final class LauncherMediaController {
     @NonNull private String visiblePackage = "";
     @NonNull private String visibleTitle = "";
     @NonNull private String visibleArtist = "";
+    @NonNull private String pendingLikePackage = "";
+    @Nullable private Boolean pendingLikeTarget;
+    private long pendingLikeStartedElapsed;
 
     private final Runnable ticker = new Runnable() {
         @Override public void run() {
@@ -228,6 +256,13 @@ public final class LauncherMediaController {
             refresh();
         }
     };
+
+    private final MediaNotificationListener.MediaLikeObserver mediaLikeObserver = () ->
+            mainHandler.post(() -> {
+                if (!started) return;
+                if (current != null) publishSession();
+                else publish();
+            });
 
     private final Runnable pendingSeekDispatch = () -> {
         seekDispatchScheduled = false;
@@ -309,6 +344,7 @@ public final class LauncherMediaController {
     public void start() {
         if (started) return;
         started = true;
+        MediaNotificationListener.addMediaLikeObserver(mediaLikeObserver);
         registerBroadcastReceiver();
         loadCachedBroadcast();
         registerSessionsListener();
@@ -319,6 +355,7 @@ public final class LauncherMediaController {
     public void stop() {
         if (!started) return;
         started = false;
+        MediaNotificationListener.removeMediaLikeObserver(mediaLikeObserver);
         mainHandler.removeCallbacks(ticker);
         mainHandler.removeCallbacks(commandReconcile);
         mainHandler.removeCallbacks(broadcastExpiry);
@@ -378,6 +415,104 @@ public final class LauncherMediaController {
         if (target.isEmpty()) return;
         MediaResumeCommand.next(context, target);
         scheduleCommandReconcile();
+    }
+
+    /**
+     * mSaver-compatible Like: heart rating on the represented MediaSession first, then the
+     * captured Like action from that player's live media notification. No mSaver-private
+     * broadcast is emitted.
+     */
+    public boolean like() {
+        String targetPackage = seekTargetPackage();
+        for (MediaController controller : resolveSeekControllers(true)) {
+            boolean matches = !targetPackage.isEmpty()
+                    ? samePackage(targetPackage, controllerPackage(controller))
+                    : controllerMatchesVisibleTrack(controller) || sameSession(current, controller);
+            if (!matches) continue;
+            try {
+                PlaybackState playback = controller.getPlaybackState();
+                if (playback == null
+                        || (playback.getActions() & PlaybackState.ACTION_SET_RATING) == 0L) {
+                    continue;
+                }
+                String commandPackage = controllerPackage(controller);
+                if (commandPackage.isEmpty()) commandPackage = targetPackage;
+                Boolean pendingTarget = pendingLikeFor(commandPackage);
+                MediaMetadata metadata = controller.getMetadata();
+                Rating rating = metadata == null ? null
+                        : metadata.getRating(MediaMetadata.METADATA_KEY_RATING);
+                Rating userRating = metadata == null ? null
+                        : metadata.getRating(MediaMetadata.METADATA_KEY_USER_RATING);
+                // Toggle the same authoritative state that HOME renders. In particular, when a
+                // player publishes contradictory RATING and USER_RATING values, USER_RATING wins
+                // for both the filled heart and the next command, so a visible Like always turns
+                // into an Unlike on the next tap.
+                Boolean displayedHeart = MediaLikeActionPolicy.displayHeart(
+                        heartValue(rating), heartValue(userRating));
+                if (displayedHeart == null) {
+                    MediaNotificationListener.MediaNotificationLikeSnapshot notificationState =
+                            MediaNotificationListener.latestMediaNotificationLike(commandPackage);
+                    if (notificationState != null) displayedHeart = notificationState.active;
+                }
+                boolean target = MediaLikeActionPolicy.nextHeartTarget(
+                        displayedHeart, pendingTarget);
+                controller.getTransportControls().setRating(Rating.newHeartRating(target));
+                setPendingLike(commandPackage, target);
+                publish();
+                recordLike("media_session", commandPackage);
+                scheduleCommandReconcile();
+                return true;
+            } catch (RuntimeException ignored) {
+            }
+        }
+        MediaNotificationListener.MediaNotificationLikeSnapshot notificationLike =
+                MediaNotificationListener.latestMediaNotificationLike(targetPackage);
+        if (notificationLike != null) {
+            String commandPackage = notificationLike.packageName.isEmpty()
+                    ? targetPackage : notificationLike.packageName;
+            Boolean authoritative = notificationLike.active;
+            boolean target = MediaLikeActionPolicy.nextHeartTarget(
+                    authoritative, pendingLikeFor(commandPackage));
+            if (!MediaNotificationListener.sendMediaNotificationLike(commandPackage)) {
+                recordLike("unavailable", commandPackage);
+                return false;
+            }
+            setPendingLike(commandPackage, target);
+            publish();
+            recordLike("notification_action", commandPackage);
+            scheduleCommandReconcile();
+            return true;
+        }
+        recordLike("unavailable", targetPackage);
+        return false;
+    }
+
+    @Nullable
+    private Boolean pendingLikeFor(@NonNull String packageName) {
+        if (pendingLikeTarget == null || !samePackage(packageName, pendingLikePackage)) return null;
+        long elapsed = SystemClock.elapsedRealtime() - pendingLikeStartedElapsed;
+        if (elapsed >= COMMAND_RECONCILE_FINAL_MS) {
+            clearPendingLike();
+            return null;
+        }
+        return pendingLikeTarget;
+    }
+
+    private void setPendingLike(@NonNull String packageName, boolean target) {
+        pendingLikePackage = packageName;
+        pendingLikeTarget = target;
+        pendingLikeStartedElapsed = SystemClock.elapsedRealtime();
+    }
+
+    private void clearPendingLike() {
+        pendingLikePackage = "";
+        pendingLikeTarget = null;
+        pendingLikeStartedElapsed = 0L;
+    }
+
+    private static void recordLike(@NonNull String route, @NonNull String packageName) {
+        ActionRecorder.record(ActionRecorder.SOURCE_ACTIVITY, "MEDIA_LIKE",
+                ActionRecorder.object("route", route, "package", packageName));
     }
 
     /** Coalesces live scrubbing while preserving the exact player represented on HOME. */
@@ -1042,6 +1177,11 @@ public final class LauncherMediaController {
             }
             boolean playing = playback != null
                     && playback.getState() == PlaybackState.STATE_PLAYING;
+            boolean likeAvailable = playback != null
+                    && (playback.getActions() & PlaybackState.ACTION_SET_RATING) != 0L;
+            Boolean liked = metadata == null ? null : MediaLikeActionPolicy.displayHeart(
+                    heartValue(metadata.getRating(MediaMetadata.METADATA_KEY_RATING)),
+                    heartValue(metadata.getRating(MediaMetadata.METADATA_KEY_USER_RATING)));
             long receivedElapsed = observedElapsed;
             MediaState previous = sessionState;
             boolean contentChanged = previous == null || !MediaStateFreshness.sameContent(
@@ -1062,7 +1202,7 @@ public final class LauncherMediaController {
                     || (previous.artwork != null) != displayArtwork;
             sessionState = new MediaState(title, artist, album, packageName,
                     applicationLabel(packageName), artwork, incomingArtworkIdentity,
-                    duration, position, playing,
+                    duration, position, playing, likeAvailable, liked,
                     updateWall, receivedElapsed,
                     MediaStateFreshness.changedAt(contentChanged, receivedElapsed,
                             previous == null ? 0L : previous.contentChangedElapsedMs),
@@ -1170,10 +1310,11 @@ public final class LauncherMediaController {
         visiblePackage = packageName;
         visibleTitle = title;
         visibleArtist = artist;
+        LikeUiState likeState = resolveLikeUiState(packageName);
         MediaPlaybackHistoryStore.record(context, packageName, playback.playing);
         listener.onMediaChanged(new Snapshot(title.isEmpty() ? "Неизвестный трек" : title,
                 artist, album, application, artworkBitmap, duration, position, playback.playing, true,
-                volume));
+                likeState.available, likeState.active, volume));
         scheduleTicker(playback.playing);
     }
 
@@ -1181,6 +1322,49 @@ public final class LauncherMediaController {
         visiblePackage = "";
         visibleTitle = "";
         visibleArtist = "";
+        clearPendingLike();
+    }
+
+    @Nullable
+    private static Boolean heartValue(@Nullable Rating rating) {
+        if (rating == null || rating.getRatingStyle() != Rating.RATING_HEART) return null;
+        return rating.hasHeart();
+    }
+
+    @NonNull
+    private LikeUiState resolveLikeUiState(@NonNull String packageName) {
+        boolean available = false;
+        Boolean authoritative = null;
+        MediaState session = sessionState;
+        if (session != null && samePackage(packageName, session.packageName)) {
+            available = session.likeAvailable;
+            authoritative = session.liked;
+        }
+        MediaNotificationListener.MediaNotificationLikeSnapshot notification = packageName.isEmpty()
+                ? null : MediaNotificationListener.latestMediaNotificationLike(packageName);
+        if (notification != null) {
+            available = true;
+            if (authoritative == null) authoritative = notification.active;
+        }
+        if (pendingLikeTarget != null && samePackage(packageName, pendingLikePackage)) {
+            long elapsed = SystemClock.elapsedRealtime() - pendingLikeStartedElapsed;
+            if (MediaLikeActionPolicy.keepPending(pendingLikeTarget, authoritative, elapsed,
+                    COMMAND_RECONCILE_SETTLED_MS, COMMAND_RECONCILE_FINAL_MS)) {
+                return new LikeUiState(true, pendingLikeTarget);
+            }
+            clearPendingLike();
+        }
+        return new LikeUiState(available, authoritative);
+    }
+
+    private static final class LikeUiState {
+        final boolean available;
+        @Nullable final Boolean active;
+
+        LikeUiState(boolean available, @Nullable Boolean active) {
+            this.available = available;
+            this.active = active;
+        }
     }
 
     private void scheduleTicker(boolean playing) {

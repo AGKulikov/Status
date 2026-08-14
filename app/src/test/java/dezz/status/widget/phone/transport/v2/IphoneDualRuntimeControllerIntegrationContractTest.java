@@ -129,6 +129,17 @@ public final class IphoneDualRuntimeControllerIntegrationContractTest {
         assertTrue(permanent.contains("coordinator.close(newWireToken())"));
     }
 
+    @Test public void typedRouteErrorIsJournaledBeforeGenericSwitchFailure() throws Exception {
+        String source = controller();
+        String listener = between(source,
+                "private final class V2TransportListener",
+                "private void applyV2DualStatus");
+        assertTrue(listener.contains("PhoneConnectionJournal.append(\"v2-error\""));
+        assertTrue(listener.contains("kind=\" + error.kind"));
+        assertTrue(listener.contains("retryable=\""));
+        assertTrue(listener.contains("redactedDiagnostic(error.detail)"));
+    }
+
     private static String controller() throws Exception {
         return text("app/src/main/java/dezz/status/widget/phone/PhoneConnectorController.java");
     }

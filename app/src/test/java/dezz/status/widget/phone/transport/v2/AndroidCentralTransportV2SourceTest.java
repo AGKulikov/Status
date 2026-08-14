@@ -90,8 +90,17 @@ public final class AndroidCentralTransportV2SourceTest {
         String selected = between(source,
                 "private void connectSelectedBond",
                 "private void connectMatchedBootstrap");
+        assertTrue(selected.contains("selectedSystemBondFacade("));
+        assertFalse(selected.contains("adapter.getRemoteDevice("));
+        assertTrue(source.contains("adapter.getBondedDevices()"));
+        assertTrue(source.contains("device.getBondState() == BluetoothDevice.BOND_BONDED"));
+        assertTrue(source.contains("samePublicAddress(device.getAddress(), selectedAddress)"));
+        assertTrue(source.contains("matches++;"));
+        assertTrue(source.contains("if (selected == null) selected = device;"));
         assertTrue(selected.contains(
                 "createGattOwner(token, selected, true, attribution)"));
+        assertTrue(selected.indexOf("if (!attribution.mayProceedToEncryptedProof())")
+                < selected.indexOf("createGattOwner(token, selected, true, attribution)"));
         String bootstrap = between(source,
                 "private void connectMatchedBootstrap",
                 "private void createGattOwner");
@@ -111,7 +120,7 @@ public final class AndroidCentralTransportV2SourceTest {
                 "private void connectSelectedBond",
                 "private void connectMatchedBootstrap");
         assertTrue(selected.contains("startRequest.selectedSystemBondAddress"));
-        assertTrue(selected.contains("selectedSystemBondMatchCount("));
+        assertTrue(selected.contains("selectedBond.matches"));
         assertTrue(selected.contains("bondAttribution.begin("));
 
         String scan = between(source,
@@ -127,10 +136,17 @@ public final class AndroidCentralTransportV2SourceTest {
                 "private IphoneBlePeerProof decodePeerProof",
                 "private void maybeCompleteTeardown");
         assertTrue(proof.contains("bondAttribution.complete("));
-        assertTrue(proof.contains("BluetoothProfile.GATT"));
+        assertTrue(proof.contains("owner.gatt != callbackGatt"));
+        assertTrue(proof.contains("!owner.connected"));
+        assertTrue(proof.contains("!ProcessGattRegistrationGateV2.owns(owner)"));
         assertTrue(proof.contains("selectedSystemBondMatchCount("));
-        assertTrue(proof.contains("activeBondedOwnerMatchCount("));
         assertTrue(proof.contains("if (!attribution.proven)"));
+        assertFalse(proof.contains("manager.getConnectedDevices("));
+        assertTrue(source.contains("decodePeerProof(callbackGatt, value)"));
+        assertTrue(proof.indexOf("owner.gatt != callbackGatt")
+                < proof.indexOf("bondAttribution.complete("));
+        assertTrue(proof.indexOf("!ProcessGattRegistrationGateV2.owns(owner)")
+                < proof.indexOf("bondAttribution.complete("));
     }
 
     @Test public void controlOwnershipUsesIndicationsBeforeAncs() throws Exception {

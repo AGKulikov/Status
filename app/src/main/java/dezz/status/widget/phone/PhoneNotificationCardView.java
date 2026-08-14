@@ -649,6 +649,11 @@ public final class PhoneNotificationCardView extends FrameLayout {
     @Nullable
     private Drawable phoneAppIcon(@Nullable String raw) {
         if (raw == null || raw.trim().isEmpty()) return null;
+        if (PhoneNotificationAutomation.LOW_BATTERY_ICON_ID.equals(raw.trim())) {
+            int iconSize = config == null ? 72
+                    : Math.max(24, config.badge.columnSpan * 24);
+            return PhoneNotificationLowBatteryIconFactory.create(getContext(), iconSize);
+        }
         String identifier = raw.startsWith("phone-app:")
                 ? raw.substring("phone-app:".length()).trim() : raw.trim();
         return identifier.isEmpty() ? null

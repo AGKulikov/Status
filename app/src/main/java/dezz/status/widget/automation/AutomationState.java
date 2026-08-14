@@ -19,6 +19,12 @@ public final class AutomationState {
     @Nullable public final String color;
     @Nullable public final String icon;
     @Nullable public final String backgroundColor;
+    @Nullable public final String borderColor;
+    @Nullable public final Integer borderWidthPx;
+    @Nullable public final String iconTint;
+    @Nullable public final String iconBackgroundColor;
+    @Nullable public final String iconOutlineColor;
+    @Nullable public final Integer iconOutlineWidthPx;
     public final boolean actionEnabled;
     public final boolean visible;
     /** True only after the owning connector confirmed this value in its current session. */
@@ -29,6 +35,10 @@ public final class AutomationState {
 
     private AutomationState(boolean present, @Nullable String text, @Nullable String color,
                             @Nullable String icon, @Nullable String backgroundColor,
+                            @Nullable String borderColor, @Nullable Integer borderWidthPx,
+                            @Nullable String iconTint, @Nullable String iconBackgroundColor,
+                            @Nullable String iconOutlineColor,
+                            @Nullable Integer iconOutlineWidthPx,
                             boolean actionEnabled, boolean visible, boolean fresh,
                             @Nullable String source, long updatedAt, long expiresAt) {
         this.present = present;
@@ -36,6 +46,12 @@ public final class AutomationState {
         this.color = color;
         this.icon = icon;
         this.backgroundColor = backgroundColor;
+        this.borderColor = borderColor;
+        this.borderWidthPx = borderWidthPx;
+        this.iconTint = iconTint;
+        this.iconBackgroundColor = iconBackgroundColor;
+        this.iconOutlineColor = iconOutlineColor;
+        this.iconOutlineWidthPx = iconOutlineWidthPx;
         this.actionEnabled = actionEnabled;
         this.visible = visible;
         this.fresh = fresh;
@@ -47,6 +63,7 @@ public final class AutomationState {
     @NonNull
     public static AutomationState missing() {
         return new AutomationState(false, null, null, null, null,
+                null, null, null, null, null, null,
                 false, true, false, null, 0, 0);
     }
 
@@ -58,7 +75,14 @@ public final class AutomationState {
         String icon = json.has("icon") && !json.isNull("icon") ? json.optString("icon", "") : null;
         String background = json.has("background_color") && !json.isNull("background_color")
                 ? json.optString("background_color", "") : null;
+        String border = optionalString(json, "border_color");
+        Integer borderWidth = optionalInteger(json, "border_width");
+        String iconTint = optionalString(json, "icon_tint");
+        String iconBackground = optionalString(json, "icon_background_color");
+        String iconOutline = optionalString(json, "icon_outline_color");
+        Integer iconOutlineWidth = optionalInteger(json, "icon_outline_width");
         return new AutomationState(true, text, color, icon, background,
+                border, borderWidth, iconTint, iconBackground, iconOutline, iconOutlineWidth,
                 json.has("action_enabled") ? json.optBoolean("action_enabled", true)
                         : json.optBoolean("enabled", true),
                 json.optBoolean("visible", true),
@@ -80,6 +104,8 @@ public final class AutomationState {
     public AutomationState asStale() {
         if (!present || !fresh) return this;
         return new AutomationState(true, text, color, icon, backgroundColor,
+                borderColor, borderWidthPx, iconTint, iconBackgroundColor,
+                iconOutlineColor, iconOutlineWidthPx,
                 actionEnabled, visible, false, source, updatedAt, expiresAt);
     }
 
@@ -95,11 +121,22 @@ public final class AutomationState {
         String nextColor = optionalOverride(overrides, "color", color);
         String nextIcon = optionalOverride(overrides, "icon", icon);
         String nextBackground = optionalOverride(overrides, "background_color", backgroundColor);
+        String nextBorder = optionalOverride(overrides, "border_color", borderColor);
+        Integer nextBorderWidth = optionalIntegerOverride(overrides, "border_width", borderWidthPx);
+        String nextIconTint = optionalOverride(overrides, "icon_tint", iconTint);
+        String nextIconBackground = optionalOverride(
+                overrides, "icon_background_color", iconBackgroundColor);
+        String nextIconOutline = optionalOverride(
+                overrides, "icon_outline_color", iconOutlineColor);
+        Integer nextIconOutlineWidth = optionalIntegerOverride(
+                overrides, "icon_outline_width", iconOutlineWidthPx);
         boolean nextActionEnabled = overrides.has("action_enabled")
                 ? overrides.optBoolean("action_enabled", actionEnabled) : actionEnabled;
         boolean nextVisible = overrides.has("visible")
                 ? overrides.optBoolean("visible", visible) : visible;
         return new AutomationState(present, nextText, nextColor, nextIcon, nextBackground,
+                nextBorder, nextBorderWidth, nextIconTint, nextIconBackground,
+                nextIconOutline, nextIconOutlineWidth,
                 nextActionEnabled, nextVisible, fresh, source, updatedAt, expiresAt);
     }
 
@@ -111,6 +148,12 @@ public final class AutomationState {
         if (color != null) out.put("color", color);
         if (icon != null) out.put("icon", icon);
         if (backgroundColor != null) out.put("background_color", backgroundColor);
+        if (borderColor != null) out.put("border_color", borderColor);
+        if (borderWidthPx != null) out.put("border_width", borderWidthPx);
+        if (iconTint != null) out.put("icon_tint", iconTint);
+        if (iconBackgroundColor != null) out.put("icon_background_color", iconBackgroundColor);
+        if (iconOutlineColor != null) out.put("icon_outline_color", iconOutlineColor);
+        if (iconOutlineWidthPx != null) out.put("icon_outline_width", iconOutlineWidthPx);
         out.put("present", present).put("visible", visible)
                 .put("action_enabled", actionEnabled)
                 .put("fresh", fresh)
@@ -167,5 +210,22 @@ public final class AutomationState {
                                            @Nullable String fallback) {
         if (!object.has(key)) return fallback;
         return object.isNull(key) ? null : object.optString(key, fallback);
+    }
+
+    @Nullable
+    private static String optionalString(@NonNull JSONObject object, String key) {
+        return object.has(key) && !object.isNull(key) ? object.optString(key, "") : null;
+    }
+
+    @Nullable
+    private static Integer optionalInteger(@NonNull JSONObject object, String key) {
+        return object.has(key) && !object.isNull(key) ? object.optInt(key) : null;
+    }
+
+    @Nullable
+    private static Integer optionalIntegerOverride(@NonNull JSONObject object, String key,
+                                                    @Nullable Integer fallback) {
+        if (!object.has(key)) return fallback;
+        return object.isNull(key) ? null : object.optInt(key);
     }
 }

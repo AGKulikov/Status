@@ -28,6 +28,8 @@ import dezz.status.widget.scenario.ScenarioPresets;
 public final class PhoneNotificationAutomation {
     public static final String OVERLAY_ID = "phone_notifications";
     public static final String OVERLAY_WITH_ICON_ID = "phone_notifications_icon";
+    /** Synthetic icon source used by the low-iPhone-battery status alert. */
+    public static final String LOW_BATTERY_ICON_ID = "builtin:phone-low-battery";
 
     /** iOS app icons use a continuous corner close to 22% of the icon side. */
     public static final float IOS_APP_ICON_CORNER_RATIO = 0.2237f;

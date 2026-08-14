@@ -43,4 +43,16 @@ public final class IphoneBleAdvertisement {
     static String normalizePeerId(String value) {
         return value == null ? "" : value.trim().toLowerCase(java.util.Locale.US);
     }
+
+    /**
+     * Canonical form accepted by Android's Bluetooth address API boundary.
+     *
+     * <p>Helper installation UUIDs are lower-case identifiers, but a Bluetooth MAC address is a
+     * different namespace: {@code BluetoothAdapter.checkBluetoothAddress()} accepts hexadecimal
+     * letters only in upper case.  Keeping the two normalizers separate prevents a valid selected
+     * system bond from being rejected before {@code connectGatt()} is reached.</p>
+     */
+    static String normalizeSystemBondAddress(String value) {
+        return value == null ? "" : value.trim().toUpperCase(java.util.Locale.US);
+    }
 }

@@ -10,7 +10,13 @@ public enum LocalField {
     TEXT_COLOR,
     ICON,
     BACKGROUND_COLOR,
-    ACTION_ENABLED;
+    ACTION_ENABLED,
+    BORDER_COLOR,
+    BORDER_WIDTH,
+    ICON_TINT,
+    ICON_BACKGROUND_COLOR,
+    ICON_OUTLINE_COLOR,
+    ICON_OUTLINE_WIDTH;
 
     public String jsonName() {
         return name();

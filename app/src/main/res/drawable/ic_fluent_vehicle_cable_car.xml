@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Microsoft Fluent UI System Icons 1.1.328 (vehicle_cable_car, filled 24px); MIT. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="@android:color/white"
+        android:pathData="M21.15 3a.75.75 0 1 1 .2 1.5l-6.85.92v1.83c0 .64-.19 1.24-.51 1.75h2.76c1.8 0 3.25 1.46 3.25 3.25v3.25H4v-3.25C4 10.45 5.46 9 7.25 9h4C12.22 9 13 8.22 13 7.25V5.62L2.85 7a.75.75 0 1 1-.2-1.48L13 4.1v-.36a.75.75 0 0 1 1.5 0v.16l6.65-.9ZM20 17v1.75c0 1.24-1 2.25-2.25 2.25H6.25C5.01 21 4 20 4 18.75V17h16Z" />
+</vector>

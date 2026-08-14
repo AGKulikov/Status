@@ -17,6 +17,8 @@ import androidx.core.content.ContextCompat;
 import androidx.core.graphics.drawable.DrawableCompat;
 
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import dezz.status.widget.R;
@@ -26,11 +28,21 @@ public final class LauncherIconResolver {
     public static final class Preset {
         @NonNull public final String key;
         @NonNull public final String label;
-        Preset(String key, String label) { this.key = key; this.label = label; }
+        @NonNull public final String category;
+        @NonNull public final String searchTerms;
+        Preset(String key, String label) {
+            this(key, label, "Основные", key.replace('_', ' '));
+        }
+        Preset(String key, String label, String category, String searchTerms) {
+            this.key = key;
+            this.label = label;
+            this.category = category;
+            this.searchTerms = searchTerms;
+        }
         @Override public String toString() { return label; }
     }
 
-    private static final List<Preset> PRESETS = Arrays.asList(
+    private static List<Preset> buildBasePresets() { return Arrays.asList(
             new Preset("app", "Иконка приложения"),
             new Preset("apps", "Приложения"),
             new Preset("navigation", "Навигация"),
@@ -132,16 +144,16 @@ public final class LauncherIconResolver {
             new Preset("scenario", "Сценарий"),
             new Preset("edit", "Изменить"),
             new Preset("settings", "Настройки"),
-            new Preset("notification", "Уведомления"));
-
+            new Preset("notification", "Уведомления")); }
     private LauncherIconResolver() {}
 
-    @NonNull public static List<Preset> presets() { return PRESETS; }
+    /** The expanded catalog is allocated only when a settings picker is actually opened. */
+    @NonNull public static List<Preset> presets() { return PresetHolder.PRESETS; }
 
     /** Finds a catalog item without changing or normalizing its persistent key. */
     @Nullable public static Preset preset(@Nullable String key) {
         if (key == null) return null;
-        for (Preset preset : PRESETS) if (preset.key.equals(key)) return preset;
+        for (Preset preset : presets()) if (preset.key.equals(key)) return preset;
         return null;
     }
 
@@ -197,7 +209,21 @@ public final class LauncherIconResolver {
 
     /** Resource-only resolver used by every visual icon picker and popup allow-list. */
     @DrawableRes public static int resource(@Nullable String key) {
-        if (key == null) return R.drawable.ic_launcher_apps;
+        int known = knownResource(key);
+        return known == 0 ? R.drawable.ic_launcher_apps : known;
+    }
+
+    /** Offline allow-list check that does not allocate the expanded settings catalog. */
+    public static boolean isKnownKey(@Nullable String key) {
+        return knownResource(key) != 0;
+    }
+
+    @DrawableRes private static int knownResource(@Nullable String key) {
+        if (key == null) return 0;
+        if (key.startsWith("fluent_")) {
+            int fluent = FluentIconCatalog.resource(key);
+            if (fluent != 0) return fluent;
+        }
         switch (key) {
             case "navigation": return R.drawable.ic_launcher_navigation;
             case "home": return R.drawable.ic_launcher_home;
@@ -303,10 +329,28 @@ public final class LauncherIconResolver {
             case "edit": return R.drawable.ic_drag_handle;
             case "settings": return R.drawable.ic_settings;
             case "notification": return R.drawable.ic_info;
+            case "favorite": return R.drawable.ic_media_like;
+            case "wrong_location": return R.drawable.ic_hwgps_find_me;
             case "app":
-            case "apps":
-            default: return R.drawable.ic_launcher_apps;
+            case "apps": return R.drawable.ic_launcher_apps;
+            default: return 0;
         }
+    }
+
+    @NonNull private static List<Preset> buildPresets() {
+        List<Preset> values = new ArrayList<>(
+                BasePresetHolder.PRESETS.size() + FluentIconCatalog.presets().size());
+        values.addAll(BasePresetHolder.PRESETS);
+        values.addAll(FluentIconCatalog.presets());
+        return Collections.unmodifiableList(values);
+    }
+
+    private static final class PresetHolder {
+        @NonNull static final List<Preset> PRESETS = buildPresets();
+    }
+
+    private static final class BasePresetHolder {
+        @NonNull static final List<Preset> PRESETS = buildBasePresets();
     }
 
     private static int shortcutDrawable(@NonNull LauncherShortcutStore.Shortcut shortcut) {

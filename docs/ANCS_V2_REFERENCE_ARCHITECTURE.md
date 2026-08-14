@@ -107,12 +107,15 @@ The Helper owns one `CBPeripheralManager` route and publishes a fixed helper ser
 BLE local name.  Android owns one public `BluetoothGatt` client and discovers both the helper
 service and Apple's ANCS on that same iPhone link.
 
-The route has two acquisition modes, both bounded and explicit:
+The route has one production acquisition mode plus an isolated foreground diagnostic:
 
-* daily recovery targets the already selected system bond and registers one public Android GATT
-  client only after startup quiet and role-switch quiescence;
-* an explicit bootstrap may scan for the fixed helper service, but may connect only after the
-  result is attributable to the selected bond.  Device names are never identity evidence.
+* first bootstrap and daily recovery target the already selected system bond and register one
+  public Android GATT client only after startup quiet and role-switch quiescence; the first
+  encryption-required `H` read is durably committed before the route can become ready;
+* a foreground diagnostic may scan for the fixed helper service, but may connect only after the
+  result is attributable to the selected bond. Device names are never identity evidence. The
+  production path never depends on that scan because iOS moves background service UUIDs into an
+  Apple-only overflow area which Android scanners cannot discover.
 
 On Android 9 the public identity resolver requires the callback facade address to equal the
 unique selected system-bond address.  The encrypted `H` installation UUID and exactly one active

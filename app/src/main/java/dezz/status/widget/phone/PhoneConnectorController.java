@@ -1283,6 +1283,11 @@ public final class PhoneConnectorController {
         @Override public void onError(IphoneTransportErrorV2 error) {
             dispatchAncsTransport(token, transportSession, () -> {
                 if (error == null) return;
+                PhoneConnectionJournal.append("v2-error",
+                        "mode=" + error.mode + ", epoch=" + error.epoch
+                                + ", kind=" + error.kind + ", retryable="
+                                + error.retryable + ", detail="
+                                + redactedDiagnostic(error.detail));
                 lastError = bounded(error.kind + ": " + error.detail, 512);
                 if (!error.retryable) ancsStatus = "failed_closed";
                 publishSnapshot(token);
