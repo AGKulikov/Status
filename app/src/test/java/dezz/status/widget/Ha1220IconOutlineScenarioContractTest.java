@@ -67,7 +67,7 @@ public final class Ha1220IconOutlineScenarioContractTest {
         if (!Files.exists(direct)) {
             direct = root.resolve("src/main/java/dezz/status/widget").resolve(relative);
         }
-        return Files.readString(direct, StandardCharsets.UTF_8);
+        return new String(Files.readAllBytes(direct), StandardCharsets.UTF_8);
     }
 
     private static String between(String source, String start, String end) {
