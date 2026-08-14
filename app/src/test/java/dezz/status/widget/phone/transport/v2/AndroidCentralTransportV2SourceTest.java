@@ -2,6 +2,7 @@
 package dezz.status.widget.phone.transport.v2;
 
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.nio.charset.StandardCharsets;
@@ -76,7 +77,7 @@ public final class AndroidCentralTransportV2SourceTest {
         assertFalse(failed.contains("postRouteDeadline(scanToken)"));
     }
 
-    @Test public void selectedBondUsesOneAutoConnectOwnerAndBootstrapIsExplicitDirect()
+    @Test public void selectedBondUsesOneActiveOwnerAndBootstrapIsExplicitDirect()
             throws Exception {
         String source = source();
         String create = between(source,
@@ -86,6 +87,7 @@ public final class AndroidCentralTransportV2SourceTest {
         assertTrue(create.contains("second BluetoothGatt wrapper forbidden"));
         assertTrue(create.contains("device.connectGatt("));
         assertTrue(create.contains("context, autoConnect, gattCallback"));
+        assertEquals(1, count(create, ".connectGatt("));
 
         String selected = between(source,
                 "private void connectSelectedBond",
@@ -98,9 +100,9 @@ public final class AndroidCentralTransportV2SourceTest {
         assertTrue(source.contains("matches++;"));
         assertTrue(source.contains("if (selected == null) selected = device;"));
         assertTrue(selected.contains(
-                "createGattOwner(token, selected, true, attribution)"));
+                "createGattOwner(token, selected, false, attribution)"));
         assertTrue(selected.indexOf("if (!attribution.mayProceedToEncryptedProof())")
-                < selected.indexOf("createGattOwner(token, selected, true, attribution)"));
+                < selected.indexOf("createGattOwner(token, selected, false, attribution)"));
         String bootstrap = between(source,
                 "private void connectMatchedBootstrap",
                 "private void createGattOwner");
@@ -112,6 +114,54 @@ public final class AndroidCentralTransportV2SourceTest {
                 "private void closeGattOwner");
         assertTrue(reassert.contains("owner.gatt.connect()"));
         assertFalse(reassert.contains("connectGatt("));
+        assertFalse(reassert.contains("new GattOwner("));
+    }
+
+    @Test public void selectedBondPlatformEvidenceIsBoundedAddressFreeAndSameWrapperOnly()
+            throws Exception {
+        String source = source();
+        String selected = between(source,
+                "private void connectSelectedBond",
+                "private void connectMatchedBootstrap");
+        assertTrue(selected.contains("selected_bond unique="));
+        assertTrue(selected.contains("matches="));
+        assertTrue(selected.contains("bonded="));
+        assertFalse(selected.contains("device.getAddress()"));
+        assertFalse(selected.contains("startBootstrapScan("));
+        assertFalse(selected.contains("stopBootstrapScan("));
+        assertFalse(selected.contains("radioReset("));
+        assertFalse(selected.contains("removeBond("));
+
+        String connect = between(source,
+                "private void acquireProcessGateAndConnect",
+                "private void cancelWaitingGattOwner");
+        assertTrue(connect.contains("process_gate result=queued"));
+        assertTrue(connect.contains("process_gate result=acquired"));
+        assertTrue(connect.contains("connect_gatt returned="));
+        assertTrue(connect.contains("autoConnect="));
+        assertTrue(connect.contains("transport=LE"));
+        assertEquals(1, count(connect, ".connectGatt("));
+
+        String reassert = between(source,
+                "private void reassertSameGatt",
+                "private void closeGattOwner");
+        assertTrue(reassert.contains("same_wrapper_reassert result="));
+        assertEquals(1, count(reassert, "owner.gatt.connect()"));
+        assertFalse(reassert.contains("connectGatt("));
+
+        String callback = between(source,
+                "private void handleConnectionState",
+                "private void handleServicesDiscovered");
+        assertTrue(callback.contains("connect_gatt callback elapsedMs="));
+        assertTrue(callback.contains("status="));
+        assertTrue(callback.contains("newState="));
+
+        String reporter = between(source,
+                "private void reportPlatformDiagnostic",
+                "private void assertMain");
+        assertTrue(source.contains("PLATFORM_DIAGNOSTIC_LIMIT = 256"));
+        assertTrue(reporter.contains("bounded.substring(0, PLATFORM_DIAGNOSTIC_LIMIT)"));
+        assertTrue(reporter.contains("listener.onPlatformDiagnostic("));
     }
 
     @Test public void selectedBondAttributionNeverGuessesRotatedFacade() throws Exception {
@@ -328,5 +378,15 @@ public final class AndroidCentralTransportV2SourceTest {
             throw new AssertionError("missing source markers: " + start + " / " + end);
         }
         return value.substring(from, to);
+    }
+
+    private static int count(String value, String needle) {
+        int count = 0;
+        int at = 0;
+        while ((at = value.indexOf(needle, at)) >= 0) {
+            count++;
+            at += needle.length();
+        }
+        return count;
     }
 }

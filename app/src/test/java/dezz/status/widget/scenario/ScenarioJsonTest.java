@@ -63,6 +63,25 @@ public final class ScenarioJsonTest {
         assertEquals(original.toJson().toString(), decoded.toJson().toString());
     }
 
+    @Test public void compoundGlyphOutlineRoundTripsAsOneScenarioBranch() throws Exception {
+        ValueReference system = new ValueReference("SYSTEM", "default",
+                "hwgps.route_lost", null);
+        Scenario original = new Scenario("outline", true, ConditionMode.ALL,
+                Collections.singletonList(new Condition("lost", system, Input.FIELD_VALUE,
+                        Operator.TRUE, "", "")), Arrays.asList(
+                        new LocalAction(TargetScope.DRIVER, "navigation",
+                                LocalField.ICON_OUTLINE_COLOR, "#FFFFD600"),
+                        new LocalAction(TargetScope.DRIVER, "navigation",
+                                LocalField.ICON_OUTLINE_WIDTH, 5)), Collections.emptyList());
+
+        Scenario decoded = Scenario.fromJson(new JSONObject(original.toJson().toString()));
+
+        assertEquals(original, decoded);
+        assertEquals(2, decoded.actions.size());
+        assertEquals(LocalField.ICON_OUTLINE_COLOR, decoded.actions.get(0).field);
+        assertEquals(LocalField.ICON_OUTLINE_WIDTH, decoded.actions.get(1).field);
+    }
+
     @Test public void schemaLessLegacyScenarioKeepsFailClosedSemanticsOnRoundTrip()
             throws Exception {
         ValueReference source = new ValueReference("HOME_ASSISTANT", "default",

@@ -1,19 +1,34 @@
-name: Verify HA1219 Natro release 2.0.2 candidate
+name: Verify HA1220 Natro release 2.0.3 candidate
 
-# Frozen Natro 2.0.2 identity gate. HA1220 supersedes it on the active candidate branch.
 on:
+  push:
+    branches: ['work/ha1220-navigator-window-hotfix']
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'build.gradle'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - 'gradlew'
+      - 'settings.gradle'
+      - 'ios/KX11-iPhone-ANCS-Helper-v50/**'
+      - 'tools/KX11_Bluetooth_Collect.command'
+      - 'tools/tests/test_KX11_Bluetooth_Collect.sh'
+      - 'release-manifests/HA1220.md'
+      - '.github/workflows/verify-ha1220.yml'
+      - '.github/workflows/release-ha1220.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ha1219-${{ github.workflow }}-${{ github.ref }}
+  group: ha1220-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  VERSION_NAME: '2.0.2'
-  VERSION_CODE: '208021219'
+  VERSION_NAME: '2.0.3'
+  VERSION_CODE: '208021220'
   HELPER_TREE: '5be62c4aea62439d36a380298a22dac0474f02e3'
   BUILD_TOOLS_VERSION: '36.0.0'
 
@@ -39,8 +54,8 @@ jobs:
           test -z "$(git status --short --ignore-submodules=none)"
           SOURCE_TREE=$(git rev-parse 'HEAD^{tree}')
           echo "tree=$SOURCE_TREE" >> "$GITHUB_OUTPUT"
-          git bundle create "$RUNNER_TEMP/natro-2.0.2-source.bundle" HEAD
-          echo "bundle_sha=$(sha256sum "$RUNNER_TEMP/natro-2.0.2-source.bundle" \
+          git bundle create "$RUNNER_TEMP/natro-2.0.3-source.bundle" HEAD
+          echo "bundle_sha=$(sha256sum "$RUNNER_TEMP/natro-2.0.3-source.bundle" \
             | awk '{print $1}')" >> "$GITHUB_OUTPUT"
           HELPER_ACTUAL_TREE=$(git rev-parse \
             'HEAD:ios/KX11-iPhone-ANCS-Helper-v50')
@@ -89,10 +104,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -Fq "return '2.0.2'" build.gradle
-          grep -Fq 'return 208021219' build.gradle
-          grep -Fq 'Android version code: `208021219`' release-manifests/HA1219.md
-          grep -Fq 'Package: `ru.natro.statuswidget`' release-manifests/HA1219.md
+          grep -Fq "return '2.0.3'" build.gradle
+          grep -Fq 'return 208021220' build.gradle
+          grep -Fq 'Android version code: `208021220`' release-manifests/HA1220.md
+          grep -Fq 'Package: `ru.natro.statuswidget`' release-manifests/HA1220.md
 
       - name: Run complete geelyDebug unit suite
         shell: bash
@@ -113,7 +128,7 @@ jobs:
             assembleGeelyRelease
           APK="app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}-release.apk"
           test -s "$APK"
-          OUT="$RUNNER_TEMP/Natro-2.0.2-unsigned.apk"
+          OUT="$RUNNER_TEMP/Natro-2.0.3-unsigned.apk"
           cp "$APK" "$OUT"
           unzip -Z1 "$OUT" | grep -Fx 'AndroidManifest.xml'
           unzip -Z1 "$OUT" | grep -Fx 'resources.arsc'
@@ -123,7 +138,7 @@ jobs:
           "$TOOLS/aapt" dump resources "$OUT" >/dev/null
           BADGING=$("$TOOLS/aapt" dump badging "$OUT")
           printf '%s\n' "$BADGING" | grep -F \
-            "package: name='ru.natro.statuswidget' versionCode='208021219' versionName='2.0.2'"
+            "package: name='ru.natro.statuswidget' versionCode='208021220' versionName='2.0.3'"
           LABELS=$(printf '%s\n' "$BADGING" | grep '^application-label')
           printf '%s\n' "$LABELS" | grep -Fx "application-label:'Natro'"
           if printf '%s\n' "$LABELS" \
@@ -145,7 +160,7 @@ jobs:
           APK_SHA=$(sha256sum "$OUT" | awk '{print $1}')
           echo "apk_sha256=$APK_SHA" >> "$GITHUB_OUTPUT"
           printf '%s  %s\n' "$APK_SHA" "$(basename "$OUT")" \
-            > "$RUNNER_TEMP/ha1219-unsigned.sha256"
+            > "$RUNNER_TEMP/ha1220-unsigned.sha256"
           test -z "$(git status --short --untracked-files=no --ignore-submodules=none)"
 
       - name: Write exact-byte candidate provenance
@@ -175,21 +190,21 @@ jobs:
               sourceBundleSha256: $sourceBundleSha256,
               helper: {version: "50.0", build: 50, tree: $helperTree},
               android: {package: $packageName, versionName: $versionName,
-                versionCode: 208021219, minSdk: 28, targetSdk: 28,
+                versionCode: 208021220, minSdk: 28, targetSdk: 28,
                 flavor: "geely", buildType: "release", unsigned: true,
-                apk: "Natro-2.0.2-unsigned.apk", apkSha256: $unsignedSha256,
+                apk: "Natro-2.0.3-unsigned.apk", apkSha256: $unsignedSha256,
                 requiredSigningCertificateSha256: $requiredSigningCertificateSha256},
               validation: {unitTask: "testGeelyDebugUnitTest",
                 helperContract: "verify-v50-contract.sh"},
               github: {runId: $runId, ref: $ref}}' \
-            > "$RUNNER_TEMP/ha1219-candidate.json"
+            > "$RUNNER_TEMP/ha1220-candidate.json"
 
       - name: Upload exact source snapshot
         if: github.event_name == 'push'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ha1219-natro-source-bundle
-          path: ${{ runner.temp }}/natro-2.0.2-source.bundle
+          name: ha1220-natro-source-bundle
+          path: ${{ runner.temp }}/natro-2.0.3-source.bundle
           if-no-files-found: error
           retention-days: 14
 
@@ -197,11 +212,11 @@ jobs:
         if: github.event_name == 'push'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ha1219-natro-unsigned-release
+          name: ha1220-natro-unsigned-release
           path: |
-            ${{ runner.temp }}/Natro-2.0.2-unsigned.apk
-            ${{ runner.temp }}/ha1219-unsigned.sha256
-            ${{ runner.temp }}/ha1219-candidate.json
+            ${{ runner.temp }}/Natro-2.0.3-unsigned.apk
+            ${{ runner.temp }}/ha1220-unsigned.sha256
+            ${{ runner.temp }}/ha1220-candidate.json
           if-no-files-found: error
           retention-days: 14
 
@@ -223,7 +238,7 @@ jobs:
         if: github.event_name == 'push'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ha1219-android-build-tools
+          name: ha1220-android-build-tools
           path: ${{ runner.temp }}/android-build-tools-36
           if-no-files-found: error
           retention-days: 1

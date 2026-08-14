@@ -423,14 +423,12 @@ public class WidgetAccessibilityService extends AccessibilityService {
         if (packageName.isEmpty() || packageName.equals(getPackageName())) return;
         boolean exactWindow = StatusBarSurfaceContext.isNavigatorWindow(packageName, className);
         if (eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            // STATE_CHANGED carries the concrete Activity. Ignore auxiliary Yandex dialogs so
-            // they cannot accidentally collapse their still-open floating parent surface.
-            if (exactWindow) {
-                StatusBarSurfaceContext.setNavigatorWindowForeground(true);
-            } else if (!StatusBarSurfaceContext.isYandexPackage(packageName)
-                    || StatusBarSurfaceContext.isFullscreenYandex(packageName, className)) {
-                StatusBarSurfaceContext.setNavigatorWindowForeground(false);
-            }
+            // TransparentSplashActivity creates the ECARX freeform task and then hands it to
+            // NavigatorActivity/MapActivity. Those content Activity classes are shared with the
+            // full-screen task, so they cannot cancel an already-confirmed window token.
+            boolean next = StatusBarSurfaceContext.navigatorWindowAfterStateChange(
+                    StatusBarSurfaceContext.isNavigatorWindowForeground(), packageName, className);
+            StatusBarSurfaceContext.setNavigatorWindowForeground(next);
         } else if (eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED && exactWindow) {
             // Some ECARX builds expose the floating Activity only through WINDOWS_CHANGED.
             StatusBarSurfaceContext.setNavigatorWindowForeground(true);

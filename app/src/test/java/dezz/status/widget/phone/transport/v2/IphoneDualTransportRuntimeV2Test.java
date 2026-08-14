@@ -50,6 +50,24 @@ public final class IphoneDualTransportRuntimeV2Test {
                 request.helperInstallationId);
     }
 
+    @Test public void exactRoutePlatformDiagnosticCrossesRuntimeBoundary() {
+        Fixture fixture = new Fixture(false, "");
+        fixture.start(IphoneBleMode.ANDROID_CENTRAL);
+        fixture.scheduler.advanceBy(10L);
+        FakeTransport active = fixture.factory.created.get(1);
+
+        active.deliverPlatformDiagnostic(
+                "connect_gatt callback elapsedMs=37, status=0, newState=2");
+        fixture.scheduler.drain();
+
+        assertEquals(IphoneBleMode.ANDROID_CENTRAL,
+                fixture.listener.lastPlatformDiagnosticMode);
+        assertEquals(active.startRequest.epoch,
+                fixture.listener.lastPlatformDiagnosticEpoch);
+        assertEquals("connect_gatt callback elapsedMs=37, status=0, newState=2",
+                fixture.listener.lastPlatformDiagnostic);
+    }
+
     @Test public void absentSnapshotRunsDrainOnlyMigrationBeforeFreshTarget() {
         Fixture fixture = new Fixture(false, "");
         fixture.start(IphoneBleMode.ANDROID_CENTRAL);
@@ -222,6 +240,8 @@ public final class IphoneDualTransportRuntimeV2Test {
         assertTrue(fixture.listener.lastDual.detail.contains("PEER_PROOF_REJECTED"));
         assertTrue(fixture.listener.lastDual.detail.contains(
                 "selected bond absent or ambiguous"));
+        assertTrue(fixture.listener.events.indexOf("error:PEER_PROOF_REJECTED")
+                < fixture.listener.events.lastIndexOf("dual:FAILED"));
     }
 
     @Test public void synchronousFactoryFailureDoesNotReusePriorDiagnostic() {
@@ -871,16 +891,34 @@ public final class IphoneDualTransportRuntimeV2Test {
                     detail, 0)));
         }
 
+        void deliverPlatformDiagnostic(String detail) {
+            IphoneTransportSessionListenerV2 exact = listener;
+            IphoneTransportStartRequest request = startRequest;
+            scheduler.execute(() -> exact.onPlatformDiagnostic(
+                    mode, request.epoch, detail));
+        }
+
     }
 
     private static final class FakeListener implements IphoneDualTransportListenerV2 {
         IphoneDualTransportStatusV2 lastDual;
         IphoneTransportErrorV2 lastError;
+        IphoneBleMode lastPlatformDiagnosticMode;
+        BleRouteEpoch lastPlatformDiagnosticEpoch;
+        String lastPlatformDiagnostic = "";
         String learnedHelperId = "";
+        final List<String> events = new ArrayList<>();
         @Override public void onDualTransportStatus(IphoneDualTransportStatusV2 status) {
             lastDual = status;
+            events.add("dual:" + status.switchPhase);
         }
         @Override public void onStatus(IphoneTransportStatusV2 status) { }
+        @Override public void onPlatformDiagnostic(
+                IphoneBleMode mode, BleRouteEpoch epoch, String detail) {
+            lastPlatformDiagnosticMode = mode;
+            lastPlatformDiagnosticEpoch = epoch;
+            lastPlatformDiagnostic = detail;
+        }
         @Override public void onTelemetry(IphoneTelemetryV2 telemetry) { }
         @Override public void onNotificationEvent(IphoneNotificationEventV2 event) { }
         @Override public void onNotification(IphoneNotificationV2 notification) { }
@@ -892,6 +930,9 @@ public final class IphoneDualTransportRuntimeV2Test {
         @Override public void onRoleControlWriteResult(
                 IphoneRoleControlV2 control, boolean success) { }
         @Override public void onLocalTerminal(IphoneBleMode mode, BleRouteEpoch epoch) { }
-        @Override public void onError(IphoneTransportErrorV2 error) { lastError = error; }
+        @Override public void onError(IphoneTransportErrorV2 error) {
+            lastError = error;
+            events.add("error:" + error.kind);
+        }
     }
 }

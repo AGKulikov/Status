@@ -71,6 +71,7 @@ import dezz.status.widget.scenario.TargetScope;
 import dezz.status.widget.scenario.ValueReference;
 import dezz.status.widget.driver.DriverPanelStylePolicy;
 import dezz.status.widget.settings.AppleColorPickerDialog;
+import dezz.status.widget.settings.SettingsColorValue;
 import dezz.status.widget.settings.VectorIconPickerDialog;
 import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.sprut.SprutCatalog;
@@ -126,7 +127,7 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
     private static final String[] FIELD_VALUES = {
             "VISIBLE", "TEXT", "TEXT_COLOR", "BACKGROUND_COLOR", "ICON", "ACTION_ENABLED",
             "BORDER_COLOR", "BORDER_WIDTH", "ICON_TINT", "ICON_BACKGROUND_COLOR",
-            "ICON_OUTLINE_COLOR", "ICON_OUTLINE_WIDTH"
+            "ICON_OUTLINE_COLOR"
     };
     private static final String[] FIELD_LABELS = {
             "Показать или скрыть", "Задать отображаемый текст", "Изменить цвет текста",
@@ -134,7 +135,7 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             "Изменить иконку", "Разрешить или запретить нажатие",
             "Изменить цвет границы", "Изменить толщину границы",
             "Изменить оттенок иконки", "Изменить фон иконки",
-            "Изменить цвет контура иконки", "Изменить толщину контура иконки"
+            "Изменить контур значка (цвет и толщина)"
     };
     private static final String[] BOOLEAN_BRANCH_LABELS = {
             "Не переопределять (обычное состояние)",
@@ -344,10 +345,14 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         TextView summary = label(entrySummary(entry));
         card.addView(summary, topMargin(6));
         if (!entry.editorSupported) {
-            TextView notice = label(entry.scenario == null
+            String noticeText = entry.scenario == null
                     ? "Неизвестный формат: запись сохранится без изменений."
+                    : hasLegacySingleOutlineAction(entry.scenario)
+                    ? "Старый отдельный параметр контура сохранён без изменений. "
+                    + "Для нового сценария цвет и толщина выбираются вместе."
                     : "Сложный сценарий: доступно включение и удаление; содержимое сохранится "
-                    + "без изменений.");
+                    + "без изменений.";
+            TextView notice = label(noticeText);
             notice.setTextColor(0xFFFFB74D);
             card.addView(notice, topMargin(6));
         }
@@ -548,14 +553,18 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
     private static JSONArray mergeActionArray(@Nullable JSONArray original,
                                                JSONArray canonical) throws JSONException {
         if (canonical.length() == 0) return new JSONArray();
-        JSONObject source = firstObject(original);
-        JSONObject target = canonical.getJSONObject(0);
-        JSONObject action = source == null ? new JSONObject() : copyObject(source);
-        action.put("targetScope", target.getString("targetScope"));
-        action.put("targetId", target.getString("targetId"));
-        action.put("field", target.getString("field"));
-        action.put("value", target.get("value"));
-        return new JSONArray().put(action);
+        JSONArray merged = new JSONArray();
+        for (int index = 0; index < canonical.length(); index++) {
+            JSONObject source = original == null ? null : original.optJSONObject(index);
+            JSONObject target = canonical.getJSONObject(index);
+            JSONObject action = source == null ? new JSONObject() : copyObject(source);
+            action.put("targetScope", target.getString("targetScope"));
+            action.put("targetId", target.getString("targetId"));
+            action.put("field", target.getString("field"));
+            action.put("value", target.get("value"));
+            merged.put(action);
+        }
+        return merged;
     }
 
     private boolean persist(boolean showSuccess) {
@@ -622,23 +631,37 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         final Switch falseStyleEnabled;
         final EditText stringValue;
         final EditText falseStringValue;
+        final EditText outlineWidthValue;
+        final EditText falseOutlineWidthValue;
         final TextView sourceSummary;
         final TextView targetSummary;
         final Button chooseStyleValue;
         final Button chooseFalseStyleValue;
         final String conditionId;
+        private LocalField lastEditorField;
+        private boolean trueOutlineSelectionConfirmed;
+        private boolean falseOutlineSelectionConfirmed;
 
         EditorViews(@Nullable Scenario source) {
             root.setPadding(dp(10), dp(6), dp(10), dp(20));
             Condition condition = source == null ? null : source.conditions.get(0);
-            LocalAction action = source == null || source.actions.isEmpty()
-                    ? null : source.actions.get(0);
-            LocalAction elseAction = source == null || source.elseActions.isEmpty()
-                    ? null : source.elseActions.get(0);
+            LocalAction action = source == null ? null : primaryEditorAction(source.actions);
+            LocalAction elseAction = source == null
+                    ? null : primaryEditorAction(source.elseActions);
+            LocalAction actionOutlineWidth = source == null
+                    ? null : actionForField(source.actions, LocalField.ICON_OUTLINE_WIDTH);
+            LocalAction elseOutlineWidth = source == null
+                    ? null : actionForField(source.elseActions, LocalField.ICON_OUTLINE_WIDTH);
+            trueOutlineSelectionConfirmed = source != null
+                    && isCompoundOutlineBranch(source.actions);
+            falseOutlineSelectionConfirmed = source != null
+                    && isCompoundOutlineBranch(source.elseActions);
             if (elseAction == null && source != null && source.legacyFailClosed) {
                 elseAction = legacyImplicitElse(action);
             }
             LocalAction baseAction = action == null ? elseAction : action;
+            lastEditorField = baseAction == null
+                    ? LocalField.VISIBLE : editorField(baseAction.field);
             conditionId = condition == null ? "condition_0" : condition.id;
 
             enabled = switchView("Сценарий включён", source == null || source.enabled);
@@ -698,7 +721,7 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             root.addView(chooseTarget, topMargin(6));
             localField = mappedSpinner(root, "Действие", FIELD_LABELS, FIELD_VALUES,
                     baseAction == null ? LocalField.VISIBLE.jsonName()
-                            : baseAction.field.jsonName());
+                            : editorField(baseAction.field).jsonName());
             root.addView(label("Если условие выполняется"), topMargin(10));
             trueBooleanChoice = simpleSpinner(BOOLEAN_BRANCH_LABELS,
                     booleanBranchIndex(action));
@@ -714,21 +737,28 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                     elseAction != null);
             root.addView(falseStyleEnabled, topMargin(8));
             stringValue = field(root, "Строковое значение стиля",
-                    action == null || action.stringValue() == null ? "" : action.stringValue());
+                    editorStringValue(action));
             hideControlAndLabel(root, stringValue);
             falseStringValue = field(root, "Строковое значение для ложной ветки",
-                    elseAction == null || elseAction.stringValue() == null
-                            ? "" : elseAction.stringValue());
+                    editorStringValue(elseAction));
             hideControlAndLabel(root, falseStringValue);
+            outlineWidthValue = field(root, "Толщина контура значка при выполнении, 0–64 px",
+                    outlineWidthValue(action, actionOutlineWidth));
+            outlineWidthValue.setInputType(InputType.TYPE_CLASS_NUMBER);
+            hideControlAndLabel(root, outlineWidthValue);
+            falseOutlineWidthValue = field(root,
+                    "Толщина контура значка при невыполнении, 0–64 px",
+                    outlineWidthValue(elseAction, elseOutlineWidth));
+            falseOutlineWidthValue.setInputType(InputType.TYPE_CLASS_NUMBER);
+            hideControlAndLabel(root, falseOutlineWidthValue);
             chooseStyleValue = new Button(ScenarioSettingsActivity.this);
-            chooseStyleValue.setText(action == null || action.stringValue() == null
-                    ? "Значение для выполненного условия" : "Выбрано: " + action.stringValue());
+            chooseStyleValue.setText(actionValueButtonText(false, action,
+                    actionOutlineWidth));
             chooseStyleValue.setOnClickListener(view -> chooseActionValue(false));
             root.addView(chooseStyleValue, topMargin(6));
             chooseFalseStyleValue = new Button(ScenarioSettingsActivity.this);
-            chooseFalseStyleValue.setText(elseAction == null || elseAction.stringValue() == null
-                    ? "Значение для невыполненного условия"
-                    : "Выбрано: " + elseAction.stringValue());
+            chooseFalseStyleValue.setText(actionValueButtonText(true, elseAction,
+                    elseOutlineWidth));
             chooseFalseStyleValue.setOnClickListener(view -> chooseActionValue(true));
             root.addView(chooseFalseStyleValue, topMargin(6));
             localField.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -804,7 +834,11 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 throw new IllegalArgumentException("Выбранное оформление не поддерживается "
                         + "этой целью панели водителя");
             }
-            if (targetScope == TargetScope.LAUNCHER && !isLauncherFieldSupported(field)) {
+            if (targetScope == TargetScope.LAUNCHER
+                    && (!isLauncherFieldSupported(field)
+                    || ((field == LocalField.ICON_OUTLINE_COLOR
+                    || field == LocalField.ICON_OUTLINE_WIDTH)
+                    && !isLauncherGlyphTarget(selectedTargetId)))) {
                 throw new IllegalArgumentException("Для кнопки HOME доступны только цвет "
                         + "иконки, фон и контур");
             }
@@ -835,11 +869,33 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             }
             Switch enabledControl = falseBranch ? falseStyleEnabled : trueStyleEnabled;
             if (!enabledControl.isChecked()) return Collections.emptyList();
+            boolean outlineConfirmed = falseBranch
+                    ? falseOutlineSelectionConfirmed : trueOutlineSelectionConfirmed;
+            if (requiresCompoundOutlineConfirmation(field, true, outlineConfirmed)) {
+                throw new IllegalArgumentException(falseBranch
+                        ? "Выберите цвет и толщину контура для невыполненного условия"
+                        : "Выберите цвет и толщину контура для выполненного условия");
+            }
             String value = text(falseBranch ? falseStringValue : stringValue);
             if (value.isEmpty()) {
                 throw new IllegalArgumentException(falseBranch
                         ? "Выберите оформление для невыполненного условия"
                         : "Выберите оформление для выполненного условия");
+            }
+            if (field == LocalField.ICON_OUTLINE_COLOR) {
+                String width = text(falseBranch
+                        ? falseOutlineWidthValue : outlineWidthValue);
+                if (width.isEmpty()) {
+                    throw new IllegalArgumentException(falseBranch
+                            ? "Выберите толщину контура для невыполненного условия"
+                            : "Выберите толщину контура для выполненного условия");
+                }
+                ArrayList<LocalAction> outline = new ArrayList<>(2);
+                outline.add(new LocalAction(targetScope, selectedTargetId,
+                        LocalField.ICON_OUTLINE_COLOR, value));
+                outline.add(new LocalAction(targetScope, selectedTargetId,
+                        LocalField.ICON_OUTLINE_WIDTH, width));
+                return Collections.unmodifiableList(outline);
             }
             return Collections.singletonList(new LocalAction(targetScope, selectedTargetId,
                     field, value));
@@ -855,6 +911,19 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 field = LocalField.fromJsonName(mappedValue(localField, FIELD_VALUES));
             } catch (RuntimeException ignored) {
                 field = LocalField.VISIBLE;
+            }
+            LocalField previousField = lastEditorField;
+            trueOutlineSelectionConfirmed = outlineConfirmationAfterFieldSelection(
+                    previousField, field, trueOutlineSelectionConfirmed);
+            falseOutlineSelectionConfirmed = outlineConfirmationAfterFieldSelection(
+                    previousField, field, falseOutlineSelectionConfirmed);
+            boolean switchedToOutline = previousField != field
+                    && field == LocalField.ICON_OUTLINE_COLOR;
+            lastEditorField = field;
+            if (switchedToOutline) {
+                chooseStyleValue.setText("Выберите цвет и толщину для выполненного условия");
+                chooseFalseStyleValue.setText(
+                        "Выберите цвет и толщину для невыполненного условия");
             }
             boolean bool = isBooleanField(field);
             boolean directText = field == LocalField.TEXT || isWidthField(field);
@@ -881,6 +950,11 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             chooseStyleValue.setVisibility(!bool && !directText ? View.VISIBLE : View.GONE);
             chooseFalseStyleValue.setVisibility(
                     !bool && !directText ? View.VISIBLE : View.GONE);
+            // ICON_OUTLINE_COLOR is a compound editor action. Its color and width are selected
+            // together from chooseActionValue(); the backing fields stay hidden so the screen
+            // never suggests that thickness is an independent scenario action.
+            outlineWidthValue.setVisibility(View.GONE);
+            falseOutlineWidthValue.setVisibility(View.GONE);
         }
 
         /**
@@ -1472,7 +1546,11 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                         text(destination), option -> {
                             destination.setText(option.key);
                             VectorIconPickerDialog.decorate(destinationButton, option);
-                        });
+                });
+                return;
+            }
+            if (field == LocalField.ICON_OUTLINE_COLOR) {
+                showIconOutlinePicker(falseBranch, destination, destinationButton);
                 return;
             }
             String current = text(destination).isEmpty() ? "#FFFFFFFF" : text(destination);
@@ -1493,6 +1571,71 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                             apply(selected);
                         }
                     });
+        }
+
+        /** One user-facing action configures both atomic legacy-compatible outline fields. */
+        private void showIconOutlinePicker(boolean falseBranch, EditText destination,
+                                           Button destinationButton) {
+            LinearLayout form = column();
+            form.setPadding(dp(16), dp(4), dp(16), dp(4));
+            String persistedColor = text(destination);
+            SettingsColorValue parsedColor = SettingsColorValue.tryParse(persistedColor);
+            String initialColor = parsedColor != null
+                    && (parsedColor.kind() == SettingsColorValue.Kind.COLOR
+                    || parsedColor.kind() == SettingsColorValue.Kind.TRANSPARENT)
+                    ? persistedColor : "#FFFFFFFF";
+            String[] selectedColor = {initialColor};
+            Button color = new Button(ScenarioSettingsActivity.this);
+            color.setText("Цвет: " + initialColor);
+            color.setOnClickListener(view -> AppleColorPickerDialog.show(
+                    ScenarioSettingsActivity.this, "Цвет контура значка", selectedColor[0],
+                    AppleColorPickerDialog.Options.standard(),
+                    new AppleColorPickerDialog.Listener() {
+                        private void apply(@Nullable String selected) {
+                            if (selected != null) selectedColor[0] = selected;
+                            color.setText("Цвет: " + selectedColor[0]);
+                        }
+
+                        @Override public void onPreview(@Nullable String selected) {
+                            apply(selected);
+                        }
+
+                        @Override public void onSelected(@Nullable String selected) {
+                            apply(selected);
+                        }
+                    }));
+            form.addView(color, matchWrap());
+            EditText width = field(form, "Толщина контура значка, 0–64 px",
+                    text(falseBranch ? falseOutlineWidthValue : outlineWidthValue));
+            width.setInputType(InputType.TYPE_CLASS_NUMBER);
+            AlertDialog dialog = new AlertDialog.Builder(ScenarioSettingsActivity.this)
+                    .setTitle("Контур значка")
+                    .setMessage("Цвет и толщина применяются вместе к силуэту значка, "
+                            + "а не к рамке всей кнопки.")
+                    .setView(form)
+                    .setNegativeButton("Отмена", null)
+                    .setPositiveButton("Применить", null)
+                    .create();
+            dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                    .setOnClickListener(view -> {
+                        try {
+                            int selectedWidth = validatedOutlineWidth(text(width));
+                            destination.setText(selectedColor[0]);
+                            (falseBranch ? falseOutlineWidthValue : outlineWidthValue)
+                                    .setText(Integer.toString(selectedWidth));
+                            if (falseBranch) {
+                                falseOutlineSelectionConfirmed = true;
+                            } else {
+                                trueOutlineSelectionConfirmed = true;
+                            }
+                            destinationButton.setText("Выбрано: " + selectedColor[0]
+                                    + " · " + selectedWidth + " px");
+                            dialog.dismiss();
+                        } catch (RuntimeException error) {
+                            showValidationError(error);
+                        }
+                    }));
+            dialog.show();
         }
 
         private void showTargetPicker() {
@@ -1874,16 +2017,17 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
 
     private static boolean isEditorSupported(@Nullable Scenario scenario) {
         if (scenario == null || scenario.mode != ConditionMode.ALL
-                || scenario.conditions.size() != 1 || scenario.actions.size() > 1
-                || scenario.elseActions.size() > 1) return false;
+                || scenario.conditions.size() != 1
+                || !isEditorBranchSupported(scenario.actions)
+                || !isEditorBranchSupported(scenario.elseActions)) return false;
         Condition condition = scenario.conditions.get(0);
         if (!Input.FIELD_VALUE.equals(condition.field)) return false;
         if (!scenario.actions.isEmpty() && !scenario.elseActions.isEmpty()) {
-            LocalAction whenTrue = scenario.actions.get(0);
-            LocalAction whenFalse = scenario.elseActions.get(0);
+            LocalAction whenTrue = primaryEditorAction(scenario.actions);
+            LocalAction whenFalse = primaryEditorAction(scenario.elseActions);
             if (whenTrue.targetScope != whenFalse.targetScope
                     || !whenTrue.targetId.equals(whenFalse.targetId)
-                    || whenTrue.field != whenFalse.field) return false;
+                    || editorField(whenTrue.field) != editorField(whenFalse.field)) return false;
         }
         boolean connectorSupported = false;
         for (String connector : CONNECTORS) {
@@ -1894,6 +2038,122 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         }
         return connectorSupported
                 && DEFAULT_CONNECTOR_ID.equals(condition.reference.connectorId);
+    }
+
+    /** A color+width pair is one compound editor action but remains schema-v2 compatible. */
+    private static boolean isEditorBranchSupported(@NonNull List<LocalAction> actions) {
+        if (actions.isEmpty()) return true;
+        if (actions.size() == 1) {
+            LocalField field = actions.get(0).field;
+            // Preserve old single-field behavior byte-for-byte. Editing it as the new compound
+            // action would silently invent a color or width and could change scenario precedence.
+            return field != LocalField.ICON_OUTLINE_COLOR
+                    && field != LocalField.ICON_OUTLINE_WIDTH;
+        }
+        return isCompoundOutlineBranch(actions);
+    }
+
+    /** Structurally complete saved pairs may open already confirmed in the simple editor. */
+    private static boolean isCompoundOutlineBranch(@NonNull List<LocalAction> actions) {
+        if (actions.size() != 2) return false;
+        LocalAction color = actionForField(actions, LocalField.ICON_OUTLINE_COLOR);
+        LocalAction width = actionForField(actions, LocalField.ICON_OUTLINE_WIDTH);
+        return color != null && width != null
+                && color.targetScope == width.targetScope
+                && color.targetId.equals(width.targetId);
+    }
+
+    /** Selecting outline from another action always requires the combined picker once. */
+    static boolean outlineConfirmationAfterFieldSelection(
+            @NonNull LocalField previousField, @NonNull LocalField selectedField,
+            boolean alreadyConfirmed) {
+        return selectedField == LocalField.ICON_OUTLINE_COLOR
+                && previousField == selectedField
+                && alreadyConfirmed;
+    }
+
+    /** Pure guard shared with the editor regression test. */
+    static boolean requiresCompoundOutlineConfirmation(
+            @NonNull LocalField field, boolean branchEnabled, boolean confirmed) {
+        return field == LocalField.ICON_OUTLINE_COLOR && branchEnabled && !confirmed;
+    }
+
+    private static boolean hasLegacySingleOutlineAction(@NonNull Scenario scenario) {
+        return isLegacySingleOutlineBranch(scenario.actions)
+                || isLegacySingleOutlineBranch(scenario.elseActions);
+    }
+
+    private static boolean isLegacySingleOutlineBranch(@NonNull List<LocalAction> actions) {
+        if (actions.size() != 1) return false;
+        LocalField field = actions.get(0).field;
+        return field == LocalField.ICON_OUTLINE_COLOR
+                || field == LocalField.ICON_OUTLINE_WIDTH;
+    }
+
+    @Nullable
+    private static LocalAction primaryEditorAction(@NonNull List<LocalAction> actions) {
+        LocalAction color = actionForField(actions, LocalField.ICON_OUTLINE_COLOR);
+        if (color != null) return color;
+        return actions.isEmpty() ? null : actions.get(0);
+    }
+
+    @Nullable
+    private static LocalAction actionForField(@NonNull List<LocalAction> actions,
+                                              @NonNull LocalField field) {
+        for (LocalAction action : actions) if (action.field == field) return action;
+        return null;
+    }
+
+    @NonNull
+    private static LocalField editorField(@NonNull LocalField field) {
+        // Pair members share one editor identity. Legacy singletons are rejected by
+        // isEditorBranchSupported and therefore remain byte-for-byte read-only.
+        return field == LocalField.ICON_OUTLINE_WIDTH
+                ? LocalField.ICON_OUTLINE_COLOR : field;
+    }
+
+    @NonNull
+    private static String editorStringValue(@Nullable LocalAction action) {
+        if (action == null) return "";
+        if (action.field == LocalField.ICON_OUTLINE_WIDTH) return "#FFFFFFFF";
+        String value = action.stringValue();
+        return value == null ? "" : value;
+    }
+
+    @NonNull
+    private static String outlineWidthValue(@Nullable LocalAction primary,
+                                            @Nullable LocalAction explicitWidth) {
+        LocalAction source = explicitWidth != null ? explicitWidth
+                : primary != null && primary.field == LocalField.ICON_OUTLINE_WIDTH
+                ? primary : null;
+        return source == null || source.stringValue() == null ? "2" : source.stringValue();
+    }
+
+    @NonNull
+    private static String actionValueButtonText(boolean falseBranch,
+                                                @Nullable LocalAction primary,
+                                                @Nullable LocalAction outlineWidth) {
+        if (primary == null) return falseBranch
+                ? "Значение для невыполненного условия"
+                : "Значение для выполненного условия";
+        if (editorField(primary.field) == LocalField.ICON_OUTLINE_COLOR) {
+            return "Выбрано: " + editorStringValue(primary) + " · "
+                    + outlineWidthValue(primary, outlineWidth) + " px";
+        }
+        String value = primary.stringValue();
+        return value == null ? (falseBranch
+                ? "Значение для невыполненного условия"
+                : "Значение для выполненного условия") : "Выбрано: " + value;
+    }
+
+    private static int validatedOutlineWidth(@Nullable String raw) {
+        try {
+            int width = Integer.parseInt(raw == null ? "" : raw.trim());
+            if (width < 0 || width > 64) throw new NumberFormatException();
+            return width;
+        } catch (NumberFormatException invalid) {
+            throw new IllegalArgumentException("Толщина контура должна быть от 0 до 64 px");
+        }
     }
 
     @Nullable
@@ -1914,10 +2174,17 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
         return field == LocalField.BORDER_WIDTH || field == LocalField.ICON_OUTLINE_WIDTH;
     }
 
-    private static boolean isDriverFieldSupported(@Nullable String targetId, LocalField field) {
+    private boolean isDriverFieldSupported(@Nullable String targetId, LocalField field) {
         if (DriverPanelStylePolicy.PANEL_TARGET_ID.equals(targetId)) {
             return field == LocalField.BACKGROUND_COLOR || field == LocalField.BORDER_COLOR
                     || field == LocalField.BORDER_WIDTH;
+        }
+        if ((field == LocalField.ICON_OUTLINE_COLOR
+                || field == LocalField.ICON_OUTLINE_WIDTH)
+                && !isDriverGlyphTarget(targetId)) {
+            // INFO/DIVIDER/panel targets have no single icon glyph. DriverClimateShortcutView is
+            // a multi-part live readout. Never fall back to outlining their whole container.
+            return false;
         }
         return isBooleanField(field) || field == LocalField.ICON_TINT
                 || field == LocalField.ICON_BACKGROUND_COLOR
@@ -1925,10 +2192,45 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 || field == LocalField.ICON_OUTLINE_WIDTH;
     }
 
+    private boolean isDriverGlyphTarget(@Nullable String targetId) {
+        if (targetId == null || targetId.isEmpty()) return false;
+        for (LauncherShortcutStore.Shortcut shortcut :
+                LauncherShortcutStore.forDriverPanel(prefs).all()) {
+            if (targetId.equals(shortcut.id)) return hasScenarioOutlineGlyph(shortcut);
+        }
+        for (dezz.status.widget.driver.DriverFavoritesPanelConfig panel :
+                new dezz.status.widget.driver.DriverFavoritesPanelStore(prefs).load()) {
+            if (targetId.equals(panel.id)) return false;
+            for (LauncherShortcutStore.Shortcut shortcut :
+                    LauncherShortcutStore.forDriverFavorites(prefs, panel.id).all()) {
+                if (targetId.equals(shortcut.id)) return hasScenarioOutlineGlyph(shortcut);
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasScenarioOutlineGlyph(
+            @NonNull LauncherShortcutStore.Shortcut shortcut) {
+        return shortcut.kind != LauncherShortcutStore.Kind.INFO
+                && shortcut.kind != LauncherShortcutStore.Kind.DIVIDER
+                && !(shortcut.liveClimateIcon
+                && LauncherShortcutStore.isInteractive(shortcut));
+    }
+
     private static boolean isLauncherFieldSupported(LocalField field) {
         return field == LocalField.ICON_TINT || field == LocalField.ICON_BACKGROUND_COLOR
                 || field == LocalField.ICON_OUTLINE_COLOR
                 || field == LocalField.ICON_OUTLINE_WIDTH;
+    }
+
+    private boolean isLauncherGlyphTarget(@Nullable String targetId) {
+        if (targetId == null || targetId.isEmpty()) return false;
+        for (LauncherShortcutStore.Shortcut shortcut : new LauncherShortcutStore(prefs).all()) {
+            if (!targetId.equals(shortcut.id)) continue;
+            return shortcut.kind != LauncherShortcutStore.Kind.INFO
+                    && shortcut.kind != LauncherShortcutStore.Kind.DIVIDER;
+        }
+        return false;
     }
 
     private static boolean isShortcutSurfaceStyleField(LocalField field) {
@@ -1960,17 +2262,9 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                 text.append(" … ").append(condition.secondOperand);
             }
         }
-        if (!scenario.actions.isEmpty()) {
-            LocalAction action = scenario.actions.get(0);
-            text.append("\nЕсли да: ").append(friendlyField(action.field))
-                    .append(" → ").append(action.targetId).append(" = ").append(action.value);
-        } else {
-            text.append("\nЕсли да: обычное состояние");
-        }
+        appendBranchSummary(text, "Если да", scenario.actions);
         if (!scenario.elseActions.isEmpty()) {
-            LocalAction action = scenario.elseActions.get(0);
-            text.append("\nЕсли нет: ").append(friendlyField(action.field))
-                    .append(" → ").append(action.targetId).append(" = ").append(action.value);
+            appendBranchSummary(text, "Если нет", scenario.elseActions);
         } else if (scenario.legacyFailClosed) {
             LocalAction implicit = scenario.actions.isEmpty()
                     ? null : legacyImplicitElse(scenario.actions.get(0));
@@ -1985,6 +2279,37 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             text.append("\nЕсли нет: обычное состояние");
         }
         return text.toString();
+    }
+
+    private static void appendBranchSummary(@NonNull StringBuilder text,
+                                            @NonNull String label,
+                                            @NonNull List<LocalAction> actions) {
+        if (actions.isEmpty()) {
+            text.append('\n').append(label).append(": обычное состояние");
+            return;
+        }
+        LocalAction action = primaryEditorAction(actions);
+        if (action == null) return;
+        if (actions.size() == 1 && (action.field == LocalField.ICON_OUTLINE_COLOR
+                || action.field == LocalField.ICON_OUTLINE_WIDTH)) {
+            String legacyLabel = action.field == LocalField.ICON_OUTLINE_COLOR
+                    ? "Изменить цвет контура значка (старый сценарий)"
+                    : "Изменить толщину контура значка (старый сценарий)";
+            text.append('\n').append(label).append(": ").append(legacyLabel)
+                    .append(" → ").append(action.targetId).append(" = ").append(action.value);
+            return;
+        }
+        LocalAction width = actionForField(actions, LocalField.ICON_OUTLINE_WIDTH);
+        if (editorField(action.field) == LocalField.ICON_OUTLINE_COLOR) {
+            text.append('\n').append(label).append(": ")
+                    .append("Изменить контур значка (цвет и толщина)")
+                    .append(" → ").append(action.targetId).append(" = ")
+                    .append(editorStringValue(action)).append(" · ")
+                    .append(outlineWidthValue(action, width)).append(" px");
+            return;
+        }
+        text.append('\n').append(label).append(": ").append(friendlyField(action.field))
+                .append(" → ").append(action.targetId).append(" = ").append(action.value);
     }
 
     @Nullable
@@ -2005,6 +2330,9 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
     private static String friendlyField(LocalField field) {
         for (int i = 0; i < FIELD_VALUES.length; i++) {
             if (FIELD_VALUES[i].equals(field.jsonName())) return FIELD_LABELS[i];
+        }
+        if (field == LocalField.ICON_OUTLINE_WIDTH) {
+            return "Изменить толщину контура значка (старый сценарий)";
         }
         return field.jsonName();
     }

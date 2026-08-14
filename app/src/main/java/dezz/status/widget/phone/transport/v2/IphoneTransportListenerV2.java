@@ -3,6 +3,15 @@ package dezz.status.widget.phone.transport.v2;
 
 /** Listener DTO boundary shared by both v2 routes. */
 public interface IphoneTransportListenerV2 {
+    /**
+     * Bounded, address-free Android platform evidence for field diagnosis.
+     *
+     * <p>The controller applies its normal diagnostic redaction again before persistence.  A
+     * default keeps older test/listener implementations source-compatible.</p>
+     */
+    default void onPlatformDiagnostic(IphoneBleMode mode, BleRouteEpoch epoch, String detail) {
+    }
+
     void onStatus(IphoneTransportStatusV2 status);
 
     void onTelemetry(IphoneTelemetryV2 telemetry);

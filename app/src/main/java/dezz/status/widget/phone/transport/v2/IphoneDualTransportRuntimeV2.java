@@ -625,10 +625,11 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
     @Override public void failClosed(Owner owner, Failure failure) {
         assertOnSerializedExecutor();
         String rootCause = fatalDetail == null ? "" : fatalDetail.trim();
-        fatalDetail = failure == Failure.TARGET_START_FAILED && !rootCause.isEmpty()
+        String exactFailureDetail = failure == Failure.TARGET_START_FAILED && !rootCause.isEmpty()
                 ? "switch failed closed: " + failure + "; " + rootCause
                 : "switch failed closed: " + failure;
-        enqueue(() -> publishDualStatus(fatalDetail));
+        fatalDetail = exactFailureDetail;
+        enqueue(() -> publishDualStatus(exactFailureDetail));
     }
 
     @Override public void closeAll(Owner owner) {
@@ -648,6 +649,15 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
 
         BoundListener(Slot bound) {
             this.bound = bound;
+        }
+
+        @Override public void onPlatformDiagnostic(
+                IphoneBleMode mode, BleRouteEpoch epoch, String detail) {
+            enqueue(() -> {
+                if (!isCurrentSlot(bound) || mode != bound.transport.mode()
+                        || epoch == null || !routeEpoch(bound.routeOwner).equals(epoch)) return;
+                listener.onPlatformDiagnostic(mode, epoch, detail);
+            });
         }
 
         @Override public void onStatus(IphoneTransportStatusV2 status) {

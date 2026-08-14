@@ -30,7 +30,11 @@ public final class Ha1217HwgpsMediaDriverContractTest {
         assertTrue(starter.contains("scenario.optBoolean(\"enabled\", true)"));
         String icons = source("dezz/status/widget/launcher/LauncherIconResolver.java");
         assertTrue(icons.contains("case \"wrong_location\": return R.drawable.ic_hwgps_find_me"));
-        assertFalse(integration.contains("postDelayed"));
+        assertTrue(integration.contains("postDelayed(deadlineRunnable"));
+        assertTrue(integration.contains("HwgpsRouteStateTracker"));
+        assertTrue(integration.contains("if (!registered || intent == null"));
+        assertTrue(integration.contains("if (!registered) return;"));
+        assertFalse(integration.contains("scheduleAtFixedRate"));
         assertFalse(integration.contains("startService"));
     }
 

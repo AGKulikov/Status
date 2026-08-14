@@ -669,7 +669,7 @@ public final class AndroidCentralRoute {
                 "selected-bond public GATT");
         return BleRouteTransition.accepted(state,
                 op(BleRouteEffect.Type.CONNECT_SELECTED_BOND, connect,
-                        "one autoConnect=true public owner for selectedSystemBondAddress; "
+                        "one active autoConnect=false public owner for selectedSystemBondAddress; "
                                 + "no scan/name/topology fallback"),
                 BleRouteEffect.deadline(connect, CONNECT_TIMEOUT_MS));
     }

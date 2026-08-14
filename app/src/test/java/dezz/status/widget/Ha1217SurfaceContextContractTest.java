@@ -77,15 +77,60 @@ public final class Ha1217SurfaceContextContractTest {
         assertFalse(StatusBarSurfaceContext.isNavigatorWindow(
                 "ru.yandex.yandexnavi",
                 "ru.yandex.yandexnavi.core.NavigatorActivity"));
-        assertTrue(StatusBarSurfaceContext.isFullscreenYandex(
-                "ru.yandex.yandexnavi",
-                "ru.yandex.yandexnavi.core.NavigatorActivity"));
-        assertFalse(StatusBarSurfaceContext.isFullscreenYandex(
-                "ru.yandex.yandexnavi",
-                "ru.yandex.account.LoginActivity"));
         assertFalse(StatusBarSurfaceContext.isNavigatorWindow(
                 "com.example.other",
                 "com.example.other.TransparentSplashActivity"));
+    }
+
+    @Test public void yandexContentActivityDoesNotCancelConfirmedFreeformTask() {
+        assertTrue(StatusBarSurfaceContext.navigatorWindowAfterStateChange(
+                true,
+                "ru.yandex.yandexnavi",
+                "ru.yandex.yandexnavi.core.NavigatorActivity"));
+        assertTrue(StatusBarSurfaceContext.navigatorWindowAfterStateChange(
+                true,
+                "ru.yandex.yandexmaps",
+                "ru.yandex.yandexmaps.app.MapActivity"));
+        assertFalse(StatusBarSurfaceContext.navigatorWindowAfterStateChange(
+                false,
+                "ru.yandex.yandexnavi",
+                "ru.yandex.yandexnavi.core.NavigatorActivity"));
+        assertTrue(StatusBarSurfaceContext.navigatorWindowAfterStateChange(
+                false,
+                "ru.yandex.yandexnavi",
+                "ru.yandex.yandexmaps.app.TransparentSplashActivity"));
+        assertFalse(StatusBarSurfaceContext.navigatorWindowAfterStateChange(
+                true,
+                "com.example.music",
+                "com.example.music.PlayerActivity"));
+    }
+
+    @Test public void windowTokenSurvivesUnderlyingHomeUntilHomeRegainsFocus() {
+        Set<String> windowOnly = Collections.singleton(
+                StatusBarSurfaceContext.NAVIGATOR_WINDOW);
+        try {
+            // Start from an unambiguous HOME-not-foreground state.
+            StatusBarSurfaceContext.setLauncherHomeForeground(true);
+            StatusBarSurfaceContext.setLauncherHomeForeground(false);
+
+            // Window launch and the subsequent HOME focus-loss. ECARX may spuriously call HOME
+            // onResume between these transitions; LauncherActivity deliberately publishes no
+            // surface state from that callback.
+            StatusBarSurfaceContext.setNavigatorWindowForeground(true);
+            StatusBarSurfaceContext.setLauncherHomeForeground(false);
+            assertTrue(StatusBarSurfaceContext.isNavigatorWindowForeground());
+            assertTrue(StatusBarSurfaceContext.matches(
+                    windowOnly, "ru.yandex.yandexnavi", false));
+
+            // Closing the freeform task returns actual window focus to HOME and clears the token.
+            StatusBarSurfaceContext.setLauncherHomeForeground(true);
+            assertFalse(StatusBarSurfaceContext.isNavigatorWindowForeground());
+            assertFalse(StatusBarSurfaceContext.matches(
+                    windowOnly, "ru.natro.statuswidget", true));
+        } finally {
+            StatusBarSurfaceContext.setLauncherHomeForeground(true);
+            StatusBarSurfaceContext.setLauncherHomeForeground(false);
+        }
     }
 
     @Test public void pickerAndLauncherUseAnExplicitLifecycleSurface() throws Exception {
@@ -103,11 +148,14 @@ public final class Ha1217SurfaceContextContractTest {
         int nextMethod = brickPicker.indexOf("private String brickTitleString", openPicker);
         String hidePicker = brickPicker.substring(openPicker, nextMethod);
         assertFalse(hidePicker.contains("Permissions.isUsageAccessGranted"));
-        assertTrue(launcher.contains("StatusBarSurfaceContext.setLauncherHomeForeground(true)"));
         assertTrue(launcher.contains("StatusBarSurfaceContext.setLauncherHomeForeground(false)"));
-        assertTrue(launcher.indexOf("setLauncherHomeForeground(true)")
-                > launcher.indexOf("protected void onResume()"));
-        int pause = launcher.indexOf("protected void onPause()");
+        int resume = launcher.indexOf("protected void onResume()");
+        int pause = launcher.indexOf("protected void onPause()", resume);
+        String resumeBody = launcher.substring(resume, pause);
+        assertFalse(resumeBody.contains("setLauncherHomeForeground("));
+        int focus = launcher.indexOf("public void onWindowFocusChanged(boolean hasFocus)");
+        assertTrue(focus > resume);
+        assertTrue(launcher.indexOf("setLauncherHomeForeground(hasFocus)", focus) > focus);
         assertTrue(launcher.indexOf("setLauncherHomeForeground(false)", pause) > pause);
         int topSurface = widget.indexOf("private boolean isLauncherHomeTopSurface()");
         int matcher = widget.indexOf("private boolean matchesForegroundContext", topSurface);
@@ -186,6 +234,10 @@ public final class Ha1217SurfaceContextContractTest {
         assertTrue(accessibility.contains("publishNavigatorWindowSurfaceEvent("));
         assertTrue(accessibility.contains(
                 "StatusBarSurfaceContext.isNavigatorWindow(packageName, className)"));
+        assertTrue(accessibility.contains(
+                "StatusBarSurfaceContext.navigatorWindowAfterStateChange("));
+        assertFalse(accessibility.contains(
+                "StatusBarSurfaceContext.isFullscreenYandex(packageName, className)"));
     }
 
     private static String source(String relative) throws Exception {

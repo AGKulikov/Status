@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 import dezz.status.widget.scenario.Condition;
+import dezz.status.widget.scenario.ConditionMode;
 import dezz.status.widget.scenario.Input;
 import dezz.status.widget.scenario.LocalAction;
 import dezz.status.widget.scenario.LocalField;
@@ -171,6 +172,47 @@ public final class LocalScenarioControllerTest {
                 .get("launcher|home_music");
 
         assertEquals(6, patch.optInt("icon_outline_width"));
+    }
+
+    @Test public void oneOutlineScenarioBranchProjectsColorAndWidthTogether() {
+        ValueReference reference = new ValueReference("SYSTEM", "default",
+                "hwgps.route_lost", null);
+        Condition condition = new Condition("lost", reference, Input.FIELD_VALUE,
+                Operator.TRUE, "", "");
+        Scenario scenario = new Scenario("glyph_outline", true, ConditionMode.ALL,
+                Collections.singletonList(condition), java.util.Arrays.asList(
+                new LocalAction(TargetScope.DRIVER, "navigation",
+                        LocalField.ICON_OUTLINE_COLOR, "#FFFFD600"),
+                new LocalAction(TargetScope.DRIVER, "navigation",
+                        LocalField.ICON_OUTLINE_WIDTH, 4)), Collections.emptyList());
+
+        JSONObject patch = LocalScenarioController.buildOverrides(
+                Collections.singletonList(scenario), ignored -> Input.value(true, true, true))
+                .get("driver|navigation");
+
+        assertEquals("#FFFFD600", patch.optString("icon_outline_color"));
+        assertEquals(4, patch.optInt("icon_outline_width"));
+    }
+
+    @Test public void falseOutlineBranchProjectsItsOwnColorAndWidthTogether() {
+        ValueReference reference = new ValueReference("SYSTEM", "default",
+                "hwgps.route_lost", null);
+        Condition condition = new Condition("lost", reference, Input.FIELD_VALUE,
+                Operator.TRUE, "", "");
+        Scenario scenario = new Scenario("restored_outline", true, ConditionMode.ALL,
+                Collections.singletonList(condition), Collections.emptyList(),
+                java.util.Arrays.asList(
+                        new LocalAction(TargetScope.LAUNCHER, "navigation",
+                                LocalField.ICON_OUTLINE_COLOR, "#FF123456"),
+                        new LocalAction(TargetScope.LAUNCHER, "navigation",
+                                LocalField.ICON_OUTLINE_WIDTH, 2)));
+
+        JSONObject patch = LocalScenarioController.buildOverrides(
+                Collections.singletonList(scenario), ignored -> Input.value(false, true, true))
+                .get("launcher|navigation");
+
+        assertEquals("#FF123456", patch.optString("icon_outline_color"));
+        assertEquals(2, patch.optInt("icon_outline_width"));
     }
 
     private static Scenario scenario(String id, String resourceId, String targetId) {
