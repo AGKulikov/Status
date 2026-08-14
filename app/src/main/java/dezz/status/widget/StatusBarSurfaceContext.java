@@ -25,6 +25,8 @@ public final class StatusBarSurfaceContext {
 
     private static volatile boolean launcherHomeForeground;
     private static volatile boolean navigatorWindowForeground;
+    /** True only between a successful startActivity handoff and real a11y/vendor confirmation. */
+    private static volatile boolean navigatorWindowOptimistic;
 
     private StatusBarSurfaceContext() {
     }
@@ -37,14 +39,28 @@ public final class StatusBarSurfaceContext {
         return navigatorWindowForeground;
     }
 
-    /** Called only from {@link LauncherActivity}'s resumed/paused lifecycle on the main thread. */
+    public static boolean isNavigatorWindowOptimistic() {
+        return navigatorWindowOptimistic;
+    }
+
+    /**
+     * Called from {@link LauncherActivity}'s window-focus lifecycle on the main thread.
+     *
+     * <p>The ECARX freeform implementation may resume HOME again while a Yandex window is still
+     * visible above it. Window focus, unlike {@code onResume()}, continues to identify the
+     * interactive top surface in that configuration.</p>
+     */
     public static void setLauncherHomeForeground(boolean foreground) {
-        boolean navigatorChanged = foreground && navigatorWindowForeground;
+        boolean navigatorChanged = foreground
+                && (navigatorWindowForeground || navigatorWindowOptimistic);
         if (launcherHomeForeground == foreground && !navigatorChanged) return;
         launcherHomeForeground = foreground;
         // Returning to the resumed HOME Activity is the authoritative close event for the
         // freeform Yandex window that Natro launched above it.
-        if (foreground) navigatorWindowForeground = false;
+        if (foreground) {
+            navigatorWindowForeground = false;
+            navigatorWindowOptimistic = false;
+        }
         notifySurfaceChanged();
     }
 
@@ -53,10 +69,37 @@ public final class StatusBarSurfaceContext {
      * Package identity alone cannot distinguish TransparentSplashActivity from full Navigator.
      */
     public static void setNavigatorWindowForeground(boolean foreground) {
-        if (navigatorWindowForeground == foreground) return;
+        boolean optimisticChanged = navigatorWindowOptimistic;
+        navigatorWindowOptimistic = false;
+        if (navigatorWindowForeground == foreground && !optimisticChanged) return;
         navigatorWindowForeground = foreground;
         if (foreground) launcherHomeForeground = false;
         notifySurfaceChanged();
+    }
+
+    /** Marks the preceding successful launch handoff as bounded, not as durable visibility. */
+    public static void markNavigatorWindowOptimistic() {
+        if (!navigatorWindowForeground || navigatorWindowOptimistic) return;
+        navigatorWindowOptimistic = true;
+        notifySurfaceChanged();
+    }
+
+    /** Consumes only the launch-owned assertion; confirmed accessibility fallback is untouched. */
+    public static boolean consumeNavigatorWindowOptimistic() {
+        if (!navigatorWindowOptimistic) return false;
+        navigatorWindowOptimistic = false;
+        navigatorWindowForeground = false;
+        notifySurfaceChanged();
+        return true;
+    }
+
+    /** Transfers all pre-existing fallback ownership to an already-established vendor decision. */
+    public static boolean consumeNavigatorWindowFallback() {
+        if (!navigatorWindowForeground && !navigatorWindowOptimistic) return false;
+        navigatorWindowForeground = false;
+        navigatorWindowOptimistic = false;
+        notifySurfaceChanged();
+        return true;
     }
 
     private static void notifySurfaceChanged() {
@@ -110,11 +153,21 @@ public final class StatusBarSurfaceContext {
                 || cls.endsWith(".TransparentSplashActivity"));
     }
 
-    static boolean isFullscreenYandex(@Nullable String packageName,
-                                      @Nullable String className) {
-        if (!isYandexPackage(packageName) || className == null) return false;
-        String cls = className.trim();
-        return cls.endsWith(".NavigatorActivity") || cls.endsWith(".MapActivity");
+    /**
+     * Applies one concrete Activity transition without confusing Yandex content with its window
+     * mode.
+     *
+     * <p>{@code NavigatorActivity}/{@code MapActivity} runs inside both the full-screen task and
+     * the ECARX freeform task after {@code TransparentSplashActivity} hands off. Consequently its
+     * class name is not evidence that a previously confirmed freeform window became full-screen.
+     * A non-Yandex top Activity remains a valid close/switch signal.</p>
+     */
+    static boolean navigatorWindowAfterStateChange(boolean current,
+                                                   @Nullable String packageName,
+                                                   @Nullable String className) {
+        if (isNavigatorWindow(packageName, className)) return true;
+        if (isYandexPackage(packageName)) return current;
+        return false;
     }
 
     static boolean isYandexPackage(@Nullable String packageName) {

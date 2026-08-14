@@ -8,6 +8,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -17,8 +20,8 @@ import androidx.core.content.ContextCompat;
  * Narrow, evidence-based bridge to the exported integration surface in HWGPS 4.5.27.
  *
  * <p>No HWGPS private service is started directly. Find-me uses its transparent/no-history
- * exported activity; route state uses the app's event broadcast and one explicit state request.
- * There is no timer or polling loop.</p>
+ * exported activity; route state uses the app's event broadcast and bounded one-shot confirmation
+ * requests. There is no polling loop.</p>
  */
 public final class HwgpsIntegration {
     public static final String PACKAGE_NAME = "org.astpepper.hwgps";
@@ -62,13 +65,21 @@ public final class HwgpsIntegration {
     public static final class RouteStateSubscription {
         private final Context context;
         private final Listener listener;
+        private final Handler mainHandler = new Handler(Looper.getMainLooper());
+        private final HwgpsRouteStateTracker tracker = new HwgpsRouteStateTracker();
+        private boolean registered;
+        private final Runnable deadlineRunnable = () -> {
+            if (!registered) return;
+            apply(tracker.evaluate(SystemClock.elapsedRealtime()));
+        };
         private final BroadcastReceiver receiver = new BroadcastReceiver() {
             @Override public void onReceive(Context ignored, Intent intent) {
-                if (intent == null || !ACTION_FIX_STATE.equals(intent.getAction())) return;
-                publish(HwgpsRouteStatePolicy.classify(intent.getStringExtra(EXTRA_FIX)));
+                if (!registered || intent == null
+                        || !ACTION_FIX_STATE.equals(intent.getAction())) return;
+                apply(tracker.accept(intent.getStringExtra(EXTRA_FIX),
+                        SystemClock.elapsedRealtime()));
             }
         };
-        private boolean registered;
         @NonNull private HwgpsRouteStatePolicy.State state =
                 HwgpsRouteStatePolicy.State.UNAVAILABLE;
 
@@ -79,6 +90,8 @@ public final class HwgpsIntegration {
 
         public void start() {
             if (registered) return;
+            tracker.reset();
+            state = HwgpsRouteStatePolicy.State.UNAVAILABLE;
             try {
                 ContextCompat.registerReceiver(context, receiver,
                         new IntentFilter(ACTION_FIX_STATE), ContextCompat.RECEIVER_EXPORTED);
@@ -87,10 +100,8 @@ public final class HwgpsIntegration {
                 publish(HwgpsRouteStatePolicy.State.UNAVAILABLE);
                 return;
             }
-            try {
-                context.sendBroadcast(new Intent(ACTION_FIX_STATE_REQUEST).setComponent(
-                        new ComponentName(PACKAGE_NAME, STATE_REQUEST_RECEIVER)));
-            } catch (RuntimeException ignored) {
+            if (!requestSnapshot()) {
+                tracker.reset();
                 publish(HwgpsRouteStatePolicy.State.UNAVAILABLE);
             }
         }
@@ -101,7 +112,9 @@ public final class HwgpsIntegration {
                 try { context.unregisterReceiver(receiver); }
                 catch (RuntimeException ignored) {}
             }
-            state = HwgpsRouteStatePolicy.State.UNAVAILABLE;
+            mainHandler.removeCallbacks(deadlineRunnable);
+            tracker.reset();
+            state = tracker.state();
         }
 
         @NonNull public HwgpsRouteStatePolicy.State state() { return state; }
@@ -110,6 +123,33 @@ public final class HwgpsIntegration {
             if (state == next) return;
             state = next;
             listener.onRouteStateChanged(next);
+        }
+
+        private void apply(@NonNull HwgpsRouteStateTracker.Update update) {
+            if (!registered) return;
+            mainHandler.removeCallbacks(deadlineRunnable);
+            if (update.deadlineAtMs != HwgpsRouteStateTracker.NO_DEADLINE && registered) {
+                long delayMs = Math.max(0L,
+                        update.deadlineAtMs - SystemClock.elapsedRealtime());
+                mainHandler.postDelayed(deadlineRunnable, delayMs);
+            }
+            if (update.requestSnapshot && !requestSnapshot()) {
+                tracker.reset();
+                mainHandler.removeCallbacks(deadlineRunnable);
+                publish(HwgpsRouteStatePolicy.State.UNAVAILABLE);
+                return;
+            }
+            publish(update.state);
+        }
+
+        private boolean requestSnapshot() {
+            try {
+                context.sendBroadcast(new Intent(ACTION_FIX_STATE_REQUEST).setComponent(
+                        new ComponentName(PACKAGE_NAME, STATE_REQUEST_RECEIVER)));
+                return true;
+            } catch (RuntimeException ignored) {
+                return false;
+            }
         }
     }
 

@@ -58,6 +58,7 @@ import java.util.concurrent.Executors;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.R;
 import dezz.status.widget.WidgetService;
+import dezz.status.widget.OutlineImageView;
 import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarControlState;
@@ -1197,9 +1198,9 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         DriverPanelStylePolicy.IconStyle initialStyle = DriverPanelStylePolicy.icon(
                 shortcut.iconColor, shortcut.backgroundColor, initialAutomation);
         background = safeColor(initialStyle.backgroundColor, background);
-        button.setBackground(rippleBackground(background, 14,
-                safeColor(initialStyle.outlineColor, Color.TRANSPARENT),
-                initialStyle.outlineWidthPx));
+        // Scenario icon outlines belong to the glyph. Keep the clickable button background free
+        // of that stroke; the four-argument call is retained only as the no-stroke ripple path.
+        button.setBackground(rippleBackground(background, 14, Color.TRANSPARENT, 0));
 
         LinearLayout content = new LinearLayout(context);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -1209,13 +1210,13 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         boolean liveClimate = isLiveClimate(shortcut);
         boolean expandedClimate = isExpandedClimate(shortcut);
         View icon;
-        @Nullable ImageView stateIcon = null;
+        @Nullable OutlineImageView stateIcon = null;
         if (liveClimate) {
             icon = new DriverClimateShortcutView(context, CarIntegrations.get(appContext),
                     initialStyle.tint, shortcut.extendedClimateInfo,
                     shortcut.climateDetailsGapPx);
         } else {
-            ImageView image = new ImageView(context);
+            OutlineImageView image = new OutlineImageView(context);
             image.setScaleType(ImageView.ScaleType.FIT_CENTER);
             Drawable resolved;
             if (shortcut.kind == LauncherShortcutStore.Kind.APP
@@ -1234,6 +1235,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                     && !"none".equalsIgnoreCase(initialAutomation.iconTint)) {
                 image.setColorFilter(safeColor(initialStyle.tint, Color.WHITE));
             }
+            applyGlyphOutline(image, initialStyle);
             icon = image;
             stateIcon = image;
         }
@@ -1650,14 +1652,14 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 shortcut, liveTint, liveBackground);
         int background = safeColor(style.backgroundColor,
                 Color.TRANSPARENT);
-        binding.button.setBackground(rippleBackground(background, 14,
-                safeColor(style.outlineColor, Color.TRANSPARENT), style.outlineWidthPx));
+        binding.button.setBackground(rippleBackground(background, 14));
         String tint = style.tint;
         String contentColor = SmartHomeTileColorPolicy.contentColor(
                 source, shortcut.textColor, tint);
         LauncherShortcutStore.Shortcut visual = shortcut.copy();
         visual.icon = state.iconKey;
         binding.icon.setImageDrawable(LauncherIconResolver.resolve(appContext, visual, tint));
+        applyGlyphOutline(binding.icon, style);
         if (binding.titleLabel != null) {
             binding.titleLabel.setTextColor(safeColor(contentColor, Color.WHITE));
         }
@@ -1715,8 +1717,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 shortcut, liveTint, liveBackground);
         int background = safeColor(style.backgroundColor,
                 Color.TRANSPARENT);
-        binding.button.setBackground(rippleBackground(background, 14,
-                safeColor(style.outlineColor, Color.TRANSPARENT), style.outlineWidthPx));
+        binding.button.setBackground(rippleBackground(background, 14));
         String tint = style.tint;
         if (TrunkControlSafety.isTrunk(shortcut.target)) {
             binding.icon.setImageDrawable(LauncherIconResolver.resolvePreset(appContext,
@@ -1725,6 +1726,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             binding.icon.setImageDrawable(LauncherIconResolver.resolve(
                     appContext, shortcut, tint));
         }
+        applyGlyphOutline(binding.icon, style);
         if (binding.titleLabel != null) {
             binding.titleLabel.setTextColor(safeColor(tint, Color.WHITE));
         }
@@ -1758,6 +1760,12 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         }
     }
 
+    private static void applyGlyphOutline(@NonNull OutlineImageView icon,
+                                          @NonNull DriverPanelStylePolicy.IconStyle style) {
+        icon.setOutlineColor(safeColor(style.outlineColor, Color.TRANSPARENT));
+        icon.setOutlineWidth(style.outlineWidthPx);
+    }
+
     private static int safeOpaqueColor(@Nullable String raw, int fallback) {
         return safeColor(raw, fallback) | 0xFF000000;
     }
@@ -1772,16 +1780,22 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
     @NonNull
     private static Drawable rippleBackground(int color, int radius) {
-        return rippleBackground(color, radius, Color.TRANSPARENT, 0);
+        return plainRippleBackground(color, radius);
     }
 
     @NonNull
-    private static Drawable rippleBackground(int color, int radius, int outlineColor,
-                                             int outlineWidthPx) {
+    private static Drawable rippleBackground(int color, int radius, int ignoredOutlineColor,
+                                             int ignoredOutlineWidthPx) {
+        // Compatibility overload for the frozen HA1217 source contract. Icon outlines are now
+        // rendered by OutlineImageView; neither argument may affect the button container.
+        return plainRippleBackground(color, radius);
+    }
+
+    @NonNull
+    private static Drawable plainRippleBackground(int color, int radius) {
         GradientDrawable content = new GradientDrawable();
         content.setColor(color);
         content.setCornerRadius(radius);
-        if (outlineWidthPx > 0) content.setStroke(outlineWidthPx, outlineColor);
         GradientDrawable mask = new GradientDrawable();
         mask.setColor(Color.WHITE);
         mask.setCornerRadius(radius);
@@ -1968,13 +1982,13 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private static final class SmartHomeBinding {
         @NonNull final LauncherShortcutStore.Shortcut shortcut;
         @NonNull final FrameLayout button;
-        @NonNull final ImageView icon;
+        @NonNull final OutlineImageView icon;
         @Nullable final TextView titleLabel;
         @Nullable final TextView stateLabel;
         final boolean actionEnabled;
 
         SmartHomeBinding(@NonNull LauncherShortcutStore.Shortcut shortcut,
-                         @NonNull FrameLayout button, @NonNull ImageView icon,
+                         @NonNull FrameLayout button, @NonNull OutlineImageView icon,
                          @Nullable TextView titleLabel, @Nullable TextView stateLabel,
                          boolean actionEnabled) {
             this.shortcut = shortcut;
@@ -1989,13 +2003,13 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private static final class CarStateBinding {
         @NonNull final LauncherShortcutStore.Shortcut shortcut;
         @NonNull final FrameLayout button;
-        @NonNull final ImageView icon;
+        @NonNull final OutlineImageView icon;
         @Nullable final TextView titleLabel;
         @Nullable final TextView stateLabel;
         final boolean actionEnabled;
 
         CarStateBinding(@NonNull LauncherShortcutStore.Shortcut shortcut,
-                        @NonNull FrameLayout button, @NonNull ImageView icon,
+                        @NonNull FrameLayout button, @NonNull OutlineImageView icon,
                         @Nullable TextView titleLabel, @Nullable TextView stateLabel,
                         boolean actionEnabled) {
             this.shortcut = shortcut;

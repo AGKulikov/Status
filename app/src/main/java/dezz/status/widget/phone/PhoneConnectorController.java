@@ -219,6 +219,8 @@ public final class PhoneConnectorController {
     private boolean v2SwitchInProgress;
     private int reconnectAttempt;
     private String lastError = "";
+    private String lastTypedV2Error = "";
+    private long lastTypedV2ErrorTransportSession = -1L;
     private String ancsStatus = "stopped";
     private String smsStatus = "stopped";
     private String stockConnectionStatus = "stopped";
@@ -489,6 +491,8 @@ public final class PhoneConnectorController {
         stockConnectionAttempt = 0;
         stockConnectionRequestInProgress = false;
         lastError = "";
+        lastTypedV2Error = "";
+        lastTypedV2ErrorTransportSession = -1L;
         ancsStatus = diagnostic;
         smsStatus = diagnostic;
         stockConnectionStatus = diagnostic;
@@ -1133,6 +1137,8 @@ public final class PhoneConnectorController {
             ancsTransportStartPending = true;
             activeAncsTransportSession = ++nextAncsTransportSession;
         }
+        lastTypedV2Error = "";
+        lastTypedV2ErrorTransportSession = -1L;
         ancsStatus = "starting_v2";
         ancsRecoveryRoute = IphoneTransportRecoveryStateV2.PROGRESSING;
         publishSnapshot(token);
@@ -1228,7 +1234,15 @@ public final class PhoneConnectorController {
 
         @Override public void onDualTransportStatus(IphoneDualTransportStatusV2 status) {
             dispatchAncsTransport(token, transportSession,
-                    () -> applyV2DualStatus(token, status));
+                    () -> applyV2DualStatus(token, transportSession, status));
+        }
+
+        @Override public void onPlatformDiagnostic(
+                IphoneBleMode mode, BleRouteEpoch epoch, String detail) {
+            dispatchAncsTransport(token, transportSession, () ->
+                    PhoneConnectionJournal.append("v2-platform",
+                            "mode=" + mode + ", epoch=" + epoch + ", detail="
+                                    + bounded(redactedDiagnostic(detail), 256)));
         }
 
         @Override public void onStatus(IphoneTransportStatusV2 status) {
@@ -1288,14 +1302,18 @@ public final class PhoneConnectorController {
                                 + ", kind=" + error.kind + ", retryable="
                                 + error.retryable + ", detail="
                                 + redactedDiagnostic(error.detail));
-                lastError = bounded(error.kind + ": " + error.detail, 512);
+                String typedError = bounded(error.kind + ": " + error.detail, 512);
+                lastTypedV2Error = typedError;
+                lastTypedV2ErrorTransportSession = transportSession;
+                lastError = typedError;
                 if (!error.retryable) ancsStatus = "failed_closed";
                 publishSnapshot(token);
             });
         }
     }
 
-    private void applyV2DualStatus(long token, @Nullable IphoneDualTransportStatusV2 status) {
+    private void applyV2DualStatus(long token, long transportSession,
+                                   @Nullable IphoneDualTransportStatusV2 status) {
         if (status == null) return;
         PhoneConnectionJournal.append("v2-switch",
                 "phase=" + status.switchPhase + ", desired=" + status.desiredMode
@@ -1341,11 +1359,25 @@ public final class PhoneConnectorController {
             ancsReady = false;
             gattConnected = false;
             ancsStatus = "switch_failed_closed";
-            lastError = bounded(status.detail, 512);
+            lastError = preserveTypedV2Failure(transportSession, status.detail);
             updateAncsPresenceLocked(false);
         }
         reconcileClassicAncsRecovery(token);
         publishSnapshot(token);
+    }
+
+    @NonNull
+    private String preserveTypedV2Failure(long transportSession, @Nullable String genericDetail) {
+        String generic = bounded(genericDetail, 512);
+        if (!generic.contains("TARGET_START_FAILED")
+                || lastTypedV2ErrorTransportSession != transportSession
+                || lastTypedV2Error.isEmpty()
+                || generic.contains(lastTypedV2Error)) {
+            return generic;
+        }
+        // Keep the typed route evidence first; TARGET_START_FAILED is only the coordinator's
+        // generic terminal summary and must not erase the platform/root cause that preceded it.
+        return bounded(lastTypedV2Error + "; " + generic, 512);
     }
 
     private void applyV2RouteStatus(long token, @Nullable IphoneTransportStatusV2 status) {
@@ -1362,6 +1394,8 @@ public final class PhoneConnectorController {
         ancsReady = ready;
         if (ready) {
             lastError = "";
+            lastTypedV2Error = "";
+            lastTypedV2ErrorTransportSession = -1L;
             reconnectAttempt = 0;
             scheduleStableAncsReadyReset(token);
             cancelSmsFallbackNotifications();
@@ -2375,6 +2409,8 @@ public final class PhoneConnectorController {
             ancsTransportStartPending = false;
             activeAncsTransportSession = ++nextAncsTransportSession;
         }
+        lastTypedV2Error = "";
+        lastTypedV2ErrorTransportSession = -1L;
         if (previousV2 != null) previousV2.close();
         ancsRecoveryRoute = IphoneTransportRecoveryStateV2.NO_OWNER;
     }

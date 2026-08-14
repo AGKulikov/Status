@@ -19,13 +19,13 @@ public final class Ha1219NatroBrandingContractTest {
         String values = project("app/src/main/res/values/strings.xml");
         String valuesRu = project("app/src/main/res/values-ru/strings.xml");
         String manifest = project("app/src/main/AndroidManifest.xml");
-        String gradle = project("build.gradle");
         assertTrue(values.contains("<string name=\"app_name\">Natro</string>"));
         assertTrue(valuesRu.contains("<string name=\"app_name\">Natro</string>"));
         assertFalse(values.contains("<string name=\"app_name\">Natro 2.0</string>"));
         assertTrue(manifest.contains("android:label=\"@string/app_name\""));
-        assertTrue(gradle.contains("return '2.0.2'"));
-        assertTrue(gradle.contains("return 208021219"));
+        String frozenRelease = project(".github/workflows/release-ha1219.yml");
+        assertTrue(frozenRelease.contains("VERSION_NAME: '2.0.2'"));
+        assertTrue(frozenRelease.contains("VERSION_CODE: '208021219'"));
         assertTrue(project("app/build.gradle").contains(
                 "applicationId \"ru.natro.statuswidget\""));
     }

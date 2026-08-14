@@ -272,6 +272,12 @@ public class WidgetService extends Service {
     private static final long FOREGROUND_APP_CHECK_INTERVAL_MS = 2_000L;
     private static final long FOREGROUND_APP_LOOKBACK_MS = 60_000L;
     private static final long FOREGROUND_FAILURE_LOG_INTERVAL_MS = 10_000L;
+    /** Longer than two observer refresh periods; prevents a dead Binder from pinning a hide. */
+    private static final long ECARX_NAVIGATOR_CONFIRMATION_LEASE_MS = 6_000L;
+    private static final long ECARX_NAVIGATOR_OPTIMISTIC_GRACE_MS = 1_800L;
+    private static final long[] ECARX_NAVIGATOR_OPTIMISTIC_RETRY_OFFSETS_MS = {
+            0L, 120L, 400L, 900L, 1_500L
+    };
     private static final String GNSSSHARE_CLIENT_PACKAGE = "dezz.gnssshare.client";
     private static final String GNSSSHARE_SATELLITE_STATUS_ACTION = "dezz.gnssshare.action.SATELLITE_STATUS";
     /** Satellite count extra. A value of {@code -1} means "no satellite data" (badge hidden). */
@@ -767,6 +773,20 @@ public class WidgetService extends Service {
     private Set<String> hiddenInPackages;
     private String lastForegroundPackage;
     private long lastForegroundFailureLogElapsed;
+    @Nullable private EcarxNavigatorWindowObserver ecarxNavigatorWindowObserver;
+    /** Independent from StatusBarSurfaceContext's launch/focus/a11y fallback token. */
+    @NonNull private NavigatorWindowSourcePolicy.VendorDecision ecarxNavigatorWindowDecision =
+            NavigatorWindowSourcePolicy.VendorDecision.NONE;
+    private long ecarxNavigatorWindowDecisionAtElapsed = -1L;
+    private final Runnable ecarxNavigatorWindowLeaseExpiry =
+            this::expireEcarxNavigatorWindowLease;
+    private boolean ecarxNavigatorOptimisticConfirmationPending;
+    private long ecarxNavigatorOptimisticStartedAtElapsed = -1L;
+    private int ecarxNavigatorOptimisticRetryIndex;
+    private final Runnable ecarxNavigatorOptimisticRetry =
+            this::runEcarxNavigatorOptimisticRetry;
+    private final Runnable ecarxNavigatorOptimisticExpiry =
+            this::expireEcarxNavigatorOptimisticConfirmation;
     private boolean overlayHiddenByApp = false;
 
     /**
@@ -1106,6 +1126,9 @@ public class WidgetService extends Service {
         touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
         timeFormat = new SimpleDateFormat("HH:mm", Locale.getDefault());
         windowManager = getSystemService(WindowManager.class);
+        ecarxNavigatorWindowObserver = new EcarxNavigatorWindowObserver(
+                this, this::onEcarxNavigatorWindowStateChanged);
+        ecarxNavigatorWindowObserver.start(android.view.Display.DEFAULT_DISPLAY);
 
         if (prefs.widgetEnabled.get() && overlayRuntimeAvailable) {
             createOverlayView();
@@ -2574,6 +2597,10 @@ public class WidgetService extends Service {
         }
 
         overlayAttached = true;
+        if (ecarxNavigatorWindowObserver != null) {
+            ecarxNavigatorWindowObserver.setTargetDisplayId(currentOverlayDisplayId());
+            ecarxNavigatorWindowObserver.refresh("status-overlay-attached");
+        }
         mainHandler.removeCallbacks(overlayAttachRetry);
         overlayAttachRetryScheduled = false;
         overlayAttachAttempts = 0;
@@ -4864,8 +4891,10 @@ public class WidgetService extends Service {
     }
 
     private boolean matchesForegroundContext(@Nullable Set<String> targets) {
+        boolean navigatorWindow = effectiveNavigatorWindowForeground();
         return StatusBarSurfaceContext.matches(
-                targets, lastForegroundPackage, isLauncherHomeTopSurface());
+                targets, lastForegroundPackage,
+                navigatorWindow ? false : isLauncherHomeTopSurface(), navigatorWindow);
     }
 
     private boolean anyBrickNeedsPackageTracking() {
@@ -6579,14 +6608,50 @@ public class WidgetService extends Service {
      * Recomputes visibility based on the package on <i>our</i> display.
      */
     public void onForegroundDisplayMapUpdated() {
+        if (ecarxNavigatorWindowObserver != null) {
+            ecarxNavigatorWindowObserver.refresh("accessibility-display-map");
+        }
         mainHandler.post(() -> safeCheckForegroundApp("display map update"));
     }
 
     /** Event-driven lifecycle update for non-package targets such as our HOME Activity. */
     public void onForegroundSurfaceContextChanged() {
+        boolean beganOptimisticConfirmation = false;
+        NavigatorWindowSourcePolicy.OptimisticAction optimisticAction =
+                NavigatorWindowSourcePolicy.optimisticActionAfterSurfaceChange(
+                        ecarxNavigatorOptimisticConfirmationPending,
+                        StatusBarSurfaceContext.isNavigatorWindowForeground(),
+                        StatusBarSurfaceContext.isNavigatorWindowOptimistic());
+        switch (optimisticAction) {
+            case START_OR_RESTART:
+                // A fresh successful startActivity hand-off owns a fresh bounded grace. The
+                // following exact TransparentSplash a11y event converts the fallback token but
+                // deliberately leaves this independent vendor confirmation running.
+                beginEcarxNavigatorOptimisticConfirmation();
+                beganOptimisticConfirmation = true;
+                break;
+            case CANCEL:
+                cancelEcarxNavigatorOptimisticConfirmation();
+                break;
+            case KEEP:
+            case IDLE:
+            default:
+                break;
+        }
+        if (!beganOptimisticConfirmation && ecarxNavigatorWindowObserver != null) {
+            // The app-owned launch/focus token is intentionally optimistic. Reconcile it with the
+            // real vendor frame after every transition, even on firmware that omits callbacks.
+            ecarxNavigatorWindowObserver.refresh("surface-context");
+        }
+        recomputeForegroundSurfacePresentation();
+    }
+
+    /** Applies both root and per-element rules without recursively requesting another snapshot. */
+    private void recomputeForegroundSurfacePresentation() {
         Runnable update = () -> {
             boolean packageChanged = false;
-            if (StatusBarSurfaceContext.isLauncherHomeForeground()) {
+            if (StatusBarSurfaceContext.isLauncherHomeForeground()
+                    && !effectiveNavigatorWindowForeground()) {
                 // API 28 deliberately ignores our own accessibility events. Replace a closed
                 // freeform Navigator's stale package immediately when HOME regains focus.
                 packageChanged = !getPackageName().equals(lastForegroundPackage);
@@ -6612,6 +6677,136 @@ public class WidgetService extends Service {
      */
     public void onForegroundTrackingPathChanged() {
         mainHandler.post(() -> safeUpdateForegroundAppTracking("accessibility state"));
+    }
+
+    /** Vendor geometry is authoritative when available; UNKNOWN preserves the safe fallback. */
+    private void onEcarxNavigatorWindowStateChanged(
+            @NonNull NavigatorWindowFramePolicy.Result result) {
+        if (destroyed) return;
+        NavigatorWindowSourcePolicy.VendorDecision decision =
+                NavigatorWindowSourcePolicy.decisionFor(
+                        result, ecarxNavigatorOptimisticConfirmationPending,
+                        ecarxNavigatorWindowDecision);
+        mainHandler.removeCallbacks(ecarxNavigatorWindowLeaseExpiry);
+        if (decision == NavigatorWindowSourcePolicy.VendorDecision.NONE) {
+            ecarxNavigatorWindowDecision = decision;
+            ecarxNavigatorWindowDecisionAtElapsed = -1L;
+            recomputeForegroundSurfacePresentation();
+            return;
+        }
+
+        cancelEcarxNavigatorOptimisticConfirmation();
+        ecarxNavigatorWindowDecision = decision;
+        ecarxNavigatorWindowDecisionAtElapsed = SystemClock.elapsedRealtime();
+        mainHandler.postDelayed(ecarxNavigatorWindowLeaseExpiry,
+                ECARX_NAVIGATOR_CONFIRMATION_LEASE_MS + 1L);
+
+        // startActivity's optimistic token led us here, but it must not outlive the independent
+        // vendor lease. Transfer ownership by consuming only the pre-existing fallback assertion;
+        // a later accessibility/lifecycle event remains free to publish a fresh fallback.
+        StatusBarSurfaceContext.consumeNavigatorWindowFallback();
+        recomputeForegroundSurfacePresentation();
+    }
+
+    private void beginEcarxNavigatorOptimisticConfirmation() {
+        ecarxNavigatorOptimisticConfirmationPending = true;
+        ecarxNavigatorOptimisticStartedAtElapsed = SystemClock.elapsedRealtime();
+        ecarxNavigatorOptimisticRetryIndex = 0;
+        mainHandler.removeCallbacks(ecarxNavigatorOptimisticRetry);
+        mainHandler.removeCallbacks(ecarxNavigatorOptimisticExpiry);
+        mainHandler.removeCallbacks(ecarxNavigatorWindowLeaseExpiry);
+        ecarxNavigatorWindowDecision = NavigatorWindowSourcePolicy.VendorDecision.NONE;
+        ecarxNavigatorWindowDecisionAtElapsed = -1L;
+        mainHandler.post(ecarxNavigatorOptimisticRetry);
+        mainHandler.postDelayed(ecarxNavigatorOptimisticExpiry,
+                ECARX_NAVIGATOR_OPTIMISTIC_GRACE_MS + 1L);
+    }
+
+    private void runEcarxNavigatorOptimisticRetry() {
+        if (destroyed || !ecarxNavigatorOptimisticConfirmationPending) return;
+        long age = SystemClock.elapsedRealtime() - ecarxNavigatorOptimisticStartedAtElapsed;
+        if (age < 0L || age > ECARX_NAVIGATOR_OPTIMISTIC_GRACE_MS) return;
+        if (ecarxNavigatorOptimisticRetryIndex
+                >= ECARX_NAVIGATOR_OPTIMISTIC_RETRY_OFFSETS_MS.length) return;
+        int attempt = ecarxNavigatorOptimisticRetryIndex++;
+        if (ecarxNavigatorWindowObserver != null) {
+            ecarxNavigatorWindowObserver.refresh("optimistic-confirmation-" + attempt);
+        }
+        if (ecarxNavigatorOptimisticRetryIndex
+                < ECARX_NAVIGATOR_OPTIMISTIC_RETRY_OFFSETS_MS.length) {
+            long nextOffset = ECARX_NAVIGATOR_OPTIMISTIC_RETRY_OFFSETS_MS[
+                    ecarxNavigatorOptimisticRetryIndex];
+            mainHandler.postDelayed(ecarxNavigatorOptimisticRetry,
+                    Math.max(1L, nextOffset - age));
+        }
+    }
+
+    private void cancelEcarxNavigatorOptimisticConfirmation() {
+        ecarxNavigatorOptimisticConfirmationPending = false;
+        ecarxNavigatorOptimisticStartedAtElapsed = -1L;
+        ecarxNavigatorOptimisticRetryIndex = 0;
+        mainHandler.removeCallbacks(ecarxNavigatorOptimisticRetry);
+        mainHandler.removeCallbacks(ecarxNavigatorOptimisticExpiry);
+    }
+
+    private void expireEcarxNavigatorOptimisticConfirmation() {
+        if (destroyed || !ecarxNavigatorOptimisticConfirmationPending) return;
+        long age = SystemClock.elapsedRealtime() - ecarxNavigatorOptimisticStartedAtElapsed;
+        if (age >= 0L && age <= ECARX_NAVIGATOR_OPTIMISTIC_GRACE_MS) {
+            mainHandler.postDelayed(ecarxNavigatorOptimisticExpiry,
+                    ECARX_NAVIGATOR_OPTIMISTIC_GRACE_MS - age + 1L);
+            return;
+        }
+        cancelEcarxNavigatorOptimisticConfirmation();
+        boolean consumedLaunchAssertion =
+                StatusBarSurfaceContext.consumeNavigatorWindowOptimistic();
+        if (!consumedLaunchAssertion
+                && StatusBarSurfaceContext.isNavigatorWindowForeground()
+                && ecarxNavigatorWindowObserver != null) {
+            // TransparentSplash a11y may already have converted the launch marker into an exact
+            // fallback assertion. At the end of the vendor grace, actively re-query once more so
+            // two confirmed ABSENT samples can bound that fallback too; UNKNOWN still fails back
+            // to the exact accessibility evidence.
+            ecarxNavigatorWindowObserver.refresh("optimistic-expiry");
+        }
+        try {
+            DiagnosticJournal.warn("navigator-window", "optimistic confirmation expired");
+        } catch (RuntimeException | LinkageError ignored) {}
+        recomputeForegroundSurfacePresentation();
+    }
+
+    private boolean effectiveNavigatorWindowForeground() {
+        return NavigatorWindowSourcePolicy.effectiveWindow(
+                StatusBarSurfaceContext.isNavigatorWindowForeground(),
+                ecarxNavigatorWindowDecision, ecarxNavigatorWindowDecisionAtElapsed,
+                SystemClock.elapsedRealtime(), ECARX_NAVIGATOR_CONFIRMATION_LEASE_MS);
+    }
+
+    private boolean hasLiveEcarxNavigatorWindowConfirmation() {
+        return ecarxNavigatorWindowDecision
+                == NavigatorWindowSourcePolicy.VendorDecision.WINDOWED
+                && NavigatorWindowSourcePolicy.isLive(
+                        ecarxNavigatorWindowDecision, ecarxNavigatorWindowDecisionAtElapsed,
+                        SystemClock.elapsedRealtime(), ECARX_NAVIGATOR_CONFIRMATION_LEASE_MS);
+    }
+
+    /** Active expiry is required: with a dead Binder there may be no event to trigger a lazy read. */
+    private void expireEcarxNavigatorWindowLease() {
+        if (destroyed || ecarxNavigatorWindowDecision
+                == NavigatorWindowSourcePolicy.VendorDecision.NONE) return;
+        long now = SystemClock.elapsedRealtime();
+        long age = now - ecarxNavigatorWindowDecisionAtElapsed;
+        if (age >= 0L && age <= ECARX_NAVIGATOR_CONFIRMATION_LEASE_MS) {
+            mainHandler.postDelayed(ecarxNavigatorWindowLeaseExpiry,
+                    ECARX_NAVIGATOR_CONFIRMATION_LEASE_MS - age + 1L);
+            return;
+        }
+        ecarxNavigatorWindowDecision = NavigatorWindowSourcePolicy.VendorDecision.NONE;
+        ecarxNavigatorWindowDecisionAtElapsed = -1L;
+        try {
+            DiagnosticJournal.warn("navigator-window", "vendor confirmation lease expired");
+        } catch (RuntimeException | LinkageError ignored) {}
+        recomputeForegroundSurfacePresentation();
     }
 
     private void safeCheckForegroundApp(@NonNull String operation) {
@@ -6674,10 +6869,13 @@ public class WidgetService extends Service {
         }
         if (latestPackage == null) return;
         if (StatusBarSurfaceContext.isNavigatorWindowForeground()
+                && !hasLiveEcarxNavigatorWindowConfirmation()
+                && !ecarxNavigatorOptimisticConfirmationPending
                 && !StatusBarSurfaceContext.isYandexPackage(latestPackage)) {
-            // UsageStats has no Activity class, but it can still prove that the floating Yandex
-            // surface is no longer topmost. Do not let an optimistic launch token leak into the
-            // next ordinary application when Accessibility is unavailable.
+            // UsageStats has no Activity class and may lag behind a slow freeform hand-off, so it
+            // cannot cancel the independent launch grace. Once that grace has ended it can still
+            // prove that the floating surface is no longer topmost and prevent a fallback token
+            // from leaking into the next ordinary application.
             StatusBarSurfaceContext.setNavigatorWindowForeground(false);
         }
 
@@ -7156,6 +7354,14 @@ public class WidgetService extends Service {
             super.onDestroy();
             return;
         }
+        if (ecarxNavigatorWindowObserver != null) {
+            ecarxNavigatorWindowObserver.stop();
+            ecarxNavigatorWindowObserver = null;
+        }
+        mainHandler.removeCallbacks(ecarxNavigatorWindowLeaseExpiry);
+        cancelEcarxNavigatorOptimisticConfirmation();
+        ecarxNavigatorWindowDecision = NavigatorWindowSourcePolicy.VendorDecision.NONE;
+        ecarxNavigatorWindowDecisionAtElapsed = -1L;
         integrationStartupScheduled = false;
         cancelDeferredIntegrationStart();
         startupStateWorker.shutdownNow();

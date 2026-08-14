@@ -11,9 +11,16 @@ public final class HwgpsRouteStatePolicyTest {
                 HwgpsRouteStatePolicy.classify("notFixed"));
     }
 
-    @Test public void everyEvidencedFixWidgetStateClearsLost() {
+    @Test public void explicitAutoShowStatesAreLost() {
+        for (String state : new String[] {"filtered", "spoofing"}) {
+            assertEquals(state, HwgpsRouteStatePolicy.State.ROUTE_LOST,
+                    HwgpsRouteStatePolicy.classify(state));
+        }
+    }
+
+    @Test public void nonExplicitAutoShowFixStatesAreAvailableBroadcastEvidence() {
         for (String state : new String[] {"fix_ok", "fix_dr", "fix_sw_dr",
-                "fix_sw_dr_mm", "fix_sw_yl_safe", "filtered", "spoofing"}) {
+                "fix_sw_dr_mm", "fix_sw_yl_safe"}) {
             assertEquals(state, HwgpsRouteStatePolicy.State.ROUTE_AVAILABLE,
                     HwgpsRouteStatePolicy.classify(state));
         }

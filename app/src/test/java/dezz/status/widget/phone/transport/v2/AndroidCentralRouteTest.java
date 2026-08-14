@@ -11,13 +11,17 @@ import org.junit.Test;
 import java.util.UUID;
 
 public final class AndroidCentralRouteTest {
-    private static final String BOND = "aa:bb:cc:dd:ee:ff";
+    private static final String BOND = "AA:BB:CC:DD:EE:FF";
     private static final String HELPER = "helper-installation-7";
 
     @Test public void selectedBondSilenceReassertsSameOwnerThenWaitsWithoutWrapperChurn() {
         AndroidCentralRoute.State state = startSelected(new BleRouteEpoch(11L, 1L));
         BleRouteToken quiet = state.expected;
-        state = AndroidCentralRoute.startupQuietElapsed(state, quiet, true).state;
+        BleRouteTransition<AndroidCentralRoute.State> firstConnect =
+                AndroidCentralRoute.startupQuietElapsed(state, quiet, true);
+        assertEquals(1, countEffects(firstConnect, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+        assertTrue(firstConnect.effects.get(0).detail.contains("autoConnect=false"));
+        state = firstConnect.state;
         assertEquals(AndroidCentralRoute.Phase.CONNECTING, state.phase);
         long soleOwner = state.expected.ownerId;
 
@@ -45,6 +49,21 @@ public final class AndroidCentralRouteTest {
         assertEquals(soleOwner, exhausted.state.activeOwnerId);
         assertFalse(hasEffect(exhausted, BleRouteEffect.Type.CLOSE_GATT));
         assertFalse(hasEffect(exhausted, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+    }
+
+    @Test public void alphabeticSelectedBondCanonicalizesBeforeSingleOwnerAllocation() {
+        IphoneTransportStartRequest request = new IphoneTransportStartRequest(
+                new BleRouteEpoch(11L, 2L), " aa:bC:dE:f0:A1:b2 ", HELPER, true, 0L,
+                IphoneAcquisitionModeV2.SELECTED_BOND);
+        assertEquals("AA:BC:DE:F0:A1:B2", request.selectedSystemBondAddress);
+
+        AndroidCentralRoute.State state = AndroidCentralRoute.start(request).state;
+        BleRouteTransition<AndroidCentralRoute.State> connect =
+                AndroidCentralRoute.startupQuietElapsed(state, state.expected, true);
+        assertEquals("AA:BC:DE:F0:A1:B2", connect.state.selectedSystemBondAddress);
+        assertEquals(1, countEffects(connect, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+        assertFalse(hasEffect(connect, BleRouteEffect.Type.START_SCAN));
+        assertFalse(hasEffect(connect, BleRouteEffect.Type.CLOSE_GATT));
     }
 
     @Test public void unprovableOwnerBlocksRoleSwitchAndNeverClaimsLocalTerminal() {
@@ -458,6 +477,15 @@ public final class AndroidCentralRouteTest {
             if (transition.effects.get(index).type == type) return index;
         }
         return -1;
+    }
+
+    private static int countEffects(BleRouteTransition<?> transition,
+                                    BleRouteEffect.Type type) {
+        int count = 0;
+        for (BleRouteEffect effect : transition.effects) {
+            if (effect.type == type) count++;
+        }
+        return count;
     }
 
     private static void assertCounterFailure(BleRouteTransition<?> transition,

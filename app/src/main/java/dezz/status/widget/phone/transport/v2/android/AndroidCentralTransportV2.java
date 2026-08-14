@@ -81,6 +81,7 @@ import java.util.UUID;
 public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 {
     private static final long CONTROL_RETRY_DELAY_MS = 150L;
     private static final long IDENTITY_COMMIT_TIMEOUT_MS = 5_000L;
+    private static final int PLATFORM_DIAGNOSTIC_LIMIT = 256;
     private static final UUID GENERIC_ATTRIBUTE_SERVICE =
             UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
     private static final UUID SERVICE_CHANGED =
@@ -139,6 +140,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         final BluetoothDevice device;
         final SelectedBondIdentityResolverV2.Candidate bondAttribution;
         BluetoothGatt gatt;
+        long connectGattStartedAtMillis;
         boolean callbackObserved;
         boolean connected;
         boolean closing;
@@ -701,6 +703,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         // Android 9 (which rejects lower-case A-F in Bluetooth addresses).
         SelectedBondFacade selectedBond = selectedSystemBondFacade(
                 startRequest.selectedSystemBondAddress);
+        reportPlatformDiagnostic(token,
+                "selected_bond unique=" + (selectedBond.matches == 1)
+                        + ", matches=" + selectedBond.matches
+                        + ", bonded=" + (selectedBond.device != null));
         BluetoothDevice selected = selectedBond.device;
         SelectedBondIdentityResolverV2.Candidate attribution = bondAttribution.begin(
                 selected, startRequest.selectedSystemBondAddress,
@@ -712,7 +718,11 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             postConnected(token, false);
             return;
         }
-        createGattOwner(token, selected, true, attribution);
+        // Android P/KX11 field captures showed the passive autoConnect=true registration staying
+        // silent for 15-40 seconds.  The first exact selected-bond attempt is therefore active.
+        // This is a directed platform fix, not a guarantee: the same wrapper is still retained
+        // and reasserted if Android never supplies its first registration callback.
+        createGattOwner(token, selected, false, attribution);
     }
 
     private void connectMatchedBootstrap(BleRouteToken token) {
@@ -760,6 +770,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             return;
         }
         if (!ProcessGattRegistrationGateV2.tryAcquire(candidate)) {
+            if (!candidate.waitingForProcessGate) {
+                reportPlatformDiagnostic(candidate.ownerToken,
+                        "process_gate result=queued");
+            }
             candidate.waitingForProcessGate = true;
             ProcessGattRegistrationGateV2.whenFree(candidate,
                     () -> dispatchMain(
@@ -767,10 +781,16 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             return;
         }
         candidate.waitingForProcessGate = false;
+        reportPlatformDiagnostic(candidate.ownerToken,
+                "process_gate result=acquired");
+        candidate.connectGattStartedAtMillis = android.os.SystemClock.elapsedRealtime();
         try {
             candidate.gatt = candidate.device.connectGatt(
                     context, autoConnect, gattCallback, BluetoothDevice.TRANSPORT_LE);
         } catch (RuntimeException error) {
+            reportPlatformDiagnostic(candidate.ownerToken,
+                    "connect_gatt returned=exception, type="
+                            + error.getClass().getSimpleName());
             owner = null;
             ProcessGattRegistrationGateV2.release(candidate);
             reportError(IphoneTransportErrorV2.Kind.GATT,
@@ -778,9 +798,14 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             postConnected(candidate.ownerToken, false);
             return;
         }
+        reportPlatformDiagnostic(candidate.ownerToken,
+                "connect_gatt returned=" + (candidate.gatt == null ? "null" : "wrapper")
+                        + ", autoConnect=" + autoConnect + ", transport=LE");
         if (candidate.gatt == null) {
             owner = null;
             ProcessGattRegistrationGateV2.release(candidate);
+            reportError(IphoneTransportErrorV2.Kind.GATT,
+                    "connectGatt returned null", true);
             postConnected(candidate.ownerToken, false);
         }
     }
@@ -796,11 +821,17 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private void reassertSameGatt(BleRouteToken token) {
         if (!owns(token) || owner.gatt == null || owner.closing) return;
         try {
-            if (!owner.gatt.connect()) {
+            boolean accepted = owner.gatt.connect();
+            reportPlatformDiagnostic(token,
+                    "same_wrapper_reassert result=" + accepted);
+            if (!accepted) {
                 reportError(IphoneTransportErrorV2.Kind.GATT,
                         "same BluetoothGatt.connect() reassert returned false", true);
             }
         } catch (RuntimeException error) {
+            reportPlatformDiagnostic(token,
+                    "same_wrapper_reassert result=exception, type="
+                            + error.getClass().getSimpleName());
             reportError(IphoneTransportErrorV2.Kind.GATT,
                     "same-owner reassert failed: " + error.getClass().getSimpleName(), true);
         }
@@ -1619,6 +1650,15 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 mode(), state.epoch, kind, detail, retryable));
     }
 
+    private void reportPlatformDiagnostic(BleRouteToken token, String detail) {
+        if (listener == null || state == null || !currentEpoch(token)) return;
+        String bounded = detail == null ? "" : detail.trim();
+        if (bounded.length() > PLATFORM_DIAGNOSTIC_LIMIT) {
+            bounded = bounded.substring(0, PLATFORM_DIAGNOSTIC_LIMIT);
+        }
+        listener.onPlatformDiagnostic(mode(), state.epoch, bounded);
+    }
+
     private void assertMain() {
         if (Looper.myLooper() != Looper.getMainLooper()) {
             throw new IllegalStateException("Route-A adapter must run on main FIFO");
@@ -1763,6 +1803,12 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private void handleConnectionState(BluetoothGatt callbackGatt, int status, int newState) {
         if (owner == null || owner.gatt != callbackGatt) return;
         GattOwner exact = owner;
+        long elapsed = exact.connectGattStartedAtMillis <= 0L ? 0L
+                : Math.max(0L, android.os.SystemClock.elapsedRealtime()
+                        - exact.connectGattStartedAtMillis);
+        reportPlatformDiagnostic(exact.ownerToken,
+                "connect_gatt callback elapsedMs=" + elapsed + ", status=" + status
+                        + ", newState=" + newState);
         owner.callbackObserved = true;
         owner.connected = newState == BluetoothProfile.STATE_CONNECTED;
         if (!ProcessGattRegistrationGateV2.owns(exact)) {

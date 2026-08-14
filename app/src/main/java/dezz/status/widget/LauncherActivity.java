@@ -293,6 +293,8 @@ public final class LauncherActivity extends AppCompatActivity {
     private GridView favoritesGrid;
     private AppCatalog appCatalog;
     private boolean appCatalogLoadInFlight;
+    private boolean initialAppCatalogReadyTraced;
+    private boolean initialActionsReadyTraced;
     private long lastAppCatalogLoadElapsed;
     private LauncherShortcutStore shortcutStore;
     @Nullable private PanelGridLayout shortcutGrid;
@@ -447,7 +449,9 @@ public final class LauncherActivity extends AppCompatActivity {
                     }
                     break;
                 case 6:
-                    if (preferences.launcherAppsVisible.get()) reloadAppCatalogAsync(true);
+                    // Geometry already admitted the first catalog scan. This is only a fallback
+                    // for a failed/skipped load and must honor the freshness window.
+                    if (preferences.launcherAppsVisible.get()) reloadAppCatalogAsync(false);
                     return;
                 default:
                     return;
@@ -469,10 +473,9 @@ public final class LauncherActivity extends AppCompatActivity {
         configureWindow();
         View root = buildRoot();
         setContentView(root);
-        // Submit every nonvisual startup command now. The serial worker is background-priority and
-        // the Service admission is merely queued on main; neither can lengthen this onCreate stack.
+        // Submit only mandatory preference bootstrap now. Optional vendor construction waits for
+        // visible panels, so it cannot occupy the serial worker ahead of HOME geometry.
         startLauncherBootstrapNow();
-        startLauncherCarRuntimeAsync();
         navigationUiHandler.post(this::startImmediateHomeRuntime);
         root.getViewTreeObserver().addOnDrawListener(new android.view.ViewTreeObserver.OnDrawListener() {
             private boolean recorded;
@@ -931,9 +934,8 @@ public final class LauncherActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // Package identity cannot distinguish this HOME surface from LauncherSettingsActivity.
-        // Publish the resumed Activity directly so per-element hide rules never affect settings.
-        StatusBarSurfaceContext.setLauncherHomeForeground(true);
+        // ECARX can resume HOME under a still-visible freeform Navigator. Surface ownership is
+        // therefore published only by onWindowFocusChanged (and cleared defensively on pause).
         if (!launcherBootstrapReady) {
             getWindow().getDecorView().requestApplyInsets();
             return;
@@ -956,11 +958,17 @@ public final class LauncherActivity extends AppCompatActivity {
 
     @Override
     protected void onPause() {
-        // A freeform Navigator or any settings Activity can cover HOME without stopping its task.
-        // onPause/onResume therefore models the foreground surface more accurately than
-        // onStart/onStop and adds no timer or package polling.
+        // Any Activity which pauses HOME also removes it from the interactive top surface.
         StatusBarSurfaceContext.setLauncherHomeForeground(false);
         super.onPause();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        // Focus is the reliable close signal for the ECARX freeform task: HOME may be RESUMED
+        // underneath Navigator, but it regains window focus only after that window is gone.
+        StatusBarSurfaceContext.setLauncherHomeForeground(hasFocus);
     }
 
     private void registerNavigationReceiver() {
@@ -1030,18 +1038,21 @@ public final class LauncherActivity extends AppCompatActivity {
     }
 
     private void reloadAppCatalogAsync(boolean force) {
-        if (appCatalogLoadInFlight || launcherWorker.isShutdown()) return;
+        if (!activityStarted || appCatalogLoadInFlight || launcherWorker.isShutdown()) return;
         if (!preferences.launcherAppsVisible.get() && !editMode) return;
-        if ((!launcherRuntimeStageReached(6) && !editMode)
+        if ((!launcherRuntimeStageReached(6) && !editMode
+                && !panelGeometryReady && !panelsInitialized)
                 || StartupWorkCoordinator.remainingQuietMillis(this) > 0L) {
             // Broad PackageManager queries are one of the largest Binder bursts in the launcher.
-            // The small saved HOME layout does not depend on them, so keep the boot lane quiet.
+            // They may start once saved geometry is ready, but never ahead of that mandatory read.
             scheduleDeferredLauncherRuntimeStart();
             return;
         }
         long now = SystemClock.elapsedRealtime();
-        if (!force && now - lastAppCatalogLoadElapsed < APP_CATALOG_REFRESH_MS) return;
+        if (!force && lastAppCatalogLoadElapsed > 0L
+                && now - lastAppCatalogLoadElapsed < APP_CATALOG_REFRESH_MS) return;
         appCatalogLoadInFlight = true;
+        final long loadStartedElapsed = SystemClock.elapsedRealtime();
         try {
             launcherWorker.execute(() -> {
                 AppCatalog loaded = new AppCatalog(getApplicationContext());
@@ -1062,6 +1073,13 @@ public final class LauncherActivity extends AppCompatActivity {
                     }
                     appCatalog = loaded;
                     lastAppCatalogLoadElapsed = SystemClock.elapsedRealtime();
+                    if (!initialAppCatalogReadyTraced) {
+                        initialAppCatalogReadyTraced = true;
+                        long loadDuration = Math.max(0L,
+                                SystemClock.elapsedRealtime() - loadStartedElapsed);
+                        StartupPerformanceTrace.mark("launcher_app_catalog_ready",
+                                loadDuration);
+                    }
                     refreshFavorites();
                     refreshAllAppsDrawerContents();
                 });
@@ -1369,6 +1387,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private void scheduleInitialLauncherBackdrops() {
         if (initialBackdropLoadInFlight || !launcherBootstrapReady
                 || !launcherFirstDrawCompleted || !activityStarted
+                || (!panelGeometryReady && !panelsInitialized)
                 || workspace == null || backdropStore == null
                 || workspace.getWidth() <= 0 || workspace.getHeight() <= 0
                 || launcherWorker.isShutdown()) return;
@@ -3011,6 +3030,13 @@ public final class LauncherActivity extends AppCompatActivity {
         // Build the first HOME frame with an empty catalog. PackageManager queries and icon loads
         // run on a worker, then atomically swap the completed catalog onto the UI thread.
         appCatalog = new AppCatalog(getApplicationContext());
+        // Geometry is the only mandatory worker read before visible launcher content. Start the
+        // broad catalog now so its Binder/icon work overlaps incremental UI panel construction;
+        // the empty catalog remains live until the complete snapshot is ready.
+        reloadAppCatalogAsync(true);
+        // Decorative JSON can be large. Queue it only after geometry and the visible app catalog
+        // have entered the lane, never between either of those user-facing startup tasks.
+        scheduleInitialLauncherBackdrops();
         shortcutStore = new LauncherShortcutStore(preferences);
         panelInitializationStage = 0;
         if (activityStarted) navigationUiHandler.post(panelInitializationStep);
@@ -3027,27 +3053,29 @@ public final class LauncherActivity extends AppCompatActivity {
                                     && hasSimplePanelContent(LauncherLayoutStore.APPS));
                     break;
                 case 1:
-                    addPanelSafely(LauncherLayoutStore.MEDIA, "Медиа", this::buildMediaPanel,
-                            () -> preferences.launcherMediaVisible.get()
-                                    && hasMediaPanelContent());
-                    makePanelTransparent(LauncherLayoutStore.MEDIA);
-                    break;
-                case 2:
-                    addPanelSafely(LauncherLayoutStore.CLOCK, "Часы", this::buildClockPanel,
-                            () -> preferences.launcherClockVisible.get()
-                                    && hasSimplePanelContent(LauncherLayoutStore.CLOCK));
-                    break;
-                case 3:
-                    addPanelSafely(LauncherLayoutStore.NAVIGATION, "Маршрут и избранное",
-                            this::buildCombinedNavigationPanel,
-                            this::isCombinedNavigationFrameVisible);
-                    break;
-                case 4:
+                    // Buttons are the other immediately interactive HOME surface. Admit them
+                    // before optional media/navigation construction and vendor runtime binding.
                     addPanelSafely(LauncherLayoutStore.ACTIONS, "Действия",
                             this::buildActionsPanel,
                             () -> actionsContentEditMode
                                     || preferences.launcherActionsVisible.get()
                                     && hasSimplePanelContent(LauncherLayoutStore.ACTIONS));
+                    break;
+                case 2:
+                    addPanelSafely(LauncherLayoutStore.MEDIA, "Медиа", this::buildMediaPanel,
+                            () -> preferences.launcherMediaVisible.get()
+                                    && hasMediaPanelContent());
+                    makePanelTransparent(LauncherLayoutStore.MEDIA);
+                    break;
+                case 3:
+                    addPanelSafely(LauncherLayoutStore.CLOCK, "Часы", this::buildClockPanel,
+                            () -> preferences.launcherClockVisible.get()
+                                    && hasSimplePanelContent(LauncherLayoutStore.CLOCK));
+                    break;
+                case 4:
+                    addPanelSafely(LauncherLayoutStore.NAVIGATION, "Маршрут и избранное",
+                            this::buildCombinedNavigationPanel,
+                            this::isCombinedNavigationFrameVisible);
                     break;
                 case 5:
                     addPanelSafely(LauncherLayoutStore.CLIMATE, "Климат",
@@ -3683,6 +3711,10 @@ public final class LauncherActivity extends AppCompatActivity {
         resubscribeCarControls();
         reconcileInformationShortcutRuntime();
         applySmartHomeStates();
+        if (!initialActionsReadyTraced) {
+            initialActionsReadyTraced = true;
+            StartupPerformanceTrace.mark("launcher_actions_ready");
+        }
     }
 
     private void applyActionsGridPlacements() {
@@ -3835,7 +3867,7 @@ public final class LauncherActivity extends AppCompatActivity {
         // Atomic widgets are edge-to-edge. Any visual breathing room belongs to the explicit
         // per-widget outer-padding setting, not an invisible inset baked into this source tile.
         content.setPadding(0, 0, 0, 0);
-        ImageView icon = new ImageView(this);
+        OutlineImageView icon = new OutlineImageView(this);
         if (addButton) {
             icon.setImageResource(R.drawable.ic_add);
             icon.setColorFilter(Color.WHITE);
@@ -4094,11 +4126,10 @@ public final class LauncherActivity extends AppCompatActivity {
         catch (IllegalArgumentException ignored) {
             binding.card.setCardBackgroundColor(Color.argb(180, 34, 39, 51));
         }
-        int outlineColor;
-        try { outlineColor = Color.parseColor(style.outlineColor); }
-        catch (IllegalArgumentException ignored) { outlineColor = Color.TRANSPARENT; }
-        binding.card.setStrokeColor(outlineColor);
-        binding.card.setStrokeWidth(style.outlineWidthPx);
+        // The scenario outline follows the icon alpha mask. The card is the clickable container
+        // and must never turn into a rectangle outlined around the entire HOME button.
+        binding.card.setStrokeColor(Color.TRANSPARENT);
+        binding.card.setStrokeWidth(0);
 
         LauncherShortcutStore.Shortcut visual = binding.shortcut.copy();
         visual.icon = binding.liveIconKey;
@@ -4111,6 +4142,11 @@ public final class LauncherActivity extends AppCompatActivity {
             try { binding.icon.setColorFilter(Color.parseColor(automation.iconTint)); }
             catch (IllegalArgumentException ignored) { binding.icon.clearColorFilter(); }
         }
+        int outlineColor;
+        try { outlineColor = Color.parseColor(style.outlineColor); }
+        catch (IllegalArgumentException ignored) { outlineColor = Color.TRANSPARENT; }
+        binding.icon.setOutlineColor(outlineColor);
+        binding.icon.setOutlineWidth(style.outlineWidthPx);
     }
 
     private void applyCarState(@NonNull ShortcutTileBinding binding,
@@ -5076,7 +5112,7 @@ public final class LauncherActivity extends AppCompatActivity {
     private static final class ShortcutTileBinding {
         final LauncherShortcutStore.Shortcut shortcut;
         final MaterialCardView card;
-        final ImageView icon;
+        final OutlineImageView icon;
         @Nullable final TextView titleLabel;
         @Nullable final TextView stateLabel;
         @NonNull String liveTint;
@@ -5084,7 +5120,7 @@ public final class LauncherActivity extends AppCompatActivity {
         @NonNull String liveIconKey;
 
         ShortcutTileBinding(LauncherShortcutStore.Shortcut shortcut, MaterialCardView card,
-                            ImageView icon, @Nullable TextView titleLabel,
+                            OutlineImageView icon, @Nullable TextView titleLabel,
                             @Nullable TextView stateLabel) {
             this.shortcut = shortcut;
             this.card = card;

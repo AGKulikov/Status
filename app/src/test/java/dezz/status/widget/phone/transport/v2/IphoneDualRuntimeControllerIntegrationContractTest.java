@@ -138,6 +138,27 @@ public final class IphoneDualRuntimeControllerIntegrationContractTest {
         assertTrue(listener.contains("kind=\" + error.kind"));
         assertTrue(listener.contains("retryable=\""));
         assertTrue(listener.contains("redactedDiagnostic(error.detail)"));
+        assertTrue(listener.contains("lastTypedV2Error = typedError"));
+        assertTrue(listener.contains("lastTypedV2ErrorTransportSession = transportSession"));
+
+        String failed = between(source,
+                "private void applyV2DualStatus",
+                "private void applyV2RouteStatus");
+        assertTrue(failed.contains(
+                "lastError = preserveTypedV2Failure(transportSession, status.detail)"));
+        assertTrue(failed.contains("generic.contains(\"TARGET_START_FAILED\")"));
+        assertTrue(failed.contains("lastTypedV2Error + \"; \" + generic"));
+    }
+
+    @Test public void platformEvidenceIsSessionFencedBoundedAndRedacted() throws Exception {
+        String source = controller();
+        String listener = between(source,
+                "private final class V2TransportListener",
+                "private void applyV2DualStatus");
+        assertTrue(listener.contains("onPlatformDiagnostic("));
+        assertTrue(listener.contains("dispatchAncsTransport(token, transportSession"));
+        assertTrue(listener.contains("PhoneConnectionJournal.append(\"v2-platform\""));
+        assertTrue(listener.contains("bounded(redactedDiagnostic(detail), 256)"));
     }
 
     private static String controller() throws Exception {

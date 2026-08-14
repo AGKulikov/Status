@@ -162,6 +162,7 @@ public final class YandexWindowLauncher {
         // startActivity only confirms handoff; the accessibility event later confirms the exact
         // class. Publishing now prevents one visible frame with stale per-element rules.
         StatusBarSurfaceContext.setNavigatorWindowForeground(windowed);
+        if (windowed) StatusBarSurfaceContext.markNavigatorWindowOptimistic();
         return true;
     }
 
