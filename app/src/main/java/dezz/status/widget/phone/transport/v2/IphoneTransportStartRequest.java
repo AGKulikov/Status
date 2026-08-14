@@ -20,7 +20,7 @@ public final class IphoneTransportStartRequest {
                                        IphoneAcquisitionModeV2 acquisitionMode) {
         this.epoch = Objects.requireNonNull(epoch, "epoch");
         this.selectedSystemBondAddress =
-                IphoneBleAdvertisement.normalizePeerId(selectedSystemBondAddress);
+                IphoneBleAdvertisement.normalizeSystemBondAddress(selectedSystemBondAddress);
         this.helperInstallationId =
                 IphoneBleAdvertisement.normalizePeerId(helperInstallationId);
         if (this.selectedSystemBondAddress.isEmpty()) {

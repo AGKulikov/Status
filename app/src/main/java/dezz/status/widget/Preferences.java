@@ -1039,7 +1039,64 @@ public class Preferences {
         migrateUnifiedDriverPanelIfNeeded();
         migrateUnifiedLauncherSettingsIfNeeded();
         migratePhoneNotificationDeferralIfNeeded();
+        migrateNavigatorWindowSurfaceIfNeeded();
         startupMigrationsComplete = true;
+    }
+
+    /**
+     * Before the floating surface had its own target, a selected Yandex package hid both its
+     * full-screen Activity and the ECARX window. Add the new id once to those existing status-row
+     * lists so an upgrade keeps the user's pixels unchanged; afterwards both checkboxes can be
+     * edited independently.
+     */
+    private void migrateNavigatorWindowSurfaceIfNeeded() {
+        final String marker = "navigatorWindowSurfaceHa1219";
+        if (prefs.getBoolean(marker, false)) return;
+        SharedPreferences.Editor editor = prefs.edit();
+        for (Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
+            if (!isHideListKey(entry.getKey()) || !(entry.getValue() instanceof Set<?>)) continue;
+            Set<String> targets = new HashSet<>();
+            for (Object raw : (Set<?>) entry.getValue()) {
+                if (raw instanceof String) targets.add((String) raw);
+            }
+            if (containsYandexPackage(targets)
+                    && targets.add(StatusBarSurfaceContext.NAVIGATOR_WINDOW)) {
+                editor.putStringSet(entry.getKey(), targets);
+            }
+        }
+
+        try {
+            JSONArray configs = new JSONArray(haMainBricksJson.get());
+            boolean changed = false;
+            for (int index = 0; index < configs.length(); index++) {
+                JSONObject config = configs.optJSONObject(index);
+                if (config == null) continue;
+                JSONArray hidden = config.optJSONArray("hideInPackages");
+                if (hidden == null) continue;
+                boolean yandex = false;
+                boolean hasWindow = false;
+                for (int item = 0; item < hidden.length(); item++) {
+                    String target = hidden.optString(item, "").trim();
+                    yandex |= StatusBarSurfaceContext.isYandexPackage(target);
+                    hasWindow |= StatusBarSurfaceContext.NAVIGATOR_WINDOW.equals(target);
+                }
+                if (yandex && !hasWindow) {
+                    hidden.put(StatusBarSurfaceContext.NAVIGATOR_WINDOW);
+                    changed = true;
+                }
+            }
+            if (changed) editor.putString(haMainBricksJson.key, configs.toString());
+        } catch (JSONException invalidImportedJson) {
+            Log.w(TAG, "Could not migrate Navigator-window hide targets", invalidImportedJson);
+        }
+        editor.putBoolean(marker, true).apply();
+    }
+
+    private static boolean containsYandexPackage(@NonNull Set<String> targets) {
+        for (String target : targets) {
+            if (StatusBarSurfaceContext.isYandexPackage(target)) return true;
+        }
+        return false;
     }
 
     /** Normalizes experimental/imported HA1217 values without changing an existing selection. */
@@ -1476,5 +1533,6 @@ public class Preferences {
         // contain HA1085's migration marker. Preserve that active profile after import too.
         migrateUnifiedDriverPanelIfNeeded();
         migrateUnifiedLauncherSettingsIfNeeded();
+        migrateNavigatorWindowSurfaceIfNeeded();
     }
 }

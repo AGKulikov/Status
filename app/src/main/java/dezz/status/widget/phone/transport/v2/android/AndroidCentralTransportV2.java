@@ -696,18 +696,15 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             postConnected(token, false);
             return;
         }
-        BluetoothDevice selected;
-        try {
-            selected = adapter.getRemoteDevice(startRequest.selectedSystemBondAddress);
-        } catch (RuntimeException error) {
-            reportError(IphoneTransportErrorV2.Kind.GATT,
-                    "invalid selected system bond address", false);
-            postConnected(token, false);
-            return;
-        }
+        // Use the exact facade exposed by Android's bonded-device inventory. Besides avoiding a
+        // second synthetic wrapper, this keeps the public-address API boundary deterministic on
+        // Android 9 (which rejects lower-case A-F in Bluetooth addresses).
+        SelectedBondFacade selectedBond = selectedSystemBondFacade(
+                startRequest.selectedSystemBondAddress);
+        BluetoothDevice selected = selectedBond.device;
         SelectedBondIdentityResolverV2.Candidate attribution = bondAttribution.begin(
                 selected, startRequest.selectedSystemBondAddress,
-                selectedSystemBondMatchCount(startRequest.selectedSystemBondAddress),
+                selectedBond.matches,
                 startRequest.helperInstallationId);
         if (!attribution.mayProceedToEncryptedProof()) {
             reportError(IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
@@ -1395,10 +1392,12 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 serviceChanged != null && indicatable(serviceChanged));
     }
 
-    private IphoneBlePeerProof decodePeerProof(byte[] value) {
+    private IphoneBlePeerProof decodePeerProof(BluetoothGatt callbackGatt, byte[] value) {
         IphoneBleControlProtocolV2.Frame frame = IphoneBleControlProtocolV2.decode(value);
         if (frame == null || frame.type != IphoneBleControlProtocolV2.Type.PEER_PROOF
                 || frame.mode != IphoneBleMode.ANDROID_CENTRAL || owner == null
+                || owner.gatt != callbackGatt || !owner.connected
+                || !ProcessGattRegistrationGateV2.owns(owner)
                 || owner.device.getBondState() != BluetoothDevice.BOND_BONDED) {
             return null;
         }
@@ -1408,7 +1407,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 owner.bondAttribution, installation.toString(),
                 selectedSystemBondMatchCount(
                         owner.bondAttribution.selectedSystemBondAddress),
-                activeBondedOwnerMatchCount(owner.device, BluetoothProfile.GATT),
+                1 /* exact connected callbackGatt plus the sole process-wide GATT lease */,
                 true /* successful read of the Helper's encryption-required H attribute */);
         if (!attribution.proven) {
             reportError(IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
@@ -1517,41 +1516,38 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     }
 
     /** Exact count is evidence: zero and non-unique selected bond records both fail closed. */
-    private int selectedSystemBondMatchCount(String selectedAddress) {
-        if (adapter == null || selectedAddress == null) return 0;
+    private static final class SelectedBondFacade {
+        final BluetoothDevice device;
+        final int matches;
+
+        SelectedBondFacade(BluetoothDevice device, int matches) {
+            this.device = device;
+            this.matches = matches;
+        }
+    }
+
+    private SelectedBondFacade selectedSystemBondFacade(String selectedAddress) {
+        if (adapter == null || selectedAddress == null) return new SelectedBondFacade(null, 0);
         try {
             java.util.Set<BluetoothDevice> bonded = adapter.getBondedDevices();
-            if (bonded == null) return 0;
+            if (bonded == null) return new SelectedBondFacade(null, 0);
             int matches = 0;
+            BluetoothDevice selected = null;
             for (BluetoothDevice device : bonded) {
                 if (device != null && device.getBondState() == BluetoothDevice.BOND_BONDED
                         && samePublicAddress(device.getAddress(), selectedAddress)) {
                     matches++;
+                    if (selected == null) selected = device;
                 }
             }
-            return matches;
+            return new SelectedBondFacade(selected, matches);
         } catch (RuntimeException unavailable) {
-            return 0;
+            return new SelectedBondFacade(null, 0);
         }
     }
 
-    /** Counts only the exact active facade; a different bonded peer never satisfies this gate. */
-    private int activeBondedOwnerMatchCount(BluetoothDevice facade, int profile) {
-        if (manager == null || facade == null || facade.getAddress() == null) return 0;
-        try {
-            List<BluetoothDevice> active = manager.getConnectedDevices(profile);
-            if (active == null) return 0;
-            int matches = 0;
-            for (BluetoothDevice device : active) {
-                if (device != null && device.getBondState() == BluetoothDevice.BOND_BONDED
-                        && samePublicAddress(device.getAddress(), facade.getAddress())) {
-                    matches++;
-                }
-            }
-            return matches;
-        } catch (RuntimeException unavailable) {
-            return 0;
-        }
+    private int selectedSystemBondMatchCount(String selectedAddress) {
+        return selectedSystemBondFacade(selectedAddress).matches;
     }
 
     private static boolean samePublicAddress(String left, String right) {
@@ -1832,7 +1828,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         pendingGatt = null;
         GattResultV2 result = GattResultV2.fromAndroidStatus(status);
         IphoneBlePeerProof proof = result == GattResultV2.SUCCESS
-                ? decodePeerProof(value) : null;
+                ? decodePeerProof(callbackGatt, value) : null;
         AndroidCentralRoute.State current = state;
         if (current != null) {
             BleRouteTransition<AndroidCentralRoute.State> transition =

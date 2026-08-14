@@ -39,7 +39,8 @@ public final class YandexRouteLauncher {
         }
 
         if (!route.floating) {
-            return startDeepLink(context, route.product, deepLink, alternateDeepLink);
+            return startDeepLink(
+                    context, route.product, deepLink, alternateDeepLink, false);
         }
 
         // Do not create a second approximation of the vendor floating window here. The HOME
@@ -49,14 +50,16 @@ public final class YandexRouteLauncher {
         boolean opened = YandexWindowLauncher.launchOverLauncher(
                 context, windowProduct(route.product), false);
         if (!opened) {
-            return startDeepLink(context, route.product, deepLink, alternateDeepLink);
+            return startDeepLink(
+                    context, route.product, deepLink, alternateDeepLink, false);
         }
 
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             // The Yandex task is now the same floating task created by the normal Navigator
             // button. ACTION_VIEW is delivered afterwards, so only its destination changes and
             // Android reuses that already-windowed task instead of constructing another window.
-            if (!startDeepLink(context, route.product, deepLink, alternateDeepLink)) {
+            if (!startDeepLink(
+                    context, route.product, deepLink, alternateDeepLink, true)) {
                 Toast.makeText(context, "Не удалось передать маршрут в Яндекс",
                         Toast.LENGTH_LONG).show();
             }
@@ -86,11 +89,12 @@ public final class YandexRouteLauncher {
     private static boolean startDeepLink(@NonNull Context context,
                                          @NonNull FavoriteRouteConfig.Product product,
                                          @NonNull Uri deepLink,
-                                         @NonNull Uri alternateDeepLink) {
+                                         @NonNull Uri alternateDeepLink,
+                                         boolean windowed) {
         if (YandexWindowLauncher.launchDeepLink(
-                context, windowProduct(product), deepLink)) return true;
+                context, windowProduct(product), deepLink, windowed)) return true;
         return YandexWindowLauncher.launchDeepLink(
-                context, windowProduct(opposite(product)), alternateDeepLink);
+                context, windowProduct(opposite(product)), alternateDeepLink, windowed);
     }
 
     @NonNull

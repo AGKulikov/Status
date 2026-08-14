@@ -23,7 +23,7 @@ String getVersionName() {
 
     logger.warn('Environment variable `VERSION_NAME` was not set, using default version')
 
-    return '2.0.1'
+    return '2.0.2'
 }
 
 int getVersionCode() {
@@ -32,8 +32,12 @@ int getVersionCode() {
         return explicitCode.toInteger()
     }
     def version = getVersionName()
-    // Public version name 2.0.1 maps to the internal HA1218 hotfix train. Keep its monotonic
+    // Public version name 2.0.2 maps to the internal HA1219 hotfix train. Keep its monotonic
     // Android identity explicit so Natro updates every installed HA build in place.
+    if (version == '2.0.2') {
+        return 208021219
+    }
+    // Keep the immediately previous public identity reproducible for its frozen/manual gates.
     if (version == '2.0.1') {
         return 208021218
     }

@@ -6673,6 +6673,13 @@ public class WidgetService extends Service {
             latestPackage = latestPackageFromUsageStats();
         }
         if (latestPackage == null) return;
+        if (StatusBarSurfaceContext.isNavigatorWindowForeground()
+                && !StatusBarSurfaceContext.isYandexPackage(latestPackage)) {
+            // UsageStats has no Activity class, but it can still prove that the floating Yandex
+            // surface is no longer topmost. Do not let an optimistic launch token leak into the
+            // next ordinary application when Accessibility is unavailable.
+            StatusBarSurfaceContext.setNavigatorWindowForeground(false);
+        }
 
         boolean changed = !latestPackage.equals(lastForegroundPackage);
         lastForegroundPackage = latestPackage;

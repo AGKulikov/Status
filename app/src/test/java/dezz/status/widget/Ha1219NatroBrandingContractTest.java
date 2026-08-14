@@ -12,20 +12,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-/** Keeps the public Natro 2.0.1 identity separate from the stable Android update identity. */
-public final class Ha1218NatroBrandingContractTest {
+/** Keeps the public Natro 2.0.2 identity separate from the stable Android update identity. */
+public final class Ha1219NatroBrandingContractTest {
     @Test public void publicNameAndVersionAreExactWhilePackageStaysUpdateCompatible()
             throws IOException {
         String values = project("app/src/main/res/values/strings.xml");
         String valuesRu = project("app/src/main/res/values-ru/strings.xml");
         String manifest = project("app/src/main/AndroidManifest.xml");
+        String gradle = project("build.gradle");
         assertTrue(values.contains("<string name=\"app_name\">Natro</string>"));
         assertTrue(valuesRu.contains("<string name=\"app_name\">Natro</string>"));
         assertFalse(values.contains("<string name=\"app_name\">Natro 2.0</string>"));
         assertTrue(manifest.contains("android:label=\"@string/app_name\""));
-        String frozenRelease = project(".github/workflows/release-ha1218.yml");
-        assertTrue(frozenRelease.contains("VERSION_NAME: '2.0.1'"));
-        assertTrue(frozenRelease.contains("VERSION_CODE: '208021218'"));
+        assertTrue(gradle.contains("return '2.0.2'"));
+        assertTrue(gradle.contains("return 208021219"));
         assertTrue(project("app/build.gradle").contains(
                 "applicationId \"ru.natro.statuswidget\""));
     }
@@ -46,6 +46,41 @@ public final class Ha1218NatroBrandingContractTest {
                 "<color name=\"ic_launcher_background\">#071923</color>"));
         assertTrue(project("tools/natro-app-icon.svg").contains(
                 "one car identity, media, notifications, navigation and automations"));
+    }
+
+    @Test public void previousPublicReleaseKeepsItsFrozenManualGate()
+            throws IOException {
+        String gradle = project("build.gradle").replaceAll("\\s+", " ");
+        String current = "if (version == '2.0.2') { return 208021219";
+        String previous = "if (version == '2.0.1') { return 208021218";
+        assertTrue(gradle.contains(current));
+        assertTrue(gradle.contains(previous));
+        assertTrue(gradle.indexOf(current) < gradle.indexOf(previous));
+        assertTrue(project(".github/workflows/verify-ha1218.yml").contains(
+                "# Frozen Natro 2.0.1 identity gate."));
+        assertTrue(project(".github/workflows/verify-ha1218.yml").contains(
+                "on:\n  workflow_dispatch:"));
+        String release = project(".github/workflows/release-ha1218.yml");
+        assertTrue(release.contains("VERSION_NAME: '2.0.1'"));
+        assertTrue(release.contains("VERSION_CODE: '208021218'"));
+    }
+
+    @Test public void releaseManifestNamesTheExactHotfixesAndPhysicalAcceptanceGate()
+            throws IOException {
+        String notes = project("release-manifests/HA1219.md");
+        assertTrue(notes.contains("normalized to upper case"));
+        assertTrue(notes.contains("exact `BluetoothDevice` facade directly"));
+        assertTrue(notes.contains("exact `callbackGatt` currently owned"));
+        assertTrue(notes.contains("bounded, redacted typed v2 diagnostic"));
+        assertTrue(notes.contains("`USER_RATING` overrides heart-style `RATING`"));
+        assertTrue(notes.contains("`@surface/navigator_window` independently"));
+        assertTrue(notes.contains("`tools/KX11_Bluetooth_Collect.command` is now collector v2"));
+        assertTrue(notes.contains("60-second device-ready timeout"));
+        assertTrue(notes.contains("5be62c4aea62439d36a380298a22dac0474f02e3"));
+        assertTrue(notes.contains("does **not** claim successful physical"));
+        String release = project(".github/workflows/release-ha1219.yml");
+        assertTrue(release.contains("RELEASE_TAG: 'natro-v2.0.2'"));
+        assertTrue(release.contains("VERSION_CODE: '208021219'"));
     }
 
     private static String project(String relative) throws IOException {

@@ -91,6 +91,7 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
     private EditText ruleTestInput;
     private TextView ruleTestStatus;
     private TextView liveStatus;
+    @Nullable private Button mainHideTargetsButton;
     private Handler liveHandler;
     private boolean screenReady;
     private boolean liveApplyScheduled;
@@ -158,6 +159,7 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
 
     @Override protected void onResume() {
         super.onResume();
+        if (main != null && screenReady) syncMainHideTargetsFromStore();
         if (previewSession != null) previewSession.onResume();
     }
 
@@ -257,6 +259,19 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         CheckBox enabled = check("Показывать этот кирпичик", c.enabled);
         enabled.setOnCheckedChangeListener((v, value) -> { c.enabled = value; onConfigChanged(); });
         page.addView(enabled);
+        mainHideTargetsButton = button(mainHideTargetsLabel());
+        mainHideTargetsButton.setOnClickListener(v -> {
+            flushLiveApply();
+            startActivity(new Intent(this, AppSelectionActivity.class)
+                    .putExtra(AppSelectionActivity.EXTRA_MAIN_BRICK_ID, c.id)
+                    .putExtra(AppSelectionActivity.EXTRA_TITLE,
+                            "Не показывать «" + c.name + "»"));
+        });
+        page.addView(mainHideTargetsButton, topMargin(7));
+        TextView surfaceHint = label("«Навигатор в окне» и обычный «Яндекс Навигатор» — "
+                + "независимые места показа.");
+        surfaceHint.setTextColor(0xFFB0BEC5);
+        page.addView(surfaceHint, topMargin(3));
         CheckBox bold = check("Жирный шрифт", c.bold);
         bold.setOnCheckedChangeListener((v, value) -> { c.bold = value; onConfigChanged(); });
         page.addView(bold);
@@ -1216,6 +1231,25 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         if (liveApplyScheduled) return;
         liveApplyScheduled = true;
         liveHandler.postDelayed(this::persistLive, LIVE_APPLY_INTERVAL_MS);
+    }
+
+    private void syncMainHideTargetsFromStore() {
+        if (main == null) return;
+        for (HaBrickConfig stored : new HaBrickConfigStore(prefs).loadMain()) {
+            if (!main.id.equals(stored.id)) continue;
+            main.hideInPackages.clear();
+            main.hideInPackages.addAll(stored.hideInPackages);
+            if (mainHideTargetsButton != null) {
+                mainHideTargetsButton.setText(mainHideTargetsLabel());
+            }
+            return;
+        }
+    }
+
+    private String mainHideTargetsLabel() {
+        int count = main == null ? 0 : main.hideInPackages.size();
+        return count == 0 ? "Где не показывать элемент"
+                : "Где не показывать элемент · " + count;
     }
 
     private void chooseIconAlignment(@NonNull Button button) {

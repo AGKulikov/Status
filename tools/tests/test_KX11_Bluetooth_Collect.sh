@@ -26,6 +26,10 @@ case "${1:-}" in
   start-server|wait-for-device)
     exit 0
     ;;
+  get-state)
+    printf 'device\n'
+    exit 0
+    ;;
   devices)
     printf 'List of devices attached\nFAKE-KX11\tdevice\n'
     exit 0
