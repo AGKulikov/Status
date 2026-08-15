@@ -24,6 +24,13 @@
       "hex": "410202000102030405060708090a0b0c0d0e0f10"
     },
     {
+      "name": "refresh-current-android-central",
+      "type": "R",
+      "activeMode": "android_central",
+      "requestTokenHex": "102030405060708090a0b0c0d0e0f001",
+      "hex": "52020100102030405060708090a0b0c0d0e0f001"
+    },
+    {
       "name": "telemetry-80-charging-lte-unlocked",
       "type": "T",
       "batteryPercent": 80,
