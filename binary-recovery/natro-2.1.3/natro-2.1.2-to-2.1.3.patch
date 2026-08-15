@@ -1,0 +1,656 @@
+--- a/apktool.yml
++++ b/apktool.yml
+@@ -10,2 +10,2 @@
+-  versionCode: 208021229
+-  versionName: 2.1.2
++  versionCode: 208021230
++  versionName: 2.1.3
+--- a/res/values/strings.xml
++++ b/res/values/strings.xml
+@@ -395 +395 @@
+-    <string name="phone_le_enrollment_not_configured">Secure BLE Helper is not enrolled. Keep the exact selected Classic iPhone connected by HFP, open Helper v51 in the foreground, then start setup.</string>
++    <string name="phone_le_enrollment_not_configured">Secure BLE Helper is not enrolled. Keep the exact selected Classic iPhone connected by HFP, open Helper v52 in the foreground, then start setup.</string>
+@@ -397 +397 @@
+-    <string name="phone_le_enrollment_prerequisite">Setup requires the exact selected bonded iPhone, an active HFP connection, the running Natro service, and Helper v51 open in the foreground.</string>
++    <string name="phone_le_enrollment_prerequisite">Setup requires the exact selected bonded iPhone, an active HFP connection, the running Natro service, and Helper v52 open in the foreground.</string>
+--- a/res/values-ru/strings.xml
++++ b/res/values-ru/strings.xml
+@@ -338 +338 @@
+-    <string name="phone_le_enrollment_not_configured">Безопасный BLE Helper не зарегистрирован. Оставьте выбранный iPhone подключённым по HFP, откройте Helper v51 на переднем плане и запустите настройку.</string>
++    <string name="phone_le_enrollment_not_configured">Безопасный BLE Helper не зарегистрирован. Оставьте выбранный iPhone подключённым по HFP, откройте Helper v52 на переднем плане и запустите настройку.</string>
+@@ -340 +340 @@
+-    <string name="phone_le_enrollment_prerequisite">Нужны точно выбранный сопряжённый iPhone, активное HFP-подключение, запущенная служба Natro и Helper v51 на переднем плане.</string>
++    <string name="phone_le_enrollment_prerequisite">Нужны точно выбранный сопряжённый iPhone, активное HFP-подключение, запущенная служба Natro и Helper v52 на переднем плане.</string>
+--- a/smali_classes2/dezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation.smali
++++ b/smali_classes2/dezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation.smali
+@@ -31,0 +32,2 @@
++.field public static final enum REQUEST_TELEMETRY:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
++
+@@ -49 +51 @@
+-    .locals 9
++    .locals 10
+@@ -70 +72,3 @@
+-    filled-new-array/range {v0 .. v8}, [Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
++    sget-object v9, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;->REQUEST_TELEMETRY:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
++
++    filled-new-array/range {v0 .. v9}, [Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
+@@ -177,0 +182,10 @@
++
++    new-instance v0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
++
++    const-string v1, "REQUEST_TELEMETRY"
++
++    const/16 v2, 0x9
++
++    invoke-direct {v0, v1, v2}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;-><init>(Ljava/lang/String;I)V
++
++    sput-object v0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;->REQUEST_TELEMETRY:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
+--- /dev/null
++++ b/smali_classes2/dezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$TelemetryRefreshRunnable.smali
+@@ -0,0 +1,34 @@
++.class final Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$TelemetryRefreshRunnable;
++.super Ljava/lang/Object;
++.source "AndroidCentralTransportV2.java"
++
++# interfaces
++.implements Ljava/lang/Runnable;
++
++
++# instance fields
++.field private final transport:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;
++
++
++# direct methods
++.method constructor <init>(Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;)V
++    .locals 0
++
++    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
++
++    iput-object p1, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$TelemetryRefreshRunnable;->transport:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;
++
++    return-void
++.end method
++
++
++# virtual methods
++.method public run()V
++    .locals 1
++
++    iget-object v0, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$TelemetryRefreshRunnable;->transport:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;
++
++    invoke-virtual {v0}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->runTelemetryRefresh()V
++
++    return-void
++.end method
+--- a/smali_classes2/dezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2.smali
++++ b/smali_classes2/dezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2.smali
+@@ -42,0 +43,4 @@
++.field private deferredAncsRequest:Ldezz/status/widget/phone/transport/v2/AncsRequestTokenV2;
++
++.field private deferredAncsValue:[B
++
+@@ -197,0 +202,2 @@
++.field private telemetryRefreshTimer:Ljava/lang/Runnable;
++
+@@ -1796,0 +1803,309 @@
++.method private cancelTelemetryRefresh()V
++    .locals 2
++
++    iget-object v0, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->telemetryRefreshTimer:Ljava/lang/Runnable;
++
++    const/4 v1, 0x0
++
++    iput-object v1, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->telemetryRefreshTimer:Ljava/lang/Runnable;
++
++    if-eqz v0, :cond_0
++
++    iget-object v1, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->main:Landroid/os/Handler;
++
++    invoke-virtual {v1, v0}, Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V
++
++    :cond_0
++    return-void
++.end method
++
++.method private scheduleTelemetryRefresh()V
++    .locals 2
++
++    const-wide/16 v0, 0x7530
++
++    invoke-direct {p0, v0, v1}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->scheduleTelemetryRefreshAfter(J)V
++
++    return-void
++.end method
++
++.method private scheduleTelemetryRefreshAfter(J)V
++    .locals 3
++
++    invoke-direct {p0}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->cancelTelemetryRefresh()V
++
++    iget-object v0, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->telemetryCharacteristic:Landroid/bluetooth/BluetoothGattCharacteristic;
++
++    if-eqz v0, :cond_0
++
++    iget-object v0, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->telemetrySubscriptionToken:Ldezz/status/widget/phone/transport/v2/BleRouteToken;
++
++    if-eqz v0, :cond_0
++
++    new-instance v0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$TelemetryRefreshRunnable;
++
++    invoke-direct {v0, p0}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$TelemetryRefreshRunnable;-><init>(Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;)V
++
++    iput-object v0, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->telemetryRefreshTimer:Ljava/lang/Runnable;
++
++    iget-object v1, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->main:Landroid/os/Handler;
++
++    invoke-virtual {v1, v0, p1, p2}, Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
++
++    :cond_0
++    return-void
++.end method
++
++.method private drainDeferredAncsAfterTelemetry()V
++    .locals 3
++
++    iget-object v0, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->deferredAncsRequest:Ldezz/status/widget/phone/transport/v2/AncsRequestTokenV2;
++
++    iget-object v1, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->deferredAncsValue:[B
++
++    const/4 v2, 0x0
++
++    iput-object v2, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->deferredAncsRequest:Ldezz/status/widget/phone/transport/v2/AncsRequestTokenV2;
++
++    iput-object v2, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->deferredAncsValue:[B
++
++    if-eqz v0, :cond_0
++
++    if-eqz v1, :cond_0
++
++    invoke-direct {p0, v0, v1}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->writeControlPoint(Ldezz/status/widget/phone/transport/v2/AncsRequestTokenV2;[B)V
++
++    return-void
++
++    :cond_0
++    iget-object v2, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->telemetryRefreshTimer:Ljava/lang/Runnable;
++
++    if-nez v2, :cond_telemetry_timer_kept_after_write
++
++    invoke-direct {p0}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->scheduleTelemetryRefresh()V
++
++    :cond_telemetry_timer_kept_after_write
++
++    return-void
++.end method
++
++.method public runTelemetryRefresh()V
++    .locals 9
++
++    const/4 v8, 0x0
++
++    iput-object v8, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->telemetryRefreshTimer:Ljava/lang/Runnable;
++
++    iget-boolean v0, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->closed:Z
++
++    if-nez v0, :cond_end
++
++    iget-boolean v0, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->ingressFrozen:Z
++
++    if-nez v0, :cond_end
++
++    iget-object v0, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->owner:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$GattOwner;
++
++    iget-object v1, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->state:Ldezz/status/widget/phone/transport/v2/AndroidCentralRoute$State;
++
++    iget-object v2, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->telemetrySubscriptionToken:Ldezz/status/widget/phone/transport/v2/BleRouteToken;
++
++    iget-object v3, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->telemetryCharacteristic:Landroid/bluetooth/BluetoothGattCharacteristic;
++
++    if-eqz v0, :cond_end
++
++    if-eqz v1, :cond_end
++
++    if-eqz v2, :cond_end
++
++    if-eqz v3, :cond_end
++
++    iget-object v4, v0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$GattOwner;->gatt:Landroid/bluetooth/BluetoothGatt;
++
++    if-eqz v4, :cond_end
++
++    iget-boolean v4, v0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$GattOwner;->connected:Z
++
++    if-eqz v4, :cond_end
++
++    iget-object v4, v0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$GattOwner;->ownerToken:Ldezz/status/widget/phone/transport/v2/BleRouteToken;
++
++    invoke-virtual {v2, v4}, Ldezz/status/widget/phone/transport/v2/BleRouteToken;->sameOwner(Ldezz/status/widget/phone/transport/v2/BleRouteToken;)Z
++
++    move-result v4
++
++    if-eqz v4, :cond_end
++
++    invoke-static {v1, v2}, Ldezz/status/widget/phone/transport/v2/AndroidCentralRoute;->acceptsTelemetry(Ldezz/status/widget/phone/transport/v2/AndroidCentralRoute$State;Ldezz/status/widget/phone/transport/v2/BleRouteToken;)Z
++
++    move-result v4
++
++    if-eqz v4, :cond_end
++
++    iget-object v4, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->pendingGatt:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$PendingGattOperation;
++
++    if-eqz v4, :cond_no_pending
++
++    iget-object v5, v4, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$PendingGattOperation;->type:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
++
++    sget-object v6, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;->REQUEST_TELEMETRY:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
++
++    if-ne v5, v6, :cond_busy
++
++    iput-object v8, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->pendingGatt:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$PendingGattOperation;
++
++    const-wide/16 v0, 0x1388
++
++    invoke-direct {p0, v0, v1}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->scheduleTelemetryRefreshAfter(J)V
++
++    invoke-direct {p0}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->drainDeferredAncsAfterTelemetry()V
++
++    return-void
++
++    :cond_busy
++    const-wide/16 v0, 0x1388
++
++    invoke-direct {p0, v0, v1}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->scheduleTelemetryRefreshAfter(J)V
++
++    return-void
++
++    :cond_no_pending
++    iget-object v4, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->requestTimers:Ljava/util/Map;
++
++    invoke-interface {v4}, Ljava/util/Map;->isEmpty()Z
++
++    move-result v4
++
++    if-eqz v4, :cond_busy
++
++    iget-object v4, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->controlRetryTimers:Ljava/util/Map;
++
++    invoke-interface {v4}, Ljava/util/Map;->isEmpty()Z
++
++    move-result v4
++
++    if-eqz v4, :cond_busy
++
++    sget-object v4, Ldezz/status/widget/phone/transport/v2/IphoneBleProtocolV2;->HELPER_PERIPHERAL_SERVICE:Ljava/util/UUID;
++
++    sget-object v5, Ldezz/status/widget/phone/transport/v2/IphoneBleProtocolV2;->CONTROL_CHARACTERISTIC:Ljava/util/UUID;
++
++    invoke-direct {p0, v4, v5}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->characteristic(Ljava/util/UUID;Ljava/util/UUID;)Landroid/bluetooth/BluetoothGattCharacteristic;
++
++    move-result-object v7
++
++    if-eqz v7, :cond_retry
++
++    invoke-static {v7}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->writable(Landroid/bluetooth/BluetoothGattCharacteristic;)Z
++
++    move-result v4
++
++    if-eqz v4, :cond_retry
++
++    const/4 v4, 0x2
++
++    invoke-virtual {v7, v4}, Landroid/bluetooth/BluetoothGattCharacteristic;->setWriteType(I)V
++
++    const/16 v4, 0x14
++
++    new-array v6, v4, [B
++
++    const/16 v4, 0x52
++
++    int-to-byte v4, v4
++
++    const/4 v5, 0x0
++
++    aput-byte v4, v6, v5
++
++    const/4 v4, 0x2
++
++    const/4 v5, 0x1
++
++    aput-byte v4, v6, v5
++
++    const/4 v4, 0x1
++
++    const/4 v5, 0x2
++
++    aput-byte v4, v6, v5
++
++    iget-object v4, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->enrollmentRandom:Ljava/security/SecureRandom;
++
++    invoke-static {v4}, Ldezz/status/widget/phone/transport/v2/IphoneBleControlProtocolV2;->newSwitchToken(Ljava/security/SecureRandom;)[B
++
++    move-result-object v4
++
++    const/4 v5, 0x0
++
++    const/4 v1, 0x4
++
++    const/16 v2, 0x10
++
++    invoke-static {v4, v5, v6, v1, v2}, Ljava/lang/System;->arraycopy(Ljava/lang/Object;ILjava/lang/Object;II)V
++
++    invoke-virtual {v7, v6}, Landroid/bluetooth/BluetoothGattCharacteristic;->setValue([B)Z
++
++    new-instance v0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$PendingGattOperation;
++
++    sget-object v1, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;->REQUEST_TELEMETRY:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
++
++    iget-object v2, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->telemetrySubscriptionToken:Ldezz/status/widget/phone/transport/v2/BleRouteToken;
++
++    const/4 v3, 0x0
++
++    move-object v4, v7
++
++    const/4 v5, 0x0
++
++    invoke-direct/range {v0 .. v5}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$PendingGattOperation;-><init>(Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;Ldezz/status/widget/phone/transport/v2/BleRouteToken;Ldezz/status/widget/phone/transport/v2/AncsRequestTokenV2;Landroid/bluetooth/BluetoothGattCharacteristic;Landroid/bluetooth/BluetoothGattDescriptor;)V
++
++    iput-object v0, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->pendingGatt:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$PendingGattOperation;
++
++    const/4 v8, 0x0
++
++    :try_start_refresh
++    iget-object v0, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->owner:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$GattOwner;
++
++    iget-object v0, v0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$GattOwner;->gatt:Landroid/bluetooth/BluetoothGatt;
++
++    invoke-virtual {v0, v7}, Landroid/bluetooth/BluetoothGatt;->writeCharacteristic(Landroid/bluetooth/BluetoothGattCharacteristic;)Z
++
++    move-result v8
++    :try_end_refresh
++    .catch Ljava/lang/RuntimeException; {:try_start_refresh .. :try_end_refresh} :catch_refresh
++
++    goto :after_refresh_write
++
++    :catch_refresh
++    const/4 v8, 0x0
++
++    :after_refresh_write
++    if-eqz v8, :cond_write_failed
++
++    const-wide/16 v0, 0x1388
++
++    invoke-direct {p0, v0, v1}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->scheduleTelemetryRefreshAfter(J)V
++
++    return-void
++
++    :cond_write_failed
++    const/4 v0, 0x0
++
++    iput-object v0, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->pendingGatt:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$PendingGattOperation;
++
++    const-wide/16 v0, 0x1388
++
++    invoke-direct {p0, v0, v1}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->scheduleTelemetryRefreshAfter(J)V
++
++    invoke-direct {p0}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->drainDeferredAncsAfterTelemetry()V
++
++    return-void
++
++    :cond_retry
++    invoke-direct {p0}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->scheduleTelemetryRefresh()V
++
++    :cond_end
++    return-void
++.end method
++
+@@ -1939,0 +2255,2 @@
++    invoke-direct {p0}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->cancelTelemetryRefresh()V
++
+@@ -2150 +2467,19 @@
+-    .locals 1
++    .locals 2
++
++    invoke-direct {p0}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->cancelTelemetryRefresh()V
++
++    iget-object v0, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->pendingGatt:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$PendingGattOperation;
++
++    if-eqz v0, :cond_clear_telemetry_fields
++
++    iget-object v1, v0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$PendingGattOperation;->type:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
++
++    sget-object v0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;->REQUEST_TELEMETRY:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
++
++    if-ne v1, v0, :cond_clear_telemetry_fields
++
++    const/4 v0, 0x0
++
++    iput-object v0, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->pendingGatt:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$PendingGattOperation;
++
++    :cond_clear_telemetry_fields
+@@ -2159,0 +2495,4 @@
++    iput-object v0, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->deferredAncsRequest:Ldezz/status/widget/phone/transport/v2/AncsRequestTokenV2;
++
++    iput-object v0, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->deferredAncsValue:[B
++
+@@ -2514,0 +2854,2 @@
++    invoke-direct {p0}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->scheduleTelemetryRefresh()V
++
+@@ -4888,0 +5230,9 @@
++    if-ne p1, p3, :cond_frozen_refresh
++
++    iput-object p2, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->pendingGatt:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$PendingGattOperation;
++
++    return-void
++
++    :cond_frozen_refresh
++    sget-object p3, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;->REQUEST_TELEMETRY:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
++
+@@ -4892,0 +5243,6 @@
++    invoke-direct {p0}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->cancelTelemetryRefresh()V
++
++    iput-object p2, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->deferredAncsRequest:Ldezz/status/widget/phone/transport/v2/AncsRequestTokenV2;
++
++    iput-object p2, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->deferredAncsValue:[B
++
+@@ -4904 +5260 @@
+-    if-ne p1, p2, :cond_a
++    if-ne p1, p2, :cond_refresh_write
+@@ -4950,0 +5307,31 @@
++    iget-object p1, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->telemetryRefreshTimer:Ljava/lang/Runnable;
++
++    if-nez p1, :cond_telemetry_timer_kept_after_write
++
++    invoke-direct {p0}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->scheduleTelemetryRefresh()V
++
++    :cond_telemetry_timer_kept_after_write
++    return-void
++
++    :cond_refresh_write
++    iget-object p1, v0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$PendingGattOperation;->type:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
++
++    sget-object p2, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;->REQUEST_TELEMETRY:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
++
++    if-ne p1, p2, :cond_a
++
++    iget-object p1, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->deferredAncsRequest:Ldezz/status/widget/phone/transport/v2/AncsRequestTokenV2;
++
++    if-nez p1, :cond_refresh_write_drain
++
++    iput-object v0, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->pendingGatt:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$PendingGattOperation;
++
++    return-void
++
++    :cond_refresh_write_drain
++    const-wide/16 v0, 0x1388
++
++    invoke-direct {p0, v0, v1}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->scheduleTelemetryRefreshAfter(J)V
++
++    invoke-direct {p0}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->drainDeferredAncsAfterTelemetry()V
++
+@@ -6579 +6966 @@
+-    if-eqz p2, :cond_2
++    if-eqz p2, :cond_refresh_after_telemetry
+@@ -6584,0 +6972,24 @@
++    :cond_refresh_after_telemetry
++    iget-object p1, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->pendingGatt:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$PendingGattOperation;
++
++    if-eqz p1, :cond_schedule_after_telemetry
++
++    iget-object p2, p1, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$PendingGattOperation;->type:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
++
++    sget-object v0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;->REQUEST_TELEMETRY:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
++
++    if-ne p2, v0, :cond_schedule_after_telemetry
++
++    const/4 p1, 0x0
++
++    iput-object p1, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->pendingGatt:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$PendingGattOperation;
++
++    invoke-direct {p0}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->cancelTelemetryRefresh()V
++
++    invoke-direct {p0}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->drainDeferredAncsAfterTelemetry()V
++
++    return-void
++
++    :cond_schedule_after_telemetry
++    invoke-direct {p0}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->scheduleTelemetryRefresh()V
++
+@@ -11030 +11441,27 @@
+-    if-nez v1, :cond_2
++    if-eqz v1, :cond_pending_allows_ancs
++
++    iget-object v2, v1, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$PendingGattOperation;->type:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
++
++    sget-object v3, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;->REQUEST_TELEMETRY:Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2$RawOperation;
++
++    if-ne v2, v3, :cond_2
++
++    iget-object v2, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->deferredAncsRequest:Ldezz/status/widget/phone/transport/v2/AncsRequestTokenV2;
++
++    if-nez v2, :cond_2
++
++    if-eqz p2, :cond_2
++
++    invoke-virtual {p2}, [B->clone()Ljava/lang/Object;
++
++    move-result-object v2
++
++    check-cast v2, [B
++
++    iput-object p1, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->deferredAncsRequest:Ldezz/status/widget/phone/transport/v2/AncsRequestTokenV2;
++
++    iput-object v2, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->deferredAncsValue:[B
++
++    return-void
++
++    :cond_pending_allows_ancs
+@@ -11143,0 +11581,8 @@
++
++    iget-object p1, p0, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->telemetryRefreshTimer:Ljava/lang/Runnable;
++
++    if-nez p1, :cond_telemetry_timer_kept_after_start_failure
++
++    invoke-direct {p0}, Ldezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2;->scheduleTelemetryRefresh()V
++
++    :cond_telemetry_timer_kept_after_start_failure
+--- a/smali_classes2/dezz/status/widget/systemui/SystemStatusBarContentState.smali
++++ b/smali_classes2/dezz/status/widget/systemui/SystemStatusBarContentState.smali
+@@ -317 +317 @@
+-    if-eqz p0, :cond_5
++    if-eqz p0, :cond_safe_raw
+@@ -319 +318,0 @@
+-    .line 137
+@@ -324 +323 @@
+-    if-eqz v1, :cond_0
++    if-nez v1, :cond_safe_raw
+@@ -326,4 +324,0 @@
+-    goto :goto_2
+-
+-    .line 138
+-    :cond_0
+@@ -338 +333 @@
+-    if-gt v1, v2, :cond_4
++    if-gt v1, v2, :cond_unsafe_raw
+@@ -340 +335 @@
+-    const-string v1, "[A-Za-z0-9_.-]{1,128}(?:,[A-Za-z0-9_.-]{1,128})*"
++    move v2, v3
+@@ -342,2 +337,2 @@
+-    .line 139
+-    invoke-virtual {p0, v1}, Ljava/lang/String;->matches(Ljava/lang/String;)Z
++    :loop_raw_chars
++    if-ge v2, v1, :check_raw_tokens
+@@ -345 +340 @@
+-    move-result v1
++    invoke-virtual {p0, v2}, Ljava/lang/String;->charAt(I)C
+@@ -347 +342 @@
+-    if-nez v1, :cond_1
++    move-result v4
+@@ -349 +344 @@
+-    goto :goto_1
++    const/16 v5, 0x20
+@@ -351,3 +346 @@
+-    .line 142
+-    :cond_1
+-    new-instance v1, Ljava/util/LinkedHashSet;
++    if-lt v4, v5, :cond_unsafe_raw
+@@ -355 +348,14 @@
+-    invoke-direct {v1}, Ljava/util/LinkedHashSet;-><init>()V
++    const/16 v5, 0x7e
++
++    if-gt v4, v5, :cond_unsafe_raw
++
++    const/16 v5, 0x27
++
++    if-ne v4, v5, :next_raw_char
++
++    return v3
++
++    :next_raw_char
++    add-int/lit8 v2, v2, 0x1
++
++    goto :loop_raw_chars
+@@ -357 +363 @@
+-    .line 143
++    :check_raw_tokens
+@@ -370,2 +376,2 @@
+-    :goto_0
+-    if-ge v4, v2, :cond_3
++    :loop_raw_tokens
++    if-ge v4, v2, :cond_safe_raw
+@@ -373 +379 @@
+-    aget-object v5, p0, v4
++    aget-object v1, p0, v4
+@@ -375,2 +381 @@
+-    .line 144
+-    invoke-interface {v1, v5}, Ljava/util/Set;->add(Ljava/lang/Object;)Z
++    invoke-virtual {v1}, Ljava/lang/String;->length()I
+@@ -378 +383,3 @@
+-    move-result v5
++    move-result v1
++
++    const/16 v5, 0x80
+@@ -380 +387 @@
+-    if-nez v5, :cond_2
++    if-le v1, v5, :next_raw_token
+@@ -384 +391 @@
+-    :cond_2
++    :next_raw_token
+@@ -387 +394 @@
+-    goto :goto_0
++    goto :loop_raw_tokens
+@@ -389 +396 @@
+-    :cond_3
++    :cond_safe_raw
+@@ -392,2 +399 @@
+-    :cond_4
+-    :goto_1
++    :cond_unsafe_raw
+@@ -395,4 +400,0 @@
+-
+-    :cond_5
+-    :goto_2
+-    return v0
+@@ -1269,4 +1270,0 @@
+-
+-    invoke-static {p0}, Ldezz/status/widget/systemui/SystemStatusBarContentState;->cleanSlots(Ljava/util/Set;)Ljava/util/Set;
+-
+-    move-result-object p0

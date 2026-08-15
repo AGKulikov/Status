@@ -1,0 +1,21 @@
+Supplied base APK: Natro-2.1.2-KX11-SIGNED.apk
+Base APK SHA-256: 16703a5594dcbd1ae96862e3a03bda39fc663cffd07e04955e1a9fd9eac7a52a
+Package: ru.natro.statuswidget
+Version: 2.1.2
+Version code: 208021229
+minSdk/targetSdk: 28/28
+Certificate SHA-256: 6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75
+Embedded unavailable revision: 5da9c7d8594cf89d0ff6e4706be33e2c7e3a2bbc
+
+Recovery patch: natro-2.1.2-to-2.1.3.patch
+Recovery patch SHA-256: e7c7a30e2b5c60e2c6fc19a4ca194fdab98cc9e687b9e1c9cd8860ef058e67ba
+Apktool 3.0.3 JAR SHA-256: dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423
+
+Published APK: Natro-2.1.3-KX11-SIGNED.apk
+Published APK SHA-256: a3b4906b8725814d83f6257400fb1b8925e938505cb8a5c5d5268c61450b0bb4
+Published version: 2.1.3
+Published version code: 208021230
+Published classes2.dex SHA-256: cb997dcccebf3894b27cbf8ed44115eae0b2aefbbe9020e5ebf36323cdc31d9a
+
+Helper 52 source ZIP SHA-256: 0bd96778ab8238f82744b2fc51bd488736530ce818f1fce85fa28451c65f3633
+Standalone collector SHA-256: a27c154731f28f0641d7ed8fab238914c4531896c5aca89332554b25c1a9e913

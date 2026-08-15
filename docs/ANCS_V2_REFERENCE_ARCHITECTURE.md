@@ -252,6 +252,11 @@ The cross-platform control and telemetry byte vectors are frozen in
 encode those exact vectors; a change requires a protocol-version change rather than an implicit
 one-sided migration.
 
+Helper v52's additive one-shot telemetry refresh is isolated in
+[`ancs-v2-wire-vectors-v52.json`](ancs-v2-wire-vectors-v52.json).  That fixture preserves the
+legacy H/C/A/T bytes and adds `R`; it does not silently widen the frozen fixture consumed by Helper
+v47-v50.
+
 `ROLE_CLOSE` carries the desired target topology and a fresh 128-bit switch token.  The peer
 accepts it only on the current encrypted owner, freezes the same source epoch, and echoes that
 exact target and token in `ROLE_CLOSE_ACK`.  A different token or target during a committed
