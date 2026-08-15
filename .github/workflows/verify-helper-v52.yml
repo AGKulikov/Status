@@ -67,6 +67,7 @@ jobs:
           grep -Eq '^[[:space:]]*PRODUCT_BUNDLE_IDENTIFIER = ru\.natro\.kx11ancshelper$' "$settings"
           grep -Eq '^[[:space:]]*MARKETING_VERSION = 52\.0$' "$settings"
           grep -Eq '^[[:space:]]*CURRENT_PROJECT_VERSION = 52$' "$settings"
+          grep -Eq '^[[:space:]]*IPHONEOS_DEPLOYMENT_TARGET = 14\.0$' "$settings"
 
       - name: Compile Helper v52 Release simulator
         shell: bash
@@ -94,6 +95,7 @@ jobs:
           test "$(plutil -extract CFBundleIdentifier raw -o - "$app/Info.plist")" = 'ru.natro.kx11ancshelper'
           test "$(plutil -extract CFBundleShortVersionString raw -o - "$app/Info.plist")" = '52.0'
           test "$(plutil -extract CFBundleVersion raw -o - "$app/Info.plist")" = '52'
+          test "$(plutil -extract MinimumOSVersion raw -o - "$app/Info.plist")" = '14.0'
           test -f ios/KX11-iPhone-ANCS-Helper-v52/README.md
           test -f ios/KX11-iPhone-ANCS-Helper-v52/RELEASE.txt
           test -x ios/KX11-iPhone-ANCS-Helper-v52/verify-v52-contract.sh

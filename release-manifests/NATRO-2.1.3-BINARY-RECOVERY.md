@@ -8,7 +8,8 @@
 - Update certificate SHA-256: `6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75`
 - Android release asset SHA-256: `a3b4906b8725814d83f6257400fb1b8925e938505cb8a5c5d5268c61450b0bb4`
 - Helper: build `52`, marketing `52.0`
-- Helper source asset SHA-256: `9df5fee8bf20cab6e3bfd1636fa7c3ef22a9d6ce8e99298ac2aa36c0f3b035ec`
+- Helper minimum iOS: `14.0` (required by the system CryptoKit HKDF API)
+- Helper source asset SHA-256: `b4dfbc6266441b5583be8dadf06f9b1af26f935d2e3b298728ca0229529b671d`
 - Frozen legacy H/C/A/T fixture SHA-256: `9244dab895dd82f0d4dd381e1aba3568a8c53a9cd0acbc2edae939faacefa7a2`
 - Helper 52 H/C/A/R/T fixture SHA-256: `5baaf397fd02e6ff6a476346a5496b2765d126aae8d52d7cedc5c7b793bb26c2`
 

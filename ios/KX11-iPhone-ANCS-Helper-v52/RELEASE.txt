@@ -2,6 +2,7 @@ KX11 ANCS Helper v52 — on-demand fresh telemetry Route-A candidate
 Bundle ID: ru.natro.kx11ancshelper
 Build: 52
 Marketing version: 52.0
+Minimum iOS: 14.0
 Paired runtime: Natro 2.1.3 candidate using enrollment_v1_vectors.json and R/T wire fixture
 Status: source/replay accepted; hosted Xcode build and physical-device matrix remain release gates
 

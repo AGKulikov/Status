@@ -1,5 +1,8 @@
 # KX11 ANCS Helper v52 — on-demand fresh telemetry Route-A candidate
 
+Minimum supported iOS: 14.0. Helper v52 uses the system CryptoKit HKDF implementation for the
+enrollment protocol; devices left on iOS 13.x cannot install this build.
+
 Helper v52 pairs with the Natro C4-enrollment runtime and keeps Route A as the production
 topology:
 

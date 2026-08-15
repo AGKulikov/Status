@@ -15,6 +15,8 @@ python3 "$ROOT/verify_helper_switch_runtime.py"
 PROJECT="$ROOT/KX11ANCSHelper.xcodeproj/project.pbxproj"
 [ "$(grep -Fc 'CURRENT_PROJECT_VERSION = 52;' "$PROJECT")" -eq 2 ]
 [ "$(grep -Fc 'MARKETING_VERSION = 52.0;' "$PROJECT")" -eq 2 ]
+[ "$(grep -Fc 'IPHONEOS_DEPLOYMENT_TARGET = 14.0;' "$PROJECT")" -eq 4 ]
+! grep -Fq 'IPHONEOS_DEPLOYMENT_TARGET = 13.0;' "$PROJECT"
 [ "$(grep -Fc 'PRODUCT_BUNDLE_IDENTIFIER = ru.natro.kx11ancshelper;' "$PROJECT")" -eq 2 ]
 for SOURCE in \
     AppDelegate.swift \

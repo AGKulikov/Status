@@ -143,7 +143,7 @@ public final class HelperTelemetrySource {
         guard path.status == .satisfied else { return .offline }
         if path.usesInterfaceType(.wifi) { return .wifi }
         guard path.usesInterfaceType(.cellular) else { return .unknown }
-        // Helper v52 targets iOS 13+, so the pre-iOS-12 single-service API is neither needed nor
+        // Helper v52 targets iOS 14+, so the pre-iOS-12 single-service API is neither needed nor
         // correct for multi-SIM devices. Keeping only the per-service API also removes the
         // currentRadioAccessTechnology deprecation warning seen in Xcode.
         let technologies: [String]
