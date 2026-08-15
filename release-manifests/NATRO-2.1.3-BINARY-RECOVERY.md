@@ -8,7 +8,9 @@
 - Update certificate SHA-256: `6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75`
 - Android release asset SHA-256: `a3b4906b8725814d83f6257400fb1b8925e938505cb8a5c5d5268c61450b0bb4`
 - Helper: build `52`, marketing `52.0`
-- Helper source asset SHA-256: `0bd96778ab8238f82744b2fc51bd488736530ce818f1fce85fa28451c65f3633`
+- Helper source asset SHA-256: `9df5fee8bf20cab6e3bfd1636fa7c3ef22a9d6ce8e99298ac2aa36c0f3b035ec`
+- Frozen legacy H/C/A/T fixture SHA-256: `9244dab895dd82f0d4dd381e1aba3568a8c53a9cd0acbc2edae939faacefa7a2`
+- Helper 52 H/C/A/R/T fixture SHA-256: `5baaf397fd02e6ff6a476346a5496b2765d126aae8d52d7cedc5c7b793bb26c2`
 
 ## Provenance boundary
 
@@ -36,7 +38,9 @@ This release does **not** claim source-native Android reproducibility or success
 - Exact APK package/version/sdk/label/non-debuggable identity.
 - 16 KiB/4-byte zip alignment and ZIP integrity.
 - APK Signature Scheme v2/v3, one signer, exact update certificate.
-- Helper 52 portable source/vector/route/runtime suite and archive checksums.
+- Helper 52 portable source/vector/route/runtime suite against the isolated
+  `ancs-v2-wire-vectors-v52.json` fixture and archive checksums; the frozen v47-v50 H/C/A/T fixture
+  remains byte-for-byte unchanged.
 - Standalone `KX11_Bluetooth_Collect.sh` syntax and immutable SHA-256.
 
 ## Mandatory physical gates

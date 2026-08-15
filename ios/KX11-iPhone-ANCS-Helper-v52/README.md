@@ -146,10 +146,11 @@ Run:
 ./verify-v52-contract.sh
 ```
 
-The suite executes shared H/C/A/R/T fixtures; deterministic ECDH/SAS/C4 enrollment and routine
-vectors; strict negative decoding; switch/recovery replays; restoration inversions; stale-
-generation fencing; exact owner release; UUID-only advertising; Route-A enforcement; and Route-B
-developer gating. It audits the exact Xcode Sources membership and build version.
+The suite executes the isolated `docs/ancs-v2-wire-vectors-v52.json` H/C/A/R/T fixture;
+deterministic ECDH/SAS/C4 enrollment and routine vectors; strict negative decoding;
+switch/recovery replays; restoration inversions; stale-generation fencing; exact owner release;
+UUID-only advertising; Route-A enforcement; and Route-B developer gating. It audits the exact
+Xcode Sources membership and build version.
 
 The Linux suite cannot compile against Apple's SDK. Its PASS is not a signed IPA or physical test.
 

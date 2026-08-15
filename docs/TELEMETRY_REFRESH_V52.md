@@ -15,9 +15,11 @@ new CONTROL frame type. The paired Android implementation is Natro 2.1.3 or newe
 | 3 | 1 | flags `0x00` |
 | 4 | 16 | fresh, non-zero random request token |
 
-The frozen vector `refresh-current-android-central` is in `ancs-v2-wire-vectors.json`. The token is
-not an identity, secret, switch token or response correlator. A valid increasing `T.sequence` is the
-response. Replaying R cannot change enrollment or role state.
+The frozen vector `refresh-current-android-central` is in
+`ancs-v2-wire-vectors-v52.json`. The legacy `ancs-v2-wire-vectors.json` remains the exact H/C/A/T
+fixture consumed by Helper v47-v50. The token is not an identity, secret, switch token or response
+correlator. A valid increasing `T.sequence` is the response. Replaying R cannot change enrollment or
+role state.
 
 ## Android scheduling and GATT serialization
 

@@ -117,7 +117,7 @@ def verify_swift_surface() -> None:
 
 
 def verify_shared_fixtures() -> None:
-    fixture_path = Path(__file__).resolve().parents[2] / "docs/ancs-v2-wire-vectors.json"
+    fixture_path = Path(__file__).resolve().parents[2] / "docs/ancs-v2-wire-vectors-v52.json"
     fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
     assert fixture["protocolVersion"] == 2
     assert fixture["defaultAttPayloadBytes"] == 20
