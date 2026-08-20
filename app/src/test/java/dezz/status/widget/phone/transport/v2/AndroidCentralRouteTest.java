@@ -51,6 +51,52 @@ public final class AndroidCentralRouteTest {
         assertFalse(hasEffect(exhausted, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
     }
 
+    @Test public void exactClassicPresencePromptsRetainedOwnerWithoutWrapperReplacement() {
+        AndroidCentralRoute.State state = waitSystemConnection(new BleRouteEpoch(11L, 2L));
+        long soleOwner = state.activeOwnerId;
+
+        BleRouteTransition<AndroidCentralRoute.State> prompt =
+                AndroidCentralRoute.selectedPhonePresent(state);
+
+        assertTrue(prompt.accepted);
+        assertEquals(AndroidCentralRoute.Phase.CONNECTING, prompt.state.phase);
+        assertEquals(soleOwner, prompt.state.activeOwnerId);
+        assertEquals(soleOwner, prompt.state.expected.ownerId);
+        assertTrue(hasEffect(prompt, BleRouteEffect.Type.REASSERT_SAME_GATT));
+        assertTrue(hasEffect(prompt, BleRouteEffect.Type.ARM_DEADLINE));
+        assertFalse(hasEffect(prompt, BleRouteEffect.Type.CLOSE_GATT));
+        assertFalse(hasEffect(prompt, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+
+        BleRouteTransition<AndroidCentralRoute.State> repeatedPresence =
+                AndroidCentralRoute.selectedPhonePresent(prompt.state);
+        assertTrue(repeatedPresence.accepted);
+        assertEquals(soleOwner, repeatedPresence.state.activeOwnerId);
+        assertTrue(hasEffect(repeatedPresence, BleRouteEffect.Type.REASSERT_SAME_GATT));
+        assertFalse(hasEffect(repeatedPresence, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+    }
+
+    @Test public void enrolledGatt133RetriesSavedFacadePassivelyWithoutIdentityScan() {
+        AndroidCentralRoute.State state = startEnrolled(new BleRouteEpoch(11L, 3L));
+        state = AndroidCentralRoute.startupQuietElapsed(
+                state, state.expected, true).state;
+
+        BleRouteTransition<AndroidCentralRoute.State> failed =
+                AndroidCentralRoute.linkLost(state, state.expected,
+                        "enrolled locator status failure; retry exact saved owner");
+        assertEquals(AndroidCentralRoute.Phase.RETRY_DRAINING, failed.state.phase);
+        assertTrue(hasEffect(failed, BleRouteEffect.Type.CLOSE_GATT));
+
+        state = AndroidCentralRoute.attemptTeardownComplete(
+                failed.state, failed.state.expected).state;
+        BleRouteTransition<AndroidCentralRoute.State> retry =
+                AndroidCentralRoute.retryElapsed(state, state.expected, true);
+
+        assertEquals(AndroidCentralRoute.Phase.CONNECTING, retry.state.phase);
+        assertTrue(hasEffect(retry, BleRouteEffect.Type.CONNECT_SELECTED_BOND));
+        assertFalse(hasEffect(retry, BleRouteEffect.Type.START_SCAN));
+        assertTrue(retry.effects.get(0).detail.contains("autoConnect=true"));
+    }
+
     @Test public void alphabeticSelectedBondCanonicalizesBeforeSingleOwnerAllocation() {
         IphoneTransportStartRequest request = new IphoneTransportStartRequest(
                 new BleRouteEpoch(11L, 2L), " aa:bC:dE:f0:A1:b2 ", HELPER, true, 0L,
@@ -442,6 +488,12 @@ public final class AndroidCentralRouteTest {
         return AndroidCentralRoute.start(new IphoneTransportStartRequest(
                 epoch, BOND, HELPER, true, 0L,
                 IphoneAcquisitionModeV2.SELECTED_BOND)).state;
+    }
+
+    private static AndroidCentralRoute.State startEnrolled(BleRouteEpoch epoch) {
+        return AndroidCentralRoute.start(new IphoneTransportStartRequest(
+                epoch, BOND, HELPER, true, 0L,
+                IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY)).state;
     }
 
     private static AndroidCentralRoute.State waitSystemConnection(BleRouteEpoch epoch) {

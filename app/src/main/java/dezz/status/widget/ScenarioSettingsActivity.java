@@ -816,7 +816,14 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             String second = rawText(secondOperand);
             validateOperands(selectedOperator, first, second);
 
-            ValueReference reference = new ValueReference(selected(connector), profile,
+            String connectorType = selected(connector);
+            if (SystemConditionResolver.CONNECTOR_TYPE.equals(connectorType)
+                    && SystemConditionResolver.HWGPS_ROUTE_LOST_RESOURCE.equals(resource)) {
+                // Opening and saving an older scenario upgrades only its stable source id; the
+                // runtime still accepts the alias when the user never edits that scenario.
+                resource = SystemConditionResolver.HWGPS_DR_ACTIVE_RESOURCE;
+            }
+            ValueReference reference = new ValueReference(connectorType, profile,
                     resource, optional(text(valuePath)));
             Condition condition = new Condition(conditionId, reference, Input.FIELD_VALUE,
                     selectedOperator, first, second);
@@ -1054,7 +1061,7 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
             String[] labels = {
                     "Диапазон времени",
                     "Пассажир присутствует",
-                    "HWGPS · маршрут потерян",
+                    "HWGPS · DR активен («Найти меня» доступно)",
                     "Элемент другой автоматизации отображается"
             };
             new AlertDialog.Builder(ScenarioSettingsActivity.this)
@@ -1070,8 +1077,8 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
                                 break;
                             case 2:
                                 applySystemSource(
-                                        SystemConditionResolver.HWGPS_ROUTE_LOST_RESOURCE,
-                                        "HWGPS · маршрут потерян");
+                                        SystemConditionResolver.HWGPS_DR_ACTIVE_RESOURCE,
+                                        "HWGPS · DR активен («Найти меня» доступно)");
                                 break;
                             case 3:
                                 showVisibleAutomationScopePicker();
@@ -1919,6 +1926,10 @@ public final class ScenarioSettingsActivity extends AppCompatActivity {
     }
 
     private static String sourceLabel(ValueReference reference) {
+        if (SystemConditionResolver.CONNECTOR_TYPE.equals(reference.connectorType)
+                && SystemConditionResolver.isHwgpsDrResource(reference.resourceId)) {
+            return "HWGPS · DR активен («Найти меня» доступно)";
+        }
         String connector;
         switch (reference.connectorType) {
             case "HOME_ASSISTANT": connector = "Home Assistant"; break;

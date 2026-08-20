@@ -18,11 +18,14 @@ public final class Ha1217HwgpsMediaDriverContractTest {
         String integration = source("dezz/status/widget/integration/HwgpsIntegration.java");
         String resolver = source("dezz/status/widget/integration/SystemConditionResolver.java");
         String starter = source("dezz/status/widget/WidgetServiceStarter.java");
+        String drPolicy = source("dezz/status/widget/integration/HwgpsDrStatePolicy.java");
+        String editor = source("dezz/status/widget/ScenarioSettingsActivity.java");
         assertTrue(integration.contains("org.astpepper.hwgps.FindMeActivity"));
         assertTrue(integration.contains("org.astpepper.hwgps.action.FIND_ME"));
         assertTrue(integration.contains("hwgps.fix.state"));
         assertTrue(integration.contains("hwgps.fix.state.request"));
         assertTrue(integration.contains("org.astpepper.hwgps.receivers.GeodataRequestReceiver"));
+        assertTrue(resolver.contains("HWGPS_DR_ACTIVE_RESOURCE"));
         assertTrue(resolver.contains("HWGPS_ROUTE_LOST_RESOURCE"));
         assertTrue(resolver.contains("if (!scenario.enabled) continue;"));
         assertTrue(starter.contains(
@@ -30,12 +33,21 @@ public final class Ha1217HwgpsMediaDriverContractTest {
         assertTrue(starter.contains("scenario.optBoolean(\"enabled\", true)"));
         String icons = source("dezz/status/widget/launcher/LauncherIconResolver.java");
         assertTrue(icons.contains("case \"wrong_location\": return R.drawable.ic_hwgps_find_me"));
-        assertTrue(integration.contains("postDelayed(deadlineRunnable"));
-        assertTrue(integration.contains("HwgpsRouteStateTracker"));
+        assertTrue(integration.contains("INITIAL_SNAPSHOT_MAX_ATTEMPTS = 3"));
+        assertTrue(integration.contains("setComponent("));
+        assertTrue(integration.contains("STATE_REQUEST_RECEIVER"));
+        assertTrue(integration.contains("HwgpsDrStatePolicy.classify(raw)"));
+        assertTrue(integration.contains("org.astpepper.hwgps.action.FIND_ME_STATUS"));
+        assertTrue(integration.contains("EXTRA_DR_ACTIVE = \"dr_active\""));
         assertTrue(integration.contains("if (!registered || intent == null"));
-        assertTrue(integration.contains("if (!registered) return;"));
+        assertTrue(integration.contains("if (registered) {"));
+        assertTrue(integration.contains("mainHandler.removeCallbacks(initialSnapshotRetry)"));
         assertFalse(integration.contains("scheduleAtFixedRate"));
         assertFalse(integration.contains("startService"));
+        assertFalse(integration.contains("NavigationDataRepository"));
+        assertTrue(drPolicy.contains(
+                "\"fix_dr\", \"fix_sw_dr\", \"fix_sw_dr_mm\", \"fix_sw_yl_safe\""));
+        assertTrue(editor.contains("DR активен («Найти меня» доступно)"));
     }
 
     @Test public void msaverLikeNeverUsesItsPrivateBroadcast() throws IOException {

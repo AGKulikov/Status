@@ -33,6 +33,12 @@ public final class SystemConditionResolverTest {
                 SystemConditionResolver.timeRangeResource("08:30", "20:45"));
     }
 
+    @Test public void preciseDrSourceAndLegacyRouteNameResolveToTheSameRuntimeSignal() {
+        assertTrue(SystemConditionResolver.isHwgpsDrResource("hwgps.dr_active"));
+        assertTrue(SystemConditionResolver.isHwgpsDrResource("hwgps.route_lost"));
+        assertFalse(SystemConditionResolver.isHwgpsDrResource("hwgps.other"));
+    }
+
     private static long localTime(int hour, int minute) {
         Calendar value = Calendar.getInstance();
         value.clear();
