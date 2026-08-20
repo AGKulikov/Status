@@ -57,7 +57,6 @@ import dezz.status.widget.phone.PhoneAppCatalog;
 import dezz.status.widget.phone.PhoneAppIconStore;
 import dezz.status.widget.phone.PhoneBleRole;
 import dezz.status.widget.phone.PhoneConnectionJournal;
-import dezz.status.widget.phone.PhoneConnectorController;
 import dezz.status.widget.phone.PhoneLowBatteryAlertPolicy;
 import dezz.status.widget.phone.PhoneNotificationFilter;
 import dezz.status.widget.phone.PhoneStatusBarPolicy;

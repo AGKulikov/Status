@@ -205,15 +205,17 @@ public final class Ha1217SurfaceContextContractTest {
                 "hidden.put(StatusBarSurfaceContext.NAVIGATOR_WINDOW)"));
     }
 
-    @Test public void oldLauncherToggleOnlyHidesTimeAndBluetoothViews() throws Exception {
+    @Test public void oldLauncherToggleIsInertAndGlobalSystemUiHasItsOwnControl()
+            throws Exception {
         String widget = source("WidgetService.java");
         String settings = source("LauncherSettingsActivity.java");
+        String main = source("MainActivity.java");
         String legacyCleanup = source("launcher/EcarxSystemStatusBarPolicy.java");
 
-        assertTrue(widget.contains("type == BrickType.TIME || type == BrickType.BLUETOOTH"));
-        assertTrue(widget.contains("StatusBarSurfaceContext.isLauncherHomeForeground()"));
-        assertTrue(settings.contains(
-                "Скрывать часы и Bluetooth нашей строки только на HOME"));
+        assertFalse(widget.contains("prefs.launcherHideSystemStatusBar.get()"));
+        assertFalse(settings.contains("launcherHideSystemStatusBar"));
+        assertTrue(main.contains("setupStockSystemContentSwitch()"));
+        assertTrue(main.contains("SystemStatusBarContentPolicy.apply(this, enabled"));
         assertFalse(settings.contains("EcarxSystemStatusBarPolicy.apply(this, checked"));
         assertFalse(legacyCleanup.contains("immersive.status=*"));
         assertFalse(legacyCleanup.contains("launcherHideSystemStatusBar.set(enabled)"));
@@ -223,8 +225,10 @@ public final class Ha1217SurfaceContextContractTest {
     @Test public void androidNineAcceptsFreeformWindowLifecycleWithoutTreeTraversal()
             throws Exception {
         String accessibility = source("WidgetAccessibilityService.java");
-        int method = accessibility.indexOf("publishAndroidNineForegroundEvent(");
-        int end = accessibility.indexOf("supportsSafeWindowTraversal()", method);
+        int method = accessibility.indexOf(
+                "private boolean publishAndroidNineForegroundEvent(");
+        int end = accessibility.indexOf(
+                "private void publishNavigatorWindowSurfaceEvent(", method);
         String windowPublishing = accessibility.substring(method, end);
 
         assertTrue(windowPublishing.contains("AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED"));

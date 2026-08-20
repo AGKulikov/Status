@@ -4946,14 +4946,6 @@ public class WidgetService extends Service {
     }
 
     private boolean isBrickHiddenByApp(BrickType type) {
-        // This legacy key now means exactly what the launcher setting says: hide only our TIME
-        // and BLUETOOTH views while HOME is foreground. It must never collapse the root row or
-        // alter Android's global SystemUI policy.
-        if (prefs.launcherHideSystemStatusBar.get()
-                && isLauncherHomeTopSurface()
-                && (type == BrickType.TIME || type == BrickType.BLUETOOTH)) {
-            return true;
-        }
         Set<String> list = effectiveHideLists.get(type);
         return matchesForegroundContext(list);
     }

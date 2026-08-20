@@ -25,7 +25,10 @@ public final class PresetMergeContractTest {
         assertTrue(preferences.contains("applyPatchFromJson(String json)"));
         assertTrue(preferences.contains("applyJson(json, false)"));
         assertTrue(preferences.contains("applyJson(json, true)"));
-        assertTrue(preferences.contains("if (clearExisting) editor.clear();"));
+        assertTrue(preferences.contains("if (clearExisting) {"));
+        assertTrue(preferences.contains("!SECRET_PREFERENCE_KEYS.contains(existing)"));
+        assertTrue(preferences.contains("!DEVICE_LOCAL_PREFERENCE_KEYS.contains(existing)"));
+        assertTrue(preferences.contains("editor.remove(existing)"));
         assertTrue(presets.contains("if (entry.bundled != null)"));
         assertTrue(presets.contains("prefs.applyPatchFromJson(json)"));
         assertTrue(presets.contains("prefs.importFromJson(json)"));

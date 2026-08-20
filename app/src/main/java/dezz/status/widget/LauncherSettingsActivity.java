@@ -115,10 +115,6 @@ public final class LauncherSettingsActivity extends AppCompatActivity {
         addButton("Выбрать домашний экран по умолчанию", view -> chooseDefaultHome());
 
         addSwitch("Полноэкранный режим", preferences.launcherImmersive);
-        addSwitch("Скрывать часы и Bluetooth нашей строки только на HOME",
-                preferences.launcherHideSystemStatusBar);
-        addHint("Скрываются только два выбранных элемента Natro. Сама строка, остальные "
-                + "элементы и системная панель Android остаются на месте.");
         addSwitch("Показывать сетку в режиме компоновки", preferences.launcherShowGrid);
         addSwitch("HOME → наш лаунчер → оконный Навигатор",
                 preferences.launcherHomeOpensWindowedNavigator);

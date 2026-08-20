@@ -93,7 +93,11 @@ public final class AndroidCentralTransportV2SourceTest {
                 "private void connectSelectedBond",
                 "private void connectMatchedBootstrap");
         assertTrue(selected.contains("selectedSystemBondFacade("));
-        assertFalse(selected.contains("adapter.getRemoteDevice("));
+        assertTrue(selected.contains(
+                "startRequest.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY"));
+        assertTrue(selected.contains("adapter.getRemoteDevice(record.leIdentityAddress)"));
+        assertTrue(selected.indexOf("adapter.getRemoteDevice(record.leIdentityAddress)")
+                < selected.indexOf("bondAttribution.begin("));
         assertTrue(source.contains("adapter.getBondedDevices()"));
         assertTrue(source.contains("device.getBondState() == BluetoothDevice.BOND_BONDED"));
         assertTrue(source.contains("samePublicAddress(device.getAddress(), selectedAddress)"));

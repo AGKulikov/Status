@@ -53,8 +53,10 @@ public final class Ha1165NotificationEditorAndClimateContractTest {
         assertTrue(editor.contains("По центру экрана по вертикали"));
         assertTrue(overlay.contains("centerHorizontally"));
         assertTrue(overlay.contains("centerVertically"));
-        assertTrue(popup.contains("(display.x - nextWidth) / 2"));
-        assertTrue(popup.contains("(display.y - nextHeight) / 2"));
+        assertTrue(popup.contains("config.centerHorizontally ? Gravity.CENTER_HORIZONTAL"));
+        assertTrue(popup.contains("config.centerVertically ? Gravity.CENTER_VERTICAL"));
+        assertTrue(popup.contains("config.centerHorizontally ? 0 : config.x"));
+        assertTrue(popup.contains("config.centerVertically ? 0 : config.y"));
         assertTrue(driver.contains("button.addView(content"));
         assertTrue(driver.contains("ViewGroup.LayoutParams.MATCH_PARENT"));
         assertTrue(driver.contains("tall live"));
