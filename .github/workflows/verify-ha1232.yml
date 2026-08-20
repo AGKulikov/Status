@@ -16,8 +16,10 @@ concurrency:
 
 env:
   VERSION_NAME: '2.2.0'
-  # Rebuild revision: 208021232 is already installed on the target head unit.
-  VERSION_CODE: '208021233'
+  # Keep the frozen public HA1232 identity available to the source contract tests.
+  VERSION_CODE: '208021232'
+  # 208021232 is already installed in the vehicle; only this rebuilt APK gets the next code.
+  REBUILD_VERSION_CODE: '208021233'
   HELPER_TREE: '6e38ebfbee71f080374609a11391a9ae1d288621'
   BUILD_TOOLS_VERSION: '36.0.0'
 
@@ -114,7 +116,8 @@ jobs:
           ALLOW_UNSIGNED_RELEASE: 'true'
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
+          VERSION_CODE="$REBUILD_VERSION_CODE" \
+            ./gradlew --no-daemon --no-configuration-cache --max-workers=1 \
             assembleGeelyRelease
           APK="app/build/outputs/apk/geely/release/status-widget-ha-${VERSION_NAME}-release.apk"
           test -s "$APK"
