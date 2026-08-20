@@ -415,9 +415,25 @@ public final class PhoneConnectorController {
             if (!running || config == null || config.deviceAddress.isEmpty()) return false;
             IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
             if (runtime != null) {
-                PhoneConnectionJournal.append("controller",
-                        "v2: ручной same-role recovery без cache refresh и сброса пары");
-                runtime.requestSameModeRecovery();
+                Handler currentWorker = worker;
+                long token = generation;
+                if (currentWorker == null) return false;
+                currentWorker.post(() -> runIfCurrent(token, () -> {
+                    if (ancsRuntimeV2 != runtime) return;
+                    if (ancsReady && !v2SwitchInProgress
+                            && ancsRecoveryRoute == IphoneTransportRecoveryStateV2.READY) {
+                        PhoneConnectionJournal.append("controller",
+                                "v2: проверка подтверждает живой ANCS; исправный GATT "
+                                        + "не перезапускаю");
+                        reconcileClassicAncsRecovery(token);
+                        publishSnapshot(token);
+                        return;
+                    }
+                    PhoneConnectionJournal.append("controller",
+                            "v2: ручной same-role recovery без cache refresh и сброса пары");
+                    runtime.requestSameModeRecovery();
+                    if (classicProfileConnected()) runtime.selectedPhonePresent();
+                }));
                 return true;
             }
             Handler currentWorker = worker;
@@ -1339,10 +1355,10 @@ public final class PhoneConnectorController {
             ancsStatus = "disabled";
             return;
         }
-        if (hasExactEnrollmentRecord(current.deviceAddress) && !hfpConnected) {
-            ancsStatus = "waiting_for_selected_classic_hfp";
-            return;
-        }
+        // Active HFP is a prerequisite only for explicit first-time enrollment. Routine Route A
+        // reconnect is already pinned to the exact saved LE identity and then proves the durable
+        // encrypted H secret, so waiting for one particular Classic profile only strands valid
+        // A2DP/BR-EDR-first automotive reconnects.
         if (nonRetryableEnrollmentRequired
                 && !current.deviceAddress.equalsIgnoreCase(nonRetryableEnrollmentAddress)) {
             nonRetryableEnrollmentRequired = false;
@@ -2552,13 +2568,23 @@ public final class PhoneConnectorController {
      */
     private void reconcileClassicAncsRecovery(long token) {
         if (!isCurrent(token)) return;
+        boolean wasClassicConnected = classicAncsRecovery.classicConnected;
+        boolean isClassicConnected = classicProfileConnected();
         ClassicAncsRecoveryPolicy.Transition transition =
                 ClassicAncsRecoveryPolicy.observe(
                         classicAncsRecovery,
-                        classicProfileConnected(),
+                        isClassicConnected,
                         ancsRecoveryRoute,
                         SystemClock.elapsedRealtime());
         applyClassicAncsRecoveryTransition(token, transition);
+        if (!wasClassicConnected && isClassicConnected) {
+            IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
+            if (runtime != null) {
+                PhoneConnectionJournal.append("classic-ancs",
+                        "Exact Classic phone appeared; prompt sole Route-A GATT owner");
+                runtime.selectedPhonePresent();
+            }
+        }
     }
 
     private boolean classicProfileConnected() {
@@ -2594,6 +2620,7 @@ public final class PhoneConnectorController {
                     IphoneDualTransportRuntimeV2 runtime = ancsRuntimeV2;
                     if (runtime != null) {
                         runtime.requestSameModeRecovery();
+                        runtime.selectedPhonePresent();
                     } else {
                         ancsRecoveryRoute = IphoneTransportRecoveryStateV2.NO_OWNER;
                         ensureGatt(token);
