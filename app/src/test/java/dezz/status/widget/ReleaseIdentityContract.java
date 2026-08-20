@@ -169,7 +169,7 @@ final class ReleaseIdentityContract {
                         && releaseWorkflow.contains("SOURCE_SHA"));
 
         String helperWorkflow = read(root.resolve(
-                ".github/workflows/verify-helper-v50.yml"));
+                ".github/workflows/verify-helper-v52.yml"));
         assertActionsPinned(helperWorkflow);
     }
 

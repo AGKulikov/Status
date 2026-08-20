@@ -19,4 +19,10 @@ public final class PhoneIndicatorVisualPolicyTest {
         assertEquals(16, large);
         assertTrue(PhoneIndicatorVisualPolicy.cellularTextGapPx(100) < large);
     }
+
+    @Test public void outlinedNetworkTypeAlwaysGetsAnEdgeReserve() {
+        assertEquals(2, PhoneIndicatorVisualPolicy.cellularTextEdgeReservePx(1, 0f));
+        assertTrue(PhoneIndicatorVisualPolicy.cellularTextEdgeReservePx(100, 4f)
+                > PhoneIndicatorVisualPolicy.cellularTextEdgeReservePx(40, 1f));
+    }
 }

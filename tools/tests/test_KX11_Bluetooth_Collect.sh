@@ -4,7 +4,7 @@ set -eu
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-COLLECTOR="$SCRIPT_DIR/KX11_Bluetooth_Collect.command"
+COLLECTOR="${KX11_COLLECTOR_UNDER_TEST:-$SCRIPT_DIR/KX11_Bluetooth_Collect.command}"
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/kx11-bt-collect-test.XXXXXX")"
 trap 'rm -rf "$TMP_ROOT"' EXIT HUP INT TERM
 

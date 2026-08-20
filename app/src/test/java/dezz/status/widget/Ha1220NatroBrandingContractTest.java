@@ -10,17 +10,18 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-/** Freezes the public 2.0.3 identity and its field-correction release contract. */
+/** Freezes the historical public 2.0.3 identity and its field-correction release contract. */
 public final class Ha1220NatroBrandingContractTest {
     @Test public void publicIdentityIsMonotonicAndInstallCompatible() throws Exception {
         ReleaseIdentityContract.assertCurrentAtLeast(1220);
         String gradle = project("build.gradle").replaceAll("\\s+", " ");
-        String current = "if (version == '2.0.3') { return 208021220";
-        String previous = "if (version == '2.0.2') { return 208021219";
-        assertTrue(gradle.contains("return '2.0.3'"));
-        assertTrue(gradle.contains(current));
-        assertTrue(gradle.contains(previous));
-        assertTrue(gradle.indexOf(current) < gradle.indexOf(previous));
+        String historical = "if (version == '2.0.3') { return 208021220";
+        assertTrue(gradle.contains("return '2.1.4'"));
+        assertTrue(gradle.contains(historical));
+        assertTrue(project(".github/workflows/verify-ha1220.yml").contains(
+                "# Frozen Natro 2.0.3 identity gate."));
+        assertTrue(project(".github/workflows/verify-ha1220.yml").contains(
+                "on:\n  workflow_dispatch:"));
         assertTrue(project("app/build.gradle").contains(
                 "applicationId \"ru.natro.statuswidget\""));
     }
