@@ -35,6 +35,16 @@ public final class Ha1231NatroBrandingContractTest {
         assertTrue(notes.contains("1626f9e3187133af9715c849cfb17103b8864904"));
     }
 
+    @Test public void signedPublishNeverOverwritesAnExistingReleasePayload() throws Exception {
+        String workflow = project(".github/workflows/release-ha1231.yml");
+        assertTrue(workflow.contains("The GitHub UI creates the tag and its empty prerelease"));
+        assertTrue(workflow.contains("'.assets | length' <<<\"$EXISTING\""));
+        assertTrue(workflow.contains("already has assets; refusing to overwrite them"));
+        assertTrue(workflow.contains("gh release upload \"$RELEASE_TAG\" \"$OUT\"/*"));
+        assertTrue(workflow.contains("EXPECTED_COUNT=$(find \"$OUT\" -maxdepth 1 -type f"));
+        assertTrue(workflow.contains(".name == $name and .size == $size"));
+    }
+
     private static String project(String relative) throws Exception {
         return new String(Files.readAllBytes(projectPath(relative)), StandardCharsets.UTF_8);
     }

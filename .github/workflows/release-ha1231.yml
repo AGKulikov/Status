@@ -706,15 +706,44 @@ jobs:
             echo "Remote $RELEASE_TAG no longer resolves to the signed source commit" >&2
             exit 1
           }
-          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $RELEASE_TAG already exists; refusing to replace signed assets" >&2
-            exit 1
-          fi
           OUT="$RUNNER_TEMP/ha1231-release"
-          gh release create "$RELEASE_TAG" "$OUT"/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --verify-tag \
-            --target "$SOURCE_SHA" \
-            --title 'Natro — signed release 2.1.4 + Helper v52' \
-            --notes-file "$OUT/HA1231-release-notes.md" \
-            --prerelease
+          TITLE='Natro — signed release 2.1.4 + Helper v52'
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # The GitHub UI creates the tag and its empty prerelease atomically. Accept only that
+            # exact empty placeholder; never replace or append to an existing release payload.
+            EXISTING=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")
+            test "$(jq -r '.draft' <<<"$EXISTING")" = false
+            test "$(jq -r '.prerelease' <<<"$EXISTING")" = true
+            test "$(jq '.assets | length' <<<"$EXISTING")" -eq 0 || {
+              echo "Release $RELEASE_TAG already has assets; refusing to overwrite them" >&2
+              exit 1
+            }
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$TITLE" \
+              --notes-file "$OUT/HA1231-release-notes.md" \
+              --prerelease
+            gh release upload "$RELEASE_TAG" "$OUT"/* \
+              --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$RELEASE_TAG" "$OUT"/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --target "$SOURCE_SHA" \
+              --title "$TITLE" \
+              --notes-file "$OUT/HA1231-release-notes.md" \
+              --prerelease
+          fi
+          PUBLISHED=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")
+          EXPECTED_COUNT=$(find "$OUT" -maxdepth 1 -type f | wc -l)
+          test "$(jq -r '.draft' <<<"$PUBLISHED")" = false
+          test "$(jq -r '.prerelease' <<<"$PUBLISHED")" = true
+          test "$(jq -r '.name' <<<"$PUBLISHED")" = "$TITLE"
+          test "$(jq '.assets | length' <<<"$PUBLISHED")" -eq "$EXPECTED_COUNT"
+          while IFS= read -r FILE; do
+            NAME=$(basename "$FILE")
+            SIZE=$(stat -c '%s' "$FILE")
+            jq -e --arg name "$NAME" --argjson size "$SIZE" \
+              '.assets[] | select(.name == $name and .size == $size)' \
+              <<<"$PUBLISHED" >/dev/null
+          done < <(find "$OUT" -maxdepth 1 -type f -print | sort)
