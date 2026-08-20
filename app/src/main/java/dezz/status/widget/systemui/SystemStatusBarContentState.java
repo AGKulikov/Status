@@ -13,22 +13,17 @@ final class SystemStatusBarContentState {
     }
 
     static boolean isSafeExplicitRaw(java.lang.String str) {
-        if (str != null && !str.isEmpty()) {
-            int length = str.length();
-            if (length <= 4096) {
-                for (int i = 0; i < length; i++) {
-                    char cCharAt = str.charAt(i);
-                    if (cCharAt < ' ' || cCharAt > '~' || cCharAt == '\'') {
-                        return false;
-                    }
-                }
-                for (java.lang.String str2 : str.split(",", -1)) {
-                    if (str2.length() > 128) {
-                        return false;
-                    }
-                }
-            }
-            return false;
+        if (str == null || str.isEmpty()) return true;
+        int length = str.length();
+        if (length > 4096) return false;
+        for (int index = 0; index < length; index++) {
+            char value = str.charAt(index);
+            // The shell fallback quotes with single quotes. Accept KX11/OEM printable tokens,
+            // including spaces and vendor punctuation, but never permit a quote or controls.
+            if (value < ' ' || value > '~' || value == '\'') return false;
+        }
+        for (java.lang.String token : str.split(",", -1)) {
+            if (token.length() > 128) return false;
         }
         return true;
     }

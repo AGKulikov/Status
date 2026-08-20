@@ -9,6 +9,8 @@ public final class IphoneTransportErrorV2 {
         RADIO,
         ADVERTISEMENT_MISMATCH,
         PEER_PROOF_REJECTED,
+        /** The selected Classic facade has no usable LE identity/transport on this Android. */
+        BOND_TRANSPORT_UNAVAILABLE,
         GATT,
         PROTOCOL,
         TEARDOWN

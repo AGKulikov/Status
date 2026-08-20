@@ -2133,10 +2133,6 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         return selectedSystemBondFacade(selectedAddress).matches;
     }
 
-    private static boolean samePublicAddress(String left, String right) {
-        return left != null && right != null && left.equalsIgnoreCase(right);
-    }
-
     private void publishStatus() {
         if (listener != null && state != null) listener.onStatus(toStatus(state));
     }
