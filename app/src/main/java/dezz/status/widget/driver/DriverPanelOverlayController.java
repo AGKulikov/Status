@@ -59,6 +59,7 @@ import dezz.status.widget.Preferences;
 import dezz.status.widget.R;
 import dezz.status.widget.WidgetService;
 import dezz.status.widget.OutlineImageView;
+import dezz.status.widget.LongPressFeedback;
 import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarControlState;
@@ -126,6 +127,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     private final Set<String> manuallyClosedFavorites = new LinkedHashSet<>();
     private final DriverPanelToggleGate panelToggleGate = new DriverPanelToggleGate();
     private final Map<String, Runnable> pendingFavoriteOutsideDismissals = new HashMap<>();
+    private final Map<String, Runnable> pendingFavoriteIdleDismissals = new HashMap<>();
     private final Map<String, ConnectorValue> smartHomeValues = new HashMap<>();
     private Map<String, IntentActionRule> smartHomeRules = Collections.emptyMap();
     @Nullable private WidgetService smartHomeValueService;
@@ -601,10 +603,11 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
         DisplayMetrics metrics = new DisplayMetrics();
         display.getRealMetrics(metrics);
         Preferences.DriverPanelProfile profile = preferences.activeDriverPanelProfile();
-        FrameLayout root = new FrameLayout(context);
+        FavoritePanelRoot root = new FavoritePanelRoot(context);
         boolean panelOnRight = profile.side.get() == 1;
         root.setBackground(favoritePanelBackground(context, profile, panelOnRight));
         root.setClickable(true);
+        root.setInteractionListener(action -> noteFavoriteInteraction(panelId, action));
         root.setOnTouchListener((view, event) -> {
             if (event.getActionMasked() != MotionEvent.ACTION_OUTSIDE) return false;
             scheduleFavoriteOutsideDismiss(panelId);
@@ -663,6 +666,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             for (LauncherShortcutStore.Shortcut value : values) itemIds.add(value.id);
             favoriteWindows.put(panelId, new FavoritePanelWindow(
                     config, grid, new AttachedWindow(root, params, manager), itemIds));
+            scheduleFavoriteIdleDismiss(panelId);
             dezz.status.widget.diagnostics.ActionRecorder.recordOverlay(
                     "driver_favorites:" + panelId, "OPENED", "driver panel button");
         } catch (RuntimeException error) {
@@ -779,6 +783,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
     }
 
     private void dismissFavoritePanel(@NonNull String panelId) {
+        cancelPendingFavoriteIdleDismiss(panelId);
         FavoritePanelWindow value = favoriteWindows.remove(panelId);
         if (value == null) return;
         for (String itemId : value.itemIds) drawerSmartHomeBindings.remove(itemId);
@@ -794,6 +799,10 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             mainHandler.removeCallbacks(pending);
         }
         pendingFavoriteOutsideDismissals.clear();
+        for (Runnable pending : new ArrayList<>(pendingFavoriteIdleDismissals.values())) {
+            mainHandler.removeCallbacks(pending);
+        }
+        pendingFavoriteIdleDismissals.clear();
         List<String> ids = new ArrayList<>(favoriteWindows.keySet());
         for (String id : ids) dismissFavoritePanel(id);
         manuallyOpenFavorites.clear();
@@ -820,6 +829,40 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
 
     private void cancelPendingFavoriteOutsideDismiss(@NonNull String panelId) {
         Runnable pending = pendingFavoriteOutsideDismissals.remove(panelId);
+        if (pending != null) mainHandler.removeCallbacks(pending);
+    }
+
+    private void noteFavoriteInteraction(@NonNull String panelId, int action) {
+        if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE) {
+            // Never dismiss while a finger is held down or the grid is being scrolled.
+            cancelPendingFavoriteIdleDismiss(panelId);
+        } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            scheduleFavoriteIdleDismiss(panelId);
+        }
+    }
+
+    private void scheduleFavoriteIdleDismiss(@NonNull String panelId) {
+        cancelPendingFavoriteIdleDismiss(panelId);
+        FavoritePanelWindow expected = favoriteWindows.get(panelId);
+        if (expected == null
+                || expected.config.autoCloseSeconds
+                <= DriverFavoritesPanelConfig.AUTO_CLOSE_DISABLED_SECONDS) return;
+        Runnable pending = new Runnable() {
+            @Override public void run() {
+                if (pendingFavoriteIdleDismissals.get(panelId) != this
+                        || favoriteWindows.get(panelId) != expected) return;
+                pendingFavoriteIdleDismissals.remove(panelId);
+                manuallyOpenFavorites.remove(panelId);
+                manuallyClosedFavorites.add(panelId);
+                dismissFavoritePanel(panelId);
+            }
+        };
+        pendingFavoriteIdleDismissals.put(panelId, pending);
+        mainHandler.postDelayed(pending, expected.config.autoCloseSeconds * 1_000L);
+    }
+
+    private void cancelPendingFavoriteIdleDismiss(@NonNull String panelId) {
+        Runnable pending = pendingFavoriteIdleDismissals.remove(panelId);
         if (pending != null) mainHandler.removeCallbacks(pending);
     }
 
@@ -1318,7 +1361,10 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 }
             });
             if (shortcut.hasLongAction) {
-                button.setOnLongClickListener(view -> executeLongShortcut(shortcut, view));
+                button.setOnLongClickListener(view -> {
+                    LongPressFeedback.play(view);
+                    return executeLongShortcut(shortcut, view);
+                });
             }
         } else {
             button.setClickable(false);
@@ -1934,6 +1980,7 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
                 });
                 if (shortcut.hasLongAction) {
                     tile.setOnLongClickListener(view -> {
+                        LongPressFeedback.play(view);
                         boolean handled = executeLongShortcut(shortcut, view);
                         if (handled && shortcut.closeFavoritePanelAfterAction) {
                             manuallyOpenFavorites.remove(panelId);
@@ -1976,6 +2023,32 @@ final class DriverPanelOverlayController implements DriverPanelActionExecutor.Ho
             this.grid = grid;
             this.window = window;
             this.itemIds = itemIds;
+        }
+    }
+
+    /** Observes every child touch so scrolling and long-presses reset the owning panel timer. */
+    private static final class FavoritePanelRoot extends FrameLayout {
+        interface InteractionListener {
+            void onInteraction(int action);
+        }
+
+        @Nullable private InteractionListener interactionListener;
+
+        FavoritePanelRoot(@NonNull Context context) {
+            super(context);
+        }
+
+        void setInteractionListener(@Nullable InteractionListener listener) {
+            interactionListener = listener;
+        }
+
+        @Override
+        public boolean dispatchTouchEvent(@NonNull MotionEvent event) {
+            int action = event.getActionMasked();
+            if (action != MotionEvent.ACTION_OUTSIDE && interactionListener != null) {
+                interactionListener.onInteraction(action);
+            }
+            return super.dispatchTouchEvent(event);
         }
     }
 

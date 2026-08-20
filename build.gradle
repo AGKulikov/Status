@@ -23,7 +23,7 @@ String getVersionName() {
 
     logger.warn('Environment variable `VERSION_NAME` was not set, using default version')
 
-    return '2.2.1'
+    return '2.2.2'
 }
 
 int getVersionCode() {
@@ -32,6 +32,11 @@ int getVersionCode() {
         return explicitCode.toInteger()
     }
     def version = getVersionName()
+    // Per-information-tile typography, per-Favorites inactivity timers and stock long-press
+    // click feedback follow the frozen 2.2.1 reconnect/HWGPS release.
+    if (version == '2.2.2') {
+        return 208021234
+    }
     // Automatic iPhone reconnect and direct HWGPS DR state follow the frozen 2.2.0 release.
     if (version == '2.2.1') {
         return 208021233

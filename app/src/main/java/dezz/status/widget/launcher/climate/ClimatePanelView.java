@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 
+import dezz.status.widget.LongPressFeedback;
 import dezz.status.widget.R;
 import dezz.status.widget.car.CarControlCommand;
 import dezz.status.widget.car.CarControlDescriptor;
@@ -786,6 +787,7 @@ public final class ClimatePanelView extends FrameLayout {
         if (!editorPreviewMode || editorLayoutListener == null) return;
         card.setLongClickable(true);
         card.setOnLongClickListener(view -> {
+            LongPressFeedback.play(view);
             ClipData data = ClipData.newPlainText("climate-element", id);
             return view.startDragAndDrop(data, new View.DragShadowBuilder(view), id, 0);
         });

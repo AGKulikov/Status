@@ -17,6 +17,8 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import dezz.status.widget.LongPressFeedback;
+
 /**
  * Recyclable all-apps cell with an OEM-style red minus badge.
  *
@@ -78,6 +80,7 @@ public final class AppDrawerTileView extends FrameLayout {
             if (!editMode) launch.run();
         });
         setOnLongClickListener(view -> {
+            LongPressFeedback.play(view);
             enterEditMode.run();
             return true;
         });

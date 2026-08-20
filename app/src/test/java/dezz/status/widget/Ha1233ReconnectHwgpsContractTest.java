@@ -18,7 +18,6 @@ public final class Ha1233ReconnectHwgpsContractTest {
         String build = project("build.gradle").replaceAll("\\s+", " ");
         String current = "if (version == '2.2.1') { return 208021233";
         String frozen = "if (version == '2.2.0') { return 208021232";
-        assertTrue(build.contains("return '2.2.1'"));
         assertTrue(build.contains(current));
         assertTrue(build.contains(frozen));
         assertTrue(build.indexOf(current) < build.indexOf(frozen));

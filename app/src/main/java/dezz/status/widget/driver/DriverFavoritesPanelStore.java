@@ -128,7 +128,8 @@ public final class DriverFavoritesPanelStore {
                         .put("gapPx", value.gapPx)
                         .put("borderEnabled", value.borderEnabled)
                         .put("borderWidthPx", value.borderWidthPx)
-                        .put("borderColor", value.borderColor));
+                        .put("borderColor", value.borderColor)
+                        .put("autoCloseSeconds", value.autoCloseSeconds));
             }
             if (items.length() == 0) {
                 DriverFavoritesPanelConfig fallback = defaultPanel();
@@ -141,7 +142,8 @@ public final class DriverFavoritesPanelStore {
                         .put("gapPx", fallback.gapPx)
                         .put("borderEnabled", fallback.borderEnabled)
                         .put("borderWidthPx", fallback.borderWidthPx)
-                        .put("borderColor", fallback.borderColor));
+                        .put("borderColor", fallback.borderColor)
+                        .put("autoCloseSeconds", fallback.autoCloseSeconds));
             }
             preferences.driverFavoritesPanelsJson.set(new JSONObject()
                     .put("version", SCHEMA_VERSION)
@@ -171,6 +173,8 @@ public final class DriverFavoritesPanelStore {
             value.borderEnabled = item.optBoolean("borderEnabled", value.borderEnabled);
             value.borderWidthPx = item.optInt("borderWidthPx", value.borderWidthPx);
             value.borderColor = item.optString("borderColor", value.borderColor);
+            value.autoCloseSeconds = item.optInt(
+                    "autoCloseSeconds", value.autoCloseSeconds);
             return sanitize(value);
         } catch (IllegalArgumentException ignored) {
             return null;
@@ -213,6 +217,13 @@ public final class DriverFavoritesPanelStore {
                 DriverFavoritesPanelConfig.MAX_BORDER_WIDTH_PX);
         value.borderColor = value.borderColor == null || value.borderColor.trim().isEmpty()
                 ? "#55FFFFFF" : value.borderColor.trim();
+        if (value.autoCloseSeconds <= DriverFavoritesPanelConfig.AUTO_CLOSE_DISABLED_SECONDS) {
+            value.autoCloseSeconds = DriverFavoritesPanelConfig.AUTO_CLOSE_DISABLED_SECONDS;
+        } else {
+            value.autoCloseSeconds = clamp(value.autoCloseSeconds,
+                    DriverFavoritesPanelConfig.MIN_AUTO_CLOSE_SECONDS,
+                    DriverFavoritesPanelConfig.MAX_AUTO_CLOSE_SECONDS);
+        }
         return value;
     }
 

@@ -119,6 +119,10 @@ public final class DriverFavoritesSettingsActivity extends AppCompatActivity {
         settingSlider(root, "Расстояние между ячейками", 0,
                 DriverFavoritesPanelConfig.MAX_GAP_PX, panel.gapPx, " px",
                 value -> panel.gapPx = value);
+        autoCloseSlider(root);
+        root.addView(text("Таймер запускается при открытии этой панели и начинается заново "
+                + "после касания, прокрутки или удержания внутри неё.",
+                13, 0xFF8E8E93), rowParams());
 
         MaterialSwitch border = new MaterialSwitch(this);
         border.setText("Показывать границы ячеек");
@@ -284,6 +288,18 @@ public final class DriverFavoritesSettingsActivity extends AppCompatActivity {
                 changed();
             });
             body.addView(showIcon, rowParams());
+            body.addView(text("Размер текста информационного элемента", 14,
+                    0xFFC7C7CC), rowParams());
+            shortcutSlider(body, "Размер подписи",
+                    LauncherShortcutStore.MIN_INFORMATION_LABEL_TEXT_SIZE_SP,
+                    LauncherShortcutStore.MAX_INFORMATION_LABEL_TEXT_SIZE_SP,
+                    shortcut.informationLabelTextSizeSp, " sp", shortcut,
+                    value -> shortcut.informationLabelTextSizeSp = value);
+            shortcutSlider(body, "Размер значения",
+                    LauncherShortcutStore.MIN_INFORMATION_VALUE_TEXT_SIZE_SP,
+                    LauncherShortcutStore.MAX_INFORMATION_VALUE_TEXT_SIZE_SP,
+                    shortcut.informationValueTextSizeSp, " sp", shortcut,
+                    value -> shortcut.informationValueTextSizeSp = value);
         }
 
         MaterialSwitch title = new MaterialSwitch(this);
@@ -439,6 +455,95 @@ public final class DriverFavoritesSettingsActivity extends AppCompatActivity {
             }
         });
         host.addView(seek, new LinearLayout.LayoutParams(match(), dp(42)));
+    }
+
+    private void shortcutSlider(@NonNull LinearLayout host, @NonNull String title,
+                                int minimum, int maximum, int current,
+                                @NonNull String suffix,
+                                @NonNull LauncherShortcutStore.Shortcut shortcut,
+                                @NonNull IntSetter setter) {
+        TextView label = text(title + ": " + current + suffix, 14, 0xFFC7C7CC);
+        host.addView(label, rowParams());
+        SeekBar seek = new SeekBar(this);
+        seek.setMax(Math.max(0, maximum - minimum));
+        seek.setProgress(Math.max(0, Math.min(maximum - minimum, current - minimum)));
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            private int selected = current;
+
+            @Override public void onProgressChanged(SeekBar bar, int progress,
+                                                    boolean fromUser) {
+                selected = minimum + progress;
+                label.setText(title + ": " + selected + suffix);
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar bar) {
+            }
+
+            @Override public void onStopTrackingTouch(SeekBar bar) {
+                setter.set(selected);
+                store.upsert(shortcut);
+                applyPanel();
+            }
+        });
+        host.addView(seek, new LinearLayout.LayoutParams(match(), dp(42)));
+    }
+
+    private void autoCloseSlider(@NonNull LinearLayout host) {
+        int current = panel.autoCloseSeconds;
+        TextView label = text(autoCloseLabel(current), 14, 0xFFC7C7CC);
+        host.addView(label, rowParams());
+        SeekBar seek = new SeekBar(this);
+        int maximumProgress = DriverFavoritesPanelConfig.MAX_AUTO_CLOSE_SECONDS
+                - DriverFavoritesPanelConfig.MIN_AUTO_CLOSE_SECONDS + 1;
+        seek.setMax(maximumProgress);
+        seek.setProgress(autoCloseProgress(current));
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            private int selected = current;
+
+            @Override public void onProgressChanged(SeekBar bar, int progress,
+                                                    boolean fromUser) {
+                selected = autoCloseSeconds(progress);
+                label.setText(autoCloseLabel(selected));
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar bar) {
+            }
+
+            @Override public void onStopTrackingTouch(SeekBar bar) {
+                panel.autoCloseSeconds = selected;
+                savePanel();
+            }
+        });
+        host.addView(seek, new LinearLayout.LayoutParams(match(), dp(42)));
+    }
+
+    private static int autoCloseProgress(int seconds) {
+        if (seconds <= DriverFavoritesPanelConfig.AUTO_CLOSE_DISABLED_SECONDS) return 0;
+        int clamped = Math.max(DriverFavoritesPanelConfig.MIN_AUTO_CLOSE_SECONDS,
+                Math.min(DriverFavoritesPanelConfig.MAX_AUTO_CLOSE_SECONDS, seconds));
+        return clamped - DriverFavoritesPanelConfig.MIN_AUTO_CLOSE_SECONDS + 1;
+    }
+
+    private static int autoCloseSeconds(int progress) {
+        if (progress <= 0) return DriverFavoritesPanelConfig.AUTO_CLOSE_DISABLED_SECONDS;
+        return DriverFavoritesPanelConfig.MIN_AUTO_CLOSE_SECONDS + progress - 1;
+    }
+
+    @NonNull
+    private static String autoCloseLabel(int seconds) {
+        if (seconds <= DriverFavoritesPanelConfig.AUTO_CLOSE_DISABLED_SECONDS) {
+            return "Автозакрытие без активности: выключено";
+        }
+        int minutes = seconds / 60;
+        int remainder = seconds % 60;
+        if (minutes == 0) {
+            return "Автозакрытие без активности: " + seconds + " с";
+        }
+        if (remainder == 0) {
+            return "Автозакрытие без активности: " + minutes + " мин";
+        }
+        return "Автозакрытие без активности: " + minutes + " мин "
+                + remainder + " с";
     }
 
     private void applyPanel() {
