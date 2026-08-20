@@ -23,7 +23,7 @@ String getVersionName() {
 
     logger.warn('Environment variable `VERSION_NAME` was not set, using default version')
 
-    return '2.2.0'
+    return '2.2.1'
 }
 
 int getVersionCode() {
@@ -32,8 +32,11 @@ int getVersionCode() {
         return explicitCode.toInteger()
     }
     def version = getVersionName()
-    // Helper 53 Bluetooth car control follows the source-native 2.1.4 release. Keep the code
-    // monotonic so Android installs it in place without deleting settings or BLE enrollment.
+    // Automatic iPhone reconnect and direct HWGPS DR state follow the frozen 2.2.0 release.
+    if (version == '2.2.1') {
+        return 208021233
+    }
+    // Preserve the original Helper 53 Bluetooth car-control release byte-for-byte reproducibly.
     if (version == '2.2.0') {
         return 208021232
     }
