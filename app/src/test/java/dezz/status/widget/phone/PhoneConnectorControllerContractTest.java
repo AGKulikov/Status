@@ -68,6 +68,30 @@ public final class PhoneConnectorControllerContractTest {
                 "|| stockConnectionRequestInProgress) return;"));
     }
 
+    @Test public void routineReconnectDoesNotWaitForHfpAndClassicOnlyPromptsExistingOwner()
+            throws IOException {
+        String source = controller();
+        String ensure = between(source, "private void ensureGatt",
+                "private void ensureV2Runtime");
+        String enrollment = between(source, "private void beginSecureLeEnrollmentOnWorker",
+                "public boolean confirmSecureLeEnrollmentSas");
+
+        assertFalse(ensure.contains("hfpConnected"));
+        assertFalse(source.contains("waiting_for_selected_classic_hfp"));
+        assertTrue(enrollment.contains("!hfpConnected"));
+        assertTrue(source.contains("!wasClassicConnected && isClassicConnected"));
+        assertTrue(source.contains("runtime.selectedPhonePresent()"));
+
+        String diagnostics = between(source, "public boolean reconnectForDiagnostics()",
+                "/** Starts the only permitted first-time LE identity enrollment");
+        assertTrue(diagnostics.contains("ancsReady && !v2SwitchInProgress"));
+        assertTrue(diagnostics.contains(
+                "ancsRecoveryRoute == IphoneTransportRecoveryStateV2.READY"));
+        assertTrue(diagnostics.contains("исправный GATT"));
+        assertTrue(diagnostics.indexOf("исправный GATT")
+                < diagnostics.indexOf("runtime.requestSameModeRecovery()"));
+    }
+
     @Test public void missingAndroidIphoneBatteryFallsBackToExactEcarxHeadsetPower()
             throws IOException {
         String bridge = javaSource("PhoneOemConnectionBridge.java");
