@@ -142,6 +142,7 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
     private boolean poisoned;
     private IphoneBleMode pendingPreInitializeMode;
     private Boolean pendingPreInitializeRadioEnabled;
+    private boolean pendingSelectedPhonePresence;
     private String fatalDetail = "";
 
     public IphoneDualTransportRuntimeV2(
@@ -205,6 +206,14 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
         enqueue(this::requestSameModeRecoveryOnSerialized);
     }
 
+    /**
+     * Prompts only the currently active route after the exact selected phone appears on Classic.
+     * The route adapter is responsible for treating this as liveness rather than peer evidence.
+     */
+    public void selectedPhonePresent() {
+        enqueue(this::selectedPhonePresentOnSerialized);
+    }
+
     public void radioChanged(boolean enabled) {
         enqueue(() -> {
             if (closed) return;
@@ -214,6 +223,7 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
             }
             config = config.withRadioEnabled(enabled);
             if (!enabled) {
+                pendingSelectedPhonePresence = false;
                 if (slot != null) {
                     slot.transport.radioOff(routeEpoch(slot.routeOwner));
                 }
@@ -390,6 +400,35 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
             return;
         }
         publishDualStatus("same-mode recovery: " + outcome);
+    }
+
+    private void selectedPhonePresentOnSerialized() {
+        assertOnSerializedExecutor();
+        if (closed) return;
+        pendingSelectedPhonePresence = true;
+        forwardSelectedPhonePresenceIfPossible();
+    }
+
+    /**
+     * Delivers the Classic liveness hint only to the sole fresh target.  The hint may arrive
+     * while process-restoration drain or startup quiet is still in progress, so it is retained
+     * until that exact target slot exists; it is never sent to a restoration-only adapter.
+     */
+    private void forwardSelectedPhonePresenceIfPossible() {
+        if (!pendingSelectedPhonePresence || coordinator == null || slot == null
+                || slot.restorationOnly || slot.terminalObserved) return;
+        Phase phase = coordinator.state().phase();
+        if (phase != Phase.STARTING && phase != Phase.ACTIVE) return;
+        Owner target = coordinator.targetOwner();
+        if (!slot.matchesRouteGeneration(target)) return;
+        forwardSelectedPhonePresenceTo(slot);
+    }
+
+    private void forwardSelectedPhonePresenceTo(Slot exact) {
+        if (!pendingSelectedPhonePresence || exact == null || exact.restorationOnly
+                || exact.terminalObserved || slot != exact) return;
+        pendingSelectedPhonePresence = false;
+        exact.transport.selectedPhonePresent();
     }
 
     @Override public void persistSnapshot(String encodedSnapshot) {
@@ -619,6 +658,9 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
                     acquisition
             );
             transport.start(request, new BoundListener(fresh));
+            // startTarget itself is the attributable fresh-target boundary.  Do not depend on
+            // an intermediate coordinator phase name when consuming a pre-start presence hint.
+            forwardSelectedPhonePresenceTo(fresh);
         } catch (RuntimeException error) {
             fatalDetail = "target start failed: " + safeMessage(error);
             closeSlot();
