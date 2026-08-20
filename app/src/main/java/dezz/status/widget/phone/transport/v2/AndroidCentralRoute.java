@@ -200,6 +200,41 @@ public final class AndroidCentralRoute {
                 DISCOVERY_TIMEOUT_MS, "discover exact public GATT database");
     }
 
+    /** Selected Classic facade cannot be used as an LE identity; fail without retry churn. */
+    public static BleRouteTransition<State> selectedBondLeUnavailable(
+            State state, BleRouteToken token, String detail) {
+        if (!expects(state, Phase.CONNECTING, token) || state.activeOwnerId != token.ownerId) {
+            return BleRouteTransition.ignored(state);
+        }
+        State failed = copyPolicy(state, Phase.FAILED, null, 0L, state.nextOwnerId,
+                state.consecutiveFailures, AuthorizationStep.NONE, 0, 0, safe(detail));
+        return BleRouteTransition.accepted(failed,
+                op(BleRouteEffect.Type.CANCEL_DEADLINE, token,
+                        "selected bond has no proven LE transport"));
+    }
+
+    /** Enrolled locator failed after attribution; require explicit recovery and close sole owner. */
+    public static BleRouteTransition<State> enrolledLeUnavailable(
+            State state, BleRouteToken token, String detail) {
+        if (state == null || token == null || state.expected == null
+                || !state.expected.sameOwner(token)
+                || state.acquisitionMode != IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
+                || (state.phase != Phase.CONNECTING && state.phase != Phase.DISCOVERING
+                && state.phase != Phase.VERIFYING_PEER)) {
+            return BleRouteTransition.ignored(state);
+        }
+        State failed = copyPolicy(state, Phase.FAILED, null, 0L, state.nextOwnerId,
+                state.consecutiveFailures, AuthorizationStep.NONE, 0, 0, safe(detail));
+        List<BleRouteEffect> effects = new ArrayList<>();
+        effects.add(op(BleRouteEffect.Type.CANCEL_DEADLINE, token,
+                "enrolled LE route requires explicit recovery"));
+        if (state.activeOwnerId != 0L) {
+            effects.add(op(BleRouteEffect.Type.CLOSE_GATT, token,
+                    "close sole enrolled LE owner"));
+        }
+        return new BleRouteTransition<>(failed, effects, true);
+    }
+
     /** A real disconnect callback proves registration and permits bounded terminal replacement. */
     public static BleRouteTransition<State> linkLost(State state,
                                                       BleRouteToken ownerCallback,
@@ -497,6 +532,12 @@ public final class AndroidCentralRoute {
                     op(BleRouteEffect.Type.REPORT_ERROR, token,
                             "local teardown not proven; fail closed"));
         }
+        if (state.phase == Phase.SCANNING
+                && state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY) {
+            return retry(state, token,
+                    "recovery scan timed out; unlock iPhone and open Helper; "
+                            + "existing pair retained; do not re-enroll");
+        }
         return retry(state, token, state.phase + " callback timeout");
     }
 
@@ -525,6 +566,12 @@ public final class AndroidCentralRoute {
                     state.consecutiveFailures, "radio off; start again with a fresh epoch");
             return BleRouteTransition.accepted(waiting,
                     op(BleRouteEffect.Type.CANCEL_DEADLINE, token, "radio off"));
+        }
+        if (state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
+                && state.consecutiveFailures == 1
+                && "link lost: enrolled locator status failure; one identity scan"
+                .equals(state.detail)) {
+            return beginScan(state);
         }
         State base = copy(state, Phase.STARTUP_QUIET, null, 0L, state.nextOwnerId,
                 state.consecutiveFailures, "retry");
@@ -632,12 +679,20 @@ public final class AndroidCentralRoute {
         }
         long owner = base.nextOwnerId;
         BleRouteToken scan = token(base, owner, 1L);
+        boolean enrolledRecovery = base.acquisitionMode
+                == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY;
         State state = copy(base, Phase.SCANNING, scan, owner, afterOwnerAllocation(owner),
-                base.consecutiveFailures, "strict v2 scan");
+                base.consecutiveFailures, enrolledRecovery
+                        ? "unfiltered enrolled recovery scan; exact saved bonded identity only"
+                        : "strict v2 scan");
         return BleRouteTransition.accepted(state,
                 op(BleRouteEffect.Type.START_SCAN, scan,
-                        "service UUID + protocol + iPhone-Helper-peripheral role; no name match"),
-                BleRouteEffect.deadline(scan, SCAN_TIMEOUT_MS));
+                        enrolledRecovery
+                                ? "unfiltered scan; accept only stack-resolved exact saved public "
+                                + "identity + bonded facade"
+                                : "service UUID + protocol + iPhone-Helper-peripheral role; "
+                                + "no name match"),
+                BleRouteEffect.deadline(scan, enrolledRecovery ? 80_000L : SCAN_TIMEOUT_MS));
     }
 
     private static BleRouteTransition<State> beginAcquisition(State base, boolean startup) {

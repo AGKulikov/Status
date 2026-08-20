@@ -54,6 +54,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -101,6 +102,7 @@ import dezz.status.widget.launcher.SingleFlightRefresh;
 import dezz.status.widget.launcher.SmartHomeShortcutStateBindingPolicy;
 import dezz.status.widget.launcher.SmartHomeShortcutStatePolicy;
 import dezz.status.widget.popup.SmartHomeTileColorPolicy;
+import dezz.status.widget.performance.PerformanceExecutors;
 import dezz.status.widget.launcher.YandexWindowLauncher;
 import dezz.status.widget.launcher.apps.FavoriteAppConfig;
 import dezz.status.widget.launcher.apps.FavoriteAppsConfigStore;
@@ -177,6 +179,14 @@ public final class LauncherActivity extends AppCompatActivity {
         thread.setDaemon(true);
         return thread;
     });
+    /** Package resources and adaptive icon decoding never share HOME's geometry/runtime lane. */
+    private final ExecutorService launcherIconWorker =
+            PerformanceExecutors.serial("NatroLauncherIcons");
+    private int launcherIconGeneration;
+    private final Map<String, Drawable> launcherShortcutAppIcons = new HashMap<>();
+    private final Set<String> launcherShortcutAppIconLoads = new HashSet<>();
+    @Nullable private Runnable launcherIconAdapterRefreshTask;
+    @Nullable private BaseAdapter launcherIconAdapterRefreshTarget;
     private final SingleFlightRefresh navigationRefresh = new SingleFlightRefresh();
     private final Runnable navigationUiRefresh = new Runnable() {
         @Override public void run() {
@@ -914,6 +924,15 @@ public final class LauncherActivity extends AppCompatActivity {
         navigationUiHandler.removeCallbacksAndMessages(null);
         navigationRefresh.cancel();
         launcherWorker.shutdownNow();
+        launcherIconGeneration++;
+        launcherIconWorker.shutdownNow();
+        if (launcherIconAdapterRefreshTask != null) {
+            navigationUiHandler.removeCallbacks(launcherIconAdapterRefreshTask);
+        }
+        launcherIconAdapterRefreshTask = null;
+        launcherIconAdapterRefreshTarget = null;
+        launcherShortcutAppIcons.clear();
+        launcherShortcutAppIconLoads.clear();
         super.onDestroy();
     }
 
@@ -921,6 +940,7 @@ public final class LauncherActivity extends AppCompatActivity {
     public void onTrimMemory(int level) {
         super.onTrimMemory(level);
         if (appCatalog != null && level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+            launcherIconGeneration++;
             appCatalog.clearIcons();
         }
         if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
@@ -3871,6 +3891,10 @@ public final class LauncherActivity extends AppCompatActivity {
         if (addButton) {
             icon.setImageResource(R.drawable.ic_add);
             icon.setColorFilter(Color.WHITE);
+        } else if (shortcut.kind == LauncherShortcutStore.Kind.APP
+                && "app".equals(shortcut.icon)) {
+            // The PackageManager/resource decode is scheduled after the interactive tile exists.
+            icon.setImageResource(R.drawable.ic_launcher_apps);
         } else {
             icon.setImageDrawable(LauncherIconResolver.resolve(this, shortcut));
         }
@@ -4134,9 +4158,18 @@ public final class LauncherActivity extends AppCompatActivity {
         LauncherShortcutStore.Shortcut visual = binding.shortcut.copy();
         visual.icon = binding.liveIconKey;
         binding.icon.clearColorFilter();
-        binding.icon.setImageDrawable(LauncherIconResolver.resolve(this, visual, style.tint));
         boolean originalApplicationIcon = visual.kind == LauncherShortcutStore.Kind.APP
                 && "app".equals(visual.icon);
+        if (originalApplicationIcon) {
+            Drawable appIcon = launcherShortcutAppIcons.get(visual.target);
+            if (appIcon == null) {
+                appIcon = ContextCompat.getDrawable(this, R.drawable.ic_launcher_apps);
+                requestShortcutAppIcon(binding, visual.target);
+            }
+            binding.icon.setImageDrawable(appIcon);
+        } else {
+            binding.icon.setImageDrawable(LauncherIconResolver.resolve(this, visual, style.tint));
+        }
         if (originalApplicationIcon && automation.iconTint != null
                 && !"none".equalsIgnoreCase(automation.iconTint)) {
             try { binding.icon.setColorFilter(Color.parseColor(automation.iconTint)); }
@@ -4147,6 +4180,45 @@ public final class LauncherActivity extends AppCompatActivity {
         catch (IllegalArgumentException ignored) { outlineColor = Color.TRANSPARENT; }
         binding.icon.setOutlineColor(outlineColor);
         binding.icon.setOutlineWidth(style.outlineWidthPx);
+    }
+
+    /** Keeps uncommon APP actions from decoding another package's resources on the UI thread. */
+    private void requestShortcutAppIcon(@NonNull ShortcutTileBinding binding,
+                                        @NonNull String flattenedComponent) {
+        if (flattenedComponent.isEmpty() || launcherIconWorker.isShutdown()
+                || !launcherShortcutAppIconLoads.add(flattenedComponent)) return;
+        ComponentName component = ComponentName.unflattenFromString(flattenedComponent);
+        if (component == null) {
+            launcherShortcutAppIconLoads.remove(flattenedComponent);
+            return;
+        }
+        final int generation = launcherIconGeneration;
+        try {
+            launcherIconWorker.execute(() -> {
+                Drawable loaded = HighResolutionAppIconLoader.load(
+                        getApplicationContext(), component);
+                if (loaded == null) {
+                    loaded = ContextCompat.getDrawable(getApplicationContext(),
+                            R.drawable.ic_launcher_apps);
+                }
+                Drawable delivered = loaded;
+                navigationUiHandler.post(() -> {
+                    launcherShortcutAppIconLoads.remove(flattenedComponent);
+                    if (generation != launcherIconGeneration || isDestroyed()) return;
+                    if (delivered != null) {
+                        launcherShortcutAppIcons.put(flattenedComponent, delivered);
+                    }
+                    ShortcutTileBinding current = launcherShortcutBindings.get(
+                            binding.shortcut.id);
+                    if (current == binding
+                            && flattenedComponent.equals(binding.shortcut.target)) {
+                        applyLauncherAutomationStyle(binding);
+                    }
+                });
+            });
+        } catch (RejectedExecutionException failure) {
+            launcherShortcutAppIconLoads.remove(flattenedComponent);
+        }
     }
 
     private void applyCarState(@NonNull ShortcutTileBinding binding,
@@ -5087,6 +5159,7 @@ public final class LauncherActivity extends AppCompatActivity {
         final ComponentName component;
         final boolean systemApp;
         @Nullable private volatile Drawable cachedIcon;
+        private boolean iconLoadRequested;
 
         AppEntry(String label, String packageName, ComponentName component,
                  boolean systemApp) {
@@ -5096,17 +5169,23 @@ public final class LauncherActivity extends AppCompatActivity {
             this.systemApp = systemApp;
         }
 
-        Drawable icon(Context context, boolean cache) {
-            Drawable value = cache ? cachedIcon : null;
-            if (value != null) return value;
-            value = HighResolutionAppIconLoader.load(context, component);
-            if (value == null) value = ContextCompat.getDrawable(
-                    context, R.drawable.ic_launcher_apps);
-            if (cache) cachedIcon = value;
-            return value;
+        @Nullable Drawable cachedIcon() { return cachedIcon; }
+
+        synchronized boolean beginIconLoad() {
+            if (cachedIcon != null || iconLoadRequested) return false;
+            iconLoadRequested = true;
+            return true;
         }
 
-        void clearIcon() { cachedIcon = null; }
+        synchronized void completeIconLoad(@Nullable Drawable value) {
+            cachedIcon = value;
+            iconLoadRequested = false;
+        }
+
+        synchronized void clearIcon() {
+            cachedIcon = null;
+            iconLoadRequested = false;
+        }
     }
 
     private static final class ShortcutTileBinding {
@@ -5178,10 +5257,16 @@ public final class LauncherActivity extends AppCompatActivity {
                     ? reusable instanceof AppDrawerTileView
                     ? (AppDrawerTileView) reusable : new AppDrawerTileView(LauncherActivity.this)
                     : null;
+            Drawable icon = entry.cachedIcon();
+            if (icon == null) {
+                icon = ContextCompat.getDrawable(LauncherActivity.this,
+                        R.drawable.ic_launcher_apps);
+                requestAppEntryIcon(entry, this);
+            }
             LinearLayout tile = LauncherAppTileRenderer.render(
                     LauncherActivity.this,
                     drawerCell == null ? reusable : drawerCell.reusableContent(), entry.label,
-                    entry.icon(LauncherActivity.this, cacheIcons),
+                    icon,
                     appearance, cacheIcons ? appsGridScalePercent
                             : Math.max(60, Math.min(180,
                             preferences.launcherAllAppsIconScalePercent.get())));
@@ -5211,6 +5296,47 @@ public final class LauncherActivity extends AppCompatActivity {
         }
     }
 
+    /** Loads one visible application icon without ever blocking GridView.getView(). */
+    private void requestAppEntryIcon(@NonNull AppEntry entry,
+                                     @NonNull BaseAdapter adapter) {
+        if (!entry.beginIconLoad() || launcherIconWorker.isShutdown()) return;
+        final int generation = launcherIconGeneration;
+        try {
+            launcherIconWorker.execute(() -> {
+                Drawable loaded = HighResolutionAppIconLoader.load(
+                        getApplicationContext(), entry.component);
+                if (loaded == null) {
+                    loaded = ContextCompat.getDrawable(getApplicationContext(),
+                            R.drawable.ic_launcher_apps);
+                }
+                Drawable delivered = loaded;
+                navigationUiHandler.post(() -> {
+                    if (generation != launcherIconGeneration || isDestroyed()) {
+                        entry.completeIconLoad(null);
+                        return;
+                    }
+                    entry.completeIconLoad(delivered);
+                    scheduleAppIconAdapterRefresh(adapter);
+                });
+            });
+        } catch (RejectedExecutionException failure) {
+            entry.completeIconLoad(null);
+        }
+    }
+
+    /** Coalesces a burst of decoded icons into one GridView layout pass per frame group. */
+    private void scheduleAppIconAdapterRefresh(@NonNull BaseAdapter adapter) {
+        launcherIconAdapterRefreshTarget = adapter;
+        if (launcherIconAdapterRefreshTask != null) return;
+        launcherIconAdapterRefreshTask = () -> {
+            launcherIconAdapterRefreshTask = null;
+            BaseAdapter target = launcherIconAdapterRefreshTarget;
+            launcherIconAdapterRefreshTarget = null;
+            if (target != null && !isDestroyed()) target.notifyDataSetChanged();
+        };
+        navigationUiHandler.postDelayed(launcherIconAdapterRefreshTask, 64L);
+    }
+
     private final class AppCatalog {
         private final Context context;
         private final List<AppEntry> apps = new ArrayList<>();
@@ -5227,9 +5353,9 @@ public final class LauncherActivity extends AppCompatActivity {
                         app.systemApp));
             }
             ensureDefaultFavorites();
-            // Preload only the handful of icons shown on HOME. The full application list keeps
-            // lazy icons so dozens of adaptive drawables do not remain resident permanently.
-            for (AppEntry favorite : favorites()) favorite.icon(context, true);
+            // Icons are a separate, low-priority lane. Publish labels/components immediately so
+            // HOME actions and application tiles become interactive before adaptive drawables
+            // finish decoding.
         }
 
         List<AppEntry> all() { return new ArrayList<>(apps); }

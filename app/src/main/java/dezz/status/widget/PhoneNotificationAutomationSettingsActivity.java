@@ -50,6 +50,7 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
     private Switch popup;
     private Switch onlyWhenLocked;
     private Switch delayInApps;
+    private Switch delayExternalOverlays;
     private TextView fieldsSummary;
     private TextView durationSummary;
     private TextView delayAppsSummary;
@@ -94,6 +95,8 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         popup.setChecked(prefs.phonePopupNotificationsEnabled.get());
         onlyWhenLocked.setChecked(prefs.phoneNotificationsOnlyWhenLocked.get());
         delayInApps.setChecked(prefs.phoneNotificationDelayInAppsEnabled.get());
+        delayExternalOverlays.setChecked(
+                prefs.phoneNotificationDelayForExternalOverlays.get());
         binding = false;
         refreshSummaries();
     }
@@ -172,6 +175,12 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
                 prefs.phoneNotificationDelayInAppsEnabled.get());
         delayCard.addView(delayInApps, matchWrap());
         delayCard.addView(label(getString(R.string.phone_notification_delay_hint)), topMargin(4));
+        delayExternalOverlays = switchView(
+                getString(R.string.phone_notification_delay_external_overlays),
+                prefs.phoneNotificationDelayForExternalOverlays.get());
+        delayCard.addView(delayExternalOverlays, topMargin(10));
+        delayCard.addView(label(getString(
+                R.string.phone_notification_delay_external_overlays_hint)), topMargin(4));
         page.addView(delayCard, topMargin(8));
         delayInApps.setOnCheckedChangeListener((button, checked) -> {
             if (binding) return;
@@ -181,6 +190,18 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
                 binding = false;
                 showForegroundTrackingRequired();
                 return;
+            }
+            persist();
+        });
+        delayExternalOverlays.setOnCheckedChangeListener((button, checked) -> {
+            if (binding) return;
+            String component = new android.content.ComponentName(this,
+                    WidgetAccessibilityService.class).flattenToString();
+            if (checked && WidgetAccessibilityService.getInstance() == null
+                    && !Permissions.isAccessibilityServiceEnabled(this, component)) {
+                Toast.makeText(this,
+                        R.string.phone_notification_delay_external_overlays_access,
+                        Toast.LENGTH_LONG).show();
             }
             persist();
         });
@@ -451,7 +472,8 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
         try {
             boolean statusEnabled = statusRow.isChecked();
             boolean popupEnabled = popup.isChecked();
-            if (delayInApps.isChecked() && delayPackages.isEmpty()) {
+            boolean automaticOverlays = delayExternalOverlays.isChecked();
+            if (delayInApps.isChecked() && delayPackages.isEmpty() && !automaticOverlays) {
                 Toast.makeText(this, R.string.phone_notification_delay_apps_required,
                         Toast.LENGTH_LONG).show();
                 binding = true;
@@ -462,7 +484,9 @@ public final class PhoneNotificationAutomationSettingsActivity extends AppCompat
             prefs.phonePopupNotificationsEnabled.set(popupEnabled);
             prefs.phoneNotificationsOnlyWhenLocked.set(onlyWhenLocked.isChecked());
             prefs.phoneNotificationDelayInAppsEnabled.set(
-                    delayInApps.isChecked() && !delayPackages.isEmpty());
+                    delayInApps.isChecked()
+                            && (!delayPackages.isEmpty() || automaticOverlays));
+            prefs.phoneNotificationDelayForExternalOverlays.set(automaticOverlays);
             prefs.phoneNotificationDelayInPackages.set(delayPackages);
             prefs.phoneNotificationDelayMaxWaitSeconds.set(
                     PhoneNotificationDeferralPolicy.boundedMaxWaitSeconds(

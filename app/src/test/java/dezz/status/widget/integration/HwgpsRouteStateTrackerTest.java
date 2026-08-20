@@ -157,6 +157,25 @@ public final class HwgpsRouteStateTrackerTest {
         }
     }
 
+    @Test public void activeNavigationRouteArmsMidLossSubscription() {
+        HwgpsRouteStateTracker tracker = new HwgpsRouteStateTracker();
+        assertTrue(tracker.setNavigationRouteActive(true).requestSnapshot);
+        HwgpsRouteStateTracker.Update first = tracker.accept("notFixed", 1_000L);
+        assertEquals(HwgpsRouteStatePolicy.State.UNAVAILABLE, first.state);
+        assertTrue(first.requestSnapshot);
+        tracker.accept("notFixed", 1_100L);
+        assertTrue(tracker.evaluate(9_000L).requestSnapshot);
+        assertEquals(HwgpsRouteStatePolicy.State.ROUTE_LOST,
+                tracker.accept("notFixed", 9_001L).state);
+    }
+
+    @Test public void idleNotFixedRemainsUnavailableWithoutRouteOrHealthyFix() {
+        HwgpsRouteStateTracker tracker = new HwgpsRouteStateTracker();
+        tracker.setNavigationRouteActive(false);
+        assertEquals(HwgpsRouteStatePolicy.State.UNAVAILABLE,
+                tracker.accept("notFixed", 1_000L).state);
+    }
+
     @Test public void explicitAdverseDoesNotEraseConfirmedNoFixRecoveryDwell() {
         HwgpsRouteStateTracker tracker = confirmedLostTracker();
         tracker.accept("filtered", 10_000L);

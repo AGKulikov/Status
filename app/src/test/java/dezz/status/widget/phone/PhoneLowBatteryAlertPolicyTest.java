@@ -12,9 +12,9 @@ import org.junit.Test;
 
 public final class PhoneLowBatteryAlertPolicyTest {
     @Test
-    public void alertFiresOnceBelowThreshold() {
+    public void alertFiresOnceAtExactThreshold() {
         PhoneLowBatteryAlertPolicy.Result first =
-                PhoneLowBatteryAlertPolicy.evaluate(true, 20, false, 19);
+                PhoneLowBatteryAlertPolicy.evaluate(true, 20, false, 20);
         assertTrue(first.trigger);
         assertTrue(first.latched);
 
@@ -22,6 +22,15 @@ public final class PhoneLowBatteryAlertPolicyTest {
                 PhoneLowBatteryAlertPolicy.evaluate(true, 20, first.latched, 18);
         assertFalse(repeated.trigger);
         assertTrue(repeated.latched);
+    }
+
+    @Test
+    public void twoThresholdsMustBeStrictlyOrdered() {
+        assertTrue(PhoneLowBatteryAlertPolicy.validOrderedThresholds(20, 10));
+        assertFalse(PhoneLowBatteryAlertPolicy.validOrderedThresholds(20, 20));
+        assertFalse(PhoneLowBatteryAlertPolicy.validOrderedThresholds(10, 20));
+        assertFalse(PhoneLowBatteryAlertPolicy.validOrderedThresholds(101, 10));
+        assertFalse(PhoneLowBatteryAlertPolicy.validOrderedThresholds(20, 0));
     }
 
     @Test

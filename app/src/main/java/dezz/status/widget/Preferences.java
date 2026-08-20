@@ -39,6 +39,29 @@ import dezz.status.widget.phone.PhoneNotificationDeferralPolicy;
 
 public class Preferences {
     private static final String TAG = "Preferences";
+    private static final String PHONE_BLE_V2_SWITCH_SNAPSHOT_KEY =
+            "phoneBleV2SwitchSnapshot";
+    private static final String PHONE_BLE_V2_HELPER_INSTALLATION_ID_KEY =
+            "phoneBleV2HelperInstallationId";
+    private static final String PHONE_BLE_V2_ANDROID_INSTALLATION_ID_KEY =
+            "phoneBleV2AndroidInstallationId";
+    private static final String PHONE_BLE_V2_ENROLLMENT_RECORD_KEY =
+            "phoneBleV2EnrollmentRecord";
+    private static final String PHONE_BLE_V2_ENROLLMENT_PENDING_RECORD_KEY =
+            "phoneBleV2EnrollmentPendingRecord";
+
+    private static final String SYSTEM_UI_PENDING_ACTIVE = "systemUiPendingActive";
+    private static final String SYSTEM_UI_PENDING_ENABLED = "systemUiPendingEnabled";
+    private static final String SYSTEM_UI_PENDING_ROLLBACK_NULL =
+            "systemUiPendingRollbackNull";
+    private static final String SYSTEM_UI_PENDING_ROLLBACK_RAW =
+            "systemUiPendingRollbackRaw";
+    private static final String SYSTEM_UI_PENDING_DESIRED_NULL =
+            "systemUiPendingDesiredNull";
+    private static final String SYSTEM_UI_PENDING_DESIRED_RAW =
+            "systemUiPendingDesiredRaw";
+    private static final String SYSTEM_UI_PENDING_OWNED_SLOTS =
+            "systemUiPendingOwnedSlots";
     /** New large HOME surfaces must remain opt-in when an existing layout is upgraded. */
     static final boolean DEFAULT_LAUNCHER_VEHICLE_INFO_VISIBLE = false;
     /** Secrets and installation identities never leave the device through settings exports or
@@ -57,11 +80,28 @@ public class Preferences {
                     // ANCS v2 role ownership and installation proofs are local protocol state.
                     // Copying any of them to another head unit could replay a stale drain or
                     // impersonate the installation identity used by the paired Helper.
-                    "phoneBleV2SwitchSnapshot", "phoneBleV2HelperInstallationId",
-                    "phoneBleV2AndroidInstallationId", "phoneBleExperimentalRouteBEnabled",
+                    PHONE_BLE_V2_SWITCH_SNAPSHOT_KEY,
+                    PHONE_BLE_V2_HELPER_INSTALLATION_ID_KEY,
+                    PHONE_BLE_V2_ANDROID_INSTALLATION_ID_KEY,
+                    PHONE_BLE_V2_ENROLLMENT_RECORD_KEY,
+                    PHONE_BLE_V2_ENROLLMENT_PENDING_RECORD_KEY,
+                    "phoneBleExperimentalRouteBEnabled",
                     // Contains both the full bearer action and fixed-endpoint token. Layout
                     // presets are routinely shared, so rules must remain device-local too.
                     "intentActionRulesJson")));
+
+    /** State tied to this head unit and its current SystemUI must never enter backups/presets. */
+    private static final Set<String> DEVICE_LOCAL_PREFERENCE_KEYS =
+            Collections.unmodifiableSet(new HashSet<>(java.util.Arrays.asList(
+                    "systemUiHideStockContentGlobally",
+                    "systemUiOwnedHiddenSlots",
+                    SYSTEM_UI_PENDING_ACTIVE,
+                    SYSTEM_UI_PENDING_ENABLED,
+                    SYSTEM_UI_PENDING_ROLLBACK_NULL,
+                    SYSTEM_UI_PENDING_ROLLBACK_RAW,
+                    SYSTEM_UI_PENDING_DESIRED_NULL,
+                    SYSTEM_UI_PENDING_DESIRED_RAW,
+                    SYSTEM_UI_PENDING_OWNED_SLOTS)));
     public static abstract class Preference {
         final Preferences preferences;
         final String key;
@@ -106,6 +146,24 @@ public class Preferences {
 
         public void set(Set<String> value) {
             preferences.prefs.edit().putStringSet(key, new HashSet<>(value)).apply();
+        }
+    }
+
+    /** Durable write-ahead record for an ownership-safe SystemUI mutation. */
+    public static final class PendingSystemStatusBarContentState {
+        public final boolean enabled;
+        @Nullable public final String rollbackRaw;
+        @Nullable public final String desiredRaw;
+        @NonNull public final Set<String> ownedSlots;
+
+        private PendingSystemStatusBarContentState(boolean enabled,
+                                                   @Nullable String rollbackRaw,
+                                                   @Nullable String desiredRaw,
+                                                   @NonNull Set<String> ownedSlots) {
+            this.enabled = enabled;
+            this.rollbackRaw = rollbackRaw;
+            this.desiredRaw = desiredRaw;
+            this.ownedSlots = Collections.unmodifiableSet(new HashSet<>(ownedSlots));
         }
     }
 
@@ -597,6 +655,12 @@ public class Preferences {
             "launcherHideSystemStatusBar", false);
     public final Str launcherSystemStatusBarOriginalPolicy = new Str(this,
             "launcherSystemStatusBarOriginalPolicy", "__unset__");
+    /** Globally hides firmware-declared stock SystemUI slots while preserving the bar itself. */
+    public final Bool systemUiHideStockContentGlobally = new Bool(this,
+            "systemUiHideStockContentGlobally", false);
+    /** Only slots added by Natro; disable removes this set and preserves every other owner. */
+    public final StringSet systemUiOwnedHiddenSlots = new StringSet(this,
+            "systemUiOwnedHiddenSlots");
     /** Explicit HOME chain requested for ECARX: HOME -> our launcher -> windowed Navigator. */
     public final Bool launcherHomeOpensWindowedNavigator = new Bool(this,
             "launcherHomeOpensWindowedNavigator", false);
@@ -774,13 +838,6 @@ public class Preferences {
     public final Bool phoneBleExperimentalRouteBEnabled = new Bool(this,
             "phoneBleExperimentalRouteBEnabled", false);
 
-    private static final String PHONE_BLE_V2_SWITCH_SNAPSHOT_KEY =
-            "phoneBleV2SwitchSnapshot";
-    private static final String PHONE_BLE_V2_HELPER_INSTALLATION_ID_KEY =
-            "phoneBleV2HelperInstallationId";
-    private static final String PHONE_BLE_V2_ANDROID_INSTALLATION_ID_KEY =
-            "phoneBleV2AndroidInstallationId";
-
     /**
      * Returns the write-ahead snapshot owned by the ANCS v2 role-switch coordinator.
      *
@@ -807,6 +864,14 @@ public class Preferences {
     /** Stable Helper installation identity learned only after the encrypted exact-owner H proof. */
     @NonNull
     public String phoneBleV2HelperInstallationId() {
+        dezz.status.widget.phone.transport.v2.IphoneLeEnrollmentRecordV2 pending =
+                dezz.status.widget.phone.transport.v2.IphoneLeEnrollmentRecordV2.parse(
+                        phoneBleV2PendingEnrollmentRecord());
+        if (pending != null) return pending.helperInstallationId.toString();
+        dezz.status.widget.phone.transport.v2.IphoneLeEnrollmentRecordV2 active =
+                dezz.status.widget.phone.transport.v2.IphoneLeEnrollmentRecordV2.parse(
+                        phoneBleV2EnrollmentRecord());
+        if (active != null) return active.helperInstallationId.toString();
         return prefs.getString(PHONE_BLE_V2_HELPER_INSTALLATION_ID_KEY, "");
     }
 
@@ -824,6 +889,75 @@ public class Preferences {
     public boolean commitPhoneBleV2AndroidInstallationId(@NonNull String installationId) {
         return prefs.edit().putString(PHONE_BLE_V2_ANDROID_INSTALLATION_ID_KEY,
                 installationId).commit();
+    }
+
+    /** Returns only authenticated ciphertext; legacy plaintext is intentionally rejected. */
+    @NonNull
+    public String phoneBleV2EnrollmentRecord() {
+        return readEncryptedEnrollmentRecord(PHONE_BLE_V2_ENROLLMENT_RECORD_KEY,
+                "BLE enrollment record");
+    }
+
+    public boolean commitPhoneBleV2EnrollmentRecord(@NonNull String encoded) {
+        try {
+            String encrypted = SecretStore.encrypt(appContext, encoded);
+            return prefs.edit().putString(PHONE_BLE_V2_ENROLLMENT_RECORD_KEY, encrypted)
+                    .commit() && encoded.equals(phoneBleV2EnrollmentRecord());
+        } catch (Exception error) {
+            Log.e(TAG, "Could not persist BLE enrollment record", error);
+            return false;
+        }
+    }
+
+    @NonNull
+    public String phoneBleV2PendingEnrollmentRecord() {
+        return readEncryptedEnrollmentRecord(PHONE_BLE_V2_ENROLLMENT_PENDING_RECORD_KEY,
+                "Pending BLE enrollment");
+    }
+
+    public boolean beginPhoneBleV2EnrollmentCommit(@NonNull String encoded) {
+        try {
+            String encrypted = SecretStore.encrypt(appContext, encoded);
+            return prefs.edit().putString(PHONE_BLE_V2_ENROLLMENT_PENDING_RECORD_KEY,
+                    encrypted).commit() && encoded.equals(phoneBleV2PendingEnrollmentRecord());
+        } catch (Exception error) {
+            Log.e(TAG, "Could not stage BLE enrollment record", error);
+            return false;
+        }
+    }
+
+    public boolean completePhoneBleV2EnrollmentCommit(@NonNull String encoded) {
+        String encrypted = prefs.getString(PHONE_BLE_V2_ENROLLMENT_PENDING_RECORD_KEY, "");
+        return encrypted != null && encrypted.startsWith("v1:")
+                && encoded.equals(phoneBleV2PendingEnrollmentRecord())
+                && prefs.edit().putString(PHONE_BLE_V2_ENROLLMENT_RECORD_KEY, encrypted)
+                .remove(PHONE_BLE_V2_ENROLLMENT_PENDING_RECORD_KEY).commit()
+                && encoded.equals(phoneBleV2EnrollmentRecord())
+                && phoneBleV2PendingEnrollmentRecord().isEmpty();
+    }
+
+    public boolean clearPhoneBleV2PendingEnrollmentRecord() {
+        return prefs.edit().remove(PHONE_BLE_V2_ENROLLMENT_PENDING_RECORD_KEY).commit();
+    }
+
+    public boolean clearPhoneBleV2EnrollmentRecord() {
+        return prefs.edit().remove(PHONE_BLE_V2_ENROLLMENT_RECORD_KEY)
+                .remove(PHONE_BLE_V2_ENROLLMENT_PENDING_RECORD_KEY)
+                .remove(PHONE_BLE_V2_HELPER_INSTALLATION_ID_KEY).commit();
+    }
+
+    @NonNull
+    private String readEncryptedEnrollmentRecord(@NonNull String key,
+                                                 @NonNull String label) {
+        String encrypted = prefs.getString(key, "");
+        if (encrypted != null && encrypted.startsWith("v1:")) {
+            try {
+                return SecretStore.decrypt(appContext, encrypted);
+            } catch (Exception error) {
+                Log.w(TAG, label + " unavailable until Keystore unlock", error);
+            }
+        }
+        return "";
     }
     public final Bool phoneNotificationsEnabled = new Bool(this,
             "phoneNotificationsEnabled", true);
@@ -846,6 +980,9 @@ public class Preferences {
     /** Holds new phone notifications while one of the selected head-unit apps is foreground. */
     public final Bool phoneNotificationDelayInAppsEnabled = new Bool(this,
             "phoneNotificationDelayInAppsEnabled", false);
+    /** Uses Android 9 window add/remove events to hold behind non-foreground overlays (e.g. AVM). */
+    public final Bool phoneNotificationDelayForExternalOverlays = new Bool(this,
+            "phoneNotificationDelayForExternalOverlays", true);
     /** Exact Android package names; stored as a StringSet for lossless settings migration. */
     public final StringSet phoneNotificationDelayInPackages = new StringSet(this,
             "phoneNotificationDelayInPackages");
@@ -870,16 +1007,22 @@ public class Preferences {
     /** Independent text color for live ANCS notifications temporarily replacing Now Playing. */
     public final Str phoneStatusBarNotificationColor = new Str(this,
             "phoneNotificationTickerColor", "#FFFFFFFF");
-    /** One-shot status-row warning when a fresh selected-iPhone battery level is below threshold. */
+    /** Two exact-percentage warnings, routed through the ordinary phone-notification surfaces. */
     public final Bool phoneLowBatteryAlertEnabled = new Bool(this,
             "phoneLowBatteryAlertEnabled", false);
     public final Int phoneLowBatteryAlertThreshold = new Int(this,
             "phoneLowBatteryAlertThreshold", 20);
     public final Str phoneLowBatteryAlertColor = new Str(this,
             "phoneLowBatteryAlertColor", "#FFFF453A");
-    /** Internal latch: survives Bluetooth/service restarts and resets only after recovery. */
+    public final Int phoneLowBatteryAlertThreshold2 = new Int(this,
+            "phoneLowBatteryAlertThreshold2", 10);
+    public final Str phoneLowBatteryAlertColor2 = new Str(this,
+            "phoneLowBatteryAlertColor2", "#FFFF2D55");
+    /** Internal latches survive Bluetooth/service restarts and reset only after recovery. */
     public final Bool phoneLowBatteryAlertLatched = new Bool(this,
             "phoneLowBatteryAlertLatched", false);
+    public final Bool phoneLowBatteryAlertLatched2 = new Bool(this,
+            "phoneLowBatteryAlertLatched2", false);
     /** Optional writable Sprut.hub boolean characteristic reflecting phone presence. */
     public final Bool phoneSprutPresenceEnabled = new Bool(this,
             "phoneSprutPresenceEnabled", false);
@@ -1261,7 +1404,92 @@ public class Preferences {
      * an async write may not reach disk in time.
      */
     public void resetAll() {
-        prefs.edit().clear().commit();
+        SharedPreferences.Editor editor = prefs.edit();
+        for (String key : prefs.getAll().keySet()) {
+            if (!DEVICE_LOCAL_PREFERENCE_KEYS.contains(key)) editor.remove(key);
+        }
+        editor.commit();
+    }
+
+    public boolean saveVerifiedSystemStatusBarContentState(
+            boolean enabled, @NonNull Set<String> ownedSlots) {
+        return prefs.edit()
+                .putBoolean(systemUiHideStockContentGlobally.key, enabled)
+                .putStringSet(systemUiOwnedHiddenSlots.key, new HashSet<>(ownedSlots))
+                .commit();
+    }
+
+    /** Commits the complete rollback journal before any shared SystemUI setting is written. */
+    public boolean beginPendingSystemStatusBarContentState(
+            boolean enabled, @Nullable String rollbackRaw, @Nullable String desiredRaw,
+            @NonNull Set<String> ownedSlots) {
+        return putPendingFields(prefs.edit(), enabled, rollbackRaw, desiredRaw, ownedSlots)
+                .putBoolean(SYSTEM_UI_PENDING_ACTIVE, true).commit();
+    }
+
+    public boolean restorePendingSystemStatusBarContentState(
+            boolean enabled, @NonNull Set<String> ownedSlots,
+            @NonNull PendingSystemStatusBarContentState pending) {
+        SharedPreferences.Editor editor = prefs.edit()
+                .putBoolean(systemUiHideStockContentGlobally.key, enabled)
+                .putStringSet(systemUiOwnedHiddenSlots.key, new HashSet<>(ownedSlots));
+        return putPendingFields(editor, pending.enabled, pending.rollbackRaw,
+                pending.desiredRaw, pending.ownedSlots)
+                .putBoolean(SYSTEM_UI_PENDING_ACTIVE, true).commit();
+    }
+
+    public boolean completePendingSystemStatusBarContentState(
+            boolean enabled, @NonNull Set<String> ownedSlots) {
+        SharedPreferences.Editor editor = prefs.edit()
+                .putBoolean(systemUiHideStockContentGlobally.key, enabled)
+                .putStringSet(systemUiOwnedHiddenSlots.key, new HashSet<>(ownedSlots));
+        return clearPendingFields(editor).commit();
+    }
+
+    public boolean clearPendingSystemStatusBarContentState() {
+        return clearPendingFields(prefs.edit()).commit();
+    }
+
+    @Nullable
+    public PendingSystemStatusBarContentState pendingSystemStatusBarContentState() {
+        if (!prefs.getBoolean(SYSTEM_UI_PENDING_ACTIVE, false)) return null;
+        boolean rollbackNull = prefs.getBoolean(SYSTEM_UI_PENDING_ROLLBACK_NULL, false);
+        boolean desiredNull = prefs.getBoolean(SYSTEM_UI_PENDING_DESIRED_NULL, false);
+        return new PendingSystemStatusBarContentState(
+                prefs.getBoolean(SYSTEM_UI_PENDING_ENABLED, false),
+                rollbackNull ? null : prefs.getString(SYSTEM_UI_PENDING_ROLLBACK_RAW,
+                        " invalid-pending-state"),
+                desiredNull ? null : prefs.getString(SYSTEM_UI_PENDING_DESIRED_RAW,
+                        " invalid-pending-state"),
+                prefs.getStringSet(SYSTEM_UI_PENDING_OWNED_SLOTS, Collections.emptySet()));
+    }
+
+    @NonNull
+    private static SharedPreferences.Editor putPendingFields(
+            @NonNull SharedPreferences.Editor editor, boolean enabled,
+            @Nullable String rollbackRaw, @Nullable String desiredRaw,
+            @NonNull Set<String> ownedSlots) {
+        editor.putBoolean(SYSTEM_UI_PENDING_ENABLED, enabled)
+                .putBoolean(SYSTEM_UI_PENDING_ROLLBACK_NULL, rollbackRaw == null)
+                .putBoolean(SYSTEM_UI_PENDING_DESIRED_NULL, desiredRaw == null)
+                .putStringSet(SYSTEM_UI_PENDING_OWNED_SLOTS, new HashSet<>(ownedSlots));
+        if (rollbackRaw == null) editor.remove(SYSTEM_UI_PENDING_ROLLBACK_RAW);
+        else editor.putString(SYSTEM_UI_PENDING_ROLLBACK_RAW, rollbackRaw);
+        if (desiredRaw == null) editor.remove(SYSTEM_UI_PENDING_DESIRED_RAW);
+        else editor.putString(SYSTEM_UI_PENDING_DESIRED_RAW, desiredRaw);
+        return editor;
+    }
+
+    @NonNull
+    private static SharedPreferences.Editor clearPendingFields(
+            @NonNull SharedPreferences.Editor editor) {
+        return editor.remove(SYSTEM_UI_PENDING_ACTIVE)
+                .remove(SYSTEM_UI_PENDING_ENABLED)
+                .remove(SYSTEM_UI_PENDING_ROLLBACK_NULL)
+                .remove(SYSTEM_UI_PENDING_ROLLBACK_RAW)
+                .remove(SYSTEM_UI_PENDING_DESIRED_NULL)
+                .remove(SYSTEM_UI_PENDING_DESIRED_RAW)
+                .remove(SYSTEM_UI_PENDING_OWNED_SLOTS);
     }
 
     /** Popup drag can be followed immediately by ignition power-off; persist both coordinates
@@ -1428,7 +1656,8 @@ public class Preferences {
         JSONObject preferencesNode = new JSONObject();
         for (Map.Entry<String, ?> entry : prefs.getAll().entrySet()) {
             // Credentials are device-local and never leave the app in an export or preset.
-            if (SECRET_PREFERENCE_KEYS.contains(entry.getKey())) continue;
+            if (SECRET_PREFERENCE_KEYS.contains(entry.getKey())
+                    || DEVICE_LOCAL_PREFERENCE_KEYS.contains(entry.getKey())) continue;
             Object value = entry.getValue();
             if (value instanceof Set) {
                 JSONArray array = new JSONArray();
@@ -1469,15 +1698,6 @@ public class Preferences {
 
     private void applyJson(String json, boolean clearExisting)
             throws JSONException, InvalidSettingsFileException {
-        // Preserve encrypted device-local connector credentials byte-for-byte. Decrypting and
-        // re-encrypting here can fail during Direct Boot before the Keystore is unlocked.
-        Map<String, String> existingSecrets = new java.util.HashMap<>();
-        if (clearExisting) {
-            for (String secretKey : SECRET_PREFERENCE_KEYS) {
-                String stored = prefs.getString(secretKey, null);
-                if (stored != null) existingSecrets.put(secretKey, stored);
-            }
-        }
         JSONObject root = new JSONObject(json);
         if (!EXPORT_FILE_TYPE.equals(root.optString(KEY_FILE_TYPE, null))) {
             throw new InvalidSettingsFileException("Not a Natro settings file");
@@ -1491,11 +1711,19 @@ public class Preferences {
             throw new InvalidSettingsFileException("Missing preferences section");
         }
         SharedPreferences.Editor editor = prefs.edit();
-        if (clearExisting) editor.clear();
+        if (clearExisting) {
+            for (String existing : prefs.getAll().keySet()) {
+                if (!SECRET_PREFERENCE_KEYS.contains(existing)
+                        && !DEVICE_LOCAL_PREFERENCE_KEYS.contains(existing)) {
+                    editor.remove(existing);
+                }
+            }
+        }
         Iterator<String> keys = preferencesNode.keys();
         while (keys.hasNext()) {
             String key = keys.next();
-            if (SECRET_PREFERENCE_KEYS.contains(key)) continue;
+            if (SECRET_PREFERENCE_KEYS.contains(key)
+                    || DEVICE_LOCAL_PREFERENCE_KEYS.contains(key)) continue;
             Object value = preferencesNode.get(key);
             if (value instanceof Boolean) {
                 editor.putBoolean(key, (Boolean) value);
@@ -1519,11 +1747,6 @@ public class Preferences {
                 editor.putStringSet(key, set);
             } else if (value instanceof String) {
                 editor.putString(key, (String) value);
-            }
-        }
-        if (clearExisting) {
-            for (Map.Entry<String, String> secret : existingSecrets.entrySet()) {
-                editor.putString(secret.getKey(), secret.getValue());
             }
         }
         editor.commit();

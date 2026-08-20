@@ -19,6 +19,8 @@ import java.util.Locale;
 public final class SelectedBondIdentityResolverV2 {
     public enum Path {
         EXACT_SELECTED_ADDRESS,
+        /** Saved post-SMP LE facade, authenticated by C4 before encrypted H is touched. */
+        ENROLLED_LE_FACADE,
         REJECTED
     }
 
@@ -149,6 +151,52 @@ public final class SelectedBondIdentityResolverV2 {
         }
         return new Candidate(Path.EXACT_SELECTED_ADDRESS, Failure.NONE, selected, observed,
                 anchored, "exact selected system-bond facade; encrypted H still required");
+    }
+
+    /**
+     * Starts attribution for the device-local enrollment route. The saved address is only a
+     * locator: authority still requires the C4 long-term-key proof followed by encrypted H.
+     */
+    public static Candidate beginEnrolled(
+            String selectedClassicAddress,
+            int selectedClassicMatches,
+            String enrolledLeAddress,
+            String observedLeAddress,
+            boolean observedFacadeBonded,
+            String helperInstallationId,
+            boolean routineProofVerified) {
+        String selected = canonicalAddress(selectedClassicAddress);
+        String enrolled = canonicalAddress(enrolledLeAddress);
+        String observed = canonicalAddress(observedLeAddress);
+        String helper = canonicalHelperId(helperInstallationId);
+        if (selected.isEmpty()) {
+            return rejected(Failure.INVALID_SELECTED_ADDRESS, selected, observed, helper,
+                    "selected Classic address is invalid");
+        }
+        if (selectedClassicMatches != 1) {
+            return rejected(selectedClassicMatches == 0
+                            ? Failure.SELECTED_BOND_MISSING : Failure.SELECTED_BOND_AMBIGUOUS,
+                    selected, observed, helper,
+                    "selected Classic bond is not uniquely present");
+        }
+        if (enrolled.isEmpty() || observed.isEmpty() || !enrolled.equals(observed)) {
+            return rejected(Failure.OBSERVED_FACADE_INVALID, selected, observed, helper,
+                    "active GATT facade does not match the post-SMP enrollment locator");
+        }
+        if (helper.isEmpty()) {
+            return rejected(Failure.ANCHORED_HELPER_ID_INVALID, selected, observed, helper,
+                    "enrollment record has no canonical Helper identity");
+        }
+        if (!observedFacadeBonded) {
+            return rejected(Failure.OBSERVED_FACADE_NOT_BONDED, selected, observed, helper,
+                    "post-SMP enrollment facade is no longer bonded; explicit re-enroll required");
+        }
+        if (!routineProofVerified) {
+            return rejected(Failure.ENCRYPTED_ATTRIBUTE_NOT_PROVEN, selected, observed, helper,
+                    "routine C4 HMAC must be proven before encrypted H");
+        }
+        return new Candidate(Path.ENROLLED_LE_FACADE, Failure.NONE, selected, observed, helper,
+                "enrolled locator authenticated by routine C4; encrypted H required");
     }
 
     /**

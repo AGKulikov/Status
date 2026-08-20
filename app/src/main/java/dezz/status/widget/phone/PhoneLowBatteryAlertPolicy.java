@@ -8,7 +8,7 @@ package dezz.status.widget.phone;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-/** One-shot low-battery threshold policy with a small recovery hysteresis. */
+/** Exact-integer, two-stage low-battery threshold policy with recovery hysteresis. */
 public final class PhoneLowBatteryAlertPolicy {
     private static final int MIN_THRESHOLD = 1;
     private static final int MAX_THRESHOLD = 100;
@@ -21,8 +21,15 @@ public final class PhoneLowBatteryAlertPolicy {
         return Math.max(MIN_THRESHOLD, Math.min(MAX_THRESHOLD, threshold));
     }
 
+    /** The second warning must be strictly lower so one descending charge can fire both stages. */
+    public static boolean validOrderedThresholds(int first, int second) {
+        int upper = boundedThreshold(first);
+        int lower = boundedThreshold(second);
+        return first == upper && second == lower && lower < upper;
+    }
+
     /**
-     * Triggers once when a fresh level is below the configured threshold. The latch resets only
+     * Triggers once when a fresh exact integer is at or below the configured threshold. The latch resets only
      * after recovery by two percentage points, preventing repeated alerts around a noisy boundary.
      */
     @NonNull
@@ -33,7 +40,7 @@ public final class PhoneLowBatteryAlertPolicy {
             return new Result(latched, false);
         }
         int bounded = boundedThreshold(threshold);
-        if (batteryLevel < bounded) {
+        if (batteryLevel <= bounded) {
             return latched ? new Result(true, false) : new Result(true, true);
         }
         if (batteryLevel >= Math.min(100, bounded + RECOVERY_HYSTERESIS_PERCENT)) {

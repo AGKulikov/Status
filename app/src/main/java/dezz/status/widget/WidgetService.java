@@ -463,7 +463,12 @@ public class WidgetService extends Service {
     private Set<String> activePhoneNotificationFields = Collections.emptySet();
     @Nullable
     private String activePhoneBatteryAlertText;
+    @Nullable
+    private String activePhoneBatteryAlertColor;
     private boolean phoneLowBatteryAlertLatched;
+    private boolean phoneLowBatteryAlertLatched2;
+    /** Event-derived Android 9 window above the UsageStats foreground task (e.g. 360° camera). */
+    private boolean phoneExternalOverlayActive;
     private final Set<String> observedPhoneNotificationKeys = new LinkedHashSet<>();
     private final ArrayDeque<QueuedPhoneNotification> queuedPhoneNotifications =
             new ArrayDeque<>();
@@ -3104,6 +3109,27 @@ public class WidgetService extends Service {
         return controller != null && controller.reconnectForDiagnostics();
     }
 
+    public boolean beginPhoneLeEnrollment(
+            @NonNull PhoneConnectorController.LeEnrollmentListener listener) {
+        PhoneConnectorController controller = phoneController;
+        return controller != null && controller.beginSecureLeEnrollment(listener);
+    }
+
+    public boolean confirmPhoneLeEnrollmentSas(boolean matches) {
+        PhoneConnectorController controller = phoneController;
+        return controller != null && controller.confirmSecureLeEnrollmentSas(matches);
+    }
+
+    public void cancelPhoneLeEnrollment() {
+        PhoneConnectorController controller = phoneController;
+        if (controller != null) controller.cancelSecureLeEnrollment();
+    }
+
+    public boolean forgetPhoneLeEnrollment() {
+        PhoneConnectorController controller = phoneController;
+        return controller != null && controller.forgetSecureLeEnrollment();
+    }
+
     @SuppressLint("MissingPermission")
     private void applyPreferences(boolean reconfigureIntegrations) {
         if (destroyed || prefs == null) return;
@@ -3112,8 +3138,7 @@ public class WidgetService extends Service {
             integrationReconfigurePending = true;
             reconfigureIntegrations = false;
         }
-        if (prefs.phonePopupNotificationsEnabled.get()
-                || prefs.phoneLowBatteryAlertEnabled.get()) {
+        if (prefs.phonePopupNotificationsEnabled.get()) {
             ensurePhoneNotificationPopupConfigured();
         }
 
@@ -3169,11 +3194,7 @@ public class WidgetService extends Service {
                 && !prefs.phonePopupNotificationsEnabled.get()) {
             cancelPhoneNotificationQueue();
         }
-        if (!prefs.phonePopupNotificationsEnabled.get()
-                && !prefs.phoneLowBatteryAlertEnabled.get()) {
-            clearPhonePopupNotification();
-        } else if (!prefs.phoneLowBatteryAlertEnabled.get()
-                && activePhoneLowBatteryPopup) {
+        if (!prefs.phonePopupNotificationsEnabled.get()) {
             clearPhonePopupNotification();
         } else if (integrationsStarted) {
             // The reserved overlay can be created by this preference pass after the manager's
@@ -3184,16 +3205,29 @@ public class WidgetService extends Service {
         // the optional status-row surface is disabled; popup-only delivery still owns this queue.
         safeUpdateForegroundAppTracking("phone notification preferences applied");
         reconcileDeferredPhoneNotifications();
-        if (binding == null) return;
-
         phoneLowBatteryAlertLatched = prefs.phoneLowBatteryAlertEnabled.get()
                 && prefs.phoneLowBatteryAlertLatched.get();
-        if (!prefs.phoneLowBatteryAlertEnabled.get()
-                && prefs.phoneLowBatteryAlertLatched.get()) {
-            prefs.phoneLowBatteryAlertLatched.set(false);
+        phoneLowBatteryAlertLatched2 = prefs.phoneLowBatteryAlertEnabled.get()
+                && prefs.phoneLowBatteryAlertLatched2.get();
+        if (!prefs.phoneLowBatteryAlertEnabled.get()) {
+            if (prefs.phoneLowBatteryAlertLatched.get()) {
+                prefs.phoneLowBatteryAlertLatched.set(false);
+            }
+            if (prefs.phoneLowBatteryAlertLatched2.get()) {
+                prefs.phoneLowBatteryAlertLatched2.set(false);
+            }
         }
+        // Re-evaluate a freshly edited threshold even when only the phone popup is enabled and
+        // the status-row View is deliberately detached. Delivery routing below remains governed
+        // by the ordinary row/popup/lock/foreground switches.
+        ConnectorValue currentPhoneBattery = phoneStatusValues.get("battery.level");
+        if (currentPhoneBattery != null) {
+            handlePhoneLowBatteryAlert(currentPhoneBattery);
+        }
+        if (binding == null) return;
         boolean activePhoneAlertDisabled = activePhoneBatteryAlertText != null
                 ? !prefs.phoneLowBatteryAlertEnabled.get()
+                || !prefs.phoneStatusBarNotificationsEnabled.get()
                 : activePhoneNotification != null
                 && !prefs.phoneStatusBarNotificationsEnabled.get();
         if (activePhoneAlertDisabled) {
@@ -3211,11 +3245,6 @@ public class WidgetService extends Service {
         }
         safeUpdateForegroundAppTracking("status preferences applied");
         updateThemedContext();
-        ConnectorValue currentPhoneBattery = phoneStatusValues.get("battery.level");
-        if (currentPhoneBattery != null) {
-            handlePhoneLowBatteryAlert(currentPhoneBattery);
-        }
-
         updateBackground();
         updateDateTime();
 
@@ -4073,6 +4102,18 @@ public class WidgetService extends Service {
         if (!phoneNotificationAllowedByLockState()) return;
         QueuedPhoneNotification delivery = new QueuedPhoneNotification(
                 presentation, selectedFields);
+        enqueuePhoneDelivery(delivery);
+    }
+
+    /** Low-battery events use exactly the same lock, overlay-delay and destination queue. */
+    private void enqueuePhoneLowBatteryAlert(int level, @NonNull String color) {
+        if (prefs == null || !phoneNotificationAllowedByLockState()
+                || (!prefs.phoneStatusBarNotificationsEnabled.get()
+                && !prefs.phonePopupNotificationsEnabled.get())) return;
+        enqueuePhoneDelivery(QueuedPhoneNotification.lowBattery(level, color));
+    }
+
+    private void enqueuePhoneDelivery(@NonNull QueuedPhoneNotification delivery) {
         if (phoneNotificationBlockedByForeground()) {
             long now = SystemClock.elapsedRealtime();
             if (!deferredPhoneNotifications.offer(delivery, now)) {
@@ -4132,14 +4173,15 @@ public class WidgetService extends Service {
 
     private boolean phoneNotificationForegroundTrackingNeeded() {
         return prefs != null && prefs.phoneNotificationDelayInAppsEnabled.get()
-                && !prefs.phoneNotificationDelayInPackages.get().isEmpty();
+                && (prefs.phoneNotificationDelayForExternalOverlays.get()
+                || !prefs.phoneNotificationDelayInPackages.get().isEmpty());
     }
 
     private boolean phoneNotificationBlockedByForeground() {
-        if (prefs == null || !prefs.phoneNotificationDelayInAppsEnabled.get()
-                || prefs.phoneNotificationDelayInPackages.get().isEmpty()) {
-            return false;
-        }
+        if (prefs == null || !prefs.phoneNotificationDelayInAppsEnabled.get()) return false;
+        if (prefs.phoneNotificationDelayForExternalOverlays.get()
+                && phoneExternalOverlayActive) return true;
+        if (prefs.phoneNotificationDelayInPackages.get().isEmpty()) return false;
         // Foreground identity can be briefly unknown while Accessibility reconnects, before the
         // first UsageStats sample, or after its permission is revoked. Showing immediately would
         // defeat the feature exactly for full-screen camera applications. Hold conservatively;
@@ -4222,6 +4264,19 @@ public class WidgetService extends Service {
 
     private boolean presentPhoneNotification(@NonNull QueuedPhoneNotification delivery) {
         if (prefs == null || !phoneNotificationAllowedByLockState()) return false;
+        if (delivery.lowBatteryLevel != null) {
+            int level = delivery.lowBatteryLevel;
+            boolean presentedInStatusRow = prefs.phoneStatusBarNotificationsEnabled.get()
+                    && showPhoneLowBatteryStatus(level, delivery.lowBatteryColor);
+            boolean presentedInPopup = prefs.phonePopupNotificationsEnabled.get()
+                    && showPhoneLowBatteryPopup(level);
+            if (binding != null) {
+                updateMediaInfo();
+                applyBrickVisibility(currentBrickSet());
+            }
+            schedulePopupRefresh();
+            return presentedInStatusRow || presentedInPopup;
+        }
         updatePhoneNotificationFieldStates(delivery.presentation, delivery.selectedFields);
         boolean presentedInStatusRow = prefs.phoneStatusBarNotificationsEnabled.get()
                 && showPhoneStatusNotification(
@@ -4293,7 +4348,7 @@ public class WidgetService extends Service {
     private void suppressPhoneNotificationsUnlessLockAllows() {
         if (prefs == null || phoneNotificationAllowedByLockState()) return;
         cancelPhoneNotificationQueue();
-        if (activePhoneNotification != null) clearPhoneStatusNotification(true);
+        if (hasActivePhoneStatusAlert()) clearPhoneStatusNotification(true);
         if (activePhonePopupNotificationExpiresAt > 0L) clearPhonePopupNotification();
     }
 
@@ -4326,8 +4381,10 @@ public class WidgetService extends Service {
     }
 
     private static final class QueuedPhoneNotification {
-        @NonNull final PhoneStatusBarPolicy.NotificationPresentation presentation;
+        @Nullable final PhoneStatusBarPolicy.NotificationPresentation presentation;
         @NonNull final Set<String> selectedFields;
+        @Nullable final Integer lowBatteryLevel;
+        @NonNull final String lowBatteryColor;
 
         QueuedPhoneNotification(
                 @NonNull PhoneStatusBarPolicy.NotificationPresentation presentation,
@@ -4335,6 +4392,19 @@ public class WidgetService extends Service {
             this.presentation = presentation;
             this.selectedFields = Collections.unmodifiableSet(
                     new LinkedHashSet<>(selectedFields));
+            this.lowBatteryLevel = null;
+            this.lowBatteryColor = "";
+        }
+
+        private QueuedPhoneNotification(int level, @NonNull String color) {
+            this.presentation = null;
+            this.selectedFields = Collections.emptySet();
+            this.lowBatteryLevel = Math.max(0, Math.min(100, level));
+            this.lowBatteryColor = color;
+        }
+
+        static QueuedPhoneNotification lowBattery(int level, @NonNull String color) {
+            return new QueuedPhoneNotification(level, color);
         }
     }
 
@@ -4783,6 +4853,12 @@ public class WidgetService extends Service {
                 textOutlineColor(prefs.phoneCellular.outlineAlpha.get()));
         binding.phoneCellularNetworkTypeText.setOutlineWidth(
                 prefs.phoneCellular.outlineWidth.get());
+        int textEdgeReserve = PhoneIndicatorVisualPolicy.cellularTextEdgeReservePx(
+                prefs.phoneCellular.size.get(), prefs.phoneCellular.outlineWidth.get());
+        binding.phoneCellularNetworkTypeText.setPadding(
+                textEdgeReserve, 0, textEdgeReserve, 0);
+        binding.phoneCellularOperatorText.setPadding(
+                textEdgeReserve, 0, textEdgeReserve, 0);
         applyPhoneCellularInternalSpacing();
         applyHorizontalMargins(binding.phoneCellularContainer,
                 prefs.phoneCellular.marginStart.get(), prefs.phoneCellular.marginEnd.get());
@@ -5595,7 +5671,22 @@ public class WidgetService extends Service {
             prefs.phoneLowBatteryAlertLatched.set(result.latched);
         }
         phoneLowBatteryAlertLatched = result.latched;
-        if (result.trigger) showPhoneLowBatteryAlert(level);
+        PhoneLowBatteryAlertPolicy.Result result2 = PhoneLowBatteryAlertPolicy.evaluate(
+                prefs.phoneLowBatteryAlertEnabled.get(),
+                prefs.phoneLowBatteryAlertThreshold2.get(),
+                phoneLowBatteryAlertLatched2, level);
+        if (phoneLowBatteryAlertLatched2 != result2.latched) {
+            prefs.phoneLowBatteryAlertLatched2.set(result2.latched);
+        }
+        phoneLowBatteryAlertLatched2 = result2.latched;
+
+        // A single exact sample may cross both thresholds; preserve the configured order.
+        if (result.trigger) {
+            enqueuePhoneLowBatteryAlert(level, prefs.phoneLowBatteryAlertColor.get());
+        }
+        if (result2.trigger) {
+            enqueuePhoneLowBatteryAlert(level, prefs.phoneLowBatteryAlertColor2.get());
+        }
     }
 
     /**
@@ -5661,6 +5752,7 @@ public class WidgetService extends Service {
         activePhoneNotificationFields = Collections.unmodifiableSet(
                 new LinkedHashSet<>(selectedFields));
         activePhoneBatteryAlertText = null;
+        activePhoneBatteryAlertColor = null;
         schedulePhoneStatusAlert();
         return true;
     }
@@ -5763,7 +5855,7 @@ public class WidgetService extends Service {
         }
     }
 
-    private void showPhoneLowBatteryAlert(int level) {
+    private boolean showPhoneLowBatteryStatus(int level, @NonNull String color) {
         boolean replacingPresentation = hasActivePhoneStatusAlert();
         if (!replacingPresentation && binding != null) {
             mediaDurationVisibilityBeforePhoneNotification =
@@ -5776,6 +5868,7 @@ public class WidgetService extends Service {
         activePhoneNotificationFields = Collections.emptySet();
         activePhoneBatteryAlertText =
                 getString(R.string.phone_low_battery_alert_text, level);
+        activePhoneBatteryAlertColor = color;
         clearPhoneNotificationFieldsIfInactive();
         schedulePhoneStatusAlert();
         if (phoneNotificationBurstActive && !queuedPhoneNotifications.isEmpty()) {
@@ -5783,12 +5876,12 @@ public class WidgetService extends Service {
             mainHandler.postDelayed(phoneNotificationQueueAdvance,
                     activePhoneLowBatteryRemaining());
         }
-        showPhoneLowBatteryPopup(level);
+        return true;
     }
 
     /**
-     * Publishes the low-battery warning into the configured icon notification card. This alert
-     * has its own enable switch, so it must not depend on the routine ANCS-popup destination.
+     * Publishes the low-battery warning into the configured icon notification card. The caller
+     * applies the same popup destination switch used by ordinary ANCS notifications.
      */
     private boolean showPhoneLowBatteryPopup(int level) {
         if (automationStates == null || prefs == null) return false;
@@ -5870,7 +5963,8 @@ public class WidgetService extends Service {
         if (android.os.SystemClock.elapsedRealtime()
                 >= activePhoneNotificationExpiresAt) return false;
         if (activePhoneBatteryAlertText != null) {
-            return prefs.phoneLowBatteryAlertEnabled.get();
+            return prefs.phoneLowBatteryAlertEnabled.get()
+                    && prefs.phoneStatusBarNotificationsEnabled.get();
         }
         return prefs.phoneStatusBarNotificationsEnabled.get()
                 && !activePhoneNotificationText().isEmpty();
@@ -5881,6 +5975,7 @@ public class WidgetService extends Service {
         activePhoneNotification = null;
         activePhoneNotificationFields = Collections.emptySet();
         activePhoneBatteryAlertText = null;
+        activePhoneBatteryAlertColor = null;
         activePhoneNotificationExpiresAt = 0L;
         if (binding != null) {
             // Clearing the alert must also stop the custom marquee when MEDIA is disabled or
@@ -5943,7 +6038,8 @@ public class WidgetService extends Service {
         int defaultColor = ContextCompat.getColor(
                 themedContext == null ? this : themedContext, R.color.text_primary);
         String configuredColor = activePhoneBatteryAlertText != null
-                ? prefs.phoneLowBatteryAlertColor.get()
+                ? (TextUtils.isEmpty(activePhoneBatteryAlertColor)
+                ? prefs.phoneLowBatteryAlertColor.get() : activePhoneBatteryAlertColor)
                 : prefs.phoneStatusBarNotificationColor.get();
         binding.mediaTitleText.setTextColor(
                 AutomationState.parseColor(configuredColor, defaultColor));
@@ -6558,6 +6654,8 @@ public class WidgetService extends Service {
 
     private void updateForegroundAppTracking() {
         boolean phoneTrackingNeeded = phoneNotificationForegroundTrackingNeeded();
+        phoneExternalOverlayActive = phoneTrackingNeeded
+                && WidgetAccessibilityService.hasMaterialExternalOverlay();
         boolean surfaceVisibilityNeeded = StatusBarSurfaceContext.requiresPackageTracking(
                 hiddenInPackages) || anyBrickNeedsPackageTracking();
         if (binding == null && !phoneTrackingNeeded && !surfaceVisibilityNeeded) {
@@ -6612,6 +6710,15 @@ public class WidgetService extends Service {
             ecarxNavigatorWindowObserver.refresh("accessibility-display-map");
         }
         mainHandler.post(() -> safeCheckForegroundApp("display map update"));
+    }
+
+    /** Event-driven signal for an application window above the foreground task. */
+    public void onExternalOverlayWindowStateChanged(boolean active) {
+        mainHandler.post(() -> {
+            if (destroyed || phoneExternalOverlayActive == active) return;
+            phoneExternalOverlayActive = active;
+            onPhoneNotificationForegroundChanged();
+        });
     }
 
     /** Event-driven lifecycle update for non-package targets such as our HOME Activity. */
@@ -7391,7 +7498,10 @@ public class WidgetService extends Service {
         activePhoneNotification = null;
         activePhoneNotificationFields = Collections.emptySet();
         activePhoneBatteryAlertText = null;
+        activePhoneBatteryAlertColor = null;
         phoneLowBatteryAlertLatched = false;
+        phoneLowBatteryAlertLatched2 = false;
+        phoneExternalOverlayActive = false;
         activePhoneNotificationExpiresAt = 0L;
         activePhonePopupNotificationExpiresAt = 0L;
         activePhoneLowBatteryPopup = false;

@@ -4,7 +4,6 @@ package dezz.status.widget.popup;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.PixelFormat;
-import android.graphics.Point;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
@@ -300,15 +299,18 @@ public final class PopupOverlayController {
         if (config == null) return;
         int nextWidth = clamp(config.width, 100, 4000);
         int nextHeight = clamp(config.height, 100, 4000);
-        Point display = physicalDisplaySize();
-        int nextX = config.centerHorizontally
-                ? (display.x - nextWidth) / 2 : config.x;
-        int nextY = config.centerVertically
-                ? (display.y - nextHeight) / 2 : config.y;
+        // Let WindowManager centre against the actual overlay display/frame. KX11 can expose
+        // resource and real-display widths from different logical displays during startup; manual
+        // (displayWidth - popupWidth) / 2 therefore produced a visibly shifted phone card.
+        int nextGravity = (config.centerHorizontally ? Gravity.CENTER_HORIZONTAL : Gravity.LEFT)
+                | (config.centerVertically ? Gravity.CENTER_VERTICAL : Gravity.TOP);
+        int nextX = config.centerHorizontally ? 0 : config.x;
+        int nextY = config.centerVertically ? 0 : config.y;
         boolean geometryChanged = params.width != nextWidth || params.height != nextHeight
-                || params.x != nextX || params.y != nextY;
+                || params.x != nextX || params.y != nextY || params.gravity != nextGravity;
         params.width = nextWidth;
         params.height = nextHeight;
+        params.gravity = nextGravity;
         params.x = nextX;
         params.y = nextY;
         if (rootAdded && geometryChanged) {
@@ -344,19 +346,6 @@ public final class PopupOverlayController {
     }
 
     @NonNull
-    private Point physicalDisplaySize() {
-        Point result = new Point();
-        try {
-            windowManager.getDefaultDisplay().getRealSize(result);
-        } catch (RuntimeException ignored) {
-        }
-        if (result.x <= 0 || result.y <= 0) {
-            android.util.DisplayMetrics metrics = context.getResources().getDisplayMetrics();
-            result.set(Math.max(1, metrics.widthPixels), Math.max(1, metrics.heightPixels));
-        }
-        return result;
-    }
-
     private void renderItems() {
         if (root == null || params == null) return;
         if (touchInProgress) {

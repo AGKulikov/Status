@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 
 /**
@@ -47,9 +49,17 @@ public final class PhoneConnectionJournal {
     private static final Pattern RAW_PROTOCOL_FIELD = Pattern.compile(
             "(?i)\\s+(payload|hex|ascii|bytes|value)\\s*=.*");
     private static final ArrayDeque<String> LINES = new ArrayDeque<>(MAX_LINES);
+    private static final ExecutorService WRITER = Executors.newSingleThreadExecutor(task -> {
+        Thread thread = new Thread(task, "NatroPhoneJournal");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private static final JournalWriteQueue WRITE_QUEUE = new JournalWriteQueue(
+            MAX_LINES, WRITER::execute, PhoneConnectionJournal::writeOperations);
 
     private static Context appContext;
     private static boolean loaded;
+    private static long revision;
 
     private PhoneConnectionJournal() {}
 
@@ -63,20 +73,14 @@ public final class PhoneConnectionJournal {
     }
 
     public static void append(@NonNull String component, @NonNull String message) {
+        String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
+                .format(new Date());
+        String line = time + "  [" + sanitize(component) + "]  " + sanitize(message);
         synchronized (LOCK) {
-            String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
-                    .format(new Date());
-            String line = time + "  [" + sanitize(component) + "]  " + sanitize(message);
             addLocked(line);
-            File file = fileLocked();
-            if (file == null) return;
-            try (FileOutputStream output = new FileOutputStream(file, true)) {
-                output.write((line + "\n").getBytes(StandardCharsets.UTF_8));
-                output.flush();
-            } catch (IOException ignored) {
-            }
-            if (file.length() >= COMPACT_AT_BYTES) rewriteLocked(file);
+            revision++;
         }
+        WRITE_QUEUE.append(line);
     }
 
     @NonNull
@@ -96,14 +100,20 @@ public final class PhoneConnectionJournal {
     }
 
     public static void clear() {
+        String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
+                .format(new Date());
+        String line = time + "  [journal]  журнал подключения очищен";
         synchronized (LOCK) {
             LINES.clear();
-            File file = fileLocked();
-            if (file != null && file.exists()) {
-                //noinspection ResultOfMethodCallIgnored
-                file.delete();
-            }
-            append("journal", "журнал подключения очищен");
+            addLocked(line);
+            revision++;
+        }
+        WRITE_QUEUE.resetAndAppend(line);
+    }
+
+    public static long revision() {
+        synchronized (LOCK) {
+            return revision;
         }
     }
 
@@ -120,6 +130,7 @@ public final class PhoneConnectionJournal {
         }
         int start = Math.max(0, read.size() - MAX_LINES);
         for (int index = start; index < read.size(); index++) addLocked(read.get(index));
+        if (start < read.size()) revision++;
     }
 
     private static void addLocked(@NonNull String line) {
@@ -127,16 +138,27 @@ public final class PhoneConnectionJournal {
         LINES.addLast(line);
     }
 
-    private static void rewriteLocked(@NonNull File file) {
+    private static void rewriteFileFromDisk(@NonNull File file) {
+        ArrayDeque<String> retained = new ArrayDeque<>(MAX_LINES);
+        try (BufferedReader input = new BufferedReader(new InputStreamReader(
+                new FileInputStream(file), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = input.readLine()) != null) {
+                while (retained.size() >= MAX_LINES) retained.removeFirst();
+                retained.addLast(line);
+            }
+        } catch (IOException ignored) {
+            return;
+        }
         File temporary = new File(file.getParentFile(), "phone-connection.next");
         try (FileOutputStream output = new FileOutputStream(temporary, false)) {
-            for (String line : LINES) {
+            for (String line : retained) {
                 output.write((line + "\n").getBytes(StandardCharsets.UTF_8));
             }
             output.flush();
             if (!temporary.renameTo(file)) {
                 try (FileOutputStream direct = new FileOutputStream(file, false)) {
-                    for (String line : LINES) {
+                    for (String line : retained) {
                         direct.write((line + "\n").getBytes(StandardCharsets.UTF_8));
                     }
                 }
@@ -147,6 +169,44 @@ public final class PhoneConnectionJournal {
             //noinspection ResultOfMethodCallIgnored
             temporary.delete();
         }
+    }
+
+    private static void writeOperations(@NonNull List<JournalWriteQueue.Operation> operations) {
+        if (operations.isEmpty()) return;
+        File file;
+        synchronized (LOCK) {
+            file = fileLocked();
+        }
+        if (file == null) return;
+
+        FileOutputStream output = null;
+        try {
+            for (JournalWriteQueue.Operation operation : operations) {
+                if (operation.resetBefore) {
+                    if (output != null) {
+                        output.flush();
+                        output.close();
+                        output = null;
+                    }
+                    if (file.exists()) {
+                        //noinspection ResultOfMethodCallIgnored
+                        file.delete();
+                    }
+                }
+                if (output == null) output = new FileOutputStream(file, true);
+                output.write((operation.line + "\n").getBytes(StandardCharsets.UTF_8));
+            }
+            if (output != null) output.flush();
+        } catch (IOException ignored) {
+        } finally {
+            if (output != null) {
+                try {
+                    output.close();
+                } catch (IOException ignored) {
+                }
+            }
+        }
+        if (file.length() >= COMPACT_AT_BYTES) rewriteFileFromDisk(file);
     }
 
     private static File fileLocked() {

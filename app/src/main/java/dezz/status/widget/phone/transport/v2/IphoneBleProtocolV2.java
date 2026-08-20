@@ -20,6 +20,9 @@ public final class IphoneBleProtocolV2 {
             UUID.fromString("d2d9e4c2-47f1-4e44-a8bb-a932fd5af200");
     public static final UUID TELEMETRY_CHARACTERISTIC =
             UUID.fromString("d2d9e4c3-47f1-4e44-a8bb-a932fd5af200");
+    /** Plain pre-SMP enrollment/routine-auth channel introduced by Helper 51. */
+    public static final UUID ENROLLMENT_CHARACTERISTIC =
+            UUID.fromString("d2d9e4c4-47f1-4e44-a8bb-a932fd5af200");
 
     private IphoneBleProtocolV2() {
     }

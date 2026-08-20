@@ -20,7 +20,7 @@ public final class AndroidIphoneDualRuntimeV2 {
                 new AndroidMainBleSchedulerV2(),
                 new AndroidIphoneBleStateStoreV2(
                         Objects.requireNonNull(preferences, "preferences")),
-                new AndroidIphoneTransportFactoryV2(app),
+                new AndroidIphoneTransportFactoryV2(app, preferences),
                 random
         );
     }

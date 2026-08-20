@@ -6,6 +6,12 @@ package dezz.status.widget.phone.transport.v2;
  * Implementations must synchronously commit and reread switch snapshots.
  */
 public interface IphoneDualTransportStateStoreV2 extends IphoneBleIdentityRegistryV2.Store {
+    /** True only when this Android installation has an authenticated Route-A LE binding. */
+    default boolean hasRouteAEnrollment(String selectedClassicAddress,
+                                        String androidInstallationId) {
+        return false;
+    }
+
     /** Distinguishes first migration from a present-but-empty/corrupt snapshot. */
     boolean hasSwitchSnapshot();
 

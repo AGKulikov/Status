@@ -16,6 +16,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
+import dezz.status.widget.launcher.NavigationDataRepository;
+
 /**
  * Narrow, evidence-based bridge to the exported integration surface in HWGPS 4.5.27.
  *
@@ -74,10 +76,13 @@ public final class HwgpsIntegration {
         };
         private final BroadcastReceiver receiver = new BroadcastReceiver() {
             @Override public void onReceive(Context ignored, Intent intent) {
-                if (!registered || intent == null
-                        || !ACTION_FIX_STATE.equals(intent.getAction())) return;
-                apply(tracker.accept(intent.getStringExtra(EXTRA_FIX),
-                        SystemClock.elapsedRealtime()));
+                if (!registered || intent == null) return;
+                if (ACTION_FIX_STATE.equals(intent.getAction())) {
+                    apply(tracker.accept(intent.getStringExtra(EXTRA_FIX),
+                            SystemClock.elapsedRealtime()));
+                } else if (NavigationDataRepository.ACTION_UPDATED.equals(intent.getAction())) {
+                    refreshNavigationRouteEvidence();
+                }
             }
         };
         @NonNull private HwgpsRouteStatePolicy.State state =
@@ -93,13 +98,18 @@ public final class HwgpsIntegration {
             tracker.reset();
             state = HwgpsRouteStatePolicy.State.UNAVAILABLE;
             try {
+                IntentFilter filter = new IntentFilter(ACTION_FIX_STATE);
+                filter.addAction(NavigationDataRepository.ACTION_UPDATED);
                 ContextCompat.registerReceiver(context, receiver,
-                        new IntentFilter(ACTION_FIX_STATE), ContextCompat.RECEIVER_EXPORTED);
+                        filter, ContextCompat.RECEIVER_EXPORTED);
                 registered = true;
             } catch (RuntimeException ignored) {
                 publish(HwgpsRouteStatePolicy.State.UNAVAILABLE);
                 return;
             }
+            // The unconditional initial request below owns this first probe; do not issue a
+            // duplicate when an already-active navigation route arms the tracker.
+            tracker.setNavigationRouteActive(readNavigationRouteActive());
             if (!requestSnapshot()) {
                 tracker.reset();
                 publish(HwgpsRouteStatePolicy.State.UNAVAILABLE);
@@ -148,6 +158,18 @@ public final class HwgpsIntegration {
                         new ComponentName(PACKAGE_NAME, STATE_REQUEST_RECEIVER)));
                 return true;
             } catch (RuntimeException ignored) {
+                return false;
+            }
+        }
+
+        private void refreshNavigationRouteEvidence() {
+            apply(tracker.setNavigationRouteActive(readNavigationRouteActive()));
+        }
+
+        private boolean readNavigationRouteActive() {
+            try {
+                return NavigationDataRepository.readRouteStatus(context).routeActive;
+            } catch (RuntimeException failure) {
                 return false;
             }
         }

@@ -49,7 +49,10 @@ final class HwgpsRouteStateTracker {
     @NonNull private HwgpsRouteStatePolicy.State state =
             HwgpsRouteStatePolicy.State.UNAVAILABLE;
     @NonNull private LossCause lossCause = LossCause.NONE;
-    private boolean routeArmed;
+    /** A healthy exported HWGPS sample seen during this subscription. */
+    private boolean fixBaselineSeen;
+    /** Independent evidence that a real navigation route is currently active. */
+    private boolean navigationRouteActive;
     private long lossCandidateAtMs = NO_DEADLINE;
     private boolean lossCandidateCorroborated;
     private boolean lossFinalProbePending;
@@ -74,7 +77,7 @@ final class HwgpsRouteStateTracker {
                 return update(false);
 
             case ROUTE_AVAILABLE:
-                routeArmed = true;
+                fixBaselineSeen = true;
                 clearLossCandidate();
                 if (state == HwgpsRouteStatePolicy.State.ROUTE_LOST
                         && lossCause == LossCause.CONFIRMED_NO_FIX) {
@@ -111,7 +114,7 @@ final class HwgpsRouteStateTracker {
                     lossCause = LossCause.NONE;
                     state = HwgpsRouteStatePolicy.State.UNAVAILABLE;
                 }
-                if (!routeArmed) {
+                if (!fixBaselineSeen && !navigationRouteActive) {
                     clearLossCandidate();
                     state = HwgpsRouteStatePolicy.State.UNAVAILABLE;
                     return update(false);
@@ -183,7 +186,8 @@ final class HwgpsRouteStateTracker {
     }
 
     void reset() {
-        routeArmed = false;
+        fixBaselineSeen = false;
+        navigationRouteActive = false;
         clearPending();
         lossCause = LossCause.NONE;
         state = HwgpsRouteStatePolicy.State.UNAVAILABLE;
@@ -192,6 +196,26 @@ final class HwgpsRouteStateTracker {
     @NonNull
     HwgpsRouteStatePolicy.State state() {
         return state;
+    }
+
+    /**
+     * Supplies route evidence from Natro's already-validated navigation repository. This closes
+     * the mid-route subscription gap: HWGPS may already be broadcasting {@code notFixed} when a
+     * scenario is enabled, so there is no preceding healthy fix sample to arm the OEM's 8-second
+     * loss confirmation. A fresh active route is an equally strong baseline without treating the
+     * indistinguishable idle/startup {@code notFixed} value as a loss.
+     */
+    @NonNull
+    Update setNavigationRouteActive(boolean active) {
+        if (navigationRouteActive == active) return update(false);
+        navigationRouteActive = active;
+        if (active) return update(true);
+        if (!fixBaselineSeen && lossCause != LossCause.EXPLICIT_AUTO_SHOW) {
+            clearPending();
+            lossCause = LossCause.NONE;
+            state = HwgpsRouteStatePolicy.State.UNAVAILABLE;
+        }
+        return update(false);
     }
 
     @NonNull

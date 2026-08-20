@@ -19,4 +19,10 @@ public final class PhoneIndicatorVisualPolicy {
     public static int cellularTextGapPx(int iconSizePx) {
         return Math.max(3, Math.round(Math.max(1, iconSizePx) * .08f));
     }
+
+    /** Prevents bold/outlined LTE/5G glyph overhang from being clipped by wrap_content. */
+    public static int cellularTextEdgeReservePx(int iconSizePx, float outlineWidthPx) {
+        return Math.max(2, (int) Math.ceil(Math.max(0f, outlineWidthPx) * .5f
+                + Math.max(1, iconSizePx) * .035f));
+    }
 }

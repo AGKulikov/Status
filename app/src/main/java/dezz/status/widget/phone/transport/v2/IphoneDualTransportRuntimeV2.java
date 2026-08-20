@@ -588,13 +588,17 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
         Slot fresh = new Slot(transport, target, false);
         slot = fresh;
         try {
+            boolean enrolled = store.hasRouteAEnrollment(
+                    config.selectedSystemBondAddress, androidInstallationId.toString());
             UUID helper = identities.learnedHelperIdentity();
-            String helperId = helper == null ? "" : helper.toString();
+            String helperId = enrolled || helper == null ? "" : helper.toString();
             // iOS moves service UUIDs into an Apple-only overflow area while a peripheral app is
             // backgrounded, so Android cannot make a filtered F201 scan a production bootstrap
             // prerequisite. The exact user-selected system bond is already the strict pre-GATT
             // identity gate; encrypted H then learns or confirms the Helper installation UUID.
-            IphoneAcquisitionModeV2 acquisition = IphoneAcquisitionModeV2.SELECTED_BOND;
+            IphoneAcquisitionModeV2 acquisition = enrolled
+                    ? IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
+                    : IphoneAcquisitionModeV2.SELECTED_BOND;
             IphoneTransportStartRequest request = new IphoneTransportStartRequest(
                     new BleRouteEpoch(target.processNonce(), target.generation().asBigInteger()),
                     config.selectedSystemBondAddress,
@@ -696,6 +700,14 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
 
         @Override public void onTelemetry(IphoneTelemetryV2 telemetry) {
             enqueue(() -> { if (isCurrentSlot(bound)) listener.onTelemetry(telemetry); });
+        }
+
+        @Override public void onStandardBatteryPercentage(int percentage, String source) {
+            enqueue(() -> {
+                if (isCurrentSlot(bound)) {
+                    listener.onStandardBatteryPercentage(percentage, source);
+                }
+            });
         }
 
         @Override public void onNotificationEvent(IphoneNotificationEventV2 event) {

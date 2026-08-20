@@ -250,6 +250,38 @@ public final class AndroidCentralTransportV2SourceTest {
         assertTrue(reset.contains("clearTelemetrySubscription()"));
     }
 
+    @Test public void exactBatteryUsesStandardBasBelowAncsPriority() throws Exception {
+        String source = source();
+        assertTrue(source.contains(
+                "UUID.fromString(\"0000180f-0000-1000-8000-00805f9b34fb\")"));
+        assertTrue(source.contains(
+                "UUID.fromString(\"00002a19-0000-1000-8000-00805f9b34fb\")"));
+        assertTrue(source.contains(
+                "UUID.fromString(\"00002bed-0000-1000-8000-00805f9b34fb\")"));
+
+        String advance = between(source,
+                "private void advanceStandardBatteryMonitoring",
+                "private boolean startStandardBatteryRead");
+        assertTrue(advance.contains("pendingGatt != null || !requestTimers.isEmpty()"));
+        assertTrue(advance.contains("READ_BATTERY_STATUS"));
+        assertTrue(advance.contains("READ_BATTERY_LEVEL"));
+        assertTrue(advance.contains("SUBSCRIBE_BATTERY_STATUS"));
+        assertTrue(advance.contains("SUBSCRIBE_BATTERY_LEVEL"));
+
+        String accept = between(source,
+                "private void acceptStandardBatteryValue",
+                "private void beginHelperIdentityCommit");
+        assertTrue(accept.contains("PhoneConnectorPolicy.decodeBatteryLevelStatusLevel(value)"));
+        assertTrue(accept.contains("listener.onStandardBatteryPercentage(percentage, source)"));
+
+        String read = between(source, "private void handleCharacteristicRead",
+                "private void handleDescriptorWrite");
+        assertTrue(read.contains("acceptStandardBatteryValue(characteristic, value)"));
+        String changed = between(source, "private void handleCharacteristicChanged",
+                "private void handleTelemetryChanged");
+        assertTrue(changed.contains("acceptStandardBatteryValue(characteristic, value)"));
+    }
+
     @Test public void adapterHasNoNameMatchHiddenCacheRefreshOrTopologyFallback()
             throws Exception {
         String source = source();

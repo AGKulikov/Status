@@ -57,9 +57,12 @@ import dezz.status.widget.phone.PhoneAppCatalog;
 import dezz.status.widget.phone.PhoneAppIconStore;
 import dezz.status.widget.phone.PhoneBleRole;
 import dezz.status.widget.phone.PhoneConnectionJournal;
+import dezz.status.widget.phone.PhoneConnectorController;
 import dezz.status.widget.phone.PhoneLowBatteryAlertPolicy;
 import dezz.status.widget.phone.PhoneNotificationFilter;
 import dezz.status.widget.phone.PhoneStatusBarPolicy;
+import dezz.status.widget.phone.transport.v2.IphoneLeEnrollmentRecordV2;
+import dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
 import dezz.status.widget.settings.SettingsColorValue;
@@ -89,6 +92,9 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     private MaterialSwitch connectorEnabled;
     private MaterialSwitch iphoneCentralRole;
     private TextView iphoneBleRoleSubtitle;
+    private AlertDialog leEnrollmentSasDialog;
+    private long leEnrollmentSasGeneration;
+    private TextView leEnrollmentStatus;
     private MaterialSwitch notificationsEnabled;
     private MaterialSwitch messagesEnabled;
     private MaterialSwitch includeNotificationText;
@@ -103,8 +109,10 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     private TextView selectedNotificationFieldsValue;
     private TextView notificationDurationValue;
     private TextView lowBatteryThresholdValue;
+    private TextView lowBatteryThreshold2Value;
     private MaterialButton notificationColorButton;
     private MaterialButton lowBatteryColorButton;
+    private MaterialButton lowBatteryColor2Button;
     private TextView selectedSprutPathValue;
     private TextView selectedSprutAncsPathValue;
     private TextView diagnostics;
@@ -130,9 +138,11 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
     private int notificationAppFilterMode = PhoneNotificationFilter.MODE_ALL;
     private int notificationDurationSeconds = 10;
     private int lowBatteryThreshold = 20;
+    private int lowBatteryThreshold2 = 10;
     private boolean experimentalRouteB;
     @NonNull private String notificationTickerColor = "#FFFFFFFF";
     @NonNull private String lowBatteryAlertColor = "#FFFF453A";
+    @NonNull private String lowBatteryAlertColor2 = "#FFFF2D55";
     @NonNull private SprutCatalog sprutCatalog = SprutCatalog.empty();
 
     @Override
@@ -166,10 +176,14 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 preferences.phoneStatusBarNotificationSeconds.get());
         lowBatteryThreshold = PhoneLowBatteryAlertPolicy.boundedThreshold(
                 preferences.phoneLowBatteryAlertThreshold.get());
+        lowBatteryThreshold2 = PhoneLowBatteryAlertPolicy.boundedThreshold(
+                preferences.phoneLowBatteryAlertThreshold2.get());
         notificationTickerColor = validColorOr(
                 preferences.phoneStatusBarNotificationColor.get(), "#FFFFFFFF");
         lowBatteryAlertColor = validColorOr(
                 preferences.phoneLowBatteryAlertColor.get(), "#FFFF453A");
+        lowBatteryAlertColor2 = validColorOr(
+                preferences.phoneLowBatteryAlertColor2.get(), "#FFFF2D55");
         View screen = buildScreen();
         setContentView(screen);
         SettingsBackNavigation.install(this, screen);
@@ -198,6 +212,16 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         diagnosticsPolling = false;
         diagnosticsHandler.removeCallbacks(diagnosticsPoll);
         super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (isFinishing()) {
+            WidgetService service = WidgetService.getInstance();
+            if (service != null) service.cancelPhoneLeEnrollment();
+        }
+        dismissEnrollmentSasDialog();
+        super.onDestroy();
     }
 
     @NonNull
@@ -254,6 +278,16 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         bluetoothActions.addView(actionButton(
                 getString(R.string.phone_open_bluetooth), this::openBluetoothSettings), weighted());
         page.addView(bluetoothActions, topMargin(10));
+
+        leEnrollmentStatus = secondary(leEnrollmentSummary(), 13);
+        leEnrollmentStatus.setPadding(dp(16), dp(12), dp(16), dp(12));
+        LinearLayout enrollmentStatusCard = column();
+        enrollmentStatusCard.addView(leEnrollmentStatus, matchWrap());
+        page.addView(card(enrollmentStatusCard), topMargin(12));
+        page.addView(actionButton(getString(R.string.phone_le_enrollment_start),
+                this::startLeEnrollment), topMargin(8));
+        page.addView(actionButton(getString(R.string.phone_le_enrollment_forget),
+                this::confirmForgetLeEnrollment), topMargin(8));
 
         page.addView(sectionTitle(getString(R.string.phone_section_data)), topMargin(24));
         LinearLayout dataRows = column();
@@ -323,14 +357,21 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
             if (checked && connectorEnabled != null) connectorEnabled.setChecked(true);
         });
         lowBatteryThresholdValue = addDisclosureRow(alertRows,
-                R.string.phone_low_battery_threshold_title,
-                this::chooseLowBatteryThreshold, true);
+                R.string.phone_low_battery_threshold_1_title,
+                () -> chooseLowBatteryThreshold(false), true);
+        lowBatteryThreshold2Value = addDisclosureRow(alertRows,
+                R.string.phone_low_battery_threshold_2_title,
+                () -> chooseLowBatteryThreshold(true), true);
         page.addView(card(alertRows), topMargin(7));
 
         lowBatteryColorButton = actionButton("", this::chooseLowBatteryColor);
         AppleColorPickerDialog.decorateButton(lowBatteryColorButton,
                 getString(R.string.phone_low_battery_color_title), lowBatteryAlertColor);
         page.addView(lowBatteryColorButton, topMargin(10));
+        lowBatteryColor2Button = actionButton("", this::chooseLowBatteryColor2);
+        AppleColorPickerDialog.decorateButton(lowBatteryColor2Button,
+                getString(R.string.phone_low_battery_color_2_title), lowBatteryAlertColor2);
+        page.addView(lowBatteryColor2Button, topMargin(8));
         TextView lowBatteryHint =
                 secondary(getString(R.string.phone_low_battery_hint), 13);
         lowBatteryHint.setPadding(dp(8), 0, dp(8), 0);
@@ -841,6 +882,16 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 });
     }
 
+    private void chooseLowBatteryColor2() {
+        chooseColor(getString(R.string.phone_low_battery_color_2_title),
+                lowBatteryAlertColor2, selected -> {
+                    lowBatteryAlertColor2 = validColorOr(selected, "#FFFF2D55");
+                    AppleColorPickerDialog.decorateButton(lowBatteryColor2Button,
+                            getString(R.string.phone_low_battery_color_2_title),
+                            lowBatteryAlertColor2);
+                });
+    }
+
     private void chooseColor(@NonNull String title, @NonNull String current,
                              @NonNull ColorSelection listener) {
         AppleColorPickerDialog.show(this, title, current,
@@ -860,16 +911,17 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 });
     }
 
-    private void chooseLowBatteryThreshold() {
+    private void chooseLowBatteryThreshold(boolean second) {
         EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_NUMBER);
         input.setSingleLine(true);
-        input.setText(String.valueOf(lowBatteryThreshold));
+        input.setText(String.valueOf(second ? lowBatteryThreshold2 : lowBatteryThreshold));
         input.setSelectAllOnFocus(true);
         input.setHint(R.string.phone_low_battery_threshold_prompt);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(R.string.phone_low_battery_threshold_title)
+                .setTitle(second ? R.string.phone_low_battery_threshold_2_title
+                        : R.string.phone_low_battery_threshold_1_title)
                 .setMessage(R.string.phone_low_battery_threshold_prompt)
                 .setView(input)
                 .setPositiveButton(android.R.string.ok, null)
@@ -888,7 +940,14 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
                 input.setError(getString(R.string.phone_low_battery_threshold_invalid));
                 return;
             }
-            lowBatteryThreshold = requested;
+            int first = second ? lowBatteryThreshold : requested;
+            int secondValue = second ? requested : lowBatteryThreshold2;
+            if (!PhoneLowBatteryAlertPolicy.validOrderedThresholds(first, secondValue)) {
+                input.setError(getString(R.string.phone_low_battery_threshold_order_invalid));
+                return;
+            }
+            if (second) lowBatteryThreshold2 = requested;
+            else lowBatteryThreshold = requested;
             refreshAlertSummaries();
             dialog.dismiss();
         }));
@@ -899,6 +958,10 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         if (lowBatteryThresholdValue != null) {
             lowBatteryThresholdValue.setText(getString(
                     R.string.phone_low_battery_threshold_value, lowBatteryThreshold));
+        }
+        if (lowBatteryThreshold2Value != null) {
+            lowBatteryThreshold2Value.setText(getString(
+                    R.string.phone_low_battery_threshold_value, lowBatteryThreshold2));
         }
     }
 
@@ -1675,6 +1738,159 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         refreshDiagnostics();
     }
 
+    private void startLeEnrollment() {
+        if (connectorEnabled != null) connectorEnabled.setChecked(true);
+        if (!persistSettings(false)) return;
+
+        WidgetService service = WidgetService.getInstance();
+        if (service == null) {
+            WidgetServiceStarter.startIfNeeded(this);
+            Toast.makeText(this, R.string.phone_le_enrollment_service_wait,
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        boolean started = service.beginPhoneLeEnrollment(
+                snapshot -> runOnUiThread(() -> handleLeEnrollmentSnapshot(snapshot)));
+        if (!started) {
+            Toast.makeText(this, R.string.phone_le_enrollment_prerequisite,
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (leEnrollmentStatus != null) {
+            leEnrollmentStatus.setText(R.string.phone_le_enrollment_starting);
+        }
+    }
+
+    private void handleLeEnrollmentSnapshot(
+            @NonNull AndroidIphoneLeEnrollmentV2.Snapshot snapshot) {
+        if (isFinishing() || isDestroyed()) return;
+        if (leEnrollmentStatus != null) {
+            leEnrollmentStatus.setText(enrollmentPhaseText(snapshot));
+        }
+        if (snapshot.phase
+                == AndroidIphoneLeEnrollmentV2.Phase.WAITING_FOR_SAS_CONFIRMATION) {
+            showEnrollmentSasDialog(snapshot);
+            return;
+        }
+        if (!snapshot.terminal()) return;
+
+        dismissEnrollmentSasDialog();
+        if (snapshot.phase == AndroidIphoneLeEnrollmentV2.Phase.SUCCEEDED) {
+            Toast.makeText(this, R.string.phone_le_enrollment_succeeded,
+                    Toast.LENGTH_LONG).show();
+        } else if (snapshot.phase == AndroidIphoneLeEnrollmentV2.Phase.FAILED) {
+            Toast.makeText(this,
+                    getString(R.string.phone_le_enrollment_failed, snapshot.detail),
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void showEnrollmentSasDialog(
+            @NonNull AndroidIphoneLeEnrollmentV2.Snapshot snapshot) {
+        if (!snapshot.sas.matches("\\d{8}")) return;
+        if (leEnrollmentSasDialog != null
+                && leEnrollmentSasGeneration == snapshot.generation) return;
+
+        dismissEnrollmentSasDialog();
+        leEnrollmentSasGeneration = snapshot.generation;
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.phone_le_enrollment_sas_title)
+                .setMessage(getString(R.string.phone_le_enrollment_sas_message, snapshot.sas))
+                .setPositiveButton(R.string.phone_le_enrollment_sas_matches,
+                        (ignored, which) -> confirmLeEnrollmentSas(true))
+                .setNegativeButton(R.string.phone_le_enrollment_sas_mismatch,
+                        (ignored, which) -> confirmLeEnrollmentSas(false))
+                .create();
+        dialog.setCancelable(false);
+        leEnrollmentSasDialog = dialog;
+        dialog.show();
+    }
+
+    private void confirmLeEnrollmentSas(boolean matches) {
+        WidgetService service = WidgetService.getInstance();
+        if (service != null) service.confirmPhoneLeEnrollmentSas(matches);
+        leEnrollmentSasDialog = null;
+    }
+
+    private void dismissEnrollmentSasDialog() {
+        AlertDialog dialog = leEnrollmentSasDialog;
+        leEnrollmentSasDialog = null;
+        if (dialog != null && dialog.isShowing()) dialog.dismiss();
+    }
+
+    private void confirmForgetLeEnrollment() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.phone_le_enrollment_forget_title)
+                .setMessage(R.string.phone_le_enrollment_forget_message)
+                .setPositiveButton(R.string.phone_le_enrollment_forget_confirm,
+                        (ignored, which) -> forgetLeEnrollment())
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void forgetLeEnrollment() {
+        WidgetService service = WidgetService.getInstance();
+        boolean cleared = service != null
+                ? service.forgetPhoneLeEnrollment()
+                : preferences.clearPhoneBleV2EnrollmentRecord();
+        if (!cleared) {
+            Toast.makeText(this, R.string.phone_le_enrollment_forget_failed,
+                    Toast.LENGTH_LONG).show();
+        }
+        if (leEnrollmentStatus != null) leEnrollmentStatus.setText(leEnrollmentSummary());
+    }
+
+    @NonNull
+    private String leEnrollmentSummary() {
+        if (IphoneLeEnrollmentRecordV2.parse(
+                preferences.phoneBleV2PendingEnrollmentRecord()) != null) {
+            return getString(R.string.phone_le_enrollment_pending);
+        }
+        if (IphoneLeEnrollmentRecordV2.parse(
+                preferences.phoneBleV2EnrollmentRecord()) == null) {
+            return getString(R.string.phone_le_enrollment_not_configured);
+        }
+        return getString(R.string.phone_le_enrollment_configured);
+    }
+
+    @NonNull
+    private String enrollmentPhaseText(
+            @NonNull AndroidIphoneLeEnrollmentV2.Snapshot snapshot) {
+        switch (snapshot.phase) {
+            case SCANNING:
+            case CONNECTING:
+            case NEGOTIATING_MTU:
+            case DISCOVERING:
+            case SENDING_HELLO:
+            case READING_RESPONSE:
+                return getString(R.string.phone_le_enrollment_scanning);
+            case WAITING_FOR_SAS_CONFIRMATION:
+                return getString(R.string.phone_le_enrollment_compare);
+            case SENDING_CONFIRM:
+            case WAITING_FOR_HELPER_SAS_CONFIRMATION:
+                return getString(R.string.phone_le_enrollment_wait_helper);
+            case WAITING_FOR_BOND:
+            case READING_ENCRYPTED_H:
+            case STAGING_FINAL_COMMIT:
+            case SENDING_FINAL_COMMIT:
+            case READING_FINAL_ACK:
+            case SENDING_PENDING_ROUTINE_HELLO:
+            case READING_PENDING_ROUTINE_PROOF:
+            case SENDING_PENDING_ROUTINE_CONFIRM:
+            case READING_PENDING_ROUTINE_ACK:
+            case READING_PENDING_ROUTINE_H:
+                return getString(R.string.phone_le_enrollment_bonding);
+            case SUCCEEDED:
+                return getString(R.string.phone_le_enrollment_configured);
+            case FAILED:
+                return getString(R.string.phone_le_enrollment_failed, snapshot.detail);
+            case CANCELLED:
+                return getString(R.string.phone_le_enrollment_cancelled);
+            default:
+                return getString(R.string.phone_le_enrollment_starting);
+        }
+    }
+
     private boolean notificationDeliveryEnabled() {
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager == null) return false;
@@ -1768,11 +1984,22 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
 
         int savedLowBatteryThreshold =
                 PhoneLowBatteryAlertPolicy.boundedThreshold(lowBatteryThreshold);
+        int savedLowBatteryThreshold2 =
+                PhoneLowBatteryAlertPolicy.boundedThreshold(lowBatteryThreshold2);
+        if (lowBatteryAlertRequested
+                && !PhoneLowBatteryAlertPolicy.validOrderedThresholds(
+                savedLowBatteryThreshold, savedLowBatteryThreshold2)) {
+            Toast.makeText(this, R.string.phone_low_battery_threshold_order_invalid,
+                    Toast.LENGTH_LONG).show();
+            return false;
+        }
         boolean resetLowBatteryLatch =
                 preferences.phoneLowBatteryAlertEnabled.get()
                         != lowBatteryAlertRequested
                 || preferences.phoneLowBatteryAlertThreshold.get()
-                        != savedLowBatteryThreshold;
+                        != savedLowBatteryThreshold
+                || preferences.phoneLowBatteryAlertThreshold2.get()
+                        != savedLowBatteryThreshold2;
 
         preferences.phoneConnectorEnabled.set(connectorRequested);
         preferences.phoneDeviceAddress.set(selectedDeviceAddress);
@@ -1795,9 +2022,13 @@ public final class PhoneConnectorSettingsActivity extends AppCompatActivity {
         preferences.phoneLowBatteryAlertEnabled.set(lowBatteryAlertRequested);
         preferences.phoneLowBatteryAlertThreshold.set(savedLowBatteryThreshold);
         preferences.phoneLowBatteryAlertColor.set(lowBatteryAlertColor);
-        if (resetLowBatteryLatch) preferences.phoneLowBatteryAlertLatched.set(false);
-        if (preferences.phoneStatusBarNotificationsEnabled.get()
-                || lowBatteryAlertRequested) {
+        preferences.phoneLowBatteryAlertThreshold2.set(savedLowBatteryThreshold2);
+        preferences.phoneLowBatteryAlertColor2.set(lowBatteryAlertColor2);
+        if (resetLowBatteryLatch) {
+            preferences.phoneLowBatteryAlertLatched.set(false);
+            preferences.phoneLowBatteryAlertLatched2.set(false);
+        }
+        if (preferences.phoneStatusBarNotificationsEnabled.get()) {
             List<BrickType> order = BrickType.parseOrder(preferences.brickOrder.get());
             if (!order.contains(BrickType.MEDIA)) {
                 order.add(BrickType.MEDIA);

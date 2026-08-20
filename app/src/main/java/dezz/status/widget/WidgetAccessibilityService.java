@@ -51,6 +51,7 @@ import dezz.status.widget.launcher.NavigationCollectionPolicy;
 import dezz.status.widget.launcher.NavigationDataRepository;
 import dezz.status.widget.diagnostics.ActionRecorder;
 import dezz.status.widget.diagnostics.DiagnosticJournal;
+import dezz.status.widget.phone.ExternalOverlayWindowPolicy;
 
 /**
  * Accessibility service that reports the foreground package on every physical display and reads
@@ -69,6 +70,8 @@ public class WidgetAccessibilityService extends AccessibilityService {
     private static final String TAG = "WidgetA11yService";
     private static final long NAVIGATION_MISSING_GRACE_MS = 1_500L;
     private static final long FRAMEWORK_FAILURE_LOG_INTERVAL_MS = 10_000L;
+    /** Fail-open expiry if ECARX drops the matching WINDOWS_CHANGE_REMOVED event. */
+    private static final long EXTERNAL_OVERLAY_STALE_MS = 2L * 60L * 1_000L;
     private static final int MAX_NAVIGATION_NODES = 1_500;
     private static final int MAX_NAVIGATION_DEPTH = 45;
     private static final int BASE_ACCESSIBILITY_EVENTS =
@@ -81,6 +84,20 @@ public class WidgetAccessibilityService extends AccessibilityService {
 
     /** displayId → current foreground package. Updated on every window change event. */
     private final Map<Integer, String> foregroundByDisplay = new HashMap<>();
+    /** Window add/remove events are safe on Android 9 even though traversing getWindows() is not. */
+    private final Map<String, ExternalOverlayObservation> externalOverlayWindows =
+            new HashMap<>();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private boolean publishedExternalOverlayActive;
+    private final Runnable expireExternalOverlayWindows = () -> {
+        long oldestAllowed = SystemClock.elapsedRealtime() - EXTERNAL_OVERLAY_STALE_MS;
+        synchronized (externalOverlayWindows) {
+            externalOverlayWindows.values().removeIf(value ->
+                    value.observedAtElapsed < oldestAllowed);
+        }
+        publishExternalOverlayStateIfChanged();
+        scheduleExternalOverlayExpiry();
+    };
     private final ActionRecorder.RecordingListener actionRecordingListener =
             this::onActionRecordingChanged;
     private boolean stockHvacWindowObserved;
@@ -101,6 +118,16 @@ public class WidgetAccessibilityService extends AccessibilityService {
         NavigationWindowScan(Set<String> visiblePackages, Set<String> routePackages) {
             this.visiblePackages = visiblePackages;
             this.routePackages = routePackages;
+        }
+    }
+
+    private static final class ExternalOverlayObservation {
+        @NonNull final String packageName;
+        final long observedAtElapsed;
+
+        ExternalOverlayObservation(@NonNull String packageName, long observedAtElapsed) {
+            this.packageName = packageName;
+            this.observedAtElapsed = observedAtElapsed;
         }
     }
     private final Runnable navigationScan = new Runnable() {
@@ -147,6 +174,15 @@ public class WidgetAccessibilityService extends AccessibilityService {
     @Nullable
     public static WidgetAccessibilityService getInstance() {
         return instance;
+    }
+
+    /** Current event-derived material external window state; never traverses the API 28 tree. */
+    public static boolean hasMaterialExternalOverlay() {
+        WidgetAccessibilityService current = instance;
+        if (current == null) return false;
+        synchronized (current.externalOverlayWindows) {
+            return !current.externalOverlayWindows.isEmpty();
+        }
     }
 
     /**
@@ -283,17 +319,22 @@ public class WidgetAccessibilityService extends AccessibilityService {
             navigationDemand = null;
         }
         stopNavigationWorker();
+        mainHandler.removeCallbacks(expireExternalOverlayWindows);
         NavigationDataRepository.clearIfAccessibilitySourceMissing(this,
                 Collections.emptySet());
         instance = null;
         synchronized (foregroundByDisplay) {
             foregroundByDisplay.clear();
         }
+        synchronized (externalOverlayWindows) {
+            externalOverlayWindows.clear();
+        }
         WidgetService widget = WidgetService.getInstance();
         if (widget != null) {
             // Falling out of accessibility-driven tracking — let WidgetService refresh the
             // tracking pipeline (which falls back to UsageStatsManager polling).
             widget.onForegroundTrackingPathChanged();
+            widget.onExternalOverlayWindowStateChanged(false);
         }
         super.onDestroy();
     }
@@ -310,6 +351,10 @@ public class WidgetAccessibilityService extends AccessibilityService {
             navigationDemand.start(this::onNavigationDemandChanged);
         }
         boolean windowTraversalAllowed = supportsSafeWindowTraversal();
+        synchronized (externalOverlayWindows) {
+            externalOverlayWindows.clear();
+        }
+        publishedExternalOverlayActive = false;
         updateNavigationEventSubscription(
                 navigationDemand.isNeeded() && windowTraversalAllowed);
         if (windowTraversalAllowed) {
@@ -328,6 +373,7 @@ public class WidgetAccessibilityService extends AccessibilityService {
         WidgetService widget = WidgetService.getInstance();
         if (widget != null) {
             widget.onForegroundTrackingPathChanged();
+            widget.onExternalOverlayWindowStateChanged(false);
         }
     }
 
@@ -367,6 +413,9 @@ public class WidgetAccessibilityService extends AccessibilityService {
         boolean windowChanged = type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
                 || type == AccessibilityEvent.TYPE_WINDOWS_CHANGED;
         if (windowChanged) {
+            if (type == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
+                updateExternalOverlayWindows(event, eventPackage);
+            }
             publishNavigatorWindowSurfaceEvent(type, eventPackage, eventClass);
             boolean foregroundChanged;
             if (supportsSafeWindowTraversal()) {
@@ -377,6 +426,7 @@ public class WidgetAccessibilityService extends AccessibilityService {
                 foregroundChanged = publishAndroidNineForegroundEvent(type, eventPackage);
             }
             if (foregroundChanged) {
+                discardForegroundPackageFromExternalOverlays(eventPackage);
                 WidgetService widget = WidgetService.getInstance();
                 if (widget != null) widget.onForegroundDisplayMapUpdated();
             }
@@ -389,6 +439,101 @@ public class WidgetAccessibilityService extends AccessibilityService {
             // maneuver distance such as "500 м" cannot overwrite the full remaining route.
             requestNavigationScan(false);
         }
+    }
+
+    /**
+     * Tracks a distinct overlay window from add/remove metadata only. This is the Android 9-safe
+     * path for ECARX' 360° camera: its window appears above Navigator without becoming the
+     * UsageStats foreground task, while getWindows() itself is a native-process hazard here.
+     */
+    private void updateExternalOverlayWindows(@NonNull AccessibilityEvent event,
+                                              @NonNull String eventPackage) {
+        int changes;
+        try {
+            changes = event.getWindowChanges();
+        } catch (RuntimeException | LinkageError failure) {
+            return;
+        }
+        int displayId = accessibilityDisplayId(event);
+        String foreground;
+        synchronized (foregroundByDisplay) {
+            foreground = foregroundByDisplay.get(displayId);
+            if (foreground == null) {
+                foreground = foregroundByDisplay.get(android.view.Display.DEFAULT_DISPLAY);
+            }
+        }
+        int windowId = event.getWindowId();
+        String key = overlayWindowKey(displayId, windowId, eventPackage);
+        boolean removed = (changes & AccessibilityEvent.WINDOWS_CHANGE_REMOVED) != 0;
+        boolean changed = false;
+        synchronized (externalOverlayWindows) {
+            if (removed) {
+                if (windowId >= 0) {
+                    changed = externalOverlayWindows.remove(key) != null;
+                } else if (!eventPackage.isEmpty()) {
+                    changed = externalOverlayWindows.values().removeIf(
+                            value -> eventPackage.equals(value.packageName));
+                }
+            }
+            int materialChanges = AccessibilityEvent.WINDOWS_CHANGE_ADDED
+                    | AccessibilityEvent.WINDOWS_CHANGE_ACTIVE
+                    | AccessibilityEvent.WINDOWS_CHANGE_FOCUSED
+                    | AccessibilityEvent.WINDOWS_CHANGE_LAYER
+                    | AccessibilityEvent.WINDOWS_CHANGE_BOUNDS;
+            // Several KX11 framework builds emit a zero change mask. Treat its distinct package
+            // as a bounded observation; the stale lease is the fail-open removal fallback.
+            boolean observable = !removed && (changes == 0 || (changes & materialChanges) != 0);
+            if (observable && ExternalOverlayWindowPolicy.isCandidate(
+                    getPackageName(), foreground, eventPackage)) {
+                externalOverlayWindows.put(key, new ExternalOverlayObservation(
+                        eventPackage, SystemClock.elapsedRealtime()));
+                changed = true;
+            }
+        }
+        if (changed) publishExternalOverlayStateIfChanged();
+        scheduleExternalOverlayExpiry();
+    }
+
+    private void discardForegroundPackageFromExternalOverlays(@NonNull String packageName) {
+        if (packageName.isEmpty()) return;
+        boolean changed;
+        synchronized (externalOverlayWindows) {
+            changed = externalOverlayWindows.values().removeIf(
+                    value -> packageName.equals(value.packageName));
+        }
+        if (changed) publishExternalOverlayStateIfChanged();
+    }
+
+    private void scheduleExternalOverlayExpiry() {
+        mainHandler.removeCallbacks(expireExternalOverlayWindows);
+        long next = Long.MAX_VALUE;
+        synchronized (externalOverlayWindows) {
+            for (ExternalOverlayObservation value : externalOverlayWindows.values()) {
+                next = Math.min(next, value.observedAtElapsed + EXTERNAL_OVERLAY_STALE_MS);
+            }
+        }
+        if (next != Long.MAX_VALUE) {
+            mainHandler.postDelayed(expireExternalOverlayWindows,
+                    Math.max(1L, next - SystemClock.elapsedRealtime()));
+        }
+    }
+
+    private void publishExternalOverlayStateIfChanged() {
+        boolean active;
+        synchronized (externalOverlayWindows) {
+            active = !externalOverlayWindows.isEmpty();
+        }
+        if (publishedExternalOverlayActive == active) return;
+        publishedExternalOverlayActive = active;
+        WidgetService widget = WidgetService.getInstance();
+        if (widget != null) widget.onExternalOverlayWindowStateChanged(active);
+    }
+
+    @NonNull
+    private static String overlayWindowKey(int displayId, int windowId,
+                                           @NonNull String packageName) {
+        return displayId + ":" + (windowId >= 0 ? String.valueOf(windowId)
+                : "package:" + packageName);
     }
 
     /**

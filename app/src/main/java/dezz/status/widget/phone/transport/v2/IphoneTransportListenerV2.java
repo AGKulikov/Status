@@ -16,6 +16,15 @@ public interface IphoneTransportListenerV2 {
 
     void onTelemetry(IphoneTelemetryV2 telemetry);
 
+    /**
+     * Exact integer percentage from the selected iPhone's standard Bluetooth Battery Service.
+     *
+     * <p>The Helper telemetry percentage is intentionally a coarse availability fallback.  A
+     * default method keeps Route-B and historical listener implementations source-compatible.</p>
+     */
+    default void onStandardBatteryPercentage(int percentage, String source) {
+    }
+
     /** Raw source event, including REMOVED, category, replay flag, and observation time. */
     void onNotificationEvent(IphoneNotificationEventV2 event);
 

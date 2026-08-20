@@ -5,6 +5,7 @@
 
 package dezz.status.widget;
 
+import android.app.Dialog;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -33,6 +34,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 
 import dezz.status.widget.launcher.LauncherAppCatalog;
 import dezz.status.widget.launcher.MediaPlaybackTargetPolicy;
@@ -43,6 +45,8 @@ import dezz.status.widget.launcher.MediaPlaybackHistoryStore;
 import dezz.status.widget.launcher.panels.PanelEditScheduler;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
+import dezz.status.widget.performance.PerformanceExecutors;
+import dezz.status.widget.performance.PerformancePickerTask;
 
 /** Visual, immediate editor for every element inside the HOME media panel. */
 public final class MediaPanelSettingsActivity extends AppCompatActivity {
@@ -60,6 +64,10 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
     private PanelEditScheduler editScheduler;
     private boolean resumedOnce;
     private final Map<String, TextView> positionLabels = new LinkedHashMap<>();
+    private int mediaPlayerPickerGeneration;
+    @Nullable private List<LauncherAppCatalog.App> preloadedMediaPlayerChoices;
+    @NonNull private final ExecutorService appCatalogLoader =
+            PerformanceExecutors.serial("NatroMediaPlayerApps");
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -586,12 +594,53 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
     }
 
     private void showMediaPlayerPicker() {
+        List<LauncherAppCatalog.App> choices = preloadedMediaPlayerChoices;
+        if (choices == null) {
+            int generation = ++mediaPlayerPickerGeneration;
+            AlertDialog loading = new AlertDialog.Builder(this)
+                    .setTitle("Музыкальный плеер")
+                    .setMessage("Загружаю список…")
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .create();
+            loading.show();
+            appCatalogLoader.execute(new PerformancePickerTask(this,
+                    "queryMediaPlayerChoices", "performanceDeliverMediaPlayers",
+                    null, generation, loading));
+            return;
+        }
+        preloadedMediaPlayerChoices = null;
+        showMediaPlayerChoices(choices);
+    }
+
+    @NonNull
+    private List<LauncherAppCatalog.App> queryMediaPlayerChoices() {
         LinkedHashMap<String, LauncherAppCatalog.App> byPackage = new LinkedHashMap<>();
-        for (LauncherAppCatalog.App app : LauncherAppCatalog.loadIncludingSystem(this)) {
+        for (LauncherAppCatalog.App app :
+                LauncherAppCatalog.loadIncludingSystem(getApplicationContext())) {
             if (getPackageName().equals(app.packageName)) continue;
             byPackage.putIfAbsent(app.packageName, app);
         }
-        List<LauncherAppCatalog.App> choices = new ArrayList<>(byPackage.values());
+        return new ArrayList<>(byPackage.values());
+    }
+
+    @SuppressWarnings("unchecked")
+    private void performanceDeliverMediaPlayers(@Nullable Object ignored,
+                                                @Nullable List<?> values,
+                                                int generation,
+                                                @NonNull Dialog loading,
+                                                @Nullable Throwable failure) {
+        if (generation != mediaPlayerPickerGeneration || isFinishing() || isDestroyed()
+                || !loading.isShowing()) return;
+        loading.dismiss();
+        if (failure != null || values == null) {
+            Toast.makeText(this, "Не удалось загрузить плееры", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        preloadedMediaPlayerChoices = (List<LauncherAppCatalog.App>) values;
+        showMediaPlayerPicker();
+    }
+
+    private void showMediaPlayerChoices(@NonNull List<LauncherAppCatalog.App> choices) {
         if (choices.isEmpty()) {
             Toast.makeText(this, "Не найдено приложений для выбора",
                     Toast.LENGTH_SHORT).show();
@@ -695,6 +744,9 @@ public final class MediaPanelSettingsActivity extends AppCompatActivity {
     }
 
     @Override protected void onDestroy() {
+        mediaPlayerPickerGeneration++;
+        preloadedMediaPlayerChoices = null;
+        appCatalogLoader.shutdownNow();
         editScheduler.cancel();
         super.onDestroy();
     }

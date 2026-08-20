@@ -7,6 +7,7 @@ package dezz.status.widget;
 
 import android.content.ComponentName;
 import android.content.Intent;
+import android.app.Dialog;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
@@ -40,6 +41,7 @@ import com.google.android.material.materialswitch.MaterialSwitch;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
 
 import dezz.status.widget.launcher.InstalledAppCatalog;
 import dezz.status.widget.launcher.LauncherActionsGridConfig;
@@ -70,6 +72,8 @@ import dezz.status.widget.scenario.IntentActionRule;
 import dezz.status.widget.scenario.IntentActionRuleStore;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.VectorIconPickerDialog;
+import dezz.status.widget.performance.PerformanceExecutors;
+import dezz.status.widget.performance.PerformancePickerTask;
 
 /** Visual, code-free editor for arbitrary HOME icons. */
 public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
@@ -96,6 +100,18 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
     private boolean addHandled;
     private boolean editingLongAction;
     private boolean syncingControls;
+    private int appPickerGeneration;
+    @Nullable private List<AppChoice> preloadedAppChoices;
+    @NonNull private final ExecutorService appCatalogLoader =
+            PerformanceExecutors.serial("NatroShortcutApps");
+
+    @Override
+    protected void onDestroy() {
+        appPickerGeneration++;
+        preloadedAppChoices = null;
+        appCatalogLoader.shutdownNow();
+        super.onDestroy();
+    }
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -1340,7 +1356,21 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
     }
 
     private void chooseApplication(@Nullable LauncherShortcutStore.Shortcut existing) {
-        List<AppChoice> apps = queryApplications();
+        List<AppChoice> apps = preloadedAppChoices;
+        if (apps == null) {
+            int generation = ++appPickerGeneration;
+            AlertDialog loading = new AlertDialog.Builder(this)
+                    .setTitle("Выберите приложение")
+                    .setMessage("Загружаю список…")
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .create();
+            loading.show();
+            appCatalogLoader.execute(new PerformancePickerTask(this,
+                    "queryApplications", "performanceDeliverApplications",
+                    existing, generation, loading));
+            return;
+        }
+        preloadedAppChoices = null;
         GridView grid = new GridView(this);
         grid.setNumColumns(5);
         grid.setPadding(dp(12), dp(12), dp(12), dp(12));
@@ -1369,6 +1399,23 @@ public final class LauncherShortcutSettingsActivity extends AppCompatActivity {
             }
         });
         picker.show();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void performanceDeliverApplications(@Nullable Object argument,
+                                                @Nullable List<?> values,
+                                                int generation,
+                                                @NonNull Dialog loading,
+                                                @Nullable Throwable failure) {
+        if (generation != appPickerGeneration || isFinishing() || isDestroyed()
+                || !loading.isShowing()) return;
+        loading.dismiss();
+        if (failure != null || values == null) {
+            Toast.makeText(this, "Не удалось загрузить приложения", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        preloadedAppChoices = (List<AppChoice>) values;
+        chooseApplication((LauncherShortcutStore.Shortcut) argument);
     }
 
     private void chooseBuiltin(@Nullable LauncherShortcutStore.Shortcut existing) {

@@ -37,6 +37,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 
 import dezz.status.widget.Preferences;
 import dezz.status.widget.R;
@@ -54,12 +55,14 @@ import dezz.status.widget.phone.transport.v2.IphoneDualTransportStatusV2;
 import dezz.status.widget.phone.transport.v2.IphoneNotificationEventV2;
 import dezz.status.widget.phone.transport.v2.IphoneNotificationV2;
 import dezz.status.widget.phone.transport.v2.IphoneRoleControlV2;
+import dezz.status.widget.phone.transport.v2.IphoneLeEnrollmentRecordV2;
 import dezz.status.widget.phone.transport.v2.IphoneTelemetryV2;
 import dezz.status.widget.phone.transport.v2.IphoneTransportErrorV2;
 import dezz.status.widget.phone.transport.v2.IphoneTransportLifecycle;
 import dezz.status.widget.phone.transport.v2.IphoneTransportRecoveryStateV2;
 import dezz.status.widget.phone.transport.v2.IphoneTransportStatusV2;
 import dezz.status.widget.phone.transport.v2.android.AndroidIphoneDualRuntimeV2;
+import dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2;
 
 /**
  * Best-effort Android 9 bridge for one explicitly selected, bonded iPhone.
@@ -138,6 +141,10 @@ public final class PhoneConnectorController {
     // Public BluetoothAdapter#getProfileProxy accepts an int, but Android 9 keeps these
     // automotive client constants out of the public SDK stub. Unsupported stacks fail closed.
     private static final int PROFILE_HEADSET_CLIENT = 16;
+
+    public interface LeEnrollmentListener {
+        void onState(@NonNull AndroidIphoneLeEnrollmentV2.Snapshot snapshot);
+    }
     private static final int PROFILE_MAP_CLIENT = 18;
     private static final String EXTRA_HFP_BATTERY =
             "android.bluetooth.headsetclient.extra.BATTERY_LEVEL";
@@ -196,6 +203,13 @@ public final class PhoneConnectorController {
     @Nullable private BroadcastReceiver bluetoothReceiver;
     /** Sole clean-room dual-role ANCS owner. */
     @Nullable private volatile IphoneDualTransportRuntimeV2 ancsRuntimeV2;
+    /** Explicit, user-confirmed foreground LE enrollment owner; never overlaps normal ANCS. */
+    @Nullable private volatile AndroidIphoneLeEnrollmentV2 leEnrollmentV2;
+    private volatile boolean leEnrollmentActive;
+    private volatile boolean enrollmentHfpActive;
+    @NonNull private volatile String enrollmentClassicAddress = "";
+    private boolean nonRetryableEnrollmentRequired;
+    @NonNull private String nonRetryableEnrollmentAddress = "";
     private long nextAncsTransportSession;
     private volatile long activeAncsTransportSession;
     private volatile boolean ancsTransportStartPending;
@@ -228,10 +242,13 @@ public final class PhoneConnectorController {
     private boolean smsAvailable;
     private boolean hfpBatteryKnown;
     private boolean hfpBatteryPercentScale;
+    private boolean basBatteryKnown;
     private boolean genericBatteryKnown;
     @Nullable private Integer hfpBatteryLevel;
+    @Nullable private Integer basBatteryLevel;
     @Nullable private Integer genericBatteryLevel;
     private long hfpBatteryUpdatedAt;
+    private long basBatteryUpdatedAt;
     private long genericBatteryUpdatedAt;
     @Nullable private Integer batteryLevel;
     @Nullable private Boolean batteryCharging;
@@ -424,6 +441,164 @@ public final class PhoneConnectorController {
         }
     }
 
+    /** Starts the only permitted first-time LE identity enrollment: explicit, foreground, HFP-bound. */
+    public boolean beginSecureLeEnrollment(@NonNull LeEnrollmentListener callback) {
+        Objects.requireNonNull(callback, "callback");
+        synchronized (lifecycleLock) {
+            if (!running || config == null || config.deviceAddress.isEmpty()
+                    || worker == null || leEnrollmentV2 != null || leEnrollmentActive) {
+                return false;
+            }
+            long token = generation;
+            worker.post(() -> runIfCurrent(token,
+                    () -> beginSecureLeEnrollmentOnWorker(token, callback)));
+            return true;
+        }
+    }
+
+    private void beginSecureLeEnrollmentOnWorker(
+            long token, @NonNull LeEnrollmentListener callback) {
+        Config current = config;
+        if (current == null || selectedDevice == null || !hfpConnected
+                || !current.deviceAddress.equalsIgnoreCase(selectedAddress)) {
+            mainHandler.post(() -> callback.onState(new AndroidIphoneLeEnrollmentV2.Snapshot(
+                    0L, AndroidIphoneLeEnrollmentV2.Phase.FAILED,
+                    AndroidIphoneLeEnrollmentV2.ErrorKind.PREREQUISITE, "",
+                    "exact selected Classic bond and active HFP are required")));
+            return;
+        }
+        closeAncsTransport();
+        cancelClassicAncsRecoveryWakeup();
+        leEnrollmentActive = true;
+        enrollmentClassicAddress = current.deviceAddress;
+        enrollmentHfpActive = true;
+        ancsStatus = "explicit_le_enrollment";
+        String storedAndroidId = prefs.phoneBleV2AndroidInstallationId().trim();
+        final UUID androidId;
+        try {
+            androidId = storedAndroidId.isEmpty()
+                    ? UUID.randomUUID() : UUID.fromString(storedAndroidId);
+            if (storedAndroidId.isEmpty()
+                    && !prefs.commitPhoneBleV2AndroidInstallationId(androidId.toString())) {
+                throw new IllegalStateException("Android identity was not durable");
+            }
+        } catch (RuntimeException unavailable) {
+            leEnrollmentActive = false;
+            enrollmentHfpActive = false;
+            mainHandler.post(() -> callback.onState(new AndroidIphoneLeEnrollmentV2.Snapshot(
+                    0L, AndroidIphoneLeEnrollmentV2.Phase.FAILED,
+                    AndroidIphoneLeEnrollmentV2.ErrorKind.PERSISTENCE, "",
+                    "Android installation identity is unavailable")));
+            return;
+        }
+        String selectedClassic = current.deviceAddress;
+        mainHandler.post(() -> {
+            if (!isCurrent(token) || !leEnrollmentActive) return;
+            AndroidIphoneLeEnrollmentV2 enrollment = new AndroidIphoneLeEnrollmentV2(
+                    context, prefs,
+                    address -> enrollmentHfpActive
+                            && address != null
+                            && address.equalsIgnoreCase(enrollmentClassicAddress),
+                    snapshot -> {
+                        callback.onState(snapshot);
+                        PhoneConnectionJournal.append("le-enrollment",
+                                "phase=" + snapshot.phase + ", error=" + snapshot.error
+                                        + ", detail="
+                                        + redactedDiagnostic(snapshot.detail));
+                        if (snapshot.terminal()) {
+                            finishSecureLeEnrollment(token, snapshot);
+                        }
+                    });
+            leEnrollmentV2 = enrollment;
+            enrollment.start(selectedClassic, androidId);
+        });
+    }
+
+    public boolean confirmSecureLeEnrollmentSas(boolean matches) {
+        AndroidIphoneLeEnrollmentV2 enrollment = leEnrollmentV2;
+        if (enrollment == null) return false;
+        enrollment.confirmMatchingSas(matches);
+        return true;
+    }
+
+    public void cancelSecureLeEnrollment() {
+        AndroidIphoneLeEnrollmentV2 enrollment = leEnrollmentV2;
+        if (enrollment != null) enrollment.close();
+    }
+
+    private void finishSecureLeEnrollment(
+            long token, @NonNull AndroidIphoneLeEnrollmentV2.Snapshot snapshot) {
+        AndroidIphoneLeEnrollmentV2 enrollment = leEnrollmentV2;
+        leEnrollmentV2 = null;
+        if (enrollment != null && snapshot.phase != AndroidIphoneLeEnrollmentV2.Phase.SUCCEEDED) {
+            enrollment.close();
+        }
+        Handler currentWorker = worker;
+        if (currentWorker == null) return;
+        currentWorker.post(() -> runIfCurrent(token, () -> {
+            leEnrollmentActive = false;
+            enrollmentHfpActive = false;
+            enrollmentClassicAddress = "";
+            if (snapshot.phase == AndroidIphoneLeEnrollmentV2.Phase.SUCCEEDED) {
+                nonRetryableEnrollmentRequired = false;
+                nonRetryableEnrollmentAddress = "";
+                lastError = "";
+                ancsRecoveryRoute = IphoneTransportRecoveryStateV2.NO_OWNER;
+                Handler handler = worker;
+                if (handler != null) {
+                    handler.postDelayed(() -> runIfCurrent(token, () -> ensureGatt(token)), 300L);
+                }
+            } else {
+                ancsStatus = "explicit_le_enrollment_failed";
+            }
+            publishSnapshot(token);
+        }));
+    }
+
+    /** Removes only Natro's encrypted enrollment record; the system Classic pairing is untouched. */
+    public boolean forgetSecureLeEnrollment() {
+        if (leEnrollmentV2 != null || leEnrollmentActive) {
+            cancelSecureLeEnrollment();
+            return false;
+        }
+        boolean cleared = prefs.clearPhoneBleV2EnrollmentRecord();
+        if (!cleared) return false;
+        nonRetryableEnrollmentRequired = true;
+        nonRetryableEnrollmentAddress = prefs.phoneDeviceAddress.get().trim();
+        signature = "";
+        Handler currentWorker = worker;
+        long token = generation;
+        if (currentWorker != null) {
+            currentWorker.post(() -> runIfCurrent(token, () -> {
+                closeAncsTransport();
+                ancsReady = false;
+                gattConnected = false;
+                ancsStatus = "le_enrollment_required";
+                updateConnected(token);
+            }));
+        }
+        return true;
+    }
+
+    private boolean hasExactEnrollmentRecord(@NonNull String selectedClassicAddress) {
+        String androidId = prefs.phoneBleV2AndroidInstallationId().trim();
+        return recordMatchesAndroid(IphoneLeEnrollmentRecordV2.validForSelectedClassic(
+                        prefs.phoneBleV2PendingEnrollmentRecord(), selectedClassicAddress),
+                androidId)
+                || recordMatchesAndroid(IphoneLeEnrollmentRecordV2.validForSelectedClassic(
+                        prefs.phoneBleV2EnrollmentRecord(), selectedClassicAddress), androidId);
+    }
+
+    private static boolean recordMatchesAndroid(
+            @Nullable IphoneLeEnrollmentRecordV2 record, @NonNull String androidId) {
+        if (record == null || androidId.isEmpty()) return false;
+        try {
+            return record.androidInstallationId.equals(UUID.fromString(androidId));
+        } catch (RuntimeException invalid) {
+            return false;
+        }
+    }
+
     private void stopLocked(@NonNull String reason) {
         generation++;
         running = false;
@@ -432,11 +607,16 @@ public final class PhoneConnectorController {
         HandlerThread oldThread = workerThread;
         BroadcastReceiver oldReceiver = bluetoothReceiver;
         IphoneDualTransportRuntimeV2 oldV2Runtime = ancsRuntimeV2;
+        AndroidIphoneLeEnrollmentV2 oldEnrollment = leEnrollmentV2;
         PhoneOemConnectionBridge.Observation oldOemObservation = oemPowerObservation;
         worker = null;
         workerThread = null;
         bluetoothReceiver = null;
         ancsRuntimeV2 = null;
+        leEnrollmentV2 = null;
+        leEnrollmentActive = false;
+        enrollmentHfpActive = false;
+        enrollmentClassicAddress = "";
         ancsTransportStartPending = false;
         activeAncsTransportSession = ++nextAncsTransportSession;
         oemPowerObservation = null;
@@ -452,6 +632,7 @@ public final class PhoneConnectorController {
         }
         closeOemObservation(oldOemObservation);
         if (oldV2Runtime != null) oldV2Runtime.close();
+        if (oldEnrollment != null) oldEnrollment.close();
         cancelAllMirroredNotifications();
         clearRuntimeState(reason);
         updatePresenceLocked(false);
@@ -486,6 +667,8 @@ public final class PhoneConnectorController {
         classicAncsRecovery = ClassicAncsRecoveryPolicy.State.initial();
         ancsRecoveryRoute = IphoneTransportRecoveryStateV2.NO_OWNER;
         v2SwitchInProgress = false;
+        enrollmentHfpActive = false;
+        enrollmentClassicAddress = "";
         connected = false;
         reconnectAttempt = 0;
         stockConnectionAttempt = 0;
@@ -500,10 +683,13 @@ public final class PhoneConnectorController {
         smsAvailable = false;
         hfpBatteryKnown = false;
         hfpBatteryPercentScale = false;
+        basBatteryKnown = false;
         genericBatteryKnown = false;
         hfpBatteryLevel = null;
+        basBatteryLevel = null;
         genericBatteryLevel = null;
         hfpBatteryUpdatedAt = 0L;
+        basBatteryUpdatedAt = 0L;
         genericBatteryUpdatedAt = 0L;
         batteryLevel = null;
         batteryCharging = null;
@@ -637,6 +823,7 @@ public final class PhoneConnectorController {
                 bredrAclConnected = false;
                 a2dpConnected = false;
                 hfpConnected = false;
+                refreshEnrollmentHfpGate();
                 clearHfpData();
                 clearGenericBatteryData();
                 if (mapConnected) endMapSession("disconnected");
@@ -660,6 +847,7 @@ public final class PhoneConnectorController {
             int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE,
                     BluetoothProfile.STATE_DISCONNECTED);
             hfpConnected = state == BluetoothProfile.STATE_CONNECTED;
+            refreshEnrollmentHfpGate();
             if (!hfpConnected) {
                 persistCurrentTelemetry();
                 clearHfpData();
@@ -682,16 +870,19 @@ public final class PhoneConnectorController {
                     ACTION_MAP_MESSAGE_DELETED_CHANGED.equals(action));
         } else if (ACTION_HFP_AG_EVENT.equals(action)) {
             hfpConnected = true;
+            refreshEnrollmentHfpGate();
             applyHfpEvent(token, intent);
             updateConnected(token);
         } else if (ACTION_HFP_AUDIO_STATE.equals(action)) {
             hfpConnected = true;
+            refreshEnrollmentHfpGate();
             applyHfpAudioState(token, intent.getIntExtra(
                     BluetoothProfile.EXTRA_STATE, HFP_AUDIO_DISCONNECTED),
                     booleanExtra(intent, EXTRA_HFP_AUDIO_WBS));
             updateConnected(token);
         } else if (ACTION_HFP_CALL_CHANGED.equals(action)) {
             hfpConnected = true;
+            refreshEnrollmentHfpGate();
             applyHfpCall(token, rawExtra(intent, EXTRA_HFP_CALL));
             updateConnected(token);
         } else if (ACTION_DEVICE_BATTERY_LEVEL_CHANGED.equals(action)) {
@@ -722,8 +913,10 @@ public final class PhoneConnectorController {
         bredrAclConnected = false;
         a2dpConnected = false;
         hfpConnected = false;
+        refreshEnrollmentHfpGate();
         mapConnected = false;
         gattConnected = false;
+        clearBasData();
         clearHfpData();
         clearGenericBatteryData();
         updateConnected(token);
@@ -734,6 +927,14 @@ public final class PhoneConnectorController {
         stockConnectionStatus = status;
         smsStatus = config != null && config.messagesEnabled ? status : "disabled";
         publishSnapshot(token);
+    }
+
+    /** Live gate consumed by the foreground enrollment object before every SMP/H/commit step. */
+    private void refreshEnrollmentHfpGate() {
+        Config current = config;
+        enrollmentHfpActive = leEnrollmentActive && hfpConnected && current != null
+                && current.deviceAddress.equalsIgnoreCase(selectedAddress)
+                && current.deviceAddress.equalsIgnoreCase(enrollmentClassicAddress);
     }
 
     private void selectAndConnect(long token) {
@@ -995,6 +1196,7 @@ public final class PhoneConnectorController {
                                     readInitialHfpState(proxy, exactDevice);
                             runIfCurrent(token, () -> {
                                 hfpConnected = true;
+                                refreshEnrollmentHfpGate();
                                 applyInitialHfpState(token, initial);
                                 updateConnected(token);
                             });
@@ -1123,8 +1325,25 @@ public final class PhoneConnectorController {
                 || stockConnectionRequestInProgress) return;
         Config current = config;
         if (current == null) return;
+        if (leEnrollmentActive) {
+            ancsStatus = "explicit_le_enrollment";
+            return;
+        }
         if (!current.transportNeeded()) {
             ancsStatus = "disabled";
+            return;
+        }
+        if (hasExactEnrollmentRecord(current.deviceAddress) && !hfpConnected) {
+            ancsStatus = "waiting_for_selected_classic_hfp";
+            return;
+        }
+        if (nonRetryableEnrollmentRequired
+                && !current.deviceAddress.equalsIgnoreCase(nonRetryableEnrollmentAddress)) {
+            nonRetryableEnrollmentRequired = false;
+            nonRetryableEnrollmentAddress = "";
+        }
+        if (nonRetryableEnrollmentRequired) {
+            ancsStatus = "le_enrollment_required";
             return;
         }
         ensureV2Runtime(token, current);
@@ -1255,6 +1474,11 @@ public final class PhoneConnectorController {
                     () -> applyHelperTelemetryV2(token, telemetry));
         }
 
+        @Override public void onStandardBatteryPercentage(int percentage, String source) {
+            dispatchAncsTransport(token, transportSession,
+                    () -> applyStandardBatteryPercentage(token, percentage, source));
+        }
+
         @Override public void onNotificationEvent(IphoneNotificationEventV2 event) {
             if (event == null || event.eventId != IphoneNotificationEventV2.REMOVED) return;
             dispatchAncsTransport(token, transportSession,
@@ -1306,7 +1530,17 @@ public final class PhoneConnectorController {
                 lastTypedV2Error = typedError;
                 lastTypedV2ErrorTransportSession = transportSession;
                 lastError = typedError;
-                if (!error.retryable) ancsStatus = "failed_closed";
+                if (!error.retryable) {
+                    ancsStatus = "failed_closed";
+                    if (error.kind == IphoneTransportErrorV2.Kind.BOND_TRANSPORT_UNAVAILABLE
+                            || error.kind == IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED) {
+                        nonRetryableEnrollmentRequired = true;
+                        nonRetryableEnrollmentAddress = config == null
+                                ? "" : config.deviceAddress;
+                        ancsStatus = "le_enrollment_required";
+                        cancelClassicAncsRecoveryWakeup();
+                    }
+                }
                 publishSnapshot(token);
             });
         }
@@ -1401,7 +1635,7 @@ public final class PhoneConnectorController {
             cancelSmsFallbackNotifications();
         } else if (!linkActive) {
             clearHelperTelemetry();
-            refreshBatteryValues();
+            clearBasData();
             if (hadSession) {
                 resetAncsSession(token, lifecycle.name().toLowerCase(Locale.ROOT));
             }
@@ -1476,6 +1710,20 @@ public final class PhoneConnectorController {
         }
         scheduleHelperTelemetryExpiry(token);
         if (powerChanged || networkChanged || lockChanged) publishSnapshot(token);
+    }
+
+    /** Restores HA1159's exact standard-Bluetooth percentage on the rewritten v2 route. */
+    private void applyStandardBatteryPercentage(long token, int percentage,
+                                                @Nullable String source) {
+        if (percentage < 0 || percentage > 100) return;
+        basBatteryKnown = true;
+        basBatteryLevel = percentage;
+        basBatteryUpdatedAt = SystemClock.elapsedRealtime();
+        refreshBatteryValues();
+        markTelemetryUpdated(true, false);
+        PhoneConnectionJournal.append("battery-standard",
+                "exact percentage via " + bounded(source, 48));
+        publishSnapshot(token);
     }
 
     private void scheduleHelperTelemetryExpiry(long token) {
@@ -1960,7 +2208,7 @@ public final class PhoneConnectorController {
 
     private void refreshBatteryValues() {
         PhoneBatteryLevelPolicy.Reading reading = PhoneBatteryLevelPolicy.resolve(
-                false, null, 0L,
+                basBatteryKnown, basBatteryLevel, basBatteryUpdatedAt,
                 genericBatteryKnown, genericBatteryLevel, genericBatteryUpdatedAt,
                 helperPowerUpdatedAtElapsed > 0L ? helperBatteryLevel : null,
                 hfpBatteryKnown, hfpBatteryLevel, hfpBatteryPercentScale);
@@ -1998,6 +2246,15 @@ public final class PhoneConnectorController {
         }
     }
 
+    private void clearBasData() {
+        basBatteryKnown = false;
+        basBatteryLevel = null;
+        basBatteryUpdatedAt = 0L;
+        refreshBatteryValues();
+        batteryLiveSeenThisConnection = hfpBatteryKnown || genericBatteryKnown
+                || helperPowerUpdatedAtElapsed > 0L;
+    }
+
     private void clearHfpData() {
         hfpBatteryKnown = false;
         hfpBatteryPercentScale = false;
@@ -2012,7 +2269,7 @@ public final class PhoneConnectorController {
         clearHfpCallData();
         refreshBatteryValues();
         networkLiveSeenThisConnection = false;
-        batteryLiveSeenThisConnection = genericBatteryKnown
+        batteryLiveSeenThisConnection = basBatteryKnown || genericBatteryKnown
                 || helperPowerUpdatedAtElapsed > 0L;
     }
 
@@ -2021,7 +2278,7 @@ public final class PhoneConnectorController {
         genericBatteryLevel = null;
         genericBatteryUpdatedAt = 0L;
         refreshBatteryValues();
-        batteryLiveSeenThisConnection = hfpBatteryKnown
+        batteryLiveSeenThisConnection = basBatteryKnown || hfpBatteryKnown
                 || helperPowerUpdatedAtElapsed > 0L;
     }
 
@@ -2229,6 +2486,7 @@ public final class PhoneConnectorController {
     private void clearDisconnectedData(long token) {
         persistCurrentTelemetry();
         clearHelperTelemetry();
+        clearBasData();
         clearHfpData();
         clearGenericBatteryData();
         batteryLevel = null;

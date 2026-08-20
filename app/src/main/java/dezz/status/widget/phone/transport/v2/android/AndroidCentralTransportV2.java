@@ -24,7 +24,10 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelUuid;
 
+import dezz.status.widget.Preferences;
 import dezz.status.widget.phone.transport.AncsProtocol;
+import dezz.status.widget.phone.PhoneConnectorPolicy;
+import dezz.status.widget.phone.transport.v2.AncsDeliveryTraceV2;
 import dezz.status.widget.phone.transport.v2.AncsConsumerCoreV2;
 import dezz.status.widget.phone.transport.v2.AncsConsumerEffectV2;
 import dezz.status.widget.phone.transport.v2.AncsRequestTokenV2;
@@ -42,6 +45,9 @@ import dezz.status.widget.phone.transport.v2.IphoneBleMode;
 import dezz.status.widget.phone.transport.v2.IphoneBlePeerProof;
 import dezz.status.widget.phone.transport.v2.IphoneBleProtocolV2;
 import dezz.status.widget.phone.transport.v2.IphoneGattInventoryV2;
+import dezz.status.widget.phone.transport.v2.IphoneAcquisitionModeV2;
+import dezz.status.widget.phone.transport.v2.IphoneLeEnrollmentProtocolV2;
+import dezz.status.widget.phone.transport.v2.IphoneLeEnrollmentRecordV2;
 import dezz.status.widget.phone.transport.v2.IphoneTelemetryProtocolV2;
 import dezz.status.widget.phone.transport.v2.IphoneTelemetryV2;
 import dezz.status.widget.phone.transport.v2.IphoneTransportErrorV2;
@@ -57,6 +63,7 @@ import dezz.status.widget.phone.transport.v2.GattResultV2;
 import dezz.status.widget.phone.transport.v2.MonotonicSessionCursorV2;
 import dezz.status.widget.phone.transport.v2.IphoneRoleControlV2;
 import dezz.status.widget.phone.transport.v2.SelectedBondIdentityResolverV2;
+import dezz.status.widget.phone.transport.v2.SelectedBondLeCapabilityV2;
 import dezz.status.widget.phone.transport.switching.BleRoleSwitchCoordinator.ControlTransmit;
 import dezz.status.widget.phone.transport.switching.BleRoleSwitchCoordinator.Owner;
 import dezz.status.widget.phone.transport.switching.BleRoleSwitchReducer.ControlFrame;
@@ -69,6 +76,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.security.GeneralSecurityException;
+import java.security.SecureRandom;
 
 /**
  * Android framework adapter for Route A (Helper Peripheral / Android Central).
@@ -81,22 +90,49 @@ import java.util.UUID;
 public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 {
     private static final long CONTROL_RETRY_DELAY_MS = 150L;
     private static final long IDENTITY_COMMIT_TIMEOUT_MS = 5_000L;
+    private static final long BATTERY_PROBE_RETRY_MS = 500L;
+    private static final int BATTERY_PROBE_RETRY_LIMIT = 60;
+    private static final int ROUTINE_REQUESTED_MTU = 185;
+    private static final int ROUTINE_REQUIRED_MTU = 69;
+    private static final long TELEMETRY_REFRESH_QUIET_MS = 30_000L;
+    private static final long TELEMETRY_REFRESH_RETRY_MS = 5_000L;
     private static final int PLATFORM_DIAGNOSTIC_LIMIT = 256;
     private static final UUID GENERIC_ATTRIBUTE_SERVICE =
             UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
     private static final UUID SERVICE_CHANGED =
             UUID.fromString("00002a05-0000-1000-8000-00805f9b34fb");
+    private static final UUID BATTERY_SERVICE =
+            UUID.fromString("0000180f-0000-1000-8000-00805f9b34fb");
+    private static final UUID BATTERY_LEVEL =
+            UUID.fromString("00002a19-0000-1000-8000-00805f9b34fb");
+    private static final UUID BATTERY_LEVEL_STATUS =
+            UUID.fromString("00002bed-0000-1000-8000-00805f9b34fb");
 
     private enum RawOperation {
         DISCOVER,
         READ_PEER_PROOF,
+        READ_BATTERY_STATUS,
+        READ_BATTERY_LEVEL,
+        SUBSCRIBE_BATTERY_STATUS,
+        SUBSCRIBE_BATTERY_LEVEL,
         SUBSCRIBE_ROUTE_CONTROL,
         SUBSCRIBE_TELEMETRY,
         SUBSCRIBE_SERVICE_CHANGED,
         SUBSCRIBE_NOTIFICATION_SOURCE,
         SUBSCRIBE_DATA_SOURCE,
         WRITE_CONTROL_POINT,
-        WRITE_ROUTE_CONTROL
+        WRITE_ROUTE_CONTROL,
+        /** Helper 52 R request; appended so historical operation ordinals stay stable. */
+        REQUEST_TELEMETRY
+    }
+
+    private enum RoutineStage {
+        NONE,
+        HELLO_WRITE,
+        PROOF_READ,
+        CONFIRM_WRITE,
+        ACK_READ,
+        PROVEN
     }
 
     private static final class PendingGattOperation {
@@ -138,7 +174,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private static final class GattOwner {
         final BleRouteToken ownerToken;
         final BluetoothDevice device;
-        final SelectedBondIdentityResolverV2.Candidate bondAttribution;
+        SelectedBondIdentityResolverV2.Candidate bondAttribution;
         BluetoothGatt gatt;
         long connectGattStartedAtMillis;
         boolean callbackObserved;
@@ -202,11 +238,14 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     }
 
     private final Context context;
+    private final Preferences preferences;
     private final Handler main;
     private final BluetoothManager manager;
     private final BluetoothAdapter adapter;
     private final SelectedBondAttributionV2 bondAttribution;
     private final AncsConsumerCoreV2 ancs = new AncsConsumerCoreV2();
+    private final AncsDeliveryTraceV2 ancsTrace = new AncsDeliveryTraceV2();
+    private final SecureRandom enrollmentRandom = new SecureRandom();
     private final Map<BleRouteToken, Runnable> routeTimers = new HashMap<>();
     private final Map<AncsRequestTokenV2, Runnable> requestTimers = new HashMap<>();
     private final Map<ControlTransmit, Runnable> controlRetryTimers = new HashMap<>();
@@ -226,6 +265,26 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private PendingGattOperation pendingGatt;
     private BluetoothGattCharacteristic telemetryCharacteristic;
     private BleRouteToken telemetrySubscriptionToken;
+    private Runnable telemetryRefreshTimer;
+    private AncsRequestTokenV2 deferredAncsRequest;
+    private byte[] deferredAncsValue;
+    private BluetoothGattCharacteristic batteryStatusCharacteristic;
+    private BluetoothGattCharacteristic batteryLevelCharacteristic;
+    private int batteryProbeStage;
+    private int batteryProbeRetries;
+    private Runnable batteryProbeTimer;
+    private IphoneLeEnrollmentRecordV2 enrollmentRecord;
+    private IphoneLeEnrollmentRecordV2 pendingEnrollmentRecord;
+    private IphoneLeEnrollmentRecordV2 activeEnrollmentRecord;
+    private boolean enrollmentRecordPending;
+    private boolean clearStalePendingAfterActiveProof;
+    private IphoneLeEnrollmentProtocolV2.RoutineSession routineSession;
+    private byte[] routineHello;
+    private byte[] routineConfirm;
+    private BleRouteToken routineRouteToken;
+    private BleRouteToken pendingMtuDiscoveryToken;
+    private RoutineStage routineStage = RoutineStage.NONE;
+    private boolean routineMtuReady;
     private AncsSessionTokenV2 ancsSession;
     private final MonotonicSessionCursorV2 ancsSessionCursor =
             new MonotonicSessionCursorV2();
@@ -247,12 +306,22 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private boolean closed;
 
     public AndroidCentralTransportV2(Context context) {
-        this(context, SelectedBondAttributionV2.STRICT_PUBLIC_API);
+        this(context, new Preferences(context), SelectedBondAttributionV2.STRICT_PUBLIC_API);
+    }
+
+    public AndroidCentralTransportV2(Context context, Preferences preferences) {
+        this(context, preferences, SelectedBondAttributionV2.STRICT_PUBLIC_API);
     }
 
     public AndroidCentralTransportV2(Context context,
                                      SelectedBondAttributionV2 bondAttribution) {
+        this(context, new Preferences(context), bondAttribution);
+    }
+
+    public AndroidCentralTransportV2(Context context, Preferences preferences,
+                                     SelectedBondAttributionV2 bondAttribution) {
         this.context = Objects.requireNonNull(context, "context").getApplicationContext();
+        this.preferences = Objects.requireNonNull(preferences, "preferences");
         this.bondAttribution = Objects.requireNonNull(bondAttribution, "bondAttribution");
         this.main = new Handler(Looper.getMainLooper());
         this.manager =
@@ -508,6 +577,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
         this.listener = newListener;
         this.startRequest = request;
+        resetRoutineAuthState();
         this.ingressFrozen = false;
         clearTelemetrySubscription();
         this.lastInboundCloseRequest = null;
@@ -581,6 +651,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             case RESET_SESSION_STATE:
                 clearTelemetrySubscription();
                 closeAncsSession();
+                resetRoutineAuthState();
                 if (pendingGatt == null
                         || pendingGatt.type != RawOperation.WRITE_ROUTE_CONTROL) {
                     pendingGatt = null;
@@ -597,6 +668,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 if (ancsSession != null) {
                     applyAncsEffects(ancs.subscriptionsReady(ancsSession));
                 }
+                scheduleStandardBatteryMonitoring(1_500L);
                 break;
             case REPORT_HELPER_ID_LEARNED:
                 if (listener != null) listener.onHelperInstallationIdLearned(effect.detail);
@@ -708,6 +780,41 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                         + ", matches=" + selectedBond.matches
                         + ", bonded=" + (selectedBond.device != null));
         BluetoothDevice selected = selectedBond.device;
+        if (startRequest.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY) {
+            if (selected == null || selectedBond.matches != 1
+                    || selected.getBondState() != BluetoothDevice.BOND_BONDED) {
+                failEnrolledRoute(token, IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
+                        "selected Classic bond is not uniquely present; enrollment blocked");
+                return;
+            }
+            IphoneLeEnrollmentRecordV2 record = loadEnrollmentRecord(
+                    startRequest.selectedSystemBondAddress,
+                    startRequest.helperInstallationId);
+            if (record == null) {
+                failEnrolledRoute(token, IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
+                        "no exact device-local LE enrollment record; explicit enrollment required");
+                return;
+            }
+            try {
+                BluetoothDevice enrolled = adapter.getRemoteDevice(record.leIdentityAddress);
+                if (enrolled == null
+                        || enrolled.getBondState() != BluetoothDevice.BOND_BONDED) {
+                    failEnrolledRoute(token,
+                            IphoneTransportErrorV2.Kind.BOND_TRANSPORT_UNAVAILABLE,
+                            "saved post-bond LE facade is not bonded; explicit re-enroll required");
+                    return;
+                }
+                reportPlatformDiagnostic(token,
+                        "enrolled_le exact_record=true, pending_recovery="
+                                + enrollmentRecordPending + ", direct_locator=true");
+                createGattOwner(token, enrolled, false, null);
+                return;
+            } catch (RuntimeException unavailable) {
+                failEnrolledRoute(token, IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
+                        "saved post-bond LE locator is unavailable; explicit re-enroll required");
+                return;
+            }
+        }
         SelectedBondIdentityResolverV2.Candidate attribution = bondAttribution.begin(
                 selected, startRequest.selectedSystemBondAddress,
                 selectedBond.matches,
@@ -716,6 +823,20 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             reportError(IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
                     "selected-bond attribution failed: " + attribution.detail, false);
             postConnected(token, false);
+            return;
+        }
+        SelectedBondLeCapabilityV2.Result capability;
+        try {
+            capability = SelectedBondLeCapabilityV2.classify(selected.getType());
+        } catch (RuntimeException unknown) {
+            capability = SelectedBondLeCapabilityV2.Result.UNKNOWN;
+        }
+        reportPlatformDiagnostic(token, SelectedBondLeCapabilityV2.diagnostic(capability));
+        if (capability != SelectedBondLeCapabilityV2.Result.LE_CAPABLE) {
+            String detail = SelectedBondLeCapabilityV2.terminalDetail(capability);
+            reportError(IphoneTransportErrorV2.Kind.BOND_TRANSPORT_UNAVAILABLE,
+                    detail, false);
+            apply(AndroidCentralRoute.selectedBondLeUnavailable(state, token, detail));
             return;
         }
         // Android P/KX11 field captures showed the passive autoConnect=true registration staying
@@ -736,8 +857,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 matchedBootstrapAttribution;
         matchedBootstrapDevice = null;
         matchedBootstrapAttribution = null;
-        if (device == null || attribution == null
-                || !attribution.mayProceedToEncryptedProof()) {
+        boolean enrolled = state != null
+                && state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY;
+        if (device == null || (!enrolled && (attribution == null
+                || !attribution.mayProceedToEncryptedProof()))) {
             postConnected(token, false);
             return;
         }
@@ -916,6 +1039,22 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             postServices(token, null);
             return;
         }
+        if (state != null
+                && state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
+                && !routineMtuReady) {
+            pendingMtuDiscoveryToken = token;
+            boolean requested;
+            try {
+                requested = owner.gatt.requestMtu(ROUTINE_REQUESTED_MTU);
+            } catch (RuntimeException rejected) {
+                requested = false;
+            }
+            if (requested) return;
+            pendingMtuDiscoveryToken = null;
+            failEnrolledRoute(token, IphoneTransportErrorV2.Kind.PROTOCOL,
+                    "routine C4 MTU request rejected before H; explicit re-enroll required");
+            return;
+        }
         pendingGatt = new PendingGattOperation(
                 RawOperation.DISCOVER, token, null, null, null);
         boolean started;
@@ -944,6 +1083,11 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
         pendingGatt = new PendingGattOperation(
                 RawOperation.READ_PEER_PROOF, token, null, characteristic, null);
+        if (state != null
+                && state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY) {
+            beginRoutineAuthentication(token);
+            return;
+        }
         boolean started;
         try {
             started = owner.gatt.readCharacteristic(characteristic);
@@ -953,6 +1097,51 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         if (!started) {
             pendingGatt = null;
             postPeerProof(token, null);
+        }
+    }
+
+    private void beginRoutineAuthentication(BleRouteToken token) {
+        BluetoothGattCharacteristic c4 = characteristic(
+                IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE,
+                IphoneBleProtocolV2.ENROLLMENT_CHARACTERISTIC);
+        if (enrollmentRecord == null || c4 == null || !readable(c4) || !writable(c4)) {
+            pendingGatt = null;
+            failEnrolledRoute(token, IphoneTransportErrorV2.Kind.PROTOCOL,
+                    "Helper 52 routine C4 is unavailable; explicit re-enroll required");
+            return;
+        }
+        try {
+            routineHello = IphoneLeEnrollmentProtocolV2.encodeRoutineHello(
+                    UUID.fromString(preferences.phoneBleV2AndroidInstallationId()),
+                    IphoneLeEnrollmentProtocolV2.randomNonce(enrollmentRandom));
+            routineRouteToken = token;
+            routineStage = RoutineStage.HELLO_WRITE;
+            if (writeRoutineC4(c4, routineHello)) return;
+        } catch (RuntimeException invalidIdentity) {
+            // Fall through to the exact typed terminal below.
+        }
+        pendingGatt = null;
+        failEnrolledRoute(token, IphoneTransportErrorV2.Kind.PROTOCOL,
+                "routine C4 hello was not accepted; explicit re-enroll required");
+    }
+
+    private boolean writeRoutineC4(BluetoothGattCharacteristic c4, byte[] frame) {
+        if (owner == null || owner.gatt == null) return false;
+        try {
+            c4.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+            c4.setValue(frame);
+            return owner.gatt.writeCharacteristic(c4);
+        } catch (RuntimeException rejected) {
+            return false;
+        }
+    }
+
+    private boolean readRoutineC4(BluetoothGattCharacteristic c4) {
+        if (owner == null || owner.gatt == null) return false;
+        try {
+            return owner.gatt.readCharacteristic(c4);
+        } catch (RuntimeException rejected) {
+            return false;
         }
     }
 
@@ -1085,6 +1274,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                         && characteristic != null) {
                     telemetryCharacteristic = characteristic;
                     telemetrySubscriptionToken = token;
+                    scheduleTelemetryRefresh();
                 }
                 apply(telemetry);
                 break;
@@ -1111,6 +1301,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             return;
         }
         ancsSession = new AncsSessionTokenV2(token.epoch, token.ownerId, sessionId);
+        ancsTrace.begin(sessionId);
         ancs.begin(ancsSession);
     }
 
@@ -1125,8 +1316,274 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     }
 
     private void clearTelemetrySubscription() {
+        cancelTelemetryRefresh();
+        deferredAncsRequest = null;
+        deferredAncsValue = null;
+        if (pendingGatt != null && pendingGatt.type == RawOperation.REQUEST_TELEMETRY) {
+            pendingGatt = null;
+        }
         telemetryCharacteristic = null;
         telemetrySubscriptionToken = null;
+        clearStandardBatteryMonitoring();
+    }
+
+    private void cancelTelemetryRefresh() {
+        Runnable timer = telemetryRefreshTimer;
+        telemetryRefreshTimer = null;
+        if (timer != null) main.removeCallbacks(timer);
+    }
+
+    private void scheduleTelemetryRefresh() {
+        scheduleTelemetryRefreshAfter(TELEMETRY_REFRESH_QUIET_MS);
+    }
+
+    private void scheduleTelemetryRefreshAfter(long delayMillis) {
+        cancelTelemetryRefresh();
+        if (telemetryCharacteristic == null || telemetrySubscriptionToken == null) return;
+        Runnable timer = this::runTelemetryRefresh;
+        telemetryRefreshTimer = timer;
+        main.postDelayed(timer, Math.max(1L, delayMillis));
+    }
+
+    /** Helper 52 refresh request; serialized behind ANCS and never treated as ANCS failure. */
+    private void runTelemetryRefresh() {
+        telemetryRefreshTimer = null;
+        GattOwner exactOwner = owner;
+        AndroidCentralRoute.State current = state;
+        BleRouteToken subscription = telemetrySubscriptionToken;
+        if (closed || ingressFrozen || exactOwner == null || current == null
+                || subscription == null || telemetryCharacteristic == null
+                || exactOwner.gatt == null || !exactOwner.connected
+                || !subscription.sameOwner(exactOwner.ownerToken)
+                || !AndroidCentralRoute.acceptsTelemetry(current, subscription)) return;
+        if (pendingGatt != null) {
+            if (pendingGatt.type == RawOperation.REQUEST_TELEMETRY) {
+                pendingGatt = null;
+                scheduleTelemetryRefreshAfter(TELEMETRY_REFRESH_RETRY_MS);
+                drainDeferredAncsAfterTelemetry();
+            } else {
+                scheduleTelemetryRefreshAfter(TELEMETRY_REFRESH_RETRY_MS);
+            }
+            return;
+        }
+        if (!requestTimers.isEmpty() || !controlRetryTimers.isEmpty()) {
+            scheduleTelemetryRefreshAfter(TELEMETRY_REFRESH_RETRY_MS);
+            return;
+        }
+        BluetoothGattCharacteristic control = characteristic(
+                IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE,
+                IphoneBleProtocolV2.CONTROL_CHARACTERISTIC);
+        if (control == null || !writable(control)) {
+            // Helper 51 has no R contract. Keep the route alive and retry only at quiet cadence.
+            scheduleTelemetryRefresh();
+            return;
+        }
+        byte[] request = new byte[20];
+        request[0] = 0x52;
+        request[1] = (byte) IphoneBleProtocolV2.VERSION;
+        request[2] = 1; // Android-central route.
+        byte[] token = IphoneBleControlProtocolV2.newSwitchToken(enrollmentRandom);
+        System.arraycopy(token, 0, request, 4, token.length);
+        control.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
+        control.setValue(request);
+        PendingGattOperation pending = new PendingGattOperation(
+                RawOperation.REQUEST_TELEMETRY, subscription, null, control, null);
+        pendingGatt = pending;
+        boolean started;
+        try {
+            started = exactOwner.gatt.writeCharacteristic(control);
+        } catch (RuntimeException rejected) {
+            started = false;
+        }
+        if (!started) pendingGatt = null;
+        // This watchdog also handles old Helper 51 rejecting/ignoring R without harming ANCS.
+        scheduleTelemetryRefreshAfter(TELEMETRY_REFRESH_RETRY_MS);
+        if (!started) drainDeferredAncsAfterTelemetry();
+    }
+
+    private void drainDeferredAncsAfterTelemetry() {
+        AncsRequestTokenV2 request = deferredAncsRequest;
+        byte[] value = deferredAncsValue;
+        deferredAncsRequest = null;
+        deferredAncsValue = null;
+        if (request != null && value != null) {
+            writeControlPoint(request, value);
+        } else if (telemetryRefreshTimer == null) {
+            scheduleTelemetryRefresh();
+        }
+    }
+
+    /**
+     * Restores HA1159's standard Battery Service path after the v2 ANCS graph is ready.
+     * ANCS remains strictly higher priority: this optional probe never starts while a control
+     * request or another ATT operation is active.
+     */
+    private void scheduleStandardBatteryMonitoring(long delayMillis) {
+        if (batteryProbeStage >= 4 || ingressFrozen || owner == null || owner.gatt == null) return;
+        if (batteryProbeTimer != null) main.removeCallbacks(batteryProbeTimer);
+        batteryProbeTimer = () -> {
+            batteryProbeTimer = null;
+            advanceStandardBatteryMonitoring();
+        };
+        main.postDelayed(batteryProbeTimer, Math.max(0L, delayMillis));
+    }
+
+    private void advanceStandardBatteryMonitoring() {
+        if (ingressFrozen || owner == null || owner.gatt == null || !owner.connected
+                || state == null || state.phase != AndroidCentralRoute.Phase.READY) return;
+        if (batteryStatusCharacteristic == null && batteryLevelCharacteristic == null) {
+            BluetoothGattService service = owner.gatt.getService(BATTERY_SERVICE);
+            if (service != null) {
+                batteryStatusCharacteristic = service.getCharacteristic(BATTERY_LEVEL_STATUS);
+                batteryLevelCharacteristic = service.getCharacteristic(BATTERY_LEVEL);
+            }
+        }
+        if (pendingGatt != null || !requestTimers.isEmpty()) {
+            if (++batteryProbeRetries <= BATTERY_PROBE_RETRY_LIMIT) {
+                scheduleStandardBatteryMonitoring(BATTERY_PROBE_RETRY_MS);
+            }
+            return;
+        }
+        batteryProbeRetries = 0;
+        while (batteryProbeStage < 4) {
+            RawOperation operation;
+            BluetoothGattCharacteristic characteristic;
+            boolean read;
+            switch (batteryProbeStage) {
+                case 0:
+                    operation = RawOperation.READ_BATTERY_STATUS;
+                    characteristic = batteryStatusCharacteristic;
+                    read = true;
+                    break;
+                case 1:
+                    operation = RawOperation.READ_BATTERY_LEVEL;
+                    characteristic = batteryLevelCharacteristic;
+                    read = true;
+                    break;
+                case 2:
+                    operation = RawOperation.SUBSCRIBE_BATTERY_STATUS;
+                    characteristic = batteryStatusCharacteristic;
+                    read = false;
+                    break;
+                default:
+                    operation = RawOperation.SUBSCRIBE_BATTERY_LEVEL;
+                    characteristic = batteryLevelCharacteristic;
+                    read = false;
+                    break;
+            }
+            if (characteristic == null || (read ? !readable(characteristic)
+                    : !notifiable(characteristic))) {
+                batteryProbeStage++;
+                continue;
+            }
+            boolean started = read
+                    ? startStandardBatteryRead(operation, characteristic)
+                    : startStandardBatterySubscription(operation, characteristic);
+            if (started) return;
+            batteryProbeStage++;
+        }
+    }
+
+    private boolean startStandardBatteryRead(RawOperation operation,
+                                             BluetoothGattCharacteristic characteristic) {
+        PendingGattOperation pending = new PendingGattOperation(operation,
+                owner.ownerToken, null, characteristic, null);
+        pendingGatt = pending;
+        boolean started;
+        try {
+            started = owner.gatt.readCharacteristic(characteristic);
+        } catch (RuntimeException error) {
+            started = false;
+        }
+        if (!started) {
+            pendingGatt = null;
+            return false;
+        }
+        armStandardBatteryOperationWatchdog(pending);
+        return true;
+    }
+
+    private boolean startStandardBatterySubscription(
+            RawOperation operation, BluetoothGattCharacteristic characteristic) {
+        BluetoothGattDescriptor descriptor =
+                characteristic.getDescriptor(AncsProtocol.CLIENT_CONFIGURATION);
+        if (descriptor == null) return false;
+        boolean notificationSet;
+        try {
+            notificationSet = owner.gatt.setCharacteristicNotification(characteristic, true);
+        } catch (RuntimeException error) {
+            notificationSet = false;
+        }
+        if (!notificationSet) return false;
+        descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+        PendingGattOperation pending = new PendingGattOperation(operation,
+                owner.ownerToken, null, characteristic, descriptor);
+        pendingGatt = pending;
+        boolean started;
+        try {
+            started = owner.gatt.writeDescriptor(descriptor);
+        } catch (RuntimeException error) {
+            started = false;
+        }
+        if (!started) {
+            pendingGatt = null;
+            return false;
+        }
+        armStandardBatteryOperationWatchdog(pending);
+        return true;
+    }
+
+    private void armStandardBatteryOperationWatchdog(PendingGattOperation expected) {
+        if (batteryProbeTimer != null) main.removeCallbacks(batteryProbeTimer);
+        batteryProbeTimer = () -> {
+            batteryProbeTimer = null;
+            if (pendingGatt != expected || !isStandardBatteryOperation(expected.type)) return;
+            pendingGatt = null;
+            batteryProbeStage++;
+            scheduleStandardBatteryMonitoring(BATTERY_PROBE_RETRY_MS);
+        };
+        main.postDelayed(batteryProbeTimer, 3_000L);
+    }
+
+    private void cancelStandardBatteryOperationWatchdog() {
+        if (batteryProbeTimer != null) main.removeCallbacks(batteryProbeTimer);
+        batteryProbeTimer = null;
+    }
+
+    private void clearStandardBatteryMonitoring() {
+        cancelStandardBatteryOperationWatchdog();
+        batteryStatusCharacteristic = null;
+        batteryLevelCharacteristic = null;
+        batteryProbeStage = 0;
+        batteryProbeRetries = 0;
+        if (pendingGatt != null && isStandardBatteryOperation(pendingGatt.type)) {
+            pendingGatt = null;
+        }
+    }
+
+    private static boolean isStandardBatteryOperation(RawOperation operation) {
+        return operation == RawOperation.READ_BATTERY_STATUS
+                || operation == RawOperation.READ_BATTERY_LEVEL
+                || operation == RawOperation.SUBSCRIBE_BATTERY_STATUS
+                || operation == RawOperation.SUBSCRIBE_BATTERY_LEVEL;
+    }
+
+    private void acceptStandardBatteryValue(BluetoothGattCharacteristic characteristic,
+                                            byte[] value) {
+        if (value == null || value.length == 0 || listener == null) return;
+        Integer percentage = null;
+        String source = "";
+        if (characteristic == batteryStatusCharacteristic) {
+            percentage = PhoneConnectorPolicy.decodeBatteryLevelStatusLevel(value);
+            source = "ble_bas_level_status";
+        } else if (characteristic == batteryLevelCharacteristic) {
+            int raw = value[0] & 0xff;
+            if (raw <= 100) percentage = raw;
+            source = "ble_bas";
+        }
+        if (percentage != null) {
+            listener.onStandardBatteryPercentage(percentage, source);
+        }
     }
 
     private void beginHelperIdentityCommit(
@@ -1227,12 +1684,22 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
 
     private void writeControlPoint(AncsRequestTokenV2 request, byte[] value) {
         if (request == null || ancsSession == null || !request.session.equals(ancsSession)
-                || owner == null || owner.gatt == null || pendingGatt != null
+                || owner == null || owner.gatt == null
                 || ingressFrozen || state == null
                 || state.phase != AndroidCentralRoute.Phase.READY) {
             if (request != null) {
                 applyAncsEffects(ancs.controlPointWriteResult(request, false));
             }
+            return;
+        }
+        if (pendingGatt != null) {
+            if (pendingGatt.type == RawOperation.REQUEST_TELEMETRY
+                    && deferredAncsRequest == null) {
+                deferredAncsRequest = request;
+                deferredAncsValue = value == null ? null : value.clone();
+                return;
+            }
+            applyAncsEffects(ancs.controlPointWriteResult(request, false));
             return;
         }
         BluetoothGattCharacteristic control = characteristic(
@@ -1254,6 +1721,9 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         if (!started) {
             pendingGatt = null;
             applyAncsEffects(ancs.controlPointWriteResult(request, false));
+        } else {
+            reportPlatformDiagnostic(owner.ownerToken,
+                    ancsTrace.controlPointWrite(request.kind, true));
         }
     }
 
@@ -1434,6 +1904,18 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
         UUID installation = IphoneBleControlProtocolV2.installationUuid(frame);
         if (installation == null) return null;
+        if (state != null
+                && state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY) {
+            if (routineStage != RoutineStage.PROVEN || enrollmentRecord == null
+                    || startRequest == null
+                    || selectedSystemBondMatchCount(
+                    startRequest.selectedSystemBondAddress) != 1
+                    || !samePublicAddress(owner.device.getAddress(),
+                    enrollmentRecord.leIdentityAddress)
+                    || !installation.equals(enrollmentRecord.helperInstallationId)) {
+                return null;
+            }
+        }
         SelectedBondIdentityResolverV2.Decision attribution = bondAttribution.complete(
                 owner.bondAttribution, installation.toString(),
                 selectedSystemBondMatchCount(
@@ -1449,6 +1931,73 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 IphoneBleMode.ANDROID_CENTRAL,
                 BlePeerRole.IPHONE_HELPER_PERIPHERAL, attribution.helperInstallationId,
                 frame.telemetrySupported(), frame.ancsSupported(), true);
+    }
+
+    private IphoneLeEnrollmentRecordV2 loadEnrollmentRecord(
+            String selectedClassicAddress, String helperInstallationId) {
+        String androidInstallationId = preferences.phoneBleV2AndroidInstallationId();
+        IphoneLeEnrollmentRecordV2 pending = IphoneLeEnrollmentRecordV2.validForSelectedClassic(
+                preferences.phoneBleV2PendingEnrollmentRecord(), selectedClassicAddress);
+        if (!recordMatchesEnrollmentContext(pending, selectedClassicAddress,
+                helperInstallationId, androidInstallationId)) pending = null;
+        pendingEnrollmentRecord = pending;
+        IphoneLeEnrollmentRecordV2 active = IphoneLeEnrollmentRecordV2.validForSelectedClassic(
+                preferences.phoneBleV2EnrollmentRecord(), selectedClassicAddress);
+        if (!recordMatchesEnrollmentContext(active, selectedClassicAddress,
+                helperInstallationId, androidInstallationId)) active = null;
+        activeEnrollmentRecord = active;
+        enrollmentRecord = pending != null ? pending : active;
+        enrollmentRecordPending = enrollmentRecord != null && enrollmentRecord == pending;
+        clearStalePendingAfterActiveProof = false;
+        return enrollmentRecord;
+    }
+
+    private static boolean recordMatchesEnrollmentContext(
+            IphoneLeEnrollmentRecordV2 record, String selectedClassicAddress,
+            String helperInstallationId, String androidInstallationId) {
+        if (record == null || selectedClassicAddress == null || androidInstallationId == null
+                || !record.selectedClassicAddress.equalsIgnoreCase(
+                selectedClassicAddress.trim())) return false;
+        try {
+            if (!record.androidInstallationId.equals(
+                    UUID.fromString(androidInstallationId.trim()))) return false;
+            if (helperInstallationId == null || helperInstallationId.trim().isEmpty()) {
+                return true;
+            }
+            return record.helperInstallationId.equals(
+                    UUID.fromString(helperInstallationId.trim()));
+        } catch (RuntimeException invalid) {
+            return false;
+        }
+    }
+
+    private void failEnrolledRoute(BleRouteToken token,
+                                   IphoneTransportErrorV2.Kind kind, String detail) {
+        reportError(kind, detail, false);
+        AndroidCentralRoute.State current = state;
+        if (current != null) {
+            apply(AndroidCentralRoute.enrolledLeUnavailable(current, token, detail));
+        }
+    }
+
+    private void resetRoutineAuthState() {
+        if (routineSession != null) routineSession.destroy();
+        routineSession = null;
+        routineHello = null;
+        routineConfirm = null;
+        routineRouteToken = null;
+        routineStage = RoutineStage.NONE;
+        pendingMtuDiscoveryToken = null;
+        routineMtuReady = false;
+        enrollmentRecord = null;
+        pendingEnrollmentRecord = null;
+        activeEnrollmentRecord = null;
+        enrollmentRecordPending = false;
+        clearStalePendingAfterActiveProof = false;
+    }
+
+    private static boolean samePublicAddress(String left, String right) {
+        return left != null && right != null && left.equalsIgnoreCase(right);
     }
 
     private void maybeCompleteTeardown() {
@@ -1518,6 +2067,9 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         for (Runnable timer : controlRetryTimers.values()) main.removeCallbacks(timer);
         controlRetryTimers.clear();
         cancelReplayQuiet();
+        cancelTelemetryRefresh();
+        cancelStandardBatteryOperationWatchdog();
+        resetRoutineAuthState();
     }
 
     private boolean readyForGattOperation(BleRouteToken token) {
@@ -1704,6 +2256,35 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private void handleScanResult(ScanAttempt attempt, ScanResult result) {
         if (ingressFrozen || !isCurrentScanAttempt(attempt)
                 || result == null || state == null) return;
+        if (state.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY) {
+            IphoneTransportStartRequest request = startRequest;
+            if (request == null) return;
+            SelectedBondFacade selected = selectedSystemBondFacade(
+                    request.selectedSystemBondAddress);
+            if (selected.matches != 1 || selected.device == null
+                    || selected.device.getBondState() != BluetoothDevice.BOND_BONDED) return;
+            IphoneLeEnrollmentRecordV2 record = enrollmentRecord != null
+                    ? enrollmentRecord : loadEnrollmentRecord(
+                    request.selectedSystemBondAddress, request.helperInstallationId);
+            BluetoothDevice device = result.getDevice();
+            if (record == null || device == null
+                    || !samePublicAddress(device.getAddress(), record.leIdentityAddress)
+                    || device.getBondState() != BluetoothDevice.BOND_BONDED) return;
+            reportPlatformDiagnostic(attempt.token,
+                    "enrolled_recovery_scan exact_saved_identity=true, bonded=true, "
+                            + "unique_selected_classic=true, advertisement_untrusted=true");
+            IphoneBleAdvertisement advertisement = new IphoneBleAdvertisement(
+                    IphoneBleProtocolV2.HELPER_PERIPHERAL_SERVICE,
+                    IphoneBleProtocolV2.VERSION, BlePeerRole.IPHONE_HELPER_PERIPHERAL,
+                    true, true);
+            matchedBootstrapDevice = device;
+            matchedBootstrapAttribution = null;
+            BleRouteTransition<AndroidCentralRoute.State> transition =
+                    AndroidCentralRoute.advertisement(state, attempt.token, advertisement);
+            if (!transition.accepted) matchedBootstrapDevice = null;
+            else apply(transition);
+            return;
+        }
         ScanRecord record = result.getScanRecord();
         if (record == null || record.getServiceUuids() == null
                 || !record.getServiceUuids().contains(
@@ -1754,6 +2335,10 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
 
         @Override public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             dispatchMain(() -> handleServicesDiscovered(gatt, status));
+        }
+
+        @Override public void onMtuChanged(BluetoothGatt gatt, int mtu, int status) {
+            dispatchMain(() -> handleMtuChanged(gatt, mtu, status));
         }
 
         @Override public void onCharacteristicRead(BluetoothGatt gatt,
@@ -1834,6 +2419,12 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         if (ingressFrozen) return;
         AndroidCentralRoute.State current = state;
         if (current == null) return;
+        if (current.acquisitionMode == IphoneAcquisitionModeV2.ENROLLED_LE_IDENTITY
+                && status != BluetoothGatt.GATT_SUCCESS) {
+            apply(AndroidCentralRoute.linkLost(current, owner.ownerToken,
+                    "enrolled locator status failure; one identity scan"));
+            return;
+        }
         if (newState == BluetoothProfile.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS) {
             apply(AndroidCentralRoute.connected(current, owner.ownerToken, true));
         } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
@@ -1863,18 +2454,189 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         }
     }
 
+    private void handleMtuChanged(BluetoothGatt callbackGatt, int mtu, int status) {
+        BleRouteToken token = pendingMtuDiscoveryToken;
+        if (owner == null || owner.gatt != callbackGatt || token == null) return;
+        pendingMtuDiscoveryToken = null;
+        if (status != BluetoothGatt.GATT_SUCCESS || mtu < ROUTINE_REQUIRED_MTU) {
+            failEnrolledRoute(token, IphoneTransportErrorV2.Kind.PROTOCOL,
+                    "routine C4 requires negotiated MTU >=69 before H; "
+                            + "explicit re-enroll required");
+            return;
+        }
+        routineMtuReady = true;
+        discoverServices(token);
+    }
+
+    private static boolean isRoutineC4(BluetoothGattCharacteristic characteristic) {
+        return characteristic != null
+                && IphoneBleProtocolV2.ENROLLMENT_CHARACTERISTIC.equals(
+                characteristic.getUuid());
+    }
+
+    private void handleRoutineProofRead(BluetoothGatt callbackGatt,
+                                        BluetoothGattCharacteristic c4,
+                                        byte[] value, int status) {
+        if (owner == null || owner.gatt != callbackGatt || enrollmentRecord == null
+                || status != BluetoothGatt.GATT_SUCCESS || value == null) {
+            failRoutine("routine C4 Helper proof read failed");
+            return;
+        }
+        IphoneLeEnrollmentProtocolV2.RoutineSession verified =
+                verifyRoutineProofForRecord(value, pendingEnrollmentRecord);
+        IphoneLeEnrollmentRecordV2 matching = verified == null
+                ? null : pendingEnrollmentRecord;
+        if (verified == null) {
+            verified = verifyRoutineProofForRecord(value, activeEnrollmentRecord);
+            matching = verified == null ? null : activeEnrollmentRecord;
+        }
+        if (verified == null || matching == null) {
+            failRoutine("routine C4 Helper key/identity proof rejected");
+            return;
+        }
+        routineSession = verified;
+        enrollmentRecord = matching;
+        enrollmentRecordPending = matching == pendingEnrollmentRecord;
+        clearStalePendingAfterActiveProof = !enrollmentRecordPending
+                && pendingEnrollmentRecord != null;
+        try {
+            routineConfirm = verified.encodeConfirm();
+            routineStage = RoutineStage.CONFIRM_WRITE;
+            if (writeRoutineC4(c4, routineConfirm)) return;
+        } catch (RuntimeException | GeneralSecurityException rejected) {
+            // Exact fail-closed terminal below.
+        }
+        failRoutine("routine C4 confirmation construction/write failed");
+    }
+
+    private IphoneLeEnrollmentProtocolV2.RoutineSession verifyRoutineProofForRecord(
+            byte[] value, IphoneLeEnrollmentRecordV2 record) {
+        if (record == null) return null;
+        try {
+            IphoneLeEnrollmentProtocolV2.RoutineSession verified =
+                    IphoneLeEnrollmentProtocolV2.verifyRoutineProof(
+                    routineHello, value, record.copyLongTermKey());
+            if (record.helperInstallationId.equals(verified.helperInstallationId)) {
+                return verified;
+            }
+            verified.destroy();
+        } catch (RuntimeException | GeneralSecurityException rejected) {
+            // Try the other durable record, if any.
+        }
+        return null;
+    }
+
+    private void handleRoutineAckRead(BluetoothGatt callbackGatt,
+                                      BluetoothGattCharacteristic c4,
+                                      byte[] value, int status) {
+        boolean verified = false;
+        if (owner != null && owner.gatt == callbackGatt
+                && status == BluetoothGatt.GATT_SUCCESS && value != null
+                && routineSession != null) {
+            try {
+                verified = routineSession.verifyAck(routineConfirm, value);
+            } catch (RuntimeException | GeneralSecurityException rejected) {
+                verified = false;
+            }
+        }
+        if (!verified || enrollmentRecord == null || routineRouteToken == null
+                || startRequest == null) {
+            failRoutine("routine C4 Helper ACK rejected");
+            return;
+        }
+        routineSession.destroy();
+        routineSession = null;
+        routineStage = RoutineStage.PROVEN;
+        owner.bondAttribution = SelectedBondIdentityResolverV2.beginEnrolled(
+                startRequest.selectedSystemBondAddress,
+                selectedSystemBondMatchCount(startRequest.selectedSystemBondAddress),
+                enrollmentRecord.leIdentityAddress,
+                owner.device.getAddress(),
+                owner.device.getBondState() == BluetoothDevice.BOND_BONDED,
+                enrollmentRecord.helperInstallationId.toString(), true);
+        if (!owner.bondAttribution.mayProceedToEncryptedProof()) {
+            failRoutine("routine C4 succeeded but enrolled facade attribution failed");
+            return;
+        }
+        PendingGattOperation pending = pendingGatt;
+        BluetoothGattCharacteristic encryptedH = pending == null
+                ? null : pending.characteristic;
+        boolean started = false;
+        if (encryptedH != null) {
+            try {
+                started = owner.gatt.readCharacteristic(encryptedH);
+            } catch (RuntimeException rejected) {
+                started = false;
+            }
+        }
+        if (!started) failRoutine("encrypted H read rejected after routine proof");
+    }
+
+    private void failRoutine(String detail) {
+        BleRouteToken token = routineRouteToken;
+        routineStage = RoutineStage.NONE;
+        if (routineSession != null) routineSession.destroy();
+        routineSession = null;
+        routineHello = null;
+        routineConfirm = null;
+        routineRouteToken = null;
+        pendingGatt = null;
+        if (token != null) {
+            failEnrolledRoute(token, IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
+                    detail + "; explicit re-enroll required");
+        }
+    }
+
     private void handleCharacteristicRead(BluetoothGatt callbackGatt,
                                           BluetoothGattCharacteristic characteristic,
                                           byte[] value, int status) {
         if (ingressFrozen) return;
+        if (isRoutineC4(characteristic) && routineStage == RoutineStage.PROOF_READ) {
+            handleRoutineProofRead(callbackGatt, characteristic, value, status);
+            return;
+        }
+        if (isRoutineC4(characteristic) && routineStage == RoutineStage.ACK_READ) {
+            handleRoutineAckRead(callbackGatt, characteristic, value, status);
+            return;
+        }
         PendingGattOperation pending = pendingGatt;
         if (owner == null || owner.gatt != callbackGatt || pending == null
-                || pending.type != RawOperation.READ_PEER_PROOF
                 || pending.characteristic != characteristic) return;
+        if (pending.type == RawOperation.READ_BATTERY_STATUS
+                || pending.type == RawOperation.READ_BATTERY_LEVEL) {
+            cancelStandardBatteryOperationWatchdog();
+            pendingGatt = null;
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                acceptStandardBatteryValue(characteristic, value);
+            }
+            batteryProbeStage++;
+            scheduleStandardBatteryMonitoring(0L);
+            return;
+        }
+        if (pending.type != RawOperation.READ_PEER_PROOF) return;
         pendingGatt = null;
         GattResultV2 result = GattResultV2.fromAndroidStatus(status);
         IphoneBlePeerProof proof = result == GattResultV2.SUCCESS
                 ? decodePeerProof(callbackGatt, value) : null;
+        if (proof != null && enrollmentRecordPending) {
+            String pendingRecord = preferences.phoneBleV2PendingEnrollmentRecord();
+            if (pendingRecord.isEmpty()
+                    || !preferences.completePhoneBleV2EnrollmentCommit(pendingRecord)) {
+                failEnrolledRoute(pending.routeToken,
+                        IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
+                        "pending routine/H succeeded but local binding promotion failed");
+                return;
+            }
+            enrollmentRecordPending = false;
+        } else if (proof != null && clearStalePendingAfterActiveProof) {
+            if (!preferences.clearPhoneBleV2PendingEnrollmentRecord()) {
+                failEnrolledRoute(pending.routeToken,
+                        IphoneTransportErrorV2.Kind.PEER_PROOF_REJECTED,
+                        "active routine/H succeeded but stale pending cleanup failed");
+                return;
+            }
+            clearStalePendingAfterActiveProof = false;
+        }
         AndroidCentralRoute.State current = state;
         if (current != null) {
             BleRouteTransition<AndroidCentralRoute.State> transition =
@@ -1897,6 +2659,14 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         PendingGattOperation pending = pendingGatt;
         if (owner == null || owner.gatt != callbackGatt || pending == null
                 || pending.descriptor != descriptor) return;
+        if (pending.type == RawOperation.SUBSCRIBE_BATTERY_STATUS
+                || pending.type == RawOperation.SUBSCRIBE_BATTERY_LEVEL) {
+            cancelStandardBatteryOperationWatchdog();
+            pendingGatt = null;
+            batteryProbeStage++;
+            scheduleStandardBatteryMonitoring(0L);
+            return;
+        }
         if (pending.type != RawOperation.SUBSCRIBE_ROUTE_CONTROL
                 && pending.type != RawOperation.SUBSCRIBE_TELEMETRY
                 && pending.type != RawOperation.SUBSCRIBE_SERVICE_CHANGED
@@ -1910,17 +2680,60 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private void handleCharacteristicWrite(BluetoothGatt callbackGatt,
                                             BluetoothGattCharacteristic characteristic,
                                             int status) {
+        if (isRoutineC4(characteristic) && routineStage == RoutineStage.HELLO_WRITE) {
+            if (owner != null && owner.gatt == callbackGatt
+                    && status == BluetoothGatt.GATT_SUCCESS) {
+                routineStage = RoutineStage.PROOF_READ;
+                if (readRoutineC4(characteristic)) return;
+                failRoutine("routine C4 proof read rejected");
+                return;
+            }
+            failRoutine("routine C4 hello write failed");
+            return;
+        }
+        if (isRoutineC4(characteristic) && routineStage == RoutineStage.CONFIRM_WRITE) {
+            if (owner != null && owner.gatt == callbackGatt
+                    && status == BluetoothGatt.GATT_SUCCESS) {
+                routineStage = RoutineStage.ACK_READ;
+                if (readRoutineC4(characteristic)) return;
+                failRoutine("routine C4 ACK read rejected");
+                return;
+            }
+            failRoutine("routine C4 confirm write failed");
+            return;
+        }
         PendingGattOperation pending = pendingGatt;
         if (owner == null || owner.gatt != callbackGatt || pending == null
                 || pending.characteristic != characteristic) return;
         if (ingressFrozen && pending.type != RawOperation.WRITE_ROUTE_CONTROL) {
-            if (pending.type == RawOperation.WRITE_CONTROL_POINT) pendingGatt = null;
+            if (pending.type == RawOperation.WRITE_CONTROL_POINT
+                    || pending.type == RawOperation.REQUEST_TELEMETRY) {
+                pendingGatt = null;
+                if (pending.type == RawOperation.REQUEST_TELEMETRY) {
+                    cancelTelemetryRefresh();
+                    deferredAncsRequest = null;
+                    deferredAncsValue = null;
+                }
+            }
             return;
         }
         pendingGatt = null;
         if (pending.type == RawOperation.WRITE_CONTROL_POINT) {
+            reportPlatformDiagnostic(owner.ownerToken,
+                    ancsTrace.controlPointResult(
+                    pending.ancsRequest == null ? null : pending.ancsRequest.kind,
+                            status));
             applyAncsEffects(ancs.controlPointWriteResult(
                     pending.ancsRequest, status == BluetoothGatt.GATT_SUCCESS));
+            if (telemetryRefreshTimer == null) scheduleTelemetryRefresh();
+        } else if (pending.type == RawOperation.REQUEST_TELEMETRY) {
+            // Keep the request as the one in-flight telemetry waiter until a fresh T arrives.
+            if (deferredAncsRequest == null) {
+                pendingGatt = pending;
+            } else {
+                scheduleTelemetryRefreshAfter(TELEMETRY_REFRESH_RETRY_MS);
+                drainDeferredAncsAfterTelemetry();
+            }
         } else if (pending.type == RawOperation.WRITE_ROUTE_CONTROL) {
             IphoneRoleControlV2 control = roleControl(pending.controlTransmit);
             completeControlTransmit(pending.controlTransmit, pending.controlCompletion,
@@ -1939,16 +2752,21 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         if (owner == null || owner.gatt != callbackGatt || characteristic == null
                 || state == null) return;
         UUID uuid = characteristic.getUuid();
-        if (SERVICE_CHANGED.equals(uuid)) {
+        if (characteristic == batteryStatusCharacteristic
+                || characteristic == batteryLevelCharacteristic) {
+            if (!ingressFrozen) acceptStandardBatteryValue(characteristic, value);
+        } else if (SERVICE_CHANGED.equals(uuid)) {
             if (ingressFrozen) return;
             pendingGatt = null;
             apply(AndroidCentralRoute.serviceChanged(state, owner.ownerToken));
         } else if (AncsProtocol.NOTIFICATION_SOURCE.equals(uuid) && ancsSession != null) {
             if (ingressFrozen) return;
+            reportPlatformDiagnostic(owner.ownerToken, ancsTrace.notificationSource(value));
             applyAncsEffects(ancs.notificationSource(
                     ancsSession, value, android.os.SystemClock.elapsedRealtime()));
         } else if (AncsProtocol.DATA_SOURCE.equals(uuid) && ancsSession != null) {
             if (ingressFrozen) return;
+            reportPlatformDiagnostic(owner.ownerToken, ancsTrace.dataSource(value));
             applyAncsEffects(ancs.dataSource(ancsSession, value));
         } else if (IphoneBleProtocolV2.TELEMETRY_CHARACTERISTIC.equals(uuid)) {
             handleTelemetryChanged(characteristic, value);
@@ -1976,6 +2794,14 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             return;
         }
         if (listener != null) listener.onTelemetry(telemetry);
+        PendingGattOperation pending = pendingGatt;
+        if (pending != null && pending.type == RawOperation.REQUEST_TELEMETRY) {
+            pendingGatt = null;
+            cancelTelemetryRefresh();
+            drainDeferredAncsAfterTelemetry();
+        } else {
+            scheduleTelemetryRefresh();
+        }
     }
 
     private void handleInboundRoleControl(byte[] value) {

@@ -219,6 +219,8 @@ public final class LauncherIconResolver {
     }
 
     @DrawableRes private static int knownResource(@Nullable String key) {
+        int automotive = LauncherAutomotiveCatalog.resource(key);
+        if (automotive != 0) return automotive;
         if (key == null) return 0;
         if (key.startsWith("fluent_")) {
             int fluent = FluentIconCatalog.resource(key);
@@ -339,8 +341,9 @@ public final class LauncherIconResolver {
 
     @NonNull private static List<Preset> buildPresets() {
         List<Preset> values = new ArrayList<>(
-                BasePresetHolder.PRESETS.size() + FluentIconCatalog.presets().size());
+                BasePresetHolder.PRESETS.size() + FluentIconCatalog.presets().size() + 46);
         values.addAll(BasePresetHolder.PRESETS);
+        LauncherAutomotiveCatalog.addPresets(values);
         values.addAll(FluentIconCatalog.presets());
         return Collections.unmodifiableList(values);
     }

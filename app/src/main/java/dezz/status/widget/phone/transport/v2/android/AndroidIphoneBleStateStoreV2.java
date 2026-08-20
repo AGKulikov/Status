@@ -5,6 +5,7 @@ import java.util.Objects;
 
 import dezz.status.widget.Preferences;
 import dezz.status.widget.phone.transport.v2.IphoneDualTransportStateStoreV2;
+import dezz.status.widget.phone.transport.v2.IphoneLeEnrollmentRecordV2;
 
 /** Device-local durable state used by the Android ANCS v2 runtime. */
 public final class AndroidIphoneBleStateStoreV2 implements IphoneDualTransportStateStoreV2 {
@@ -47,5 +48,19 @@ public final class AndroidIphoneBleStateStoreV2 implements IphoneDualTransportSt
 
     @Override public boolean commitHelperInstallationId(String canonicalUuid) {
         return preferences.commitPhoneBleV2HelperInstallationId(canonicalUuid);
+    }
+
+    @Override public boolean hasRouteAEnrollment(String selectedClassicAddress,
+                                                 String androidInstallationId) {
+        IphoneLeEnrollmentRecordV2 pending = IphoneLeEnrollmentRecordV2.validForSelectedClassic(
+                preferences.phoneBleV2PendingEnrollmentRecord(), selectedClassicAddress);
+        if (pending != null && pending.matchesBinding(selectedClassicAddress,
+                pending.helperInstallationId.toString(), androidInstallationId)) {
+            return true;
+        }
+        IphoneLeEnrollmentRecordV2 active = IphoneLeEnrollmentRecordV2.validForSelectedClassic(
+                preferences.phoneBleV2EnrollmentRecord(), selectedClassicAddress);
+        return active != null && active.matchesBinding(selectedClassicAddress,
+                active.helperInstallationId.toString(), androidInstallationId);
     }
 }

@@ -255,7 +255,7 @@ public class PhoneWidgetServiceIntegrationContractTest {
     }
 
     @Test
-    public void lowBatteryWarningUsesPersistentOneShotLatchAndIndependentColor()
+    public void lowBatteryWarningsUseTwoPersistentLatchesAndSharedDeliveryRouting()
             throws Exception {
         String source = readService();
         String evaluate = between(source, "private void handlePhoneLowBatteryAlert(",
@@ -267,12 +267,21 @@ public class PhoneWidgetServiceIntegrationContractTest {
 
         assertTrue(source.contains(
                 "prefs.phoneLowBatteryAlertLatched.get()"));
+        assertTrue(source.contains(
+                "prefs.phoneLowBatteryAlertLatched2.get()"));
         assertTrue(evaluate.contains("PhoneLowBatteryAlertPolicy.evaluate("));
         assertTrue(evaluate.contains("prefs.phoneLowBatteryAlertLatched.set(result.latched)"));
-        assertTrue(evaluate.contains("if (result.trigger) showPhoneLowBatteryAlert(level)"));
+        assertTrue(evaluate.contains(
+                "prefs.phoneLowBatteryAlertLatched2.set(result2.latched)"));
+        assertTrue(evaluate.contains("enqueuePhoneLowBatteryAlert(level,"));
+        assertTrue(source.contains("enqueuePhoneDelivery(QueuedPhoneNotification.lowBattery("));
+        assertTrue(source.contains("phoneNotificationAllowedByLockState()"));
+        assertTrue(source.contains("phoneNotificationBlockedByForeground()"));
+        assertTrue(source.contains("prefs.phoneStatusBarNotificationsEnabled.get()"));
+        assertTrue(source.contains("prefs.phonePopupNotificationsEnabled.get()"));
         assertFalse(disconnect.contains("phoneLowBatteryAlertLatched = false"));
         assertTrue(source.contains("activePhoneBatteryAlertText"));
-        assertTrue(render.contains("prefs.phoneLowBatteryAlertColor.get()"));
+        assertTrue(render.contains("activePhoneBatteryAlertColor"));
         assertTrue(render.contains("prefs.phoneStatusBarNotificationColor.get()"));
         assertTrue(render.contains("AutomationState.parseColor(configuredColor, defaultColor)"));
     }
