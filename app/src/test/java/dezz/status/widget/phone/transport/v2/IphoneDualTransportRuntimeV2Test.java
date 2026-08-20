@@ -68,6 +68,25 @@ public final class IphoneDualTransportRuntimeV2Test {
                 fixture.listener.lastPlatformDiagnostic);
     }
 
+    @Test public void exactClassicPresenceWaitsForFreshTargetAndSkipsRestorationDrain() {
+        Fixture fixture = new Fixture(false, "");
+        fixture.start(IphoneBleMode.ANDROID_CENTRAL);
+        FakeTransport restorationDrain = fixture.factory.created.get(0);
+
+        fixture.runtime.selectedPhonePresent();
+        fixture.scheduler.drain();
+        assertEquals(0, restorationDrain.selectedPhonePresentCount);
+
+        fixture.scheduler.advanceBy(10L);
+        FakeTransport active = fixture.factory.created.get(1);
+        assertEquals(1, active.selectedPhonePresentCount);
+        fixture.runtime.selectedPhonePresent();
+        fixture.scheduler.drain();
+
+        assertEquals(2, active.selectedPhonePresentCount);
+        assertEquals(0, restorationDrain.selectedPhonePresentCount);
+    }
+
     @Test public void absentSnapshotRunsDrainOnlyMigrationBeforeFreshTarget() {
         Fixture fixture = new Fixture(false, "");
         fixture.start(IphoneBleMode.ANDROID_CENTRAL);
@@ -783,6 +802,7 @@ public final class IphoneDualTransportRuntimeV2Test {
         Integer forcedOwnerCount;
         FreezeResult freezeResultOverride;
         int freezeCount;
+        int selectedPhonePresentCount;
         ControlTransmit lastTransmit;
 
         FakeTransport(IphoneBleMode mode, FakeScheduler scheduler) {
@@ -791,6 +811,7 @@ public final class IphoneDualTransportRuntimeV2Test {
         }
 
         @Override public IphoneBleMode mode() { return mode; }
+        @Override public void selectedPhonePresent() { selectedPhonePresentCount++; }
         @Override public void radioOff(BleRouteEpoch epoch) {
             if (startRequest != null && startRequest.epoch.equals(epoch)) {
                 deliverOrdinaryTerminal();
