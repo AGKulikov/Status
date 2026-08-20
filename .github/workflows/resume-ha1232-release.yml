@@ -6,6 +6,7 @@ on:
       - 'agent/natro-helper-car-control-2.2.0'
     paths:
       - '.github/workflows/resume-ha1232-release.yml'
+      - '.github/workflows/release-ha1232.yml'
   workflow_dispatch:
 
 permissions:

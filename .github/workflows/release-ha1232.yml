@@ -75,6 +75,7 @@ jobs:
         shell: bash
         env:
           REQUESTED_REF: ${{ inputs.release_ref || github.ref }}
+          CALLED_RELEASE_REF: ${{ inputs.release_ref }}
         run: |
           set -euo pipefail
           TAG_REF="refs/tags/${RELEASE_TAG}"
@@ -96,7 +97,8 @@ jobs:
           TAG_SHA=$(git rev-parse "${TAG_REF}^{commit}")
           test "$SOURCE_SHA" = "$REQUESTED_SHA"
           test "$SOURCE_SHA" = "$TAG_SHA"
-          if test "$GITHUB_EVENT_NAME" = 'push'; then
+          if test "$GITHUB_EVENT_NAME" = 'push' \
+              && test -z "$CALLED_RELEASE_REF"; then
             test "$GITHUB_REF" = "$TAG_REF"
             test "$(git rev-parse "${GITHUB_SHA}^{commit}")" = "$SOURCE_SHA"
           fi
