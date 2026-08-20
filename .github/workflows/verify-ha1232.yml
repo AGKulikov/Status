@@ -16,7 +16,8 @@ concurrency:
 
 env:
   VERSION_NAME: '2.2.0'
-  VERSION_CODE: '208021232'
+  # Rebuild revision: 208021232 is already installed on the target head unit.
+  VERSION_CODE: '208021233'
   HELPER_TREE: '6e38ebfbee71f080374609a11391a9ae1d288621'
   BUILD_TOOLS_VERSION: '36.0.0'
 
@@ -127,7 +128,7 @@ jobs:
           "$TOOLS/aapt" dump resources "$OUT" >/dev/null
           BADGING=$("$TOOLS/aapt" dump badging "$OUT")
           printf '%s\n' "$BADGING" | grep -F \
-            "package: name='ru.natro.statuswidget' versionCode='208021232' versionName='2.2.0'"
+            "package: name='ru.natro.statuswidget' versionCode='208021233' versionName='2.2.0'"
           LABELS=$(printf '%s\n' "$BADGING" | grep '^application-label')
           printf '%s\n' "$LABELS" | grep -Fx "application-label:'Natro'"
           if printf '%s\n' "$LABELS" \
@@ -179,7 +180,7 @@ jobs:
               sourceBundleSha256: $sourceBundleSha256,
               helper: {version: "53.0", build: 53, tree: $helperTree},
               android: {package: $packageName, versionName: $versionName,
-                versionCode: 208021232, minSdk: 28, targetSdk: 28,
+                versionCode: 208021233, minSdk: 28, targetSdk: 28,
                 flavor: "geely", buildType: "release", unsigned: true,
                 apk: "Natro-2.2.0-unsigned.apk", apkSha256: $unsignedSha256,
                 requiredSigningCertificateSha256: $requiredSigningCertificateSha256},
