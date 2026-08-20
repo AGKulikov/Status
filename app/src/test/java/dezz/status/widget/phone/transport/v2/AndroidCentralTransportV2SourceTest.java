@@ -119,6 +119,19 @@ public final class AndroidCentralTransportV2SourceTest {
         assertTrue(reassert.contains("owner.gatt.connect()"));
         assertFalse(reassert.contains("connectGatt("));
         assertFalse(reassert.contains("new GattOwner("));
+
+        String presence = between(source,
+                "@Override public void selectedPhonePresent()",
+                "/** Radio-off is terminal");
+        assertTrue(presence.contains("selectedPhonePresencePending = true"));
+        assertTrue(source.contains("applySelectedPhonePresenceIfPossible();"));
+        assertTrue(source.contains("case CONNECTING:"));
+        assertTrue(source.contains("AndroidCentralRoute.selectedPhonePresent(state)"));
+
+        assertTrue(selected.contains("boolean passiveRetry = state != null"));
+        assertTrue(selected.contains("state.consecutiveFailures > 0"));
+        assertTrue(selected.contains(
+                "createGattOwner(token, enrolled, passiveRetry, null)"));
     }
 
     @Test public void selectedBondPlatformEvidenceIsBoundedAddressFreeAndSameWrapperOnly()
@@ -166,6 +179,36 @@ public final class AndroidCentralTransportV2SourceTest {
         assertTrue(source.contains("PLATFORM_DIAGNOSTIC_LIMIT = 256"));
         assertTrue(reporter.contains("bounded.substring(0, PLATFORM_DIAGNOSTIC_LIMIT)"));
         assertTrue(reporter.contains("listener.onPlatformDiagnostic("));
+    }
+
+    @Test public void selectedClassicPresenceCanOnlyPromptTheRetainedGattWrapper()
+            throws Exception {
+        String source = source();
+        String prompt = between(source,
+                "@Override public void selectedPhonePresent",
+                "/** Radio-off is terminal");
+        assertTrue(prompt.contains("main.post("));
+        assertTrue(prompt.contains("closed || ingressFrozen || state == null"));
+        assertTrue(prompt.contains("selectedPhonePresencePending = true"));
+        assertTrue(prompt.contains("applySelectedPhonePresenceIfPossible()"));
+        assertFalse(prompt.contains("connectGatt("));
+        assertFalse(prompt.contains("new GattOwner("));
+
+        String retained = between(source,
+                "private void applySelectedPhonePresenceIfPossible",
+                "private void execute");
+        assertTrue(retained.contains("AndroidCentralRoute.selectedPhonePresent(state)"));
+        assertTrue(retained.contains("case CONNECTING:"));
+        assertTrue(retained.contains("case WAIT_REASSERT:"));
+        assertTrue(retained.contains("case WAIT_SYSTEM_CONNECTION:"));
+        assertFalse(retained.contains("connectGatt("));
+        assertFalse(retained.contains("new GattOwner("));
+
+        String reassert = between(source,
+                "private void reassertSameGatt",
+                "private void closeGattOwner");
+        assertEquals(1, count(reassert, "owner.gatt.connect()"));
+        assertFalse(reassert.contains("connectGatt("));
     }
 
     @Test public void selectedBondAttributionNeverGuessesRotatedFacade() throws Exception {
