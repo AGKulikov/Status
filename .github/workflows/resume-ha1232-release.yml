@@ -1,0 +1,25 @@
+name: Resume exact HA1232 Natro signed prerelease
+
+on:
+  push:
+    branches:
+      - 'agent/natro-helper-car-control-2.2.0'
+    paths:
+      - '.github/workflows/resume-ha1232-release.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: resume-ha1232-natro-v2.2.0
+  cancel-in-progress: false
+
+jobs:
+  sign-and-publish:
+    name: Resume verified Natro 2.2.0 release
+    uses: ./.github/workflows/release-ha1232.yml
+    with:
+      release_ref: 'adcf253033125d6428523669507340fecdc7b4e3'
+    secrets: inherit

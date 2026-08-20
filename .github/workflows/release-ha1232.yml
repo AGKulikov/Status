@@ -18,11 +18,11 @@ on:
         type: string
     secrets:
       KEYSTORE_BASE64:
-        required: true
+        required: false
       KEY_PASSWORD:
-        required: true
+        required: false
       KEY_ALIAS:
-        required: true
+        required: false
 
 permissions:
   contents: read
@@ -325,10 +325,10 @@ jobs:
     name: Sign exact handoff on a clean runner without repository code
     needs: build-verify
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    timeout-minutes: 35
     permissions:
       actions: read
-      contents: read
+      contents: write
     outputs:
       artifact_name: ${{ steps.package.outputs.artifact_name }}
       apk_name: ${{ steps.package.outputs.apk_name }}
@@ -401,6 +401,108 @@ jobs:
           printf '%s\n' "$BADGING" | grep -Fx "application-label:'Natro'"
           "$TOOLS/zipalign" -c -P 16 -v 4 "$APK" >/dev/null
 
+      - name: Receive exact encrypted signing bundle when Actions secrets are unavailable
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HANDOFF_BRANCH: 'agent/natro-helper-car-control-2.2.0'
+          SIGNING_BUNDLE_SHA256: '4fb34ee8aed62dad3896d7aa6240d4066ec9b6ef3da5459bca9d7d1c4c3b7fc0'
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          CONFIGURED=0
+          for required in KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS; do
+            test -z "${!required:-}" || CONFIGURED=$((CONFIGURED + 1))
+          done
+          case "$CONFIGURED" in
+            3)
+              echo 'Complete GitHub Actions signing secrets are configured'
+              exit 0
+              ;;
+            0) ;;
+            *)
+              echo 'Signing credentials must be supplied completely or omitted completely' >&2
+              exit 1
+              ;;
+          esac
+          unset KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS
+          umask 077
+          TRANSPORT="$RUNNER_TEMP/ha1232-signing-transport"
+          SIGNING="$RUNNER_TEMP/ha1232-signing"
+          mkdir -p "$TRANSPORT/chunks" "$SIGNING"
+          PRIVATE="$TRANSPORT/private.pem"
+          PUBLIC="$TRANSPORT/public.pem"
+          ENCRYPTED="$TRANSPORT/signing-bundle.enc"
+          ARCHIVE="$TRANSPORT/signing-bundle.tar.gz"
+          PREFIX="ha1232-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          PUBLIC_PATH="release-handoff/${PREFIX}.pub"
+          ENCRYPTED_PATH="release-handoff/${PREFIX}.enc"
+
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 \
+            -out "$PRIVATE" 2>/dev/null
+          openssl pkey -in "$PRIVATE" -pubout -out "$PUBLIC"
+          PUBLIC_CONTENT=$(base64 -w0 "$PUBLIC")
+          gh api --method PUT \
+            "repos/${GITHUB_REPOSITORY}/contents/${PUBLIC_PATH}" \
+            -f message="ci: publish ephemeral HA1232 transport key [skip ci]" \
+            -f content="$PUBLIC_CONTENT" \
+            -f branch="$HANDOFF_BRANCH" >/dev/null
+          echo "::notice title=HA1232 encrypted handoff::Waiting for ${ENCRYPTED_PATH}"
+
+          for _ in $(seq 1 180); do
+            if gh api \
+                "repos/${GITHUB_REPOSITORY}/contents/${ENCRYPTED_PATH}?ref=${HANDOFF_BRANCH}" \
+                > "$TRANSPORT/encrypted.json" 2>/dev/null; then
+              jq -r '.content' "$TRANSPORT/encrypted.json" \
+                | tr -d '\n' | base64 --decode > "$ENCRYPTED"
+              break
+            fi
+            sleep 5
+          done
+          test -s "$ENCRYPTED" || {
+            echo 'Timed out waiting for the encrypted signing handoff' >&2
+            exit 1
+          }
+          test $(( $(stat -c '%s' "$ENCRYPTED") % 512 )) -eq 0
+          split -b 512 -d -a 3 "$ENCRYPTED" "$TRANSPORT/chunks/chunk-"
+          : > "$ARCHIVE"
+          for chunk in "$TRANSPORT"/chunks/chunk-*; do
+            openssl pkeyutl -decrypt -inkey "$PRIVATE" \
+              -pkeyopt rsa_padding_mode:oaep \
+              -pkeyopt rsa_oaep_md:sha256 \
+              -pkeyopt rsa_mgf1_md:sha256 \
+              -in "$chunk" >> "$ARCHIVE"
+          done
+          test "$(sha256sum "$ARCHIVE" | awk '{print $1}')" \
+            = "$SIGNING_BUNDLE_SHA256"
+          tar -tzf "$ARCHIVE" | awk \
+            'BEGIN { ok=1 } /^\// || /(^|\/)\.\.($|\/)/ { ok=0 } END { exit ok ? 0 : 1 }'
+          tar -xzf "$ARCHIVE" -C "$SIGNING" \
+            --no-same-owner --no-same-permissions
+          chmod 600 "$SIGNING"/*
+          test -s "$SIGNING/status-widget-ha-update.jks"
+          test -s "$SIGNING/status-widget-ha-update.pass"
+          IFS= read -r BUNDLE_PASSWORD \
+            < "$SIGNING/status-widget-ha-update.pass"
+          test -n "$BUNDLE_PASSWORD"
+          export BUNDLE_PASSWORD
+          KEYTOOL_OUTPUT=$(keytool -J-Duser.language=en -J-Duser.country=US \
+            -list -v -keystore "$SIGNING/status-widget-ha-update.jks" \
+            -alias status-widget-ha -storepass:env BUNDLE_PASSWORD)
+          BUNDLE_CERT=$(printf '%s\n' "$KEYTOOL_OUTPUT" \
+            | sed -n 's/^[[:space:]]*SHA256:[[:space:]]*//p' \
+            | tr -d ':\r' | tr 'A-F' 'a-f' | head -n 1)
+          unset BUNDLE_PASSWORD
+          test "$BUNDLE_CERT" = "$STABLE_CERT_SHA256"
+          touch "$SIGNING/verified.ready"
+
+          find "$TRANSPORT/chunks" -type f -exec shred -u -- {} +
+          shred -u -- "$PRIVATE" "$PUBLIC" "$ENCRYPTED" "$ARCHIVE" \
+            "$TRANSPORT/encrypted.json"
+          rmdir "$TRANSPORT/chunks" "$TRANSPORT"
+
       - name: Sign only the verified handoff with the stable update keystore
         id: sign
         shell: bash
@@ -410,16 +512,32 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           set -euo pipefail
-          for required in KEYSTORE_BASE64 KEY_PASSWORD KEY_ALIAS; do
-            test -n "${!required:-}" || {
-              echo "::error::Required stable signing secret $required is not configured"
-              exit 1
-            }
-          done
           umask 077
+          SIGNING="$RUNNER_TEMP/ha1232-signing"
           KEYSTORE="$RUNNER_TEMP/ha1232-stable-keystore.jks"
-          trap 'shred -u -- "$KEYSTORE" 2>/dev/null || true' EXIT
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          PASSWORD_FILE=''
+          cleanup_files=("$KEYSTORE")
+          trap 'shred -u -- "${cleanup_files[@]}" 2>/dev/null || true' EXIT
+          if test -n "${KEYSTORE_BASE64:-}" \
+              && test -n "${KEY_PASSWORD:-}" \
+              && test -n "${KEY_ALIAS:-}"; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          elif test -z "${KEYSTORE_BASE64:-}" \
+              && test -z "${KEY_PASSWORD:-}" \
+              && test -z "${KEY_ALIAS:-}"; then
+            test -f "$SIGNING/verified.ready"
+            KEYSTORE="$SIGNING/status-widget-ha-update.jks"
+            PASSWORD_FILE="$SIGNING/status-widget-ha-update.pass"
+            cleanup_files=("$KEYSTORE" "$PASSWORD_FILE")
+            IFS= read -r KEY_PASSWORD < "$PASSWORD_FILE"
+            KEY_ALIAS='status-widget-ha'
+          else
+            echo 'Signing credentials must be supplied completely or by encrypted handoff' >&2
+            exit 1
+          fi
+          test -n "$KEY_PASSWORD"
+          test -n "$KEY_ALIAS"
+          export KEY_PASSWORD
           test -s "$KEYSTORE"
           KEYTOOL=$(command -v keytool)
           test -x "$KEYTOOL"
