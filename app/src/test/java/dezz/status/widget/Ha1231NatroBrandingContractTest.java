@@ -45,6 +45,22 @@ public final class Ha1231NatroBrandingContractTest {
         assertTrue(workflow.contains(".name == $name and .size == $size"));
     }
 
+    @Test public void oneShotAuthorizationCreatesOnlyTheExactNatroTag() throws Exception {
+        String trigger = project(".github/workflows/create-ha1231-release-tag.yml");
+        String intent = project("release-manifests/HA1231.publish.json");
+        String release = project(".github/workflows/release-ha1231.yml");
+        assertTrue(trigger.contains("refs/heads/agent/natro-source-restoration-2.1.4"));
+        assertTrue(trigger.contains("Existing $TAG points to another commit; refusing to move it"));
+        assertTrue(trigger.contains("refs/tags/${TAG}"));
+        assertTrue(trigger.contains("uses: ./.github/workflows/release-ha1231.yml"));
+        assertTrue(trigger.contains("secrets: inherit"));
+        assertTrue(intent.contains("\"appName\": \"Natro\""));
+        assertTrue(intent.contains("\"tag\": \"natro-v2.1.4\""));
+        assertTrue(intent.contains("\"publication\": \"signed-prerelease\""));
+        assertTrue(release.contains("workflow_call:"));
+        assertTrue(release.contains("ref: ${{ inputs.release_ref || github.ref }}"));
+    }
+
     private static String project(String relative) throws Exception {
         return new String(Files.readAllBytes(projectPath(relative)), StandardCharsets.UTF_8);
     }
