@@ -1,7 +1,13 @@
 name: Authorize exact HA1232 Natro signed prerelease
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - 'agent/natro-helper-car-control-2.2.0'
+    paths:
+      - '.github/workflows/create-ha1232-release-tag.yml'
+      - '.github/workflows/release-ha1232.yml'
+      - 'release-manifests/HA1232.publish.json'
 
 permissions:
   actions: read
