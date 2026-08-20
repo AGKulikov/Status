@@ -496,4 +496,10 @@
     <string name="phone_privacy_hint">Данные ANCS и MAP с подтверждённым устройством принимаются только от выбранного iPhone; Android Notification Access и доступ к общему хранилищу SMS не требуются. Точный Bluetooth-адрес хранится только на этой магнитоле и показывается здесь в маскированном виде.</string>
     <string name="phone_apply">Применить настройки телефона</string>
     <string name="phone_saved">Настройки телефона применены</string>
+    <string name="hide_stock_system_content">Скрывать штатные часы и всю область системных значков</string>
+    <string name="hide_stock_system_content_hint">Во всех приложениях скрывает штатные часы и все слоты системных индикаторов, объявленные прошивкой: Bluetooth, сеть, батарею и другие. Сама системная строка, значки уведомлений и строка Natro остаются видимыми. Системные функции не отключаются. Перед удалением Natro или очисткой его данных отключите эту настройку, чтобы вернуть значки.</string>
+    <string name="stock_system_content_apply_failed">Не удалось изменить системную строку: %1$s</string>
+    <string name="stock_system_content_hidden">Настройка системных индикаторов применена</string>
+    <string name="stock_system_content_restored">Исходная настройка системных индикаторов восстановлена</string>
+    <string name="system_settings_not_available">На этом устройстве нет нужного доступа к системным настройкам</string>
 </resources>

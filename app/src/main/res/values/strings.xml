@@ -501,4 +501,10 @@
     <string name="phone_privacy_hint">ANCS and device-qualified MAP data come only from the selected iPhone over Bluetooth and require neither Android Notification Access nor access to the shared Android SMS inbox. The exact Bluetooth address stays on this head unit and is shown here only in masked form.</string>
     <string name="phone_apply">Apply phone settings</string>
     <string name="phone_saved">Phone settings applied</string>
+    <string name="hide_stock_system_content">Hide the stock clock and the entire system-icon area</string>
+    <string name="hide_stock_system_content_hint">In every app, hides the stock clock and every system-indicator slot declared by the firmware, including Bluetooth, network, battery, and others. The status bar, notification icons, and the Natro row remain visible. System functions stay enabled. Turn this setting off before uninstalling Natro or clearing its app data so the icons can be restored.</string>
+    <string name="stock_system_content_apply_failed">Could not change the system status bar: %1$s</string>
+    <string name="stock_system_content_hidden">System-indicator setting applied</string>
+    <string name="stock_system_content_restored">Original system-indicator setting restored</string>
+    <string name="system_settings_not_available">This device does not provide the required system settings access</string>
 </resources>

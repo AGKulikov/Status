@@ -141,17 +141,17 @@ public final class AndroidIphoneLeEnrollmentV2 implements java.lang.AutoCloseabl
         AnonymousClass1() {
         }
 
-        public /* synthetic */ void lambda$onScanResult$0(android.bluetooth.le.ScanResult scanResult) {
+        private void acceptPostedScanResult(android.bluetooth.le.ScanResult scanResult) {
             dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.acceptScanResult(scanResult);
         }
 
         @Override // android.bluetooth.le.ScanCallback
         public void onScanResult(int i, final android.bluetooth.le.ScanResult scanResult) {
             dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.main
-                    .post(() -> lambda$onScanResult$0(scanResult));
+                    .post(() -> acceptPostedScanResult(scanResult));
         }
 
-        public /* synthetic */ void lambda$onBatchScanResults$1(android.bluetooth.le.ScanResult scanResult) {
+        private void acceptPostedBatchResult(android.bluetooth.le.ScanResult scanResult) {
             dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.acceptScanResult(scanResult);
         }
 
@@ -162,18 +162,18 @@ public final class AndroidIphoneLeEnrollmentV2 implements java.lang.AutoCloseabl
             }
             for (final android.bluetooth.le.ScanResult scanResult : list) {
                 dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.main
-                        .post(() -> lambda$onBatchScanResults$1(scanResult));
+                        .post(() -> acceptPostedBatchResult(scanResult));
             }
         }
 
-        public /* synthetic */ void lambda$onScanFailed$2(int i) {
+        private void handlePostedScanFailure(int i) {
             dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.fail(dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.ErrorKind.SCAN_FAILED, "filtered Helper scan failed (code " + i + ")");
         }
 
         @Override // android.bluetooth.le.ScanCallback
         public void onScanFailed(final int i) {
             dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.main
-                    .post(() -> lambda$onScanFailed$2(i));
+                    .post(() -> handlePostedScanFailure(i));
         }
     }
 
@@ -181,44 +181,44 @@ public final class AndroidIphoneLeEnrollmentV2 implements java.lang.AutoCloseabl
         AnonymousClass2() {
         }
 
-        public /* synthetic */ void lambda$onConnectionStateChange$0(android.bluetooth.BluetoothGatt bluetoothGatt, int i, int i2) {
+        private void handlePostedConnectionState(android.bluetooth.BluetoothGatt bluetoothGatt, int i, int i2) {
             dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.handleConnectionState(bluetoothGatt, i, i2);
         }
 
         @Override // android.bluetooth.BluetoothGattCallback
         public void onConnectionStateChange(final android.bluetooth.BluetoothGatt bluetoothGatt, final int i, final int i2) {
             dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.main
-                    .post(() -> lambda$onConnectionStateChange$0(bluetoothGatt, i, i2));
+                    .post(() -> handlePostedConnectionState(bluetoothGatt, i, i2));
         }
 
-        public /* synthetic */ void lambda$onMtuChanged$1(android.bluetooth.BluetoothGatt bluetoothGatt, int i, int i2) {
+        private void handlePostedMtu(android.bluetooth.BluetoothGatt bluetoothGatt, int i, int i2) {
             dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.handleMtuChanged(bluetoothGatt, i, i2);
         }
 
         @Override // android.bluetooth.BluetoothGattCallback
         public void onMtuChanged(final android.bluetooth.BluetoothGatt bluetoothGatt, final int i, final int i2) {
             dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.main
-                    .post(() -> lambda$onMtuChanged$1(bluetoothGatt, i, i2));
+                    .post(() -> handlePostedMtu(bluetoothGatt, i, i2));
         }
 
-        public /* synthetic */ void lambda$onServicesDiscovered$2(android.bluetooth.BluetoothGatt bluetoothGatt, int i) {
+        private void handlePostedServices(android.bluetooth.BluetoothGatt bluetoothGatt, int i) {
             dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.handleServicesDiscovered(bluetoothGatt, i);
         }
 
         @Override // android.bluetooth.BluetoothGattCallback
         public void onServicesDiscovered(final android.bluetooth.BluetoothGatt bluetoothGatt, final int i) {
             dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.main
-                    .post(() -> lambda$onServicesDiscovered$2(bluetoothGatt, i));
+                    .post(() -> handlePostedServices(bluetoothGatt, i));
         }
 
-        public /* synthetic */ void lambda$onCharacteristicWrite$3(android.bluetooth.BluetoothGatt bluetoothGatt, android.bluetooth.BluetoothGattCharacteristic bluetoothGattCharacteristic, int i) {
+        private void handlePostedCharacteristicWrite(android.bluetooth.BluetoothGatt bluetoothGatt, android.bluetooth.BluetoothGattCharacteristic bluetoothGattCharacteristic, int i) {
             dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.handleCharacteristicWrite(bluetoothGatt, bluetoothGattCharacteristic, i);
         }
 
         @Override // android.bluetooth.BluetoothGattCallback
         public void onCharacteristicWrite(final android.bluetooth.BluetoothGatt bluetoothGatt, final android.bluetooth.BluetoothGattCharacteristic bluetoothGattCharacteristic, final int i) {
             dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.main
-                    .post(() -> lambda$onCharacteristicWrite$3(
+                    .post(() -> handlePostedCharacteristicWrite(
                             bluetoothGatt, bluetoothGattCharacteristic, i));
         }
 
@@ -226,11 +226,11 @@ public final class AndroidIphoneLeEnrollmentV2 implements java.lang.AutoCloseabl
         public void onCharacteristicRead(final android.bluetooth.BluetoothGatt bluetoothGatt, final android.bluetooth.BluetoothGattCharacteristic bluetoothGattCharacteristic, final int i) {
             final byte[] bArr = (bluetoothGattCharacteristic == null || bluetoothGattCharacteristic.getValue() == null) ? null : (byte[]) bluetoothGattCharacteristic.getValue().clone();
             dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.main
-                    .post(() -> lambda$onCharacteristicRead$4(
+                    .post(() -> handlePostedCharacteristicRead(
                             bluetoothGatt, bluetoothGattCharacteristic, bArr, i));
         }
 
-        public /* synthetic */ void lambda$onCharacteristicRead$4(android.bluetooth.BluetoothGatt bluetoothGatt, android.bluetooth.BluetoothGattCharacteristic bluetoothGattCharacteristic, byte[] bArr, int i) {
+        private void handlePostedCharacteristicRead(android.bluetooth.BluetoothGatt bluetoothGatt, android.bluetooth.BluetoothGattCharacteristic bluetoothGattCharacteristic, byte[] bArr, int i) {
             dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.handleCharacteristicRead(bluetoothGatt, bluetoothGattCharacteristic, bArr, i);
         }
     }
@@ -260,10 +260,10 @@ public final class AndroidIphoneLeEnrollmentV2 implements java.lang.AutoCloseabl
     }
 
     public void start(final java.lang.String str, final java.util.UUID uuid) {
-        this.main.post(() -> lambda$start$0(str, uuid));
+        this.main.post(() -> startOnMain(str, uuid));
     }
 
-    public /* synthetic */ void lambda$start$0(java.lang.String str, java.util.UUID uuid) {
+    private void startOnMain(java.lang.String str, java.util.UUID uuid) {
         android.bluetooth.BluetoothAdapter bluetoothAdapter;
         if (this.phase != dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.Phase.IDLE) {
             return;
@@ -289,10 +289,10 @@ public final class AndroidIphoneLeEnrollmentV2 implements java.lang.AutoCloseabl
     }
 
     public void confirmMatchingSas(final boolean z) {
-        this.main.post(() -> lambda$confirmMatchingSas$1(z));
+        this.main.post(() -> confirmMatchingSasOnMain(z));
     }
 
-    public /* synthetic */ void lambda$confirmMatchingSas$1(boolean z) {
+    private void confirmMatchingSasOnMain(boolean z) {
         if (this.phase != dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.Phase.WAITING_FOR_SAS_CONFIRMATION || this.session == null) {
             return;
         }
@@ -322,10 +322,10 @@ public final class AndroidIphoneLeEnrollmentV2 implements java.lang.AutoCloseabl
 
     @Override // java.lang.AutoCloseable
     public void close() {
-        this.main.post(this::lambda$close$2);
+        this.main.post(this::closeOnMain);
     }
 
-    public /* synthetic */ void lambda$close$2() {
+    private void closeOnMain() {
         if (!terminal()) {
             this.phase = dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.Phase.CANCELLED;
             this.error = dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.ErrorKind.NONE;
@@ -370,13 +370,13 @@ public final class AndroidIphoneLeEnrollmentV2 implements java.lang.AutoCloseabl
             if (this.candidateSettleTask != null) {
                 return;
             }
-            java.lang.Runnable runnable = this::lambda$acceptScanResult$3;
+            java.lang.Runnable runnable = this::finishCandidateWindow;
             this.candidateSettleTask = runnable;
             this.main.postDelayed(runnable, CANDIDATE_SETTLE_MS);
         }
     }
 
-    public /* synthetic */ void lambda$acceptScanResult$3() {
+    private void finishCandidateWindow() {
         this.candidateSettleTask = null;
         if (this.phase == dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.Phase.SCANNING && this.candidates.size() == 1) {
             this.provisionalDevice = this.candidates.values().iterator().next();
@@ -395,15 +395,15 @@ public final class AndroidIphoneLeEnrollmentV2 implements java.lang.AutoCloseabl
             connectProvisionalDevice();
         } else {
             dezz.status.widget.phone.transport.v2.android.ProcessGattRegistrationGateV2.whenFree(
-                    this.processGateKey, this::lambda$waitForProcessGattOwner$5);
+                    this.processGateKey, this::onProcessGattGateAcquired);
         }
     }
 
-    public /* synthetic */ void lambda$waitForProcessGattOwner$5() {
-        this.main.post(this::lambda$waitForProcessGattOwner$4);
+    private void onProcessGattGateAcquired() {
+        this.main.post(this::connectAfterProcessGattGate);
     }
 
-    public /* synthetic */ void lambda$waitForProcessGattOwner$4() {
+    private void connectAfterProcessGattGate() {
         if (terminal()) {
             return;
         }
@@ -657,13 +657,13 @@ public final class AndroidIphoneLeEnrollmentV2 implements java.lang.AutoCloseabl
 
     private void scheduleHelperConfirmPoll() {
         if (this.helperConfirmPollTask == null && !terminal() && this.phase == dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.Phase.WAITING_FOR_HELPER_SAS_CONFIRMATION) {
-            java.lang.Runnable runnable = this::lambda$scheduleHelperConfirmPoll$6;
+            java.lang.Runnable runnable = this::pollHelperConfirmation;
             this.helperConfirmPollTask = runnable;
             this.main.postDelayed(runnable, 400L);
         }
     }
 
-    public /* synthetic */ void lambda$scheduleHelperConfirmPoll$6() {
+    private void pollHelperConfirmation() {
         this.helperConfirmPollTask = null;
         if (this.phase != dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.Phase.WAITING_FOR_HELPER_SAS_CONFIRMATION || terminal()) {
             return;
@@ -888,12 +888,12 @@ public final class AndroidIphoneLeEnrollmentV2 implements java.lang.AutoCloseabl
         if (this.bondPollTask != null || terminal()) {
             return;
         }
-        java.lang.Runnable runnable = this::lambda$scheduleBondPoll$7;
+        java.lang.Runnable runnable = this::pollBondState;
         this.bondPollTask = runnable;
         this.main.postDelayed(runnable, 500L);
     }
 
-    public /* synthetic */ void lambda$scheduleBondPoll$7() {
+    private void pollBondState() {
         this.bondPollTask = null;
         if (terminal() || this.provisionalDevice == null || this.phase != dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.Phase.WAITING_FOR_BOND) {
             return;
@@ -1051,11 +1051,11 @@ public final class AndroidIphoneLeEnrollmentV2 implements java.lang.AutoCloseabl
                 final android.bluetooth.BluetoothDevice bluetoothDevice = (android.bluetooth.BluetoothDevice) intent.getParcelableExtra("android.bluetooth.device.extra.DEVICE");
                 final int intExtra = intent.getIntExtra("android.bluetooth.device.extra.BOND_STATE", 10);
                 dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.main
-                        .post(() -> lambda$onReceive$0(bluetoothDevice, intExtra));
+                        .post(() -> handlePostedBondEvent(bluetoothDevice, intExtra));
             }
         }
 
-        public /* synthetic */ void lambda$onReceive$0(android.bluetooth.BluetoothDevice bluetoothDevice, int i) {
+        private void handlePostedBondEvent(android.bluetooth.BluetoothDevice bluetoothDevice, int i) {
             dezz.status.widget.phone.transport.v2.android.AndroidIphoneLeEnrollmentV2.this.handleBondEvent(bluetoothDevice, i);
         }
     }
@@ -1206,12 +1206,12 @@ public final class AndroidIphoneLeEnrollmentV2 implements java.lang.AutoCloseabl
             fail(errorKind, str);
             return;
         }
-        java.lang.Runnable runnable = this::lambda$armMonotonicDeadline$8;
+        java.lang.Runnable runnable = this::handleSessionDeadline;
         this.deadlineTask = runnable;
         this.main.postDelayed(runnable, jElapsedRealtime);
     }
 
-    public /* synthetic */ void lambda$armMonotonicDeadline$8() {
+    private void handleSessionDeadline() {
         this.deadlineTask = null;
         armMonotonicDeadline();
     }

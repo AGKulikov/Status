@@ -55,6 +55,7 @@ import java.util.List;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.databinding.ActivityMainBinding;
+import dezz.status.widget.systemui.SystemStatusBarContentPolicy;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
@@ -65,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
     public static final int BACKGROUND_LOCATION_SETTINGS_REQUEST_CODE = 1004;
 
     private Preferences prefs;
+    private boolean stockSystemContentChangeInFlight;
     private int systemTopInset;
 
     ActivityMainBinding binding;
@@ -154,6 +156,7 @@ public class MainActivity extends AppCompatActivity {
     private void initializeViews() {
         binding.sectionGeneral.enableWidgetSwitch.setChecked(prefs.widgetEnabled.get());
         binding.sectionGeneral.enableWidgetSwitch.setOnCheckedChangeListener(enableWidgetSwitchListener);
+        setupStockSystemContentSwitch();
 
         bindDropdown(
                 binding.sectionAppearance.iconDesignDropdown,
@@ -196,6 +199,43 @@ public class MainActivity extends AppCompatActivity {
 
         setupPositionSliders(binder);
         setupBrickList();
+    }
+
+    private void setupStockSystemContentSwitch() {
+        binding.sectionGeneral.hideStockSystemContentSwitch.setChecked(
+                prefs.systemUiHideStockContentGlobally.get());
+        binding.sectionGeneral.hideStockSystemContentSwitch.setOnCheckedChangeListener(
+                (button, enabled) -> {
+                    if (stockSystemContentChangeInFlight
+                            || enabled == prefs.systemUiHideStockContentGlobally.get()) {
+                        return;
+                    }
+                    stockSystemContentChangeInFlight = true;
+                    button.setEnabled(false);
+                    SystemStatusBarContentPolicy.apply(this, enabled, (success, detail) -> {
+                        if (isFinishing() || isDestroyed() || binding == null) {
+                            stockSystemContentChangeInFlight = false;
+                            return;
+                        }
+                        binding.sectionGeneral.hideStockSystemContentSwitch.setChecked(
+                                prefs.systemUiHideStockContentGlobally.get());
+                        binding.sectionGeneral.hideStockSystemContentSwitch.setEnabled(true);
+                        stockSystemContentChangeInFlight = false;
+                        if (success) {
+                            Toast.makeText(this,
+                                    enabled ? R.string.stock_system_content_hidden
+                                            : R.string.stock_system_content_restored,
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        String reason = detail == null || detail.trim().isEmpty()
+                                ? getString(R.string.system_settings_not_available)
+                                : detail.trim();
+                        Toast.makeText(this,
+                                getString(R.string.stock_system_content_apply_failed, reason),
+                                Toast.LENGTH_LONG).show();
+                    });
+                });
     }
 
     private void setupPositionSliders(ViewBinder binder) {

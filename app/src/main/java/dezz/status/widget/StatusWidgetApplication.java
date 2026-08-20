@@ -40,6 +40,7 @@ import dezz.status.widget.diagnostics.DiagnosticJournal;
 import dezz.status.widget.diagnostics.MainThreadWatchdog;
 import dezz.status.widget.diagnostics.PrivilegedActionCollector;
 import dezz.status.widget.launcher.EcarxSystemStatusBarPolicy;
+import dezz.status.widget.systemui.SystemStatusBarContentPolicy;
 
 /**
  * Installs a process-wide uncaught-exception handler that dumps the stacktrace to the cache
@@ -96,6 +97,7 @@ public class StatusWidgetApplication extends Application {
             ActionRecorderOverlayService.show(this);
         }
         EcarxSystemStatusBarPolicy.applyStored(this);
+        SystemStatusBarContentPolicy.applyStored(this);
     }
 
     public static void ensureUnlockedRuntimeInitialized(@NonNull Context context) {

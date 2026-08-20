@@ -81,6 +81,7 @@ import dezz.status.widget.settings.SettingsDestinationCatalog.Destination;
 import dezz.status.widget.settings.SettingsDestinationCatalog.Group;
 import dezz.status.widget.settings.SettingsResponsiveLayoutPolicy;
 import dezz.status.widget.sprut.SprutHubController;
+import dezz.status.widget.systemui.SystemStatusBarContentPolicy;
 
 /**
  * Canonical settings entry point.
@@ -152,6 +153,22 @@ public final class SettingsHubActivity extends AppCompatActivity {
         splitPane = SettingsResponsiveLayoutPolicy.useSplitPane(
                 getResources().getConfiguration().screenWidthDp);
         setContentView(buildScreen());
+        root.getViewTreeObserver().addOnDrawListener(
+                new android.view.ViewTreeObserver.OnDrawListener() {
+                    private boolean recorded;
+
+                    @Override public void onDraw() {
+                        if (recorded) return;
+                        recorded = true;
+                        root.post(() -> {
+                            if (root != null && root.getViewTreeObserver().isAlive()) {
+                                root.getViewTreeObserver().removeOnDrawListener(this);
+                            }
+                            StatusWidgetApplication.notifyFirstUsefulSurface(
+                                    SettingsHubActivity.this);
+                        });
+                    }
+                });
         applySafeInsets();
         renderNavigationSelection();
         renderContent();
@@ -670,6 +687,21 @@ public final class SettingsHubActivity extends AppCompatActivity {
     }
 
     private void resetAllSettings() {
+        SystemStatusBarContentPolicy.restoreBeforeReset(this, (success, detail) -> {
+            if (!success) {
+                String reason = detail == null || detail.trim().isEmpty()
+                        ? getString(R.string.system_settings_not_available)
+                        : detail.trim();
+                Toast.makeText(this,
+                        getString(R.string.stock_system_content_apply_failed, reason),
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+            finishResetAllSettings();
+        });
+    }
+
+    private void finishResetAllSettings() {
         if (WidgetService.isRunning()) stopService(new Intent(this, WidgetService.class));
         if (preferences.climatePanelEnabled.get()
                 || new ScreenReservationStateStore(this).hasManagedReservation()) {
