@@ -867,7 +867,6 @@ jobs:
             gh release create "$RELEASE_TAG" "$OUT"/* \
               --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
-              --target "$SOURCE_SHA" \
               --title "$TITLE" \
               --notes-file "$OUT/HA1232-release-notes.md" \
               --prerelease
