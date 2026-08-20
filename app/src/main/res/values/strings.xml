@@ -506,5 +506,4 @@
     <string name="stock_system_content_apply_failed">Could not change the system status bar: %1$s</string>
     <string name="stock_system_content_hidden">System-indicator setting applied</string>
     <string name="stock_system_content_restored">Original system-indicator setting restored</string>
-    <string name="system_settings_not_available">This device does not provide the required system settings access</string>
 </resources>

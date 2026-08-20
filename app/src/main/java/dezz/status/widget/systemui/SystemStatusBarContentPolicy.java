@@ -115,45 +115,33 @@ public final class SystemStatusBarContentPolicy {
     }
 
     public static void completeRequest(final dezz.status.widget.systemui.SystemStatusBarContentPolicy.PendingRequest pendingRequest, final boolean z, final java.lang.String str) {
-        runOnMain(new java.lang.Runnable() { // from class: dezz.status.widget.systemui.SystemStatusBarContentPolicy$$ExternalSyntheticLambda1
-            @Override // java.lang.Runnable
-            public final void run() {
-                dezz.status.widget.systemui.SystemStatusBarContentPolicy.lambda$completeRequest$3(pendingRequest, z, str);
-            }
-        });
+        runOnMain(() -> finishRequestOnMain(pendingRequest, z, str));
     }
 
-    static /* synthetic */ void lambda$completeRequest$3(dezz.status.widget.systemui.SystemStatusBarContentPolicy.PendingRequest pendingRequest, boolean z, java.lang.String str) {
-        dezz.status.widget.systemui.SystemStatusBarContentPolicy.PendingRequest pendingRequestRemoveFirst = null;
+    private static void finishRequestOnMain(
+            dezz.status.widget.systemui.SystemStatusBarContentPolicy.PendingRequest pendingRequest,
+            boolean success,
+            java.lang.String detail) {
         try {
             if (pendingRequest.callback != null) {
-                pendingRequest.callback.onComplete(z, str);
-            }
-            synchronized (REQUEST_LOCK) {
-                if (pendingRequest.resetRequest) {
-                    resetBarrier = false;
-                }
-                java.util.ArrayDeque<dezz.status.widget.systemui.SystemStatusBarContentPolicy.PendingRequest> arrayDeque = REQUEST_QUEUE;
-                if (arrayDeque.isEmpty()) {
-                    requestActive = false;
-                } else {
-                    pendingRequestRemoveFirst = arrayDeque.removeFirst();
-                }
+                pendingRequest.callback.onComplete(success, detail);
             }
         } finally {
+            dezz.status.widget.systemui.SystemStatusBarContentPolicy.PendingRequest next = null;
             synchronized (REQUEST_LOCK) {
                 if (pendingRequest.resetRequest) {
                     resetBarrier = false;
                 }
-                java.util.ArrayDeque<dezz.status.widget.systemui.SystemStatusBarContentPolicy.PendingRequest> arrayDeque2 = REQUEST_QUEUE;
-                if (arrayDeque2.isEmpty()) {
+                if (REQUEST_QUEUE.isEmpty()) {
                     requestActive = false;
                 } else {
-                    pendingRequestRemoveFirst = arrayDeque2.removeFirst();
+                    next = REQUEST_QUEUE.removeFirst();
                 }
-                if (pendingRequestRemoveFirst != null) {
-                    startRequest(pendingRequestRemoveFirst);
-                }
+            }
+            // Never invoke or start another request while holding REQUEST_LOCK. A callback may
+            // synchronously enqueue another apply, and the reset callback may restart the app.
+            if (next != null) {
+                startRequest(next);
             }
         }
     }

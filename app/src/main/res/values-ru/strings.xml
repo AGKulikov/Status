@@ -501,5 +501,4 @@
     <string name="stock_system_content_apply_failed">Не удалось изменить системную строку: %1$s</string>
     <string name="stock_system_content_hidden">Настройка системных индикаторов применена</string>
     <string name="stock_system_content_restored">Исходная настройка системных индикаторов восстановлена</string>
-    <string name="system_settings_not_available">На этом устройстве нет нужного доступа к системным настройкам</string>
 </resources>
