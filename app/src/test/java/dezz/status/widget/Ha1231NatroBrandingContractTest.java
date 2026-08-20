@@ -24,7 +24,7 @@ public final class Ha1231NatroBrandingContractTest {
     }
 
     @Test public void manifestNamesRestorationFeaturesAndHonestPhysicalGate() throws Exception {
-        String notes = project("release-manifests/HA1231.md");
+        String notes = project("release-manifests/HA1231.md").replaceAll("\\s+", " ");
         assertTrue(notes.contains("standard BLE Battery Service"));
         assertTrue(notes.contains("two independently configurable low-battery thresholds"));
         assertTrue(notes.contains("external overlay windows"));
