@@ -1,18 +1,7 @@
 name: Verify HA1216 immediate lean runtime candidate
 
+# Frozen HA1216 identity gate; current source is verified by HA1231.
 on:
-  push:
-    branches: ['work/ha1216-fast-cold-start']
-  pull_request:
-    paths:
-      - 'app/**'
-      - 'build.gradle'
-      - 'gradle/**'
-      - 'gradle.properties'
-      - 'gradlew'
-      - 'settings.gradle'
-      - 'release-manifests/HA1216.md'
-      - '.github/workflows/verify-ha1216.yml'
   workflow_dispatch:
 
 permissions:

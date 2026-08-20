@@ -1,28 +1,7 @@
 name: Verify HA1204 live climate and modern automotive icons
 
+# Frozen HA1204 identity gate; current source is verified by HA1231.
 on:
-  push:
-    branches:
-      - 'work/ha1203-climate-icons-backgrounds'
-    paths:
-      - 'app/**'
-      - 'build.gradle'
-      - 'gradle/**'
-      - 'gradlew'
-      - 'settings.gradle'
-      - 'third_party/**'
-      - 'release-manifests/HA1204.md'
-      - '.github/workflows/verify-ha1204.yml'
-  pull_request:
-    paths:
-      - 'app/**'
-      - 'build.gradle'
-      - 'gradle/**'
-      - 'gradlew'
-      - 'settings.gradle'
-      - 'third_party/**'
-      - 'release-manifests/HA1204.md'
-      - '.github/workflows/verify-ha1204.yml'
   workflow_dispatch:
 
 permissions:

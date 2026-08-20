@@ -1,25 +1,7 @@
 name: Verify HA1196 without signing
 
+# Frozen HA1196 identity gate; current source is verified by HA1231.
 on:
-  push:
-    branches:
-      - 'work/ha1196-ancs-authorization'
-      - 'release/v2.8.2-ha1196'
-    paths:
-      - 'app/**'
-      - 'build.gradle'
-      - 'gradle/**'
-      - 'gradlew'
-      - 'settings.gradle'
-      - '.github/workflows/verify-ha1196.yml'
-  pull_request:
-    paths:
-      - 'app/**'
-      - 'build.gradle'
-      - 'gradle/**'
-      - 'gradlew'
-      - 'settings.gradle'
-      - '.github/workflows/verify-ha1196.yml'
   workflow_dispatch:
 
 permissions:

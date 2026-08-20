@@ -1,28 +1,7 @@
 name: Verify HA1209 atomic HOME and quiet startup
 
+# Frozen HA1209 identity gate; current source is verified by HA1231.
 on:
-  push:
-    branches:
-      - 'work/ha1209-launcher-first-frame'
-    paths:
-      - 'app/**'
-      - 'build.gradle'
-      - 'gradle/**'
-      - 'gradlew'
-      - 'settings.gradle'
-      - 'third_party/**'
-      - 'release-manifests/HA1209.md'
-      - '.github/workflows/verify-ha1209.yml'
-  pull_request:
-    paths:
-      - 'app/**'
-      - 'build.gradle'
-      - 'gradle/**'
-      - 'gradlew'
-      - 'settings.gradle'
-      - 'third_party/**'
-      - 'release-manifests/HA1209.md'
-      - '.github/workflows/verify-ha1209.yml'
   workflow_dispatch:
 
 permissions:
